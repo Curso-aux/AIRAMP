@@ -181,7 +181,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                       const Divider(color: AppColors.border),
                       const SizedBox(height: 16),
                       GestureDetector(
-                        onTap: () {},
+                        onTap: () => context.go('/admin'),
                         child: Row(
                           mainAxisAlignment: MainAxisAlignment.center,
                           children: const [
