@@ -79,12 +79,10 @@ class AppTheme {
         secondary: accent,
         surface: surface,
         error: error,
-        background: background,
         onPrimary: Colors.black, // Dark text on primary button
         onSecondary: Colors.white,
         onSurface: text,
         onError: Colors.white,
-        onBackground: text,
       ),
       textTheme: const TextTheme(
         displayLarge: TextStyle(color: text, fontWeight: FontWeight.bold),
@@ -134,12 +132,12 @@ class AppTheme {
           borderSide: const BorderSide(color: error),
         ),
         hintStyle: const TextStyle(color: textMuted),
-        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+        contentPadding: const EdgeInsets.symmetric(
+          horizontal: 16,
+          vertical: 16,
+        ),
       ),
-      dividerTheme: const DividerThemeData(
-        color: border,
-        thickness: 1,
-      ),
+      dividerTheme: const DividerThemeData(color: border, thickness: 1),
     );
   }
 }

@@ -37,68 +37,36 @@ class ChatNotifier extends Notifier<ChatState> {
 
   @override
   ChatState build() {
-    final user = ref.watch(authProvider);
+    // Listen to auth changes AFTER build returns.
+    // Use ref.listen instead of ref.watch to avoid circular state access.
+    ref.listen<User?>(authProvider, (prev, next) {
+      if (next != null && prev == null) {
+        _connectAndLoad(next.id);
+      } else if (next == null && prev != null) {
+        _disconnect();
+      }
+    });
+
+    // Check current auth state for initial load (scheduled after build)
+    final user = ref.read(authProvider);
     if (user != null) {
-      // In a real app, we would use a real token
-      _connect(user.id, 'mock_token');
-    } else {
-      _disconnect();
+      // Schedule after build completes to avoid "read state during build" error
+      Future.microtask(() => _connectAndLoad(user.id));
     }
+
     return ChatState();
   }
 
-  void _connect(String userId, String token) {
-    final repo = ref.read(chatRepositoryProvider);
-    final stream = repo.connect(userId, token);
-    
-    state = state.copyWith(isConnected: true);
-    
-    _subscription = stream.listen(
-      (data) {
-        _handleWebSocketEvent(data);
-      },
-      onError: (e) {
-        state = state.copyWith(isConnected: false);
-      },
-      onDone: () {
-        state = state.copyWith(isConnected: false);
-      },
-    );
-    
-    // Mock initial data if stream is empty (for UI development)
-    _loadMockData();
+  void _connectAndLoad(String userId) {
+    // For now, skip the real WebSocket (no backend running) and just load mock data
+    state = state.copyWith(isConnected: false);
+    // _loadMockData(); // Uncomment to pre-populate with mock conversations
   }
 
   void _disconnect() {
     _subscription?.cancel();
     ref.read(chatRepositoryProvider).disconnect();
     state = ChatState();
-  }
-  
-  void _loadMockData() {
-    final mockConvo = ChatConversation(
-      id: 'mock_convo_1',
-      type: 'direct',
-      name: 'Maria Lopez',
-      participants: [
-        ChatUser(id: 'student_1', fullName: 'Maria Lopez', email: 'maria@test.com', role: 'student')
-      ],
-      lastMessage: ChatMessage(
-        id: 'msg_1',
-        conversationId: 'mock_convo_1',
-        senderId: 'student_1',
-        text: 'Hello Sir John, I have a question.',
-        createdAt: DateTime.now().subtract(const Duration(minutes: 5)).toIso8601String(),
-      ),
-      unreadCount: 1,
-    );
-    
-    state = state.copyWith(
-      conversations: [mockConvo],
-      messages: {
-        'mock_convo_1': [mockConvo.lastMessage!]
-      },
-    );
   }
 
   void _handleWebSocketEvent(Map<String, dynamic> event) {

@@ -49,7 +49,7 @@ class _MyCoursesScreenState extends ConsumerState<MyCoursesScreen> {
               ),
 
               const SizedBox(height: 24),
-              
+
               // Add More Subjects Button
               GestureDetector(
                 onTap: () {
@@ -77,7 +77,9 @@ class _MyCoursesScreenState extends ConsumerState<MyCoursesScreen> {
                       ),
                       const SizedBox(width: 8),
                       Text(
-                        _showAvailable ? 'Hide Available Subjects' : 'Add More Subjects',
+                        _showAvailable
+                            ? 'Hide Available Subjects'
+                            : 'Add More Subjects',
                         style: const TextStyle(
                           color: AppTheme.primary,
                           fontWeight: FontWeight.bold,
@@ -93,10 +95,11 @@ class _MyCoursesScreenState extends ConsumerState<MyCoursesScreen> {
                 _buildAvailableCourseCard(
                   title: 'React Native to Flutter Migration',
                   code: 'CS303',
-                  description: 'Learn how to migrate your existing React Native applications to Flutter.',
+                  description:
+                      'Learn how to migrate your existing React Native applications to Flutter.',
                   unlockType: 'Flexible',
                 ),
-              ]
+              ],
             ],
           ),
         ),
@@ -126,10 +129,14 @@ class _MyCoursesScreenState extends ConsumerState<MyCoursesScreen> {
                   width: 56,
                   height: 56,
                   decoration: BoxDecoration(
-                    color: AppTheme.primary.withOpacity(0.1),
+                    color: AppTheme.primary.withValues(alpha: 0.1),
                     borderRadius: BorderRadius.circular(14),
                   ),
-                  child: const Icon(Icons.menu_book, color: AppTheme.primary, size: 28),
+                  child: const Icon(
+                    Icons.menu_book,
+                    color: AppTheme.primary,
+                    size: 28,
+                  ),
                 ),
                 const SizedBox(width: 14),
                 Expanded(
@@ -148,7 +155,10 @@ class _MyCoursesScreenState extends ConsumerState<MyCoursesScreen> {
                           ),
                           const SizedBox(width: 8),
                           Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 6,
+                              vertical: 2,
+                            ),
                             decoration: BoxDecoration(
                               color: AppTheme.surfaceLight,
                               borderRadius: BorderRadius.circular(4),
@@ -156,14 +166,21 @@ class _MyCoursesScreenState extends ConsumerState<MyCoursesScreen> {
                             child: Row(
                               children: [
                                 Icon(
-                                  unlockType == 'Sequential' ? Icons.lock : Icons.lock_open,
+                                  unlockType == 'Sequential'
+                                      ? Icons.lock
+                                      : Icons.lock_open,
                                   size: 10,
-                                  color: unlockType == 'Sequential' ? AppTheme.warning : AppTheme.primary,
+                                  color: unlockType == 'Sequential'
+                                      ? AppTheme.warning
+                                      : AppTheme.primary,
                                 ),
                                 const SizedBox(width: 4),
                                 Text(
                                   unlockType,
-                                  style: const TextStyle(fontSize: 9, color: AppTheme.textSecondary),
+                                  style: const TextStyle(
+                                    fontSize: 9,
+                                    color: AppTheme.textSecondary,
+                                  ),
                                 ),
                               ],
                             ),
@@ -173,20 +190,29 @@ class _MyCoursesScreenState extends ConsumerState<MyCoursesScreen> {
                       const SizedBox(height: 4),
                       Text(
                         title,
-                        style: const TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: AppTheme.text),
+                        style: const TextStyle(
+                          fontSize: 15,
+                          fontWeight: FontWeight.bold,
+                          color: AppTheme.text,
+                        ),
                       ),
                       const SizedBox(height: 8),
                       LinearProgressIndicator(
                         value: progress / 100,
                         backgroundColor: AppTheme.surfaceLight,
-                        valueColor: const AlwaysStoppedAnimation<Color>(AppTheme.primary),
+                        valueColor: const AlwaysStoppedAnimation<Color>(
+                          AppTheme.primary,
+                        ),
                         minHeight: 6,
                         borderRadius: BorderRadius.circular(3),
                       ),
                       const SizedBox(height: 4),
                       Text(
                         '$progress% Complete',
-                        style: const TextStyle(fontSize: 11, color: AppTheme.textMuted),
+                        style: const TextStyle(
+                          fontSize: 11,
+                          color: AppTheme.textMuted,
+                        ),
                       ),
                     ],
                   ),
@@ -205,9 +231,20 @@ class _MyCoursesScreenState extends ConsumerState<MyCoursesScreen> {
             child: const Row(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                Icon(Icons.remove_circle_outline, color: AppTheme.error, size: 14),
+                Icon(
+                  Icons.remove_circle_outline,
+                  color: AppTheme.error,
+                  size: 14,
+                ),
                 SizedBox(width: 6),
-                Text('Unenroll', style: TextStyle(color: AppTheme.error, fontSize: 13, fontWeight: FontWeight.w500)),
+                Text(
+                  'Unenroll',
+                  style: TextStyle(
+                    color: AppTheme.error,
+                    fontSize: 13,
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
               ],
             ),
           ),
@@ -254,12 +291,17 @@ class _MyCoursesScreenState extends ConsumerState<MyCoursesScreen> {
                     Icon(
                       unlockType == 'Sequential' ? Icons.lock : Icons.lock_open,
                       size: 10,
-                      color: unlockType == 'Sequential' ? AppTheme.warning : AppTheme.primary,
+                      color: unlockType == 'Sequential'
+                          ? AppTheme.warning
+                          : AppTheme.primary,
                     ),
                     const SizedBox(width: 4),
                     Text(
                       unlockType,
-                      style: const TextStyle(fontSize: 9, color: AppTheme.textSecondary),
+                      style: const TextStyle(
+                        fontSize: 9,
+                        color: AppTheme.textSecondary,
+                      ),
                     ),
                   ],
                 ),
@@ -269,7 +311,11 @@ class _MyCoursesScreenState extends ConsumerState<MyCoursesScreen> {
           const SizedBox(height: 4),
           Text(
             title,
-            style: const TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: AppTheme.text),
+            style: const TextStyle(
+              fontSize: 15,
+              fontWeight: FontWeight.bold,
+              color: AppTheme.text,
+            ),
           ),
           const SizedBox(height: 4),
           Text(
@@ -289,7 +335,14 @@ class _MyCoursesScreenState extends ConsumerState<MyCoursesScreen> {
               children: [
                 Icon(Icons.add, color: Colors.black, size: 16),
                 SizedBox(width: 6),
-                Text('Enroll', style: TextStyle(color: Colors.black, fontSize: 14, fontWeight: FontWeight.bold)),
+                Text(
+                  'Enroll',
+                  style: TextStyle(
+                    color: Colors.black,
+                    fontSize: 14,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
               ],
             ),
           ),

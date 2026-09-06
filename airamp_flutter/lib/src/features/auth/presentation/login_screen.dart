@@ -12,12 +12,13 @@ class LoginScreen extends ConsumerStatefulWidget {
   ConsumerState<LoginScreen> createState() => _LoginScreenState();
 }
 
-class _LoginScreenState extends ConsumerState<LoginScreen> with SingleTickerProviderStateMixin {
+class _LoginScreenState extends ConsumerState<LoginScreen>
+    with SingleTickerProviderStateMixin {
   final TextEditingController _identifierController = TextEditingController();
   final TextEditingController _passwordController = TextEditingController();
   bool _showPassword = false;
   String _error = '';
-  
+
   late AnimationController _buttonScaleController;
   late Animation<double> _buttonScaleAnimation;
 
@@ -82,7 +83,10 @@ class _LoginScreenState extends ConsumerState<LoginScreen> with SingleTickerProv
       body: SafeArea(
         child: Center(
           child: SingleChildScrollView(
-            padding: const EdgeInsets.symmetric(horizontal: 28.0, vertical: 40.0),
+            padding: const EdgeInsets.symmetric(
+              horizontal: 28.0,
+              vertical: 40.0,
+            ),
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
@@ -103,7 +107,11 @@ class _LoginScreenState extends ConsumerState<LoginScreen> with SingleTickerProv
                     ],
                   ),
                   alignment: Alignment.center,
-                  child: const Icon(Icons.school, size: 60, color: AppTheme.primary),
+                  child: const Icon(
+                    Icons.school,
+                    size: 60,
+                    color: AppTheme.primary,
+                  ),
                 ),
                 const SizedBox(height: 16),
                 const Text(
@@ -181,16 +189,25 @@ class _LoginScreenState extends ConsumerState<LoginScreen> with SingleTickerProv
                           decoration: BoxDecoration(
                             color: AppTheme.errorSoft,
                             borderRadius: BorderRadius.circular(12),
-                            border: Border.all(color: AppTheme.error.withOpacity(0.3)),
+                            border: Border.all(
+                              color: AppTheme.error.withValues(alpha: 0.3),
+                            ),
                           ),
                           child: Row(
                             children: [
-                              const Icon(Icons.error_outline, color: AppTheme.error, size: 20),
+                              const Icon(
+                                Icons.error_outline,
+                                color: AppTheme.error,
+                                size: 20,
+                              ),
                               const SizedBox(width: 8),
                               Expanded(
                                 child: Text(
                                   _error,
-                                  style: const TextStyle(color: AppTheme.error, fontSize: 13),
+                                  style: const TextStyle(
+                                    color: AppTheme.error,
+                                    fontSize: 13,
+                                  ),
                                 ),
                               ),
                             ],
@@ -200,11 +217,18 @@ class _LoginScreenState extends ConsumerState<LoginScreen> with SingleTickerProv
                       // Email/Username Input
                       TextField(
                         controller: _identifierController,
-                        style: const TextStyle(color: AppTheme.text, fontSize: 15),
+                        style: const TextStyle(
+                          color: AppTheme.text,
+                          fontSize: 15,
+                        ),
                         keyboardType: TextInputType.emailAddress,
                         decoration: InputDecoration(
                           hintText: 'Email or Username',
-                          prefixIcon: const Icon(Icons.mail_outline, color: AppTheme.textMuted, size: 20),
+                          prefixIcon: const Icon(
+                            Icons.mail_outline,
+                            color: AppTheme.textMuted,
+                            size: 20,
+                          ),
                         ),
                       ),
                       const SizedBox(height: 14),
@@ -213,13 +237,22 @@ class _LoginScreenState extends ConsumerState<LoginScreen> with SingleTickerProv
                       TextField(
                         controller: _passwordController,
                         obscureText: !_showPassword,
-                        style: const TextStyle(color: AppTheme.text, fontSize: 15),
+                        style: const TextStyle(
+                          color: AppTheme.text,
+                          fontSize: 15,
+                        ),
                         decoration: InputDecoration(
                           hintText: 'Password',
-                          prefixIcon: const Icon(Icons.lock_outline, color: AppTheme.textMuted, size: 20),
+                          prefixIcon: const Icon(
+                            Icons.lock_outline,
+                            color: AppTheme.textMuted,
+                            size: 20,
+                          ),
                           suffixIcon: IconButton(
                             icon: Icon(
-                              _showPassword ? Icons.visibility_off_outlined : Icons.visibility_outlined,
+                              _showPassword
+                                  ? Icons.visibility_off_outlined
+                                  : Icons.visibility_outlined,
                               color: AppTheme.textMuted,
                               size: 20,
                             ),
@@ -286,8 +319,12 @@ class _LoginScreenState extends ConsumerState<LoginScreen> with SingleTickerProv
                                 ),
                                 if (!isLoading) ...[
                                   const SizedBox(width: 8),
-                                  const Icon(Icons.arrow_forward, color: Colors.black, size: 20),
-                                ]
+                                  const Icon(
+                                    Icons.arrow_forward,
+                                    color: Colors.black,
+                                    size: 20,
+                                  ),
+                                ],
                               ],
                             ),
                           ),
@@ -301,7 +338,10 @@ class _LoginScreenState extends ConsumerState<LoginScreen> with SingleTickerProv
                         children: [
                           const Text(
                             "Don't have an account? ",
-                            style: TextStyle(color: AppTheme.textSecondary, fontSize: 14),
+                            style: TextStyle(
+                              color: AppTheme.textSecondary,
+                              fontSize: 14,
+                            ),
                           ),
                           GestureDetector(
                             onTap: () => context.push('/signup'),
@@ -324,7 +364,11 @@ class _LoginScreenState extends ConsumerState<LoginScreen> with SingleTickerProv
                         child: Row(
                           mainAxisAlignment: MainAxisAlignment.center,
                           children: [
-                            const Icon(Icons.shield_outlined, color: AppTheme.accent, size: 16),
+                            const Icon(
+                              Icons.shield_outlined,
+                              color: AppTheme.accent,
+                              size: 16,
+                            ),
                             const SizedBox(width: 8),
                             const Text(
                               'Register as Admin (Teacher)',

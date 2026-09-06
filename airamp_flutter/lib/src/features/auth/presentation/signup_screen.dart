@@ -1,32 +1,95 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../../core/theme/app_theme.dart';
+import '../application/auth_provider.dart';
 
-class SignupScreen extends StatefulWidget {
+class SignupScreen extends ConsumerStatefulWidget {
   const SignupScreen({super.key});
 
   @override
-  State<SignupScreen> createState() => _SignupScreenState();
+  ConsumerState<SignupScreen> createState() => _SignupScreenState();
 }
 
-class _SignupScreenState extends State<SignupScreen> {
+class _SignupScreenState extends ConsumerState<SignupScreen> {
   int _step = 1;
+  String _error = '';
+
+  final _fullNameController = TextEditingController();
+  final _emailController = TextEditingController();
+  final _passwordController = TextEditingController();
+  final _confirmPasswordController = TextEditingController();
+  final _invitationCodeController = TextEditingController();
+
+  @override
+  void dispose() {
+    _fullNameController.dispose();
+    _emailController.dispose();
+    _passwordController.dispose();
+    _confirmPasswordController.dispose();
+    _invitationCodeController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _handleRegister() async {
+    setState(() => _error = '');
+
+    if (_fullNameController.text.trim().isEmpty ||
+        _emailController.text.trim().isEmpty ||
+        _passwordController.text.isEmpty) {
+      setState(() => _error = 'Please fill in all required fields.');
+      return;
+    }
+
+    if (_passwordController.text != _confirmPasswordController.text) {
+      setState(() => _error = 'Passwords do not match.');
+      return;
+    }
+
+    try {
+      await ref.read(authProvider.notifier).register(
+            fullName: _fullNameController.text.trim(),
+            email: _emailController.text.trim(),
+            password: _passwordController.text,
+            role: 'student',
+          );
+      final user = ref.read(authProvider);
+      if (user != null && mounted) {
+        context.go('/student/home');
+      }
+    } catch (e) {
+      setState(() => _error = e.toString().replaceFirst('Exception: ', ''));
+    }
+  }
 
   void _nextStep() {
-    if (_step < 4) {
+    if (_step == 1) {
+      // Validate step 1 fields
+      if (_fullNameController.text.trim().isEmpty ||
+          _emailController.text.trim().isEmpty ||
+          _passwordController.text.isEmpty ||
+          _confirmPasswordController.text.isEmpty) {
+        setState(() => _error = 'Please fill in all fields.');
+        return;
+      }
+      if (_passwordController.text != _confirmPasswordController.text) {
+        setState(() => _error = 'Passwords do not match.');
+        return;
+      }
       setState(() {
+        _error = '';
         _step++;
       });
+    } else if (_step < 3) {
+      setState(() => _step++);
     } else {
-      context.go('/student/home');
+      _handleRegister();
     }
   }
 
   void _prevStep() {
     if (_step > 1) {
-      setState(() {
-        _step--;
-      });
+      setState(() => _step--);
     } else {
       context.pop();
     }
@@ -53,7 +116,7 @@ class _SignupScreenState extends State<SignupScreen> {
               Text(
                 _step == 1 ? 'Create Account' 
                 : _step == 2 ? 'Select Section & Subjects' 
-                : _step == 3 ? 'Invitation Code' : 'Verify Email',
+                : 'Invitation Code',
                 style: const TextStyle(
                   fontSize: 28,
                   fontWeight: FontWeight.bold,
@@ -64,8 +127,7 @@ class _SignupScreenState extends State<SignupScreen> {
               Text(
                 _step == 1 ? 'Join AIRA and start your learning journey'
                 : _step == 2 ? 'Choose your section and subjects to enroll in'
-                : _step == 3 ? 'Enter the invitation code provided by your instructor'
-                : 'Enter the verification code sent to your email',
+                : 'Enter the invitation code provided by your instructor',
                 style: const TextStyle(
                   fontSize: 14,
                   color: AppTheme.textSecondary,
@@ -76,7 +138,7 @@ class _SignupScreenState extends State<SignupScreen> {
               // Progress indicator
               Row(
                 mainAxisAlignment: MainAxisAlignment.center,
-                children: List.generate(4, (index) {
+                children: List.generate(3, (index) {
                   return Container(
                     margin: const EdgeInsets.symmetric(horizontal: 4),
                     width: 10,
@@ -90,28 +152,58 @@ class _SignupScreenState extends State<SignupScreen> {
               ),
               const SizedBox(height: 32),
 
+              if (_error.isNotEmpty)
+                Container(
+                  margin: const EdgeInsets.only(bottom: 16),
+                  padding: const EdgeInsets.all(14),
+                  decoration: BoxDecoration(
+                    color: AppTheme.errorSoft,
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: AppTheme.error.withValues(alpha: 0.3)),
+                  ),
+                  child: Row(
+                    children: [
+                      const Icon(Icons.error_outline, color: AppTheme.error, size: 20),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          _error,
+                          style: const TextStyle(color: AppTheme.error, fontSize: 13),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+
               if (_step == 1) ...[
-                _buildTextField('Full Name', Icons.person_outline),
+                _buildTextField('Full Name', Icons.person_outline, controller: _fullNameController),
                 const SizedBox(height: 14),
-                _buildTextField('Username', Icons.person_outline),
+                _buildTextField('Email', Icons.mail_outline, controller: _emailController),
                 const SizedBox(height: 14),
-                _buildTextField('Email', Icons.mail_outline),
+                _buildTextField('Password', Icons.lock_outline, isPassword: true, controller: _passwordController),
                 const SizedBox(height: 14),
-                _buildTextField('Password', Icons.lock_outline, isPassword: true),
-                const SizedBox(height: 14),
-                _buildTextField('Confirm Password', Icons.lock_outline, isPassword: true),
+                _buildTextField('Confirm Password', Icons.lock_outline, isPassword: true, controller: _confirmPasswordController),
               ] else if (_step == 2) ...[
-                const Text('Mock: Sections and Subjects selection', style: TextStyle(color: AppTheme.text)),
+                Container(
+                  padding: const EdgeInsets.all(20),
+                  decoration: BoxDecoration(
+                    color: AppTheme.surface,
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: AppTheme.border),
+                  ),
+                  child: const Text(
+                    'Section and subject selection will be available once your teacher sets them up.',
+                    style: TextStyle(color: AppTheme.textSecondary, fontSize: 14),
+                  ),
+                ),
               ] else if (_step == 3) ...[
-                _buildTextField('Invitation Code', Icons.tag),
-              ] else if (_step == 4) ...[
-                _buildTextField('OTP Code', Icons.key),
+                _buildTextField('Invitation Code (Optional)', Icons.tag, controller: _invitationCodeController),
               ],
 
               const SizedBox(height: 32),
               ElevatedButton(
                 onPressed: _nextStep,
-                child: Text(_step < 4 ? 'Next' : 'Verify & Complete'),
+                child: Text(_step < 3 ? 'Next' : 'Create Account'),
               ),
               const SizedBox(height: 24),
               Row(
@@ -131,8 +223,9 @@ class _SignupScreenState extends State<SignupScreen> {
     );
   }
 
-  Widget _buildTextField(String hint, IconData icon, {bool isPassword = false}) {
+  Widget _buildTextField(String hint, IconData icon, {bool isPassword = false, TextEditingController? controller}) {
     return TextField(
+      controller: controller,
       obscureText: isPassword,
       style: const TextStyle(color: AppTheme.text),
       decoration: InputDecoration(

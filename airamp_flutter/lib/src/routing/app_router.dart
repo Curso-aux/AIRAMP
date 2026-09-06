@@ -13,11 +13,13 @@ import '../features/student/presentation/quiz_history_screen.dart';
 import '../features/student/presentation/student_profile_screen.dart';
 import '../features/admin/presentation/admin_dashboard_screen.dart';
 import '../features/admin/presentation/subjects_mgmt_screen.dart';
+import '../features/admin/presentation/subject_detail_screen.dart';
 import '../features/admin/presentation/sections_mgmt_screen.dart';
 import '../features/admin/presentation/reg_links_screen.dart';
 import '../features/admin/presentation/scores_screen.dart';
 import '../features/admin/presentation/admin_profile_screen.dart';
 import '../features/admin/presentation/admin_management_screen.dart';
+import '../features/admin/presentation/admin_scaffold.dart';
 import '../features/chat/presentation/chat_list_screen.dart';
 import '../features/chat/presentation/chat_room_screen.dart';
 import '../features/quiz/presentation/quiz_screen.dart';
@@ -59,51 +61,99 @@ final routerProvider = Provider<GoRouter>((ref) {
         path: '/forgot-password',
         builder: (context, state) => const ForgotPasswordScreen(),
       ),
-      // Student Routes
+      // Student Routes (TODO: Refactor to StatefulShellRoute later)
       GoRoute(
         path: '/student/home',
         builder: (context, state) => const StudentHomeScreen(),
       ),
       GoRoute(
-        path: '/student/my-courses',
-        builder: (context, state) => const MyCoursesScreen(),
+        path: '/student/profile',
+        builder: (context, state) => const StudentProfileScreen(),
       ),
       GoRoute(
-        path: '/student/my-progress',
+        path: '/student/progress',
         builder: (context, state) => const MyProgressScreen(),
+      ),
+      GoRoute(
+        path: '/student/courses',
+        builder: (context, state) => const MyCoursesScreen(),
       ),
       GoRoute(
         path: '/student/quiz-history',
         builder: (context, state) => const QuizHistoryScreen(),
       ),
-      GoRoute(
-        path: '/student/student-profile',
-        builder: (context, state) => const StudentProfileScreen(),
-      ),
-      // Admin Routes
-      GoRoute(
-        path: '/admin/dashboard',
-        builder: (context, state) => const AdminDashboardScreen(),
-      ),
-      GoRoute(
-        path: '/admin/subjects-mgmt',
-        builder: (context, state) => const SubjectsMgmtScreen(),
-      ),
-      GoRoute(
-        path: '/admin/sections-mgmt',
-        builder: (context, state) => const SectionsMgmtScreen(),
-      ),
-      GoRoute(
-        path: '/admin/reg-links',
-        builder: (context, state) => const RegLinksScreen(),
-      ),
-      GoRoute(
-        path: '/admin/scores',
-        builder: (context, state) => const ScoresScreen(),
-      ),
-      GoRoute(
-        path: '/admin/admin-profile',
-        builder: (context, state) => const AdminProfileScreen(),
+      // Admin Routes with Bottom Navigation
+      StatefulShellRoute.indexedStack(
+        builder: (context, state, navigationShell) {
+          return AdminScaffold(navigationShell: navigationShell);
+        },
+        branches: [
+          StatefulShellBranch(
+            routes: [
+              GoRoute(
+                path: '/admin/dashboard',
+                builder: (context, state) => const AdminDashboardScreen(),
+              ),
+            ],
+          ),
+          StatefulShellBranch(
+            routes: [
+              GoRoute(
+                path: '/admin/subjects',
+                builder: (context, state) => const SubjectsMgmtScreen(),
+                routes: [
+                  GoRoute(
+                    path: ':id',
+                    builder: (context, state) {
+                      final id = state.pathParameters['id']!;
+                      return SubjectDetailScreen(subjectId: id);
+                    },
+                  ),
+                ],
+              ),
+            ],
+          ),
+          StatefulShellBranch(
+            routes: [
+              GoRoute(
+                path: '/admin/sections',
+                builder: (context, state) => const SectionsMgmtScreen(),
+              ),
+            ],
+          ),
+          StatefulShellBranch(
+            routes: [
+              GoRoute(
+                path: '/admin/scores',
+                builder: (context, state) => const ScoresScreen(),
+              ),
+            ],
+          ),
+          StatefulShellBranch(
+            routes: [
+              GoRoute(
+                path: '/admin/chat',
+                builder: (context, state) => const ChatListScreen(),
+              ),
+            ],
+          ),
+          StatefulShellBranch(
+            routes: [
+              GoRoute(
+                path: '/admin/reg-links',
+                builder: (context, state) => const RegLinksScreen(),
+              ),
+            ],
+          ),
+          StatefulShellBranch(
+            routes: [
+              GoRoute(
+                path: '/admin/profile',
+                builder: (context, state) => const AdminProfileScreen(),
+              ),
+            ],
+          ),
+        ],
       ),
       GoRoute(
         path: '/admin/admin-management',

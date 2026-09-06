@@ -33,7 +33,10 @@ class _SubmissionsScreenState extends State<SubmissionsScreen> {
     return Scaffold(
       backgroundColor: AppTheme.background,
       appBar: AppBar(
-        title: const Text('Submit Assignment', style: TextStyle(color: AppTheme.text)),
+        title: const Text(
+          'Submit Assignment',
+          style: TextStyle(color: AppTheme.text),
+        ),
         backgroundColor: AppTheme.background,
         iconTheme: const IconThemeData(color: AppTheme.text),
       ),
@@ -44,17 +47,28 @@ class _SubmissionsScreenState extends State<SubmissionsScreen> {
           children: [
             const Text(
               'Final Project: Flutter Migration',
-              style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold, color: AppTheme.text),
+              style: TextStyle(
+                fontSize: 24,
+                fontWeight: FontWeight.bold,
+                color: AppTheme.text,
+              ),
             ),
             const SizedBox(height: 8),
             const Text(
               'Due: Oct 31, 2026 11:59 PM',
-              style: TextStyle(color: AppTheme.error, fontWeight: FontWeight.bold),
+              style: TextStyle(
+                color: AppTheme.error,
+                fontWeight: FontWeight.bold,
+              ),
             ),
             const SizedBox(height: 24),
             const Text(
               'Instructions',
-              style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: AppTheme.text),
+              style: TextStyle(
+                fontSize: 18,
+                fontWeight: FontWeight.bold,
+                color: AppTheme.text,
+              ),
             ),
             const SizedBox(height: 8),
             const Text(
@@ -62,10 +76,7 @@ class _SubmissionsScreenState extends State<SubmissionsScreen> {
               style: TextStyle(color: AppTheme.textSecondary, height: 1.5),
             ),
             const SizedBox(height: 32),
-            if (_isSubmitted)
-              _buildSuccessState()
-            else
-              _buildSubmissionForm(),
+            if (_isSubmitted) _buildSuccessState() else _buildSubmissionForm(),
           ],
         ),
       ),
@@ -78,7 +89,11 @@ class _SubmissionsScreenState extends State<SubmissionsScreen> {
       children: [
         const Text(
           'Your Submission',
-          style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: AppTheme.text),
+          style: TextStyle(
+            fontSize: 18,
+            fontWeight: FontWeight.bold,
+            color: AppTheme.text,
+          ),
         ),
         const SizedBox(height: 16),
         TextField(
@@ -102,9 +117,14 @@ class _SubmissionsScreenState extends State<SubmissionsScreen> {
           style: ElevatedButton.styleFrom(
             backgroundColor: AppTheme.primary,
             minimumSize: const Size(double.infinity, 50),
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(12),
+            ),
           ),
-          child: const Text('Submit Assignment', style: TextStyle(color: Colors.black, fontWeight: FontWeight.bold)),
+          child: const Text(
+            'Submit Assignment',
+            style: TextStyle(color: Colors.black, fontWeight: FontWeight.bold),
+          ),
         ),
       ],
     );
@@ -117,7 +137,7 @@ class _SubmissionsScreenState extends State<SubmissionsScreen> {
       decoration: BoxDecoration(
         color: AppTheme.successSoft,
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: AppTheme.success.withOpacity(0.3)),
+        border: Border.all(color: AppTheme.success.withValues(alpha: 0.3)),
       ),
       child: Column(
         children: [
@@ -125,7 +145,11 @@ class _SubmissionsScreenState extends State<SubmissionsScreen> {
           const SizedBox(height: 16),
           const Text(
             'Submitted Successfully!',
-            style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: AppTheme.success),
+            style: TextStyle(
+              fontSize: 18,
+              fontWeight: FontWeight.bold,
+              color: AppTheme.success,
+            ),
           ),
           const SizedBox(height: 8),
           Text(

@@ -51,6 +51,29 @@ class AuthNotifier extends Notifier<User?> {
     }
   }
 
+  Future<void> register({
+    required String fullName,
+    required String email,
+    required String password,
+    required String role,
+  }) async {
+    final repository = ref.read(authRepositoryProvider);
+    isLoading = true;
+
+    try {
+      final data = await repository.register(
+        fullName: fullName,
+        email: email,
+        password: password,
+        role: role,
+      );
+      final user = User.fromJson(data['user']);
+      state = user;
+    } finally {
+      isLoading = false;
+    }
+  }
+
   Future<void> logout() async {
     final repository = ref.read(authRepositoryProvider);
     isLoading = true;

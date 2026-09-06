@@ -1,6 +1,5 @@
 import 'dart:convert';
 import 'package:web_socket_channel/web_socket_channel.dart';
-import '../domain/chat_models.dart';
 
 class ChatRepository {
   final String baseUrl;
@@ -10,10 +9,10 @@ class ChatRepository {
 
   Stream<Map<String, dynamic>> connect(String userId, String token) {
     final uri = Uri.parse('$baseUrl?userId=$userId&token=$token');
-    
+
     try {
       _channel = WebSocketChannel.connect(uri);
-      
+
       return _channel!.stream.map((event) {
         if (event is String) {
           return jsonDecode(event) as Map<String, dynamic>;
@@ -36,7 +35,7 @@ class ChatRepository {
       _channel!.sink.add(payload);
     }
   }
-  
+
   void sendTypingIndicator(String conversationId) {
     if (_channel != null) {
       final payload = jsonEncode({

@@ -55,25 +55,56 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
       body: SafeArea(
         child: Center(
           child: SingleChildScrollView(
-            padding: const EdgeInsets.symmetric(horizontal: 28.0, vertical: 40.0),
+            padding: const EdgeInsets.symmetric(
+              horizontal: 28.0,
+              vertical: 40.0,
+            ),
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
                 // Logo Section Placeholder
                 Container(
-                  width: 90, height: 90,
+                  width: 90,
+                  height: 90,
                   decoration: BoxDecoration(
-                    color: AppColors.surface, borderRadius: BorderRadius.circular(20),
+                    color: AppColors.surface,
+                    borderRadius: BorderRadius.circular(20),
                     border: Border.all(color: AppColors.border),
                   ),
-                  child: const Icon(Icons.school, size: 40, color: AppColors.primary),
+                  child: const Icon(
+                    Icons.school,
+                    size: 40,
+                    color: AppColors.primary,
+                  ),
                 ),
                 const SizedBox(height: 16),
-                const Text('AIRA', style: TextStyle(fontSize: 34, fontWeight: FontWeight.w900, color: AppColors.text, letterSpacing: 4)),
+                const Text(
+                  'AIRA',
+                  style: TextStyle(
+                    fontSize: 34,
+                    fontWeight: FontWeight.w900,
+                    color: AppColors.text,
+                    letterSpacing: 4,
+                  ),
+                ),
                 const SizedBox(height: 4),
-                const Text('Academic Integrated Review & Assessment', style: TextStyle(fontSize: 12, color: AppColors.accent, fontWeight: FontWeight.w500)),
+                const Text(
+                  'Academic Integrated Review & Assessment',
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: AppColors.accent,
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
                 const SizedBox(height: 4),
-                const Text('Train Smart. Get Certified!', style: TextStyle(fontSize: 13, color: AppColors.textSecondary, fontStyle: FontStyle.italic)),
+                const Text(
+                  'Train Smart. Get Certified!',
+                  style: TextStyle(
+                    fontSize: 13,
+                    color: AppColors.textSecondary,
+                    fontStyle: FontStyle.italic,
+                  ),
+                ),
                 const SizedBox(height: 32),
 
                 // Form Section
@@ -81,39 +112,94 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                   width: double.infinity,
                   padding: const EdgeInsets.all(24),
                   decoration: BoxDecoration(
-                    color: AppColors.surface, borderRadius: BorderRadius.circular(20),
+                    color: AppColors.surface,
+                    borderRadius: BorderRadius.circular(20),
                     border: Border.all(color: AppColors.border),
                   ),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      const Text('Welcome Back', style: TextStyle(fontSize: 26, fontWeight: FontWeight.w800, color: AppColors.text)),
+                      const Text(
+                        'Welcome Back',
+                        style: TextStyle(
+                          fontSize: 26,
+                          fontWeight: FontWeight.w800,
+                          color: AppColors.text,
+                        ),
+                      ),
                       const SizedBox(height: 4),
-                      const Text('Sign in with your email or username', style: TextStyle(fontSize: 14, color: AppColors.textSecondary)),
+                      const Text(
+                        'Sign in with your email or username',
+                        style: TextStyle(
+                          fontSize: 14,
+                          color: AppColors.textSecondary,
+                        ),
+                      ),
                       const SizedBox(height: 24),
 
                       if (_error.isNotEmpty)
                         Container(
                           padding: const EdgeInsets.all(14),
                           margin: const EdgeInsets.only(bottom: 16),
-                          decoration: BoxDecoration(color: AppColors.errorSoft, borderRadius: BorderRadius.circular(12), border: Border.all(color: AppColors.error.withOpacity(0.3))),
-                          child: Row(children: [const Icon(Icons.error_outline, color: AppColors.error, size: 20), const SizedBox(width: 8), Expanded(child: Text(_error, style: const TextStyle(color: AppColors.error, fontSize: 13)))]),
+                          decoration: BoxDecoration(
+                            color: AppColors.errorSoft,
+                            borderRadius: BorderRadius.circular(12),
+                            border: Border.all(
+                              color: AppColors.error.withValues(alpha: 0.3),
+                            ),
+                          ),
+                          child: Row(
+                            children: [
+                              const Icon(
+                                Icons.error_outline,
+                                color: AppColors.error,
+                                size: 20,
+                              ),
+                              const SizedBox(width: 8),
+                              Expanded(
+                                child: Text(
+                                  _error,
+                                  style: const TextStyle(
+                                    color: AppColors.error,
+                                    fontSize: 13,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
                         ),
 
                       // Email Input
                       Container(
                         height: 54,
                         padding: const EdgeInsets.symmetric(horizontal: 16),
-                        decoration: BoxDecoration(color: AppColors.inputBg, borderRadius: BorderRadius.circular(14), border: Border.all(color: AppColors.border)),
+                        decoration: BoxDecoration(
+                          color: AppColors.inputBg,
+                          borderRadius: BorderRadius.circular(14),
+                          border: Border.all(color: AppColors.border),
+                        ),
                         child: Row(
                           children: [
-                            const Icon(Icons.mail_outline, color: AppColors.textMuted, size: 18),
+                            const Icon(
+                              Icons.mail_outline,
+                              color: AppColors.textMuted,
+                              size: 18,
+                            ),
                             const SizedBox(width: 12),
                             Expanded(
                               child: TextField(
                                 controller: _identifierController,
-                                style: const TextStyle(color: AppColors.text, fontSize: 15),
-                                decoration: const InputDecoration(border: InputBorder.none, hintText: 'Email or Username', hintStyle: TextStyle(color: AppColors.textMuted)),
+                                style: const TextStyle(
+                                  color: AppColors.text,
+                                  fontSize: 15,
+                                ),
+                                decoration: const InputDecoration(
+                                  border: InputBorder.none,
+                                  hintText: 'Email or Username',
+                                  hintStyle: TextStyle(
+                                    color: AppColors.textMuted,
+                                  ),
+                                ),
                               ),
                             ),
                           ],
@@ -125,22 +211,47 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                       Container(
                         height: 54,
                         padding: const EdgeInsets.symmetric(horizontal: 16),
-                        decoration: BoxDecoration(color: AppColors.inputBg, borderRadius: BorderRadius.circular(14), border: Border.all(color: AppColors.border)),
+                        decoration: BoxDecoration(
+                          color: AppColors.inputBg,
+                          borderRadius: BorderRadius.circular(14),
+                          border: Border.all(color: AppColors.border),
+                        ),
                         child: Row(
                           children: [
-                            const Icon(Icons.lock_outline, color: AppColors.textMuted, size: 18),
+                            const Icon(
+                              Icons.lock_outline,
+                              color: AppColors.textMuted,
+                              size: 18,
+                            ),
                             const SizedBox(width: 12),
                             Expanded(
                               child: TextField(
                                 controller: _passwordController,
                                 obscureText: !_showPassword,
-                                style: const TextStyle(color: AppColors.text, fontSize: 15),
-                                decoration: const InputDecoration(border: InputBorder.none, hintText: 'Password', hintStyle: TextStyle(color: AppColors.textMuted)),
+                                style: const TextStyle(
+                                  color: AppColors.text,
+                                  fontSize: 15,
+                                ),
+                                decoration: const InputDecoration(
+                                  border: InputBorder.none,
+                                  hintText: 'Password',
+                                  hintStyle: TextStyle(
+                                    color: AppColors.textMuted,
+                                  ),
+                                ),
                               ),
                             ),
                             GestureDetector(
-                              onTap: () => setState(() => _showPassword = !_showPassword),
-                              child: Icon(_showPassword ? Icons.visibility_off : Icons.visibility, color: AppColors.textMuted, size: 18),
+                              onTap: () => setState(
+                                () => _showPassword = !_showPassword,
+                              ),
+                              child: Icon(
+                                _showPassword
+                                    ? Icons.visibility_off
+                                    : Icons.visibility,
+                                color: AppColors.textMuted,
+                                size: 18,
+                              ),
                             ),
                           ],
                         ),
@@ -149,21 +260,47 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
 
                       Align(
                         alignment: Alignment.centerRight,
-                        child: TextButton(onPressed: () {}, child: const Text('Forgot Password?', style: TextStyle(color: AppColors.accent, fontSize: 13, fontWeight: FontWeight.w600))),
+                        child: TextButton(
+                          onPressed: () {},
+                          child: const Text(
+                            'Forgot Password?',
+                            style: TextStyle(
+                              color: AppColors.accent,
+                              fontSize: 13,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ),
                       ),
                       const SizedBox(height: 12),
 
                       // Login Button
                       SizedBox(
-                        width: double.infinity, height: 54,
+                        width: double.infinity,
+                        height: 54,
                         child: ElevatedButton(
                           onPressed: loginPending ? null : _handleLogin,
-                          style: ElevatedButton.styleFrom(backgroundColor: AppColors.primary, foregroundColor: Colors.black, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14))),
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: AppColors.primary,
+                            foregroundColor: Colors.black,
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(14),
+                            ),
+                          ),
                           child: Row(
                             mainAxisAlignment: MainAxisAlignment.center,
                             children: [
-                              Text(loginPending ? 'Signing In...' : 'Sign In', style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w800)),
-                              if (!loginPending) ...[const SizedBox(width: 8), const Icon(Icons.arrow_forward, size: 18)],
+                              Text(
+                                loginPending ? 'Signing In...' : 'Sign In',
+                                style: const TextStyle(
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.w800,
+                                ),
+                              ),
+                              if (!loginPending) ...[
+                                const SizedBox(width: 8),
+                                const Icon(Icons.arrow_forward, size: 18),
+                              ],
                             ],
                           ),
                         ),
@@ -173,8 +310,24 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                       Row(
                         mainAxisAlignment: MainAxisAlignment.center,
                         children: [
-                          const Text("Don't have an account? ", style: TextStyle(color: AppColors.textSecondary, fontSize: 14)),
-                          GestureDetector(onTap: () => context.push('/signup'), child: const Text('Sign Up', style: TextStyle(color: AppColors.primary, fontSize: 14, fontWeight: FontWeight.w700))),
+                          const Text(
+                            "Don't have an account? ",
+                            style: TextStyle(
+                              color: AppColors.textSecondary,
+                              fontSize: 14,
+                            ),
+                          ),
+                          GestureDetector(
+                            onTap: () => context.push('/signup'),
+                            child: const Text(
+                              'Sign Up',
+                              style: TextStyle(
+                                color: AppColors.primary,
+                                fontSize: 14,
+                                fontWeight: FontWeight.w700,
+                              ),
+                            ),
+                          ),
                         ],
                       ),
                       const SizedBox(height: 16),
@@ -185,9 +338,20 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                         child: Row(
                           mainAxisAlignment: MainAxisAlignment.center,
                           children: const [
-                            Icon(Icons.shield, color: AppColors.accent, size: 14),
+                            Icon(
+                              Icons.shield,
+                              color: AppColors.accent,
+                              size: 14,
+                            ),
                             SizedBox(width: 8),
-                            Text('Register as Admin (Teacher)', style: TextStyle(color: AppColors.accent, fontSize: 13, fontWeight: FontWeight.w600)),
+                            Text(
+                              'Register as Admin (Teacher)',
+                              style: TextStyle(
+                                color: AppColors.accent,
+                                fontSize: 13,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
                           ],
                         ),
                       ),

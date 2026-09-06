@@ -1,57 +1,77 @@
-import 'package:dio/dio.dart';
+import '../../../core/database/database_helper.dart';
 
 class AuthRepository {
-  final Dio _dio;
-
-  AuthRepository(this._dio);
+  // Dio kept for future backend calls but not used for local auth
+  AuthRepository(dynamic dio);
 
   Future<Map<String, dynamic>> login(String identifier, String password) async {
-    // TODO: Connect to real backend. Mocking for now based on RN mock structure.
-    // The actual Cloudflare endpoint is /v1/auth/session
-    /*
-    final response = await _dio.post('/auth/session', data: {
-      'identifier': identifier,
-      'password': password,
-    });
-    return response.data;
-    */
-    
-    await Future.delayed(const Duration(seconds: 1)); // Mock network delay
-    
-    final identifierLower = identifier.toLowerCase();
-    
-    if (identifierLower == 'aira admin' || identifierLower == 'aira@admin' || identifierLower == 'admin') {
-      return {
-        'user': {
-          'id': 'super_admin_1',
-          'email': 'aira@admin',
-          'role': 'super_admin',
-          'fullName': 'Aira Admin',
-        }
-      };
-    } else if (identifierLower == 'sir john' || identifierLower == 'john.reyes@deped.gov.ph' || identifierLower.endsWith('@deped.gov.ph')) {
-      return {
-        'user': {
-          'id': 'teacher_1',
-          'email': 'john.reyes@deped.gov.ph',
-          'role': 'admin', // Teachers map to admin route
-          'fullName': 'Sir John',
-        }
-      };
-    } else {
-      return {
-        'user': {
-          'id': 'student_1',
-          'email': identifier.contains('@') ? identifier : 'maria@test.com',
-          'role': 'student',
-          'fullName': identifier.contains('maria') ? 'Maria Lopez' : 'Mock Student',
-        }
-      };
+    final db = await DatabaseHelper().database;
+    final identifierLower = identifier.toLowerCase().trim();
+
+    // Search by email or full_name (case-insensitive)
+    final results = await db.rawQuery(
+      '''SELECT * FROM users 
+         WHERE (LOWER(email) = ? OR LOWER(full_name) = ?) 
+         AND password = ?''',
+      [identifierLower, identifierLower, password],
+    );
+
+    if (results.isEmpty) {
+      throw Exception('Invalid email/username or password.');
     }
+
+    final user = results.first;
+    return {
+      'user': {
+        'id': user['id'],
+        'email': user['email'],
+        'role': user['role'],
+        'fullName': user['full_name'],
+      }
+    };
+  }
+
+  Future<Map<String, dynamic>> register({
+    required String fullName,
+    required String email,
+    required String password,
+    required String role,
+  }) async {
+    final db = await DatabaseHelper().database;
+
+    // Check if email already exists
+    final existing = await db.query(
+      'users',
+      where: 'LOWER(email) = ?',
+      whereArgs: [email.toLowerCase().trim()],
+    );
+
+    if (existing.isNotEmpty) {
+      throw Exception('An account with this email already exists.');
+    }
+
+    final id = '${role}_${DateTime.now().millisecondsSinceEpoch}';
+
+    await db.insert('users', {
+      'id': id,
+      'email': email.trim(),
+      'password': password,
+      'role': role,
+      'full_name': fullName.trim(),
+      'created_at': DateTime.now().toIso8601String(),
+    });
+
+    return {
+      'user': {
+        'id': id,
+        'email': email.trim(),
+        'role': role,
+        'fullName': fullName.trim(),
+      }
+    };
   }
 
   Future<void> logout() async {
-    // await _dio.post('/auth/revoke');
-    await Future.delayed(const Duration(milliseconds: 500));
+    // No-op for local auth; will clear tokens for real backend later
   }
 }
