@@ -12,22 +12,26 @@ class ChatState {
   final bool isConnected;
   final List<ChatConversation> conversations;
   final Map<String, List<ChatMessage>> messages; // conversationId -> messages
+  final List<ChatUser> availableUsers;
 
   ChatState({
     this.isConnected = false,
     this.conversations = const [],
     this.messages = const {},
+    this.availableUsers = const [],
   });
 
   ChatState copyWith({
     bool? isConnected,
     List<ChatConversation>? conversations,
     Map<String, List<ChatMessage>>? messages,
+    List<ChatUser>? availableUsers,
   }) {
     return ChatState(
       isConnected: isConnected ?? this.isConnected,
       conversations: conversations ?? this.conversations,
       messages: messages ?? this.messages,
+      availableUsers: availableUsers ?? this.availableUsers,
     );
   }
 }
@@ -102,6 +106,11 @@ class ChatNotifier extends Notifier<ChatState> {
     
     // Send over socket
     ref.read(chatRepositoryProvider).sendMessage(conversationId, text);
+  }
+
+  Future<ChatConversation?> getOrCreateConversation(String matchedUserId) async {
+    // Stub for now.
+    return null;
   }
 }
 

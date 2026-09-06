@@ -40,14 +40,12 @@ class _SubjectDetailScreenState extends ConsumerState<SubjectDetailScreen> {
   Widget build(BuildContext context) {
     if (_loading) {
       return const Scaffold(
-        backgroundColor: AppTheme.background,
         body: Center(child: CircularProgressIndicator(color: AppTheme.primary)),
       );
     }
 
     if (_subject == null) {
       return Scaffold(
-        backgroundColor: AppTheme.background,
         body: SafeArea(
           child: Center(
             child: Column(
@@ -72,7 +70,6 @@ class _SubjectDetailScreenState extends ConsumerState<SubjectDetailScreen> {
     final topics = ref.watch(subjectDetailProvider);
 
     return Scaffold(
-      backgroundColor: AppTheme.background,
       body: SafeArea(
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -83,9 +80,9 @@ class _SubjectDetailScreenState extends ConsumerState<SubjectDetailScreen> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   // Header
-                  const Text(
+                  Text(
                     'Manage Subjects',
-                    style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold, color: AppTheme.text),
+                    style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold, color: Theme.of(context).colorScheme.onSurface),
                   ),
                   const SizedBox(height: 4),
                   const Text(
@@ -97,10 +94,10 @@ class _SubjectDetailScreenState extends ConsumerState<SubjectDetailScreen> {
                   // Back link
                   GestureDetector(
                     onTap: () => context.pop(),
-                    child: const Row(
+                    child: Row(
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        Icon(Icons.arrow_back, color: AppTheme.primary, size: 18),
+                        Icon(Icons.arrow_back, color: Theme.of(context).colorScheme.primary, size: 18),
                         SizedBox(width: 4),
                         Text(
                           'Back to Subjects',
@@ -150,7 +147,7 @@ class _SubjectDetailScreenState extends ConsumerState<SubjectDetailScreen> {
                   // Topics / Quizzes Tab
                   Container(
                     decoration: BoxDecoration(
-                      color: AppTheme.surface,
+                      color: Theme.of(context).colorScheme.surface,
                       borderRadius: BorderRadius.circular(12),
                     ),
                     child: Row(
@@ -240,7 +237,7 @@ class _SubjectDetailScreenState extends ConsumerState<SubjectDetailScreen> {
                           style: TextStyle(fontWeight: FontWeight.bold),
                         ),
                         style: ElevatedButton.styleFrom(
-                          backgroundColor: AppTheme.primary,
+                          backgroundColor: Theme.of(context).colorScheme.primary,
                           foregroundColor: Colors.black,
                           padding: const EdgeInsets.symmetric(vertical: 14),
                           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
@@ -274,7 +271,7 @@ class _SubjectDetailScreenState extends ConsumerState<SubjectDetailScreen> {
             Icon(
               Icons.layers_outlined,
               size: 64,
-              color: AppTheme.textMuted.withValues(alpha: 0.4),
+              color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.4).withValues(alpha: 0.4),
             ),
             const SizedBox(height: 16),
             const Text(
@@ -305,7 +302,7 @@ class _SubjectDetailScreenState extends ConsumerState<SubjectDetailScreen> {
             Icon(
               Icons.help_outline,
               size: 64,
-              color: AppTheme.textMuted.withValues(alpha: 0.4),
+              color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.4).withValues(alpha: 0.4),
             ),
             const SizedBox(height: 16),
             const Text(
@@ -358,7 +355,7 @@ class _TopicCardState extends ConsumerState<_TopicCard> {
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
-        backgroundColor: AppTheme.surface,
+        backgroundColor: Theme.of(context).colorScheme.surface,
         title: const Text('Delete Topic', style: TextStyle(color: AppTheme.text)),
         content: Text('Are you sure you want to delete "${widget.topic['title']}" and all its contents?',
             style: const TextStyle(color: AppTheme.textSecondary)),
@@ -386,7 +383,7 @@ class _TopicCardState extends ConsumerState<_TopicCard> {
     return Container(
       margin: const EdgeInsets.only(bottom: 16),
       decoration: BoxDecoration(
-        color: AppTheme.surface,
+        color: Theme.of(context).colorScheme.surface,
         borderRadius: BorderRadius.circular(12),
         border: Border.all(color: AppTheme.border),
       ),
@@ -427,7 +424,7 @@ class _TopicCardState extends ConsumerState<_TopicCard> {
                     mainAxisSize: MainAxisSize.min,
                     children: [
                       IconButton(
-                        icon: const Icon(Icons.edit_outlined, color: AppTheme.primary, size: 20),
+                        icon: Icon(Icons.edit_outlined, color: Theme.of(context).colorScheme.primary, size: 20),
                         onPressed: () {
                           showModalBottomSheet(
                             context: context,
@@ -438,12 +435,12 @@ class _TopicCardState extends ConsumerState<_TopicCard> {
                         },
                       ),
                       IconButton(
-                        icon: const Icon(Icons.delete_outline, color: AppTheme.error, size: 20),
+                        icon: Icon(Icons.delete_outline, color: Theme.of(context).colorScheme.error, size: 20),
                         onPressed: _confirmDeleteTopic,
                       ),
                       Icon(
                         _isExpanded ? Icons.keyboard_arrow_up : Icons.keyboard_arrow_down,
-                        color: AppTheme.textSecondary,
+                        color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6),
                         size: 24,
                       ),
                     ],
@@ -475,11 +472,11 @@ class _TopicCardState extends ConsumerState<_TopicCard> {
                     builder: (ctx) => _AddLOSheet(topicId: widget.topic['id'], subjectId: widget.subjectId),
                   );
                 },
-                icon: const Icon(Icons.add, color: AppTheme.primary, size: 18),
+                icon: Icon(Icons.add, color: Theme.of(context).colorScheme.primary, size: 18),
                 label: const Text('Add Learning Outcome'),
                 style: OutlinedButton.styleFrom(
-                  foregroundColor: AppTheme.primary,
-                  side: BorderSide(color: AppTheme.primary.withValues(alpha: 0.3)),
+                  foregroundColor: Theme.of(context).colorScheme.onPrimary,
+                  side: BorderSide(color: Theme.of(context).colorScheme.primary.withValues(alpha: 0.3)),
                   padding: const EdgeInsets.symmetric(vertical: 12),
                   shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
                   minimumSize: const Size(double.infinity, 40),
@@ -533,7 +530,7 @@ class _LOCardState extends ConsumerState<_LOCard> {
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
-        backgroundColor: AppTheme.surface,
+        backgroundColor: Theme.of(context).colorScheme.surface,
         title: const Text('Delete Learning Outcome', style: TextStyle(color: AppTheme.text)),
         content: Text('Are you sure you want to delete "${widget.lo['title']}" and all its contents?',
             style: const TextStyle(color: AppTheme.textSecondary)),
@@ -561,7 +558,7 @@ class _LOCardState extends ConsumerState<_LOCard> {
     return Container(
       margin: const EdgeInsets.only(bottom: 12),
       decoration: BoxDecoration(
-        color: AppTheme.background,
+        color: Theme.of(context).scaffoldBackgroundColor,
         borderRadius: BorderRadius.circular(12),
         border: Border.all(color: AppTheme.border.withValues(alpha: 0.5)),
       ),
@@ -577,9 +574,9 @@ class _LOCardState extends ConsumerState<_LOCard> {
               child: Row(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const Padding(
+                  Padding(
                     padding: EdgeInsets.only(top: 4, right: 8),
-                    child: Icon(Icons.drag_indicator, color: AppTheme.textMuted, size: 16),
+                    child: Icon(Icons.drag_indicator, color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.4), size: 16),
                   ),
                   Expanded(
                     child: Column(
@@ -606,7 +603,7 @@ class _LOCardState extends ConsumerState<_LOCard> {
                     mainAxisSize: MainAxisSize.min,
                     children: [
                       IconButton(
-                        icon: const Icon(Icons.edit_outlined, color: AppTheme.primary, size: 16),
+                        icon: Icon(Icons.edit_outlined, color: Theme.of(context).colorScheme.primary, size: 16),
                         constraints: const BoxConstraints(),
                         padding: const EdgeInsets.all(4),
                         onPressed: () {
@@ -619,14 +616,14 @@ class _LOCardState extends ConsumerState<_LOCard> {
                         },
                       ),
                       IconButton(
-                        icon: const Icon(Icons.delete_outline, color: AppTheme.error, size: 16),
+                        icon: Icon(Icons.delete_outline, color: Theme.of(context).colorScheme.error, size: 16),
                         constraints: const BoxConstraints(),
                         padding: const EdgeInsets.all(4),
                         onPressed: _confirmDeleteLO,
                       ),
                       Icon(
                         _isExpanded ? Icons.keyboard_arrow_up : Icons.keyboard_arrow_down,
-                        color: AppTheme.textSecondary,
+                        color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6),
                         size: 20,
                       ),
                     ],
@@ -683,11 +680,11 @@ class _LOCardState extends ConsumerState<_LOCard> {
                     builder: (ctx) => _AddContentSheet(loId: widget.lo['id'], subjectId: widget.subjectId),
                   );
                 },
-                icon: const Icon(Icons.add, color: AppTheme.primary, size: 16),
+                icon: Icon(Icons.add, color: Theme.of(context).colorScheme.primary, size: 16),
                 label: const Text('Add Content', style: TextStyle(fontSize: 13)),
                 style: OutlinedButton.styleFrom(
-                  foregroundColor: AppTheme.primary,
-                  side: BorderSide(color: AppTheme.primary.withValues(alpha: 0.15)),
+                  foregroundColor: Theme.of(context).colorScheme.onPrimary,
+                  side: BorderSide(color: Theme.of(context).colorScheme.primary.withValues(alpha: 0.15)),
                   padding: const EdgeInsets.symmetric(vertical: 8),
                   shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
                   minimumSize: const Size(double.infinity, 36),
@@ -747,13 +744,13 @@ class _ContentCard extends ConsumerWidget {
       margin: const EdgeInsets.only(bottom: 8),
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        color: AppTheme.surface,
+        color: Theme.of(context).colorScheme.surface,
         borderRadius: BorderRadius.circular(8),
         border: Border.all(color: AppTheme.border.withValues(alpha: 0.3)),
       ),
       child: Row(
         children: [
-          Icon(getIconForType(content['content_type']), color: AppTheme.primary, size: 20),
+          Icon(getIconForType(content['content_type']), color: Theme.of(context).colorScheme.primary, size: 20),
           const SizedBox(width: 12),
           Expanded(
             child: Column(
@@ -771,7 +768,7 @@ class _ContentCard extends ConsumerWidget {
             ),
           ),
           IconButton(
-            icon: const Icon(Icons.edit_outlined, color: AppTheme.primary, size: 16),
+            icon: Icon(Icons.edit_outlined, color: Theme.of(context).colorScheme.primary, size: 16),
             constraints: const BoxConstraints(),
             padding: const EdgeInsets.all(4),
             onPressed: () {
@@ -784,14 +781,14 @@ class _ContentCard extends ConsumerWidget {
             },
           ),
           IconButton(
-            icon: const Icon(Icons.delete_outline, color: AppTheme.error, size: 16),
+            icon: Icon(Icons.delete_outline, color: Theme.of(context).colorScheme.error, size: 16),
             constraints: const BoxConstraints(),
             padding: const EdgeInsets.all(4),
             onPressed: () {
               showDialog(
                 context: context,
                 builder: (context) => AlertDialog(
-                  backgroundColor: AppTheme.surface,
+                  backgroundColor: Theme.of(context).colorScheme.surface,
                   title: const Text('Delete Content', style: TextStyle(color: AppTheme.text)),
                   content: Text('Are you sure you want to delete "${content['title']}"?',
                       style: const TextStyle(color: AppTheme.textSecondary)),
@@ -958,8 +955,8 @@ class _AddContentSheetState extends ConsumerState<_AddContentSheet> {
                   label: Text(type['name']),
                   selected: isSelected,
                   onSelected: (selected) => setState(() => _selectedType = type['name']),
-                  selectedColor: AppTheme.primary,
-                  backgroundColor: AppTheme.surface,
+                  selectedColor: Theme.of(context).colorScheme.primary,
+                  backgroundColor: Theme.of(context).colorScheme.surface,
                   labelStyle: TextStyle(
                     color: isSelected ? Colors.black : AppTheme.textMuted,
                     fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
@@ -996,8 +993,8 @@ class _BaseBottomSheet extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      decoration: const BoxDecoration(
-        color: AppTheme.surface,
+      decoration: BoxDecoration(
+        color: Theme.of(context).colorScheme.surface,
         borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
       ),
       padding: EdgeInsets.only(
@@ -1012,9 +1009,9 @@ class _BaseBottomSheet extends StatelessWidget {
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Text(title, style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: AppTheme.text)),
+              Text(title, style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: Theme.of(context).colorScheme.onSurface)),
               IconButton(
-                icon: const Icon(Icons.close, color: AppTheme.textSecondary),
+                icon: Icon(Icons.close, color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6)),
                 onPressed: () => Navigator.pop(context),
               ),
             ],
@@ -1034,7 +1031,7 @@ class _BaseBottomSheet extends StatelessWidget {
             child: ElevatedButton(
               onPressed: onSave,
               style: ElevatedButton.styleFrom(
-                backgroundColor: AppTheme.primary,
+                backgroundColor: Theme.of(context).colorScheme.primary,
                 foregroundColor: Colors.black,
                 padding: const EdgeInsets.symmetric(vertical: 16),
                 shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
@@ -1098,7 +1095,7 @@ class _QuizTopicCardState extends ConsumerState<_QuizTopicCard> {
     return Container(
       margin: const EdgeInsets.only(bottom: 16),
       decoration: BoxDecoration(
-        color: AppTheme.surface,
+        color: Theme.of(context).colorScheme.surface,
         borderRadius: BorderRadius.circular(12),
         border: Border.all(color: AppTheme.border),
       ),
@@ -1132,7 +1129,7 @@ class _QuizTopicCardState extends ConsumerState<_QuizTopicCard> {
                   ),
                   Icon(
                     _isExpanded ? Icons.keyboard_arrow_up : Icons.keyboard_arrow_down,
-                    color: AppTheme.textSecondary,
+                    color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6),
                     size: 24,
                   ),
                 ],
@@ -1185,7 +1182,7 @@ class _QuizLOCardState extends ConsumerState<_QuizLOCard> {
     return Container(
       margin: const EdgeInsets.only(bottom: 12),
       decoration: BoxDecoration(
-        color: AppTheme.background,
+        color: Theme.of(context).scaffoldBackgroundColor,
         borderRadius: BorderRadius.circular(12),
         border: Border.all(color: AppTheme.border.withValues(alpha: 0.5)),
       ),
@@ -1221,7 +1218,7 @@ class _QuizLOCardState extends ConsumerState<_QuizLOCard> {
                     mainAxisSize: MainAxisSize.min,
                     children: [
                       IconButton(
-                        icon: const Icon(Icons.add, color: AppTheme.primary, size: 20),
+                        icon: Icon(Icons.add, color: Theme.of(context).colorScheme.primary, size: 20),
                         constraints: const BoxConstraints(),
                         padding: const EdgeInsets.all(4),
                         onPressed: () {
@@ -1236,7 +1233,7 @@ class _QuizLOCardState extends ConsumerState<_QuizLOCard> {
                       const SizedBox(width: 4),
                       Icon(
                         _isExpanded ? Icons.keyboard_arrow_up : Icons.keyboard_arrow_down,
-                        color: AppTheme.textSecondary,
+                        color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6),
                         size: 20,
                       ),
                     ],
@@ -1261,7 +1258,7 @@ class _QuizLOCardState extends ConsumerState<_QuizLOCard> {
                   ),
                   if (widget.lo['passing_score'] != null && widget.lo['passing_score'] > 0)
                     IconButton(
-                      icon: const Icon(Icons.delete_outline, color: AppTheme.error, size: 16),
+                      icon: Icon(Icons.delete_outline, color: Theme.of(context).colorScheme.error, size: 16),
                       constraints: const BoxConstraints(),
                       padding: EdgeInsets.zero,
                       onPressed: () {
@@ -1279,7 +1276,7 @@ class _QuizLOCardState extends ConsumerState<_QuizLOCard> {
               margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
               padding: const EdgeInsets.all(16),
               decoration: BoxDecoration(
-                color: AppTheme.surface,
+                color: Theme.of(context).colorScheme.surface,
                 borderRadius: BorderRadius.circular(8),
                 border: Border.all(color: AppTheme.border),
               ),
@@ -1288,7 +1285,7 @@ class _QuizLOCardState extends ConsumerState<_QuizLOCard> {
                 children: [
                   Row(
                     children: [
-                      const Icon(Icons.calendar_today, color: AppTheme.text, size: 18),
+                      Icon(Icons.calendar_today, color: Theme.of(context).colorScheme.onSurface, size: 18),
                       const SizedBox(width: 8),
                       const Text('Scheduled Access', style: TextStyle(color: AppTheme.text, fontWeight: FontWeight.bold)),
                       const Spacer(),
@@ -1296,7 +1293,7 @@ class _QuizLOCardState extends ConsumerState<_QuizLOCard> {
                         Container(
                           padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                           decoration: BoxDecoration(
-                            color: AppTheme.primary.withValues(alpha: 0.2),
+                            color: Theme.of(context).colorScheme.primary.withValues(alpha: 0.2),
                             borderRadius: BorderRadius.circular(12),
                           ),
                           child: const Text('Available', style: TextStyle(color: AppTheme.primary, fontSize: 11, fontWeight: FontWeight.bold)),
@@ -1310,7 +1307,7 @@ class _QuizLOCardState extends ConsumerState<_QuizLOCard> {
                     const SizedBox(height: 12),
                     ElevatedButton.icon(
                       style: ElevatedButton.styleFrom(
-                        backgroundColor: AppTheme.primary,
+                        backgroundColor: Theme.of(context).colorScheme.primary,
                         foregroundColor: Colors.black,
                         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
                       ),
@@ -1328,7 +1325,7 @@ class _QuizLOCardState extends ConsumerState<_QuizLOCard> {
                   ] else ...[
                     Row(
                       children: [
-                        const Icon(Icons.date_range, color: AppTheme.primary, size: 14),
+                        Icon(Icons.date_range, color: Theme.of(context).colorScheme.primary, size: 14),
                         const SizedBox(width: 8),
                         Text('Opens: ${widget.lo['schedule_start']}', style: const TextStyle(color: AppTheme.textSecondary, fontSize: 12)),
                       ],
@@ -1336,7 +1333,7 @@ class _QuizLOCardState extends ConsumerState<_QuizLOCard> {
                     const SizedBox(height: 6),
                     Row(
                       children: [
-                        const Icon(Icons.event_busy, color: AppTheme.error, size: 14),
+                        Icon(Icons.event_busy, color: Theme.of(context).colorScheme.error, size: 14),
                         const SizedBox(width: 8),
                         Text('Closes: ${widget.lo['schedule_end']}', style: const TextStyle(color: AppTheme.textSecondary, fontSize: 12)),
                       ],
@@ -1344,7 +1341,7 @@ class _QuizLOCardState extends ConsumerState<_QuizLOCard> {
                     const SizedBox(height: 6),
                     Row(
                       children: [
-                        const Icon(Icons.access_time, color: AppTheme.textMuted, size: 14),
+                        Icon(Icons.access_time, color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.4), size: 14),
                         const SizedBox(width: 8),
                         Text('Timezone: ${widget.lo['timezone']}', style: const TextStyle(color: AppTheme.textSecondary, fontSize: 12)),
                       ],
@@ -1362,8 +1359,8 @@ class _QuizLOCardState extends ConsumerState<_QuizLOCard> {
                     const SizedBox(height: 12),
                     OutlinedButton.icon(
                       style: OutlinedButton.styleFrom(
-                        foregroundColor: AppTheme.primary,
-                        side: const BorderSide(color: AppTheme.primary),
+                        foregroundColor: Theme.of(context).colorScheme.onPrimary,
+                        side: BorderSide(color: Theme.of(context).colorScheme.primary),
                         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
                       ),
                       icon: const Icon(Icons.edit_calendar, size: 16),
@@ -1448,7 +1445,7 @@ class _QuestionCard extends ConsumerWidget {
       margin: const EdgeInsets.only(bottom: 8),
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        color: AppTheme.surface,
+        color: Theme.of(context).colorScheme.surface,
         borderRadius: BorderRadius.circular(8),
         border: Border.all(color: AppTheme.border.withValues(alpha: 0.3)),
       ),
@@ -1475,7 +1472,7 @@ class _QuestionCard extends ConsumerWidget {
             mainAxisSize: MainAxisSize.min,
             children: [
               IconButton(
-                icon: const Icon(Icons.edit_outlined, color: AppTheme.primary, size: 16),
+                icon: Icon(Icons.edit_outlined, color: Theme.of(context).colorScheme.primary, size: 16),
                 constraints: const BoxConstraints(),
                 padding: const EdgeInsets.all(4),
                 onPressed: () {
@@ -1489,14 +1486,14 @@ class _QuestionCard extends ConsumerWidget {
               ),
               const SizedBox(width: 4),
               IconButton(
-                icon: const Icon(Icons.delete_outline, color: AppTheme.error, size: 16),
+                icon: Icon(Icons.delete_outline, color: Theme.of(context).colorScheme.error, size: 16),
                 constraints: const BoxConstraints(),
                 padding: const EdgeInsets.all(4),
                 onPressed: () {
                   showDialog(
                     context: context,
                     builder: (context) => AlertDialog(
-                      backgroundColor: AppTheme.surface,
+                      backgroundColor: Theme.of(context).colorScheme.surface,
                       title: const Text('Delete Question', style: TextStyle(color: AppTheme.text)),
                       content: const Text('Are you sure you want to delete this question?',
                           style: TextStyle(color: AppTheme.textSecondary)),
@@ -1762,8 +1759,8 @@ class _EditContentSheetState extends ConsumerState<_EditContentSheet> {
                   label: Text(type['name']),
                   selected: isSelected,
                   onSelected: (selected) => setState(() => _selectedType = type['name']),
-                  selectedColor: AppTheme.primary,
-                  backgroundColor: AppTheme.surface,
+                  selectedColor: Theme.of(context).colorScheme.primary,
+                  backgroundColor: Theme.of(context).colorScheme.surface,
                   labelStyle: TextStyle(
                     color: isSelected ? Colors.black : AppTheme.textMuted,
                     fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
@@ -1910,17 +1907,17 @@ class _ScheduleQuizSheetState extends ConsumerState<_ScheduleQuizSheet> {
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: Row(
-          children: const [
-            Icon(Icons.check_circle_outline, color: AppTheme.primary),
+          children: [
+            Icon(Icons.check_circle_outline, color: Theme.of(context).colorScheme.primary),
             SizedBox(width: 8),
             Text('Quiz schedule saved successfully!', style: TextStyle(color: Colors.white)),
           ],
         ),
-        backgroundColor: AppTheme.surface,
+        backgroundColor: Theme.of(context).colorScheme.surface,
         behavior: SnackBarBehavior.floating,
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(8),
-          side: const BorderSide(color: AppTheme.primary),
+          side: BorderSide(color: Theme.of(context).colorScheme.primary),
         ),
         margin: const EdgeInsets.only(bottom: 20, left: 20, right: 20),
       ),
@@ -1959,14 +1956,14 @@ class _ScheduleQuizSheetState extends ConsumerState<_ScheduleQuizSheet> {
 
         Container(
           decoration: BoxDecoration(
-            color: AppTheme.background,
+            color: Theme.of(context).scaffoldBackgroundColor,
             border: Border.all(color: _allowExtend ? AppTheme.primary : AppTheme.border),
             borderRadius: BorderRadius.circular(8),
           ),
           child: CheckboxListTile(
             value: _allowExtend,
             onChanged: (val) => setState(() => _allowExtend = val ?? false),
-            activeColor: AppTheme.primary,
+            activeColor: Theme.of(context).colorScheme.primary,
             checkColor: Colors.black,
             title: const Text('Allow extending end time', style: TextStyle(color: AppTheme.primary, fontWeight: FontWeight.bold, fontSize: 13)),
             subtitle: const Text('Permit editing the end time even after students have started the quiz.', style: TextStyle(color: AppTheme.textSecondary, fontSize: 11)),

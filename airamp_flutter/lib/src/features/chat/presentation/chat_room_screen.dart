@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+﻿import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/theme/app_theme.dart';
 import '../application/chat_provider.dart';
@@ -43,10 +43,9 @@ class _ChatRoomScreenState extends ConsumerState<ChatRoomScreen> {
     );
 
     return Scaffold(
-      backgroundColor: AppTheme.background,
       appBar: AppBar(
         title: Text(convo?.name ?? 'Chat', style: const TextStyle(color: AppTheme.text)),
-        backgroundColor: AppTheme.surface,
+        backgroundColor: Theme.of(context).colorScheme.surface,
         iconTheme: const IconThemeData(color: AppTheme.text),
       ),
       body: Column(
@@ -67,7 +66,7 @@ class _ChatRoomScreenState extends ConsumerState<ChatRoomScreen> {
                     margin: const EdgeInsets.only(bottom: 12),
                     padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
                     decoration: BoxDecoration(
-                      color: isMe ? AppTheme.primary : AppTheme.surface,
+                      color: isMe ? AppTheme.primary : Theme.of(context).colorScheme.surface,
                       borderRadius: BorderRadius.circular(16).copyWith(
                         bottomRight: isMe ? const Radius.circular(0) : null,
                         bottomLeft: !isMe ? const Radius.circular(0) : null,
@@ -88,9 +87,9 @@ class _ChatRoomScreenState extends ConsumerState<ChatRoomScreen> {
           ),
           Container(
             padding: const EdgeInsets.all(12).copyWith(bottom: MediaQuery.of(context).padding.bottom + 12),
-            decoration: const BoxDecoration(
-              color: AppTheme.surface,
-              border: Border(top: BorderSide(color: AppTheme.border)),
+            decoration: BoxDecoration(
+              color: Theme.of(context).colorScheme.surface,
+              border: Border(top: BorderSide(color: Theme.of(context).dividerColor)),
             ),
             child: Row(
               children: [
@@ -114,7 +113,7 @@ class _ChatRoomScreenState extends ConsumerState<ChatRoomScreen> {
                 ),
                 const SizedBox(width: 8),
                 CircleAvatar(
-                  backgroundColor: AppTheme.primary,
+                  backgroundColor: Theme.of(context).colorScheme.primary,
                   child: IconButton(
                     icon: const Icon(Icons.send, color: Colors.black, size: 20),
                     onPressed: _sendMessage,

@@ -7,12 +7,16 @@ class User {
   final String email;
   final String role;
   final String fullName;
+  final String username;
+  final String? profileImage;
 
   User({
     required this.id,
     required this.email,
     required this.role,
     required this.fullName,
+    this.username = '',
+    this.profileImage,
   });
 
   factory User.fromJson(Map<String, dynamic> json) {
@@ -21,6 +25,26 @@ class User {
       email: json['email'] ?? '',
       role: json['role'] ?? 'student',
       fullName: json['fullName'] ?? '',
+      username: json['username'] ?? json['fullName'] ?? '',
+      profileImage: json['profileImage'],
+    );
+  }
+
+  /// Create a copy with updated fields.
+  User copyWith({
+    String? fullName,
+    String? username,
+    String? email,
+    String? profileImage,
+    String? role,
+  }) {
+    return User(
+      id: id,
+      email: email ?? this.email,
+      role: role ?? this.role,
+      fullName: fullName ?? this.fullName,
+      username: username ?? this.username,
+      profileImage: profileImage ?? this.profileImage,
     );
   }
 }
@@ -72,6 +96,30 @@ class AuthNotifier extends Notifier<User?> {
     } finally {
       isLoading = false;
     }
+  }
+
+  /// Update the current user's profile fields locally.
+  /// When backend is available, this will also call the API.
+  Future<void> updateProfile({
+    String? fullName,
+    String? username,
+    String? email,
+    String? profileImage,
+    String? password,
+  }) async {
+    if (state == null) return;
+
+    // Update local state immediately
+    state = state!.copyWith(
+      fullName: fullName,
+      username: username,
+      email: email,
+      profileImage: profileImage,
+    );
+
+    // TODO: Call API to persist changes when backend is available
+    // final repository = ref.read(authRepositoryProvider);
+    // await repository.updateProfile(...);
   }
 
   Future<void> logout() async {

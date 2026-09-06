@@ -17,7 +17,6 @@ class AdminDashboardScreen extends ConsumerWidget {
         : 'T';
 
     return Scaffold(
-      backgroundColor: AppTheme.background,
       body: SafeArea(
         child: SingleChildScrollView(
           padding: const EdgeInsets.all(20.0),
@@ -31,16 +30,16 @@ class AdminDashboardScreen extends ConsumerWidget {
                   Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      const Text('Admin Dashboard', style: TextStyle(fontSize: 14, color: AppTheme.textSecondary)),
+                      Text('Admin Dashboard', style: TextStyle(fontSize: 14, color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6))),
                       Text(
                         currentUser?.fullName ?? 'Teacher John Reyes',
-                        style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold, color: AppTheme.text),
+                        style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold, color: Theme.of(context).colorScheme.onSurface),
                       ),
                     ],
                   ),
                   CircleAvatar(
                     radius: 24,
-                    backgroundColor: AppTheme.primary,
+                    backgroundColor: Theme.of(context).colorScheme.primary,
                     child: Text(
                       initial,
                       style: const TextStyle(fontSize: 24, color: Colors.black, fontWeight: FontWeight.bold),
@@ -53,11 +52,11 @@ class AdminDashboardScreen extends ConsumerWidget {
               // Stats Cards Row
               Row(
                 children: [
-                  Expanded(child: _buildStatCard('Students', Icons.people_outline, '1')),
+                  Expanded(child: _buildStatCard(context, 'Students', Icons.people_outline, '1')),
                   const SizedBox(width: 12),
-                  Expanded(child: _buildStatCard('Subjects', Icons.menu_book, '0')),
+                  Expanded(child: _buildStatCard(context, 'Subjects', Icons.menu_book, '0')),
                   const SizedBox(width: 12),
-                  Expanded(child: _buildStatCard('Sections', Icons.layers, '1')),
+                  Expanded(child: _buildStatCard(context, 'Sections', Icons.layers, '1')),
                 ],
               ),
               const SizedBox(height: 32),
@@ -67,17 +66,17 @@ class AdminDashboardScreen extends ConsumerWidget {
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
                   Row(
-                    children: const [
-                      Icon(Icons.campaign, color: AppTheme.warning, size: 20),
-                      SizedBox(width: 8),
-                      Text('Announcements', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: AppTheme.text)),
+                    children: [
+                      const Icon(Icons.campaign, color: AppTheme.warning, size: 20),
+                      const SizedBox(width: 8),
+                      Text('Announcements', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Theme.of(context).colorScheme.onSurface)),
                     ],
                   ),
                   GestureDetector(
                     onTap: () => _showPostAnnouncementSheet(context, ref),
                     child: CircleAvatar(
                       radius: 14,
-                      backgroundColor: AppTheme.primary,
+                      backgroundColor: Theme.of(context).colorScheme.primary,
                       child: const Icon(Icons.add, color: Colors.black, size: 20),
                     ),
                   ),
@@ -90,7 +89,7 @@ class AdminDashboardScreen extends ConsumerWidget {
                   width: double.infinity,
                   padding: const EdgeInsets.all(20),
                   decoration: BoxDecoration(
-                    color: AppTheme.surface,
+                    color: Theme.of(context).colorScheme.surface,
                     borderRadius: BorderRadius.circular(12),
                     border: Border.all(color: AppTheme.border),
                   ),
@@ -105,7 +104,7 @@ class AdminDashboardScreen extends ConsumerWidget {
                   margin: const EdgeInsets.only(bottom: 12),
                   padding: const EdgeInsets.all(16),
                   decoration: BoxDecoration(
-                    color: AppTheme.surface,
+                    color: Theme.of(context).colorScheme.surface,
                     borderRadius: BorderRadius.circular(12),
                     border: Border.all(
                       color: a['priority'] == 'Important' ? AppTheme.error : AppTheme.border,
@@ -121,10 +120,10 @@ class AdminDashboardScreen extends ConsumerWidget {
                           Expanded(
                             child: Text(
                               a['title'],
-                              style: const TextStyle(
+                              style: TextStyle(
                                 fontSize: 16, 
                                 fontWeight: FontWeight.bold, 
-                                color: AppTheme.text,
+                                color: Theme.of(context).colorScheme.onSurface,
                               ),
                             ),
                           ),
@@ -141,8 +140,8 @@ class AdminDashboardScreen extends ConsumerWidget {
                               ),
                             ),
                           PopupMenuButton<String>(
-                            icon: const Icon(Icons.more_vert, color: AppTheme.textMuted, size: 20),
-                            color: AppTheme.surface,
+                            icon: Icon(Icons.more_vert, color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.4), size: 20),
+                            color: Theme.of(context).colorScheme.surface,
                             onSelected: (value) {
                               if (value == 'edit') {
                                 _showPostAnnouncementSheet(context, ref, initialAnnouncement: a);
@@ -171,7 +170,7 @@ class AdminDashboardScreen extends ConsumerWidget {
                       const SizedBox(height: 12),
                       Row(
                         children: [
-                          const Icon(Icons.people_outline, size: 14, color: AppTheme.textMuted),
+                          Icon(Icons.people_outline, size: 14, color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.4)),
                           const SizedBox(width: 4),
                           Text(
                             a['target_audience'],
@@ -186,13 +185,13 @@ class AdminDashboardScreen extends ConsumerWidget {
               const SizedBox(height: 32),
 
               // Subjects Overview Section
-              const Text('Subjects Overview', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: AppTheme.text)),
+              Text('Subjects Overview', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Theme.of(context).colorScheme.onSurface)),
               const SizedBox(height: 16),
               Container(
                 width: double.infinity,
                 padding: const EdgeInsets.symmetric(vertical: 40),
                 decoration: BoxDecoration(
-                  color: AppTheme.surface,
+                  color: Theme.of(context).colorScheme.surface,
                   borderRadius: BorderRadius.circular(12),
                   border: Border.all(color: AppTheme.border),
                 ),
@@ -210,17 +209,17 @@ class AdminDashboardScreen extends ConsumerWidget {
     );
   }
 
-  Widget _buildStatCard(String title, IconData icon, String count) {
+  Widget _buildStatCard(BuildContext context, String title, IconData icon, String count) {
     return Container(
       padding: const EdgeInsets.symmetric(vertical: 20),
       decoration: BoxDecoration(
-        color: AppTheme.surface,
+        color: Theme.of(context).colorScheme.surface,
         borderRadius: BorderRadius.circular(16),
         border: Border.all(color: AppTheme.border),
       ),
       child: Column(
         children: [
-          Icon(icon, color: AppTheme.primary, size: 24),
+          Icon(icon, color: Theme.of(context).colorScheme.primary, size: 24),
           const SizedBox(height: 12),
           Text(count, style: const TextStyle(color: AppTheme.text, fontSize: 24, fontWeight: FontWeight.bold)),
           const SizedBox(height: 4),
@@ -234,7 +233,7 @@ class AdminDashboardScreen extends ConsumerWidget {
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
-      backgroundColor: AppTheme.surface,
+      backgroundColor: Theme.of(context).colorScheme.surface,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
       ),
@@ -314,11 +313,11 @@ class _PostAnnouncementSheetState extends State<_PostAnnouncementSheet> {
               children: [
                 Text(
                   widget.initialAnnouncement != null ? 'Edit Announcement' : 'Post Announcement',
-                  style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: AppTheme.text),
+                  style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: Theme.of(context).colorScheme.onSurface),
                 ),
                 GestureDetector(
                   onTap: () => Navigator.pop(context),
-                  child: const Icon(Icons.close, color: AppTheme.textMuted, size: 24),
+                  child: Icon(Icons.close, color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.4), size: 24),
                 ),
               ],
             ),
@@ -381,7 +380,7 @@ class _PostAnnouncementSheetState extends State<_PostAnnouncementSheet> {
                 icon: Icon(widget.initialAnnouncement != null ? Icons.save : Icons.send, color: Colors.black, size: 18),
                 label: Text(widget.initialAnnouncement != null ? 'Update Announcement' : 'Post Announcement'),
                 style: ElevatedButton.styleFrom(
-                  backgroundColor: AppTheme.primary,
+                  backgroundColor: Theme.of(context).colorScheme.primary,
                   foregroundColor: Colors.black,
                   padding: const EdgeInsets.symmetric(vertical: 16),
                   shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),

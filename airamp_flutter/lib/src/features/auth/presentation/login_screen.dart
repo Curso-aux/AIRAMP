@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+﻿import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
@@ -79,7 +79,6 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
     final isLoading = ref.watch(authProvider.notifier).isLoading;
 
     return Scaffold(
-      backgroundColor: AppTheme.background,
       body: SafeArea(
         child: Center(
           child: SingleChildScrollView(
@@ -95,7 +94,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
                   width: 120,
                   height: 120,
                   decoration: BoxDecoration(
-                    color: AppTheme.surface,
+                    color: Theme.of(context).colorScheme.surface,
                     borderRadius: BorderRadius.circular(30),
                     border: Border.all(color: AppTheme.border),
                     boxShadow: [
@@ -107,40 +106,40 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
                     ],
                   ),
                   alignment: Alignment.center,
-                  child: const Icon(
+                  child: Icon(
                     Icons.school,
                     size: 60,
-                    color: AppTheme.primary,
+                    color: Theme.of(context).colorScheme.primary,
                   ),
                 ),
                 const SizedBox(height: 16),
-                const Text(
+                Text(
                   'AIRA',
                   style: TextStyle(
                     fontSize: 34,
                     fontWeight: FontWeight.w900,
-                    color: AppTheme.text,
+                    color: Theme.of(context).colorScheme.onSurface,
                     letterSpacing: 4,
                   ),
                 ),
                 const SizedBox(height: 4),
-                const Text(
+                Text(
                   'Academic Integrated Review & Assessment',
                   style: TextStyle(
                     fontSize: 12,
                     fontWeight: FontWeight.w500,
-                    color: AppTheme.accent,
+                    color: Theme.of(context).colorScheme.secondary,
                     letterSpacing: 0.5,
                   ),
                   textAlign: TextAlign.center,
                 ),
                 const SizedBox(height: 4),
-                const Text(
+                Text(
                   'Train Smart. Get Certified!',
                   style: TextStyle(
                     fontSize: 13,
                     fontStyle: FontStyle.italic,
-                    color: AppTheme.textSecondary,
+                    color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6),
                   ),
                 ),
                 const SizedBox(height: 32),
@@ -150,7 +149,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
                   width: double.infinity,
                   padding: const EdgeInsets.all(24),
                   decoration: BoxDecoration(
-                    color: AppTheme.surface,
+                    color: Theme.of(context).colorScheme.surface,
                     borderRadius: BorderRadius.circular(20),
                     border: Border.all(color: AppTheme.border),
                     boxShadow: const [
@@ -164,20 +163,20 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      const Text(
+                      Text(
                         'Welcome Back',
                         style: TextStyle(
                           fontSize: 26,
                           fontWeight: FontWeight.w800,
-                          color: AppTheme.text,
+                          color: Theme.of(context).colorScheme.onSurface,
                         ),
                       ),
                       const SizedBox(height: 4),
-                      const Text(
+                      Text(
                         'Sign in with your email or username',
                         style: TextStyle(
                           fontSize: 14,
-                          color: AppTheme.textSecondary,
+                          color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6),
                         ),
                       ),
                       const SizedBox(height: 24),
@@ -190,22 +189,22 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
                             color: AppTheme.errorSoft,
                             borderRadius: BorderRadius.circular(12),
                             border: Border.all(
-                              color: AppTheme.error.withValues(alpha: 0.3),
+                              color: Theme.of(context).colorScheme.error.withValues(alpha: 0.3),
                             ),
                           ),
                           child: Row(
                             children: [
-                              const Icon(
+                              Icon(
                                 Icons.error_outline,
-                                color: AppTheme.error,
+                                color: Theme.of(context).colorScheme.error,
                                 size: 20,
                               ),
                               const SizedBox(width: 8),
                               Expanded(
                                 child: Text(
                                   _error,
-                                  style: const TextStyle(
-                                    color: AppTheme.error,
+                                  style: TextStyle(
+                                    color: Theme.of(context).colorScheme.error,
                                     fontSize: 13,
                                   ),
                                 ),
@@ -217,16 +216,16 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
                       // Email/Username Input
                       TextField(
                         controller: _identifierController,
-                        style: const TextStyle(
-                          color: AppTheme.text,
+                        style: TextStyle(
+                          color: Theme.of(context).colorScheme.onSurface,
                           fontSize: 15,
                         ),
                         keyboardType: TextInputType.emailAddress,
                         decoration: InputDecoration(
                           hintText: 'Email or Username',
-                          prefixIcon: const Icon(
+                          prefixIcon: Icon(
                             Icons.mail_outline,
-                            color: AppTheme.textMuted,
+                            color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.4),
                             size: 20,
                           ),
                         ),
@@ -237,15 +236,15 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
                       TextField(
                         controller: _passwordController,
                         obscureText: !_showPassword,
-                        style: const TextStyle(
-                          color: AppTheme.text,
+                        style: TextStyle(
+                          color: Theme.of(context).colorScheme.onSurface,
                           fontSize: 15,
                         ),
                         decoration: InputDecoration(
                           hintText: 'Password',
-                          prefixIcon: const Icon(
+                          prefixIcon: Icon(
                             Icons.lock_outline,
-                            color: AppTheme.textMuted,
+                            color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.4),
                             size: 20,
                           ),
                           suffixIcon: IconButton(
@@ -253,7 +252,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
                               _showPassword
                                   ? Icons.visibility_off_outlined
                                   : Icons.visibility_outlined,
-                              color: AppTheme.textMuted,
+                              color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.4),
                               size: 20,
                             ),
                             onPressed: () {
@@ -270,10 +269,10 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
                         alignment: Alignment.centerRight,
                         child: TextButton(
                           onPressed: () => context.push('/forgot-password'),
-                          child: const Text(
+                          child: Text(
                             'Forgot Password?',
                             style: TextStyle(
-                              color: AppTheme.accent,
+                              color: Theme.of(context).colorScheme.secondary,
                               fontSize: 13,
                               fontWeight: FontWeight.w600,
                             ),
@@ -295,7 +294,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
                           child: Container(
                             height: 54,
                             decoration: BoxDecoration(
-                              color: AppTheme.primary,
+                              color: Theme.of(context).colorScheme.primary,
                               borderRadius: BorderRadius.circular(14),
                               boxShadow: const [
                                 BoxShadow(
@@ -336,19 +335,19 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
                       Row(
                         mainAxisAlignment: MainAxisAlignment.center,
                         children: [
-                          const Text(
+                          Text(
                             "Don't have an account? ",
                             style: TextStyle(
-                              color: AppTheme.textSecondary,
+                              color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6),
                               fontSize: 14,
                             ),
                           ),
                           GestureDetector(
                             onTap: () => context.push('/signup'),
-                            child: const Text(
+                            child: Text(
                               'Sign Up',
                               style: TextStyle(
-                                color: AppTheme.primary,
+                                color: Theme.of(context).colorScheme.primary,
                                 fontSize: 14,
                                 fontWeight: FontWeight.w700,
                               ),
@@ -364,16 +363,16 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
                         child: Row(
                           mainAxisAlignment: MainAxisAlignment.center,
                           children: [
-                            const Icon(
+                            Icon(
                               Icons.shield_outlined,
-                              color: AppTheme.accent,
+                              color: Theme.of(context).colorScheme.secondary,
                               size: 16,
                             ),
                             const SizedBox(width: 8),
-                            const Text(
+                            Text(
                               'Register as Admin (Teacher)',
                               style: TextStyle(
-                                color: AppTheme.accent,
+                                color: Theme.of(context).colorScheme.secondary,
                                 fontSize: 13,
                                 fontWeight: FontWeight.w600,
                               ),

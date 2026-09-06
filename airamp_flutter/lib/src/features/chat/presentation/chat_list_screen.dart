@@ -2,16 +2,34 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/theme/app_theme.dart';
 import '../application/chat_provider.dart';
+import 'new_conversation_modal.dart';
 
 class ChatListScreen extends ConsumerWidget {
   const ChatListScreen({super.key});
+
+  void _openNewConversationModal(BuildContext context) async {
+    final conv = await showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (_) => const NewConversationModal(),
+    );
+
+    if (conv != null) {
+      // Navigate to chat room
+    }
+  }
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final chatState = ref.watch(chatProvider);
 
     return Scaffold(
-      backgroundColor: AppTheme.background,
+      floatingActionButton: FloatingActionButton(
+        onPressed: () => _openNewConversationModal(context),
+        backgroundColor: AppTheme.primary,
+        child: const Icon(Icons.edit, color: Colors.black),
+      ),
       body: SafeArea(
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -54,19 +72,19 @@ class ChatListScreen extends ConsumerWidget {
                     style: const TextStyle(color: AppTheme.text),
                     decoration: InputDecoration(
                       hintText: 'Search conversations...',
-                      prefixIcon: const Icon(
+                      prefixIcon: Icon(
                         Icons.search,
-                        color: AppTheme.textMuted,
+                        color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.4),
                       ),
                       filled: true,
-                      fillColor: AppTheme.surface,
+                      fillColor: Theme.of(context).colorScheme.surface,
                       border: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(12),
-                        borderSide: const BorderSide(color: AppTheme.border),
+                        borderSide: BorderSide(color: Theme.of(context).dividerColor),
                       ),
                       enabledBorder: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(12),
-                        borderSide: const BorderSide(color: AppTheme.border),
+                        borderSide: BorderSide(color: Theme.of(context).dividerColor),
                       ),
                       contentPadding: const EdgeInsets.symmetric(vertical: 12),
                     ),
@@ -92,7 +110,7 @@ class ChatListScreen extends ConsumerWidget {
                             vertical: 8,
                           ),
                           leading: CircleAvatar(
-                            backgroundColor: AppTheme.primary,
+                            backgroundColor: Theme.of(context).colorScheme.primary,
                             child: Text(
                               convo.name != null && convo.name!.isNotEmpty
                                   ? convo.name![0]
@@ -105,15 +123,15 @@ class ChatListScreen extends ConsumerWidget {
                           ),
                           title: Text(
                             convo.name ?? 'Unknown',
-                            style: const TextStyle(
-                              color: AppTheme.text,
+                            style: TextStyle(
+                              color: Theme.of(context).colorScheme.onSurface,
                               fontWeight: FontWeight.bold,
                             ),
                           ),
                           subtitle: Text(
                             convo.lastMessage?.text ?? 'No messages',
-                            style: const TextStyle(
-                              color: AppTheme.textSecondary,
+                            style: TextStyle(
+                              color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6),
                             ),
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
@@ -121,7 +139,7 @@ class ChatListScreen extends ConsumerWidget {
                           trailing: convo.unreadCount > 0
                               ? CircleAvatar(
                                   radius: 12,
-                                  backgroundColor: AppTheme.primary,
+                                  backgroundColor: Theme.of(context).colorScheme.primary,
                                   child: Text(
                                     convo.unreadCount.toString(),
                                     style: const TextStyle(
@@ -153,15 +171,15 @@ class ChatListScreen extends ConsumerWidget {
           Icon(
             Icons.chat_bubble_outline,
             size: 64,
-            color: AppTheme.textMuted.withValues(alpha: 0.5),
+            color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.4).withValues(alpha: 0.5),
           ),
           const SizedBox(height: 20),
-          const Text(
+          Text(
             'No conversations yet',
             style: TextStyle(
               fontSize: 18,
               fontWeight: FontWeight.bold,
-              color: AppTheme.text,
+              color: Theme.of(context).colorScheme.onSurface,
             ),
           ),
           const SizedBox(height: 8),
@@ -171,11 +189,11 @@ class ChatListScreen extends ConsumerWidget {
           ),
           const SizedBox(height: 24),
           ElevatedButton.icon(
-            onPressed: () {},
+            onPressed: () => _openNewConversationModal(context),
             icon: const Icon(Icons.people_outline, color: Colors.black),
             label: const Text('Start a Conversation'),
             style: ElevatedButton.styleFrom(
-              backgroundColor: AppTheme.primary,
+              backgroundColor: Theme.of(context).colorScheme.primary,
               foregroundColor: Colors.black,
               padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 14),
               shape: RoundedRectangleBorder(

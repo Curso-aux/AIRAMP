@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+﻿import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import '../../../core/theme/app_theme.dart';
 
@@ -18,10 +18,8 @@ class _QuizScreenState extends State<QuizScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: AppTheme.background,
       appBar: AppBar(
         title: const Text('Assessment', style: TextStyle(color: AppTheme.text)),
-        backgroundColor: AppTheme.background,
         iconTheme: const IconThemeData(color: AppTheme.text),
       ),
       body: _buildContent(),
@@ -48,11 +46,11 @@ class _QuizScreenState extends State<QuizScreen> {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            const Icon(Icons.assignment, size: 80, color: AppTheme.primary),
+            Icon(Icons.assignment, size: 80, color: Theme.of(context).colorScheme.primary),
             const SizedBox(height: 24),
-            const Text(
+            Text(
               'Module 1 Assessment',
-              style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold, color: AppTheme.text),
+              style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold, color: Theme.of(context).colorScheme.onSurface),
             ),
             const SizedBox(height: 16),
             const Text(
@@ -64,7 +62,7 @@ class _QuizScreenState extends State<QuizScreen> {
             ElevatedButton(
               onPressed: () => setState(() => _state = 1),
               style: ElevatedButton.styleFrom(
-                backgroundColor: AppTheme.primary,
+                backgroundColor: Theme.of(context).colorScheme.primary,
                 minimumSize: const Size(double.infinity, 50),
               ),
               child: const Text('Start Quiz', style: TextStyle(color: Colors.black, fontWeight: FontWeight.bold)),
@@ -87,9 +85,9 @@ class _QuizScreenState extends State<QuizScreen> {
               style: TextStyle(color: AppTheme.textMuted),
             ),
             const SizedBox(height: 24),
-            const Text(
+            Text(
               'What is the primary language used in Flutter?',
-              style: TextStyle(fontSize: 20, fontWeight: FontWeight.w600, color: AppTheme.text),
+              style: TextStyle(fontSize: 20, fontWeight: FontWeight.w600, color: Theme.of(context).colorScheme.onSurface),
               textAlign: TextAlign.center,
             ),
             const SizedBox(height: 48),
@@ -116,7 +114,7 @@ class _QuizScreenState extends State<QuizScreen> {
         width: double.infinity,
         padding: const EdgeInsets.all(16),
         decoration: BoxDecoration(
-          color: AppTheme.surface,
+          color: Theme.of(context).colorScheme.surface,
           borderRadius: BorderRadius.circular(12),
           border: Border.all(color: AppTheme.border),
         ),
@@ -134,20 +132,20 @@ class _QuizScreenState extends State<QuizScreen> {
           children: [
             const Icon(Icons.check_circle, size: 80, color: AppTheme.success),
             const SizedBox(height: 24),
-            const Text(
+            Text(
               'Assessment Completed',
-              style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold, color: AppTheme.text),
+              style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold, color: Theme.of(context).colorScheme.onSurface),
             ),
             const SizedBox(height: 16),
             Text(
               'You scored $_score / 1',
-              style: const TextStyle(fontSize: 18, color: AppTheme.textSecondary),
+              style: TextStyle(fontSize: 18, color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6)),
             ),
             const SizedBox(height: 32),
             ElevatedButton(
               onPressed: () => context.pop(),
               style: ElevatedButton.styleFrom(
-                backgroundColor: AppTheme.primary,
+                backgroundColor: Theme.of(context).colorScheme.primary,
                 minimumSize: const Size(double.infinity, 50),
               ),
               child: const Text('Return to Course', style: TextStyle(color: Colors.black, fontWeight: FontWeight.bold)),

@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+﻿import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import '../../../core/theme/app_theme.dart';
 
@@ -31,13 +31,11 @@ class _SubmissionsScreenState extends State<SubmissionsScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: AppTheme.background,
       appBar: AppBar(
         title: const Text(
           'Submit Assignment',
           style: TextStyle(color: AppTheme.text),
         ),
-        backgroundColor: AppTheme.background,
         iconTheme: const IconThemeData(color: AppTheme.text),
       ),
       body: SingleChildScrollView(
@@ -45,29 +43,29 @@ class _SubmissionsScreenState extends State<SubmissionsScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Text(
+            Text(
               'Final Project: Flutter Migration',
               style: TextStyle(
                 fontSize: 24,
                 fontWeight: FontWeight.bold,
-                color: AppTheme.text,
+                color: Theme.of(context).colorScheme.onSurface,
               ),
             ),
             const SizedBox(height: 8),
-            const Text(
+            Text(
               'Due: Oct 31, 2026 11:59 PM',
               style: TextStyle(
-                color: AppTheme.error,
+                color: Theme.of(context).colorScheme.error,
                 fontWeight: FontWeight.bold,
               ),
             ),
             const SizedBox(height: 24),
-            const Text(
+            Text(
               'Instructions',
               style: TextStyle(
                 fontSize: 18,
                 fontWeight: FontWeight.bold,
-                color: AppTheme.text,
+                color: Theme.of(context).colorScheme.onSurface,
               ),
             ),
             const SizedBox(height: 8),
@@ -87,12 +85,12 @@ class _SubmissionsScreenState extends State<SubmissionsScreen> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const Text(
+        Text(
           'Your Submission',
           style: TextStyle(
             fontSize: 18,
             fontWeight: FontWeight.bold,
-            color: AppTheme.text,
+            color: Theme.of(context).colorScheme.onSurface,
           ),
         ),
         const SizedBox(height: 16),
@@ -103,7 +101,7 @@ class _SubmissionsScreenState extends State<SubmissionsScreen> {
             hintText: 'Paste link here (e.g. https://github.com/...)',
             hintStyle: const TextStyle(color: AppTheme.textMuted),
             filled: true,
-            fillColor: AppTheme.surface,
+            fillColor: Theme.of(context).colorScheme.surface,
             border: OutlineInputBorder(
               borderRadius: BorderRadius.circular(12),
               borderSide: BorderSide.none,
@@ -115,7 +113,7 @@ class _SubmissionsScreenState extends State<SubmissionsScreen> {
         ElevatedButton(
           onPressed: _submit,
           style: ElevatedButton.styleFrom(
-            backgroundColor: AppTheme.primary,
+            backgroundColor: Theme.of(context).colorScheme.primary,
             minimumSize: const Size(double.infinity, 50),
             shape: RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(12),
@@ -161,7 +159,7 @@ class _SubmissionsScreenState extends State<SubmissionsScreen> {
           OutlinedButton(
             onPressed: () => context.pop(),
             style: OutlinedButton.styleFrom(
-              foregroundColor: AppTheme.success,
+              foregroundColor: Theme.of(context).colorScheme.onPrimary,
               side: const BorderSide(color: AppTheme.success),
             ),
             child: const Text('Go Back'),

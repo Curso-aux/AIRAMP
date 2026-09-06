@@ -20,6 +20,7 @@ import '../features/admin/presentation/scores_screen.dart';
 import '../features/admin/presentation/admin_profile_screen.dart';
 import '../features/admin/presentation/admin_management_screen.dart';
 import '../features/admin/presentation/admin_scaffold.dart';
+import '../features/student/presentation/student_scaffold.dart';
 import '../features/chat/presentation/chat_list_screen.dart';
 import '../features/chat/presentation/chat_room_screen.dart';
 import '../features/quiz/presentation/quiz_screen.dart';
@@ -61,26 +62,61 @@ final routerProvider = Provider<GoRouter>((ref) {
         path: '/forgot-password',
         builder: (context, state) => const ForgotPasswordScreen(),
       ),
-      // Student Routes (TODO: Refactor to StatefulShellRoute later)
-      GoRoute(
-        path: '/student/home',
-        builder: (context, state) => const StudentHomeScreen(),
-      ),
-      GoRoute(
-        path: '/student/profile',
-        builder: (context, state) => const StudentProfileScreen(),
-      ),
-      GoRoute(
-        path: '/student/progress',
-        builder: (context, state) => const MyProgressScreen(),
-      ),
-      GoRoute(
-        path: '/student/courses',
-        builder: (context, state) => const MyCoursesScreen(),
-      ),
-      GoRoute(
-        path: '/student/quiz-history',
-        builder: (context, state) => const QuizHistoryScreen(),
+      // Student Routes with Bottom Navigation
+      StatefulShellRoute.indexedStack(
+        builder: (context, state, navigationShell) {
+          return StudentScaffold(navigationShell: navigationShell);
+        },
+        branches: [
+          StatefulShellBranch(
+            routes: [
+              GoRoute(
+                path: '/student/home',
+                builder: (context, state) => const StudentHomeScreen(),
+              ),
+            ],
+          ),
+          StatefulShellBranch(
+            routes: [
+              GoRoute(
+                path: '/student/courses',
+                builder: (context, state) => const MyCoursesScreen(),
+              ),
+            ],
+          ),
+          StatefulShellBranch(
+            routes: [
+              GoRoute(
+                path: '/student/progress',
+                builder: (context, state) => const MyProgressScreen(),
+              ),
+            ],
+          ),
+          StatefulShellBranch(
+            routes: [
+              GoRoute(
+                path: '/student/quiz-history',
+                builder: (context, state) => const QuizHistoryScreen(),
+              ),
+            ],
+          ),
+          StatefulShellBranch(
+            routes: [
+              GoRoute(
+                path: '/student/chat',
+                builder: (context, state) => const ChatListScreen(),
+              ),
+            ],
+          ),
+          StatefulShellBranch(
+            routes: [
+              GoRoute(
+                path: '/student/profile',
+                builder: (context, state) => const StudentProfileScreen(),
+              ),
+            ],
+          ),
+        ],
       ),
       // Admin Routes with Bottom Navigation
       StatefulShellRoute.indexedStack(

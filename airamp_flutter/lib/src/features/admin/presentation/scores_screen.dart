@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+﻿import 'package:flutter/material.dart';
 import '../../../core/theme/app_theme.dart';
 
 class ScoresScreen extends StatefulWidget {
@@ -21,7 +21,6 @@ class _ScoresScreenState extends State<ScoresScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: AppTheme.background,
       body: SafeArea(
         child: SingleChildScrollView(
           padding: const EdgeInsets.all(20),
@@ -37,15 +36,15 @@ class _ScoresScreenState extends State<ScoresScreen> {
                       color: AppTheme.primarySoft,
                       borderRadius: BorderRadius.circular(12),
                     ),
-                    child: const Icon(Icons.assignment_turned_in, color: AppTheme.primary, size: 28),
+                    child: Icon(Icons.assignment_turned_in, color: Theme.of(context).colorScheme.primary, size: 28),
                   ),
                   const SizedBox(width: 12),
                   Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
-                    children: const [
+                    children: [
                       Text(
                         'Student Quiz Scores',
-                        style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: AppTheme.text),
+                        style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: Theme.of(context).colorScheme.onSurface),
                       ),
                       SizedBox(height: 2),
                       Text(
@@ -64,16 +63,16 @@ class _ScoresScreenState extends State<ScoresScreen> {
                 style: const TextStyle(color: AppTheme.text),
                 decoration: InputDecoration(
                   hintText: 'Search student, subject, or quiz...',
-                  prefixIcon: const Icon(Icons.search, color: AppTheme.textMuted),
+                  prefixIcon: Icon(Icons.search, color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.4)),
                   filled: true,
-                  fillColor: AppTheme.surface,
+                  fillColor: Theme.of(context).colorScheme.surface,
                   border: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(12),
-                    borderSide: const BorderSide(color: AppTheme.border),
+                    borderSide: BorderSide(color: Theme.of(context).dividerColor),
                   ),
                   enabledBorder: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(12),
-                    borderSide: const BorderSide(color: AppTheme.border),
+                    borderSide: BorderSide(color: Theme.of(context).dividerColor),
                   ),
                 ),
               ),
@@ -87,8 +86,8 @@ class _ScoresScreenState extends State<ScoresScreen> {
                 icon: const Icon(Icons.filter_list, size: 16),
                 label: const Text('Filters'),
                 style: OutlinedButton.styleFrom(
-                  foregroundColor: AppTheme.primary,
-                  side: const BorderSide(color: AppTheme.border),
+                  foregroundColor: Theme.of(context).colorScheme.onPrimary,
+                  side: BorderSide(color: Theme.of(context).dividerColor),
                   shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
                   padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
                 ),
@@ -99,7 +98,7 @@ class _ScoresScreenState extends State<ScoresScreen> {
                 Container(
                   padding: const EdgeInsets.all(16),
                   decoration: BoxDecoration(
-                    color: AppTheme.surface,
+                    color: Theme.of(context).colorScheme.surface,
                     borderRadius: BorderRadius.circular(12),
                     border: Border.all(color: AppTheme.border),
                   ),
@@ -114,7 +113,7 @@ class _ScoresScreenState extends State<ScoresScreen> {
                           ChoiceChip(
                             label: const Text('All Sections'),
                             selected: true,
-                            selectedColor: AppTheme.primary,
+                            selectedColor: Theme.of(context).colorScheme.primary,
                             labelStyle: const TextStyle(color: Colors.black, fontWeight: FontWeight.w600),
                             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
                             onSelected: (_) {},
@@ -122,9 +121,9 @@ class _ScoresScreenState extends State<ScoresScreen> {
                           ChoiceChip(
                             label: const Text('STEM B'),
                             selected: false,
-                            backgroundColor: AppTheme.surface,
+                            backgroundColor: Theme.of(context).colorScheme.surface,
                             labelStyle: const TextStyle(color: AppTheme.textSecondary),
-                            side: const BorderSide(color: AppTheme.border),
+                            side: BorderSide(color: Theme.of(context).dividerColor),
                             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
                             onSelected: (_) {},
                           ),
@@ -144,15 +143,15 @@ class _ScoresScreenState extends State<ScoresScreen> {
                     Container(
                       padding: const EdgeInsets.all(20),
                       decoration: BoxDecoration(
-                        color: AppTheme.surface,
+                        color: Theme.of(context).colorScheme.surface,
                         shape: BoxShape.circle,
                       ),
-                      child: const Icon(Icons.assignment_turned_in_outlined, size: 48, color: AppTheme.textMuted),
+                      child: Icon(Icons.assignment_turned_in_outlined, size: 48, color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.4)),
                     ),
                     const SizedBox(height: 20),
-                    const Text(
+                    Text(
                       'No Quiz Scores Found',
-                      style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: AppTheme.text),
+                      style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Theme.of(context).colorScheme.onSurface),
                     ),
                     const SizedBox(height: 8),
                     const Padding(

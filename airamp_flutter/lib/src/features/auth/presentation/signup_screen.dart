@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+﻿import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../../core/theme/app_theme.dart';
@@ -98,12 +98,11 @@ class _SignupScreenState extends ConsumerState<SignupScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: AppTheme.background,
       appBar: AppBar(
         backgroundColor: Colors.transparent,
         elevation: 0,
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back, color: AppTheme.text),
+          icon: Icon(Icons.arrow_back, color: Theme.of(context).colorScheme.onSurface),
           onPressed: _prevStep,
         ),
       ),
@@ -117,10 +116,10 @@ class _SignupScreenState extends ConsumerState<SignupScreen> {
                 _step == 1 ? 'Create Account' 
                 : _step == 2 ? 'Select Section & Subjects' 
                 : 'Invitation Code',
-                style: const TextStyle(
+                style: TextStyle(
                   fontSize: 28,
                   fontWeight: FontWeight.bold,
-                  color: AppTheme.text,
+                  color: Theme.of(context).colorScheme.onSurface,
                 ),
               ),
               const SizedBox(height: 8),
@@ -128,9 +127,9 @@ class _SignupScreenState extends ConsumerState<SignupScreen> {
                 _step == 1 ? 'Join AIRA and start your learning journey'
                 : _step == 2 ? 'Choose your section and subjects to enroll in'
                 : 'Enter the invitation code provided by your instructor',
-                style: const TextStyle(
+                style: TextStyle(
                   fontSize: 14,
-                  color: AppTheme.textSecondary,
+                  color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6),
                 ),
               ),
               const SizedBox(height: 32),
@@ -163,7 +162,7 @@ class _SignupScreenState extends ConsumerState<SignupScreen> {
                   ),
                   child: Row(
                     children: [
-                      const Icon(Icons.error_outline, color: AppTheme.error, size: 20),
+                      Icon(Icons.error_outline, color: Theme.of(context).colorScheme.error, size: 20),
                       const SizedBox(width: 8),
                       Expanded(
                         child: Text(
@@ -187,7 +186,7 @@ class _SignupScreenState extends ConsumerState<SignupScreen> {
                 Container(
                   padding: const EdgeInsets.all(20),
                   decoration: BoxDecoration(
-                    color: AppTheme.surface,
+                    color: Theme.of(context).colorScheme.surface,
                     borderRadius: BorderRadius.circular(12),
                     border: Border.all(color: AppTheme.border),
                   ),
@@ -230,7 +229,7 @@ class _SignupScreenState extends ConsumerState<SignupScreen> {
       style: const TextStyle(color: AppTheme.text),
       decoration: InputDecoration(
         hintText: hint,
-        prefixIcon: Icon(icon, color: AppTheme.textMuted),
+        prefixIcon: Icon(icon, color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.4)),
       ),
     );
   }

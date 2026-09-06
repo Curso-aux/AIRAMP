@@ -12,95 +12,151 @@ class MyCoursesScreen extends ConsumerStatefulWidget {
 class _MyCoursesScreenState extends ConsumerState<MyCoursesScreen> {
   bool _showAvailable = false;
 
+  void _handleUnenroll(String subjectName) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        backgroundColor: AppTheme.surface,
+        title: const Text('Unenroll from Subject', style: TextStyle(color: AppTheme.text)),
+        content: Text('Remove "$subjectName" from your courses?\n\nYour progress will be preserved.', style: const TextStyle(color: AppTheme.textSecondary)),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Cancel', style: TextStyle(color: AppTheme.textMuted)),
+          ),
+          TextButton(
+            onPressed: () {
+              Navigator.pop(context);
+              // Implement unenroll logic here
+            },
+            child: const Text('Unenroll', style: TextStyle(color: AppTheme.error)),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _handleEnroll(String subjectName) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        backgroundColor: AppTheme.surface,
+        title: const Text('Enroll in Subject', style: TextStyle(color: AppTheme.text)),
+        content: Text('Add "$subjectName" to your courses?', style: const TextStyle(color: AppTheme.textSecondary)),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Cancel', style: TextStyle(color: AppTheme.textMuted)),
+          ),
+          TextButton(
+            onPressed: () {
+              Navigator.pop(context);
+              // Implement enroll logic here
+            },
+            child: const Text('Enroll', style: TextStyle(color: AppTheme.primary)),
+          ),
+        ],
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: AppTheme.background,
-      appBar: AppBar(
-        title: const Text('My Courses', style: TextStyle(color: AppTheme.text)),
-        backgroundColor: AppTheme.background,
-        iconTheme: const IconThemeData(color: AppTheme.text),
-      ),
       body: SafeArea(
-        child: SingleChildScrollView(
-          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              const Text(
-                'Your enrolled subjects',
-                style: TextStyle(fontSize: 14, color: AppTheme.textSecondary),
-              ),
-              const SizedBox(height: 24),
+        child: RefreshIndicator(
+          onRefresh: () async {
+            await Future.delayed(const Duration(seconds: 1));
+          },
+          color: AppTheme.primary,
+          child: SingleChildScrollView(
+            physics: const AlwaysScrollableScrollPhysics(),
+            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text(
+                  'My Courses',
+                  style: TextStyle(fontSize: 28, fontWeight: FontWeight.bold, color: AppTheme.text),
+                ),
+                const SizedBox(height: 4),
+                const Text(
+                  'Your enrolled subjects',
+                  style: TextStyle(fontSize: 14, color: AppTheme.textSecondary),
+                ),
+                const SizedBox(height: 24),
 
-              // Mock Enrolled Course
-              _buildCourseCard(
-                title: 'Introduction to Flutter',
-                code: 'CS101',
-                progress: 45,
-                unlockType: 'Flexible',
-              ),
-              const SizedBox(height: 14),
-              _buildCourseCard(
-                title: 'Advanced State Management',
-                code: 'CS202',
-                progress: 10,
-                unlockType: 'Sequential',
-              ),
+                // Mock Enrolled Courses
+                _buildCourseCard(
+                  title: 'Introduction to Flutter',
+                  code: 'CS101',
+                  progress: 45,
+                  unlockType: 'Flexible',
+                  completedLos: 4,
+                  totalLos: 9,
+                  cocs: 5,
+                ),
+                const SizedBox(height: 16),
+                _buildCourseCard(
+                  title: 'Advanced State Management',
+                  code: 'CS202',
+                  progress: 10,
+                  unlockType: 'Sequential',
+                  completedLos: 1,
+                  totalLos: 10,
+                  cocs: 2,
+                ),
 
-              const SizedBox(height: 24),
+                const SizedBox(height: 24),
 
-              // Add More Subjects Button
-              GestureDetector(
-                onTap: () {
-                  setState(() {
-                    _showAvailable = !_showAvailable;
-                  });
-                },
-                child: Container(
-                  width: double.infinity,
-                  padding: const EdgeInsets.symmetric(vertical: 14),
-                  decoration: BoxDecoration(
-                    borderRadius: BorderRadius.circular(12),
-                    border: Border.all(
-                      color: AppTheme.primary,
-                      style: BorderStyle.solid,
+                // Add More Subjects Button
+                GestureDetector(
+                  onTap: () {
+                    setState(() {
+                      _showAvailable = !_showAvailable;
+                    });
+                  },
+                  child: Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.symmetric(vertical: 14),
+                    decoration: BoxDecoration(
+                      color: AppTheme.primary.withValues(alpha: 0.1),
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(color: AppTheme.primary.withValues(alpha: 0.3)),
+                    ),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(
+                          _showAvailable ? Icons.remove_circle_outline : Icons.add_circle_outline,
+                          color: AppTheme.primary,
+                          size: 20,
+                        ),
+                        const SizedBox(width: 8),
+                        Text(
+                          _showAvailable ? 'Hide Available Subjects' : 'Add More Subjects',
+                          style: const TextStyle(
+                            color: AppTheme.primary,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ],
                     ),
                   ),
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Icon(
-                        _showAvailable ? Icons.remove : Icons.add,
-                        color: AppTheme.primary,
-                        size: 20,
-                      ),
-                      const SizedBox(width: 8),
-                      Text(
-                        _showAvailable
-                            ? 'Hide Available Subjects'
-                            : 'Add More Subjects',
-                        style: const TextStyle(
-                          color: AppTheme.primary,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                    ],
-                  ),
                 ),
-              ),
 
-              if (_showAvailable) ...[
-                const SizedBox(height: 16),
-                _buildAvailableCourseCard(
-                  title: 'React Native to Flutter Migration',
-                  code: 'CS303',
-                  description:
-                      'Learn how to migrate your existing React Native applications to Flutter.',
-                  unlockType: 'Flexible',
-                ),
+                if (_showAvailable) ...[
+                  const SizedBox(height: 16),
+                  _buildAvailableCourseCard(
+                    title: 'React Native to Flutter Migration',
+                    code: 'CS303',
+                    description: 'Learn how to migrate your existing React Native applications to Flutter.',
+                    unlockType: 'Flexible',
+                  ),
+                ],
               ],
-            ],
+            ),
           ),
         ),
       ),
@@ -112,6 +168,9 @@ class _MyCoursesScreenState extends ConsumerState<MyCoursesScreen> {
     required String code,
     required int progress,
     required String unlockType,
+    required int completedLos,
+    required int totalLos,
+    required int cocs,
   }) {
     return Container(
       decoration: BoxDecoration(
@@ -124,6 +183,7 @@ class _MyCoursesScreenState extends ConsumerState<MyCoursesScreen> {
           Padding(
             padding: const EdgeInsets.all(16.0),
             child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Container(
                   width: 56,
@@ -147,40 +207,27 @@ class _MyCoursesScreenState extends ConsumerState<MyCoursesScreen> {
                         children: [
                           Text(
                             code,
-                            style: const TextStyle(
-                              fontSize: 11,
-                              fontWeight: FontWeight.bold,
-                              color: AppTheme.primary,
-                            ),
+                            style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: AppTheme.primary),
                           ),
                           const SizedBox(width: 8),
                           Container(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 6,
-                              vertical: 2,
-                            ),
+                            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                             decoration: BoxDecoration(
-                              color: AppTheme.surfaceLight,
+                              color: AppTheme.surface,
                               borderRadius: BorderRadius.circular(4),
+                              border: Border.all(color: AppTheme.border),
                             ),
                             child: Row(
                               children: [
                                 Icon(
-                                  unlockType == 'Sequential'
-                                      ? Icons.lock
-                                      : Icons.lock_open,
+                                  unlockType == 'Sequential' ? Icons.lock : Icons.lock_open,
                                   size: 10,
-                                  color: unlockType == 'Sequential'
-                                      ? AppTheme.warning
-                                      : AppTheme.primary,
+                                  color: unlockType == 'Sequential' ? AppTheme.warning : AppTheme.primary,
                                 ),
                                 const SizedBox(width: 4),
                                 Text(
                                   unlockType,
-                                  style: const TextStyle(
-                                    fontSize: 9,
-                                    color: AppTheme.textSecondary,
-                                  ),
+                                  style: const TextStyle(fontSize: 10, color: AppTheme.textSecondary),
                                 ),
                               ],
                             ),
@@ -190,29 +237,31 @@ class _MyCoursesScreenState extends ConsumerState<MyCoursesScreen> {
                       const SizedBox(height: 4),
                       Text(
                         title,
-                        style: const TextStyle(
-                          fontSize: 15,
-                          fontWeight: FontWeight.bold,
-                          color: AppTheme.text,
-                        ),
+                        style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: AppTheme.text),
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
                       ),
-                      const SizedBox(height: 8),
+                      const SizedBox(height: 12),
                       LinearProgressIndicator(
                         value: progress / 100,
-                        backgroundColor: AppTheme.surfaceLight,
-                        valueColor: const AlwaysStoppedAnimation<Color>(
-                          AppTheme.primary,
-                        ),
+                        backgroundColor: AppTheme.border,
+                        color: AppTheme.primary,
                         minHeight: 6,
                         borderRadius: BorderRadius.circular(3),
                       ),
-                      const SizedBox(height: 4),
-                      Text(
-                        '$progress% Complete',
-                        style: const TextStyle(
-                          fontSize: 11,
-                          color: AppTheme.textMuted,
-                        ),
+                      const SizedBox(height: 6),
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Text(
+                            '$completedLos/$totalLos LOs · $cocs COCs',
+                            style: const TextStyle(fontSize: 12, color: AppTheme.textSecondary),
+                          ),
+                          Text(
+                            '$progress%',
+                            style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: AppTheme.primary),
+                          ),
+                        ],
                       ),
                     ],
                   ),
@@ -221,31 +270,23 @@ class _MyCoursesScreenState extends ConsumerState<MyCoursesScreen> {
               ],
             ),
           ),
-          Container(
-            width: double.infinity,
-            padding: const EdgeInsets.symmetric(vertical: 10),
-            decoration: const BoxDecoration(
-              border: Border(top: BorderSide(color: AppTheme.border)),
-              color: Color(0x08FF6B6B), // error color with 8% opacity
-            ),
-            child: const Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Icon(
-                  Icons.remove_circle_outline,
-                  color: AppTheme.error,
-                  size: 14,
-                ),
-                SizedBox(width: 6),
-                Text(
-                  'Unenroll',
-                  style: TextStyle(
-                    color: AppTheme.error,
-                    fontSize: 13,
-                    fontWeight: FontWeight.w500,
-                  ),
-                ),
-              ],
+          const Divider(height: 1, color: AppTheme.border),
+          InkWell(
+            onTap: () => _handleUnenroll(title),
+            child: Container(
+              width: double.infinity,
+              padding: const EdgeInsets.symmetric(vertical: 12),
+              decoration: const BoxDecoration(
+                borderRadius: BorderRadius.only(bottomLeft: Radius.circular(16), bottomRight: Radius.circular(16)),
+              ),
+              child: const Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(Icons.remove_circle_outline, color: AppTheme.error, size: 16),
+                  SizedBox(width: 6),
+                  Text('Unenroll', style: TextStyle(color: AppTheme.error, fontSize: 13, fontWeight: FontWeight.w600)),
+                ],
+              ),
             ),
           ),
         ],
@@ -263,87 +304,88 @@ class _MyCoursesScreenState extends ConsumerState<MyCoursesScreen> {
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
         color: AppTheme.surface,
-        borderRadius: BorderRadius.circular(14),
+        borderRadius: BorderRadius.circular(16),
         border: Border.all(color: AppTheme.border),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text(
-                code,
-                style: const TextStyle(
-                  fontSize: 11,
-                  fontWeight: FontWeight.bold,
-                  color: AppTheme.accent,
-                ),
-              ),
-              const SizedBox(width: 8),
               Container(
-                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                width: 48,
+                height: 48,
                 decoration: BoxDecoration(
-                  color: AppTheme.surfaceLight,
-                  borderRadius: BorderRadius.circular(4),
+                  color: AppTheme.primary.withValues(alpha: 0.1),
+                  borderRadius: BorderRadius.circular(12),
                 ),
-                child: Row(
+                child: const Icon(Icons.class_, color: AppTheme.primary, size: 24),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Icon(
-                      unlockType == 'Sequential' ? Icons.lock : Icons.lock_open,
-                      size: 10,
-                      color: unlockType == 'Sequential'
-                          ? AppTheme.warning
-                          : AppTheme.primary,
+                    Row(
+                      children: [
+                        Text(
+                          code,
+                          style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: AppTheme.primary),
+                        ),
+                        const SizedBox(width: 8),
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                          decoration: BoxDecoration(
+                            color: AppTheme.surface,
+                            borderRadius: BorderRadius.circular(4),
+                            border: Border.all(color: AppTheme.border),
+                          ),
+                          child: Row(
+                            children: [
+                              Icon(
+                                unlockType == 'Sequential' ? Icons.lock : Icons.lock_open,
+                                size: 10,
+                                color: unlockType == 'Sequential' ? AppTheme.warning : AppTheme.primary,
+                              ),
+                              const SizedBox(width: 4),
+                              Text(
+                                unlockType,
+                                style: const TextStyle(fontSize: 10, color: AppTheme.textSecondary),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
                     ),
-                    const SizedBox(width: 4),
+                    const SizedBox(height: 4),
                     Text(
-                      unlockType,
-                      style: const TextStyle(
-                        fontSize: 9,
-                        color: AppTheme.textSecondary,
-                      ),
+                      title,
+                      style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: AppTheme.text),
                     ),
                   ],
                 ),
               ),
             ],
           ),
-          const SizedBox(height: 4),
-          Text(
-            title,
-            style: const TextStyle(
-              fontSize: 15,
-              fontWeight: FontWeight.bold,
-              color: AppTheme.text,
-            ),
-          ),
-          const SizedBox(height: 4),
+          const SizedBox(height: 12),
           Text(
             description,
-            style: const TextStyle(fontSize: 12, color: AppTheme.textSecondary),
+            style: const TextStyle(fontSize: 13, color: AppTheme.textSecondary),
           ),
-          const SizedBox(height: 12),
-          Container(
+          const SizedBox(height: 16),
+          SizedBox(
             width: double.infinity,
-            padding: const EdgeInsets.symmetric(vertical: 10),
-            decoration: BoxDecoration(
-              color: AppTheme.primary,
-              borderRadius: BorderRadius.circular(10),
-            ),
-            child: const Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Icon(Icons.add, color: Colors.black, size: 16),
-                SizedBox(width: 6),
-                Text(
-                  'Enroll',
-                  style: TextStyle(
-                    color: Colors.black,
-                    fontSize: 14,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-              ],
+            child: ElevatedButton.icon(
+              onPressed: () => _handleEnroll(title),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppTheme.primary,
+                foregroundColor: Colors.white,
+                padding: const EdgeInsets.symmetric(vertical: 12),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+              ),
+              icon: const Icon(Icons.add, size: 18),
+              label: const Text('Enroll Now', style: TextStyle(fontWeight: FontWeight.bold)),
             ),
           ),
         ],

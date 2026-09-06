@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+﻿import 'package:flutter/material.dart';
 import '../../../core/theme/app_theme.dart';
 
 class SectionsMgmtScreen extends StatefulWidget {
@@ -39,7 +39,6 @@ class _SectionsMgmtScreenState extends State<SectionsMgmtScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: AppTheme.background,
       body: SafeArea(
         child: SingleChildScrollView(
           padding: const EdgeInsets.all(20),
@@ -53,9 +52,9 @@ class _SectionsMgmtScreenState extends State<SectionsMgmtScreen> {
                   Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      const Text(
+                      Text(
                         'Manage Sections',
-                        style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold, color: AppTheme.text),
+                        style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold, color: Theme.of(context).colorScheme.onSurface),
                       ),
                       const SizedBox(height: 4),
                       Text(
@@ -68,7 +67,7 @@ class _SectionsMgmtScreenState extends State<SectionsMgmtScreen> {
                     onPressed: () {
                       setState(() => _showForm = !_showForm);
                     },
-                    backgroundColor: AppTheme.primary,
+                    backgroundColor: Theme.of(context).colorScheme.primary,
                     child: Icon(_showForm ? Icons.close : Icons.add, color: Colors.black),
                   ),
                 ],
@@ -80,16 +79,16 @@ class _SectionsMgmtScreenState extends State<SectionsMgmtScreen> {
                 Container(
                   padding: const EdgeInsets.all(20),
                   decoration: BoxDecoration(
-                    color: AppTheme.surface,
+                    color: Theme.of(context).colorScheme.surface,
                     borderRadius: BorderRadius.circular(16),
                     border: Border.all(color: AppTheme.border),
                   ),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      const Text(
+                      Text(
                         'Add New Section',
-                        style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: AppTheme.text),
+                        style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Theme.of(context).colorScheme.onSurface),
                       ),
                       const SizedBox(height: 16),
                       TextField(
@@ -125,8 +124,8 @@ class _SectionsMgmtScreenState extends State<SectionsMgmtScreen> {
                             onSelected: (selected) {
                               setState(() => _selectedGrade = selected ? grade : '');
                             },
-                            selectedColor: AppTheme.primary,
-                            backgroundColor: AppTheme.surface,
+                            selectedColor: Theme.of(context).colorScheme.primary,
+                            backgroundColor: Theme.of(context).colorScheme.surface,
                             labelStyle: TextStyle(
                               color: isSelected ? Colors.black : AppTheme.textSecondary,
                               fontWeight: FontWeight.w600,
@@ -151,8 +150,8 @@ class _SectionsMgmtScreenState extends State<SectionsMgmtScreen> {
                                 });
                               },
                               style: OutlinedButton.styleFrom(
-                                foregroundColor: AppTheme.textSecondary,
-                                side: const BorderSide(color: AppTheme.border),
+                                foregroundColor: Theme.of(context).colorScheme.onPrimary,
+                                side: BorderSide(color: Theme.of(context).dividerColor),
                                 padding: const EdgeInsets.symmetric(vertical: 14),
                               ),
                               child: const Text('Cancel'),
@@ -222,7 +221,7 @@ class _SectionCardState extends State<_SectionCard> {
       margin: const EdgeInsets.only(bottom: 12),
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: AppTheme.surface,
+        color: Theme.of(context).colorScheme.surface,
         borderRadius: BorderRadius.circular(16),
         border: Border.all(color: AppTheme.border),
       ),
@@ -236,7 +235,7 @@ class _SectionCardState extends State<_SectionCard> {
                   children: [
                     Text(
                       widget.section['name'],
-                      style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: AppTheme.text),
+                      style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Theme.of(context).colorScheme.onSurface),
                     ),
                     if (widget.section['description'] != null && widget.section['description'].toString().isNotEmpty) ...[
                       const SizedBox(height: 4),
@@ -248,7 +247,7 @@ class _SectionCardState extends State<_SectionCard> {
                     const SizedBox(height: 8),
                     Row(
                       children: [
-                        const Icon(Icons.school_outlined, size: 14, color: AppTheme.primary),
+                        Icon(Icons.school_outlined, size: 14, color: Theme.of(context).colorScheme.primary),
                         const SizedBox(width: 4),
                         Text(
                           widget.section['grade'] ?? 'No grade',
@@ -259,7 +258,7 @@ class _SectionCardState extends State<_SectionCard> {
                     const SizedBox(height: 4),
                     Row(
                       children: [
-                        const Icon(Icons.people_outline, size: 14, color: AppTheme.primary),
+                        Icon(Icons.people_outline, size: 14, color: Theme.of(context).colorScheme.primary),
                         const SizedBox(width: 4),
                         Text(
                           '${widget.section['studentCount']} students',
@@ -274,7 +273,7 @@ class _SectionCardState extends State<_SectionCard> {
                 children: [
                   IconButton(
                     onPressed: () {},
-                    icon: const Icon(Icons.edit, color: AppTheme.primary, size: 18),
+                    icon: Icon(Icons.edit, color: Theme.of(context).colorScheme.primary, size: 18),
                     style: IconButton.styleFrom(
                       backgroundColor: AppTheme.primarySoft,
                       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
@@ -283,7 +282,7 @@ class _SectionCardState extends State<_SectionCard> {
                   const SizedBox(width: 4),
                   IconButton(
                     onPressed: widget.onDelete,
-                    icon: const Icon(Icons.delete_outline, color: AppTheme.error, size: 18),
+                    icon: Icon(Icons.delete_outline, color: Theme.of(context).colorScheme.error, size: 18),
                     style: IconButton.styleFrom(
                       backgroundColor: AppTheme.errorSoft,
                       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
@@ -292,7 +291,7 @@ class _SectionCardState extends State<_SectionCard> {
                   const SizedBox(width: 4),
                   IconButton(
                     onPressed: () => setState(() => _isExpanded = !_isExpanded),
-                    icon: Icon(_isExpanded ? Icons.expand_less : Icons.expand_more, color: AppTheme.textSecondary, size: 20),
+                    icon: Icon(_isExpanded ? Icons.expand_less : Icons.expand_more, color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6), size: 20),
                   ),
                 ],
               ),
@@ -304,7 +303,7 @@ class _SectionCardState extends State<_SectionCard> {
             // Tabs
             Container(
               decoration: BoxDecoration(
-                color: AppTheme.background,
+                color: Theme.of(context).scaffoldBackgroundColor,
                 borderRadius: BorderRadius.circular(8),
               ),
               child: Row(
@@ -395,7 +394,7 @@ class _SectionCardState extends State<_SectionCard> {
               children: [
                 IconButton(
                   onPressed: () {},
-                  icon: const Icon(Icons.visibility_outlined, size: 16, color: AppTheme.primary),
+                  icon: Icon(Icons.visibility_outlined, size: 16, color: Theme.of(context).colorScheme.primary),
                   style: IconButton.styleFrom(backgroundColor: AppTheme.background, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8))),
                 ),
                 const SizedBox(width: 4),
@@ -407,13 +406,13 @@ class _SectionCardState extends State<_SectionCard> {
                 const SizedBox(width: 4),
                 IconButton(
                   onPressed: () {},
-                  icon: const Icon(Icons.archive_outlined, size: 16, color: AppTheme.textSecondary),
+                  icon: Icon(Icons.archive_outlined, size: 16, color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6)),
                   style: IconButton.styleFrom(backgroundColor: AppTheme.background, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8))),
                 ),
                 const SizedBox(width: 4),
                 IconButton(
                   onPressed: () {},
-                  icon: const Icon(Icons.delete_outline, size: 16, color: AppTheme.error),
+                  icon: Icon(Icons.delete_outline, size: 16, color: Theme.of(context).colorScheme.error),
                   style: IconButton.styleFrom(backgroundColor: AppTheme.background, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8))),
                 ),
               ],
@@ -442,8 +441,7 @@ class _SectionCardState extends State<_SectionCard> {
                   label: Text(sub),
                   selected: isSelected,
                   onSelected: (val) => setState(() => _selectedSubject = sub),
-                  selectedColor: AppTheme.primary,
-                  backgroundColor: AppTheme.background,
+                  selectedColor: Theme.of(context).colorScheme.primary,
                   labelStyle: TextStyle(
                     color: isSelected ? Colors.black : AppTheme.textSecondary,
                     fontWeight: FontWeight.bold,

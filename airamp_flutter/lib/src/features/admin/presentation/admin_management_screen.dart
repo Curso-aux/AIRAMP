@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+﻿import 'package:flutter/material.dart';
 import '../../../core/theme/app_theme.dart';
 
 class AdminManagementScreen extends StatelessWidget {
@@ -7,10 +7,8 @@ class AdminManagementScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: AppTheme.background,
       appBar: AppBar(
         title: const Text('Super Admin Management', style: TextStyle(color: AppTheme.text)),
-        backgroundColor: AppTheme.background,
         iconTheme: const IconThemeData(color: AppTheme.text),
       ),
       body: const Center(

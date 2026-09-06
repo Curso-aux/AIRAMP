@@ -20,7 +20,6 @@ class _SubjectsMgmtScreenState extends ConsumerState<SubjectsMgmtScreen> {
     final subjects = ref.watch(subjectsProvider);
 
     return Scaffold(
-      backgroundColor: AppTheme.background,
       body: SafeArea(
         child: SingleChildScrollView(
           padding: const EdgeInsets.all(20),
@@ -28,9 +27,9 @@ class _SubjectsMgmtScreenState extends ConsumerState<SubjectsMgmtScreen> {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               // Header
-              const Text(
+              Text(
                 'Manage Subjects',
-                style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold, color: AppTheme.text),
+                style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold, color: Theme.of(context).colorScheme.onSurface),
               ),
               const SizedBox(height: 4),
               const Text(
@@ -47,7 +46,7 @@ class _SubjectsMgmtScreenState extends ConsumerState<SubjectsMgmtScreen> {
                   icon: const Icon(Icons.add, color: Colors.black),
                   label: const Text('Create New Subject'),
                   style: ElevatedButton.styleFrom(
-                    backgroundColor: AppTheme.primary,
+                    backgroundColor: Theme.of(context).colorScheme.primary,
                     foregroundColor: Colors.black,
                     padding: const EdgeInsets.symmetric(vertical: 14),
                     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
@@ -62,14 +61,14 @@ class _SubjectsMgmtScreenState extends ConsumerState<SubjectsMgmtScreen> {
                 width: double.infinity,
                 child: OutlinedButton.icon(
                   onPressed: () => _showCreateSubjectDialog(context, autoExpandGlobal: true),
-                  icon: const Icon(Icons.public, color: AppTheme.text),
+                  icon: Icon(Icons.public, color: Theme.of(context).colorScheme.onSurface),
                   label: const Text('Adopt Global Subject'),
                   style: OutlinedButton.styleFrom(
-                    foregroundColor: AppTheme.text,
+                    foregroundColor: Theme.of(context).colorScheme.onPrimary,
                     padding: const EdgeInsets.symmetric(vertical: 14),
                     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                    side: const BorderSide(color: AppTheme.border),
-                    backgroundColor: AppTheme.surface,
+                    side: BorderSide(color: Theme.of(context).dividerColor),
+                    backgroundColor: Theme.of(context).colorScheme.surface,
                     textStyle: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
                   ),
                 ),
@@ -87,8 +86,8 @@ class _SubjectsMgmtScreenState extends ConsumerState<SubjectsMgmtScreen> {
                     onSelected: (selected) {
                       setState(() => _selectedFilter = index);
                     },
-                    selectedColor: AppTheme.primary,
-                    backgroundColor: AppTheme.surface,
+                    selectedColor: Theme.of(context).colorScheme.primary,
+                    backgroundColor: Theme.of(context).colorScheme.surface,
                     labelStyle: TextStyle(
                       color: isSelected ? Colors.black : AppTheme.textSecondary,
                       fontWeight: FontWeight.w600,
@@ -110,7 +109,7 @@ class _SubjectsMgmtScreenState extends ConsumerState<SubjectsMgmtScreen> {
                     padding: const EdgeInsets.only(top: 24.0),
                     child: Column(
                       children: [
-                        Icon(Icons.menu_book, size: 64, color: AppTheme.textMuted.withOpacity(0.5)),
+                        Icon(Icons.menu_book, size: 64, color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.4).withOpacity(0.5)),
                         const SizedBox(height: 16),
                         const Text(
                           'No subjects created yet',
@@ -150,7 +149,7 @@ class _SubjectsMgmtScreenState extends ConsumerState<SubjectsMgmtScreen> {
         margin: const EdgeInsets.only(bottom: 16),
         padding: const EdgeInsets.all(16),
         decoration: BoxDecoration(
-          color: AppTheme.surface,
+          color: Theme.of(context).colorScheme.surface,
           borderRadius: BorderRadius.circular(12),
           border: Border.all(color: AppTheme.border),
         ),
@@ -164,7 +163,7 @@ class _SubjectsMgmtScreenState extends ConsumerState<SubjectsMgmtScreen> {
                   Container(
                     padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                     decoration: BoxDecoration(
-                      color: AppTheme.primary.withValues(alpha: 0.15),
+                      color: Theme.of(context).colorScheme.primary.withValues(alpha: 0.15),
                       borderRadius: BorderRadius.circular(4),
                     ),
                     child: Text(
@@ -177,13 +176,13 @@ class _SubjectsMgmtScreenState extends ConsumerState<SubjectsMgmtScreen> {
                   Container(
                     padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                     decoration: BoxDecoration(
-                      color: AppTheme.primary.withValues(alpha: 0.1),
+                      color: Theme.of(context).colorScheme.primary.withValues(alpha: 0.1),
                       borderRadius: BorderRadius.circular(4),
                     ),
-                    child: const Row(
+                    child: Row(
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        Icon(Icons.auto_awesome, size: 12, color: AppTheme.primary),
+                        Icon(Icons.auto_awesome, size: 12, color: Theme.of(context).colorScheme.primary),
                         SizedBox(width: 4),
                         Text('Adapted Copy', style: TextStyle(color: AppTheme.primary, fontSize: 11)),
                       ],
@@ -194,7 +193,7 @@ class _SubjectsMgmtScreenState extends ConsumerState<SubjectsMgmtScreen> {
                 Container(
                   padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                   decoration: BoxDecoration(
-                    color: AppTheme.background,
+                    color: Theme.of(context).scaffoldBackgroundColor,
                     borderRadius: BorderRadius.circular(4),
                   ),
                   child: Row(
@@ -203,7 +202,7 @@ class _SubjectsMgmtScreenState extends ConsumerState<SubjectsMgmtScreen> {
                       Icon(
                         unlockType == 'Sequential' ? Icons.lock_outline : Icons.lock_open_outlined,
                         size: 12,
-                        color: AppTheme.textSecondary,
+                        color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6),
                       ),
                       const SizedBox(width: 4),
                       Text(
@@ -236,7 +235,7 @@ class _SubjectsMgmtScreenState extends ConsumerState<SubjectsMgmtScreen> {
             // Bottom row: student count + action buttons
             Row(
               children: [
-                const Icon(Icons.groups_outlined, size: 16, color: AppTheme.primary),
+                Icon(Icons.groups_outlined, size: 16, color: Theme.of(context).colorScheme.primary),
                 const SizedBox(width: 4),
                 const Text(
                   '0 students',
@@ -246,21 +245,21 @@ class _SubjectsMgmtScreenState extends ConsumerState<SubjectsMgmtScreen> {
                 if (isAdopted)
                   _actionIconButton(
                     icon: Icons.cancel_outlined,
-                    color: AppTheme.error,
+                    color: Theme.of(context).colorScheme.error,
                     bgColor: AppTheme.error.withValues(alpha: 0.15),
                     onTap: () => _confirmDelete(context, subject, ref),
                   ),
                 if (isAdopted) const SizedBox(width: 8),
                 _actionIconButton(
                   icon: Icons.edit_outlined,
-                  color: AppTheme.primary,
+                  color: Theme.of(context).colorScheme.primary,
                   bgColor: AppTheme.primary.withValues(alpha: 0.15),
                   onTap: () => _showEditSubjectDialog(context, subject, ref),
                 ),
                 const SizedBox(width: 8),
                 _actionIconButton(
                   icon: Icons.delete_outline,
-                  color: AppTheme.error,
+                  color: Theme.of(context).colorScheme.error,
                   bgColor: AppTheme.error.withValues(alpha: 0.15),
                   onTap: () => _confirmDelete(context, subject, ref),
                 ),
@@ -295,7 +294,7 @@ class _SubjectsMgmtScreenState extends ConsumerState<SubjectsMgmtScreen> {
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
-        backgroundColor: AppTheme.surface,
+        backgroundColor: Theme.of(context).colorScheme.surface,
         title: const Text('Delete Subject', style: TextStyle(color: AppTheme.text)),
         content: Text('Are you sure you want to delete "${subject['name']}"?',
             style: const TextStyle(color: AppTheme.textSecondary)),
@@ -413,8 +412,8 @@ class _CreateSubjectSheetState extends ConsumerState<_CreateSubjectSheet> {
   @override
   Widget build(BuildContext context) {
     return Container(
-      decoration: const BoxDecoration(
-        color: AppTheme.background,
+      decoration: BoxDecoration(
+        color: Theme.of(context).scaffoldBackgroundColor,
         borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
       ),
       padding: EdgeInsets.only(
@@ -426,8 +425,8 @@ class _CreateSubjectSheetState extends ConsumerState<_CreateSubjectSheet> {
         crossAxisAlignment: CrossAxisAlignment.start,
         mainAxisSize: MainAxisSize.min,
         children: [
-          const Text('Create New Subject',
-              style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: AppTheme.text)),
+          Text('Create New Subject',
+              style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: Theme.of(context).colorScheme.onSurface)),
           const SizedBox(height: 20),
           Expanded(
             child: SingleChildScrollView(
@@ -440,14 +439,14 @@ class _CreateSubjectSheetState extends ConsumerState<_CreateSubjectSheet> {
                     child: Container(
                       padding: const EdgeInsets.all(16),
                       decoration: BoxDecoration(
-                        color: AppTheme.surface,
+                        color: Theme.of(context).colorScheme.surface,
                         borderRadius: BorderRadius.circular(12),
                         border: Border.all(color: AppTheme.border),
                       ),
                       child: Row(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          const Icon(Icons.link, color: AppTheme.primary, size: 20),
+                          Icon(Icons.link, color: Theme.of(context).colorScheme.primary, size: 20),
                           const SizedBox(width: 12),
                           Expanded(
                             child: Column(
@@ -464,7 +463,7 @@ class _CreateSubjectSheetState extends ConsumerState<_CreateSubjectSheet> {
                             ),
                           ),
                           Icon(_isExpanded ? Icons.keyboard_arrow_up : Icons.keyboard_arrow_down,
-                              color: AppTheme.textSecondary),
+                              color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6)),
                         ],
                       ),
                     ),
@@ -482,7 +481,7 @@ class _CreateSubjectSheetState extends ConsumerState<_CreateSubjectSheet> {
                             padding: const EdgeInsets.symmetric(horizontal: 16.0),
                             child: Text('or create your own below',
                                 style: TextStyle(
-                                    color: AppTheme.textMuted.withValues(alpha: 0.5),
+                                    color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.4).withValues(alpha: 0.5),
                                     fontSize: 12,
                                     fontStyle: FontStyle.italic)),
                           ),
@@ -513,8 +512,7 @@ class _CreateSubjectSheetState extends ConsumerState<_CreateSubjectSheet> {
                         label: Text(grade),
                         selected: isSelected,
                         onSelected: (selected) => setState(() => _selectedGrade = selected ? grade : null),
-                        selectedColor: AppTheme.surface,
-                        backgroundColor: AppTheme.background,
+                        selectedColor: Theme.of(context).colorScheme.surface,
                         labelStyle: TextStyle(
                           color: isSelected ? AppTheme.text : AppTheme.textSecondary,
                           fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
@@ -538,8 +536,7 @@ class _CreateSubjectSheetState extends ConsumerState<_CreateSubjectSheet> {
                         label: Text(sem),
                         selected: isSelected,
                         onSelected: (selected) => setState(() => _selectedSemester = selected ? sem : null),
-                        selectedColor: AppTheme.surface,
-                        backgroundColor: AppTheme.background,
+                        selectedColor: Theme.of(context).colorScheme.surface,
                         labelStyle: TextStyle(
                           color: isSelected ? AppTheme.text : AppTheme.textSecondary,
                           fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
@@ -580,8 +577,8 @@ class _CreateSubjectSheetState extends ConsumerState<_CreateSubjectSheet> {
                   child: OutlinedButton(
                     onPressed: () => Navigator.pop(context),
                     style: OutlinedButton.styleFrom(
-                      foregroundColor: AppTheme.textSecondary,
-                      side: const BorderSide(color: AppTheme.border),
+                      foregroundColor: Theme.of(context).colorScheme.onPrimary,
+                      side: BorderSide(color: Theme.of(context).dividerColor),
                       padding: const EdgeInsets.symmetric(vertical: 16),
                       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                     ),
@@ -593,7 +590,7 @@ class _CreateSubjectSheetState extends ConsumerState<_CreateSubjectSheet> {
                   child: ElevatedButton(
                     onPressed: _saveSubject,
                     style: ElevatedButton.styleFrom(
-                      backgroundColor: AppTheme.primary,
+                      backgroundColor: Theme.of(context).colorScheme.primary,
                       foregroundColor: Colors.black,
                       padding: const EdgeInsets.symmetric(vertical: 16),
                       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
@@ -614,7 +611,7 @@ class _CreateSubjectSheetState extends ConsumerState<_CreateSubjectSheet> {
       margin: const EdgeInsets.only(bottom: 12),
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: AppTheme.surface,
+        color: Theme.of(context).colorScheme.surface,
         borderRadius: BorderRadius.circular(12),
         border: Border.all(color: AppTheme.border),
       ),
@@ -626,7 +623,7 @@ class _CreateSubjectSheetState extends ConsumerState<_CreateSubjectSheet> {
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
                 decoration: BoxDecoration(
-                  color: AppTheme.primary.withValues(alpha: 0.2),
+                  color: Theme.of(context).colorScheme.primary.withValues(alpha: 0.2),
                   borderRadius: BorderRadius.circular(4),
                 ),
                 child: Text(sub['code']!,
@@ -636,13 +633,13 @@ class _CreateSubjectSheetState extends ConsumerState<_CreateSubjectSheet> {
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
                 decoration: BoxDecoration(
-                  color: AppTheme.background,
+                  color: Theme.of(context).scaffoldBackgroundColor,
                   borderRadius: BorderRadius.circular(4),
                 ),
-                child: const Row(
+                child: Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    Icon(Icons.language, size: 12, color: AppTheme.textSecondary),
+                    Icon(Icons.language, size: 12, color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6)),
                     SizedBox(width: 4),
                     Text('Global', style: TextStyle(color: AppTheme.textSecondary, fontSize: 12)),
                   ],
@@ -662,7 +659,7 @@ class _CreateSubjectSheetState extends ConsumerState<_CreateSubjectSheet> {
               icon: const Icon(Icons.person_add_alt, size: 18, color: Colors.black),
               label: const Text('Adopt This', style: TextStyle(fontWeight: FontWeight.bold)),
               style: ElevatedButton.styleFrom(
-                backgroundColor: AppTheme.primary,
+                backgroundColor: Theme.of(context).colorScheme.primary,
                 foregroundColor: Colors.black,
                 padding: const EdgeInsets.symmetric(vertical: 12),
                 shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
@@ -682,7 +679,7 @@ class _CreateSubjectSheetState extends ConsumerState<_CreateSubjectSheet> {
       decoration: InputDecoration(
         hintText: hint,
         filled: true,
-        fillColor: AppTheme.surface,
+        fillColor: Theme.of(context).colorScheme.surface,
         border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
       ),
     );
@@ -697,7 +694,7 @@ class _CreateSubjectSheetState extends ConsumerState<_CreateSubjectSheet> {
       child: Container(
         padding: const EdgeInsets.all(16),
         decoration: BoxDecoration(
-          color: isSelected ? AppTheme.primary : AppTheme.surface,
+          color: isSelected ? AppTheme.primary : Theme.of(context).colorScheme.surface,
           borderRadius: BorderRadius.circular(12),
           border: isSelected ? null : Border.all(color: AppTheme.border),
         ),
@@ -766,8 +763,8 @@ class _EditSubjectSheetState extends ConsumerState<_EditSubjectSheet> {
   @override
   Widget build(BuildContext context) {
     return Container(
-      decoration: const BoxDecoration(
-        color: AppTheme.background,
+      decoration: BoxDecoration(
+        color: Theme.of(context).scaffoldBackgroundColor,
         borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
       ),
       padding: EdgeInsets.only(
@@ -779,8 +776,8 @@ class _EditSubjectSheetState extends ConsumerState<_EditSubjectSheet> {
         crossAxisAlignment: CrossAxisAlignment.start,
         mainAxisSize: MainAxisSize.min,
         children: [
-          const Text('Edit Subject',
-              style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: AppTheme.text)),
+          Text('Edit Subject',
+              style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: Theme.of(context).colorScheme.onSurface)),
           const SizedBox(height: 20),
           Expanded(
             child: SingleChildScrollView(
@@ -806,8 +803,7 @@ class _EditSubjectSheetState extends ConsumerState<_EditSubjectSheet> {
                         label: Text(grade),
                         selected: isSelected,
                         onSelected: (selected) => setState(() => _selectedGrade = selected ? grade : null),
-                        selectedColor: AppTheme.surface,
-                        backgroundColor: AppTheme.background,
+                        selectedColor: Theme.of(context).colorScheme.surface,
                         labelStyle: TextStyle(
                           color: isSelected ? AppTheme.text : AppTheme.textSecondary,
                           fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
@@ -831,8 +827,7 @@ class _EditSubjectSheetState extends ConsumerState<_EditSubjectSheet> {
                         label: Text(sem),
                         selected: isSelected,
                         onSelected: (selected) => setState(() => _selectedSemester = selected ? sem : null),
-                        selectedColor: AppTheme.surface,
-                        backgroundColor: AppTheme.background,
+                        selectedColor: Theme.of(context).colorScheme.surface,
                         labelStyle: TextStyle(
                           color: isSelected ? AppTheme.text : AppTheme.textSecondary,
                           fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
@@ -873,8 +868,8 @@ class _EditSubjectSheetState extends ConsumerState<_EditSubjectSheet> {
                   child: OutlinedButton(
                     onPressed: () => Navigator.pop(context),
                     style: OutlinedButton.styleFrom(
-                      foregroundColor: AppTheme.textSecondary,
-                      side: const BorderSide(color: AppTheme.border),
+                      foregroundColor: Theme.of(context).colorScheme.onPrimary,
+                      side: BorderSide(color: Theme.of(context).dividerColor),
                       padding: const EdgeInsets.symmetric(vertical: 16),
                       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                     ),
@@ -896,7 +891,7 @@ class _EditSubjectSheetState extends ConsumerState<_EditSubjectSheet> {
                       Navigator.pop(context);
                     },
                     style: ElevatedButton.styleFrom(
-                      backgroundColor: AppTheme.primary,
+                      backgroundColor: Theme.of(context).colorScheme.primary,
                       foregroundColor: Colors.black,
                       padding: const EdgeInsets.symmetric(vertical: 16),
                       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
@@ -920,7 +915,7 @@ class _EditSubjectSheetState extends ConsumerState<_EditSubjectSheet> {
       decoration: InputDecoration(
         hintText: hint,
         filled: true,
-        fillColor: AppTheme.surface,
+        fillColor: Theme.of(context).colorScheme.surface,
         border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
       ),
     );
@@ -935,7 +930,7 @@ class _EditSubjectSheetState extends ConsumerState<_EditSubjectSheet> {
       child: Container(
         padding: const EdgeInsets.all(16),
         decoration: BoxDecoration(
-          color: isSelected ? AppTheme.primary : AppTheme.surface,
+          color: isSelected ? AppTheme.primary : Theme.of(context).colorScheme.surface,
           borderRadius: BorderRadius.circular(12),
           border: isSelected ? null : Border.all(color: AppTheme.border),
         ),

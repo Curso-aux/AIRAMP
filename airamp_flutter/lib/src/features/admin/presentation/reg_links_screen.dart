@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+﻿import 'package:flutter/material.dart';
 import '../../../core/theme/app_theme.dart';
 
 class RegLinksScreen extends StatefulWidget {
@@ -23,7 +23,6 @@ class _RegLinksScreenState extends State<RegLinksScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: AppTheme.background,
       body: SafeArea(
         child: SingleChildScrollView(
           padding: const EdgeInsets.all(20),
@@ -31,12 +30,12 @@ class _RegLinksScreenState extends State<RegLinksScreen> {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               // Header
-              const Text(
+              Text(
                 'Student Access',
                 style: TextStyle(
                   fontSize: 24,
                   fontWeight: FontWeight.bold,
-                  color: AppTheme.text,
+                  color: Theme.of(context).colorScheme.onSurface,
                 ),
               ),
               const SizedBox(height: 4),
@@ -54,18 +53,18 @@ class _RegLinksScreenState extends State<RegLinksScreen> {
                   color: AppTheme.primarySoft,
                   borderRadius: BorderRadius.circular(12),
                   border: Border.all(
-                    color: AppTheme.primary.withValues(alpha: 0.3),
+                    color: Theme.of(context).colorScheme.primary.withValues(alpha: 0.3),
                   ),
                 ),
                 child: Row(
-                  children: const [
-                    Icon(Icons.info_outline, color: AppTheme.primary, size: 20),
+                  children: [
+                    Icon(Icons.info_outline, color: Theme.of(context).colorScheme.primary, size: 20),
                     SizedBox(width: 12),
                     Expanded(
                       child: Text(
                         'Registration links are scoped to your organization and never expose another Admin\'s students.',
                         style: TextStyle(
-                          color: AppTheme.text,
+                          color: Theme.of(context).colorScheme.onSurface,
                           fontSize: 13,
                           height: 1.4,
                         ),
@@ -84,10 +83,10 @@ class _RegLinksScreenState extends State<RegLinksScreen> {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        const Text(
+                        Text(
                           'Expiration',
                           style: TextStyle(
-                            color: AppTheme.textSecondary,
+                            color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6),
                             fontSize: 13,
                           ),
                         ),
@@ -97,23 +96,23 @@ class _RegLinksScreenState extends State<RegLinksScreen> {
                           style: const TextStyle(color: AppTheme.text),
                           decoration: InputDecoration(
                             hintText: 'YYYY-MM-DD (optional)',
-                            prefixIcon: const Icon(
+                            prefixIcon: Icon(
                               Icons.calendar_today,
-                              color: AppTheme.textMuted,
+                              color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.4),
                               size: 18,
                             ),
                             filled: true,
-                            fillColor: AppTheme.surface,
+                            fillColor: Theme.of(context).colorScheme.surface,
                             border: OutlineInputBorder(
                               borderRadius: BorderRadius.circular(12),
-                              borderSide: const BorderSide(
-                                color: AppTheme.border,
+                              borderSide: BorderSide(
+                                color: Theme.of(context).dividerColor,
                               ),
                             ),
                             enabledBorder: OutlineInputBorder(
                               borderRadius: BorderRadius.circular(12),
-                              borderSide: const BorderSide(
-                                color: AppTheme.border,
+                              borderSide: BorderSide(
+                                color: Theme.of(context).dividerColor,
                               ),
                             ),
                           ),
@@ -127,10 +126,10 @@ class _RegLinksScreenState extends State<RegLinksScreen> {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        const Text(
+                        Text(
                           'Max uses',
                           style: TextStyle(
-                            color: AppTheme.textSecondary,
+                            color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6),
                             fontSize: 13,
                           ),
                         ),
@@ -142,17 +141,17 @@ class _RegLinksScreenState extends State<RegLinksScreen> {
                           textAlign: TextAlign.center,
                           decoration: InputDecoration(
                             filled: true,
-                            fillColor: AppTheme.surface,
+                            fillColor: Theme.of(context).colorScheme.surface,
                             border: OutlineInputBorder(
                               borderRadius: BorderRadius.circular(12),
-                              borderSide: const BorderSide(
-                                color: AppTheme.border,
+                              borderSide: BorderSide(
+                                color: Theme.of(context).dividerColor,
                               ),
                             ),
                             enabledBorder: OutlineInputBorder(
                               borderRadius: BorderRadius.circular(12),
-                              borderSide: const BorderSide(
-                                color: AppTheme.border,
+                              borderSide: BorderSide(
+                                color: Theme.of(context).dividerColor,
                               ),
                             ),
                           ),
@@ -184,7 +183,7 @@ class _RegLinksScreenState extends State<RegLinksScreen> {
                   icon: const Icon(Icons.add, color: Colors.black),
                   label: const Text('Generate Student Link'),
                   style: ElevatedButton.styleFrom(
-                    backgroundColor: AppTheme.primary,
+                    backgroundColor: Theme.of(context).colorScheme.primary,
                     foregroundColor: Colors.black,
                     padding: const EdgeInsets.symmetric(vertical: 16),
                     shape: RoundedRectangleBorder(
@@ -200,12 +199,12 @@ class _RegLinksScreenState extends State<RegLinksScreen> {
               const SizedBox(height: 32),
 
               // Your Student Links Section
-              const Text(
+              Text(
                 'Your student links',
                 style: TextStyle(
                   fontSize: 16,
                   fontWeight: FontWeight.bold,
-                  color: AppTheme.text,
+                  color: Theme.of(context).colorScheme.onSurface,
                 ),
               ),
               const SizedBox(height: 16),
@@ -215,7 +214,7 @@ class _RegLinksScreenState extends State<RegLinksScreen> {
                   width: double.infinity,
                   padding: const EdgeInsets.symmetric(vertical: 40),
                   decoration: BoxDecoration(
-                    color: AppTheme.surface,
+                    color: Theme.of(context).colorScheme.surface,
                     borderRadius: BorderRadius.circular(12),
                     border: Border.all(color: AppTheme.border),
                   ),
@@ -224,13 +223,13 @@ class _RegLinksScreenState extends State<RegLinksScreen> {
                       Icon(
                         Icons.vpn_key_outlined,
                         size: 48,
-                        color: AppTheme.textMuted.withValues(alpha: 0.5),
+                        color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.4).withValues(alpha: 0.5),
                       ),
                       const SizedBox(height: 12),
-                      const Text(
+                      Text(
                         'No student links yet',
                         style: TextStyle(
-                          color: AppTheme.textMuted,
+                          color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.4),
                           fontSize: 14,
                         ),
                       ),
@@ -251,7 +250,7 @@ class _RegLinksScreenState extends State<RegLinksScreen> {
       margin: const EdgeInsets.only(bottom: 12),
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: AppTheme.surface,
+        color: Theme.of(context).colorScheme.surface,
         borderRadius: BorderRadius.circular(12),
         border: Border.all(color: AppTheme.border),
       ),
@@ -260,13 +259,13 @@ class _RegLinksScreenState extends State<RegLinksScreen> {
         children: [
           Row(
             children: [
-              const Icon(Icons.link, color: AppTheme.primary, size: 18),
+              Icon(Icons.link, color: Theme.of(context).colorScheme.primary, size: 18),
               const SizedBox(width: 8),
               Expanded(
                 child: Text(
                   link['code'],
-                  style: const TextStyle(
-                    color: AppTheme.text,
+                  style: TextStyle(
+                    color: Theme.of(context).colorScheme.onSurface,
                     fontWeight: FontWeight.bold,
                     fontSize: 15,
                   ),
@@ -282,15 +281,15 @@ class _RegLinksScreenState extends State<RegLinksScreen> {
                     ),
                   );
                 },
-                icon: const Icon(Icons.copy, color: AppTheme.primary, size: 18),
+                icon: Icon(Icons.copy, color: Theme.of(context).colorScheme.primary, size: 18),
               ),
               IconButton(
                 onPressed: () {
                   setState(() => _links.remove(link));
                 },
-                icon: const Icon(
+                icon: Icon(
                   Icons.delete_outline,
-                  color: AppTheme.error,
+                  color: Theme.of(context).colorScheme.error,
                   size: 18,
                 ),
               ),
@@ -305,8 +304,8 @@ class _RegLinksScreenState extends State<RegLinksScreen> {
             const SizedBox(height: 4),
             Text(
               'Expires: ${link['expiration']}',
-              style: const TextStyle(
-                color: AppTheme.textSecondary,
+              style: TextStyle(
+                color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6),
                 fontSize: 12,
               ),
             ),

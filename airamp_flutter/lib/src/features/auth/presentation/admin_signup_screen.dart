@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+﻿import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../../core/theme/app_theme.dart';
@@ -56,12 +56,11 @@ class _AdminSignupScreenState extends ConsumerState<AdminSignupScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: AppTheme.background,
       appBar: AppBar(
         backgroundColor: Colors.transparent,
         elevation: 0,
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back, color: AppTheme.text),
+          icon: Icon(Icons.arrow_back, color: Theme.of(context).colorScheme.onSurface),
           onPressed: () => context.pop(),
         ),
       ),
@@ -71,20 +70,20 @@ class _AdminSignupScreenState extends ConsumerState<AdminSignupScreen> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              const Text(
+              Text(
                 'Teacher Registration',
                 style: TextStyle(
                   fontSize: 28,
                   fontWeight: FontWeight.bold,
-                  color: AppTheme.text,
+                  color: Theme.of(context).colorScheme.onSurface,
                 ),
               ),
               const SizedBox(height: 8),
-              const Text(
+              Text(
                 'Register with a valid @deped.gov.ph email address',
                 style: TextStyle(
                   fontSize: 14,
-                  color: AppTheme.textSecondary,
+                  color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6),
                 ),
               ),
               const SizedBox(height: 32),
@@ -100,7 +99,7 @@ class _AdminSignupScreenState extends ConsumerState<AdminSignupScreen> {
                   ),
                   child: Row(
                     children: [
-                      const Icon(Icons.error_outline, color: AppTheme.error, size: 20),
+                      Icon(Icons.error_outline, color: Theme.of(context).colorScheme.error, size: 20),
                       const SizedBox(width: 8),
                       Expanded(
                         child: Text(
@@ -139,7 +138,7 @@ class _AdminSignupScreenState extends ConsumerState<AdminSignupScreen> {
       style: const TextStyle(color: AppTheme.text),
       decoration: InputDecoration(
         hintText: hint,
-        prefixIcon: Icon(icon, color: AppTheme.textMuted),
+        prefixIcon: Icon(icon, color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.4)),
       ),
     );
   }
