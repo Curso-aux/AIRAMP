@@ -113,6 +113,17 @@ class SectionsNotifier extends Notifier<List<Map<String, dynamic>>> {
   }
 }
 
+// --- Count Providers (for dashboard stats) ---
+final subjectsCountProvider = Provider<int>((ref) {
+  final subjects = ref.watch(subjectsProvider);
+  return subjects.length;
+});
+
+final sectionsCountProvider = Provider<int>((ref) {
+  final sections = ref.watch(sectionsProvider);
+  return sections.length;
+});
+
 // --- Registration Links ---
 final regLinksProvider = NotifierProvider<RegLinksNotifier, List<Map<String, dynamic>>>(() {
   return RegLinksNotifier();

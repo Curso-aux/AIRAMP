@@ -11,6 +11,11 @@ class AdminDashboardScreen extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final currentUser = ref.watch(authProvider);
     final announcements = ref.watch(announcementsProvider);
+    final subjects = ref.watch(subjectsProvider);
+    final sections = ref.watch(sectionsProvider);
+
+    final subjectsCount = subjects.length;
+    final sectionsCount = sections.length;
     
     final initial = currentUser?.fullName.isNotEmpty == true 
         ? currentUser!.fullName[0].toUpperCase() 
@@ -52,11 +57,11 @@ class AdminDashboardScreen extends ConsumerWidget {
               // Stats Cards Row
               Row(
                 children: [
-                  Expanded(child: _buildStatCard(context, 'Students', Icons.people_outline, '1')),
+                  Expanded(child: _buildStatCard(context, 'Students', Icons.people_outline, subjectsCount.toString())),
                   const SizedBox(width: 12),
-                  Expanded(child: _buildStatCard(context, 'Subjects', Icons.menu_book, '0')),
+                  Expanded(child: _buildStatCard(context, 'Subjects', Icons.menu_book, sectionsCount.toString())),
                   const SizedBox(width: 12),
-                  Expanded(child: _buildStatCard(context, 'Sections', Icons.layers, '1')),
+                  Expanded(child: _buildStatCard(context, 'Sections', Icons.layers, sectionsCount.toString())),
                 ],
               ),
               const SizedBox(height: 32),
