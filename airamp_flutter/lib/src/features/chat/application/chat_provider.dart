@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../data/chat_repository.dart';
 import '../domain/chat_models.dart';
 import '../../auth/application/auth_provider.dart';
+import '../../../core/api/api_client.dart';
 
 final chatRepositoryProvider = Provider<ChatRepository>((ref) {
   return ChatRepository();
@@ -63,7 +64,7 @@ class ChatNotifier extends Notifier<ChatState> {
 
   void _connectAndLoad(String userId) {
     final repo = ref.read(chatRepositoryProvider);
-    final token = ref.read(authProvider)?.sessionToken ?? '';
+    final token = ApiClient.hasSession ? userId : '';
 
     _subscription?.cancel();
     final stream = repo.connect(userId, token);
