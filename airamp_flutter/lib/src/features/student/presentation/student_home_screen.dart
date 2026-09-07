@@ -3,6 +3,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../auth/application/auth_provider.dart';
 
+import '../data/student_repository.dart';
+
 class StudentHomeScreen extends ConsumerStatefulWidget {
   const StudentHomeScreen({super.key});
 
@@ -16,7 +18,10 @@ class _StudentHomeScreenState extends ConsumerState<StudentHomeScreen> {
   @override
   Widget build(BuildContext context) {
     final currentUser = ref.watch(authProvider);
+    final courses = ref.watch(studentCoursesProvider);
     if (currentUser == null) return const SizedBox.shrink();
+
+    final activeCourses = courses.length;
 
     return Scaffold(
       backgroundColor: AppTheme.background,
@@ -81,11 +86,11 @@ class _StudentHomeScreenState extends ConsumerState<StudentHomeScreen> {
                 // Quick Stats
                 Row(
                   children: [
-                    Expanded(child: _buildStatCard('Active Courses', Icons.book, '3', AppTheme.primary)),
+                    Expanded(child: _buildStatCard('Active Courses', Icons.book, activeCourses.toString(), AppTheme.primary)),
                     const SizedBox(width: 12),
-                    Expanded(child: _buildStatCard('Lessons Done', Icons.check_circle, '12', AppTheme.success)),
+                    Expanded(child: _buildStatCard('Lessons Done', Icons.check_circle, '0', AppTheme.success)),
                     const SizedBox(width: 12),
-                    Expanded(child: _buildStatCard('Pending', Icons.schedule, '4', AppTheme.warning)),
+                    Expanded(child: _buildStatCard('Pending', Icons.schedule, '0', AppTheme.warning)),
                   ],
                 ),
                 const SizedBox(height: 32),
