@@ -1,5 +1,8 @@
+import 'package:dio/dio.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:sqflite/sqflite.dart';
 import '../../../core/database/database_helper.dart';
+import '../../../core/api/api_client.dart';
 
 // --- Announcements ---
 final announcementsProvider = NotifierProvider<AnnouncementsNotifier, List<Map<String, dynamic>>>(() {
@@ -44,6 +47,8 @@ final subjectsProvider = NotifierProvider<SubjectsNotifier, List<Map<String, dyn
 });
 
 class SubjectsNotifier extends Notifier<List<Map<String, dynamic>>> {
+  final Dio? _dio;
+  SubjectsNotifier({Dio? dio}) : _dio = dio ?? (ApiClient.isCloudAvailable ? ApiClient.instance : null);
   @override
   List<Map<String, dynamic>> build() {
     _loadSubjects();
@@ -53,6 +58,22 @@ class SubjectsNotifier extends Notifier<List<Map<String, dynamic>>> {
   Future<void> _loadSubjects() async {
     final db = await DatabaseHelper().database;
     final List<Map<String, dynamic>> maps = await db.query('subjects', orderBy: 'id DESC');
+    if (_dio != null && ApiClient.isCloudAvailable) {
+      try {
+        final resp = await _dio.get('/v1/api/subjects');
+        final remote = resp.data;
+        if (remote is Map && remote['subjects'] is List) {
+          final remoteList = (remote['subjects'] as List).cast<Map<String, dynamic>>();
+          for (final s in remoteList) {
+            await db.insert('subjects', s, conflictAlgorithm: ConflictAlgorithm.replace);
+          }
+          state = await db.query('subjects', orderBy: 'id DESC');
+          return;
+        }
+      } on DioException {
+        // fall through to local data
+      }
+    }
     state = maps;
   }
 
