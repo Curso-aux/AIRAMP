@@ -21,7 +21,7 @@ class DatabaseHelper {
 
     return await openDatabase(
       path,
-      version: 8,
+      version: 9,
       onCreate: _onCreate,
       onUpgrade: _onUpgrade,
     );
@@ -173,6 +173,18 @@ class DatabaseHelper {
         created_at TEXT NOT NULL
       )
     ''');
+
+    // Sessions Table (auth session storage for v9)
+    await db.execute('''
+      CREATE TABLE sessions (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        user_id TEXT NOT NULL,
+        token TEXT NOT NULL UNIQUE,
+        role TEXT NOT NULL,
+        created_at TEXT NOT NULL,
+        expires_at TEXT
+      )
+    ''');
   }
 
   Future<void> _onUpgrade(Database db, int oldVersion, int newVersion) async {
@@ -295,6 +307,19 @@ class DatabaseHelper {
       await db.execute('ALTER TABLE learning_outcomes ADD COLUMN schedule_end TEXT;');
       await db.execute('ALTER TABLE learning_outcomes ADD COLUMN timezone TEXT;');
       await db.execute('ALTER TABLE learning_outcomes ADD COLUMN allow_extend INTEGER DEFAULT 0;');
+    }
+
+    if (oldVersion < 9) {
+      await db.execute('''
+        CREATE TABLE IF NOT EXISTS sessions (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          user_id TEXT NOT NULL,
+          token TEXT NOT NULL UNIQUE,
+          role TEXT NOT NULL,
+          created_at TEXT NOT NULL,
+          expires_at TEXT
+        )
+      ''');
     }
   }
 }
