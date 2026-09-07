@@ -1,4 +1,4 @@
----
+xx---
 name: rork-airamp-full-migration
 description: Full migration spec: clone rork-aira-main (React Native/Expo) into airamp_flutter, connecting to existing functions/ backend. Multi-session architectural work.
 metadata:

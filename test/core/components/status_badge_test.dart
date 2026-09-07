@@ -1,0 +1,1 @@
+import package:flutter_test/flutter_test.dart; import package:airamp_flutter/src/core/components/status_badge.dart; void main() { test("StatusBadge renders label", () { expect(StatusBadge(label: "Active"), isA<StatusBadge>()); }); }

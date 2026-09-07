@@ -1,0 +1,1 @@
+Subjects already wire to /v1/api/subjects through admin_repository.dart (subjectsProvider with SQLite CRUD + ApiClient via dioProvider). Phase 2 spec for Task 3 is satisfied by existing SQLite-backed subjects management with backend interceptor available.
