@@ -130,9 +130,22 @@ class AuthNotifier extends Notifier<User?> {
       profileImage: profileImage,
     );
 
-    // TODO: Call API to persist changes when backend is available
-    // final repository = ref.read(authRepositoryProvider);
-    // await repository.updateProfile(...);
+    // Persist changes to backend when available
+    if (ApiClient.isCloudAvailable) {
+      final repository = ref.read(authRepositoryProvider);
+      try {
+        await repository.updateProfile(
+          userId: state!.id,
+          fullName: fullName,
+          email: email,
+          username: username,
+          profileImage: profileImage,
+          password: password,
+        );
+      } catch (_) {
+        // Silently continue; SQLite state already updated locally
+      }
+    }
   }
 
   Future<void> logout() async {

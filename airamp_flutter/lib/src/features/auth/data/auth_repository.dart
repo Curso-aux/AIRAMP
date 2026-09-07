@@ -119,6 +119,29 @@ class AuthRepository {
     );
   }
 
+  Future<void> updateProfile({
+    required String userId,
+    String? fullName,
+    String? username,
+    String? email,
+    String? profileImage,
+    String? password,
+  }) async {
+    if (ApiClient.isCloudAvailable) {
+      try {
+        await _dio.put('/v1/api/users/$userId', data: {
+          if (fullName != null) 'fullName': fullName,
+          if (username != null) 'username': username,
+          if (email != null) 'email': email,
+          if (profileImage != null) 'profileImage': profileImage,
+          if (password != null) 'password': password,
+        });
+      } on DioException {
+        // Fall through; local SQLite is already updated via authProvider
+      }
+    }
+  }
+
   Future<void> logout() async {
     final db = await DatabaseHelper().database;
     final session = await currentSession();
