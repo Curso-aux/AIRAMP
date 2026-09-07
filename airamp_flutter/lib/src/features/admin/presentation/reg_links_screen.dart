@@ -1,4 +1,4 @@
-﻿import 'package:flutter/material.dart';
+import 'package:flutter/material.dart';
 import '../../../core/theme/app_theme.dart';
 
 class RegLinksScreen extends StatefulWidget {
@@ -168,17 +168,20 @@ class _RegLinksScreenState extends State<RegLinksScreen> {
                 width: double.infinity,
                 child: ElevatedButton.icon(
                   onPressed: () {
+                    final code = 'AIRA-${DateTime.now().millisecondsSinceEpoch.toString().substring(7)}';
                     setState(() {
                       _links.add({
-                        'code':
-                            'AIRA-${DateTime.now().millisecondsSinceEpoch.toString().substring(7)}',
+                        'code': code,
                         'maxUses': int.tryParse(_maxUsesController.text) ?? 1,
                         'usedCount': 0,
                         'expiration': _expirationController.text.isNotEmpty
                             ? _expirationController.text
                             : null,
+                        'createdAt': '${DateTime.now().month}/${DateTime.now().day}/${DateTime.now().year}',
+                        'isActive': true,
                       });
                     });
+                    _showGeneratedCodeModal(code);
                   },
                   icon: const Icon(Icons.add, color: Colors.black),
                   label: const Text('Generate Student Link'),
@@ -245,71 +248,194 @@ class _RegLinksScreenState extends State<RegLinksScreen> {
     );
   }
 
+  void _showGeneratedCodeModal(String code) {
+    showDialog(
+      context: context,
+      builder: (context) {
+        return AlertDialog(
+          backgroundColor: Theme.of(context).colorScheme.surface,
+          title: const Text('Link Generated Successfully', style: TextStyle(color: AppTheme.text)),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Text('Here is your new student registration code:', style: TextStyle(color: AppTheme.textSecondary)),
+              const SizedBox(height: 20),
+              Container(
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: AppTheme.background,
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: AppTheme.primary.withValues(alpha: 0.5)),
+                ),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Text(
+                      code,
+                      style: const TextStyle(
+                        fontSize: 24,
+                        fontWeight: FontWeight.bold,
+                        color: AppTheme.primary,
+                        letterSpacing: 2,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('Close'),
+            ),
+            ElevatedButton.icon(
+              onPressed: () {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text('Code copied!'), duration: Duration(seconds: 1)),
+                );
+                Navigator.pop(context);
+              },
+              icon: const Icon(Icons.copy, size: 16),
+              label: const Text('Copy Code'),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
   Widget _buildLinkCard(Map<String, dynamic> link) {
+    final createdDate = link['createdAt'] ?? '9/7/2026';
+    final expires = link['expiration'] ?? 'Never';
+    final uses = '${link['usedCount']} / ${link['maxUses']}';
+    final bool isActive = link['isActive'] ?? true;
+    
     return Container(
-      margin: const EdgeInsets.only(bottom: 12),
-      padding: const EdgeInsets.all(16),
+      margin: const EdgeInsets.only(bottom: 16),
+      padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
         color: Theme.of(context).colorScheme.surface,
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(16),
         border: Border.all(color: AppTheme.border),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Icon(Icons.link, color: Theme.of(context).colorScheme.primary, size: 18),
-              const SizedBox(width: 8),
-              Expanded(
-                child: Text(
-                  link['code'],
-                  style: TextStyle(
-                    color: Theme.of(context).colorScheme.onSurface,
-                    fontWeight: FontWeight.bold,
-                    fontSize: 15,
-                  ),
-                ),
-              ),
-              IconButton(
-                onPressed: () {
-                  // Copy to clipboard
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(
-                      content: Text('Link copied!'),
-                      duration: Duration(seconds: 1),
+              Row(
+                children: [
+                  Text(
+                    link['code'],
+                    style: const TextStyle(
+                      color: AppTheme.text,
+                      fontWeight: FontWeight.bold,
+                      fontSize: 20,
+                      letterSpacing: 1,
                     ),
-                  );
-                },
-                icon: Icon(Icons.copy, color: Theme.of(context).colorScheme.primary, size: 18),
+                  ),
+                  const SizedBox(width: 8),
+                  IconButton(
+                    padding: EdgeInsets.zero,
+                    constraints: const BoxConstraints(),
+                    icon: Icon(Icons.content_copy, color: Theme.of(context).colorScheme.primary, size: 18),
+                    onPressed: () {
+                      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Link copied!'), duration: Duration(seconds: 1)));
+                    },
+                  ),
+                ],
               ),
-              IconButton(
-                onPressed: () {
-                  setState(() => _links.remove(link));
-                },
-                icon: Icon(
-                  Icons.delete_outline,
-                  color: Theme.of(context).colorScheme.error,
-                  size: 18,
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                decoration: BoxDecoration(
+                  color: isActive ? AppTheme.primarySoft.withValues(alpha: 0.2) : Theme.of(context).colorScheme.error.withValues(alpha: 0.2),
+                  borderRadius: BorderRadius.circular(12),
                 ),
+                child: Text(isActive ? 'Active' : 'Inactive', style: TextStyle(color: isActive ? AppTheme.primary : Theme.of(context).colorScheme.error, fontSize: 12, fontWeight: FontWeight.bold)),
               ),
             ],
           ),
-          const SizedBox(height: 8),
-          Text(
-            'Uses: ${link['usedCount']} / ${link['maxUses']}',
-            style: const TextStyle(color: AppTheme.textSecondary, fontSize: 12),
-          ),
-          if (link['expiration'] != null) ...[
-            const SizedBox(height: 4),
-            Text(
-              'Expires: ${link['expiration']}',
-              style: TextStyle(
-                color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6),
-                fontSize: 12,
+          const SizedBox(height: 20),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text('Created', style: TextStyle(color: AppTheme.textSecondary, fontSize: 11)),
+                  const SizedBox(height: 4),
+                  Text(createdDate, style: const TextStyle(color: AppTheme.text, fontSize: 13, fontWeight: FontWeight.bold)),
+                ],
               ),
-            ),
-          ],
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text('Expires', style: TextStyle(color: AppTheme.textSecondary, fontSize: 11)),
+                  const SizedBox(height: 4),
+                  Text(expires, style: const TextStyle(color: AppTheme.text, fontSize: 13, fontWeight: FontWeight.bold)),
+                ],
+              ),
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text('Uses', style: TextStyle(color: AppTheme.textSecondary, fontSize: 11)),
+                  const SizedBox(height: 4),
+                  Text(uses, style: const TextStyle(color: AppTheme.text, fontSize: 13, fontWeight: FontWeight.bold)),
+                ],
+              ),
+              const SizedBox(width: 24), // Spacing for alignment
+            ],
+          ),
+          const SizedBox(height: 20),
+          Row(
+            children: [
+              if (isActive)
+                Expanded(
+                  child: TextButton.icon(
+                    onPressed: () {},
+                    icon: const Icon(Icons.share_outlined, size: 18),
+                    label: const Text('Share'),
+                    style: TextButton.styleFrom(
+                      foregroundColor: AppTheme.primary,
+                      backgroundColor: AppTheme.primarySoft.withValues(alpha: 0.1),
+                      padding: const EdgeInsets.symmetric(vertical: 12),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                    ),
+                  ),
+                ),
+              if (isActive) const SizedBox(width: 12),
+              if (isActive)
+                Expanded(
+                  child: TextButton.icon(
+                    onPressed: () => setState(() => link['isActive'] = false),
+                    icon: const Icon(Icons.block, size: 18),
+                    label: const Text('Deactivate'),
+                    style: TextButton.styleFrom(
+                      foregroundColor: Colors.orange,
+                      backgroundColor: Colors.orange.withValues(alpha: 0.1),
+                      padding: const EdgeInsets.symmetric(vertical: 12),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                    ),
+                  ),
+                ),
+              if (!isActive)
+                Expanded(
+                  child: TextButton.icon(
+                    onPressed: () => setState(() => _links.remove(link)),
+                    icon: const Icon(Icons.delete_outline, size: 18),
+                    label: const Text('Delete permanently'),
+                    style: TextButton.styleFrom(
+                      foregroundColor: Theme.of(context).colorScheme.error,
+                      backgroundColor: Theme.of(context).colorScheme.error.withValues(alpha: 0.1),
+                      padding: const EdgeInsets.symmetric(vertical: 12),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                    ),
+                  ),
+                ),
+            ],
+          ),
         ],
       ),
     );
