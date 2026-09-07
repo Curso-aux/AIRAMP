@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/theme/app_theme.dart';
+import '../../../core/theme/theme_provider.dart';
 import '../../auth/application/auth_provider.dart';
 
 import '../data/student_repository.dart';
@@ -13,10 +14,9 @@ class StudentHomeScreen extends ConsumerStatefulWidget {
 }
 
 class _StudentHomeScreenState extends ConsumerState<StudentHomeScreen> {
-  bool _showNotifications = false;
-
   @override
   Widget build(BuildContext context) {
+    ref.watch(themeProvider);
     final currentUser = ref.watch(authProvider);
     final courses = ref.watch(studentCoursesProvider);
     if (currentUser == null) return const SizedBox.shrink();
@@ -51,7 +51,7 @@ class _StudentHomeScreenState extends ConsumerState<StudentHomeScreen> {
                           ),
                           Text(
                             currentUser.fullName,
-                            style: const TextStyle(
+                            style: TextStyle(
                               fontSize: 24,
                               fontWeight: FontWeight.bold,
                               color: AppTheme.text,
@@ -98,9 +98,9 @@ class _StudentHomeScreenState extends ConsumerState<StudentHomeScreen> {
                 // Active Announcements
                 Row(
                   children: [
-                    const Icon(Icons.campaign, color: AppTheme.warning, size: 20),
+                    Icon(Icons.campaign, color: AppTheme.warning, size: 20),
                     const SizedBox(width: 8),
-                    const Text(
+                    Text(
                       'Announcements',
                       style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: AppTheme.text),
                     ),
@@ -114,9 +114,9 @@ class _StudentHomeScreenState extends ConsumerState<StudentHomeScreen> {
                 // Continue Learning
                 Row(
                   children: [
-                    const Icon(Icons.play_circle_outline, color: AppTheme.primary, size: 20),
+                    Icon(Icons.play_circle_outline, color: AppTheme.primary, size: 20),
                     const SizedBox(width: 8),
-                    const Text(
+                    Text(
                       'Continue Learning',
                       style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: AppTheme.text),
                     ),
@@ -146,12 +146,12 @@ class _StudentHomeScreenState extends ConsumerState<StudentHomeScreen> {
           const SizedBox(height: 8),
           Text(
             value,
-            style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: AppTheme.text),
+            style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: AppTheme.text),
           ),
           const SizedBox(height: 4),
           Text(
             title,
-            style: const TextStyle(fontSize: 11, color: AppTheme.textSecondary),
+            style: TextStyle(fontSize: 11, color: AppTheme.textSecondary),
             textAlign: TextAlign.center,
           ),
         ],
@@ -162,8 +162,7 @@ class _StudentHomeScreenState extends ConsumerState<StudentHomeScreen> {
   Widget _buildBellButton() {
     return GestureDetector(
       onTap: () {
-        setState(() => _showNotifications = true);
-        // Show modal or dialog
+        // Show notifications modal or dialog
       },
       child: Container(
         width: 44,
@@ -206,9 +205,9 @@ class _StudentHomeScreenState extends ConsumerState<StudentHomeScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(title, style: const TextStyle(fontWeight: FontWeight.bold, color: AppTheme.text, fontSize: 16)),
+          Text(title, style: TextStyle(fontWeight: FontWeight.bold, color: AppTheme.text, fontSize: 16)),
           const SizedBox(height: 6),
-          Text(body, style: const TextStyle(color: AppTheme.textSecondary)),
+          Text(body, style: TextStyle(color: AppTheme.textSecondary)),
         ],
       ),
     );
@@ -231,20 +230,20 @@ class _StudentHomeScreenState extends ConsumerState<StudentHomeScreen> {
               color: AppTheme.primary.withValues(alpha: 0.1),
               borderRadius: BorderRadius.circular(8),
             ),
-            child: const Icon(Icons.book, color: AppTheme.primary),
+            child: Icon(Icons.book, color: AppTheme.primary),
           ),
           const SizedBox(width: 16),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(subject, style: const TextStyle(fontWeight: FontWeight.bold, color: AppTheme.text)),
+                Text(subject, style: TextStyle(fontWeight: FontWeight.bold, color: AppTheme.text)),
                 const SizedBox(height: 4),
-                Text(topic, style: const TextStyle(color: AppTheme.textSecondary, fontSize: 12)),
+                Text(topic, style: TextStyle(color: AppTheme.textSecondary, fontSize: 12)),
               ],
             ),
           ),
-          const Icon(Icons.chevron_right, color: AppTheme.textMuted),
+          Icon(Icons.chevron_right, color: AppTheme.textMuted),
         ],
       ),
     );

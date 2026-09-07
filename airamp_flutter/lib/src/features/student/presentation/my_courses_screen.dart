@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/theme/app_theme.dart';
+import '../../../core/theme/theme_provider.dart';
 import '../data/student_repository.dart';
 
 class MyCoursesScreen extends ConsumerStatefulWidget {
@@ -18,19 +19,19 @@ class _MyCoursesScreenState extends ConsumerState<MyCoursesScreen> {
       context: context,
       builder: (context) => AlertDialog(
         backgroundColor: AppTheme.surface,
-        title: const Text('Unenroll from Subject', style: TextStyle(color: AppTheme.text)),
-        content: Text('Remove "$subjectName" from your courses?\n\nYour progress will be preserved.', style: const TextStyle(color: AppTheme.textSecondary)),
+        title: Text('Unenroll from Subject', style: TextStyle(color: AppTheme.text)),
+        content: Text('Remove "$subjectName" from your courses?\n\nYour progress will be preserved.', style: TextStyle(color: AppTheme.textSecondary)),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context),
-            child: const Text('Cancel', style: TextStyle(color: AppTheme.textMuted)),
+            child: Text('Cancel', style: TextStyle(color: AppTheme.textMuted)),
           ),
           TextButton(
             onPressed: () {
               Navigator.pop(context);
               // Implement unenroll logic here
             },
-            child: const Text('Unenroll', style: TextStyle(color: AppTheme.error)),
+            child: Text('Unenroll', style: TextStyle(color: AppTheme.error)),
           ),
         ],
       ),
@@ -42,19 +43,19 @@ class _MyCoursesScreenState extends ConsumerState<MyCoursesScreen> {
       context: context,
       builder: (context) => AlertDialog(
         backgroundColor: AppTheme.surface,
-        title: const Text('Enroll in Subject', style: TextStyle(color: AppTheme.text)),
-        content: Text('Add "$subjectName" to your courses?', style: const TextStyle(color: AppTheme.textSecondary)),
+        title: Text('Enroll in Subject', style: TextStyle(color: AppTheme.text)),
+        content: Text('Add "$subjectName" to your courses?', style: TextStyle(color: AppTheme.textSecondary)),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context),
-            child: const Text('Cancel', style: TextStyle(color: AppTheme.textMuted)),
+            child: Text('Cancel', style: TextStyle(color: AppTheme.textMuted)),
           ),
           TextButton(
             onPressed: () {
               Navigator.pop(context);
               // Implement enroll logic here
             },
-            child: const Text('Enroll', style: TextStyle(color: AppTheme.primary)),
+            child: Text('Enroll', style: TextStyle(color: AppTheme.primary)),
           ),
         ],
       ),
@@ -63,6 +64,7 @@ class _MyCoursesScreenState extends ConsumerState<MyCoursesScreen> {
 
   @override
   Widget build(BuildContext context) {
+    ref.watch(themeProvider);
     final courses = ref.watch(studentCoursesProvider);
 
     return Scaffold(
@@ -79,12 +81,12 @@ class _MyCoursesScreenState extends ConsumerState<MyCoursesScreen> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Text(
+                Text(
                   'My Courses',
                   style: TextStyle(fontSize: 28, fontWeight: FontWeight.bold, color: AppTheme.text),
                 ),
                 const SizedBox(height: 4),
-                const Text(
+                Text(
                   'Your enrolled subjects',
                   style: TextStyle(fontSize: 14, color: AppTheme.textSecondary),
                 ),
@@ -92,7 +94,7 @@ class _MyCoursesScreenState extends ConsumerState<MyCoursesScreen> {
 
                 // Enrolled Courses from provider
                 if (courses.isEmpty)
-                  const Center(
+                  Center(
                     child: Padding(
                       padding: EdgeInsets.symmetric(vertical: 32),
                       child: Text('No courses enrolled yet.', style: TextStyle(color: AppTheme.textMuted)),
@@ -140,7 +142,7 @@ class _MyCoursesScreenState extends ConsumerState<MyCoursesScreen> {
                         const SizedBox(width: 8),
                         Text(
                           _showAvailable ? 'Hide Available Subjects' : 'Add More Subjects',
-                          style: const TextStyle(
+                          style: TextStyle(
                             color: AppTheme.primary,
                             fontWeight: FontWeight.bold,
                           ),
@@ -196,7 +198,7 @@ class _MyCoursesScreenState extends ConsumerState<MyCoursesScreen> {
                     color: AppTheme.primary.withValues(alpha: 0.1),
                     borderRadius: BorderRadius.circular(14),
                   ),
-                  child: const Icon(
+                  child: Icon(
                     Icons.menu_book,
                     color: AppTheme.primary,
                     size: 28,
@@ -211,7 +213,7 @@ class _MyCoursesScreenState extends ConsumerState<MyCoursesScreen> {
                         children: [
                           Text(
                             code,
-                            style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: AppTheme.primary),
+                            style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: AppTheme.primary),
                           ),
                           const SizedBox(width: 8),
                           Container(
@@ -231,7 +233,7 @@ class _MyCoursesScreenState extends ConsumerState<MyCoursesScreen> {
                                 const SizedBox(width: 4),
                                 Text(
                                   unlockType,
-                                  style: const TextStyle(fontSize: 10, color: AppTheme.textSecondary),
+                                  style: TextStyle(fontSize: 10, color: AppTheme.textSecondary),
                                 ),
                               ],
                             ),
@@ -241,7 +243,7 @@ class _MyCoursesScreenState extends ConsumerState<MyCoursesScreen> {
                       const SizedBox(height: 4),
                       Text(
                         title,
-                        style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: AppTheme.text),
+                        style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: AppTheme.text),
                         maxLines: 2,
                         overflow: TextOverflow.ellipsis,
                       ),
@@ -259,22 +261,22 @@ class _MyCoursesScreenState extends ConsumerState<MyCoursesScreen> {
                         children: [
                           Text(
                             '$completedLos/$totalLos LOs · $cocs COCs',
-                            style: const TextStyle(fontSize: 12, color: AppTheme.textSecondary),
+                            style: TextStyle(fontSize: 12, color: AppTheme.textSecondary),
                           ),
                           Text(
                             '$progress%',
-                            style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: AppTheme.primary),
+                            style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: AppTheme.primary),
                           ),
                         ],
                       ),
                     ],
                   ),
                 ),
-                const Icon(Icons.chevron_right, color: AppTheme.textMuted),
+                Icon(Icons.chevron_right, color: AppTheme.textMuted),
               ],
             ),
           ),
-          const Divider(height: 1, color: AppTheme.border),
+          Divider(height: 1, color: AppTheme.border),
           InkWell(
             onTap: () => _handleUnenroll(title),
             child: Container(
@@ -283,7 +285,7 @@ class _MyCoursesScreenState extends ConsumerState<MyCoursesScreen> {
               decoration: const BoxDecoration(
                 borderRadius: BorderRadius.only(bottomLeft: Radius.circular(16), bottomRight: Radius.circular(16)),
               ),
-              child: const Row(
+              child: Row(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
                   Icon(Icons.remove_circle_outline, color: AppTheme.error, size: 16),
@@ -324,7 +326,7 @@ class _MyCoursesScreenState extends ConsumerState<MyCoursesScreen> {
                   color: AppTheme.primary.withValues(alpha: 0.1),
                   borderRadius: BorderRadius.circular(12),
                 ),
-                child: const Icon(Icons.class_, color: AppTheme.primary, size: 24),
+                child: Icon(Icons.class_, color: AppTheme.primary, size: 24),
               ),
               const SizedBox(width: 12),
               Expanded(
@@ -335,7 +337,7 @@ class _MyCoursesScreenState extends ConsumerState<MyCoursesScreen> {
                       children: [
                         Text(
                           code,
-                          style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: AppTheme.primary),
+                          style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: AppTheme.primary),
                         ),
                         const SizedBox(width: 8),
                         Container(
@@ -355,7 +357,7 @@ class _MyCoursesScreenState extends ConsumerState<MyCoursesScreen> {
                               const SizedBox(width: 4),
                               Text(
                                 unlockType,
-                                style: const TextStyle(fontSize: 10, color: AppTheme.textSecondary),
+                                style: TextStyle(fontSize: 10, color: AppTheme.textSecondary),
                               ),
                             ],
                           ),
@@ -365,7 +367,7 @@ class _MyCoursesScreenState extends ConsumerState<MyCoursesScreen> {
                     const SizedBox(height: 4),
                     Text(
                       title,
-                      style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: AppTheme.text),
+                      style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: AppTheme.text),
                     ),
                   ],
                 ),
@@ -375,7 +377,7 @@ class _MyCoursesScreenState extends ConsumerState<MyCoursesScreen> {
           const SizedBox(height: 12),
           Text(
             description,
-            style: const TextStyle(fontSize: 13, color: AppTheme.textSecondary),
+            style: TextStyle(fontSize: 13, color: AppTheme.textSecondary),
           ),
           const SizedBox(height: 16),
           SizedBox(

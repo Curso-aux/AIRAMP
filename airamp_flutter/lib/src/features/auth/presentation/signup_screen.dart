@@ -1,4 +1,4 @@
-﻿import 'package:flutter/material.dart';
+import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../../core/theme/app_theme.dart';
@@ -167,7 +167,7 @@ class _SignupScreenState extends ConsumerState<SignupScreen> {
                       Expanded(
                         child: Text(
                           _error,
-                          style: const TextStyle(color: AppTheme.error, fontSize: 13),
+                          style: TextStyle(color: AppTheme.error, fontSize: 13),
                         ),
                       ),
                     ],
@@ -190,7 +190,7 @@ class _SignupScreenState extends ConsumerState<SignupScreen> {
                     borderRadius: BorderRadius.circular(12),
                     border: Border.all(color: AppTheme.border),
                   ),
-                  child: const Text(
+                  child: Text(
                     'Section and subject selection will be available once your teacher sets them up.',
                     style: TextStyle(color: AppTheme.textSecondary, fontSize: 14),
                   ),
@@ -208,10 +208,10 @@ class _SignupScreenState extends ConsumerState<SignupScreen> {
               Row(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  const Text('Already have an account? ', style: TextStyle(color: AppTheme.textSecondary)),
+                  Text('Already have an account? ', style: TextStyle(color: AppTheme.textSecondary)),
                   GestureDetector(
                     onTap: () => context.pop(),
-                    child: const Text('Sign In', style: TextStyle(color: AppTheme.primary, fontWeight: FontWeight.bold)),
+                    child: Text('Sign In', style: TextStyle(color: AppTheme.primary, fontWeight: FontWeight.bold)),
                   ),
                 ],
               ),
@@ -226,7 +226,7 @@ class _SignupScreenState extends ConsumerState<SignupScreen> {
     return TextField(
       controller: controller,
       obscureText: isPassword,
-      style: const TextStyle(color: AppTheme.text),
+      style: TextStyle(color: AppTheme.text),
       decoration: InputDecoration(
         hintText: hint,
         prefixIcon: Icon(icon, color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.4)),

@@ -21,7 +21,7 @@ class DatabaseHelper {
 
     return await openDatabase(
       path,
-      version: 9,
+      version: 13,
       onCreate: _onCreate,
       onUpgrade: _onUpgrade,
     );
@@ -36,17 +36,21 @@ class DatabaseHelper {
         password TEXT NOT NULL,
         role TEXT NOT NULL,
         full_name TEXT NOT NULL,
+        section TEXT,
+        grade TEXT,
         created_at TEXT NOT NULL
       )
     ''');
 
-    // Seed default accounts
+    // Seed default authentic accounts
     await db.insert('users', {
-      'id': 'super_admin_1',
+      'id': 'admin_1',
       'email': 'aira@admin',
       'password': 'aira@admin',
       'role': 'super_admin',
       'full_name': 'Aira Admin',
+      'section': null,
+      'grade': null,
       'created_at': DateTime.now().toIso8601String(),
     });
     await db.insert('users', {
@@ -54,7 +58,9 @@ class DatabaseHelper {
       'email': 'john.reyes@deped.gov.ph',
       'password': 'John@123',
       'role': 'admin',
-      'full_name': 'Sir John',
+      'full_name': 'Sir John Reyes',
+      'section': null,
+      'grade': null,
       'created_at': DateTime.now().toIso8601String(),
     });
     await db.insert('users', {
@@ -63,6 +69,8 @@ class DatabaseHelper {
       'password': 'Maria@123',
       'role': 'student',
       'full_name': 'Maria Lopez',
+      'section': 'Emerald',
+      'grade': 'Grade 10',
       'created_at': DateTime.now().toIso8601String(),
     });
 
@@ -183,6 +191,39 @@ class DatabaseHelper {
         role TEXT NOT NULL,
         created_at TEXT NOT NULL,
         expires_at TEXT
+      )
+    ''');
+
+    // App Settings Table (theme preference, etc.)
+    await db.execute('''
+      CREATE TABLE IF NOT EXISTS app_settings (
+        key TEXT PRIMARY KEY,
+        value TEXT NOT NULL
+      )
+    ''');
+
+    // Conversations Table
+    await db.execute('''
+      CREATE TABLE IF NOT EXISTS conversations (
+        id TEXT PRIMARY KEY,
+        type TEXT NOT NULL,
+        name TEXT,
+        subject_id INTEGER,
+        is_archived INTEGER DEFAULT 0,
+        created_at TEXT NOT NULL
+      )
+    ''');
+
+    // Messages Table
+    await db.execute('''
+      CREATE TABLE IF NOT EXISTS messages (
+        id TEXT PRIMARY KEY,
+        conversation_id TEXT NOT NULL,
+        sender_id TEXT NOT NULL,
+        text TEXT NOT NULL,
+        created_at TEXT NOT NULL,
+        is_read INTEGER DEFAULT 0,
+        FOREIGN KEY (conversation_id) REFERENCES conversations (id) ON DELETE CASCADE
       )
     ''');
   }
@@ -321,5 +362,249 @@ class DatabaseHelper {
         )
       ''');
     }
+
+    if (oldVersion < 10) {
+      await db.execute('''
+        CREATE TABLE IF NOT EXISTS app_settings (
+          key TEXT PRIMARY KEY,
+          value TEXT NOT NULL
+        )
+      ''');
+    }
+
+    if (oldVersion < 11) {
+      await db.execute('''
+        CREATE TABLE IF NOT EXISTS conversations (
+          id TEXT PRIMARY KEY,
+          type TEXT NOT NULL,
+          name TEXT,
+          subject_id INTEGER,
+          created_at TEXT NOT NULL
+        )
+      ''');
+      await db.execute('''
+        CREATE TABLE IF NOT EXISTS messages (
+          id TEXT PRIMARY KEY,
+          conversation_id TEXT NOT NULL,
+          sender_id TEXT NOT NULL,
+          text TEXT NOT NULL,
+          created_at TEXT NOT NULL,
+          is_read INTEGER DEFAULT 0,
+          FOREIGN KEY (conversation_id) REFERENCES conversations (id) ON DELETE CASCADE
+        )
+      ''');
+    }
+
+    if (oldVersion < 12) {
+      try {
+        await db.execute('ALTER TABLE users ADD COLUMN section TEXT');
+      } catch (_) {}
+      try {
+        await db.execute('ALTER TABLE users ADD COLUMN grade TEXT');
+      } catch (_) {}
+
+      // Update student_1 with section and grade
+      await db.update('users', {
+        'section': 'Emerald',
+        'grade': 'Grade 10',
+      }, where: 'id = ?', whereArgs: ['student_1']);
+
+      // Update teacher_1 name if needed
+      await db.update('users', {
+        'full_name': 'Sir John Reyes',
+      }, where: 'id = ?', whereArgs: ['teacher_1']);
+
+      // Seed additional realistic contacts
+      final usersToSeed = [
+        {
+          'id': 'teacher_2',
+          'email': 'sarah.jenkins@university.edu',
+          'password': 'Sarah@123',
+          'role': 'admin',
+          'full_name': 'Prof. Sarah Jenkins',
+          'section': null,
+          'grade': null,
+          'created_at': DateTime.now().toIso8601String(),
+        },
+        {
+          'id': 'student_2',
+          'email': 'juan.delacruz@school.edu',
+          'password': 'Juan@123',
+          'role': 'student',
+          'full_name': 'Juan Dela Cruz',
+          'section': 'Ruby',
+          'grade': 'Grade 10',
+          'created_at': DateTime.now().toIso8601String(),
+        },
+        {
+          'id': 'student_3',
+          'email': 'angela.santos@school.edu',
+          'password': 'Angela@123',
+          'role': 'student',
+          'full_name': 'Angela Santos',
+          'section': 'Diamond',
+          'grade': 'Grade 11',
+          'created_at': DateTime.now().toIso8601String(),
+        },
+        {
+          'id': 'student_4',
+          'email': 'mark.bautista@school.edu',
+          'password': 'Mark@123',
+          'role': 'student',
+          'full_name': 'Mark Bautista',
+          'section': 'Emerald',
+          'grade': 'Grade 10',
+          'created_at': DateTime.now().toIso8601String(),
+        },
+        {
+          'id': 'student_5',
+          'email': 'bea.alonzo@school.edu',
+          'password': 'Bea@123',
+          'role': 'student',
+          'full_name': 'Bea Alonzo',
+          'section': 'Gold',
+          'grade': 'Grade 12',
+          'created_at': DateTime.now().toIso8601String(),
+        },
+        {
+          'id': 'student_6',
+          'email': 'christian.rivera@school.edu',
+          'password': 'Christian@123',
+          'role': 'student',
+          'full_name': 'Christian Rivera',
+          'section': 'Ruby',
+          'grade': 'Grade 11',
+          'created_at': DateTime.now().toIso8601String(),
+        },
+      ];
+
+      for (final u in usersToSeed) {
+        final exists = await db.query('users', where: 'id = ?', whereArgs: [u['id']]);
+        if (exists.isEmpty) {
+          await db.insert('users', u);
+        }
+      }
+    }
+
+    if (oldVersion < 13) {
+      try {
+        await db.execute('ALTER TABLE conversations ADD COLUMN is_archived INTEGER DEFAULT 0');
+      } catch (_) {}
+      // Clean up hardcoded dummy users so only authentic and registered users remain
+      await db.delete('users', where: "id IN ('student_2', 'student_3', 'student_4', 'student_5', 'student_6', 'teacher_2')");
+    }
+  }
+
+  Future<String?> getSetting(String key) async {
+    final db = await database;
+    final res = await db.query(
+      'app_settings',
+      where: 'key = ?',
+      whereArgs: [key],
+    );
+    if (res.isNotEmpty) {
+      return res.first['value'] as String?;
+    }
+    return null;
+  }
+
+  Future<void> setSetting(String key, String value) async {
+    final db = await database;
+    await db.insert(
+      'app_settings',
+      {'key': key, 'value': value},
+      conflictAlgorithm: ConflictAlgorithm.replace,
+    );
+  }
+
+  // ── Chat Conversations & Messages ──────────────────────────
+
+  Future<List<Map<String, dynamic>>> getConversations() async {
+    final db = await database;
+    return await db.query('conversations', orderBy: 'created_at DESC');
+  }
+
+  Future<Map<String, dynamic>?> getConversationBySubjectId(int subjectId) async {
+    final db = await database;
+    final res = await db.query('conversations', where: 'subject_id = ?', whereArgs: [subjectId]);
+    return res.isNotEmpty ? res.first : null;
+  }
+
+  Future<void> saveConversation(Map<String, dynamic> convo) async {
+    final db = await database;
+    await db.insert('conversations', convo, conflictAlgorithm: ConflictAlgorithm.replace);
+  }
+
+  Future<void> updateConversationName(String id, String newName) async {
+    final db = await database;
+    await db.update('conversations', {'name': newName}, where: 'id = ?', whereArgs: [id]);
+  }
+
+  Future<void> setConversationArchived(String id, bool isArchived) async {
+    final db = await database;
+    await db.update('conversations', {'is_archived': isArchived ? 1 : 0}, where: 'id = ?', whereArgs: [id]);
+  }
+
+  Future<void> deleteConversation(String id) async {
+    final db = await database;
+    await db.delete('messages', where: 'conversation_id = ?', whereArgs: [id]);
+    await db.delete('conversations', where: 'id = ?', whereArgs: [id]);
+  }
+
+  Future<void> updateMessageText(String id, String newText) async {
+    final db = await database;
+    await db.update('messages', {'text': newText}, where: 'id = ?', whereArgs: [id]);
+  }
+
+  Future<void> deleteMessage(String id) async {
+    final db = await database;
+    await db.delete('messages', where: 'id = ?', whereArgs: [id]);
+  }
+
+  Future<List<Map<String, dynamic>>> getMessages(String conversationId) async {
+    final db = await database;
+    return await db.query(
+      'messages',
+      where: 'conversation_id = ?',
+      whereArgs: [conversationId],
+      orderBy: 'created_at ASC',
+    );
+  }
+
+  Future<void> saveMessage(Map<String, dynamic> msg) async {
+    final db = await database;
+    await db.insert('messages', msg, conflictAlgorithm: ConflictAlgorithm.replace);
+  }
+
+  Future<Map<String, dynamic>?> getLastMessage(String conversationId) async {
+    final db = await database;
+    final res = await db.query(
+      'messages',
+      where: 'conversation_id = ?',
+      whereArgs: [conversationId],
+      orderBy: 'created_at DESC',
+      limit: 1,
+    );
+    return res.isNotEmpty ? res.first : null;
+  }
+
+  // ── Users & Contacts ───────────────────────────────────────
+
+  Future<List<Map<String, dynamic>>> getUsers() async {
+    final db = await database;
+    return await db.query('users', orderBy: 'role ASC, full_name ASC');
+  }
+
+  Future<Map<String, dynamic>?> getDirectConversation(String userId1, String userId2) async {
+    final db = await database;
+    final id1 = 'dm_${userId1}_$userId2';
+    final id2 = 'dm_${userId2}_$userId1';
+    final res = await db.query(
+      'conversations',
+      where: 'id = ? OR id = ?',
+      whereArgs: [id1, id2],
+      limit: 1,
+    );
+    return res.isNotEmpty ? res.first : null;
   }
 }

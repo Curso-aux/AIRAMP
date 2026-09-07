@@ -3,21 +3,38 @@ class ChatUser {
   final String fullName;
   final String email;
   final String role;
+  final String? section;
+  final String? grade;
   
   ChatUser({
     required this.id,
     required this.fullName,
     required this.email,
     required this.role,
+    this.section,
+    this.grade,
   });
 
   factory ChatUser.fromJson(Map<String, dynamic> json) {
     return ChatUser(
       id: json['id'] ?? '',
-      fullName: json['fullName'] ?? '',
+      fullName: json['fullName'] ?? json['full_name'] ?? '',
       email: json['email'] ?? '',
       role: json['role'] ?? 'student',
+      section: json['section'],
+      grade: json['grade'],
     );
+  }
+
+  Map<String, dynamic> toJson() {
+    return {
+      'id': id,
+      'fullName': fullName,
+      'email': email,
+      'role': role,
+      'section': section,
+      'grade': grade,
+    };
   }
 }
 
@@ -57,6 +74,7 @@ class ChatConversation {
   final List<ChatUser> participants;
   final ChatMessage? lastMessage;
   final int unreadCount;
+  final bool isArchived;
 
   ChatConversation({
     required this.id,
@@ -65,7 +83,28 @@ class ChatConversation {
     required this.participants,
     this.lastMessage,
     this.unreadCount = 0,
+    this.isArchived = false,
   });
+
+  ChatConversation copyWith({
+    String? id,
+    String? type,
+    String? name,
+    List<ChatUser>? participants,
+    ChatMessage? lastMessage,
+    int? unreadCount,
+    bool? isArchived,
+  }) {
+    return ChatConversation(
+      id: id ?? this.id,
+      type: type ?? this.type,
+      name: name ?? this.name,
+      participants: participants ?? this.participants,
+      lastMessage: lastMessage ?? this.lastMessage,
+      unreadCount: unreadCount ?? this.unreadCount,
+      isArchived: isArchived ?? this.isArchived,
+    );
+  }
 
   factory ChatConversation.fromJson(Map<String, dynamic> json) {
     return ChatConversation(
@@ -80,6 +119,7 @@ class ChatConversation {
           ? ChatMessage.fromJson(json['lastMessage'])
           : null,
       unreadCount: json['unreadCount'] ?? 0,
+      isArchived: (json['isArchived'] ?? json['is_archived']) == 1 || (json['isArchived'] == true),
     );
   }
 }

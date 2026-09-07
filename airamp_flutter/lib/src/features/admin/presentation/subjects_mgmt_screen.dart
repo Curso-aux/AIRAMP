@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../../core/theme/app_theme.dart';
+import '../../../core/theme/theme_provider.dart';
 import '../data/admin_repository.dart';
 
 class SubjectsMgmtScreen extends ConsumerStatefulWidget {
@@ -17,6 +18,7 @@ class _SubjectsMgmtScreenState extends ConsumerState<SubjectsMgmtScreen> {
 
   @override
   Widget build(BuildContext context) {
+    ref.watch(themeProvider);
     final subjects = ref.watch(subjectsProvider);
 
     return Scaffold(
@@ -32,7 +34,7 @@ class _SubjectsMgmtScreenState extends ConsumerState<SubjectsMgmtScreen> {
                 style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold, color: Theme.of(context).colorScheme.onSurface),
               ),
               const SizedBox(height: 4),
-              const Text(
+              Text(
                 'Create and manage subjects',
                 style: TextStyle(color: AppTheme.textSecondary, fontSize: 14),
               ),
@@ -42,7 +44,7 @@ class _SubjectsMgmtScreenState extends ConsumerState<SubjectsMgmtScreen> {
               SizedBox(
                 width: double.infinity,
                 child: ElevatedButton.icon(
-                  onPressed: () => _showCreateSubjectDialog(context),
+                  onPressed: () => _showCreateSubjectDialog(),
                   icon: const Icon(Icons.add, color: Colors.black),
                   label: const Text('Create New Subject'),
                   style: ElevatedButton.styleFrom(
@@ -60,15 +62,15 @@ class _SubjectsMgmtScreenState extends ConsumerState<SubjectsMgmtScreen> {
               SizedBox(
                 width: double.infinity,
                 child: OutlinedButton.icon(
-                  onPressed: () => _showCreateSubjectDialog(context, autoExpandGlobal: true),
-                  icon: Icon(Icons.public, color: Theme.of(context).colorScheme.onSurface),
+                  onPressed: () => _showCreateSubjectDialog(autoExpandGlobal: true),
+                  icon: Icon(Icons.public, color: AppTheme.text),
                   label: const Text('Adopt Global Subject'),
                   style: OutlinedButton.styleFrom(
-                    foregroundColor: Theme.of(context).colorScheme.onPrimary,
+                    foregroundColor: AppTheme.text,
                     padding: const EdgeInsets.symmetric(vertical: 14),
                     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                    side: BorderSide(color: Theme.of(context).dividerColor),
-                    backgroundColor: Theme.of(context).colorScheme.surface,
+                    side: BorderSide(color: AppTheme.border),
+                    backgroundColor: AppTheme.surface,
                     textStyle: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
                   ),
                 ),
@@ -109,9 +111,9 @@ class _SubjectsMgmtScreenState extends ConsumerState<SubjectsMgmtScreen> {
                     padding: const EdgeInsets.only(top: 24.0),
                     child: Column(
                       children: [
-                        Icon(Icons.menu_book, size: 64, color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.4).withOpacity(0.5)),
+                        Icon(Icons.menu_book, size: 64, color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.4)),
                         const SizedBox(height: 16),
-                        const Text(
+                        Text(
                           'No subjects created yet',
                           style: TextStyle(color: AppTheme.textMuted, fontSize: 16),
                         ),
@@ -168,7 +170,7 @@ class _SubjectsMgmtScreenState extends ConsumerState<SubjectsMgmtScreen> {
                     ),
                     child: Text(
                       code,
-                      style: const TextStyle(color: AppTheme.primary, fontSize: 11, fontWeight: FontWeight.bold),
+                      style: TextStyle(color: AppTheme.primary, fontSize: 11, fontWeight: FontWeight.bold),
                     ),
                   ),
                 if (code.isNotEmpty) const SizedBox(width: 8),
@@ -207,7 +209,7 @@ class _SubjectsMgmtScreenState extends ConsumerState<SubjectsMgmtScreen> {
                       const SizedBox(width: 4),
                       Text(
                         unlockType,
-                        style: const TextStyle(color: AppTheme.textSecondary, fontSize: 11),
+                        style: TextStyle(color: AppTheme.textSecondary, fontSize: 11),
                       ),
                     ],
                   ),
@@ -219,14 +221,14 @@ class _SubjectsMgmtScreenState extends ConsumerState<SubjectsMgmtScreen> {
             // Subject name
             Text(
               subject['name'] ?? '',
-              style: const TextStyle(color: AppTheme.text, fontWeight: FontWeight.bold, fontSize: 16),
+              style: TextStyle(color: AppTheme.text, fontWeight: FontWeight.bold, fontSize: 16),
             ),
             const SizedBox(height: 4),
 
             // Description
             Text(
               subject['description'] ?? '',
-              style: const TextStyle(color: AppTheme.textSecondary, fontSize: 13),
+              style: TextStyle(color: AppTheme.textSecondary, fontSize: 13),
               maxLines: 2,
               overflow: TextOverflow.ellipsis,
             ),
@@ -237,7 +239,7 @@ class _SubjectsMgmtScreenState extends ConsumerState<SubjectsMgmtScreen> {
               children: [
                 Icon(Icons.groups_outlined, size: 16, color: Theme.of(context).colorScheme.primary),
                 const SizedBox(width: 4),
-                const Text(
+                Text(
                   '0 students',
                   style: TextStyle(color: AppTheme.primary, fontSize: 13),
                 ),
@@ -295,20 +297,20 @@ class _SubjectsMgmtScreenState extends ConsumerState<SubjectsMgmtScreen> {
       context: context,
       builder: (context) => AlertDialog(
         backgroundColor: Theme.of(context).colorScheme.surface,
-        title: const Text('Delete Subject', style: TextStyle(color: AppTheme.text)),
+        title: Text('Delete Subject', style: TextStyle(color: AppTheme.text)),
         content: Text('Are you sure you want to delete "${subject['name']}"?',
-            style: const TextStyle(color: AppTheme.textSecondary)),
+            style: TextStyle(color: AppTheme.textSecondary)),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context),
-            child: const Text('Cancel', style: TextStyle(color: AppTheme.textSecondary)),
+            child: Text('Cancel', style: TextStyle(color: AppTheme.textSecondary)),
           ),
           TextButton(
             onPressed: () {
               ref.read(subjectsProvider.notifier).deleteSubject(subject['id']);
               Navigator.pop(context);
             },
-            child: const Text('Delete', style: TextStyle(color: AppTheme.error)),
+            child: Text('Delete', style: TextStyle(color: AppTheme.error)),
           ),
         ],
       ),
@@ -326,16 +328,46 @@ class _SubjectsMgmtScreenState extends ConsumerState<SubjectsMgmtScreen> {
     );
   }
 
-  void _showCreateSubjectDialog(BuildContext context, {bool autoExpandGlobal = false}) {
-    showModalBottomSheet(
+  Future<void> _showCreateSubjectDialog({bool autoExpandGlobal = false}) async {
+    final result = await showModalBottomSheet<_SubjectCreationResult>(
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
-      builder: (context) {
+      builder: (ctx) {
         return _CreateSubjectSheet(autoExpandGlobal: autoExpandGlobal);
       },
     );
+
+    if (result == null || !mounted) return;
+
+    await ref.read(subjectsProvider.notifier).addSubject({
+      'name': result.name,
+      'subject_code': result.code ?? '',
+      'description': result.desc ?? '',
+      'grade_level': result.grade,
+      'semester': result.semester,
+      'unlock_type': result.unlock,
+      'created_at': DateTime.now().toIso8601String(),
+    });
   }
+}
+
+class _SubjectCreationResult {
+  final String name;
+  final String? code;
+  final String? desc;
+  final String? grade;
+  final String? semester;
+  final String unlock;
+
+  const _SubjectCreationResult({
+    required this.name,
+    this.code,
+    this.desc,
+    this.grade,
+    this.semester,
+    required this.unlock,
+  });
 }
 
 // ========================
@@ -397,16 +429,27 @@ class _CreateSubjectSheetState extends ConsumerState<_CreateSubjectSheet> {
   }
 
   void _saveSubject({String? code, String? name, String? desc}) {
-    ref.read(subjectsProvider.notifier).addSubject({
-      'name': name ?? _nameController.text.trim(),
-      'subject_code': code ?? _codeController.text.trim(),
-      'description': desc ?? _descController.text.trim(),
-      'grade_level': _selectedGrade,
-      'semester': _selectedSemester,
-      'unlock_type': _selectedUnlock,
-      'created_at': DateTime.now().toIso8601String(),
-    });
-    Navigator.pop(context);
+    final sName = (name ?? _nameController.text).trim();
+    if (sName.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Please enter a subject name')),
+      );
+      return;
+    }
+    final sCode = (code ?? _codeController.text).trim();
+    final sDesc = (desc ?? _descController.text).trim();
+
+    Navigator.pop(
+      context,
+      _SubjectCreationResult(
+        name: sName,
+        code: sCode.isNotEmpty ? sCode : null,
+        desc: sDesc.isNotEmpty ? sDesc : null,
+        grade: _selectedGrade,
+        semester: _selectedSemester,
+        unlock: _selectedUnlock,
+      ),
+    );
   }
 
   @override
@@ -452,12 +495,12 @@ class _CreateSubjectSheetState extends ConsumerState<_CreateSubjectSheet> {
                             child: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
-                                const Text('Integrate existing subjects?',
+                                Text('Integrate existing subjects?',
                                     style: TextStyle(color: AppTheme.primary, fontWeight: FontWeight.bold)),
                                 const SizedBox(height: 4),
                                 Text(
                                   'Super Admin has ${_globalSubjects.length} subject(s) available to adopt as independent copies.',
-                                  style: const TextStyle(color: AppTheme.textSecondary, fontSize: 12),
+                                  style: TextStyle(color: AppTheme.textSecondary, fontSize: 12),
                                 ),
                               ],
                             ),
@@ -476,7 +519,7 @@ class _CreateSubjectSheetState extends ConsumerState<_CreateSubjectSheet> {
                       padding: const EdgeInsets.symmetric(vertical: 24.0),
                       child: Row(
                         children: [
-                          const Expanded(child: Divider(color: AppTheme.border)),
+                          Expanded(child: Divider(color: AppTheme.border)),
                           Padding(
                             padding: const EdgeInsets.symmetric(horizontal: 16.0),
                             child: Text('or create your own below',
@@ -485,7 +528,7 @@ class _CreateSubjectSheetState extends ConsumerState<_CreateSubjectSheet> {
                                     fontSize: 12,
                                     fontStyle: FontStyle.italic)),
                           ),
-                          const Expanded(child: Divider(color: AppTheme.border)),
+                          Expanded(child: Divider(color: AppTheme.border)),
                         ],
                       ),
                     ),
@@ -501,7 +544,7 @@ class _CreateSubjectSheetState extends ConsumerState<_CreateSubjectSheet> {
                   const SizedBox(height: 24),
 
                   // Grade Level
-                  const Text('Grade Level', style: TextStyle(color: AppTheme.textSecondary, fontSize: 14)),
+                  Text('Grade Level', style: TextStyle(color: AppTheme.textSecondary, fontSize: 14)),
                   const SizedBox(height: 12),
                   Wrap(
                     spacing: 8,
@@ -525,7 +568,7 @@ class _CreateSubjectSheetState extends ConsumerState<_CreateSubjectSheet> {
                   const SizedBox(height: 24),
 
                   // Semester
-                  const Text('Semester', style: TextStyle(color: AppTheme.textSecondary, fontSize: 14)),
+                  Text('Semester', style: TextStyle(color: AppTheme.textSecondary, fontSize: 14)),
                   const SizedBox(height: 12),
                   Wrap(
                     spacing: 8,
@@ -549,7 +592,7 @@ class _CreateSubjectSheetState extends ConsumerState<_CreateSubjectSheet> {
                   const SizedBox(height: 24),
 
                   // Unlock Type
-                  const Text('Unlock Type', style: TextStyle(color: AppTheme.textSecondary, fontSize: 14)),
+                  Text('Unlock Type', style: TextStyle(color: AppTheme.textSecondary, fontSize: 14)),
                   const SizedBox(height: 12),
                   _buildUnlockTypeSelector(
                     title: 'Sequential', subtitle: 'Must pass quiz to unlock next',
@@ -577,8 +620,8 @@ class _CreateSubjectSheetState extends ConsumerState<_CreateSubjectSheet> {
                   child: OutlinedButton(
                     onPressed: () => Navigator.pop(context),
                     style: OutlinedButton.styleFrom(
-                      foregroundColor: Theme.of(context).colorScheme.onPrimary,
-                      side: BorderSide(color: Theme.of(context).dividerColor),
+                      foregroundColor: AppTheme.textSecondary,
+                      side: BorderSide(color: AppTheme.border),
                       padding: const EdgeInsets.symmetric(vertical: 16),
                       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                     ),
@@ -627,7 +670,7 @@ class _CreateSubjectSheetState extends ConsumerState<_CreateSubjectSheet> {
                   borderRadius: BorderRadius.circular(4),
                 ),
                 child: Text(sub['code']!,
-                    style: const TextStyle(color: AppTheme.primary, fontSize: 12, fontWeight: FontWeight.bold)),
+                    style: TextStyle(color: AppTheme.primary, fontSize: 12, fontWeight: FontWeight.bold)),
               ),
               const SizedBox(width: 8),
               Container(
@@ -648,9 +691,9 @@ class _CreateSubjectSheetState extends ConsumerState<_CreateSubjectSheet> {
             ],
           ),
           const SizedBox(height: 12),
-          Text(sub['name']!, style: const TextStyle(color: AppTheme.text, fontWeight: FontWeight.bold, fontSize: 15)),
+          Text(sub['name']!, style: TextStyle(color: AppTheme.text, fontWeight: FontWeight.bold, fontSize: 15)),
           const SizedBox(height: 4),
-          Text(sub['desc']!, style: const TextStyle(color: AppTheme.textSecondary, fontSize: 13)),
+          Text(sub['desc']!, style: TextStyle(color: AppTheme.textSecondary, fontSize: 13)),
           const SizedBox(height: 16),
           SizedBox(
             width: double.infinity,
@@ -674,7 +717,7 @@ class _CreateSubjectSheetState extends ConsumerState<_CreateSubjectSheet> {
   Widget _buildTextField(TextEditingController controller, String hint, {int maxLines = 1}) {
     return TextField(
       controller: controller,
-      style: const TextStyle(color: AppTheme.text),
+      style: TextStyle(color: AppTheme.text),
       maxLines: maxLines,
       decoration: InputDecoration(
         hintText: hint,
@@ -792,7 +835,7 @@ class _EditSubjectSheetState extends ConsumerState<_EditSubjectSheet> {
                   const SizedBox(height: 24),
 
                   // Grade Level
-                  const Text('Grade Level', style: TextStyle(color: AppTheme.textSecondary, fontSize: 14)),
+                  Text('Grade Level', style: TextStyle(color: AppTheme.textSecondary, fontSize: 14)),
                   const SizedBox(height: 12),
                   Wrap(
                     spacing: 8,
@@ -816,7 +859,7 @@ class _EditSubjectSheetState extends ConsumerState<_EditSubjectSheet> {
                   const SizedBox(height: 24),
 
                   // Semester
-                  const Text('Semester', style: TextStyle(color: AppTheme.textSecondary, fontSize: 14)),
+                  Text('Semester', style: TextStyle(color: AppTheme.textSecondary, fontSize: 14)),
                   const SizedBox(height: 12),
                   Wrap(
                     spacing: 8,
@@ -840,7 +883,7 @@ class _EditSubjectSheetState extends ConsumerState<_EditSubjectSheet> {
                   const SizedBox(height: 24),
 
                   // Unlock Type
-                  const Text('Unlock Type', style: TextStyle(color: AppTheme.textSecondary, fontSize: 14)),
+                  Text('Unlock Type', style: TextStyle(color: AppTheme.textSecondary, fontSize: 14)),
                   const SizedBox(height: 12),
                   _buildUnlockTypeSelector(
                     title: 'Sequential', subtitle: 'Must pass quiz to unlock next',
@@ -868,8 +911,8 @@ class _EditSubjectSheetState extends ConsumerState<_EditSubjectSheet> {
                   child: OutlinedButton(
                     onPressed: () => Navigator.pop(context),
                     style: OutlinedButton.styleFrom(
-                      foregroundColor: Theme.of(context).colorScheme.onPrimary,
-                      side: BorderSide(color: Theme.of(context).dividerColor),
+                      foregroundColor: AppTheme.textSecondary,
+                      side: BorderSide(color: AppTheme.border),
                       padding: const EdgeInsets.symmetric(vertical: 16),
                       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                     ),
@@ -910,7 +953,7 @@ class _EditSubjectSheetState extends ConsumerState<_EditSubjectSheet> {
   Widget _buildTextField(TextEditingController controller, String hint, {int maxLines = 1}) {
     return TextField(
       controller: controller,
-      style: const TextStyle(color: AppTheme.text),
+      style: TextStyle(color: AppTheme.text),
       maxLines: maxLines,
       decoration: InputDecoration(
         hintText: hint,

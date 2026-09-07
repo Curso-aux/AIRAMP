@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/theme/app_theme.dart';
+import '../../../core/theme/theme_provider.dart';
 
 class QuizHistoryScreen extends ConsumerStatefulWidget {
   const QuizHistoryScreen({super.key});
@@ -15,6 +16,7 @@ class _QuizHistoryScreenState extends ConsumerState<QuizHistoryScreen> {
 
   @override
   Widget build(BuildContext context) {
+    ref.watch(themeProvider);
     return Scaffold(
       backgroundColor: AppTheme.background,
       body: SafeArea(
@@ -26,16 +28,16 @@ class _QuizHistoryScreenState extends ConsumerState<QuizHistoryScreen> {
             children: [
               Row(
                 children: [
-                  const Icon(Icons.assignment, color: AppTheme.primary, size: 28),
+                  Icon(Icons.assignment, color: AppTheme.primary, size: 28),
                   const SizedBox(width: 8),
-                  const Text(
+                  Text(
                     'Quiz History',
                     style: TextStyle(fontSize: 28, fontWeight: FontWeight.bold, color: AppTheme.text),
                   ),
                 ],
               ),
               const SizedBox(height: 4),
-              const Text(
+              Text(
                 'Complete record of all your quiz attempts',
                 style: TextStyle(fontSize: 14, color: AppTheme.textSecondary),
               ),
@@ -145,12 +147,12 @@ class _QuizHistoryScreenState extends ConsumerState<QuizHistoryScreen> {
           const SizedBox(height: 6),
           Text(
             value,
-            style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: AppTheme.text),
+            style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: AppTheme.text),
           ),
           const SizedBox(height: 2),
           Text(
             label,
-            style: const TextStyle(fontSize: 10, color: AppTheme.textMuted),
+            style: TextStyle(fontSize: 10, color: AppTheme.textMuted),
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
           ),
@@ -193,12 +195,12 @@ class _QuizHistoryScreenState extends ConsumerState<QuizHistoryScreen> {
                         children: [
                           Text(
                             subject,
-                            style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: AppTheme.primary),
+                            style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: AppTheme.primary),
                           ),
                           const SizedBox(width: 8),
                           Text(
                             loTitle,
-                            style: const TextStyle(fontSize: 12, color: AppTheme.textSecondary),
+                            style: TextStyle(fontSize: 12, color: AppTheme.textSecondary),
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
                           ),
@@ -207,18 +209,18 @@ class _QuizHistoryScreenState extends ConsumerState<QuizHistoryScreen> {
                       const SizedBox(height: 6),
                       Text(
                         quizTitle,
-                        style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: AppTheme.text),
+                        style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: AppTheme.text),
                       ),
                       const SizedBox(height: 12),
                       Row(
                         children: [
-                          const Icon(Icons.calendar_today, size: 12, color: AppTheme.textMuted),
+                          Icon(Icons.calendar_today, size: 12, color: AppTheme.textMuted),
                           const SizedBox(width: 4),
-                          Text('$date at $time', style: const TextStyle(fontSize: 11, color: AppTheme.textSecondary)),
+                          Text('$date at $time', style: TextStyle(fontSize: 11, color: AppTheme.textSecondary)),
                           const SizedBox(width: 12),
-                          const Icon(Icons.schedule, size: 12, color: AppTheme.textMuted),
+                          Icon(Icons.schedule, size: 12, color: AppTheme.textMuted),
                           const SizedBox(width: 4),
-                          Text(duration, style: const TextStyle(fontSize: 11, color: AppTheme.textSecondary)),
+                          Text(duration, style: TextStyle(fontSize: 11, color: AppTheme.textSecondary)),
                         ],
                       ),
                     ],
@@ -260,7 +262,7 @@ class _QuizHistoryScreenState extends ConsumerState<QuizHistoryScreen> {
               ],
             ),
           ),
-          const Divider(height: 1, color: AppTheme.border),
+          Divider(height: 1, color: AppTheme.border),
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
             decoration: const BoxDecoration(
@@ -288,11 +290,11 @@ class _QuizHistoryScreenState extends ConsumerState<QuizHistoryScreen> {
                     const SizedBox(width: 8),
                     Text(
                       '(${percentage.toStringAsFixed(0)}%)',
-                      style: const TextStyle(fontSize: 12, color: AppTheme.textSecondary),
+                      style: TextStyle(fontSize: 12, color: AppTheme.textSecondary),
                     ),
                   ],
                 ),
-                const Row(
+                Row(
                   children: [
                     Text('Review', style: TextStyle(fontSize: 13, color: AppTheme.primary, fontWeight: FontWeight.w600)),
                     SizedBox(width: 4),

@@ -1,4 +1,4 @@
-﻿import 'package:flutter/material.dart';
+import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
@@ -296,7 +296,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
                             decoration: BoxDecoration(
                               color: Theme.of(context).colorScheme.primary,
                               borderRadius: BorderRadius.circular(14),
-                              boxShadow: const [
+                              boxShadow: [
                                 BoxShadow(
                                   color: AppTheme.glowPrimary,
                                   blurRadius: 16,

@@ -1,15 +1,17 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/theme/app_theme.dart';
+import '../../../core/theme/theme_provider.dart';
 import 'student_profile_screen.dart';
 
-class SectionsMgmtScreen extends StatefulWidget {
+class SectionsMgmtScreen extends ConsumerStatefulWidget {
   const SectionsMgmtScreen({super.key});
 
   @override
-  State<SectionsMgmtScreen> createState() => _SectionsMgmtScreenState();
+  ConsumerState<SectionsMgmtScreen> createState() => _SectionsMgmtScreenState();
 }
 
-class _SectionsMgmtScreenState extends State<SectionsMgmtScreen> {
+class _SectionsMgmtScreenState extends ConsumerState<SectionsMgmtScreen> {
   bool _showForm = false;
   final _nameController = TextEditingController();
   final _descController = TextEditingController();
@@ -60,8 +62,8 @@ class _SectionsMgmtScreenState extends State<SectionsMgmtScreen> {
       context: context,
       builder: (context) => AlertDialog(
         backgroundColor: Theme.of(context).colorScheme.surface,
-        title: Text(title, style: const TextStyle(color: AppTheme.text)),
-        content: Text(content, style: const TextStyle(color: AppTheme.textSecondary)),
+        title: Text(title, style: TextStyle(color: AppTheme.text)),
+        content: Text(content, style: TextStyle(color: AppTheme.textSecondary)),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context, false),
@@ -92,7 +94,7 @@ class _SectionsMgmtScreenState extends State<SectionsMgmtScreen> {
           builder: (context, setDialogState) {
             return AlertDialog(
               backgroundColor: Theme.of(context).colorScheme.surface,
-              title: const Text('Edit Section', style: TextStyle(color: AppTheme.text)),
+              title: Text('Edit Section', style: TextStyle(color: AppTheme.text)),
               content: SingleChildScrollView(
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
@@ -100,7 +102,7 @@ class _SectionsMgmtScreenState extends State<SectionsMgmtScreen> {
                   children: [
                     TextField(
                       controller: editNameController,
-                      style: const TextStyle(color: AppTheme.text),
+                      style: TextStyle(color: AppTheme.text),
                       decoration: const InputDecoration(
                         hintText: 'Section Name',
                       ),
@@ -108,14 +110,14 @@ class _SectionsMgmtScreenState extends State<SectionsMgmtScreen> {
                     const SizedBox(height: 12),
                     TextField(
                       controller: editDescController,
-                      style: const TextStyle(color: AppTheme.text),
+                      style: TextStyle(color: AppTheme.text),
                       decoration: const InputDecoration(
                         hintText: 'Description (optional)',
                       ),
                       maxLines: 3,
                     ),
                     const SizedBox(height: 16),
-                    const Text(
+                    Text(
                       'Assign Grade Level',
                       style: TextStyle(color: AppTheme.textSecondary, fontSize: 14),
                     ),
@@ -180,6 +182,7 @@ class _SectionsMgmtScreenState extends State<SectionsMgmtScreen> {
 
   @override
   Widget build(BuildContext context) {
+    ref.watch(themeProvider);
     return Scaffold(
       body: SafeArea(
         child: SingleChildScrollView(
@@ -201,7 +204,7 @@ class _SectionsMgmtScreenState extends State<SectionsMgmtScreen> {
                       const SizedBox(height: 4),
                       Text(
                         '${_sections.length} active sections',
-                        style: const TextStyle(color: AppTheme.textSecondary, fontSize: 14),
+                        style: TextStyle(color: AppTheme.textSecondary, fontSize: 14),
                       ),
                     ],
                   ),
@@ -235,7 +238,7 @@ class _SectionsMgmtScreenState extends State<SectionsMgmtScreen> {
                       const SizedBox(height: 16),
                       TextField(
                         controller: _nameController,
-                        style: const TextStyle(color: AppTheme.text),
+                        style: TextStyle(color: AppTheme.text),
                         decoration: const InputDecoration(
                           hintText: 'Section Name (e.g., Grade 12 - ICT A)',
                         ),
@@ -243,14 +246,14 @@ class _SectionsMgmtScreenState extends State<SectionsMgmtScreen> {
                       const SizedBox(height: 12),
                       TextField(
                         controller: _descController,
-                        style: const TextStyle(color: AppTheme.text),
+                        style: TextStyle(color: AppTheme.text),
                         decoration: const InputDecoration(
                           hintText: 'Description (optional)',
                         ),
                         maxLines: 3,
                       ),
                       const SizedBox(height: 16),
-                      const Text(
+                      Text(
                         'Assign Grade Level',
                         style: TextStyle(color: AppTheme.textSecondary, fontSize: 14),
                       ),
@@ -292,8 +295,8 @@ class _SectionsMgmtScreenState extends State<SectionsMgmtScreen> {
                                 });
                               },
                               style: OutlinedButton.styleFrom(
-                                foregroundColor: Theme.of(context).colorScheme.onPrimary,
-                                side: BorderSide(color: Theme.of(context).dividerColor),
+                                foregroundColor: AppTheme.textSecondary,
+                                side: BorderSide(color: AppTheme.border),
                                 padding: const EdgeInsets.symmetric(vertical: 14),
                               ),
                               child: const Text('Cancel'),
@@ -375,8 +378,8 @@ class _SectionCardState extends State<_SectionCard> {
       context: context,
       builder: (context) => AlertDialog(
         backgroundColor: Theme.of(context).colorScheme.surface,
-        title: Text(title, style: const TextStyle(color: AppTheme.text)),
-        content: Text(content, style: const TextStyle(color: AppTheme.textSecondary)),
+        title: Text(title, style: TextStyle(color: AppTheme.text)),
+        content: Text(content, style: TextStyle(color: AppTheme.textSecondary)),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context, false),
@@ -421,7 +424,7 @@ class _SectionCardState extends State<_SectionCard> {
                       const SizedBox(height: 4),
                       Text(
                         widget.section['description'],
-                        style: const TextStyle(color: AppTheme.textSecondary, fontSize: 13),
+                        style: TextStyle(color: AppTheme.textSecondary, fontSize: 13),
                       ),
                     ],
                     const SizedBox(height: 8),
@@ -431,7 +434,7 @@ class _SectionCardState extends State<_SectionCard> {
                         const SizedBox(width: 4),
                         Text(
                           widget.section['grade'] ?? 'No grade',
-                          style: const TextStyle(color: AppTheme.primary, fontSize: 12, fontWeight: FontWeight.bold),
+                          style: TextStyle(color: AppTheme.primary, fontSize: 12, fontWeight: FontWeight.bold),
                         ),
                       ],
                     ),
@@ -442,7 +445,7 @@ class _SectionCardState extends State<_SectionCard> {
                         const SizedBox(width: 4),
                         Text(
                           '${widget.section['studentCount']} students',
-                          style: const TextStyle(color: AppTheme.primary, fontSize: 12, fontWeight: FontWeight.bold),
+                          style: TextStyle(color: AppTheme.primary, fontSize: 12, fontWeight: FontWeight.bold),
                         ),
                       ],
                     ),
@@ -553,7 +556,7 @@ class _SectionCardState extends State<_SectionCard> {
     final activeStudents = students.where((s) => s['isArchived'] != true).toList();
 
     if (activeStudents.isEmpty) {
-      return const Padding(
+      return Padding(
         padding: EdgeInsets.all(16.0),
         child: Text('No active students', style: TextStyle(color: AppTheme.textSecondary)),
       );
@@ -576,9 +579,9 @@ class _SectionCardState extends State<_SectionCard> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(student['name'], style: const TextStyle(color: AppTheme.text, fontWeight: FontWeight.bold, fontSize: 14)),
+                      Text(student['name'], style: TextStyle(color: AppTheme.text, fontWeight: FontWeight.bold, fontSize: 14)),
                       const SizedBox(height: 2),
-                      Text('@${student['name']} · ${student['email']} · ${student['grade']}', style: const TextStyle(color: AppTheme.textSecondary, fontSize: 11)),
+                      Text('@${student['name']} · ${student['email']} · ${student['grade']}', style: TextStyle(color: AppTheme.textSecondary, fontSize: 11)),
                     ],
                   ),
                 ),
@@ -645,7 +648,7 @@ class _SectionCardState extends State<_SectionCard> {
               ],
             ),
             const SizedBox(height: 12),
-            const Divider(color: AppTheme.border, height: 1),
+            Divider(color: AppTheme.border, height: 1),
           ],
         );
       }).toList(),
@@ -657,7 +660,7 @@ class _SectionCardState extends State<_SectionCard> {
     final activeStudents = students.where((s) => s['isArchived'] != true).toList();
 
     if (activeStudents.isEmpty) {
-      return const Padding(
+      return Padding(
         padding: EdgeInsets.all(16.0),
         child: Text('No students to display', style: TextStyle(color: AppTheme.textSecondary)),
       );
@@ -673,7 +676,7 @@ class _SectionCardState extends State<_SectionCard> {
     final subjects = allSubjects.toList()..sort();
     
     if (subjects.isEmpty) {
-      return const Padding(
+      return Padding(
         padding: EdgeInsets.all(16.0),
         child: Text('No subjects available', style: TextStyle(color: AppTheme.textSecondary)),
       );
@@ -727,7 +730,7 @@ class _SectionCardState extends State<_SectionCard> {
               dataRowMaxHeight: 40,
               columnSpacing: 24,
               horizontalMargin: 16,
-              headingTextStyle: const TextStyle(color: AppTheme.textSecondary, fontSize: 11, fontWeight: FontWeight.bold),
+              headingTextStyle: TextStyle(color: AppTheme.textSecondary, fontSize: 11, fontWeight: FontWeight.bold),
               columns: const [
                 DataColumn(label: Text('Student')),
                 DataColumn(label: Text('LO1')),
@@ -742,7 +745,7 @@ class _SectionCardState extends State<_SectionCard> {
               }).map((student) {
                 final progress = (student['subjects'] as Map<String, dynamic>)[currentSubject] as List<dynamic>;
                 return DataRow(cells: [
-                  DataCell(Text(student['name'], style: const TextStyle(color: AppTheme.text, fontSize: 12, fontWeight: FontWeight.bold))),
+                  DataCell(Text(student['name'], style: TextStyle(color: AppTheme.text, fontSize: 12, fontWeight: FontWeight.bold))),
                   ...List.generate(5, (index) {
                      final isChecked = index < progress.length ? (progress[index] as bool) : false;
                      return DataCell(_buildCheckbox(isChecked, () {
@@ -757,7 +760,7 @@ class _SectionCardState extends State<_SectionCard> {
           ),
         ),
         const SizedBox(height: 16),
-        const Center(
+        Center(
           child: Text(
             'Sequential: Check marks require admin validation',
             style: TextStyle(color: AppTheme.textMuted, fontSize: 11, fontStyle: FontStyle.italic),

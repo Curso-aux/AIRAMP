@@ -1,4 +1,4 @@
-﻿import 'package:flutter/material.dart';
+import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import '../../../core/theme/app_theme.dart';
 
@@ -41,7 +41,7 @@ class ForgotPasswordScreen extends StatelessWidget {
               const SizedBox(height: 32),
               
               TextField(
-                style: const TextStyle(color: AppTheme.text),
+                style: TextStyle(color: AppTheme.text),
                 decoration: InputDecoration(
                   hintText: 'Email',
                   prefixIcon: Icon(Icons.mail_outline, color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.4)),

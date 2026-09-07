@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../../core/theme/app_theme.dart';
+import '../../../core/theme/theme_provider.dart';
 import '../data/admin_repository.dart';
 
 class SubjectDetailScreen extends ConsumerStatefulWidget {
@@ -38,8 +39,9 @@ class _SubjectDetailScreenState extends ConsumerState<SubjectDetailScreen> {
 
   @override
   Widget build(BuildContext context) {
+    ref.watch(themeProvider);
     if (_loading) {
-      return const Scaffold(
+      return Scaffold(
         body: Center(child: CircularProgressIndicator(color: AppTheme.primary)),
       );
     }
@@ -51,11 +53,11 @@ class _SubjectDetailScreenState extends ConsumerState<SubjectDetailScreen> {
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                const Text('Subject not found', style: TextStyle(color: AppTheme.textMuted, fontSize: 16)),
+                Text('Subject not found', style: TextStyle(color: AppTheme.textMuted, fontSize: 16)),
                 const SizedBox(height: 16),
                 TextButton(
                   onPressed: () => context.pop(),
-                  child: const Text('Go Back', style: TextStyle(color: AppTheme.primary)),
+                  child: Text('Go Back', style: TextStyle(color: AppTheme.primary)),
                 ),
               ],
             ),
@@ -85,7 +87,7 @@ class _SubjectDetailScreenState extends ConsumerState<SubjectDetailScreen> {
                     style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold, color: Theme.of(context).colorScheme.onSurface),
                   ),
                   const SizedBox(height: 4),
-                  const Text(
+                  Text(
                     'COCs, LOs, content & quizzes',
                     style: TextStyle(color: AppTheme.textSecondary, fontSize: 14),
                   ),
@@ -113,7 +115,7 @@ class _SubjectDetailScreenState extends ConsumerState<SubjectDetailScreen> {
                     width: double.infinity,
                     padding: const EdgeInsets.all(16),
                     decoration: BoxDecoration(
-                      gradient: const LinearGradient(
+                      gradient: LinearGradient(
                         colors: [AppTheme.primary, Color(0xFF0A9B8A)],
                         begin: Alignment.topLeft,
                         end: Alignment.bottomRight,
@@ -274,7 +276,7 @@ class _SubjectDetailScreenState extends ConsumerState<SubjectDetailScreen> {
               color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.4).withValues(alpha: 0.4),
             ),
             const SizedBox(height: 16),
-            const Text(
+            Text(
               'No topics yet. Add your first topic.',
               style: TextStyle(color: AppTheme.textMuted, fontSize: 14),
             ),
@@ -305,7 +307,7 @@ class _SubjectDetailScreenState extends ConsumerState<SubjectDetailScreen> {
               color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.4).withValues(alpha: 0.4),
             ),
             const SizedBox(height: 16),
-            const Text(
+            Text(
               'No quizzes yet. Add your first quiz.',
               style: TextStyle(color: AppTheme.textMuted, fontSize: 14),
             ),
@@ -356,20 +358,20 @@ class _TopicCardState extends ConsumerState<_TopicCard> {
       context: context,
       builder: (context) => AlertDialog(
         backgroundColor: Theme.of(context).colorScheme.surface,
-        title: const Text('Delete Topic', style: TextStyle(color: AppTheme.text)),
+        title: Text('Delete Topic', style: TextStyle(color: AppTheme.text)),
         content: Text('Are you sure you want to delete "${widget.topic['title']}" and all its contents?',
-            style: const TextStyle(color: AppTheme.textSecondary)),
+            style: TextStyle(color: AppTheme.textSecondary)),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context),
-            child: const Text('Cancel', style: TextStyle(color: AppTheme.textSecondary)),
+            child: Text('Cancel', style: TextStyle(color: AppTheme.textSecondary)),
           ),
           TextButton(
             onPressed: () {
               ref.read(subjectDetailProvider.notifier).deleteTopic(widget.topic['id']);
               Navigator.pop(context);
             },
-            child: const Text('Delete', style: TextStyle(color: AppTheme.error)),
+            child: Text('Delete', style: TextStyle(color: AppTheme.error)),
           ),
         ],
       ),
@@ -405,17 +407,17 @@ class _TopicCardState extends ConsumerState<_TopicCard> {
                       children: [
                         Text(
                           'Topic ${widget.topicIndex}',
-                          style: const TextStyle(color: AppTheme.primary, fontSize: 12, fontWeight: FontWeight.bold),
+                          style: TextStyle(color: AppTheme.primary, fontSize: 12, fontWeight: FontWeight.bold),
                         ),
                         const SizedBox(height: 4),
                         Text(
                           widget.topic['title'],
-                          style: const TextStyle(color: AppTheme.text, fontSize: 16, fontWeight: FontWeight.bold),
+                          style: TextStyle(color: AppTheme.text, fontSize: 16, fontWeight: FontWeight.bold),
                         ),
                         const SizedBox(height: 4),
                         Text(
                           '${los.length} Learning Outcomes',
-                          style: const TextStyle(color: AppTheme.textSecondary, fontSize: 12),
+                          style: TextStyle(color: AppTheme.textSecondary, fontSize: 12),
                         ),
                       ],
                     ),
@@ -456,7 +458,7 @@ class _TopicCardState extends ConsumerState<_TopicCard> {
                 padding: const EdgeInsets.only(left: 16, right: 16, bottom: 16),
                 child: Text(
                   widget.topic['description'],
-                  style: const TextStyle(color: AppTheme.textSecondary, fontSize: 14),
+                  style: TextStyle(color: AppTheme.textSecondary, fontSize: 14),
                 ),
               ),
 
@@ -475,7 +477,7 @@ class _TopicCardState extends ConsumerState<_TopicCard> {
                 icon: Icon(Icons.add, color: Theme.of(context).colorScheme.primary, size: 18),
                 label: const Text('Add Learning Outcome'),
                 style: OutlinedButton.styleFrom(
-                  foregroundColor: Theme.of(context).colorScheme.onPrimary,
+                  foregroundColor: Theme.of(context).colorScheme.primary,
                   side: BorderSide(color: Theme.of(context).colorScheme.primary.withValues(alpha: 0.3)),
                   padding: const EdgeInsets.symmetric(vertical: 12),
                   shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
@@ -487,7 +489,7 @@ class _TopicCardState extends ConsumerState<_TopicCard> {
 
             // LOs List
             if (los.isEmpty)
-              const Padding(
+              Padding(
                 padding: EdgeInsets.only(bottom: 24),
                 child: Center(
                   child: Text('No Learning Outcomes yet', style: TextStyle(color: AppTheme.textMuted, fontStyle: FontStyle.italic)),
@@ -531,20 +533,20 @@ class _LOCardState extends ConsumerState<_LOCard> {
       context: context,
       builder: (context) => AlertDialog(
         backgroundColor: Theme.of(context).colorScheme.surface,
-        title: const Text('Delete Learning Outcome', style: TextStyle(color: AppTheme.text)),
+        title: Text('Delete Learning Outcome', style: TextStyle(color: AppTheme.text)),
         content: Text('Are you sure you want to delete "${widget.lo['title']}" and all its contents?',
-            style: const TextStyle(color: AppTheme.textSecondary)),
+            style: TextStyle(color: AppTheme.textSecondary)),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context),
-            child: const Text('Cancel', style: TextStyle(color: AppTheme.textSecondary)),
+            child: Text('Cancel', style: TextStyle(color: AppTheme.textSecondary)),
           ),
           TextButton(
             onPressed: () {
               ref.read(subjectDetailProvider.notifier).deleteLearningOutcome(widget.lo['id']);
               Navigator.pop(context);
             },
-            child: const Text('Delete', style: TextStyle(color: AppTheme.error)),
+            child: Text('Delete', style: TextStyle(color: AppTheme.error)),
           ),
         ],
       ),
@@ -584,17 +586,17 @@ class _LOCardState extends ConsumerState<_LOCard> {
                       children: [
                         Text(
                           'LO ${widget.loIndex}',
-                          style: const TextStyle(color: AppTheme.primary, fontSize: 11, fontWeight: FontWeight.bold),
+                          style: TextStyle(color: AppTheme.primary, fontSize: 11, fontWeight: FontWeight.bold),
                         ),
                         const SizedBox(height: 2),
                         Text(
                           widget.lo['title'],
-                          style: const TextStyle(color: AppTheme.text, fontSize: 14, fontWeight: FontWeight.bold),
+                          style: TextStyle(color: AppTheme.text, fontSize: 14, fontWeight: FontWeight.bold),
                         ),
                         const SizedBox(height: 2),
                         Text(
                           '${contents.length} content items',
-                          style: const TextStyle(color: AppTheme.textSecondary, fontSize: 11),
+                          style: TextStyle(color: AppTheme.textSecondary, fontSize: 11),
                         ),
                       ],
                     ),
@@ -639,7 +641,7 @@ class _LOCardState extends ConsumerState<_LOCard> {
                 padding: const EdgeInsets.only(left: 36, right: 12, bottom: 12),
                 child: Text(
                   widget.lo['description'],
-                  style: const TextStyle(color: AppTheme.textSecondary, fontSize: 13),
+                  style: TextStyle(color: AppTheme.textSecondary, fontSize: 13),
                 ),
               ),
 
@@ -649,7 +651,7 @@ class _LOCardState extends ConsumerState<_LOCard> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const Text('Performance Criteria:', style: TextStyle(color: AppTheme.textSecondary, fontSize: 12, fontWeight: FontWeight.bold)),
+                    Text('Performance Criteria:', style: TextStyle(color: AppTheme.textSecondary, fontSize: 12, fontWeight: FontWeight.bold)),
                     const SizedBox(height: 4),
                     ...widget.lo['performance_criteria'].toString().split('\n').map((criteria) {
                       if (criteria.trim().isEmpty) return const SizedBox();
@@ -658,8 +660,8 @@ class _LOCardState extends ConsumerState<_LOCard> {
                         child: Row(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            const Text('• ', style: TextStyle(color: AppTheme.textMuted)),
-                            Expanded(child: Text(criteria, style: const TextStyle(color: AppTheme.textMuted, fontSize: 12))),
+                            Text('• ', style: TextStyle(color: AppTheme.textMuted)),
+                            Expanded(child: Text(criteria, style: TextStyle(color: AppTheme.textMuted, fontSize: 12))),
                           ],
                         ),
                       );
@@ -683,7 +685,7 @@ class _LOCardState extends ConsumerState<_LOCard> {
                 icon: Icon(Icons.add, color: Theme.of(context).colorScheme.primary, size: 16),
                 label: const Text('Add Content', style: TextStyle(fontSize: 13)),
                 style: OutlinedButton.styleFrom(
-                  foregroundColor: Theme.of(context).colorScheme.onPrimary,
+                  foregroundColor: Theme.of(context).colorScheme.primary,
                   side: BorderSide(color: Theme.of(context).colorScheme.primary.withValues(alpha: 0.15)),
                   padding: const EdgeInsets.symmetric(vertical: 8),
                   shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
@@ -694,7 +696,7 @@ class _LOCardState extends ConsumerState<_LOCard> {
 
             // Content List
             if (contents.isEmpty)
-              const Padding(
+              Padding(
                 padding: EdgeInsets.only(bottom: 20),
                 child: Center(
                   child: Text('No content yet', style: TextStyle(color: AppTheme.textMuted, fontStyle: FontStyle.italic, fontSize: 12)),
@@ -758,11 +760,11 @@ class _ContentCard extends ConsumerWidget {
               children: [
                 Text(
                   content['title'],
-                  style: const TextStyle(color: AppTheme.text, fontSize: 13, fontWeight: FontWeight.w600),
+                  style: TextStyle(color: AppTheme.text, fontSize: 13, fontWeight: FontWeight.w600),
                 ),
                 Text(
                   content['content_type'],
-                  style: const TextStyle(color: AppTheme.textMuted, fontSize: 11),
+                  style: TextStyle(color: AppTheme.textMuted, fontSize: 11),
                 ),
               ],
             ),
@@ -789,20 +791,20 @@ class _ContentCard extends ConsumerWidget {
                 context: context,
                 builder: (context) => AlertDialog(
                   backgroundColor: Theme.of(context).colorScheme.surface,
-                  title: const Text('Delete Content', style: TextStyle(color: AppTheme.text)),
+                  title: Text('Delete Content', style: TextStyle(color: AppTheme.text)),
                   content: Text('Are you sure you want to delete "${content['title']}"?',
-                      style: const TextStyle(color: AppTheme.textSecondary)),
+                      style: TextStyle(color: AppTheme.textSecondary)),
                   actions: [
                     TextButton(
                       onPressed: () => Navigator.pop(context),
-                      child: const Text('Cancel', style: TextStyle(color: AppTheme.textSecondary)),
+                      child: Text('Cancel', style: TextStyle(color: AppTheme.textSecondary)),
                     ),
                     TextButton(
                       onPressed: () {
                         ref.read(subjectDetailProvider.notifier).deleteContent(content['id']);
                         Navigator.pop(context);
                       },
-                      child: const Text('Delete', style: TextStyle(color: AppTheme.error)),
+                      child: Text('Delete', style: TextStyle(color: AppTheme.error)),
                     ),
                   ],
                 ),
@@ -845,11 +847,11 @@ class _AddTopicSheetState extends ConsumerState<_AddTopicSheet> {
       title: 'Add Topic',
       onSave: _save,
       children: [
-        const Text('Title', style: TextStyle(color: AppTheme.textSecondary, fontSize: 12)),
+        Text('Title', style: TextStyle(color: AppTheme.textSecondary, fontSize: 12)),
         const SizedBox(height: 8),
         _buildTextField(_titleController, 'Title of Topic'),
         const SizedBox(height: 16),
-        const Text('Description', style: TextStyle(color: AppTheme.textSecondary, fontSize: 12)),
+        Text('Description', style: TextStyle(color: AppTheme.textSecondary, fontSize: 12)),
         const SizedBox(height: 8),
         _buildTextField(_descController, 'Description', maxLines: 4),
       ],
@@ -886,15 +888,15 @@ class _AddLOSheetState extends ConsumerState<_AddLOSheet> {
       title: 'Add LO',
       onSave: _save,
       children: [
-        const Text('Title', style: TextStyle(color: AppTheme.textSecondary, fontSize: 12)),
+        Text('Title', style: TextStyle(color: AppTheme.textSecondary, fontSize: 12)),
         const SizedBox(height: 8),
         _buildTextField(_titleController, 'LO title'),
         const SizedBox(height: 16),
-        const Text('Description', style: TextStyle(color: AppTheme.textSecondary, fontSize: 12)),
+        Text('Description', style: TextStyle(color: AppTheme.textSecondary, fontSize: 12)),
         const SizedBox(height: 8),
         _buildTextField(_descController, 'Description', maxLines: 3),
         const SizedBox(height: 16),
-        const Text('Performance Criteria (one per line)', style: TextStyle(color: AppTheme.textSecondary, fontSize: 12)),
+        Text('Performance Criteria (one per line)', style: TextStyle(color: AppTheme.textSecondary, fontSize: 12)),
         const SizedBox(height: 8),
         _buildTextField(_criteriaController, 'Enter criteria...', maxLines: 4),
       ],
@@ -941,7 +943,7 @@ class _AddContentSheetState extends ConsumerState<_AddContentSheet> {
       title: 'Add Content',
       onSave: _save,
       children: [
-        const Text('Content Type', style: TextStyle(color: AppTheme.textSecondary, fontSize: 12)),
+        Text('Content Type', style: TextStyle(color: AppTheme.textSecondary, fontSize: 12)),
         const SizedBox(height: 8),
         SingleChildScrollView(
           scrollDirection: Axis.horizontal,
@@ -970,11 +972,11 @@ class _AddContentSheetState extends ConsumerState<_AddContentSheet> {
           ),
         ),
         const SizedBox(height: 16),
-        const Text('Title', style: TextStyle(color: AppTheme.textSecondary, fontSize: 12)),
+        Text('Title', style: TextStyle(color: AppTheme.textSecondary, fontSize: 12)),
         const SizedBox(height: 8),
         _buildTextField(_titleController, 'Content title'),
         const SizedBox(height: 16),
-        const Text('Content', style: TextStyle(color: AppTheme.textSecondary, fontSize: 12)),
+        Text('Content', style: TextStyle(color: AppTheme.textSecondary, fontSize: 12)),
         const SizedBox(height: 8),
         _buildTextField(_contentController, 'Enter text content...', maxLines: 5),
       ],
@@ -1048,24 +1050,24 @@ class _BaseBottomSheet extends StatelessWidget {
 Widget _buildTextField(TextEditingController controller, String hint, {int maxLines = 1}) {
   return TextField(
     controller: controller,
-    style: const TextStyle(color: AppTheme.text),
+    style: TextStyle(color: AppTheme.text),
     maxLines: maxLines,
     decoration: InputDecoration(
       hintText: hint,
-      hintStyle: const TextStyle(color: AppTheme.textMuted),
+      hintStyle: TextStyle(color: AppTheme.textMuted),
       filled: true,
       fillColor: AppTheme.background,
       border: OutlineInputBorder(
         borderRadius: BorderRadius.circular(8),
-        borderSide: const BorderSide(color: AppTheme.border),
+        borderSide: BorderSide(color: AppTheme.border),
       ),
       enabledBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(8),
-        borderSide: const BorderSide(color: AppTheme.border),
+        borderSide: BorderSide(color: AppTheme.border),
       ),
       focusedBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(8),
-        borderSide: const BorderSide(color: AppTheme.primary),
+        borderSide: BorderSide(color: AppTheme.primary),
       ),
     ),
   );
@@ -1117,12 +1119,12 @@ class _QuizTopicCardState extends ConsumerState<_QuizTopicCard> {
                       children: [
                         Text(
                           'Topic ${widget.topicIndex}',
-                          style: const TextStyle(color: AppTheme.primary, fontSize: 12, fontWeight: FontWeight.bold),
+                          style: TextStyle(color: AppTheme.primary, fontSize: 12, fontWeight: FontWeight.bold),
                         ),
                         const SizedBox(height: 4),
                         Text(
                           widget.topic['title'],
-                          style: const TextStyle(color: AppTheme.text, fontSize: 16, fontWeight: FontWeight.bold),
+                          style: TextStyle(color: AppTheme.text, fontSize: 16, fontWeight: FontWeight.bold),
                         ),
                       ],
                     ),
@@ -1139,7 +1141,7 @@ class _QuizTopicCardState extends ConsumerState<_QuizTopicCard> {
           
           if (_isExpanded) ...[
             if (los.isEmpty)
-              const Padding(
+              Padding(
                 padding: EdgeInsets.only(bottom: 24),
                 child: Center(
                   child: Text('No Learning Outcomes yet', style: TextStyle(color: AppTheme.textMuted, fontStyle: FontStyle.italic)),
@@ -1204,12 +1206,12 @@ class _QuizLOCardState extends ConsumerState<_QuizLOCard> {
                       children: [
                         Text(
                           'LO ${widget.loIndex}: ${widget.lo['title']}',
-                          style: const TextStyle(color: AppTheme.primary, fontSize: 13, fontWeight: FontWeight.bold),
+                          style: TextStyle(color: AppTheme.primary, fontSize: 13, fontWeight: FontWeight.bold),
                         ),
                         const SizedBox(height: 4),
                         Text(
                           '${questions.isEmpty ? 'No quiz yet' : '${questions.length} questions'}${widget.lo['passing_score'] != null && widget.lo['passing_score'] > 0 ? ' - Pass: ${widget.lo['passing_score']}%' : ''}',
-                          style: const TextStyle(color: AppTheme.textSecondary, fontSize: 11),
+                          style: TextStyle(color: AppTheme.textSecondary, fontSize: 11),
                         ),
                       ],
                     ),
@@ -1253,7 +1255,7 @@ class _QuizLOCardState extends ConsumerState<_QuizLOCard> {
                       widget.lo['passing_score'] != null && widget.lo['passing_score'] > 0
                           ? 'Passing Score: ${widget.lo['passing_score']}%'
                           : 'No passing score set.',
-                      style: const TextStyle(color: AppTheme.textSecondary, fontSize: 13),
+                      style: TextStyle(color: AppTheme.textSecondary, fontSize: 13),
                     ),
                   ),
                   if (widget.lo['passing_score'] != null && widget.lo['passing_score'] > 0)
@@ -1287,7 +1289,7 @@ class _QuizLOCardState extends ConsumerState<_QuizLOCard> {
                     children: [
                       Icon(Icons.calendar_today, color: Theme.of(context).colorScheme.onSurface, size: 18),
                       const SizedBox(width: 8),
-                      const Text('Scheduled Access', style: TextStyle(color: AppTheme.text, fontWeight: FontWeight.bold)),
+                      Text('Scheduled Access', style: TextStyle(color: AppTheme.text, fontWeight: FontWeight.bold)),
                       const Spacer(),
                       if (widget.lo['schedule_start'] != null)
                         Container(
@@ -1296,13 +1298,13 @@ class _QuizLOCardState extends ConsumerState<_QuizLOCard> {
                             color: Theme.of(context).colorScheme.primary.withValues(alpha: 0.2),
                             borderRadius: BorderRadius.circular(12),
                           ),
-                          child: const Text('Available', style: TextStyle(color: AppTheme.primary, fontSize: 11, fontWeight: FontWeight.bold)),
+                          child: Text('Available', style: TextStyle(color: AppTheme.primary, fontSize: 11, fontWeight: FontWeight.bold)),
                         ),
                     ],
                   ),
                   const SizedBox(height: 12),
                   if (widget.lo['schedule_start'] == null) ...[
-                    const Text('No schedule set. Quiz is available anytime once lesson is done.',
+                    Text('No schedule set. Quiz is available anytime once lesson is done.',
                         style: TextStyle(color: AppTheme.textSecondary, fontSize: 13)),
                     const SizedBox(height: 12),
                     ElevatedButton.icon(
@@ -1327,7 +1329,7 @@ class _QuizLOCardState extends ConsumerState<_QuizLOCard> {
                       children: [
                         Icon(Icons.date_range, color: Theme.of(context).colorScheme.primary, size: 14),
                         const SizedBox(width: 8),
-                        Text('Opens: ${widget.lo['schedule_start']}', style: const TextStyle(color: AppTheme.textSecondary, fontSize: 12)),
+                        Text('Opens: ${widget.lo['schedule_start']}', style: TextStyle(color: AppTheme.textSecondary, fontSize: 12)),
                       ],
                     ),
                     const SizedBox(height: 6),
@@ -1335,7 +1337,7 @@ class _QuizLOCardState extends ConsumerState<_QuizLOCard> {
                       children: [
                         Icon(Icons.event_busy, color: Theme.of(context).colorScheme.error, size: 14),
                         const SizedBox(width: 8),
-                        Text('Closes: ${widget.lo['schedule_end']}', style: const TextStyle(color: AppTheme.textSecondary, fontSize: 12)),
+                        Text('Closes: ${widget.lo['schedule_end']}', style: TextStyle(color: AppTheme.textSecondary, fontSize: 12)),
                       ],
                     ),
                     const SizedBox(height: 6),
@@ -1343,12 +1345,12 @@ class _QuizLOCardState extends ConsumerState<_QuizLOCard> {
                       children: [
                         Icon(Icons.access_time, color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.4), size: 14),
                         const SizedBox(width: 8),
-                        Text('Timezone: ${widget.lo['timezone']}', style: const TextStyle(color: AppTheme.textSecondary, fontSize: 12)),
+                        Text('Timezone: ${widget.lo['timezone']}', style: TextStyle(color: AppTheme.textSecondary, fontSize: 12)),
                       ],
                     ),
                     if (widget.lo['allow_extend'] == 1) ...[
                       const SizedBox(height: 6),
-                      const Row(
+                      Row(
                         children: [
                           Icon(Icons.timer, color: Colors.orange, size: 14),
                           SizedBox(width: 8),
@@ -1359,7 +1361,7 @@ class _QuizLOCardState extends ConsumerState<_QuizLOCard> {
                     const SizedBox(height: 12),
                     OutlinedButton.icon(
                       style: OutlinedButton.styleFrom(
-                        foregroundColor: Theme.of(context).colorScheme.onPrimary,
+                        foregroundColor: Theme.of(context).colorScheme.primary,
                         side: BorderSide(color: Theme.of(context).colorScheme.primary),
                         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
                       ),
@@ -1382,7 +1384,7 @@ class _QuizLOCardState extends ConsumerState<_QuizLOCard> {
 
             // Questions List
             if (questions.isEmpty)
-              const Padding(
+              Padding(
                 padding: EdgeInsets.only(bottom: 20),
                 child: Center(
                   child: Text('No questions yet.', style: TextStyle(color: AppTheme.textMuted, fontStyle: FontStyle.italic, fontSize: 12)),
@@ -1458,7 +1460,7 @@ class _QuestionCard extends ConsumerWidget {
               children: [
                 Text(
                   question['question_text'],
-                  style: const TextStyle(color: AppTheme.text, fontSize: 13, fontWeight: FontWeight.bold),
+                  style: TextStyle(color: AppTheme.text, fontSize: 13, fontWeight: FontWeight.bold),
                 ),
                 const SizedBox(height: 8),
                 _buildOption('A', question['option_a']),
@@ -1494,20 +1496,20 @@ class _QuestionCard extends ConsumerWidget {
                     context: context,
                     builder: (context) => AlertDialog(
                       backgroundColor: Theme.of(context).colorScheme.surface,
-                      title: const Text('Delete Question', style: TextStyle(color: AppTheme.text)),
-                      content: const Text('Are you sure you want to delete this question?',
+                      title: Text('Delete Question', style: TextStyle(color: AppTheme.text)),
+                      content: Text('Are you sure you want to delete this question?',
                           style: TextStyle(color: AppTheme.textSecondary)),
                       actions: [
                         TextButton(
                           onPressed: () => Navigator.pop(context),
-                          child: const Text('Cancel', style: TextStyle(color: AppTheme.textSecondary)),
+                          child: Text('Cancel', style: TextStyle(color: AppTheme.textSecondary)),
                         ),
                         TextButton(
                           onPressed: () {
                             ref.read(subjectDetailProvider.notifier).deleteQuestion(question['id']);
                             Navigator.pop(context);
                           },
-                          child: const Text('Delete', style: TextStyle(color: AppTheme.error)),
+                          child: Text('Delete', style: TextStyle(color: AppTheme.error)),
                         ),
                       ],
                     ),
@@ -1580,11 +1582,11 @@ class _AddQuestionSheetState extends ConsumerState<_AddQuestionSheet> {
       title: 'Add Question',
       onSave: _save,
       children: [
-        const Text('Question', style: TextStyle(color: AppTheme.textSecondary, fontSize: 12)),
+        Text('Question', style: TextStyle(color: AppTheme.textSecondary, fontSize: 12)),
         const SizedBox(height: 8),
         _buildTextField(_questionController, 'Question text', maxLines: 3),
         const SizedBox(height: 16),
-        const Text('Options (tap radio for correct answer)', style: TextStyle(color: AppTheme.textSecondary, fontSize: 12)),
+        Text('Options (tap radio for correct answer)', style: TextStyle(color: AppTheme.textSecondary, fontSize: 12)),
         const SizedBox(height: 12),
         _buildOptionRow('A', _optionAController),
         _buildOptionRow('B', _optionBController),
@@ -1633,11 +1635,11 @@ class _EditTopicSheetState extends ConsumerState<_EditTopicSheet> {
       title: 'Edit Topic',
       onSave: _save,
       children: [
-        const Text('Title', style: TextStyle(color: AppTheme.textSecondary, fontSize: 12)),
+        Text('Title', style: TextStyle(color: AppTheme.textSecondary, fontSize: 12)),
         const SizedBox(height: 8),
         _buildTextField(_titleController, 'Title of Topic'),
         const SizedBox(height: 16),
-        const Text('Description', style: TextStyle(color: AppTheme.textSecondary, fontSize: 12)),
+        Text('Description', style: TextStyle(color: AppTheme.textSecondary, fontSize: 12)),
         const SizedBox(height: 8),
         _buildTextField(_descController, 'Description', maxLines: 4),
       ],
@@ -1682,15 +1684,15 @@ class _EditLOSheetState extends ConsumerState<_EditLOSheet> {
       title: 'Edit LO',
       onSave: _save,
       children: [
-        const Text('Title', style: TextStyle(color: AppTheme.textSecondary, fontSize: 12)),
+        Text('Title', style: TextStyle(color: AppTheme.textSecondary, fontSize: 12)),
         const SizedBox(height: 8),
         _buildTextField(_titleController, 'LO title'),
         const SizedBox(height: 16),
-        const Text('Description', style: TextStyle(color: AppTheme.textSecondary, fontSize: 12)),
+        Text('Description', style: TextStyle(color: AppTheme.textSecondary, fontSize: 12)),
         const SizedBox(height: 8),
         _buildTextField(_descController, 'Description', maxLines: 3),
         const SizedBox(height: 16),
-        const Text('Performance Criteria (one per line)', style: TextStyle(color: AppTheme.textSecondary, fontSize: 12)),
+        Text('Performance Criteria (one per line)', style: TextStyle(color: AppTheme.textSecondary, fontSize: 12)),
         const SizedBox(height: 8),
         _buildTextField(_criteriaController, 'Enter criteria...', maxLines: 4),
       ],
@@ -1745,7 +1747,7 @@ class _EditContentSheetState extends ConsumerState<_EditContentSheet> {
       title: 'Edit Content',
       onSave: _save,
       children: [
-        const Text('Content Type', style: TextStyle(color: AppTheme.textSecondary, fontSize: 12)),
+        Text('Content Type', style: TextStyle(color: AppTheme.textSecondary, fontSize: 12)),
         const SizedBox(height: 8),
         SingleChildScrollView(
           scrollDirection: Axis.horizontal,
@@ -1774,11 +1776,11 @@ class _EditContentSheetState extends ConsumerState<_EditContentSheet> {
           ),
         ),
         const SizedBox(height: 16),
-        const Text('Title', style: TextStyle(color: AppTheme.textSecondary, fontSize: 12)),
+        Text('Title', style: TextStyle(color: AppTheme.textSecondary, fontSize: 12)),
         const SizedBox(height: 8),
         _buildTextField(_titleController, 'Content title'),
         const SizedBox(height: 16),
-        const Text('Content', style: TextStyle(color: AppTheme.textSecondary, fontSize: 12)),
+        Text('Content', style: TextStyle(color: AppTheme.textSecondary, fontSize: 12)),
         const SizedBox(height: 8),
         _buildTextField(_contentController, 'Enter text content...', maxLines: 5),
       ],
@@ -1855,11 +1857,11 @@ class _EditQuestionSheetState extends ConsumerState<_EditQuestionSheet> {
       title: 'Edit Question',
       onSave: _save,
       children: [
-        const Text('Question', style: TextStyle(color: AppTheme.textSecondary, fontSize: 12)),
+        Text('Question', style: TextStyle(color: AppTheme.textSecondary, fontSize: 12)),
         const SizedBox(height: 8),
         _buildTextField(_questionController, 'Question text', maxLines: 3),
         const SizedBox(height: 16),
-        const Text('Options (tap radio for correct answer)', style: TextStyle(color: AppTheme.textSecondary, fontSize: 12)),
+        Text('Options (tap radio for correct answer)', style: TextStyle(color: AppTheme.textSecondary, fontSize: 12)),
         const SizedBox(height: 12),
         _buildOptionRow('A', _optionAController),
         _buildOptionRow('B', _optionBController),
@@ -1910,7 +1912,7 @@ class _ScheduleQuizSheetState extends ConsumerState<_ScheduleQuizSheet> {
           children: [
             Icon(Icons.check_circle_outline, color: Theme.of(context).colorScheme.primary),
             SizedBox(width: 8),
-            Text('Quiz schedule saved successfully!', style: TextStyle(color: Colors.white)),
+            Text('Quiz schedule saved successfully!', style: TextStyle(color: Theme.of(context).colorScheme.onSurface)),
           ],
         ),
         backgroundColor: Theme.of(context).colorScheme.surface,
@@ -1930,26 +1932,26 @@ class _ScheduleQuizSheetState extends ConsumerState<_ScheduleQuizSheet> {
       title: 'Schedule Quiz Access',
       onSave: _save,
       children: [
-        const Text('Set when students can access this quiz. Before the start time, the quiz shows a countdown. After the end time, the quiz is closed.',
+        Text('Set when students can access this quiz. Before the start time, the quiz shows a countdown. After the end time, the quiz is closed.',
             style: TextStyle(color: AppTheme.textSecondary, fontSize: 13)),
         const SizedBox(height: 16),
 
-        const Text('Passing Score (%)', style: TextStyle(color: AppTheme.textSecondary, fontSize: 12)),
+        Text('Passing Score (%)', style: TextStyle(color: AppTheme.textSecondary, fontSize: 12)),
         const SizedBox(height: 8),
         _buildTextField(_passingScoreController, 'e.g. 80'),
         const SizedBox(height: 16),
 
-        const Text('Start Date & Time', style: TextStyle(color: AppTheme.textSecondary, fontSize: 12)),
+        Text('Start Date & Time', style: TextStyle(color: AppTheme.textSecondary, fontSize: 12)),
         const SizedBox(height: 8),
         _buildTextField(_startController, 'YYYY-MM-DDTHH:MM'),
         const SizedBox(height: 16),
 
-        const Text('End Date & Time', style: TextStyle(color: AppTheme.textSecondary, fontSize: 12)),
+        Text('End Date & Time', style: TextStyle(color: AppTheme.textSecondary, fontSize: 12)),
         const SizedBox(height: 8),
         _buildTextField(_endController, 'YYYY-MM-DDTHH:MM'),
         const SizedBox(height: 16),
 
-        const Text('Time Zone', style: TextStyle(color: AppTheme.textSecondary, fontSize: 12)),
+        Text('Time Zone', style: TextStyle(color: AppTheme.textSecondary, fontSize: 12)),
         const SizedBox(height: 8),
         _buildTextField(_timezoneController, 'e.g. Asia/Shanghai'),
         const SizedBox(height: 16),
@@ -1965,8 +1967,8 @@ class _ScheduleQuizSheetState extends ConsumerState<_ScheduleQuizSheet> {
             onChanged: (val) => setState(() => _allowExtend = val ?? false),
             activeColor: Theme.of(context).colorScheme.primary,
             checkColor: Colors.black,
-            title: const Text('Allow extending end time', style: TextStyle(color: AppTheme.primary, fontWeight: FontWeight.bold, fontSize: 13)),
-            subtitle: const Text('Permit editing the end time even after students have started the quiz.', style: TextStyle(color: AppTheme.textSecondary, fontSize: 11)),
+            title: Text('Allow extending end time', style: TextStyle(color: AppTheme.primary, fontWeight: FontWeight.bold, fontSize: 13)),
+            subtitle: Text('Permit editing the end time even after students have started the quiz.', style: TextStyle(color: AppTheme.textSecondary, fontSize: 11)),
             controlAffinity: ListTileControlAffinity.leading,
             contentPadding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
           ),

@@ -1,4 +1,4 @@
-﻿import 'package:flutter/material.dart';
+import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../../core/theme/app_theme.dart';
@@ -104,7 +104,7 @@ class _AdminSignupScreenState extends ConsumerState<AdminSignupScreen> {
                       Expanded(
                         child: Text(
                           _error,
-                          style: const TextStyle(color: AppTheme.error, fontSize: 13),
+                          style: TextStyle(color: AppTheme.error, fontSize: 13),
                         ),
                       ),
                     ],
@@ -135,7 +135,7 @@ class _AdminSignupScreenState extends ConsumerState<AdminSignupScreen> {
     return TextField(
       controller: controller,
       obscureText: isPassword,
-      style: const TextStyle(color: AppTheme.text),
+      style: TextStyle(color: AppTheme.text),
       decoration: InputDecoration(
         hintText: hint,
         prefixIcon: Icon(icon, color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.4)),

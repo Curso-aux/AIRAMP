@@ -1,4 +1,4 @@
-﻿import 'package:flutter/material.dart';
+import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import '../../../core/theme/app_theme.dart';
 
@@ -32,11 +32,11 @@ class _SubmissionsScreenState extends State<SubmissionsScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text(
+        title: Text(
           'Submit Assignment',
           style: TextStyle(color: AppTheme.text),
         ),
-        iconTheme: const IconThemeData(color: AppTheme.text),
+        iconTheme: IconThemeData(color: AppTheme.text),
       ),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(24.0),
@@ -69,7 +69,7 @@ class _SubmissionsScreenState extends State<SubmissionsScreen> {
               ),
             ),
             const SizedBox(height: 8),
-            const Text(
+            Text(
               'Please provide a link to your GitHub repository or Google Drive folder containing the final project files.',
               style: TextStyle(color: AppTheme.textSecondary, height: 1.5),
             ),
@@ -96,10 +96,10 @@ class _SubmissionsScreenState extends State<SubmissionsScreen> {
         const SizedBox(height: 16),
         TextField(
           controller: _controller,
-          style: const TextStyle(color: AppTheme.text),
+          style: TextStyle(color: AppTheme.text),
           decoration: InputDecoration(
             hintText: 'Paste link here (e.g. https://github.com/...)',
-            hintStyle: const TextStyle(color: AppTheme.textMuted),
+            hintStyle: TextStyle(color: AppTheme.textMuted),
             filled: true,
             fillColor: Theme.of(context).colorScheme.surface,
             border: OutlineInputBorder(
@@ -139,9 +139,9 @@ class _SubmissionsScreenState extends State<SubmissionsScreen> {
       ),
       child: Column(
         children: [
-          const Icon(Icons.check_circle, color: AppTheme.success, size: 48),
+          Icon(Icons.check_circle, color: AppTheme.success, size: 48),
           const SizedBox(height: 16),
-          const Text(
+          Text(
             'Submitted Successfully!',
             style: TextStyle(
               fontSize: 18,
@@ -152,15 +152,15 @@ class _SubmissionsScreenState extends State<SubmissionsScreen> {
           const SizedBox(height: 8),
           Text(
             'Link: ${_controller.text}',
-            style: const TextStyle(color: AppTheme.text),
+            style: TextStyle(color: AppTheme.text),
             textAlign: TextAlign.center,
           ),
           const SizedBox(height: 24),
           OutlinedButton(
             onPressed: () => context.pop(),
             style: OutlinedButton.styleFrom(
-              foregroundColor: Theme.of(context).colorScheme.onPrimary,
-              side: const BorderSide(color: AppTheme.success),
+              foregroundColor: AppTheme.success,
+              side: BorderSide(color: AppTheme.success),
             ),
             child: const Text('Go Back'),
           ),

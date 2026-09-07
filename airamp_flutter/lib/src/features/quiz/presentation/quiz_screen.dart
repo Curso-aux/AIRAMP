@@ -1,4 +1,4 @@
-﻿import 'package:flutter/material.dart';
+import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import '../../../core/theme/app_theme.dart';
 
@@ -19,8 +19,8 @@ class _QuizScreenState extends State<QuizScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Assessment', style: TextStyle(color: AppTheme.text)),
-        iconTheme: const IconThemeData(color: AppTheme.text),
+        title: Text('Assessment', style: TextStyle(color: AppTheme.text)),
+        iconTheme: IconThemeData(color: AppTheme.text),
       ),
       body: _buildContent(),
     );
@@ -53,7 +53,7 @@ class _QuizScreenState extends State<QuizScreen> {
               style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold, color: Theme.of(context).colorScheme.onSurface),
             ),
             const SizedBox(height: 16),
-            const Text(
+            Text(
               'This quiz consists of 10 questions. You must score at least 70% to pass.',
               textAlign: TextAlign.center,
               style: TextStyle(color: AppTheme.textSecondary),
@@ -80,7 +80,7 @@ class _QuizScreenState extends State<QuizScreen> {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            const Text(
+            Text(
               'Question 1 of 10',
               style: TextStyle(color: AppTheme.textMuted),
             ),
@@ -118,7 +118,7 @@ class _QuizScreenState extends State<QuizScreen> {
           borderRadius: BorderRadius.circular(12),
           border: Border.all(color: AppTheme.border),
         ),
-        child: Text(text, style: const TextStyle(color: AppTheme.text)),
+        child: Text(text, style: TextStyle(color: AppTheme.text)),
       ),
     );
   }
@@ -130,7 +130,7 @@ class _QuizScreenState extends State<QuizScreen> {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            const Icon(Icons.check_circle, size: 80, color: AppTheme.success),
+            Icon(Icons.check_circle, size: 80, color: AppTheme.success),
             const SizedBox(height: 24),
             Text(
               'Assessment Completed',

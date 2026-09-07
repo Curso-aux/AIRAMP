@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../../core/theme/app_theme.dart';
+import '../../../core/theme/theme_provider.dart';
 
-class AdminScaffold extends StatelessWidget {
+class AdminScaffold extends ConsumerWidget {
   final StatefulNavigationShell navigationShell;
 
   const AdminScaffold({super.key, required this.navigationShell});
@@ -15,11 +17,15 @@ class AdminScaffold extends StatelessWidget {
   }
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    ref.watch(themeProvider);
+
     return Scaffold(
+      backgroundColor: AppTheme.background,
       body: navigationShell,
       bottomNavigationBar: Container(
-        decoration: const BoxDecoration(
+        decoration: BoxDecoration(
+          color: AppTheme.surface,
           border: Border(top: BorderSide(color: AppTheme.border, width: 1)),
         ),
         child: BottomNavigationBar(

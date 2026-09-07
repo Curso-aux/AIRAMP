@@ -19,6 +19,7 @@ class AnnouncementsNotifier extends Notifier<List<Map<String, dynamic>>> {
   Future<void> _loadAnnouncements() async {
     final db = await DatabaseHelper().database;
     final List<Map<String, dynamic>> maps = await db.query('announcements', orderBy: 'id DESC');
+    if (!ref.mounted) return;
     state = maps;
   }
 
@@ -67,6 +68,7 @@ class SubjectsNotifier extends Notifier<List<Map<String, dynamic>>> {
           for (final s in remoteList) {
             await db.insert('subjects', s, conflictAlgorithm: ConflictAlgorithm.replace);
           }
+          if (!ref.mounted) return;
           state = await db.query('subjects', orderBy: 'id DESC');
           return;
         }
@@ -74,13 +76,15 @@ class SubjectsNotifier extends Notifier<List<Map<String, dynamic>>> {
         // fall through to local data
       }
     }
+    if (!ref.mounted) return;
     state = maps;
   }
 
-  Future<void> addSubject(Map<String, dynamic> subject) async {
+  Future<int> addSubject(Map<String, dynamic> subject) async {
     final db = await DatabaseHelper().database;
-    await db.insert('subjects', subject);
+    final id = await db.insert('subjects', subject);
     await _loadSubjects();
+    return id;
   }
 
   Future<void> updateSubject(int id, Map<String, dynamic> data) async {
@@ -118,6 +122,7 @@ class SectionsNotifier extends Notifier<List<Map<String, dynamic>>> {
   Future<void> _loadSections() async {
     final db = await DatabaseHelper().database;
     final List<Map<String, dynamic>> maps = await db.query('sections', orderBy: 'id DESC');
+    if (!ref.mounted) return;
     state = maps;
   }
 
@@ -160,6 +165,7 @@ class RegLinksNotifier extends Notifier<List<Map<String, dynamic>>> {
   Future<void> _loadLinks() async {
     final db = await DatabaseHelper().database;
     final List<Map<String, dynamic>> maps = await db.query('reg_links', orderBy: 'created_at DESC');
+    if (!ref.mounted) return;
     state = maps;
   }
 

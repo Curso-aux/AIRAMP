@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../theme/app_theme.dart';
 
 class ProgressBar extends StatelessWidget {
   final double value;
@@ -18,11 +19,12 @@ class ProgressBar extends StatelessWidget {
           child: LinearProgressIndicator(
             value: clamped,
             minHeight: 6,
-            backgroundColor: Colors.white12,
+            backgroundColor: AppTheme.surfaceLight,
+            valueColor: AlwaysStoppedAnimation<Color>(AppTheme.primary),
           ),
         ),
         const SizedBox(height: 4),
-        Text(label ?? '$percent%', style: const TextStyle(fontSize: 12, color: Colors.white70)),
+        Text(label ?? '$percent%', style: TextStyle(fontSize: 12, color: AppTheme.textSecondary)),
       ],
     );
   }

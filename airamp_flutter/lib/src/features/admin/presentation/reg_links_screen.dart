@@ -1,14 +1,16 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/theme/app_theme.dart';
+import '../../../core/theme/theme_provider.dart';
 
-class RegLinksScreen extends StatefulWidget {
+class RegLinksScreen extends ConsumerStatefulWidget {
   const RegLinksScreen({super.key});
 
   @override
-  State<RegLinksScreen> createState() => _RegLinksScreenState();
+  ConsumerState<RegLinksScreen> createState() => _RegLinksScreenState();
 }
 
-class _RegLinksScreenState extends State<RegLinksScreen> {
+class _RegLinksScreenState extends ConsumerState<RegLinksScreen> {
   final _expirationController = TextEditingController();
   final _maxUsesController = TextEditingController(text: '1');
   final List<Map<String, dynamic>> _links = [];
@@ -22,7 +24,9 @@ class _RegLinksScreenState extends State<RegLinksScreen> {
 
   @override
   Widget build(BuildContext context) {
+    ref.watch(themeProvider);
     return Scaffold(
+      backgroundColor: AppTheme.background,
       body: SafeArea(
         child: SingleChildScrollView(
           padding: const EdgeInsets.all(20),
@@ -39,7 +43,7 @@ class _RegLinksScreenState extends State<RegLinksScreen> {
                 ),
               ),
               const SizedBox(height: 4),
-              const Text(
+              Text(
                 'Create student registration links for your organization.',
                 style: TextStyle(color: AppTheme.textSecondary, fontSize: 14),
               ),
@@ -93,7 +97,7 @@ class _RegLinksScreenState extends State<RegLinksScreen> {
                         const SizedBox(height: 8),
                         TextField(
                           controller: _expirationController,
-                          style: const TextStyle(color: AppTheme.text),
+                          style: TextStyle(color: AppTheme.text),
                           decoration: InputDecoration(
                             hintText: 'YYYY-MM-DD (optional)',
                             prefixIcon: Icon(
@@ -136,7 +140,7 @@ class _RegLinksScreenState extends State<RegLinksScreen> {
                         const SizedBox(height: 8),
                         TextField(
                           controller: _maxUsesController,
-                          style: const TextStyle(color: AppTheme.text),
+                          style: TextStyle(color: AppTheme.text),
                           keyboardType: TextInputType.number,
                           textAlign: TextAlign.center,
                           decoration: InputDecoration(
@@ -254,11 +258,11 @@ class _RegLinksScreenState extends State<RegLinksScreen> {
       builder: (context) {
         return AlertDialog(
           backgroundColor: Theme.of(context).colorScheme.surface,
-          title: const Text('Link Generated Successfully', style: TextStyle(color: AppTheme.text)),
+          title: Text('Link Generated Successfully', style: TextStyle(color: AppTheme.text)),
           content: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              const Text('Here is your new student registration code:', style: TextStyle(color: AppTheme.textSecondary)),
+              Text('Here is your new student registration code:', style: TextStyle(color: AppTheme.textSecondary)),
               const SizedBox(height: 20),
               Container(
                 padding: const EdgeInsets.all(16),
@@ -272,7 +276,7 @@ class _RegLinksScreenState extends State<RegLinksScreen> {
                   children: [
                     Text(
                       code,
-                      style: const TextStyle(
+                      style: TextStyle(
                         fontSize: 24,
                         fontWeight: FontWeight.bold,
                         color: AppTheme.primary,
@@ -329,7 +333,7 @@ class _RegLinksScreenState extends State<RegLinksScreen> {
                 children: [
                   Text(
                     link['code'],
-                    style: const TextStyle(
+                    style: TextStyle(
                       color: AppTheme.text,
                       fontWeight: FontWeight.bold,
                       fontSize: 20,
@@ -364,25 +368,25 @@ class _RegLinksScreenState extends State<RegLinksScreen> {
               Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const Text('Created', style: TextStyle(color: AppTheme.textSecondary, fontSize: 11)),
+                  Text('Created', style: TextStyle(color: AppTheme.textSecondary, fontSize: 11)),
                   const SizedBox(height: 4),
-                  Text(createdDate, style: const TextStyle(color: AppTheme.text, fontSize: 13, fontWeight: FontWeight.bold)),
+                  Text(createdDate, style: TextStyle(color: AppTheme.text, fontSize: 13, fontWeight: FontWeight.bold)),
                 ],
               ),
               Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const Text('Expires', style: TextStyle(color: AppTheme.textSecondary, fontSize: 11)),
+                  Text('Expires', style: TextStyle(color: AppTheme.textSecondary, fontSize: 11)),
                   const SizedBox(height: 4),
-                  Text(expires, style: const TextStyle(color: AppTheme.text, fontSize: 13, fontWeight: FontWeight.bold)),
+                  Text(expires, style: TextStyle(color: AppTheme.text, fontSize: 13, fontWeight: FontWeight.bold)),
                 ],
               ),
               Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const Text('Uses', style: TextStyle(color: AppTheme.textSecondary, fontSize: 11)),
+                  Text('Uses', style: TextStyle(color: AppTheme.textSecondary, fontSize: 11)),
                   const SizedBox(height: 4),
-                  Text(uses, style: const TextStyle(color: AppTheme.text, fontSize: 13, fontWeight: FontWeight.bold)),
+                  Text(uses, style: TextStyle(color: AppTheme.text, fontSize: 13, fontWeight: FontWeight.bold)),
                 ],
               ),
               const SizedBox(width: 24), // Spacing for alignment

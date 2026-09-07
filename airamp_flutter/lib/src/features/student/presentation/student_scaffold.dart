@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import '../../../core/theme/app_theme.dart';
+import '../../../core/theme/theme_provider.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import '../../auth/application/auth_provider.dart';
 
 class StudentScaffold extends ConsumerWidget {
   final StatefulNavigationShell navigationShell;
@@ -18,12 +18,16 @@ class StudentScaffold extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    ref.watch(themeProvider);
+
     // In the future, we could read unread notification counts and display a badge.
     // For now, we will just construct the standard layout.
     return Scaffold(
+      backgroundColor: AppTheme.background,
       body: navigationShell,
       bottomNavigationBar: Container(
-        decoration: const BoxDecoration(
+        decoration: BoxDecoration(
+          color: AppTheme.surface,
           border: Border(top: BorderSide(color: AppTheme.border, width: 1)),
         ),
         child: BottomNavigationBar(

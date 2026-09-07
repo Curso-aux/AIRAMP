@@ -54,7 +54,7 @@ class _StudentProfileScreenState extends ConsumerState<StudentProfileScreen> {
     // For now show a snackbar
     if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
+      SnackBar(
         content: Text('Image picker will be integrated with image_picker package'),
         backgroundColor: AppTheme.accent,
       ),
@@ -113,18 +113,18 @@ class _StudentProfileScreenState extends ConsumerState<StudentProfileScreen> {
       builder: (ctx) => AlertDialog(
         backgroundColor: AppTheme.surface,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-        title: const Text(
+        title: Text(
           'Sign Out',
           style: TextStyle(color: AppTheme.text, fontWeight: FontWeight.bold),
         ),
-        content: const Text(
+        content: Text(
           'Are you sure you want to sign out?',
           style: TextStyle(color: AppTheme.textSecondary),
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.of(ctx).pop(),
-            child: const Text('Cancel',
+            child: Text('Cancel',
                 style: TextStyle(color: AppTheme.textSecondary)),
           ),
           TextButton(
@@ -132,7 +132,7 @@ class _StudentProfileScreenState extends ConsumerState<StudentProfileScreen> {
               Navigator.of(ctx).pop();
               await ref.read(authProvider.notifier).logout();
             },
-            child: const Text('Sign Out',
+            child: Text('Sign Out',
                 style: TextStyle(
                     color: AppTheme.error, fontWeight: FontWeight.bold)),
           ),
@@ -148,15 +148,15 @@ class _StudentProfileScreenState extends ConsumerState<StudentProfileScreen> {
         backgroundColor: AppTheme.surface,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
         title: Text(title,
-            style: const TextStyle(
+            style: TextStyle(
                 color: AppTheme.text, fontWeight: FontWeight.bold)),
         content:
-            Text(message, style: const TextStyle(color: AppTheme.textSecondary)),
+            Text(message, style: TextStyle(color: AppTheme.textSecondary)),
         actions: [
           TextButton(
             onPressed: () => Navigator.of(ctx).pop(),
             child:
-                const Text('OK', style: TextStyle(color: AppTheme.primary)),
+                Text('OK', style: TextStyle(color: AppTheme.primary)),
           ),
         ],
       ),
@@ -169,7 +169,7 @@ class _StudentProfileScreenState extends ConsumerState<StudentProfileScreen> {
     final themeState = ref.watch(themeProvider);
 
     if (currentUser == null) {
-      return const Scaffold(
+      return Scaffold(
         backgroundColor: AppTheme.background,
         body: Center(
             child: CircularProgressIndicator(color: AppTheme.primary)),
@@ -267,7 +267,7 @@ class _StudentProfileScreenState extends ConsumerState<StudentProfileScreen> {
         ),
         const SizedBox(height: 32),
         // Activity Timeline
-        const Text(
+        Text(
           'Student Activity',
           style: TextStyle(
               fontSize: 18, fontWeight: FontWeight.bold, color: AppTheme.text),
@@ -275,7 +275,7 @@ class _StudentProfileScreenState extends ConsumerState<StudentProfileScreen> {
         const SizedBox(height: 12),
         Text(
           currentUser.fullName,
-          style: const TextStyle(
+          style: TextStyle(
             fontSize: 20,
             fontWeight: FontWeight.w700,
             color: AppTheme.text,
@@ -284,7 +284,7 @@ class _StudentProfileScreenState extends ConsumerState<StudentProfileScreen> {
         const SizedBox(height: 2),
         Text(
           _getRoleLabel(currentUser.role),
-          style: const TextStyle(
+          style: TextStyle(
             fontSize: 13,
             color: AppTheme.textSecondary,
           ),
@@ -301,7 +301,7 @@ class _StudentProfileScreenState extends ConsumerState<StudentProfileScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text(
+          Text(
             'Appearance',
             style: TextStyle(
               fontSize: 16,
@@ -310,7 +310,7 @@ class _StudentProfileScreenState extends ConsumerState<StudentProfileScreen> {
             ),
           ),
           const SizedBox(height: 8),
-          const Text(
+          Text(
             'Choose your preferred theme. Auto follows your system setting.',
             style: TextStyle(
               fontSize: 13,
@@ -349,7 +349,7 @@ class _StudentProfileScreenState extends ConsumerState<StudentProfileScreen> {
           Center(
             child: Text(
               'Current: ${ref.read(themeProvider.notifier).currentModeLabel}',
-              style: const TextStyle(
+              style: TextStyle(
                 fontSize: 12,
                 color: AppTheme.textMuted,
               ),
@@ -416,7 +416,7 @@ class _StudentProfileScreenState extends ConsumerState<StudentProfileScreen> {
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              const Text(
+              Text(
                 'Personal Information',
                 style: TextStyle(
                   fontSize: 16,
@@ -427,7 +427,7 @@ class _StudentProfileScreenState extends ConsumerState<StudentProfileScreen> {
               if (!_isEditing)
                 GestureDetector(
                   onTap: () => setState(() => _isEditing = true),
-                  child: const Row(
+                  child: Row(
                     children: [
                       Icon(Icons.edit, size: 14, color: AppTheme.primary),
                       SizedBox(width: 4),
@@ -520,7 +520,7 @@ class _StudentProfileScreenState extends ConsumerState<StudentProfileScreen> {
       padding: const EdgeInsets.symmetric(vertical: 10),
       decoration: BoxDecoration(
         border: showBorder
-            ? const Border(
+            ? Border(
                 bottom: BorderSide(color: AppTheme.border, width: 1))
             : null,
       ),
@@ -538,7 +538,7 @@ class _StudentProfileScreenState extends ConsumerState<StudentProfileScreen> {
               children: [
                 Text(
                   label,
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontSize: 11,
                     color: AppTheme.textMuted,
                   ),
@@ -548,7 +548,7 @@ class _StudentProfileScreenState extends ConsumerState<StudentProfileScreen> {
                   TextField(
                     controller: controller,
                     keyboardType: keyboardType,
-                    style: const TextStyle(
+                    style: TextStyle(
                         color: AppTheme.text, fontSize: 15),
                     decoration: InputDecoration(
                       isDense: true,
@@ -559,24 +559,24 @@ class _StudentProfileScreenState extends ConsumerState<StudentProfileScreen> {
                       border: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(8),
                         borderSide:
-                            const BorderSide(color: AppTheme.border),
+                            BorderSide(color: AppTheme.border),
                       ),
                       enabledBorder: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(8),
                         borderSide:
-                            const BorderSide(color: AppTheme.border),
+                            BorderSide(color: AppTheme.border),
                       ),
                       focusedBorder: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(8),
                         borderSide:
-                            const BorderSide(color: AppTheme.primary),
+                            BorderSide(color: AppTheme.primary),
                       ),
                     ),
                   )
                 else
                   Text(
                     value,
-                    style: const TextStyle(
+                    style: TextStyle(
                         color: AppTheme.text, fontSize: 15),
                   ),
               ],
@@ -600,10 +600,10 @@ class _StudentProfileScreenState extends ConsumerState<StudentProfileScreen> {
                 setState(() => _showPasswordForm = !_showPasswordForm),
             child: Row(
               children: [
-                const Icon(Icons.lock_outline,
+                Icon(Icons.lock_outline,
                     size: 18, color: AppTheme.accent),
                 const SizedBox(width: 12),
-                const Expanded(
+                Expanded(
                   child: Text(
                     'Change Password',
                     style: TextStyle(
@@ -636,27 +636,27 @@ class _StudentProfileScreenState extends ConsumerState<StudentProfileScreen> {
                     controller: _newPasswordController,
                     obscureText: true,
                     style:
-                        const TextStyle(color: AppTheme.text, fontSize: 14),
+                        TextStyle(color: AppTheme.text, fontSize: 14),
                     decoration: InputDecoration(
                       hintText: 'New Password',
                       hintStyle:
-                          const TextStyle(color: AppTheme.textMuted),
+                          TextStyle(color: AppTheme.textMuted),
                       filled: true,
                       fillColor: AppTheme.inputBg,
                       border: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(10),
                         borderSide:
-                            const BorderSide(color: AppTheme.border),
+                            BorderSide(color: AppTheme.border),
                       ),
                       enabledBorder: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(10),
                         borderSide:
-                            const BorderSide(color: AppTheme.border),
+                            BorderSide(color: AppTheme.border),
                       ),
                       focusedBorder: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(10),
                         borderSide:
-                            const BorderSide(color: AppTheme.primary),
+                            BorderSide(color: AppTheme.primary),
                       ),
                       contentPadding: const EdgeInsets.symmetric(
                           horizontal: 14, vertical: 10),
@@ -669,27 +669,27 @@ class _StudentProfileScreenState extends ConsumerState<StudentProfileScreen> {
                     controller: _confirmPasswordController,
                     obscureText: true,
                     style:
-                        const TextStyle(color: AppTheme.text, fontSize: 14),
+                        TextStyle(color: AppTheme.text, fontSize: 14),
                     decoration: InputDecoration(
                       hintText: 'Confirm Password',
                       hintStyle:
-                          const TextStyle(color: AppTheme.textMuted),
+                          TextStyle(color: AppTheme.textMuted),
                       filled: true,
                       fillColor: AppTheme.inputBg,
                       border: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(10),
                         borderSide:
-                            const BorderSide(color: AppTheme.border),
+                            BorderSide(color: AppTheme.border),
                       ),
                       enabledBorder: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(10),
                         borderSide:
-                            const BorderSide(color: AppTheme.border),
+                            BorderSide(color: AppTheme.border),
                       ),
                       focusedBorder: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(10),
                         borderSide:
-                            const BorderSide(color: AppTheme.primary),
+                            BorderSide(color: AppTheme.primary),
                       ),
                       contentPadding: const EdgeInsets.symmetric(
                           horizontal: 14, vertical: 10),
@@ -744,7 +744,7 @@ class _StudentProfileScreenState extends ConsumerState<StudentProfileScreen> {
               width: 1,
             ),
           ),
-          child: const Row(
+          child: Row(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
               Icon(Icons.logout, size: 18, color: AppTheme.error),

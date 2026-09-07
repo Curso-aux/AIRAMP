@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../theme/app_theme.dart';
 
 class EmptyState extends StatelessWidget {
   final String message;
@@ -19,13 +20,13 @@ class EmptyState extends StatelessWidget {
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(icon, size: 48, color: Colors.white30),
+          Icon(icon, size: 48, color: AppTheme.textMuted),
           const SizedBox(height: 12),
-          Text(message, style: const TextStyle(color: Colors.white70, fontSize: 14)),
+          Text(message, style: TextStyle(color: AppTheme.textSecondary, fontSize: 14)),
           if (onAction != null && actionLabel != null)
             TextButton(
               onPressed: onAction,
-              child: Text(actionLabel!, style: const TextStyle(color: Colors.blueAccent)),
+              child: Text(actionLabel!, style: TextStyle(color: AppTheme.primary)),
             ),
         ],
       ),

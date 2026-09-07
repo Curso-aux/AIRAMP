@@ -55,7 +55,7 @@ class StudentProfileScreen extends StatelessWidget {
                     const SizedBox(height: 16),
                     Text(
                       student['name'],
-                      style: const TextStyle(
+                      style: TextStyle(
                         fontSize: 20,
                         fontWeight: FontWeight.bold,
                         color: AppTheme.text,
@@ -64,7 +64,7 @@ class StudentProfileScreen extends StatelessWidget {
                     const SizedBox(height: 4),
                     Text(
                       student['email'],
-                      style: const TextStyle(
+                      style: TextStyle(
                         color: AppTheme.textSecondary,
                         fontSize: 14,
                       ),
@@ -85,7 +85,7 @@ class StudentProfileScreen extends StatelessWidget {
                               const SizedBox(width: 4),
                               Text(
                                 student['grade'],
-                                style: const TextStyle(
+                                style: TextStyle(
                                   color: AppTheme.primary,
                                   fontSize: 12,
                                   fontWeight: FontWeight.bold,
@@ -107,7 +107,7 @@ class StudentProfileScreen extends StatelessWidget {
                               const SizedBox(width: 4),
                               Text(
                                 sectionName,
-                                style: const TextStyle(
+                                style: TextStyle(
                                   color: AppTheme.primary,
                                   fontSize: 12,
                                   fontWeight: FontWeight.bold,
@@ -119,9 +119,9 @@ class StudentProfileScreen extends StatelessWidget {
                       ],
                     ),
                     const SizedBox(height: 24),
-                    const Divider(color: AppTheme.border),
+                    Divider(color: AppTheme.border),
                     const SizedBox(height: 16),
-                    const Text(
+                    Text(
                       'Overall: 0/38 LOs (0%)',
                       style: TextStyle(color: AppTheme.textSecondary, fontSize: 12),
                     ),
@@ -145,7 +145,7 @@ class StudentProfileScreen extends StatelessWidget {
                       label: const Text('Reset Password'),
                       style: OutlinedButton.styleFrom(
                         foregroundColor: AppTheme.primary,
-                        side: const BorderSide(color: AppTheme.primarySoft),
+                        side: BorderSide(color: AppTheme.primarySoft),
                         backgroundColor: AppTheme.primarySoft.withValues(alpha: 0.1),
                         shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(8),
@@ -158,7 +158,7 @@ class StudentProfileScreen extends StatelessWidget {
               const SizedBox(height: 32),
               
               // Subjects & Scores
-              const Text(
+              Text(
                 'Subjects & Scores',
                 style: TextStyle(
                   fontSize: 18,
@@ -177,7 +177,7 @@ class StudentProfileScreen extends StatelessWidget {
                       color: AppTheme.textSecondary.withValues(alpha: 0.5),
                     ),
                     const SizedBox(height: 16),
-                    const Text(
+                    Text(
                       'No subjects enrolled',
                       style: TextStyle(
                         color: AppTheme.textSecondary,
@@ -199,7 +199,7 @@ class StudentProfileScreen extends StatelessWidget {
       children: [
         Text(
           value,
-          style: const TextStyle(
+          style: TextStyle(
             fontSize: 20,
             fontWeight: FontWeight.bold,
             color: AppTheme.text,
@@ -208,7 +208,7 @@ class StudentProfileScreen extends StatelessWidget {
         const SizedBox(height: 4),
         Text(
           label,
-          style: const TextStyle(
+          style: TextStyle(
             fontSize: 10,
             color: AppTheme.textSecondary,
           ),

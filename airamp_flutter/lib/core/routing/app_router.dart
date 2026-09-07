@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
-import '../../features/auth/presentation/login_screen.dart';
-import '../../features/auth/presentation/signup_screen.dart';
+import '../../src/features/auth/presentation/login_screen.dart';
+import '../../src/features/auth/presentation/signup_screen.dart';
 import '../../features/student/presentation/student_layout_screen.dart';
 import '../../features/student/presentation/student_dashboard_screen.dart';
 import '../../features/student/presentation/student_courses_screen.dart';

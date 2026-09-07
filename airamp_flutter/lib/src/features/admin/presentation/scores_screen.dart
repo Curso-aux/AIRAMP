@@ -1,14 +1,16 @@
-﻿import 'package:flutter/material.dart';
+import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/theme/app_theme.dart';
+import '../../../core/theme/theme_provider.dart';
 
-class ScoresScreen extends StatefulWidget {
+class ScoresScreen extends ConsumerStatefulWidget {
   const ScoresScreen({super.key});
 
   @override
-  State<ScoresScreen> createState() => _ScoresScreenState();
+  ConsumerState<ScoresScreen> createState() => _ScoresScreenState();
 }
 
-class _ScoresScreenState extends State<ScoresScreen> {
+class _ScoresScreenState extends ConsumerState<ScoresScreen> {
   final _searchController = TextEditingController();
   bool _showFilters = false;
 
@@ -20,6 +22,7 @@ class _ScoresScreenState extends State<ScoresScreen> {
 
   @override
   Widget build(BuildContext context) {
+    ref.watch(themeProvider);
     return Scaffold(
       body: SafeArea(
         child: SingleChildScrollView(
@@ -60,7 +63,7 @@ class _ScoresScreenState extends State<ScoresScreen> {
               // Search Bar
               TextField(
                 controller: _searchController,
-                style: const TextStyle(color: AppTheme.text),
+                style: TextStyle(color: AppTheme.text),
                 decoration: InputDecoration(
                   hintText: 'Search student, subject, or quiz...',
                   prefixIcon: Icon(Icons.search, color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.4)),
@@ -83,11 +86,11 @@ class _ScoresScreenState extends State<ScoresScreen> {
                 onPressed: () {
                   setState(() => _showFilters = !_showFilters);
                 },
-                icon: const Icon(Icons.filter_list, size: 16),
+                icon: Icon(Icons.filter_list, size: 16, color: AppTheme.text),
                 label: const Text('Filters'),
                 style: OutlinedButton.styleFrom(
-                  foregroundColor: Theme.of(context).colorScheme.onPrimary,
-                  side: BorderSide(color: Theme.of(context).dividerColor),
+                  foregroundColor: AppTheme.text,
+                  side: BorderSide(color: AppTheme.border),
                   shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
                   padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
                 ),
@@ -105,7 +108,7 @@ class _ScoresScreenState extends State<ScoresScreen> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      const Text('Filter by Section', style: TextStyle(color: AppTheme.textSecondary, fontSize: 13)),
+                      Text('Filter by Section', style: TextStyle(color: AppTheme.textSecondary, fontSize: 13)),
                       const SizedBox(height: 8),
                       Wrap(
                         spacing: 8,
@@ -122,7 +125,7 @@ class _ScoresScreenState extends State<ScoresScreen> {
                             label: const Text('STEM B'),
                             selected: false,
                             backgroundColor: Theme.of(context).colorScheme.surface,
-                            labelStyle: const TextStyle(color: AppTheme.textSecondary),
+                            labelStyle: TextStyle(color: AppTheme.textSecondary),
                             side: BorderSide(color: Theme.of(context).dividerColor),
                             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
                             onSelected: (_) {},
@@ -154,7 +157,7 @@ class _ScoresScreenState extends State<ScoresScreen> {
                       style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Theme.of(context).colorScheme.onSurface),
                     ),
                     const SizedBox(height: 8),
-                    const Padding(
+                    Padding(
                       padding: EdgeInsets.symmetric(horizontal: 40),
                       child: Text(
                         'No quiz attempts have been recorded yet. Scores will appear here once students start taking quizzes.',

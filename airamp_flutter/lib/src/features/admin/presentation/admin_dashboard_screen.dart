@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/theme/app_theme.dart';
+import '../../../core/theme/theme_provider.dart';
 import '../../auth/application/auth_provider.dart';
 import '../data/admin_repository.dart';
 
@@ -9,6 +10,7 @@ class AdminDashboardScreen extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    ref.watch(themeProvider);
     final currentUser = ref.watch(authProvider);
     final announcements = ref.watch(announcementsProvider);
     final subjects = ref.watch(subjectsProvider);
@@ -22,6 +24,7 @@ class AdminDashboardScreen extends ConsumerWidget {
         : 'T';
 
     return Scaffold(
+      backgroundColor: AppTheme.background,
       body: SafeArea(
         child: SingleChildScrollView(
           padding: const EdgeInsets.all(20.0),
@@ -72,7 +75,7 @@ class AdminDashboardScreen extends ConsumerWidget {
                 children: [
                   Row(
                     children: [
-                      const Icon(Icons.campaign, color: AppTheme.warning, size: 20),
+                      Icon(Icons.campaign, color: AppTheme.warning, size: 20),
                       const SizedBox(width: 8),
                       Text('Announcements', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Theme.of(context).colorScheme.onSurface)),
                     ],
@@ -98,7 +101,7 @@ class AdminDashboardScreen extends ConsumerWidget {
                     borderRadius: BorderRadius.circular(12),
                     border: Border.all(color: AppTheme.border),
                   ),
-                  child: const Text(
+                  child: Text(
                     'No announcements yet. Post one for your students.',
                     style: TextStyle(color: AppTheme.textMuted, fontStyle: FontStyle.italic),
                   ),
@@ -139,7 +142,7 @@ class AdminDashboardScreen extends ConsumerWidget {
                                 color: AppTheme.errorSoft,
                                 borderRadius: BorderRadius.circular(8),
                               ),
-                              child: const Text(
+                              child: Text(
                                 'Important',
                                 style: TextStyle(color: AppTheme.error, fontSize: 10, fontWeight: FontWeight.bold),
                               ),
@@ -155,11 +158,11 @@ class AdminDashboardScreen extends ConsumerWidget {
                               }
                             },
                             itemBuilder: (context) => [
-                              const PopupMenuItem(
+                              PopupMenuItem(
                                 value: 'edit',
                                 child: Text('Edit', style: TextStyle(color: AppTheme.text)),
                               ),
-                              const PopupMenuItem(
+                              PopupMenuItem(
                                 value: 'delete',
                                 child: Text('Delete', style: TextStyle(color: AppTheme.error)),
                               ),
@@ -170,7 +173,7 @@ class AdminDashboardScreen extends ConsumerWidget {
                       const SizedBox(height: 8),
                       Text(
                         a['message'],
-                        style: const TextStyle(color: AppTheme.textSecondary, fontSize: 14),
+                        style: TextStyle(color: AppTheme.textSecondary, fontSize: 14),
                       ),
                       const SizedBox(height: 12),
                       Row(
@@ -179,7 +182,7 @@ class AdminDashboardScreen extends ConsumerWidget {
                           const SizedBox(width: 4),
                           Text(
                             a['target_audience'],
-                            style: const TextStyle(color: AppTheme.textMuted, fontSize: 12),
+                            style: TextStyle(color: AppTheme.textMuted, fontSize: 12),
                           ),
                         ],
                       )
@@ -200,7 +203,7 @@ class AdminDashboardScreen extends ConsumerWidget {
                   borderRadius: BorderRadius.circular(12),
                   border: Border.all(color: AppTheme.border),
                 ),
-                child: const Center(
+                child: Center(
                   child: Text(
                     'No subjects available',
                     style: TextStyle(color: AppTheme.textMuted),
@@ -226,9 +229,9 @@ class AdminDashboardScreen extends ConsumerWidget {
         children: [
           Icon(icon, color: Theme.of(context).colorScheme.primary, size: 24),
           const SizedBox(height: 12),
-          Text(count, style: const TextStyle(color: AppTheme.text, fontSize: 24, fontWeight: FontWeight.bold)),
+          Text(count, style: TextStyle(color: AppTheme.text, fontSize: 24, fontWeight: FontWeight.bold)),
           const SizedBox(height: 4),
-          Text(title, style: const TextStyle(color: AppTheme.textSecondary, fontSize: 12)),
+          Text(title, style: TextStyle(color: AppTheme.textSecondary, fontSize: 12)),
         ],
       ),
     );
@@ -331,7 +334,7 @@ class _PostAnnouncementSheetState extends State<_PostAnnouncementSheet> {
             // Title Field
             TextField(
               controller: _titleController,
-              style: const TextStyle(color: AppTheme.text),
+              style: TextStyle(color: AppTheme.text),
               decoration: const InputDecoration(hintText: 'Title'),
             ),
             const SizedBox(height: 12),
@@ -339,14 +342,14 @@ class _PostAnnouncementSheetState extends State<_PostAnnouncementSheet> {
             // Message Field
             TextField(
               controller: _messageController,
-              style: const TextStyle(color: AppTheme.text),
+              style: TextStyle(color: AppTheme.text),
               decoration: const InputDecoration(hintText: 'Message...'),
               maxLines: 4,
             ),
             const SizedBox(height: 20),
 
             // Priority
-            const Text('Priority', style: TextStyle(color: AppTheme.textSecondary, fontSize: 14, fontWeight: FontWeight.w600)),
+            Text('Priority', style: TextStyle(color: AppTheme.textSecondary, fontSize: 14, fontWeight: FontWeight.w600)),
             const SizedBox(height: 10),
             ..._priorities.map((p) => _buildSelectableOption(
               label: p,
@@ -356,7 +359,7 @@ class _PostAnnouncementSheetState extends State<_PostAnnouncementSheet> {
             const SizedBox(height: 20),
 
             // Target Audience
-            const Text('Target Audience', style: TextStyle(color: AppTheme.textSecondary, fontSize: 14, fontWeight: FontWeight.w600)),
+            Text('Target Audience', style: TextStyle(color: AppTheme.textSecondary, fontSize: 14, fontWeight: FontWeight.w600)),
             const SizedBox(height: 10),
             ..._audiences.map((a) => _buildSelectableOption(
               label: a['label'],

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/theme/app_theme.dart';
+import '../../../core/theme/theme_provider.dart';
 
 class MyProgressScreen extends ConsumerStatefulWidget {
   const MyProgressScreen({super.key});
@@ -16,6 +17,7 @@ class _MyProgressScreenState extends ConsumerState<MyProgressScreen> {
 
   @override
   Widget build(BuildContext context) {
+    ref.watch(themeProvider);
     return Scaffold(
       backgroundColor: AppTheme.background,
       body: SafeArea(
@@ -25,12 +27,12 @@ class _MyProgressScreenState extends ConsumerState<MyProgressScreen> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const Text(
+              Text(
                 'Progress',
                 style: TextStyle(fontSize: 28, fontWeight: FontWeight.bold, color: AppTheme.text),
               ),
               const SizedBox(height: 4),
-              const Text(
+              Text(
                 'Track your learning journey',
                 style: TextStyle(fontSize: 14, color: AppTheme.textSecondary),
               ),
@@ -131,12 +133,12 @@ class _MyProgressScreenState extends ConsumerState<MyProgressScreen> {
         children: [
           Row(
             children: [
-              const Icon(Icons.bar_chart, color: AppTheme.primary, size: 24),
+              Icon(Icons.bar_chart, color: AppTheme.primary, size: 24),
               const SizedBox(width: 8),
               Expanded(
                 child: Text(
                   name,
-                  style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: AppTheme.text),
+                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: AppTheme.text),
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                 ),
@@ -144,7 +146,7 @@ class _MyProgressScreenState extends ConsumerState<MyProgressScreen> {
             ],
           ),
           const SizedBox(height: 4),
-          Text(meta, style: const TextStyle(color: AppTheme.textSecondary, fontSize: 13)),
+          Text(meta, style: TextStyle(color: AppTheme.textSecondary, fontSize: 13)),
           const SizedBox(height: 20),
           LinearProgressIndicator(
             value: progress / 100,
@@ -156,7 +158,7 @@ class _MyProgressScreenState extends ConsumerState<MyProgressScreen> {
           const SizedBox(height: 12),
           Text(
             '$completed of $total topics completed (${progress.toInt()}%)',
-            style: const TextStyle(fontWeight: FontWeight.w600, color: AppTheme.text),
+            style: TextStyle(fontWeight: FontWeight.w600, color: AppTheme.text),
           ),
           const SizedBox(height: 16),
           Container(
@@ -178,7 +180,7 @@ class _MyProgressScreenState extends ConsumerState<MyProgressScreen> {
                     unlockType == 'sequential'
                         ? 'Sequential: Progress checks require admin validation'
                         : 'Flexible: Progress reflects automatically',
-                    style: const TextStyle(fontSize: 12, color: AppTheme.textSecondary),
+                    style: TextStyle(fontSize: 12, color: AppTheme.textSecondary),
                   ),
                 ),
               ],
@@ -214,12 +216,12 @@ class _MyProgressScreenState extends ConsumerState<MyProgressScreen> {
                     Expanded(
                       child: Text(
                         title,
-                        style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15, color: AppTheme.text),
+                        style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15, color: AppTheme.text),
                       ),
                     ),
                     Text(
                       '$completed/$total',
-                      style: const TextStyle(fontWeight: FontWeight.bold, color: AppTheme.textSecondary),
+                      style: TextStyle(fontWeight: FontWeight.bold, color: AppTheme.textSecondary),
                     ),
                   ],
                 ),
@@ -234,7 +236,7 @@ class _MyProgressScreenState extends ConsumerState<MyProgressScreen> {
               ],
             ),
           ),
-          const Divider(height: 1, color: AppTheme.border),
+          Divider(height: 1, color: AppTheme.border),
           ...items,
         ],
       ),
@@ -244,7 +246,7 @@ class _MyProgressScreenState extends ConsumerState<MyProgressScreen> {
   Widget _buildLoItem(String number, String title, bool hasProgress, String? scoreText, bool isPassed) {
     return Container(
       padding: const EdgeInsets.all(16),
-      decoration: const BoxDecoration(
+      decoration: BoxDecoration(
         border: Border(bottom: BorderSide(color: AppTheme.border)),
       ),
       child: Row(
@@ -260,7 +262,7 @@ class _MyProgressScreenState extends ConsumerState<MyProgressScreen> {
             alignment: Alignment.center,
             child: Text(
               number,
-              style: const TextStyle(fontWeight: FontWeight.bold, color: AppTheme.textMuted),
+              style: TextStyle(fontWeight: FontWeight.bold, color: AppTheme.textMuted),
             ),
           ),
           const SizedBox(width: 12),
@@ -270,13 +272,13 @@ class _MyProgressScreenState extends ConsumerState<MyProgressScreen> {
               children: [
                 Text(
                   title,
-                  style: const TextStyle(fontWeight: FontWeight.bold, color: AppTheme.text),
+                  style: TextStyle(fontWeight: FontWeight.bold, color: AppTheme.text),
                 ),
                 if (hasProgress && scoreText != null) ...[
                   const SizedBox(height: 4),
                   Text(
                     scoreText,
-                    style: const TextStyle(fontSize: 12, color: AppTheme.textSecondary),
+                    style: TextStyle(fontSize: 12, color: AppTheme.textSecondary),
                   ),
                 ],
                 if (hasProgress) ...[
