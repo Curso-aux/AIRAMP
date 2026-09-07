@@ -62,9 +62,21 @@ class ChatNotifier extends Notifier<ChatState> {
   }
 
   void _connectAndLoad(String userId) {
-    // For now, skip the real WebSocket (no backend running) and just load mock data
-    state = state.copyWith(isConnected: false);
-    // _loadMockData(); // Uncomment to pre-populate with mock conversations
+    final repo = ref.read(chatRepositoryProvider);
+    final token = ref.read(authProvider)?.sessionToken ?? '';
+
+    _subscription?.cancel();
+    final stream = repo.connect(userId, token);
+    _subscription = stream.listen(
+      _handleWebSocketEvent,
+      onError: (_) {
+        state = state.copyWith(isConnected: false);
+      },
+      onDone: () {
+        state = state.copyWith(isConnected: false);
+      },
+    );
+    state = state.copyWith(isConnected: true);
   }
 
   void _disconnect() {

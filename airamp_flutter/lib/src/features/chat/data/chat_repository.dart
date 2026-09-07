@@ -5,7 +5,10 @@ class ChatRepository {
   final String baseUrl;
   WebSocketChannel? _channel;
 
-  ChatRepository({this.baseUrl = 'ws://localhost:8787/v1/chat/ws'});
+  ChatRepository({String baseUrl = ''})
+      : baseUrl = baseUrl.isEmpty
+            ? '${String.fromEnvironment('FUNCTIONS_URL', defaultValue: '').replaceFirst('https', 'wss')}/v1/chat/ws'
+            : baseUrl;
 
   Stream<Map<String, dynamic>> connect(String userId, String token) {
     final uri = Uri.parse('$baseUrl?userId=$userId&token=$token');
