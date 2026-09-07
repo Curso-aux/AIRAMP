@@ -63,9 +63,12 @@ class ChatNotifier extends Notifier<ChatState> {
   }
 
   void _connectAndLoad(String userId) {
+    if (!ApiClient.isCloudAvailable) {
+      state = state.copyWith(isConnected: false);
+      return;
+    }
     final repo = ref.read(chatRepositoryProvider);
     final token = ApiClient.hasSession ? userId : '';
-
     _subscription?.cancel();
     final stream = repo.connect(userId, token);
     _subscription = stream.listen(
