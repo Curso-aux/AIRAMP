@@ -2,20 +2,54 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'src/routing/app_router.dart';
 import 'src/core/theme/app_theme.dart';
+import 'src/features/auth/application/auth_provider.dart';
 
-void main() {
+void main() async {
+  WidgetsFlutterBinding.ensureInitialized();
   runApp(
     const ProviderScope(
-      child: MyApp(),
+      child: AirampApp(),
     ),
   );
 }
 
-class MyApp extends ConsumerWidget {
-  const MyApp({super.key});
+class AirampApp extends ConsumerStatefulWidget {
+  const AirampApp({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<AirampApp> createState() => _AirampAppState();
+}
+
+class _AirampAppState extends ConsumerState<AirampApp> {
+  bool _bootstrapped = false;
+
+  @override
+  void initState() {
+    super.initState();
+    // Restore session from SQLite on app start
+    Future.microtask(() => _bootstrap());
+  }
+
+  Future<void> _bootstrap() async {
+    await ref.read(authProvider.notifier).bootstrap();
+    if (mounted) {
+      setState(() => _bootstrapped = true);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    // Wait for bootstrap to complete before rendering
+    if (!_bootstrapped) {
+      return MaterialApp(
+        theme: AppTheme.darkTheme,
+        debugShowCheckedModeBanner: false,
+        home: const Scaffold(
+          body: Center(child: CircularProgressIndicator()),
+        ),
+      );
+    }
+
     final router = ref.watch(routerProvider);
 
     return MaterialApp.router(

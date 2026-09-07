@@ -1,5 +1,5 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import '../../../core/network/dio_client.dart';
+import '../../../core/api/api_client.dart';
 import '../data/auth_repository.dart';
 
 class User {
@@ -50,8 +50,7 @@ class User {
 }
 
 final authRepositoryProvider = Provider<AuthRepository>((ref) {
-  final dio = ref.watch(dioProvider);
-  return AuthRepository(dio);
+  return AuthRepository();
 });
 
 class AuthNotifier extends Notifier<User?> {
@@ -65,7 +64,7 @@ class AuthNotifier extends Notifier<User?> {
   Future<void> login(String identifier, String password) async {
     final repository = ref.read(authRepositoryProvider);
     isLoading = true;
-    
+
     try {
       final data = await repository.login(identifier, password);
       final user = User.fromJson(data['user']);
@@ -73,6 +72,20 @@ class AuthNotifier extends Notifier<User?> {
     } finally {
       isLoading = false;
     }
+  }
+
+  /// Restore user from persisted session on app start.
+  Future<void> bootstrap() async {
+    final repository = ref.read(authRepositoryProvider);
+    final session = await repository.currentSession();
+    if (session == null) return;
+    state = User(
+      id: session.userId,
+      email: '',
+      role: session.role,
+      fullName: session.userId,
+    );
+    ApiClient.setSession(session: session.session, userId: session.userId);
   }
 
   Future<void> register({

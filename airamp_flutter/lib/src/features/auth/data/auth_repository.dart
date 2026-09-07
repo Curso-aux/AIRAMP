@@ -1,17 +1,25 @@
+import 'package:dio/dio.dart';
 import '../../../core/database/database_helper.dart';
+import '../../../core/api/api_client.dart';
+
+class AuthSession {
+  final String session;
+  final String userId;
+  final String role;
+  AuthSession({required this.session, required this.userId, required this.role});
+}
 
 class AuthRepository {
-  // Dio kept for future backend calls but not used for local auth
-  AuthRepository(dynamic dio);
+  final Dio _dio;
+  AuthRepository({Dio? dio}) : _dio = dio ?? ApiClient.instance;
 
   Future<Map<String, dynamic>> login(String identifier, String password) async {
     final db = await DatabaseHelper().database;
     final identifierLower = identifier.toLowerCase().trim();
 
-    // Search by email or full_name (case-insensitive)
     final results = await db.rawQuery(
-      '''SELECT * FROM users 
-         WHERE (LOWER(email) = ? OR LOWER(full_name) = ?) 
+      '''SELECT * FROM users
+         WHERE (LOWER(email) = ? OR LOWER(full_name) = ?)
          AND password = ?''',
       [identifierLower, identifierLower, password],
     );
@@ -21,13 +29,42 @@ class AuthRepository {
     }
 
     final user = results.first;
+    final userId = user['id'] as String;
+    final role = user['role'] as String;
+
+    String token = _localToken(userId);
+
+    if (ApiClient.isCloudAvailable) {
+      try {
+        final resp = await _dio.post(
+          '/v1/auth/session',
+          options: Options(
+            headers: {
+              'X-School-Session': token,
+              'X-School-User-Id': userId,
+            },
+          ),
+        );
+        final data = resp.data;
+        if (data is Map && data['token'] is String) {
+          token = data['token'] as String;
+        }
+      } on DioException {
+        // Fall through with local token
+      }
+    }
+
+    await _persistSession(userId: userId, role: role, token: token);
+    ApiClient.setSession(session: token, userId: userId);
+
     return {
       'user': {
-        'id': user['id'],
+        'id': userId,
         'email': user['email'],
-        'role': user['role'],
+        'role': role,
         'fullName': user['full_name'],
-      }
+      },
+      'session': token,
     };
   }
 
@@ -39,7 +76,6 @@ class AuthRepository {
   }) async {
     final db = await DatabaseHelper().database;
 
-    // Check if email already exists
     final existing = await db.query(
       'users',
       where: 'LOWER(email) = ?',
@@ -71,7 +107,56 @@ class AuthRepository {
     };
   }
 
+  Future<AuthSession?> currentSession() async {
+    final db = await DatabaseHelper().database;
+    final rows = await db.query('sessions', orderBy: 'id DESC', limit: 1);
+    if (rows.isEmpty) return null;
+    final r = rows.first;
+    return AuthSession(
+      session: r['token'] as String,
+      userId: r['user_id'] as String,
+      role: r['role'] as String,
+    );
+  }
+
   Future<void> logout() async {
-    // No-op for local auth; will clear tokens for real backend later
+    final db = await DatabaseHelper().database;
+    final session = await currentSession();
+    if (session != null && ApiClient.isCloudAvailable) {
+      try {
+        await _dio.post(
+          '/v1/auth/revoke',
+          options: Options(
+            headers: {
+              'X-School-Session': session.session,
+              'X-School-User-Id': session.userId,
+            },
+          ),
+        );
+      } on DioException {
+        // ignore network errors during logout
+      }
+    }
+    await db.delete('sessions');
+    ApiClient.clearSession();
+  }
+
+  Future<void> _persistSession({
+    required String userId,
+    required String role,
+    required String token,
+  }) async {
+    final db = await DatabaseHelper().database;
+    await db.delete('sessions');
+    await db.insert('sessions', {
+      'user_id': userId,
+      'token': token,
+      'role': role,
+      'created_at': DateTime.now().toIso8601String(),
+    });
+  }
+
+  String _localToken(String userId) {
+    return 'local-$userId-${DateTime.now().millisecondsSinceEpoch}';
   }
 }
