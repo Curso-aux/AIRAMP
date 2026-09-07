@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/theme/app_theme.dart';
+import '../data/student_repository.dart';
 
 class MyCoursesScreen extends ConsumerStatefulWidget {
   const MyCoursesScreen({super.key});
@@ -62,6 +63,8 @@ class _MyCoursesScreenState extends ConsumerState<MyCoursesScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final courses = ref.watch(studentCoursesProvider);
+
     return Scaffold(
       backgroundColor: AppTheme.background,
       body: SafeArea(
@@ -87,26 +90,27 @@ class _MyCoursesScreenState extends ConsumerState<MyCoursesScreen> {
                 ),
                 const SizedBox(height: 24),
 
-                // Mock Enrolled Courses
-                _buildCourseCard(
-                  title: 'Introduction to Flutter',
-                  code: 'CS101',
-                  progress: 45,
-                  unlockType: 'Flexible',
-                  completedLos: 4,
-                  totalLos: 9,
-                  cocs: 5,
-                ),
-                const SizedBox(height: 16),
-                _buildCourseCard(
-                  title: 'Advanced State Management',
-                  code: 'CS202',
-                  progress: 10,
-                  unlockType: 'Sequential',
-                  completedLos: 1,
-                  totalLos: 10,
-                  cocs: 2,
-                ),
+                // Enrolled Courses from provider
+                if (courses.isEmpty)
+                  const Center(
+                    child: Padding(
+                      padding: EdgeInsets.symmetric(vertical: 32),
+                      child: Text('No courses enrolled yet.', style: TextStyle(color: AppTheme.textMuted)),
+                    ),
+                  )
+                else
+                  ...courses.map((c) => Padding(
+                    padding: const EdgeInsets.only(bottom: 16),
+                    child: _buildCourseCard(
+                      title: c['name']?.toString() ?? '',
+                      code: c['subject_code']?.toString() ?? '',
+                      progress: 0,
+                      unlockType: c['unlock_type']?.toString() ?? 'Flexible',
+                      completedLos: 0,
+                      totalLos: 0,
+                      cocs: 0,
+                    ),
+                  )),
 
                 const SizedBox(height: 24),
 
