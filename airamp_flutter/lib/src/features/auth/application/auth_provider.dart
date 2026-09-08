@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/api/api_client.dart';
 import '../data/auth_repository.dart';
@@ -79,6 +80,20 @@ class AuthNotifier extends Notifier<User?> {
     final repository = ref.read(authRepositoryProvider);
     final session = await repository.currentSession();
     if (session == null) return;
+
+    // Strict platform separation:
+    // On Mobile / Desktop (!kIsWeb): Admin sessions are NOT permitted. Mobile is exclusively for Students and Teachers!
+    if (!kIsWeb && (session.role == 'admin' || session.role == 'super_admin')) {
+      await repository.logout();
+      return;
+    }
+
+    // On Web (kIsWeb): Non-admin sessions are NOT permitted. Web is exclusively for School Administrators!
+    if (kIsWeb && (session.role != 'admin' && session.role != 'super_admin')) {
+      await repository.logout();
+      return;
+    }
+
     state = User(
       id: session.userId,
       email: '',

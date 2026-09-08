@@ -130,11 +130,11 @@ class AuthRepository {
     if (ApiClient.isCloudAvailable) {
       try {
         await _dio.put('/v1/api/users/$userId', data: {
-          if (fullName != null) 'fullName': fullName,
-          if (username != null) 'username': username,
-          if (email != null) 'email': email,
-          if (profileImage != null) 'profileImage': profileImage,
-          if (password != null) 'password': password,
+          'fullName': ?fullName,
+          'username': ?username,
+          'email': ?email,
+          'profileImage': ?profileImage,
+          'password': ?password,
         });
       } on DioException {
         // Fall through; local SQLite is already updated via authProvider

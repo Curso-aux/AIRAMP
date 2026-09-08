@@ -1,6 +1,9 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../features/landing/presentation/web_landing_screen.dart';
+import '../features/auth/presentation/web/admin_web_login_screen.dart';
 import '../features/auth/presentation/login_screen.dart';
 import '../features/auth/presentation/signup_screen.dart';
 import '../features/auth/presentation/admin_signup_screen.dart';
@@ -8,18 +11,20 @@ import '../features/auth/presentation/forgot_password_screen.dart';
 import '../features/auth/application/auth_provider.dart';
 import '../features/student/presentation/student_home_screen.dart';
 import '../features/student/presentation/my_courses_screen.dart';
+import '../features/student/presentation/student_course_detail_screen.dart';
 import '../features/student/presentation/my_progress_screen.dart';
 import '../features/student/presentation/quiz_history_screen.dart';
 import '../features/student/presentation/student_profile_screen.dart';
-import '../features/admin/presentation/admin_dashboard_screen.dart';
 import '../features/admin/presentation/subjects_mgmt_screen.dart';
 import '../features/admin/presentation/subject_detail_screen.dart';
 import '../features/admin/presentation/sections_mgmt_screen.dart';
-import '../features/admin/presentation/reg_links_screen.dart';
 import '../features/admin/presentation/scores_screen.dart';
-import '../features/admin/presentation/admin_profile_screen.dart';
 import '../features/admin/presentation/admin_management_screen.dart';
-import '../features/admin/presentation/admin_scaffold.dart';
+import '../features/admin/presentation/web/admin_web_scaffold.dart';
+import '../features/admin/presentation/web/admin_web_analytics_view.dart';
+import '../features/admin/presentation/web/admin_web_students_screen.dart';
+import '../features/admin/presentation/web/admin_web_keys_screen.dart';
+import '../features/admin/presentation/web/admin_web_announcements_screen.dart';
 import '../features/student/presentation/student_scaffold.dart';
 import '../features/chat/presentation/chat_list_screen.dart';
 import '../features/chat/presentation/chat_room_screen.dart';
@@ -44,8 +49,16 @@ final routerProvider = Provider<GoRouter>((ref) {
   final authState = ref.watch(authProvider);
 
   return GoRouter(
-    initialLocation: '/login',
+    initialLocation: kIsWeb ? '/' : '/login',
     routes: [
+      GoRoute(
+        path: '/',
+        builder: (context, state) => kIsWeb ? const WebLandingScreen() : const LoginScreen(),
+      ),
+      GoRoute(
+        path: '/admin/login',
+        builder: (context, state) => const AdminWebLoginScreen(),
+      ),
       GoRoute(
         path: '/login',
         builder: (context, state) => const LoginScreen(),
@@ -118,17 +131,25 @@ final routerProvider = Provider<GoRouter>((ref) {
           ),
         ],
       ),
-      // Admin Routes with Bottom Navigation
+      // Admin Web Portal Routes with Responsive Sidebar Scaffold
       StatefulShellRoute.indexedStack(
         builder: (context, state, navigationShell) {
-          return AdminScaffold(navigationShell: navigationShell);
+          return AdminWebScaffold(navigationShell: navigationShell);
         },
         branches: [
           StatefulShellBranch(
             routes: [
               GoRoute(
                 path: '/admin/dashboard',
-                builder: (context, state) => const AdminDashboardScreen(),
+                builder: (context, state) => const AdminWebAnalyticsView(),
+              ),
+            ],
+          ),
+          StatefulShellBranch(
+            routes: [
+              GoRoute(
+                path: '/admin/students',
+                builder: (context, state) => const AdminWebStudentsScreen(),
               ),
             ],
           ),
@@ -152,8 +173,16 @@ final routerProvider = Provider<GoRouter>((ref) {
           StatefulShellBranch(
             routes: [
               GoRoute(
-                path: '/admin/sections',
-                builder: (context, state) => const SectionsMgmtScreen(),
+                path: '/admin/keys',
+                builder: (context, state) => const AdminWebKeysScreen(),
+              ),
+            ],
+          ),
+          StatefulShellBranch(
+            routes: [
+              GoRoute(
+                path: '/admin/announcements',
+                builder: (context, state) => const AdminWebAnnouncementsScreen(),
               ),
             ],
           ),
@@ -168,28 +197,16 @@ final routerProvider = Provider<GoRouter>((ref) {
           StatefulShellBranch(
             routes: [
               GoRoute(
-                path: '/admin/chat',
-                builder: (context, state) => const ChatListScreen(),
-              ),
-            ],
-          ),
-          StatefulShellBranch(
-            routes: [
-              GoRoute(
-                path: '/admin/reg-links',
-                builder: (context, state) => const RegLinksScreen(),
-              ),
-            ],
-          ),
-          StatefulShellBranch(
-            routes: [
-              GoRoute(
-                path: '/admin/profile',
-                builder: (context, state) => const AdminProfileScreen(),
+                path: '/admin/sections',
+                builder: (context, state) => const SectionsMgmtScreen(),
               ),
             ],
           ),
         ],
+      ),
+      GoRoute(
+        path: '/admin/reg-links',
+        builder: (context, state) => const AdminWebKeysScreen(),
       ),
       GoRoute(
         path: '/admin/admin-management',
@@ -205,6 +222,13 @@ final routerProvider = Provider<GoRouter>((ref) {
         builder: (context, state) {
           final id = state.pathParameters['id']!;
           return ChatRoomScreen(conversationId: id);
+        },
+      ),
+      GoRoute(
+        path: '/student/course/:id',
+        builder: (context, state) {
+          final id = state.pathParameters['id']!;
+          return StudentCourseDetailScreen(courseId: id);
         },
       ),
       GoRoute(
@@ -224,36 +248,68 @@ final routerProvider = Provider<GoRouter>((ref) {
     ],
     redirect: (context, state) {
       final isAuth = authState != null;
-      final isLoginRoute = state.matchedLocation == '/login' || 
-                           state.matchedLocation == '/signup' || 
-                           state.matchedLocation == '/admin-signup' || 
-                           state.matchedLocation == '/forgot-password';
+      final matched = state.matchedLocation;
+      final isPublicRoute = matched == '/' ||
+          matched == '/login' ||
+          matched == '/admin/login' ||
+          matched == '/signup' ||
+          matched == '/admin-signup' ||
+          matched == '/forgot-password';
 
-      if (!isAuth && !isLoginRoute) {
-        // Redirect to login if not authenticated and trying to access protected route
-        return '/login';
+      // Strict Platform Separation Guard:
+      // On Mobile / Desktop (!kIsWeb): Admin is strictly forbidden. Mobile is ONLY for Students and Teachers!
+      if (!kIsWeb) {
+        if (isAuth && (authState.role == 'admin' || authState.role == 'super_admin')) {
+          return '/login';
+        }
+        if (matched.startsWith('/admin')) {
+          return '/login';
+        }
       }
 
-      if (isAuth && isLoginRoute) {
-        // Redirect away from login if already authenticated
+      // 1. Unauthenticated user trying to access protected route
+      if (!isAuth && !isPublicRoute) {
+        if (kIsWeb && matched.startsWith('/admin')) {
+          return '/admin/login';
+        }
+        return kIsWeb ? '/' : '/login';
+      }
+
+      // 2. On Web, visiting generic /login routes to /admin/login
+      if (kIsWeb && matched == '/login') {
+        if (!isAuth) return '/admin/login';
         if (authState.role == 'admin' || authState.role == 'super_admin') {
           return '/admin/dashboard';
+        }
+        return '/';
+      }
+
+      // 3. Authenticated user visiting login routes
+      final isLoginRoute = matched == '/login' ||
+          matched == '/admin/login' ||
+          matched == '/signup' ||
+          matched == '/admin-signup' ||
+          matched == '/forgot-password';
+
+      if (isAuth && isLoginRoute) {
+        if (authState.role == 'admin' || authState.role == 'super_admin') {
+          return kIsWeb ? '/admin/dashboard' : '/login';
         } else {
-          return '/student/home';
+          return kIsWeb ? '/' : '/student/home';
         }
       }
 
-      // Role based guard
+      // 4. Role-based Route Guard
       if (isAuth) {
         final isAdmin = authState.role == 'admin' || authState.role == 'super_admin';
-        final isStudent = authState.role == 'student';
+        final isNonAdmin = !isAdmin; // student or teacher
 
-        if (isAdmin && state.matchedLocation.startsWith('/student')) {
-          return '/admin/dashboard';
+        if (isAdmin && matched.startsWith('/student')) {
+          return kIsWeb ? '/admin/dashboard' : '/login';
         }
 
-        if (isStudent && state.matchedLocation.startsWith('/admin')) {
-          return '/student/home';
+        if (isNonAdmin && matched.startsWith('/admin') && matched != '/admin/login') {
+          return kIsWeb ? '/admin/login' : '/student/home';
         }
       }
 

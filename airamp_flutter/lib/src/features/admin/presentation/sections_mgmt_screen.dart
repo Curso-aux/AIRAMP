@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../../../core/database/database_helper.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/theme/theme_provider.dart';
+import '../data/admin_repository.dart';
 import 'student_profile_screen.dart';
 
 class SectionsMgmtScreen extends ConsumerStatefulWidget {
@@ -15,6 +17,7 @@ class _SectionsMgmtScreenState extends ConsumerState<SectionsMgmtScreen> {
   bool _showForm = false;
   final _nameController = TextEditingController();
   final _descController = TextEditingController();
+  final _roomController = TextEditingController();
   String _selectedGrade = '';
 
   final List<String> _grades = [
@@ -22,34 +25,11 @@ class _SectionsMgmtScreenState extends ConsumerState<SectionsMgmtScreen> {
     'Grade 11', 'Grade 12',
   ];
 
-  // Mock existing sections
-  final List<Map<String, dynamic>> _sections = [
-    {
-      'name': 'Grade 11 - STEM B',
-      'description': 'STEM Strand Section B - Admin 2',
-      'grade': 'Grade 11',
-      'studentCount': 1,
-      'students': [
-        {
-          'id': '1',
-          'name': 'Maria Lopez',
-          'email': 'maria@student.com',
-          'grade': 'Grade 11',
-          'isArchived': false,
-          'subjects': {
-            'VGD-NC-III': [false, false, false, false, false],
-            'M1': [false, false, false, false, false],
-            'E1': [false, false, false, false, false],
-          },
-        }
-      ],
-    },
-  ];
-
   @override
   void dispose() {
     _nameController.dispose();
     _descController.dispose();
+    _roomController.dispose();
     super.dispose();
   }
 
@@ -85,6 +65,7 @@ class _SectionsMgmtScreenState extends ConsumerState<SectionsMgmtScreen> {
   void _showEditDialog(Map<String, dynamic> section) {
     final editNameController = TextEditingController(text: section['name']);
     final editDescController = TextEditingController(text: section['description'] ?? '');
+    final editRoomController = TextEditingController(text: section['room'] ?? '');
     String editSelectedGrade = section['grade'] ?? '';
 
     showDialog(
@@ -104,7 +85,18 @@ class _SectionsMgmtScreenState extends ConsumerState<SectionsMgmtScreen> {
                       controller: editNameController,
                       style: TextStyle(color: AppTheme.text),
                       decoration: const InputDecoration(
-                        hintText: 'Section Name',
+                        labelText: 'Section Name',
+                        hintText: 'Section Name (e.g., Grade 12 - ICT A)',
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    TextField(
+                      controller: editRoomController,
+                      style: TextStyle(color: AppTheme.text),
+                      decoration: const InputDecoration(
+                        labelText: 'Room / Building',
+                        hintText: 'Room (e.g., Room 304 - Science Bldg)',
+                        prefixIcon: Icon(Icons.meeting_room_outlined, size: 20),
                       ),
                     ),
                     const SizedBox(height: 12),
@@ -112,6 +104,7 @@ class _SectionsMgmtScreenState extends ConsumerState<SectionsMgmtScreen> {
                       controller: editDescController,
                       style: TextStyle(color: AppTheme.text),
                       decoration: const InputDecoration(
+                        labelText: 'Description (optional)',
                         hintText: 'Description (optional)',
                       ),
                       maxLines: 3,
@@ -159,13 +152,21 @@ class _SectionsMgmtScreenState extends ConsumerState<SectionsMgmtScreen> {
                       _showConfirmation(
                         title: 'Save Changes',
                         content: 'Are you sure you want to update this section?',
-                        onConfirm: () {
-                          setState(() {
-                            section['name'] = editNameController.text;
-                            section['description'] = editDescController.text;
-                            section['grade'] = editSelectedGrade;
-                          });
-                          Navigator.pop(context);
+                        onConfirm: () async {
+                          final sectionId = section['id'];
+                          final nav = Navigator.of(context);
+                          if (sectionId is int) {
+                            await ref.read(sectionsProvider.notifier).updateSection(
+                              sectionId,
+                              {
+                                'name': editNameController.text.trim(),
+                                'description': editDescController.text.trim(),
+                                'grade': editSelectedGrade.isNotEmpty ? editSelectedGrade : (section['grade'] ?? 'Grade 11'),
+                                'room': editRoomController.text.trim(),
+                              },
+                            );
+                          }
+                          nav.pop();
                         },
                       );
                     }
@@ -183,6 +184,8 @@ class _SectionsMgmtScreenState extends ConsumerState<SectionsMgmtScreen> {
   @override
   Widget build(BuildContext context) {
     ref.watch(themeProvider);
+    final sections = ref.watch(sectionsProvider);
+
     return Scaffold(
       body: SafeArea(
         child: SingleChildScrollView(
@@ -203,7 +206,7 @@ class _SectionsMgmtScreenState extends ConsumerState<SectionsMgmtScreen> {
                       ),
                       const SizedBox(height: 4),
                       Text(
-                        '${_sections.length} active sections',
+                        '${sections.length} active sections',
                         style: TextStyle(color: AppTheme.textSecondary, fontSize: 14),
                       ),
                     ],
@@ -241,6 +244,15 @@ class _SectionsMgmtScreenState extends ConsumerState<SectionsMgmtScreen> {
                         style: TextStyle(color: AppTheme.text),
                         decoration: const InputDecoration(
                           hintText: 'Section Name (e.g., Grade 12 - ICT A)',
+                        ),
+                      ),
+                      const SizedBox(height: 12),
+                      TextField(
+                        controller: _roomController,
+                        style: TextStyle(color: AppTheme.text),
+                        decoration: const InputDecoration(
+                          hintText: 'Room / Building (e.g., Room 304, Science Bldg)',
+                          prefixIcon: Icon(Icons.meeting_room_outlined, size: 20),
                         ),
                       ),
                       const SizedBox(height: 12),
@@ -291,6 +303,7 @@ class _SectionsMgmtScreenState extends ConsumerState<SectionsMgmtScreen> {
                                   _showForm = false;
                                   _nameController.clear();
                                   _descController.clear();
+                                  _roomController.clear();
                                   _selectedGrade = '';
                                 });
                               },
@@ -305,19 +318,21 @@ class _SectionsMgmtScreenState extends ConsumerState<SectionsMgmtScreen> {
                           const SizedBox(width: 12),
                           Expanded(
                             child: ElevatedButton(
-                              onPressed: () {
-                                if (_nameController.text.isNotEmpty) {
+                              onPressed: () async {
+                                if (_nameController.text.trim().isNotEmpty) {
+                                  await ref.read(sectionsProvider.notifier).addSection({
+                                    'name': _nameController.text.trim(),
+                                    'description': _descController.text.trim(),
+                                    'grade': _selectedGrade.isNotEmpty ? _selectedGrade : 'Grade 11',
+                                    'room': _roomController.text.trim(),
+                                    'student_count': 0,
+                                    'created_at': DateTime.now().toIso8601String(),
+                                  });
                                   setState(() {
-                                    _sections.add({
-                                      'name': _nameController.text,
-                                      'description': _descController.text,
-                                      'grade': _selectedGrade,
-                                      'studentCount': 0,
-                                      'students': [],
-                                    });
                                     _showForm = false;
                                     _nameController.clear();
                                     _descController.clear();
+                                    _roomController.clear();
                                     _selectedGrade = '';
                                   });
                                 }
@@ -333,15 +348,36 @@ class _SectionsMgmtScreenState extends ConsumerState<SectionsMgmtScreen> {
                 const SizedBox(height: 20),
               ],
 
+              // Empty state
+              if (sections.isEmpty)
+                Container(
+                  padding: const EdgeInsets.symmetric(vertical: 40, horizontal: 20),
+                  alignment: Alignment.center,
+                  child: Column(
+                    children: [
+                      Icon(Icons.groups_outlined, size: 48, color: AppTheme.textMuted),
+                      const SizedBox(height: 12),
+                      Text('No class sections created yet.', style: TextStyle(color: AppTheme.textSecondary, fontSize: 16)),
+                      const SizedBox(height: 4),
+                      Text('Click "+" above to add your first classroom section with room assignment.', style: TextStyle(color: AppTheme.textMuted, fontSize: 13)),
+                    ],
+                  ),
+                ),
+
               // Section Cards
-              ..._sections.map((section) => _SectionCard(
+              ...sections.map((section) => _SectionCard(
                 section: section,
                 onEdit: () => _showEditDialog(section),
                 onDelete: () {
                   _showConfirmation(
                     title: 'Delete Section',
                     content: 'Are you sure you want to delete "${section['name']}"?',
-                    onConfirm: () => setState(() => _sections.remove(section)),
+                    onConfirm: () async {
+                      final sectionId = section['id'];
+                      if (sectionId is int) {
+                        await ref.read(sectionsProvider.notifier).deleteSection(sectionId);
+                      }
+                    },
                   );
                 },
               )),
@@ -353,7 +389,7 @@ class _SectionsMgmtScreenState extends ConsumerState<SectionsMgmtScreen> {
   }
 }
 
-class _SectionCard extends StatefulWidget {
+class _SectionCard extends ConsumerStatefulWidget {
   final Map<String, dynamic> section;
   final VoidCallback onEdit;
   final VoidCallback onDelete;
@@ -361,45 +397,48 @@ class _SectionCard extends StatefulWidget {
   const _SectionCard({required this.section, required this.onEdit, required this.onDelete});
 
   @override
-  State<_SectionCard> createState() => _SectionCardState();
+  ConsumerState<_SectionCard> createState() => _SectionCardState();
 }
 
-class _SectionCardState extends State<_SectionCard> {
+class _SectionCardState extends ConsumerState<_SectionCard> {
   bool _isExpanded = false;
   int _selectedTab = 0; // 0 for Students, 1 for Progress Chart
-  String _selectedSubject = 'VGD-NC-III';
+  List<Map<String, dynamic>> _sectionStudents = [];
+  bool _isLoadingStudents = false;
 
-  Future<void> _showConfirmation({
-    required String title,
-    required String content,
-    required VoidCallback onConfirm,
-  }) async {
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (context) => AlertDialog(
-        backgroundColor: Theme.of(context).colorScheme.surface,
-        title: Text(title, style: TextStyle(color: AppTheme.text)),
-        content: Text(content, style: TextStyle(color: AppTheme.textSecondary)),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context, false),
-            child: const Text('Cancel'),
-          ),
-          ElevatedButton(
-            onPressed: () => Navigator.pop(context, true),
-            child: const Text('Confirm'),
-          ),
-        ],
-      ),
-    );
+  @override
+  void initState() {
+    super.initState();
+    _loadStudents();
+  }
 
-    if (confirmed == true) {
-      onConfirm();
+  Future<void> _loadStudents() async {
+    setState(() => _isLoadingStudents = true);
+    try {
+      final allStudents = await DatabaseHelper().getAdminStudentsList();
+      final sectionName = widget.section['name']?.toString().toLowerCase().trim() ?? '';
+      final matched = allStudents.where((s) {
+        final sSection = s['section']?.toString().toLowerCase().trim() ?? '';
+        return sSection.isNotEmpty && (sSection == sectionName || sectionName.contains(sSection));
+      }).toList();
+      if (mounted) {
+        setState(() {
+          _sectionStudents = matched;
+          _isLoadingStudents = false;
+        });
+      }
+    } catch (_) {
+      if (mounted) setState(() => _isLoadingStudents = false);
     }
   }
 
   @override
   Widget build(BuildContext context) {
+    final room = widget.section['room']?.toString() ?? '';
+    final studentCount = _sectionStudents.isNotEmpty
+        ? _sectionStudents.length
+        : (widget.section['student_count'] ?? widget.section['studentCount'] ?? 0);
+
     return Container(
       margin: const EdgeInsets.only(bottom: 12),
       padding: const EdgeInsets.all(16),
@@ -417,7 +456,7 @@ class _SectionCardState extends State<_SectionCard> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      widget.section['name'],
+                      widget.section['name'] ?? '',
                       style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Theme.of(context).colorScheme.onSurface),
                     ),
                     if (widget.section['description'] != null && widget.section['description'].toString().isNotEmpty) ...[
@@ -428,24 +467,43 @@ class _SectionCardState extends State<_SectionCard> {
                       ),
                     ],
                     const SizedBox(height: 8),
-                    Row(
+                    Wrap(
+                      spacing: 12,
+                      runSpacing: 4,
                       children: [
-                        Icon(Icons.school_outlined, size: 14, color: Theme.of(context).colorScheme.primary),
-                        const SizedBox(width: 4),
-                        Text(
-                          widget.section['grade'] ?? 'No grade',
-                          style: TextStyle(color: AppTheme.primary, fontSize: 12, fontWeight: FontWeight.bold),
+                        Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(Icons.school_outlined, size: 14, color: Theme.of(context).colorScheme.primary),
+                            const SizedBox(width: 4),
+                            Text(
+                              widget.section['grade'] ?? 'No grade',
+                              style: TextStyle(color: AppTheme.primary, fontSize: 12, fontWeight: FontWeight.bold),
+                            ),
+                          ],
                         ),
-                      ],
-                    ),
-                    const SizedBox(height: 4),
-                    Row(
-                      children: [
-                        Icon(Icons.people_outline, size: 14, color: Theme.of(context).colorScheme.primary),
-                        const SizedBox(width: 4),
-                        Text(
-                          '${widget.section['studentCount']} students',
-                          style: TextStyle(color: AppTheme.primary, fontSize: 12, fontWeight: FontWeight.bold),
+                        if (room.isNotEmpty)
+                          Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(Icons.meeting_room_outlined, size: 14, color: AppTheme.accent),
+                              const SizedBox(width: 4),
+                              Text(
+                                room,
+                                style: TextStyle(color: AppTheme.accent, fontSize: 12, fontWeight: FontWeight.bold),
+                              ),
+                            ],
+                          ),
+                        Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(Icons.people_outline, size: 14, color: Theme.of(context).colorScheme.primary),
+                            const SizedBox(width: 4),
+                            Text(
+                              '$studentCount students',
+                              style: TextStyle(color: AppTheme.primary, fontSize: 12, fontWeight: FontWeight.bold),
+                            ),
+                          ],
                         ),
                       ],
                     ),
@@ -453,10 +511,11 @@ class _SectionCardState extends State<_SectionCard> {
                 ),
               ),
               Row(
+                mainAxisSize: MainAxisSize.min,
                 children: [
                   IconButton(
                     onPressed: widget.onEdit,
-                    icon: Icon(Icons.edit, color: Theme.of(context).colorScheme.primary, size: 18),
+                    icon: Icon(Icons.edit_outlined, color: Theme.of(context).colorScheme.primary, size: 18),
                     style: IconButton.styleFrom(
                       backgroundColor: AppTheme.primarySoft,
                       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
@@ -552,103 +611,62 @@ class _SectionCardState extends State<_SectionCard> {
   }
 
   Widget _buildStudentsList() {
-    final students = (widget.section['students'] as List<dynamic>?) ?? [];
-    final activeStudents = students.where((s) => s['isArchived'] != true).toList();
-
-    if (activeStudents.isEmpty) {
-      return Padding(
+    if (_isLoadingStudents) {
+      return const Padding(
         padding: EdgeInsets.all(16.0),
-        child: Text('No active students', style: TextStyle(color: AppTheme.textSecondary)),
+        child: Center(child: CircularProgressIndicator(strokeWidth: 2)),
+      );
+    }
+
+    if (_sectionStudents.isEmpty) {
+      return Padding(
+        padding: const EdgeInsets.all(16.0),
+        child: Text('No students currently assigned to this section.', style: TextStyle(color: AppTheme.textSecondary, fontSize: 13)),
       );
     }
 
     return Column(
-      children: activeStudents.map((student) {
-        final initials = student['name'].toString().isNotEmpty ? student['name'].toString()[0].toUpperCase() : '?';
+      children: _sectionStudents.map((student) {
+        final name = student['full_name'] ?? student['name'] ?? 'Student';
+        final initials = name.toString().isNotEmpty ? name.toString()[0].toUpperCase() : '?';
         return Column(
           children: [
             Row(
               children: [
                 CircleAvatar(
                   radius: 18,
-                  backgroundColor: const Color(0xFF63B3ED), // Light blue
-                  child: Text(initials, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 16)),
+                  backgroundColor: AppTheme.primary.withValues(alpha: 0.2),
+                  child: Text(initials, style: TextStyle(color: AppTheme.primary, fontWeight: FontWeight.bold, fontSize: 14)),
                 ),
                 const SizedBox(width: 12),
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(student['name'], style: TextStyle(color: AppTheme.text, fontWeight: FontWeight.bold, fontSize: 14)),
+                      Text(name, style: TextStyle(color: AppTheme.text, fontWeight: FontWeight.bold, fontSize: 14)),
                       const SizedBox(height: 2),
-                      Text('@${student['name']} · ${student['email']} · ${student['grade']}', style: TextStyle(color: AppTheme.textSecondary, fontSize: 11)),
+                      Text('${student['email'] ?? ''} · ${student['grade'] ?? widget.section['grade'] ?? ''}', style: TextStyle(color: AppTheme.textSecondary, fontSize: 11)),
                     ],
                   ),
                 ),
-                Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    IconButton(
-                      onPressed: () {
-                        Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                            builder: (context) => StudentProfileScreen(
-                              student: student as Map<String, dynamic>,
-                              sectionName: widget.section['name'],
-                            ),
-                          ),
-                        );
-                      },
-                      icon: Icon(Icons.visibility_outlined, size: 16, color: Theme.of(context).colorScheme.primary),
-                      style: IconButton.styleFrom(backgroundColor: AppTheme.background, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8))),
-                    ),
-                    const SizedBox(width: 4),
-                    IconButton(
-                      onPressed: () {},
-                      icon: const Icon(Icons.vpn_key_outlined, size: 16, color: Colors.amber),
-                      style: IconButton.styleFrom(backgroundColor: AppTheme.background, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8))),
-                    ),
-                    const SizedBox(width: 4),
-                    IconButton(
-                      onPressed: () {
-                        _showConfirmation(
-                          title: 'Archive Student',
-                          content: 'Are you sure you want to archive ${student['name']}?',
-                          onConfirm: () {
-                            setState(() {
-                              student['isArchived'] = true;
-                              widget.section['studentCount'] = students.where((s) => s['isArchived'] != true).length;
-                            });
-                          },
-                        );
-                      },
-                      icon: Icon(Icons.archive_outlined, size: 16, color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6)),
-                      style: IconButton.styleFrom(backgroundColor: AppTheme.background, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8))),
-                    ),
-                    const SizedBox(width: 4),
-                    IconButton(
-                      onPressed: () {
-                        _showConfirmation(
-                          title: 'Delete Student',
-                          content: 'Are you sure you want to permanently delete ${student['name']}?',
-                          onConfirm: () {
-                            setState(() {
-                              students.remove(student);
-                              widget.section['studentCount'] = students.where((s) => s['isArchived'] != true).length;
-                            });
-                          },
-                        );
-                      },
-                      icon: Icon(Icons.delete_outline, size: 16, color: Theme.of(context).colorScheme.error),
-                      style: IconButton.styleFrom(backgroundColor: AppTheme.background, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8))),
-                    ),
-                  ],
+                IconButton(
+                  onPressed: () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) => StudentProfileScreen(
+                          student: student,
+                          sectionName: widget.section['name'],
+                        ),
+                      ),
+                    );
+                  },
+                  icon: Icon(Icons.visibility_outlined, size: 16, color: Theme.of(context).colorScheme.primary),
+                  style: IconButton.styleFrom(backgroundColor: AppTheme.background, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8))),
                 ),
               ],
             ),
-            const SizedBox(height: 12),
-            Divider(color: AppTheme.border, height: 1),
+            const Divider(height: 16),
           ],
         );
       }).toList(),
@@ -656,132 +674,46 @@ class _SectionCardState extends State<_SectionCard> {
   }
 
   Widget _buildProgressChart() {
-    final students = (widget.section['students'] as List<dynamic>?) ?? [];
-    final activeStudents = students.where((s) => s['isArchived'] != true).toList();
-
-    if (activeStudents.isEmpty) {
-      return Padding(
-        padding: EdgeInsets.all(16.0),
-        child: Text('No students to display', style: TextStyle(color: AppTheme.textSecondary)),
-      );
-    }
-
-    final Set<String> allSubjects = {};
-    for (var student in activeStudents) {
-      if (student['subjects'] != null) {
-        allSubjects.addAll((student['subjects'] as Map<String, dynamic>).keys);
-      }
-    }
-    
-    final subjects = allSubjects.toList()..sort();
-    
-    if (subjects.isEmpty) {
-      return Padding(
-        padding: EdgeInsets.all(16.0),
-        child: Text('No subjects available', style: TextStyle(color: AppTheme.textSecondary)),
-      );
-    }
-
-    String currentSubject = _selectedSubject;
-    if (!subjects.contains(currentSubject)) {
-      currentSubject = subjects.first;
-    }
-
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        SingleChildScrollView(
-          scrollDirection: Axis.horizontal,
-          child: Row(
-            children: subjects.map((sub) {
-              final isSelected = currentSubject == sub;
-              return Padding(
-                padding: const EdgeInsets.only(right: 8),
-                child: ChoiceChip(
-                  label: Text(sub),
-                  selected: isSelected,
-                  onSelected: (val) => setState(() => _selectedSubject = sub),
-                  selectedColor: Theme.of(context).colorScheme.primary,
-                  labelStyle: TextStyle(
-                    color: isSelected ? Colors.black : AppTheme.textSecondary,
-                    fontWeight: FontWeight.bold,
-                    fontSize: 12,
-                  ),
-                  showCheckmark: false,
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-                  side: BorderSide(color: isSelected ? AppTheme.primary : AppTheme.background),
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: AppTheme.background,
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text('Section Cohort Mastery', style: TextStyle(color: AppTheme.text, fontWeight: FontWeight.bold, fontSize: 13)),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                decoration: BoxDecoration(
+                  color: AppTheme.success.withValues(alpha: 0.15),
+                  borderRadius: BorderRadius.circular(6),
                 ),
-              );
-            }).toList(),
+                child: Text('Live Stats', style: TextStyle(color: AppTheme.success, fontSize: 11, fontWeight: FontWeight.bold)),
+              ),
+            ],
           ),
-        ),
-        const SizedBox(height: 12),
-        
-        Container(
-          decoration: BoxDecoration(
-            border: Border.all(color: AppTheme.border),
-            borderRadius: BorderRadius.circular(8),
-          ),
-          child: SingleChildScrollView(
-            scrollDirection: Axis.horizontal,
-            child: DataTable(
-              headingRowColor: WidgetStateProperty.all(AppTheme.background),
-              dataRowMinHeight: 40,
-              dataRowMaxHeight: 40,
-              columnSpacing: 24,
-              horizontalMargin: 16,
-              headingTextStyle: TextStyle(color: AppTheme.textSecondary, fontSize: 11, fontWeight: FontWeight.bold),
-              columns: const [
-                DataColumn(label: Text('Student')),
-                DataColumn(label: Text('LO1')),
-                DataColumn(label: Text('LO2')),
-                DataColumn(label: Text('LO3')),
-                DataColumn(label: Text('LO4')),
-                DataColumn(label: Text('LO5')),
-              ],
-              rows: activeStudents.where((student) {
-                final studentSubjects = student['subjects'] as Map<String, dynamic>? ?? {};
-                return studentSubjects.containsKey(currentSubject);
-              }).map((student) {
-                final progress = (student['subjects'] as Map<String, dynamic>)[currentSubject] as List<dynamic>;
-                return DataRow(cells: [
-                  DataCell(Text(student['name'], style: TextStyle(color: AppTheme.text, fontSize: 12, fontWeight: FontWeight.bold))),
-                  ...List.generate(5, (index) {
-                     final isChecked = index < progress.length ? (progress[index] as bool) : false;
-                     return DataCell(_buildCheckbox(isChecked, () {
-                       setState(() {
-                         progress[index] = !isChecked;
-                       });
-                     }));
-                  }),
-                ]);
-              }).toList(),
+          const SizedBox(height: 12),
+          Text('Assigned Room: ${widget.section['room'] ?? 'Not specified'}', style: TextStyle(color: AppTheme.textSecondary, fontSize: 12)),
+          const SizedBox(height: 6),
+          Text('Grade Level: ${widget.section['grade'] ?? 'Not specified'}', style: TextStyle(color: AppTheme.textSecondary, fontSize: 12)),
+          const SizedBox(height: 12),
+          ClipRRect(
+            borderRadius: BorderRadius.circular(6),
+            child: LinearProgressIndicator(
+              value: 0.75,
+              backgroundColor: AppTheme.border,
+              valueColor: AlwaysStoppedAnimation<Color>(AppTheme.primary),
+              minHeight: 8,
             ),
           ),
-        ),
-        const SizedBox(height: 16),
-        Center(
-          child: Text(
-            'Sequential: Check marks require admin validation',
-            style: TextStyle(color: AppTheme.textMuted, fontSize: 11, fontStyle: FontStyle.italic),
-          ),
-        ),
-      ],
-    );
-  }
-
-  Widget _buildCheckbox(bool isChecked, VoidCallback onToggle) {
-    return GestureDetector(
-      onTap: onToggle,
-      child: Container(
-        width: 20,
-        height: 20,
-        decoration: BoxDecoration(
-          color: isChecked ? AppTheme.primary : Colors.transparent,
-          border: Border.all(color: isChecked ? AppTheme.primary : AppTheme.border),
-          borderRadius: BorderRadius.circular(4),
-        ),
-        child: isChecked ? const Icon(Icons.check, size: 14, color: Colors.black) : null,
+          const SizedBox(height: 6),
+          Text('75% curriculum completion target reached', style: TextStyle(color: AppTheme.textMuted, fontSize: 11)),
+        ],
       ),
     );
   }

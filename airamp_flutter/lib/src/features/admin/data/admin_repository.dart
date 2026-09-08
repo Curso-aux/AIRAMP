@@ -131,6 +131,12 @@ class SectionsNotifier extends Notifier<List<Map<String, dynamic>>> {
     await db.insert('sections', section);
     await _loadSections();
   }
+
+  Future<void> updateSection(int id, Map<String, dynamic> section) async {
+    final db = await DatabaseHelper().database;
+    await db.update('sections', section, where: 'id = ?', whereArgs: [id]);
+    await _loadSections();
+  }
   
   Future<void> deleteSection(int id) async {
     final db = await DatabaseHelper().database;
@@ -138,6 +144,11 @@ class SectionsNotifier extends Notifier<List<Map<String, dynamic>>> {
     await _loadSections();
   }
 }
+
+// --- Teachers List (for subject assignment) ---
+final teachersListProvider = FutureProvider<List<Map<String, dynamic>>>((ref) async {
+  return await DatabaseHelper().getTeachersList();
+});
 
 // --- Count Providers (for dashboard stats) ---
 final subjectsCountProvider = Provider<int>((ref) {
@@ -323,3 +334,121 @@ class SubjectDetailNotifier extends Notifier<List<Map<String, dynamic>>> {
     await loadHierarchy(_subjectId!);
   }
 }
+
+// --- Admin Web Analytics Provider ---
+final adminAnalyticsProvider = NotifierProvider<AdminAnalyticsNotifier, Map<String, dynamic>>(() {
+  return AdminAnalyticsNotifier();
+});
+
+class AdminAnalyticsNotifier extends Notifier<Map<String, dynamic>> {
+  @override
+  Map<String, dynamic> build() {
+    loadAnalytics();
+    return {
+      'totalUsers': 0,
+      'totalStudents': 0,
+      'totalTeachers': 0,
+      'totalAdmins': 0,
+      'totalEnrollments': 0,
+      'totalSubjects': 0,
+      'totalTopics': 0,
+      'totalLos': 0,
+      'totalAttempts': 0,
+      'passedAttempts': 0,
+      'passRate': 0,
+      'avgScore': 0,
+      'subjectEnrollments': <Map<String, dynamic>>[],
+      'sectionDistribution': <Map<String, dynamic>>[],
+      'recentAnnouncements': <Map<String, dynamic>>[],
+      'recentAttempts': <Map<String, dynamic>>[],
+    };
+  }
+
+  Future<void> loadAnalytics() async {
+    final summary = await DatabaseHelper().getAdminAnalyticsSummary();
+    if (!ref.mounted) return;
+    state = summary;
+  }
+}
+
+// --- Admin Students Provider ---
+final adminStudentsProvider = NotifierProvider<AdminStudentsNotifier, List<Map<String, dynamic>>>(() {
+  return AdminStudentsNotifier();
+});
+
+class AdminStudentsNotifier extends Notifier<List<Map<String, dynamic>>> {
+  String _selectedSection = 'All';
+  String _selectedGrade = 'All';
+  String _searchQuery = '';
+
+  @override
+  List<Map<String, dynamic>> build() {
+    loadStudents();
+    return [];
+  }
+
+  Future<void> loadStudents({String? section, String? grade, String? query}) async {
+    if (section != null) _selectedSection = section;
+    if (grade != null) _selectedGrade = grade;
+    if (query != null) _searchQuery = query;
+
+    final results = await DatabaseHelper().getAdminStudentsList(
+      section: _selectedSection,
+      grade: _selectedGrade,
+      query: _searchQuery,
+    );
+    if (!ref.mounted) return;
+    state = results;
+  }
+
+  Future<void> reassignSection(String studentId, String newSection, {String? newGrade}) async {
+    await DatabaseHelper().updateStudentSection(studentId, newSection, grade: newGrade);
+    await loadStudents();
+    ref.read(adminAnalyticsProvider.notifier).loadAnalytics();
+  }
+}
+
+// --- Admin Enrollment Keys Provider ---
+final adminKeysProvider = NotifierProvider<AdminKeysNotifier, List<Map<String, dynamic>>>(() {
+  return AdminKeysNotifier();
+});
+
+class AdminKeysNotifier extends Notifier<List<Map<String, dynamic>>> {
+  @override
+  List<Map<String, dynamic>> build() {
+    loadKeys();
+    return [];
+  }
+
+  Future<void> loadKeys() async {
+    final keys = await DatabaseHelper().getEnrollmentKeysList();
+    if (!ref.mounted) return;
+    state = keys;
+  }
+
+  Future<void> createKey({
+    required String code,
+    required String section,
+    int maxUses = 50,
+    String? expiration,
+  }) async {
+    await DatabaseHelper().generateEnrollmentKey(
+      code: code,
+      section: section,
+      maxUses: maxUses,
+      expiration: expiration,
+    );
+    await loadKeys();
+  }
+
+  Future<void> deleteKey(String code) async {
+    await DatabaseHelper().deleteEnrollmentKey(code);
+    await loadKeys();
+  }
+}
+
+// --- Available Sections Provider ---
+final availableSectionsProvider = FutureProvider<List<String>>((ref) async {
+  return await DatabaseHelper().getAvailableSectionsList();
+});
+

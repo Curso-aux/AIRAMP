@@ -21,10 +21,6 @@ class _SignupScreenState extends ConsumerState<SignupScreen> {
   bool _showPassword = false;
   bool _showConfirm = false;
 
-  final String _selectedGradeLevel = '';
-  final String _selectedSectionId = '';
-  final List<String> _selectedSubjectIds = [];
-
   final _regCodeCtrl = TextEditingController();
   final _otpCtrl = TextEditingController();
 

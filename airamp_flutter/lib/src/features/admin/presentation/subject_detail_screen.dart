@@ -141,6 +141,23 @@ class _SubjectDetailScreenState extends ConsumerState<SubjectDetailScreen> {
                             fontSize: 13,
                           ),
                         ),
+                        if (_subject!['teacher_name'] != null && _subject!['teacher_name'].toString().isNotEmpty) ...[
+                          const SizedBox(height: 6),
+                          Row(
+                            children: [
+                              const Icon(Icons.school, size: 14, color: Colors.black87),
+                              const SizedBox(width: 4),
+                              Text(
+                                'Assigned Faculty: ${_subject!['teacher_name']}',
+                                style: const TextStyle(
+                                  color: Colors.black87,
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ],
                       ],
                     ),
                   ),
@@ -1416,7 +1433,7 @@ class _QuestionCard extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final correctOption = question['correct_option'] as String;
 
-    Widget _buildOption(String letter, String text) {
+    Widget buildOption(String letter, String text) {
       final isCorrect = correctOption == letter;
       return Padding(
         padding: const EdgeInsets.only(bottom: 6),
@@ -1463,10 +1480,10 @@ class _QuestionCard extends ConsumerWidget {
                   style: TextStyle(color: AppTheme.text, fontSize: 13, fontWeight: FontWeight.bold),
                 ),
                 const SizedBox(height: 8),
-                _buildOption('A', question['option_a']),
-                _buildOption('B', question['option_b']),
-                _buildOption('C', question['option_c']),
-                _buildOption('D', question['option_d']),
+                buildOption('A', question['option_a']),
+                buildOption('B', question['option_b']),
+                buildOption('C', question['option_c']),
+                buildOption('D', question['option_d']),
               ],
             ),
           ),
@@ -1555,7 +1572,7 @@ class _AddQuestionSheetState extends ConsumerState<_AddQuestionSheet> {
 
   @override
   Widget build(BuildContext context) {
-    Widget _buildOptionRow(String letter, TextEditingController controller) {
+    Widget buildOptionRow(String letter, TextEditingController controller) {
       final isSelected = _correctOption == letter;
       return Padding(
         padding: const EdgeInsets.only(bottom: 8),
@@ -1588,10 +1605,10 @@ class _AddQuestionSheetState extends ConsumerState<_AddQuestionSheet> {
         const SizedBox(height: 16),
         Text('Options (tap radio for correct answer)', style: TextStyle(color: AppTheme.textSecondary, fontSize: 12)),
         const SizedBox(height: 12),
-        _buildOptionRow('A', _optionAController),
-        _buildOptionRow('B', _optionBController),
-        _buildOptionRow('C', _optionCController),
-        _buildOptionRow('D', _optionDController),
+        buildOptionRow('A', _optionAController),
+        buildOptionRow('B', _optionBController),
+        buildOptionRow('C', _optionCController),
+        buildOptionRow('D', _optionDController),
       ],
     );
   }
@@ -1830,7 +1847,7 @@ class _EditQuestionSheetState extends ConsumerState<_EditQuestionSheet> {
 
   @override
   Widget build(BuildContext context) {
-    Widget _buildOptionRow(String letter, TextEditingController controller) {
+    Widget buildOptionRow(String letter, TextEditingController controller) {
       final isSelected = _correctOption == letter;
       return Padding(
         padding: const EdgeInsets.only(bottom: 8),
@@ -1863,10 +1880,10 @@ class _EditQuestionSheetState extends ConsumerState<_EditQuestionSheet> {
         const SizedBox(height: 16),
         Text('Options (tap radio for correct answer)', style: TextStyle(color: AppTheme.textSecondary, fontSize: 12)),
         const SizedBox(height: 12),
-        _buildOptionRow('A', _optionAController),
-        _buildOptionRow('B', _optionBController),
-        _buildOptionRow('C', _optionCController),
-        _buildOptionRow('D', _optionDController),
+        buildOptionRow('A', _optionAController),
+        buildOptionRow('B', _optionBController),
+        buildOptionRow('C', _optionCController),
+        buildOptionRow('D', _optionDController),
       ],
     );
   }

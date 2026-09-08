@@ -42,11 +42,11 @@ class _AdminSignupScreenState extends ConsumerState<AdminSignupScreen> {
             fullName: _fullNameController.text.trim(),
             email: _emailController.text.trim(),
             password: _passwordController.text,
-            role: 'admin',
+            role: 'teacher',
           );
       final user = ref.read(authProvider);
       if (user != null && mounted) {
-        context.go('/admin/dashboard');
+        context.go('/student/home');
       }
     } catch (e) {
       setState(() => _error = e.toString().replaceFirst('Exception: ', ''));

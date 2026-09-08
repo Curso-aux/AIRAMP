@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/theme/theme_provider.dart';
+import '../../auth/application/auth_provider.dart';
 import '../data/admin_repository.dart';
 
 class SubjectsMgmtScreen extends ConsumerStatefulWidget {
@@ -19,7 +20,17 @@ class _SubjectsMgmtScreenState extends ConsumerState<SubjectsMgmtScreen> {
   @override
   Widget build(BuildContext context) {
     ref.watch(themeProvider);
-    final subjects = ref.watch(subjectsProvider);
+    final currentUser = ref.watch(authProvider);
+    final isAdmin = currentUser == null || currentUser.role == 'admin' || currentUser.role == 'super_admin';
+    final isTeacher = currentUser?.role == 'teacher';
+
+    var subjects = ref.watch(subjectsProvider);
+    if (isTeacher && currentUser != null) {
+      subjects = subjects.where((s) {
+        final tId = s['teacher_id']?.toString();
+        return tId == currentUser.id || tId == null || tId.isEmpty;
+      }).toList();
+    }
 
     return Scaffold(
       body: SafeArea(
@@ -35,47 +46,88 @@ class _SubjectsMgmtScreenState extends ConsumerState<SubjectsMgmtScreen> {
               ),
               const SizedBox(height: 4),
               Text(
-                'Create and manage subjects',
+                isAdmin
+                    ? 'Create subjects and designate faculty permissions'
+                    : 'Manage topics, lessons, and quizzes for your assigned subjects',
                 style: TextStyle(color: AppTheme.textSecondary, fontSize: 14),
               ),
-              const SizedBox(height: 24),
+              const SizedBox(height: 20),
 
-              // Create New Subject Button
-              SizedBox(
-                width: double.infinity,
-                child: ElevatedButton.icon(
-                  onPressed: () => _showCreateSubjectDialog(),
-                  icon: const Icon(Icons.add, color: Colors.black),
-                  label: const Text('Create New Subject'),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: Theme.of(context).colorScheme.primary,
-                    foregroundColor: Colors.black,
-                    padding: const EdgeInsets.symmetric(vertical: 14),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                    textStyle: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+              // Teacher Role Notice
+              if (isTeacher) ...[
+                Container(
+                  margin: const EdgeInsets.only(bottom: 20),
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    color: Theme.of(context).colorScheme.primary.withValues(alpha: 0.1),
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: Theme.of(context).colorScheme.primary.withValues(alpha: 0.3)),
+                  ),
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Icon(Icons.assignment_ind_outlined, color: AppTheme.primary, size: 22),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              'Faculty Course Assignment Notice',
+                              style: TextStyle(color: AppTheme.primary, fontWeight: FontWeight.bold, fontSize: 14),
+                            ),
+                            const SizedBox(height: 4),
+                            Text(
+                              'Subject courses and sections are created and designated by School Administrators. You have permission to manage Topics, Learning Outcomes, Lessons, and Quizzes for your assigned subjects below.',
+                              style: TextStyle(color: AppTheme.textSecondary, fontSize: 12, height: 1.4),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
                   ),
                 ),
-              ),
-              const SizedBox(height: 12),
+              ],
 
-              // Adopt Global Subject Button
-              SizedBox(
-                width: double.infinity,
-                child: OutlinedButton.icon(
-                  onPressed: () => _showCreateSubjectDialog(autoExpandGlobal: true),
-                  icon: Icon(Icons.public, color: AppTheme.text),
-                  label: const Text('Adopt Global Subject'),
-                  style: OutlinedButton.styleFrom(
-                    foregroundColor: AppTheme.text,
-                    padding: const EdgeInsets.symmetric(vertical: 14),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                    side: BorderSide(color: AppTheme.border),
-                    backgroundColor: AppTheme.surface,
-                    textStyle: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+              // Admin-Only Subject Creation Actions
+              if (isAdmin) ...[
+                // Create New Subject Button
+                SizedBox(
+                  width: double.infinity,
+                  child: ElevatedButton.icon(
+                    onPressed: () => _showCreateSubjectDialog(),
+                    icon: const Icon(Icons.add, color: Colors.black),
+                    label: const Text('Create New Subject'),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Theme.of(context).colorScheme.primary,
+                      foregroundColor: Colors.black,
+                      padding: const EdgeInsets.symmetric(vertical: 14),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                      textStyle: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+                    ),
                   ),
                 ),
-              ),
-              const SizedBox(height: 24),
+                const SizedBox(height: 12),
+
+                // Adopt Global Subject Button
+                SizedBox(
+                  width: double.infinity,
+                  child: OutlinedButton.icon(
+                    onPressed: () => _showCreateSubjectDialog(autoExpandGlobal: true),
+                    icon: Icon(Icons.public, color: AppTheme.text),
+                    label: const Text('Adopt Global Subject'),
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: AppTheme.text,
+                      padding: const EdgeInsets.symmetric(vertical: 14),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                      side: BorderSide(color: AppTheme.border),
+                      backgroundColor: AppTheme.surface,
+                      textStyle: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 24),
+              ],
 
               // Filter Chips
               Wrap(
@@ -114,7 +166,7 @@ class _SubjectsMgmtScreenState extends ConsumerState<SubjectsMgmtScreen> {
                         Icon(Icons.menu_book, size: 64, color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.4)),
                         const SizedBox(height: 16),
                         Text(
-                          'No subjects created yet',
+                          isTeacher ? 'No assigned subjects found' : 'No subjects created yet',
                           style: TextStyle(color: AppTheme.textMuted, fontSize: 16),
                         ),
                       ],
@@ -128,7 +180,7 @@ class _SubjectsMgmtScreenState extends ConsumerState<SubjectsMgmtScreen> {
                   itemCount: subjects.length,
                   itemBuilder: (context, index) {
                     final subject = subjects[index];
-                    return _buildSubjectCard(context, subject, ref);
+                    return _buildSubjectCard(context, subject, ref, isAdmin: isAdmin);
                   },
                 ),
             ],
@@ -138,10 +190,11 @@ class _SubjectsMgmtScreenState extends ConsumerState<SubjectsMgmtScreen> {
     );
   }
 
-  Widget _buildSubjectCard(BuildContext context, Map<String, dynamic> subject, WidgetRef ref) {
+  Widget _buildSubjectCard(BuildContext context, Map<String, dynamic> subject, WidgetRef ref, {bool isAdmin = true}) {
     final code = subject['subject_code']?.toString() ?? '';
     final unlockType = subject['unlock_type']?.toString() ?? 'Sequential';
     final isAdopted = code.isNotEmpty && (code == 'CSS-NC-II' || code == 'VGD-NC-III' || code == 'EMP-TECH');
+    final teacherName = subject['teacher_name']?.toString() ?? '';
 
     return GestureDetector(
       onTap: () {
@@ -185,7 +238,7 @@ class _SubjectsMgmtScreenState extends ConsumerState<SubjectsMgmtScreen> {
                       mainAxisSize: MainAxisSize.min,
                       children: [
                         Icon(Icons.auto_awesome, size: 12, color: Theme.of(context).colorScheme.primary),
-                        SizedBox(width: 4),
+                        const SizedBox(width: 4),
                         Text('Adapted Copy', style: TextStyle(color: AppTheme.primary, fontSize: 11)),
                       ],
                     ),
@@ -232,6 +285,36 @@ class _SubjectsMgmtScreenState extends ConsumerState<SubjectsMgmtScreen> {
               maxLines: 2,
               overflow: TextOverflow.ellipsis,
             ),
+            const SizedBox(height: 10),
+
+            // Teacher / Faculty Assignment Chip
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+              decoration: BoxDecoration(
+                color: Theme.of(context).scaffoldBackgroundColor,
+                borderRadius: BorderRadius.circular(6),
+                border: Border.all(color: AppTheme.border),
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(Icons.school_outlined, size: 14, color: AppTheme.primary),
+                  const SizedBox(width: 6),
+                  Text(
+                    teacherName.isNotEmpty
+                        ? 'Faculty: $teacherName'
+                        : 'Faculty: Unassigned',
+                    style: TextStyle(
+                      color: teacherName.isNotEmpty
+                          ? AppTheme.text
+                          : AppTheme.textSecondary,
+                      fontSize: 12,
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                ],
+              ),
+            ),
             const SizedBox(height: 12),
 
             // Bottom row: student count + action buttons
@@ -244,27 +327,29 @@ class _SubjectsMgmtScreenState extends ConsumerState<SubjectsMgmtScreen> {
                   style: TextStyle(color: AppTheme.primary, fontSize: 13),
                 ),
                 const Spacer(),
-                if (isAdopted)
+                if (isAdopted && isAdmin)
                   _actionIconButton(
                     icon: Icons.cancel_outlined,
                     color: Theme.of(context).colorScheme.error,
                     bgColor: AppTheme.error.withValues(alpha: 0.15),
                     onTap: () => _confirmDelete(context, subject, ref),
                   ),
-                if (isAdopted) const SizedBox(width: 8),
+                if (isAdopted && isAdmin) const SizedBox(width: 8),
                 _actionIconButton(
                   icon: Icons.edit_outlined,
                   color: Theme.of(context).colorScheme.primary,
                   bgColor: AppTheme.primary.withValues(alpha: 0.15),
                   onTap: () => _showEditSubjectDialog(context, subject, ref),
                 ),
-                const SizedBox(width: 8),
-                _actionIconButton(
-                  icon: Icons.delete_outline,
-                  color: Theme.of(context).colorScheme.error,
-                  bgColor: AppTheme.error.withValues(alpha: 0.15),
-                  onTap: () => _confirmDelete(context, subject, ref),
-                ),
+                if (isAdmin) ...[
+                  const SizedBox(width: 8),
+                  _actionIconButton(
+                    icon: Icons.delete_outline,
+                    color: Theme.of(context).colorScheme.error,
+                    bgColor: AppTheme.error.withValues(alpha: 0.15),
+                    onTap: () => _confirmDelete(context, subject, ref),
+                  ),
+                ],
               ],
             ),
           ],
@@ -347,6 +432,8 @@ class _SubjectsMgmtScreenState extends ConsumerState<SubjectsMgmtScreen> {
       'grade_level': result.grade,
       'semester': result.semester,
       'unlock_type': result.unlock,
+      'teacher_id': result.teacherId,
+      'teacher_name': result.teacherName,
       'created_at': DateTime.now().toIso8601String(),
     });
   }
@@ -359,6 +446,8 @@ class _SubjectCreationResult {
   final String? grade;
   final String? semester;
   final String unlock;
+  final String? teacherId;
+  final String? teacherName;
 
   const _SubjectCreationResult({
     required this.name,
@@ -367,6 +456,8 @@ class _SubjectCreationResult {
     this.grade,
     this.semester,
     required this.unlock,
+    this.teacherId,
+    this.teacherName,
   });
 }
 
@@ -391,6 +482,8 @@ class _CreateSubjectSheetState extends ConsumerState<_CreateSubjectSheet> {
   String? _selectedGrade;
   String? _selectedSemester;
   String _selectedUnlock = 'Sequential';
+  String? _selectedTeacherId;
+  String? _selectedTeacherName;
 
   final List<String> _semesters = ['1st Semester', '2nd Semester', '3rd Semester'];
 
@@ -448,6 +541,8 @@ class _CreateSubjectSheetState extends ConsumerState<_CreateSubjectSheet> {
         grade: _selectedGrade,
         semester: _selectedSemester,
         unlock: _selectedUnlock,
+        teacherId: _selectedTeacherId,
+        teacherName: _selectedTeacherName,
       ),
     );
   }
@@ -457,7 +552,7 @@ class _CreateSubjectSheetState extends ConsumerState<_CreateSubjectSheet> {
     return Container(
       decoration: BoxDecoration(
         color: Theme.of(context).scaffoldBackgroundColor,
-        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+        borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
       ),
       padding: EdgeInsets.only(
         left: 20, right: 20, top: 24,
@@ -606,6 +701,48 @@ class _CreateSubjectSheetState extends ConsumerState<_CreateSubjectSheet> {
                     onTap: () => setState(() => _selectedUnlock = 'Flexible'),
                   ),
                   const SizedBox(height: 24),
+
+                  // Teacher Assignment Dropdown
+                  Text('Assigned Faculty / Teacher', style: TextStyle(color: AppTheme.textSecondary, fontSize: 14)),
+                  const SizedBox(height: 8),
+                  ref.watch(teachersListProvider).when(
+                    data: (teachers) => DropdownButtonFormField<String?>(
+                      initialValue: _selectedTeacherId,
+                      dropdownColor: Theme.of(context).colorScheme.surface,
+                      style: TextStyle(color: AppTheme.text),
+                      decoration: InputDecoration(
+                        hintText: 'Select teacher handling this subject',
+                        filled: true,
+                        fillColor: Theme.of(context).colorScheme.surface,
+                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
+                        prefixIcon: Icon(Icons.school_outlined, size: 20, color: AppTheme.primary),
+                      ),
+                      items: [
+                        DropdownMenuItem<String?>(
+                          value: null,
+                          child: Text('Unassigned / To Be Designated', style: TextStyle(color: AppTheme.textSecondary)),
+                        ),
+                        ...teachers.map((t) => DropdownMenuItem<String?>(
+                          value: t['id']?.toString(),
+                          child: Text('${t['full_name']} (${t['role'] ?? 'teacher'})'),
+                        )),
+                      ],
+                      onChanged: (val) {
+                        setState(() {
+                          _selectedTeacherId = val;
+                          if (val != null) {
+                            final found = teachers.firstWhere((t) => t['id']?.toString() == val, orElse: () => {});
+                            _selectedTeacherName = found['full_name']?.toString();
+                          } else {
+                            _selectedTeacherName = null;
+                          }
+                        });
+                      },
+                    ),
+                    loading: () => const LinearProgressIndicator(),
+                    error: (err, stack) => const SizedBox.shrink(),
+                  ),
+                  const SizedBox(height: 24),
                 ],
               ),
             ),
@@ -683,7 +820,7 @@ class _CreateSubjectSheetState extends ConsumerState<_CreateSubjectSheet> {
                   mainAxisSize: MainAxisSize.min,
                   children: [
                     Icon(Icons.language, size: 12, color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6)),
-                    SizedBox(width: 4),
+                    const SizedBox(width: 4),
                     Text('Global', style: TextStyle(color: AppTheme.textSecondary, fontSize: 12)),
                   ],
                 ),
@@ -780,6 +917,8 @@ class _EditSubjectSheetState extends ConsumerState<_EditSubjectSheet> {
   String? _selectedGrade;
   String? _selectedSemester;
   late String _selectedUnlock;
+  String? _selectedTeacherId;
+  String? _selectedTeacherName;
 
   final List<String> _gradeLevels = ['Grade 7', 'Grade 8', 'Grade 9', 'Grade 10', 'Grade 11', 'Grade 12'];
   final List<String> _semesters = ['1st Semester', '2nd Semester', '3rd Semester'];
@@ -793,6 +932,8 @@ class _EditSubjectSheetState extends ConsumerState<_EditSubjectSheet> {
     _selectedGrade = widget.subject['grade_level'];
     _selectedSemester = widget.subject['semester'];
     _selectedUnlock = widget.subject['unlock_type'] ?? 'Sequential';
+    _selectedTeacherId = widget.subject['teacher_id']?.toString();
+    _selectedTeacherName = widget.subject['teacher_name']?.toString();
   }
 
   @override
@@ -808,7 +949,7 @@ class _EditSubjectSheetState extends ConsumerState<_EditSubjectSheet> {
     return Container(
       decoration: BoxDecoration(
         color: Theme.of(context).scaffoldBackgroundColor,
-        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+        borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
       ),
       padding: EdgeInsets.only(
         left: 20, right: 20, top: 24,
@@ -897,6 +1038,48 @@ class _EditSubjectSheetState extends ConsumerState<_EditSubjectSheet> {
                     onTap: () => setState(() => _selectedUnlock = 'Flexible'),
                   ),
                   const SizedBox(height: 24),
+
+                  // Teacher Assignment Dropdown
+                  Text('Assigned Faculty / Teacher', style: TextStyle(color: AppTheme.textSecondary, fontSize: 14)),
+                  const SizedBox(height: 8),
+                  ref.watch(teachersListProvider).when(
+                    data: (teachers) => DropdownButtonFormField<String?>(
+                      initialValue: _selectedTeacherId,
+                      dropdownColor: Theme.of(context).colorScheme.surface,
+                      style: TextStyle(color: AppTheme.text),
+                      decoration: InputDecoration(
+                        hintText: 'Select teacher handling this subject',
+                        filled: true,
+                        fillColor: Theme.of(context).colorScheme.surface,
+                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
+                        prefixIcon: Icon(Icons.school_outlined, size: 20, color: AppTheme.primary),
+                      ),
+                      items: [
+                        DropdownMenuItem<String?>(
+                          value: null,
+                          child: Text('Unassigned / To Be Designated', style: TextStyle(color: AppTheme.textSecondary)),
+                        ),
+                        ...teachers.map((t) => DropdownMenuItem<String?>(
+                          value: t['id']?.toString(),
+                          child: Text('${t['full_name']} (${t['role'] ?? 'teacher'})'),
+                        )),
+                      ],
+                      onChanged: (val) {
+                        setState(() {
+                          _selectedTeacherId = val;
+                          if (val != null) {
+                            final found = teachers.firstWhere((t) => t['id']?.toString() == val, orElse: () => {});
+                            _selectedTeacherName = found['full_name']?.toString();
+                          } else {
+                            _selectedTeacherName = null;
+                          }
+                        });
+                      },
+                    ),
+                    loading: () => const LinearProgressIndicator(),
+                    error: (err, stack) => const SizedBox.shrink(),
+                  ),
+                  const SizedBox(height: 24),
                 ],
               ),
             ),
@@ -930,6 +1113,8 @@ class _EditSubjectSheetState extends ConsumerState<_EditSubjectSheet> {
                         'grade_level': _selectedGrade,
                         'semester': _selectedSemester,
                         'unlock_type': _selectedUnlock,
+                        'teacher_id': _selectedTeacherId,
+                        'teacher_name': _selectedTeacherName,
                       });
                       Navigator.pop(context);
                     },

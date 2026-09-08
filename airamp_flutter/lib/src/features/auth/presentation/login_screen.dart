@@ -61,11 +61,16 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
       await ref.read(authProvider.notifier).login(identifier, password);
       final user = ref.read(authProvider);
       if (user != null) {
+        // Mobile App is strictly for Students and Teachers!
         if (user.role == 'admin' || user.role == 'super_admin') {
-          if (mounted) context.go('/admin/dashboard');
-        } else {
-          if (mounted) context.go('/student/home');
+          await ref.read(authProvider.notifier).logout();
+          setState(() {
+            _error = 'Administrator accounts can only access the AIRAMP Web Portal (via web browser). This mobile app is exclusively for Students and Teachers.';
+          });
+          return;
         }
+
+        if (mounted) context.go('/student/home');
       }
     } catch (e) {
       setState(() {
@@ -370,7 +375,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
                             ),
                             const SizedBox(width: 8),
                             Text(
-                              'Register as Admin (Teacher)',
+                              'Register as Teacher',
                               style: TextStyle(
                                 color: Theme.of(context).colorScheme.secondary,
                                 fontSize: 13,
