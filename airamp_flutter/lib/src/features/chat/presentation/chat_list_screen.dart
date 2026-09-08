@@ -30,6 +30,15 @@ class _ChatListScreenState extends ConsumerState<ChatListScreen> {
   final List<String> _sectionOptions = ['All', 'Emerald', 'Ruby', 'Diamond', 'Gold'];
 
   @override
+  void initState() {
+    super.initState();
+    Future.microtask(() async {
+      await ref.read(chatProvider.notifier).loadAvailableUsers();
+      await ref.read(chatProvider.notifier).loadLocalConversations();
+    });
+  }
+
+  @override
   void dispose() {
     _convoSearchController.dispose();
     _contactSearchController.dispose();
@@ -61,7 +70,7 @@ class _ChatListScreenState extends ConsumerState<ChatListScreen> {
 
     // Filter by role
     if (_selectedRole == 'teacher') {
-      list = list.where((u) => u.role == 'admin' || u.role == 'super_admin').toList();
+      list = list.where((u) => u.role == 'teacher' || u.role == 'admin' || u.role == 'super_admin').toList();
     } else if (_selectedRole == 'student') {
       list = list.where((u) => u.role == 'student').toList();
     }
@@ -84,7 +93,7 @@ class _ChatListScreenState extends ConsumerState<ChatListScreen> {
         final emailMatch = u.email.toLowerCase().contains(q);
         final sectionMatch = u.section != null && u.section!.toLowerCase().contains(q);
         final gradeMatch = u.grade != null && u.grade!.toLowerCase().contains(q);
-        final roleLabel = (u.role == 'admin' || u.role == 'super_admin') ? 'teacher' : 'student';
+        final roleLabel = (u.role == 'admin' || u.role == 'super_admin' || u.role == 'teacher') ? 'teacher' : 'student';
         final roleMatch = roleLabel.contains(q);
         return nameMatch || emailMatch || sectionMatch || gradeMatch || roleMatch;
       }).toList();
@@ -377,11 +386,15 @@ class _ChatListScreenState extends ConsumerState<ChatListScreen> {
           child: Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Text(
-                _showArchived ? 'Showing archived conversations' : 'Slide right to edit · Slide left to archive',
-                style: TextStyle(fontSize: 11, color: AppTheme.textMuted),
+              Expanded(
+                child: Text(
+                  _showArchived ? 'Showing archived conversations' : 'Slide right to edit · Slide left to archive',
+                  style: TextStyle(fontSize: 11, color: AppTheme.textMuted),
+                  overflow: TextOverflow.ellipsis,
+                ),
               ),
-              if (!_showArchived && archivedCount > 0)
+              if (!_showArchived && archivedCount > 0) ...[
+                const SizedBox(width: 8),
                 GestureDetector(
                   onTap: () => setState(() => _showArchived = true),
                   child: Text(
@@ -389,15 +402,29 @@ class _ChatListScreenState extends ConsumerState<ChatListScreen> {
                     style: TextStyle(fontSize: 11, color: AppTheme.primary, fontWeight: FontWeight.bold),
                   ),
                 ),
+              ],
             ],
           ),
         ),
         const SizedBox(height: 6),
 
         Expanded(
-          child: conversations.isEmpty
-              ? _buildEmptyState(context)
-              : ListView.separated(
+          child: RefreshIndicator(
+            onRefresh: () async {
+              await ref.read(chatProvider.notifier).loadAvailableUsers();
+              await ref.read(chatProvider.notifier).loadLocalConversations();
+            },
+            child: conversations.isEmpty
+                ? ListView(
+                    physics: const AlwaysScrollableScrollPhysics(),
+                    children: [
+                      SizedBox(
+                        height: MediaQuery.of(context).size.height * 0.5,
+                        child: _buildEmptyState(context),
+                      ),
+                    ],
+                  )
+                : ListView.separated(
                   padding: const EdgeInsets.symmetric(horizontal: 20),
                   itemCount: conversations.length,
                   separatorBuilder: (_, _) => Divider(color: AppTheme.border, height: 1),
@@ -545,6 +572,7 @@ class _ChatListScreenState extends ConsumerState<ChatListScreen> {
                     );
                   },
                 ),
+          ),
         ),
       ],
     );
@@ -746,15 +774,27 @@ class _ChatListScreenState extends ConsumerState<ChatListScreen> {
 
         // Contacts List
         Expanded(
-          child: contacts.isEmpty
-              ? _buildEmptyContactsState()
-              : ListView.separated(
+          child: RefreshIndicator(
+            onRefresh: () async {
+              await ref.read(chatProvider.notifier).loadAvailableUsers();
+            },
+            child: contacts.isEmpty
+                ? ListView(
+                    physics: const AlwaysScrollableScrollPhysics(),
+                    children: [
+                      SizedBox(
+                        height: MediaQuery.of(context).size.height * 0.5,
+                        child: _buildEmptyContactsState(),
+                      ),
+                    ],
+                  )
+                : ListView.separated(
                   padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 6),
                   itemCount: contacts.length,
                   separatorBuilder: (_, _) => Divider(color: AppTheme.border, height: 1),
                   itemBuilder: (context, index) {
                     final user = contacts[index];
-                    final isTeacher = user.role == 'admin' || user.role == 'super_admin';
+                    final isTeacher = user.role == 'teacher' || user.role == 'admin' || user.role == 'super_admin';
 
                     return ListTile(
                       contentPadding: const EdgeInsets.symmetric(vertical: 8),
@@ -848,6 +888,7 @@ class _ChatListScreenState extends ConsumerState<ChatListScreen> {
                     );
                   },
                 ),
+          ),
         ),
       ],
     );
@@ -925,6 +966,9 @@ class _ChatListScreenState extends ConsumerState<ChatListScreen> {
   }
 
   Widget _buildEmptyState(BuildContext context) {
+    final chatState = ref.watch(chatProvider);
+    final archivedCount = chatState.conversations.where((c) => c.isArchived).length;
+
     return Center(
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
@@ -936,7 +980,9 @@ class _ChatListScreenState extends ConsumerState<ChatListScreen> {
           ),
           const SizedBox(height: 16),
           Text(
-            _showArchived ? 'No archived chats' : 'No conversations yet',
+            _showArchived
+                ? 'No archived chats'
+                : (archivedCount > 0 ? 'No active conversations yet' : 'No conversations yet'),
             style: TextStyle(
               fontSize: 18,
               fontWeight: FontWeight.bold,

@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -19,11 +20,14 @@ class _QuizScreenState extends ConsumerState<QuizScreen> {
   int _state = 0; // 0: intro, 1: active, 2: results
   bool _loading = true;
 
-  Map<String, dynamic>? _loData;
+  int? _quizId;
+  int _loId = 0;
+  Map<String, dynamic>? _quizData;
   List<Map<String, dynamic>> _questions = [];
   int _passingScore = 70;
   int _subjectId = 0;
-  String _loTitle = '';
+  String _quizTitle = '';
+  int _timeLimitMinutes = 0;
 
   int _currentIndex = 0;
   final Map<int, String> _selectedAnswers = {}; // question index -> 'A' | 'B' | 'C' | 'D'
@@ -32,29 +36,64 @@ class _QuizScreenState extends ConsumerState<QuizScreen> {
   bool _isPassed = false;
   DateTime? _startTime;
 
+  // Countdown Timer
+  Timer? _countdownTimer;
+  int _remainingSeconds = 0;
+
   @override
   void initState() {
     super.initState();
     _loadQuiz();
   }
 
+  @override
+  void dispose() {
+    _countdownTimer?.cancel();
+    super.dispose();
+  }
+
   Future<void> _loadQuiz() async {
-    final loId = int.tryParse(widget.quizId);
-    if (loId == null) {
+    final parsedId = int.tryParse(widget.quizId);
+    if (parsedId == null) {
       setState(() => _loading = false);
       return;
     }
 
-    final data = await DatabaseHelper().getLoQuiz(loId);
+    // 1. Try loading as first-class quiz from `quizzes` table
+    final quizData = await DatabaseHelper().getQuizById(parsedId);
+    if (quizData != null && mounted) {
+      final qList = (quizData['questions'] as List?)?.cast<Map<String, dynamic>>() ?? [];
+      final tLimit = (quizData['time_limit_minutes'] as int?) ?? 0;
+      setState(() {
+        _quizId = parsedId;
+        _loId = (quizData['lo_id'] as int?) ?? 0;
+        _quizData = quizData;
+        _questions = qList;
+        _quizTitle = quizData['title']?.toString() ?? 'Assessment';
+        _passingScore = (quizData['passing_score'] as int?) ?? 70;
+        _subjectId = (quizData['subject_id'] as int?) ?? 0;
+        _timeLimitMinutes = tLimit;
+        _remainingSeconds = tLimit * 60;
+        _loading = false;
+      });
+      return;
+    }
+
+    // 2. Fallback: try loading as LO quiz
+    final loData = await DatabaseHelper().getLoQuiz(parsedId);
     if (mounted) {
-      if (data != null) {
-        final qList = (data['questions'] as List?)?.cast<Map<String, dynamic>>() ?? [];
+      if (loData != null) {
+        final qList = (loData['questions'] as List?)?.cast<Map<String, dynamic>>() ?? [];
         setState(() {
-          _loData = data;
+          _quizId = null;
+          _loId = parsedId;
+          _quizData = loData;
           _questions = qList;
-          _loTitle = data['title']?.toString() ?? 'Learning Outcome';
-          _passingScore = (data['passing_score'] as int?) ?? 70;
-          _subjectId = (data['subject_id'] as int?) ?? 0;
+          _quizTitle = loData['title']?.toString() ?? 'Learning Outcome';
+          _passingScore = (loData['passing_score'] as int?) ?? 70;
+          _subjectId = (loData['subject_id'] as int?) ?? 0;
+          _timeLimitMinutes = 0;
+          _remainingSeconds = 0;
           _loading = false;
         });
       } else {
@@ -63,7 +102,33 @@ class _QuizScreenState extends ConsumerState<QuizScreen> {
     }
   }
 
-  Future<void> _submitQuiz() async {
+  void _startTimer() {
+    if (_timeLimitMinutes <= 0) return;
+    _remainingSeconds = _timeLimitMinutes * 60;
+    _countdownTimer?.cancel();
+    _countdownTimer = Timer.periodic(const Duration(seconds: 1), (timer) {
+      if (!mounted) {
+        timer.cancel();
+        return;
+      }
+      if (_remainingSeconds > 0) {
+        setState(() => _remainingSeconds--);
+      } else {
+        timer.cancel();
+        _submitQuiz(isTimeout: true);
+      }
+    });
+  }
+
+  String _formatTimer(int totalSecs) {
+    final m = totalSecs ~/ 60;
+    final s = totalSecs % 60;
+    return '${m.toString().padLeft(2, '0')}:${s.toString().padLeft(2, '0')}';
+  }
+
+  Future<void> _submitQuiz({bool isTimeout = false}) async {
+    _countdownTimer?.cancel();
+
     int score = 0;
     for (int i = 0; i < _questions.length; i++) {
       final q = _questions[i];
@@ -78,10 +143,10 @@ class _QuizScreenState extends ConsumerState<QuizScreen> {
     final pct = total > 0 ? (score / total) * 100 : 0.0;
     final passed = pct >= _passingScore;
     final duration = _startTime != null ? DateTime.now().difference(_startTime!).inSeconds : 0;
-    final loId = int.tryParse(widget.quizId) ?? 0;
 
     await ref.read(studentQuizAttemptsProvider.notifier).recordAttempt(
-      loId: loId,
+      loId: _loId,
+      quizId: _quizId,
       subjectId: _subjectId,
       score: score,
       totalQuestions: total,
@@ -97,6 +162,15 @@ class _QuizScreenState extends ConsumerState<QuizScreen> {
         _isPassed = passed;
         _state = 2;
       });
+
+      if (isTimeout) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            backgroundColor: AppTheme.error,
+            content: const Text("Time is up! Your quiz has been automatically submitted."),
+          ),
+        );
+      }
     }
   }
 
@@ -115,7 +189,7 @@ class _QuizScreenState extends ConsumerState<QuizScreen> {
       );
     }
 
-    if (_loData == null || _questions.isEmpty) {
+    if (_quizData == null || _questions.isEmpty) {
       return Scaffold(
         backgroundColor: AppTheme.background,
         appBar: AppBar(
@@ -136,7 +210,7 @@ class _QuizScreenState extends ConsumerState<QuizScreen> {
                 ),
                 const SizedBox(height: 8),
                 Text(
-                  'The instructor has not added quiz questions for this learning outcome yet.',
+                  'The instructor has not added quiz questions for this assessment yet.',
                   textAlign: TextAlign.center,
                   style: TextStyle(color: AppTheme.textSecondary),
                 ),
@@ -159,8 +233,50 @@ class _QuizScreenState extends ConsumerState<QuizScreen> {
     return Scaffold(
       backgroundColor: AppTheme.background,
       appBar: AppBar(
-        title: Text(_loTitle, style: TextStyle(color: AppTheme.text, fontSize: 16, fontWeight: FontWeight.bold)),
+        title: Text(
+          _quizTitle,
+          style: TextStyle(color: AppTheme.text, fontSize: 16, fontWeight: FontWeight.bold),
+        ),
         iconTheme: IconThemeData(color: AppTheme.text),
+        actions: [
+          if (_state == 1 && _timeLimitMinutes > 0)
+            Padding(
+              padding: const EdgeInsets.only(right: 16),
+              child: Center(
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                  decoration: BoxDecoration(
+                    color: _remainingSeconds < 60
+                        ? AppTheme.error.withValues(alpha: 0.15)
+                        : AppTheme.primary.withValues(alpha: 0.15),
+                    borderRadius: BorderRadius.circular(20),
+                    border: Border.all(
+                      color: _remainingSeconds < 60 ? AppTheme.error : AppTheme.primary,
+                    ),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(
+                        Icons.timer_outlined,
+                        size: 15,
+                        color: _remainingSeconds < 60 ? AppTheme.error : AppTheme.primary,
+                      ),
+                      const SizedBox(width: 4),
+                      Text(
+                        _formatTimer(_remainingSeconds),
+                        style: TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.bold,
+                          color: _remainingSeconds < 60 ? AppTheme.error : AppTheme.primary,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+        ],
       ),
       body: _buildContent(),
     );
@@ -196,16 +312,38 @@ class _QuizScreenState extends ConsumerState<QuizScreen> {
             ),
             const SizedBox(height: 24),
             Text(
-              'Assessment: $_loTitle',
+              _quizTitle,
               style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: AppTheme.text),
               textAlign: TextAlign.center,
             ),
             const SizedBox(height: 12),
             Text(
-              'This quiz consists of ${_questions.length} multiple-choice questions.\nYou must achieve at least $_passingScore% to pass and complete this learning outcome.',
+              'This assessment consists of ${_questions.length} multiple-choice questions.\nYou must achieve at least $_passingScore% to pass.',
               textAlign: TextAlign.center,
               style: TextStyle(color: AppTheme.textSecondary, height: 1.5, fontSize: 14),
             ),
+            if (_timeLimitMinutes > 0) ...[
+              const SizedBox(height: 12),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                decoration: BoxDecoration(
+                  color: Colors.orange.withValues(alpha: 0.12),
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(color: Colors.orange.withValues(alpha: 0.4)),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const Icon(Icons.access_time, size: 16, color: Colors.orange),
+                    const SizedBox(width: 6),
+                    Text(
+                      'Time Limit: $_timeLimitMinutes Minutes',
+                      style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.orange, fontSize: 13),
+                    ),
+                  ],
+                ),
+              ),
+            ],
             const SizedBox(height: 36),
             SizedBox(
               width: double.infinity,
@@ -218,6 +356,7 @@ class _QuizScreenState extends ConsumerState<QuizScreen> {
                     _currentIndex = 0;
                     _selectedAnswers.clear();
                   });
+                  _startTimer();
                 },
                 style: ElevatedButton.styleFrom(
                   backgroundColor: AppTheme.primary,
@@ -292,7 +431,7 @@ class _QuizScreenState extends ConsumerState<QuizScreen> {
                   child: Text(
                     q['question_text']?.toString() ?? '',
                     style: TextStyle(
-                      fontSize: 18,
+                      fontSize: 17,
                       fontWeight: FontWeight.w600,
                       color: AppTheme.text,
                       height: 1.4,
@@ -308,11 +447,11 @@ class _QuizScreenState extends ConsumerState<QuizScreen> {
                 const SizedBox(height: 12),
 
                 _buildAnswerCard('A', q['option_a']?.toString() ?? '', selectedOption == 'A'),
-                const SizedBox(height: 12),
+                const SizedBox(height: 10),
                 _buildAnswerCard('B', q['option_b']?.toString() ?? '', selectedOption == 'B'),
-                const SizedBox(height: 12),
+                const SizedBox(height: 10),
                 _buildAnswerCard('C', q['option_c']?.toString() ?? '', selectedOption == 'C'),
-                const SizedBox(height: 12),
+                const SizedBox(height: 10),
                 _buildAnswerCard('D', q['option_d']?.toString() ?? '', selectedOption == 'D'),
               ],
             ),
@@ -420,7 +559,7 @@ class _QuizScreenState extends ConsumerState<QuizScreen> {
                 style: TextStyle(
                   color: isSelected ? AppTheme.text : AppTheme.textSecondary,
                   fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
-                  fontSize: 15,
+                  fontSize: 14,
                 ),
               ),
             ),
@@ -435,41 +574,41 @@ class _QuizScreenState extends ConsumerState<QuizScreen> {
   Widget _buildResults() {
     return Center(
       child: SingleChildScrollView(
-        padding: const EdgeInsets.all(24.0),
+        padding: const EdgeInsets.all(20.0),
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
             Container(
-              padding: const EdgeInsets.all(24),
+              padding: const EdgeInsets.all(20),
               decoration: BoxDecoration(
                 color: _isPassed ? AppTheme.success.withValues(alpha: 0.15) : AppTheme.error.withValues(alpha: 0.15),
                 shape: BoxShape.circle,
               ),
               child: Icon(
                 _isPassed ? Icons.check_circle_outline : Icons.cancel_outlined,
-                size: 72,
+                size: 64,
                 color: _isPassed ? AppTheme.success : AppTheme.error,
               ),
             ),
-            const SizedBox(height: 24),
+            const SizedBox(height: 16),
             Text(
               _isPassed ? 'Congratulations! You Passed' : 'Assessment Not Passed',
               style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: AppTheme.text),
               textAlign: TextAlign.center,
             ),
-            const SizedBox(height: 8),
+            const SizedBox(height: 6),
             Text(
               _isPassed
-                  ? 'Great job! This learning outcome is now marked as complete.'
-                  : 'You did not reach the passing score of $_passingScore%. You can review the materials and try again.',
+                  ? 'Great job! Your score and progress have been recorded.'
+                  : 'You scored ${_percentage.round()}%, which is below the passing mark of $_passingScore%. Review the answers below and try again.',
               textAlign: TextAlign.center,
-              style: TextStyle(color: AppTheme.textSecondary, fontSize: 14, height: 1.4),
+              style: TextStyle(color: AppTheme.textSecondary, fontSize: 13, height: 1.4),
             ),
-            const SizedBox(height: 28),
+            const SizedBox(height: 20),
 
             // Score details card
             Container(
-              padding: const EdgeInsets.symmetric(vertical: 20, horizontal: 24),
+              padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 20),
               decoration: BoxDecoration(
                 color: AppTheme.surface,
                 borderRadius: BorderRadius.circular(16),
@@ -480,53 +619,128 @@ class _QuizScreenState extends ConsumerState<QuizScreen> {
                 children: [
                   Column(
                     children: [
-                      Text('Score', style: TextStyle(color: AppTheme.textMuted, fontSize: 12)),
-                      const SizedBox(height: 6),
-                      Text('$_score / ${_questions.length}', style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: AppTheme.text)),
+                      Text('Score', style: TextStyle(color: AppTheme.textMuted, fontSize: 11)),
+                      const SizedBox(height: 4),
+                      Text('$_score / ${_questions.length}', style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: AppTheme.text)),
                     ],
                   ),
-                  Container(height: 40, width: 1, color: AppTheme.border),
+                  Container(height: 36, width: 1, color: AppTheme.border),
                   Column(
                     children: [
-                      Text('Percentage', style: TextStyle(color: AppTheme.textMuted, fontSize: 12)),
-                      const SizedBox(height: 6),
+                      Text('Percentage', style: TextStyle(color: AppTheme.textMuted, fontSize: 11)),
+                      const SizedBox(height: 4),
                       Text(
                         '${_percentage.round()}%',
                         style: TextStyle(
-                          fontSize: 22,
+                          fontSize: 20,
                           fontWeight: FontWeight.bold,
                           color: _isPassed ? AppTheme.success : AppTheme.error,
                         ),
                       ),
                     ],
                   ),
-                  Container(height: 40, width: 1, color: AppTheme.border),
+                  Container(height: 36, width: 1, color: AppTheme.border),
                   Column(
                     children: [
-                      Text('Passing Score', style: TextStyle(color: AppTheme.textMuted, fontSize: 12)),
-                      const SizedBox(height: 6),
-                      Text('$_passingScore%', style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: AppTheme.text)),
+                      Text('Passing Mark', style: TextStyle(color: AppTheme.textMuted, fontSize: 11)),
+                      const SizedBox(height: 4),
+                      Text('$_passingScore%', style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: AppTheme.text)),
                     ],
                   ),
                 ],
               ),
             ),
-            const SizedBox(height: 36),
+            const SizedBox(height: 24),
 
+            // Question Review Section
+            Align(
+              alignment: Alignment.centerLeft,
+              child: Text(
+                'Review Answers',
+                style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: AppTheme.text),
+              ),
+            ),
+            const SizedBox(height: 10),
+
+            ..._questions.asMap().entries.map((entry) {
+              final i = entry.key;
+              final q = entry.value;
+              final selected = _selectedAnswers[i] ?? 'None';
+              final correct = (q['correct_option']?.toString() ?? 'A').toUpperCase().trim();
+              final isCorrect = selected == correct;
+
+              return Container(
+                margin: const EdgeInsets.only(bottom: 10),
+                padding: const EdgeInsets.all(14),
+                decoration: BoxDecoration(
+                  color: AppTheme.surface,
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(
+                    color: isCorrect ? AppTheme.success.withValues(alpha: 0.3) : AppTheme.error.withValues(alpha: 0.3),
+                  ),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Icon(
+                          isCorrect ? Icons.check_circle : Icons.cancel,
+                          color: isCorrect ? AppTheme.success : AppTheme.error,
+                          size: 18,
+                        ),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Text(
+                            'Question ${i + 1}: ${q['question_text']}',
+                            style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: AppTheme.text),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 8),
+                    Text(
+                      'Your Answer: Option $selected ${isCorrect ? '(Correct)' : '(Incorrect)'}',
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: isCorrect ? AppTheme.success : AppTheme.error,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                    if (!isCorrect)
+                      Padding(
+                        padding: const EdgeInsets.only(top: 4),
+                        child: Text(
+                          'Correct Answer: Option $correct (${q['option_${correct.toLowerCase()}'] ?? ''})',
+                          style: TextStyle(fontSize: 12, color: AppTheme.textSecondary),
+                        ),
+                      ),
+                  ],
+                ),
+              );
+            }),
+
+            const SizedBox(height: 24),
             SizedBox(
               width: double.infinity,
-              height: 50,
+              height: 48,
               child: ElevatedButton(
-                onPressed: () => context.pop(),
+                onPressed: () {
+                  if (Navigator.of(context).canPop()) {
+                    Navigator.of(context).pop();
+                  } else {
+                    context.go('/student/quiz-history');
+                  }
+                },
                 style: ElevatedButton.styleFrom(
                   backgroundColor: AppTheme.primary,
                   foregroundColor: Colors.black,
                   shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                 ),
-                child: const Text('Return to Course', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+                child: const Text('Back to Quizzes', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
               ),
             ),
-            const SizedBox(height: 12),
+            const SizedBox(height: 10),
             TextButton.icon(
               onPressed: () {
                 setState(() {
@@ -545,4 +759,3 @@ class _QuizScreenState extends ConsumerState<QuizScreen> {
     );
   }
 }
-

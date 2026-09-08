@@ -210,6 +210,23 @@ class _StudentCourseDetailScreenState extends ConsumerState<StudentCourseDetailS
                       _subject!['description']?.toString() ?? '',
                       style: TextStyle(fontSize: 13, color: Colors.black.withValues(alpha: 0.75), height: 1.4),
                     ),
+                    if (_subject!['teacher_name'] != null && _subject!['teacher_name'].toString().isNotEmpty) ...[
+                      const SizedBox(height: 8),
+                      Row(
+                        children: [
+                          Icon(Icons.person_outline, size: 14, color: Colors.black.withValues(alpha: 0.8)),
+                          const SizedBox(width: 4),
+                          Text(
+                            'Instructor: ${_subject!['teacher_name']}',
+                            style: TextStyle(
+                              fontSize: 12,
+                              fontWeight: FontWeight.w600,
+                              color: Colors.black.withValues(alpha: 0.9),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
                     const SizedBox(height: 18),
 
                     // Progress inside banner

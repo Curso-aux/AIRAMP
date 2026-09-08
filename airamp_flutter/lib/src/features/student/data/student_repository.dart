@@ -1,6 +1,8 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/database/database_helper.dart';
 import '../../auth/application/auth_provider.dart';
+import '../../admin/data/admin_repository.dart';
+import '../../teacher/data/teacher_repository.dart';
 
 // --- Student Enrolled Courses ---
 final studentCoursesProvider = NotifierProvider<StudentCoursesNotifier, List<Map<String, dynamic>>>(() {
@@ -110,6 +112,36 @@ class StudentProgressNotifier extends Notifier<Map<String, dynamic>> {
   }
 }
 
+// --- Student Quiz Assignments (Active / Pending Quizzes) ---
+final studentQuizAssignmentsProvider = NotifierProvider<StudentQuizAssignmentsNotifier, List<Map<String, dynamic>>>(() {
+  return StudentQuizAssignmentsNotifier();
+});
+
+class StudentQuizAssignmentsNotifier extends Notifier<List<Map<String, dynamic>>> {
+  int? _activeSubjectFilter;
+
+  @override
+  List<Map<String, dynamic>> build() {
+    loadAssignedQuizzes();
+    return [];
+  }
+
+  String _getStudentId() {
+    final user = ref.watch(authProvider);
+    return user?.id ?? 'student_1';
+  }
+
+  Future<void> loadAssignedQuizzes({int? subjectId}) async {
+    _activeSubjectFilter = subjectId;
+    final studentId = _getStudentId();
+    final results = await DatabaseHelper().getAssignedQuizzesForStudent(studentId, subjectId: subjectId);
+    if (!ref.mounted) return;
+    state = results;
+  }
+
+  Future<void> reload() async => loadAssignedQuizzes(subjectId: _activeSubjectFilter);
+}
+
 // --- Student Quiz Attempts & History ---
 final studentQuizAttemptsProvider = NotifierProvider<StudentQuizAttemptsNotifier, List<Map<String, dynamic>>>(() {
   return StudentQuizAttemptsNotifier();
@@ -139,6 +171,7 @@ class StudentQuizAttemptsNotifier extends Notifier<List<Map<String, dynamic>>> {
 
   Future<void> recordAttempt({
     required int loId,
+    int? quizId,
     required int subjectId,
     required int score,
     required int totalQuestions,
@@ -150,6 +183,7 @@ class StudentQuizAttemptsNotifier extends Notifier<List<Map<String, dynamic>>> {
     await DatabaseHelper().recordQuizAttempt(
       studentId: studentId,
       loId: loId,
+      quizId: quizId,
       subjectId: subjectId,
       score: score,
       totalQuestions: totalQuestions,
@@ -159,9 +193,12 @@ class StudentQuizAttemptsNotifier extends Notifier<List<Map<String, dynamic>>> {
     );
 
     await loadAttempts(subjectId: _activeSubjectFilter);
+    ref.invalidate(studentQuizAssignmentsProvider);
     ref.invalidate(studentCoursesProvider);
     ref.invalidate(studentProgressProvider);
     ref.invalidate(teacherScoresProvider);
+    ref.invalidate(teacherDashboardProvider);
+    ref.invalidate(adminAnalyticsProvider);
   }
 }
 

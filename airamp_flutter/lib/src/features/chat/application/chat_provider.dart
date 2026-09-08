@@ -40,14 +40,28 @@ class ChatState {
 
 class ChatNotifier extends Notifier<ChatState> {
   StreamSubscription? _subscription;
+  bool _disposed = false;
 
   @override
   ChatState build() {
-    // Listen to auth changes AFTER build returns.
+    _disposed = false;
+    ref.onDispose(() {
+      _disposed = true;
+      _subscription?.cancel();
+    });
+
+    // Listen to auth changes: whenever user logs in or switches, reload everything!
     ref.listen<User?>(authProvider, (prev, next) {
-      if (next != null && prev == null) {
-        _connectAndLoad(next.id);
-      } else if (next == null && prev != null) {
+      if (next != null) {
+        Future.microtask(() async {
+          if (_disposed) return;
+          await loadAvailableUsers();
+          if (_disposed) return;
+          await loadLocalConversations();
+          if (_disposed) return;
+          _connectAndLoad(next.id);
+        });
+      } else if (prev != null) {
         _disconnect();
       }
     });
@@ -55,8 +69,11 @@ class ChatNotifier extends Notifier<ChatState> {
     // Load local conversations and connect websocket if authenticated
     final user = ref.read(authProvider);
     Future.microtask(() async {
-      await loadLocalConversations();
+      if (_disposed) return;
       await loadAvailableUsers();
+      if (_disposed) return;
+      await loadLocalConversations();
+      if (_disposed) return;
       if (user != null) {
         _connectAndLoad(user.id);
       }
@@ -65,17 +82,130 @@ class ChatNotifier extends Notifier<ChatState> {
     return ChatState();
   }
 
+  /// Reload messages for a specific conversation from DB (so student sees teacher's messages)
+  Future<void> reloadMessages(String conversationId) async {
+    try {
+      if (_disposed) return;
+      final db = DatabaseHelper();
+      final rawMessages = await db.getMessages(conversationId);
+      if (_disposed) return;
+      final messages = rawMessages.map((m) => ChatMessage(
+        id: m['id'] as String,
+        conversationId: conversationId,
+        senderId: m['sender_id'] as String,
+        text: m['text'] as String,
+        createdAt: m['created_at'] as String,
+        isRead: (m['is_read'] as int? ?? 0) == 1,
+      )).toList();
+      final messagesMap = Map<String, List<ChatMessage>>.from(state.messages);
+      messagesMap[conversationId] = messages;
+
+      final lastMsg = messages.isNotEmpty ? messages.last : null;
+      final updatedConvos = state.conversations.map((c) {
+        if (c.id == conversationId) {
+          return c.copyWith(lastMessage: lastMsg);
+        }
+        return c;
+      }).toList();
+
+      if (_disposed) return;
+      state = state.copyWith(messages: messagesMap, conversations: updatedConvos);
+    } catch (_) {}
+  }
+
+  /// Mark messages in conversation as read and update unread count
+  Future<void> markConversationAsRead(String conversationId) async {
+    try {
+      if (_disposed) return;
+      final user = ref.read(authProvider);
+      final myId = user?.id;
+      final db = DatabaseHelper();
+      await db.markMessagesAsRead(conversationId, excludeSenderId: myId);
+      if (_disposed) return;
+
+      final currentMsgs = state.messages[conversationId];
+      if (currentMsgs != null) {
+        final updatedMsgs = currentMsgs.map((m) {
+          if (m.senderId != myId && !m.isRead) {
+            return ChatMessage(
+              id: m.id,
+              conversationId: m.conversationId,
+              senderId: m.senderId,
+              text: m.text,
+              createdAt: m.createdAt,
+              isRead: true,
+            );
+          }
+          return m;
+        }).toList();
+
+        final messagesMap = Map<String, List<ChatMessage>>.from(state.messages);
+        messagesMap[conversationId] = updatedMsgs;
+
+        final updatedConvos = state.conversations.map((c) {
+          if (c.id == conversationId) {
+            return c.copyWith(unreadCount: 0);
+          }
+          return c;
+        }).toList();
+
+        if (_disposed) return;
+        state = state.copyWith(messages: messagesMap, conversations: updatedConvos);
+      }
+    } catch (_) {}
+  }
+
   /// Load conversations and messages from local SQLite database.
   Future<void> loadLocalConversations() async {
     try {
+      if (_disposed) return;
       final db = DatabaseHelper();
+      await db.normalizeDirectConversations();
+      if (_disposed) return;
+
+      final currentUser = ref.read(authProvider);
+      final myId = currentUser?.id ?? 'teacher_1';
+
+      final allUserRows = await db.getUsers();
+      if (_disposed) return;
+      final allUsers = allUserRows.map((r) => ChatUser.fromJson(r)).toList();
+
       final rows = await db.getConversations();
+      if (_disposed) return;
       final List<ChatConversation> loadedConversations = [];
       final Map<String, List<ChatMessage>> loadedMessages = {};
 
       for (final row in rows) {
         final convId = row['id'] as String;
+        final type = row['type'] as String? ?? 'direct';
+        final isDirect = type == 'direct' || convId.startsWith('dm_');
+
+        ChatUser? otherParticipant;
+
+        if (isDirect) {
+          ChatUser? matchedOther;
+          for (final u in allUsers) {
+            if (u.id == myId) continue;
+            final sorted = [myId, u.id]..sort();
+            final expected = 'dm_${sorted[0]}_${sorted[1]}';
+            final legacy1 = 'dm_${myId}_${u.id}';
+            final legacy2 = 'dm_${u.id}_$myId';
+            if (convId == expected || convId == legacy1 || convId == legacy2) {
+              matchedOther = u;
+              break;
+            }
+          }
+
+          if (matchedOther != null) {
+            otherParticipant = matchedOther;
+          } else {
+            // Direct conversation between two other users; hide from current user
+            continue;
+          }
+        }
+
         final rawMessages = await db.getMessages(convId);
+        if (_disposed) return;
         final messages = rawMessages.map((m) => ChatMessage(
           id: m['id'] as String,
           conversationId: convId,
@@ -90,17 +220,28 @@ class ChatNotifier extends Notifier<ChatState> {
         final lastMsg = messages.isNotEmpty ? messages.last : null;
         final isArchived = (row['is_archived'] as int? ?? 0) == 1;
 
+        // Display name: for direct chats, always show the OTHER participant's name!
+        String displayName;
+        if (isDirect && otherParticipant != null) {
+          displayName = otherParticipant.fullName;
+        } else {
+          displayName = row['name'] as String? ?? 'Chat';
+        }
+
+        final unreadCount = messages.where((m) => m.senderId != myId && !m.isRead).length;
+
         loadedConversations.add(ChatConversation(
           id: convId,
-          type: row['type'] as String? ?? 'direct',
-          name: row['name'] as String?,
-          participants: const [],
+          type: type,
+          name: displayName,
+          participants: otherParticipant != null ? [otherParticipant] : const [],
           lastMessage: lastMsg,
-          unreadCount: 0,
+          unreadCount: unreadCount,
           isArchived: isArchived,
         ));
       }
 
+      if (_disposed) return;
       state = state.copyWith(
         conversations: loadedConversations,
         messages: loadedMessages,
@@ -111,6 +252,7 @@ class ChatNotifier extends Notifier<ChatState> {
   }
 
   void _connectAndLoad(String userId) {
+    if (_disposed) return;
     if (!ApiClient.isCloudAvailable) {
       state = state.copyWith(isConnected: false);
       return;
@@ -162,16 +304,17 @@ class ChatNotifier extends Notifier<ChatState> {
       senderId: user.id,
       text: text.trim(),
       createdAt: now,
+      isRead: false,
     );
     
-    // Save locally
+    // Save locally: is_read is 0 so recipient sees it as unread message
     DatabaseHelper().saveMessage({
       'id': msgId,
       'conversation_id': conversationId,
       'sender_id': user.id,
       'text': text.trim(),
       'created_at': now,
-      'is_read': 1,
+      'is_read': 0,
     }).catchError((_) {});
 
     final messagesMap = Map<String, List<ChatMessage>>.from(state.messages);
@@ -179,19 +322,26 @@ class ChatNotifier extends Notifier<ChatState> {
     messagesMap[conversationId] = [...list, newMsg];
     
     // Update conversation lastMessage in list
-    final updatedConvos = state.conversations.map((c) {
-      if (c.id == conversationId) {
-        return ChatConversation(
-          id: c.id,
-          type: c.type,
-          name: c.name,
-          participants: c.participants,
-          lastMessage: newMsg,
-          unreadCount: c.unreadCount,
-        );
-      }
-      return c;
-    }).toList();
+    final hasConvo = state.conversations.any((c) => c.id == conversationId);
+    List<ChatConversation> updatedConvos;
+    if (hasConvo) {
+      updatedConvos = state.conversations.map((c) {
+        if (c.id == conversationId) {
+          return c.copyWith(lastMessage: newMsg);
+        }
+        return c;
+      }).toList();
+    } else {
+      final newConvo = ChatConversation(
+        id: conversationId,
+        type: conversationId.startsWith('dm_') ? 'direct' : 'group',
+        name: 'Chat',
+        participants: const [],
+        lastMessage: newMsg,
+        unreadCount: 0,
+      );
+      updatedConvos = [newConvo, ...state.conversations];
+    }
 
     state = state.copyWith(messages: messagesMap, conversations: updatedConvos);
     
@@ -285,8 +435,10 @@ class ChatNotifier extends Notifier<ChatState> {
   /// Loads all available app users for contacts and 1-on-1 conversations.
   Future<void> loadAvailableUsers() async {
     try {
+      if (_disposed) return;
       final db = DatabaseHelper();
       final rows = await db.getUsers();
+      if (_disposed) return;
       final currentUser = ref.read(authProvider);
 
       final users = rows.map((r) => ChatUser.fromJson(r)).toList();
@@ -294,6 +446,7 @@ class ChatNotifier extends Notifier<ChatState> {
           ? users.where((u) => u.id != currentUser.id).toList()
           : users;
 
+      if (_disposed) return;
       state = state.copyWith(availableUsers: filtered);
     } catch (_) {}
   }
@@ -303,6 +456,12 @@ class ChatNotifier extends Notifier<ChatState> {
     final currentUser = ref.read(authProvider);
     final myId = currentUser?.id ?? 'teacher_1';
 
+    // Canonical direct conversation ID: sorted so it is identical for both users
+    final sortedIds = [myId, targetUserId]..sort();
+    final canonicalId = 'dm_${sortedIds[0]}_${sortedIds[1]}';
+    final legacyId1 = 'dm_${myId}_$targetUserId';
+    final legacyId2 = 'dm_${targetUserId}_$myId';
+
     // Find the target user in availableUsers or database
     ChatUser? targetUser;
     final match = state.availableUsers.where((u) => u.id == targetUserId);
@@ -311,6 +470,7 @@ class ChatNotifier extends Notifier<ChatState> {
     } else {
       final db = DatabaseHelper();
       final rows = await db.getUsers();
+      if (_disposed) return null;
       final dbMatch = rows.where((r) => r['id'] == targetUserId);
       if (dbMatch.isNotEmpty) {
         targetUser = ChatUser.fromJson(dbMatch.first);
@@ -320,12 +480,12 @@ class ChatNotifier extends Notifier<ChatState> {
     final targetName = targetUser?.fullName ?? 'Direct Chat';
 
     // Check existing conversation in state
-    final convIdOption1 = 'dm_${myId}_$targetUserId';
-    final convIdOption2 = 'dm_${targetUserId}_$myId';
-
     for (final conv in state.conversations) {
-      if (conv.id == convIdOption1 || conv.id == convIdOption2) {
-        return conv;
+      if (conv.id == canonicalId || conv.id == legacyId1 || conv.id == legacyId2) {
+        return conv.copyWith(
+          name: targetName,
+          participants: targetUser != null ? [targetUser] : conv.participants,
+        );
       }
     }
 
@@ -334,32 +494,50 @@ class ChatNotifier extends Notifier<ChatState> {
     final existingRow = await dbHelper.getDirectConversation(myId, targetUserId);
     if (existingRow != null) {
       final existingId = existingRow['id'] as String;
+      final rawMessages = await dbHelper.getMessages(existingId);
+      if (_disposed) return null;
+      final messages = rawMessages.map((m) => ChatMessage(
+        id: m['id'] as String,
+        conversationId: existingId,
+        senderId: m['sender_id'] as String,
+        text: m['text'] as String,
+        createdAt: m['created_at'] as String,
+        isRead: (m['is_read'] as int? ?? 0) == 1,
+      )).toList();
+
       final existingConv = ChatConversation(
         id: existingId,
         type: 'direct',
-        name: existingRow['name'] as String? ?? targetName,
+        name: targetName,
         participants: targetUser != null ? [targetUser] : [],
-        lastMessage: null,
+        lastMessage: messages.isNotEmpty ? messages.last : null,
+        unreadCount: messages.where((m) => m.senderId != myId && !m.isRead).length,
       );
+
+      final updatedMessages = Map<String, List<ChatMessage>>.from(state.messages);
+      updatedMessages[existingId] = messages;
+
+      if (_disposed) return existingConv;
       state = state.copyWith(
         conversations: [existingConv, ...state.conversations.where((c) => c.id != existingId)],
+        messages: updatedMessages,
       );
       return existingConv;
     }
 
-    // Create new direct conversation
-    final convId = convIdOption1;
+    // Create new direct conversation using canonical ID
     final now = DateTime.now().toIso8601String();
 
     await dbHelper.saveConversation({
-      'id': convId,
+      'id': canonicalId,
       'type': 'direct',
       'name': targetName,
       'created_at': now,
     });
+    if (_disposed) return null;
 
     final newConv = ChatConversation(
-      id: convId,
+      id: canonicalId,
       type: 'direct',
       name: targetName,
       participants: targetUser != null ? [targetUser] : [],
@@ -367,8 +545,9 @@ class ChatNotifier extends Notifier<ChatState> {
       unreadCount: 0,
     );
 
+    if (_disposed) return newConv;
     state = state.copyWith(
-      conversations: [newConv, ...state.conversations.where((c) => c.id != convId)],
+      conversations: [newConv, ...state.conversations.where((c) => c.id != canonicalId)],
     );
 
     return newConv;
@@ -377,8 +556,10 @@ class ChatNotifier extends Notifier<ChatState> {
   Future<void> editConversationName(String conversationId, String newName) async {
     final trimmed = newName.trim();
     if (trimmed.isEmpty) return;
+    if (_disposed) return;
     final dbHelper = DatabaseHelper();
     await dbHelper.updateConversationName(conversationId, trimmed);
+    if (_disposed) return;
 
     final updated = state.conversations.map((c) {
       if (c.id == conversationId) {
@@ -387,12 +568,15 @@ class ChatNotifier extends Notifier<ChatState> {
       return c;
     }).toList();
 
+    if (_disposed) return;
     state = state.copyWith(conversations: updated);
   }
 
   Future<void> archiveConversation(String conversationId, {bool archive = true}) async {
+    if (_disposed) return;
     final dbHelper = DatabaseHelper();
     await dbHelper.setConversationArchived(conversationId, archive);
+    if (_disposed) return;
 
     final updated = state.conversations.map((c) {
       if (c.id == conversationId) {
@@ -401,17 +585,21 @@ class ChatNotifier extends Notifier<ChatState> {
       return c;
     }).toList();
 
+    if (_disposed) return;
     state = state.copyWith(conversations: updated);
   }
 
   Future<void> deleteConversation(String conversationId) async {
+    if (_disposed) return;
     final dbHelper = DatabaseHelper();
     await dbHelper.deleteConversation(conversationId);
+    if (_disposed) return;
 
     final updatedConversations = state.conversations.where((c) => c.id != conversationId).toList();
     final updatedMessages = Map<String, List<ChatMessage>>.from(state.messages);
     updatedMessages.remove(conversationId);
 
+    if (_disposed) return;
     state = state.copyWith(
       conversations: updatedConversations,
       messages: updatedMessages,
@@ -421,8 +609,10 @@ class ChatNotifier extends Notifier<ChatState> {
   Future<void> editMessage(String conversationId, String messageId, String newText) async {
     final trimmed = newText.trim();
     if (trimmed.isEmpty) return;
+    if (_disposed) return;
     final dbHelper = DatabaseHelper();
     await dbHelper.updateMessageText(messageId, trimmed);
+    if (_disposed) return;
 
     final currentMsgs = state.messages[conversationId] ?? [];
     final updatedMsgs = currentMsgs.map((m) {
@@ -449,6 +639,7 @@ class ChatNotifier extends Notifier<ChatState> {
       return c;
     }).toList();
 
+    if (_disposed) return;
     state = state.copyWith(
       messages: updatedMap,
       conversations: updatedConvos,
@@ -456,8 +647,10 @@ class ChatNotifier extends Notifier<ChatState> {
   }
 
   Future<void> deleteMessage(String conversationId, String messageId) async {
+    if (_disposed) return;
     final dbHelper = DatabaseHelper();
     await dbHelper.deleteMessage(messageId);
+    if (_disposed) return;
 
     final currentMsgs = state.messages[conversationId] ?? [];
     final updatedMsgs = currentMsgs.where((m) => m.id != messageId).toList();
@@ -472,6 +665,7 @@ class ChatNotifier extends Notifier<ChatState> {
       return c;
     }).toList();
 
+    if (_disposed) return;
     state = state.copyWith(
       messages: updatedMap,
       conversations: updatedConvos,

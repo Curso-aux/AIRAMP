@@ -3,6 +3,10 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/theme/theme_provider.dart';
+import '../../../core/database/database_helper.dart';
+import '../../teacher/data/teacher_repository.dart';
+import '../../teacher/presentation/components/create_quiz_dialog.dart';
+import '../../teacher/presentation/components/quiz_roster_dialog.dart';
 import '../data/admin_repository.dart';
 
 class SubjectDetailScreen extends ConsumerStatefulWidget {
@@ -238,7 +242,7 @@ class _SubjectDetailScreenState extends ConsumerState<SubjectDetailScreen> {
                   ),
                   const SizedBox(height: 16),
 
-                  // Add Topic button
+                  // Add Topic / Create Quiz button
                   if (_selectedTab == 0) ...[
                     SizedBox(
                       width: double.infinity,
@@ -253,6 +257,40 @@ class _SubjectDetailScreenState extends ConsumerState<SubjectDetailScreen> {
                         ),
                         label: const Text(
                           'Add Topic',
+                          style: TextStyle(fontWeight: FontWeight.bold),
+                        ),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Theme.of(context).colorScheme.primary,
+                          foregroundColor: Colors.black,
+                          padding: const EdgeInsets.symmetric(vertical: 14),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                          textStyle: const TextStyle(fontSize: 16),
+                        ),
+                      ),
+                    ),
+                  ] else ...[
+                    SizedBox(
+                      width: double.infinity,
+                      child: ElevatedButton.icon(
+                        onPressed: () {
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              fullscreenDialog: true,
+                              builder: (ctx) => CreateQuizDialog(
+                                subjectId: subjectId,
+                                subjectName: subjectName,
+                              ),
+                            ),
+                          );
+                        },
+                        icon: const Icon(
+                          Icons.assignment_add,
+                          color: Colors.black,
+                          size: 20,
+                        ),
+                        label: const Text(
+                          'Create & Assign Quiz',
                           style: TextStyle(fontWeight: FontWeight.bold),
                         ),
                         style: ElevatedButton.styleFrom(
@@ -313,33 +351,214 @@ class _SubjectDetailScreenState extends ConsumerState<SubjectDetailScreen> {
   }
 
   Widget _buildQuizzesList(List<Map<String, dynamic>> topics, int subjectId) {
-    if (topics.isEmpty) {
-      return Center(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(
-              Icons.help_outline,
-              size: 64,
-              color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.4).withValues(alpha: 0.4),
-            ),
-            const SizedBox(height: 16),
-            Text(
-              'No quizzes yet. Add your first quiz.',
-              style: TextStyle(color: AppTheme.textMuted, fontSize: 14),
-            ),
-          ],
-        ),
-      );
-    }
+    final quizzesAsync = ref.watch(subjectQuizzesProvider(subjectId));
 
-    return ListView.builder(
+    return ListView(
       padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
-      itemCount: topics.length,
-      itemBuilder: (context, index) {
-        final topic = topics[index];
-        return _QuizTopicCard(topic: topic, topicIndex: index + 1, subjectId: subjectId);
-      },
+      children: [
+        // Assigned Subject Quizzes Section
+        quizzesAsync.when(
+          loading: () => const Center(child: Padding(padding: EdgeInsets.all(16), child: CircularProgressIndicator())),
+          error: (e, _) => Padding(
+            padding: const EdgeInsets.all(8.0),
+            child: Text('Error loading quizzes: $e', style: TextStyle(color: AppTheme.error)),
+          ),
+          data: (quizzes) {
+            if (quizzes.isEmpty) {
+              return Container(
+                margin: const EdgeInsets.only(bottom: 16),
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: Theme.of(context).colorScheme.surface,
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: AppTheme.border),
+                ),
+                child: Row(
+                  children: [
+                    Icon(Icons.assignment_outlined, color: AppTheme.textMuted, size: 28),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text('No assigned quizzes created yet', style: TextStyle(fontWeight: FontWeight.bold, color: AppTheme.text, fontSize: 13)),
+                          Text('Tap "Create & Assign Quiz" above to author questions and assign them in bulk to students.', style: TextStyle(color: AppTheme.textSecondary, fontSize: 11)),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              );
+            }
+
+            return Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Text(
+                      'Assigned Quizzes (${quizzes.length})',
+                      style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: AppTheme.text),
+                    ),
+                    Text(
+                      'Live Roster & Submissions',
+                      style: TextStyle(fontSize: 11, color: AppTheme.textSecondary),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 8),
+                ...quizzes.map((quiz) {
+                  final qId = quiz['id'] as int;
+                  final title = quiz['title']?.toString() ?? 'Quiz';
+                  final qCount = quiz['question_count'] ?? 0;
+                  final assignedCount = quiz['assigned_count'] ?? 0;
+                  final compCount = quiz['completed_count'] ?? 0;
+                  final timeLimit = quiz['time_limit_minutes'] ?? 0;
+                  final passingScore = quiz['passing_score'] ?? 70;
+
+                  return Container(
+                    margin: const EdgeInsets.only(bottom: 12),
+                    padding: const EdgeInsets.all(16),
+                    decoration: BoxDecoration(
+                      color: Theme.of(context).colorScheme.surface,
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(color: AppTheme.primary.withValues(alpha: 0.3)),
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          children: [
+                            Container(
+                              padding: const EdgeInsets.all(8),
+                              decoration: BoxDecoration(
+                                color: AppTheme.primary.withValues(alpha: 0.15),
+                                borderRadius: BorderRadius.circular(8),
+                              ),
+                              child: Icon(Icons.quiz, color: AppTheme.primary, size: 20),
+                            ),
+                            const SizedBox(width: 12),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(title, style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: AppTheme.text)),
+                                  const SizedBox(height: 2),
+                                  Text(
+                                    '$qCount Questions · Pass: $passingScore% · ${timeLimit > 0 ? '$timeLimit mins' : 'No time limit'}',
+                                    style: TextStyle(fontSize: 11, color: AppTheme.textSecondary),
+                                  ),
+                                ],
+                              ),
+                            ),
+                            IconButton(
+                              icon: Icon(Icons.delete_outline, color: AppTheme.error, size: 20),
+                              onPressed: () => _confirmDeleteQuiz(context, qId, title, subjectId),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 12),
+                        Row(
+                          children: [
+                            Expanded(
+                              child: ClipRRect(
+                                borderRadius: BorderRadius.circular(4),
+                                child: LinearProgressIndicator(
+                                  value: assignedCount > 0 ? (compCount / assignedCount) : 0,
+                                  backgroundColor: AppTheme.border,
+                                  valueColor: AlwaysStoppedAnimation<Color>(AppTheme.success),
+                                  minHeight: 6,
+                                ),
+                              ),
+                            ),
+                            const SizedBox(width: 12),
+                            Text(
+                              '$compCount / $assignedCount completed',
+                              style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: AppTheme.text),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 10),
+                        Align(
+                          alignment: Alignment.centerRight,
+                          child: TextButton.icon(
+                            style: TextButton.styleFrom(
+                              foregroundColor: AppTheme.primary,
+                              visualDensity: VisualDensity.compact,
+                            ),
+                            onPressed: () {
+                              showDialog(
+                                context: context,
+                                builder: (ctx) => QuizRosterDialog(quizId: qId, quizTitle: title),
+                              );
+                            },
+                            icon: const Icon(Icons.people_outline, size: 16),
+                            label: const Text('View Roster & Scores', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12)),
+                          ),
+                        ),
+                      ],
+                    ),
+                  );
+                }),
+                const SizedBox(height: 16),
+                const Divider(),
+                const SizedBox(height: 12),
+              ],
+            );
+          },
+        ),
+
+        // Topic & Learning Outcome Quizzes Section
+        Text(
+          'Topic & Learning Outcome Quizzes',
+          style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: AppTheme.text),
+        ),
+        const SizedBox(height: 8),
+
+        if (topics.isEmpty)
+          Center(
+            child: Padding(
+              padding: const EdgeInsets.all(24.0),
+              child: Text(
+                'No curriculum topics created yet.',
+                style: TextStyle(color: AppTheme.textMuted, fontSize: 13),
+              ),
+            ),
+          )
+        else
+          ...topics.asMap().entries.map((entry) {
+            final topic = entry.value;
+            return _QuizTopicCard(topic: topic, topicIndex: entry.key + 1, subjectId: subjectId);
+          }),
+      ],
+    );
+  }
+
+  void _confirmDeleteQuiz(BuildContext context, int quizId, String title, int subjectId) {
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: Theme.of(context).colorScheme.surface,
+        title: Text('Delete Quiz', style: TextStyle(color: AppTheme.text)),
+        content: Text('Are you sure you want to delete "$title" and all its questions and student submissions?',
+            style: TextStyle(color: AppTheme.textSecondary)),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: Text('Cancel', style: TextStyle(color: AppTheme.textSecondary)),
+          ),
+          TextButton(
+            onPressed: () async {
+              await DatabaseHelper().deleteQuiz(quizId);
+              ref.invalidate(subjectQuizzesProvider(subjectId));
+              ref.invalidate(teacherDashboardProvider);
+              if (ctx.mounted) Navigator.pop(ctx);
+            },
+            child: Text('Delete', style: TextStyle(color: AppTheme.error)),
+          ),
+        ],
+      ),
     );
   }
 

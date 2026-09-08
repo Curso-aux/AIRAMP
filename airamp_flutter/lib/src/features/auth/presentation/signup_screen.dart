@@ -52,6 +52,9 @@ class _SignupScreenState extends ConsumerState<SignupScreen> {
             email: _emailController.text.trim(),
             password: _passwordController.text,
             role: 'student',
+            sectionCode: _invitationCodeController.text.trim().isEmpty
+                ? null
+                : _invitationCodeController.text.trim(),
           );
       final user = ref.read(authProvider);
       if (user != null && mounted) {

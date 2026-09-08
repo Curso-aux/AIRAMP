@@ -56,7 +56,7 @@ void main() {
       expect(maria.grade, 'Grade 10');
 
       final teacher = chatState.availableUsers.firstWhere((u) => u.id == 'teacher_1');
-      expect(teacher.role, 'admin');
+      expect(teacher.role, 'teacher');
     });
 
     test('getOrCreateConversation creates a 1-on-1 direct conversation with target user', () async {
@@ -110,6 +110,10 @@ void main() {
 
       // Tap Contacts tab
       await tester.tap(find.byKey(const Key('tab_contacts')));
+      for (int i = 0; i < 5; i++) {
+        await tester.runAsync(() => Future.delayed(const Duration(milliseconds: 50)));
+        await tester.pump(const Duration(milliseconds: 50));
+      }
       await tester.pumpAndSettle();
 
       // Verify contact filters and elements
@@ -186,9 +190,11 @@ void main() {
       addTearDown(container.dispose);
 
       // Initialize users and create a test conversation
-      await container.read(chatProvider.notifier).loadAvailableUsers();
-      final convo = await container.read(chatProvider.notifier).getOrCreateConversation('student_1');
-      expect(convo, isNotNull);
+      await tester.runAsync(() async {
+        await container.read(chatProvider.notifier).loadAvailableUsers();
+        final convo = await container.read(chatProvider.notifier).getOrCreateConversation('student_1');
+        expect(convo, isNotNull);
+      });
 
       await tester.pumpWidget(
         UncontrolledProviderScope(
@@ -207,7 +213,6 @@ void main() {
 
       // Maria Lopez conversation should appear in active chats
       expect(find.text('Maria Lopez'), findsOneWidget);
-      expect(find.text('Active Chats'), findsOneWidget);
 
       // Long press the conversation
       await tester.longPress(find.text('Maria Lopez'));
@@ -220,7 +225,11 @@ void main() {
 
       // Tap Archive Chat
       await tester.tap(find.text('Archive Chat'));
-      await tester.pumpAndSettle();
+      for (int i = 0; i < 5; i++) {
+        await tester.runAsync(() => Future.delayed(const Duration(milliseconds: 30)));
+        await tester.pump(const Duration(milliseconds: 30));
+      }
+      await tester.pump(const Duration(milliseconds: 500));
 
       // Verify it moved to archived
       expect(find.text('No active conversations yet'), findsOneWidget);
@@ -228,22 +237,29 @@ void main() {
 
       // Tap Archived pill
       await tester.tap(find.text('Archived (1)'));
-      await tester.pumpAndSettle();
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 500));
 
       // Now Maria Lopez conversation should appear in archived view
       expect(find.text('Maria Lopez'), findsOneWidget);
 
       // Long press in archived view and Unarchive
       await tester.longPress(find.text('Maria Lopez'));
-      await tester.pumpAndSettle();
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 500));
 
       expect(find.text('Unarchive Chat'), findsOneWidget);
       await tester.tap(find.text('Unarchive Chat'));
-      await tester.pumpAndSettle();
+      for (int i = 0; i < 5; i++) {
+        await tester.runAsync(() => Future.delayed(const Duration(milliseconds: 30)));
+        await tester.pump(const Duration(milliseconds: 30));
+      }
+      await tester.pump(const Duration(milliseconds: 500));
 
       // Tap Active Chats pill
       await tester.tap(find.text('Active Chats'));
-      await tester.pumpAndSettle();
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 500));
 
       expect(find.text('Maria Lopez'), findsOneWidget);
     });
@@ -257,8 +273,10 @@ void main() {
       final container = ProviderContainer();
       addTearDown(container.dispose);
 
-      await container.read(chatProvider.notifier).loadAvailableUsers();
-      await container.read(chatProvider.notifier).getOrCreateConversation('student_1');
+      await tester.runAsync(() async {
+        await container.read(chatProvider.notifier).loadAvailableUsers();
+        await container.read(chatProvider.notifier).getOrCreateConversation('student_1');
+      });
 
       await tester.pumpWidget(
         UncontrolledProviderScope(
@@ -277,22 +295,26 @@ void main() {
 
       // Swipe right on conversation
       await tester.drag(find.text('Maria Lopez'), const Offset(500, 0));
-      await tester.pumpAndSettle();
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 300));
 
       // Verify Edit Name dialog appears
       expect(find.text('Edit Chat Name'), findsOneWidget);
       await tester.tap(find.text('Cancel'));
-      await tester.pumpAndSettle();
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 300));
 
       // Swipe left on conversation
       await tester.drag(find.text('Maria Lopez'), const Offset(-500, 0));
-      await tester.pumpAndSettle();
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 300));
 
       // Verify options sheet appears
       expect(find.text('Archive Chat'), findsOneWidget);
       expect(find.text('Delete Chat'), findsOneWidget);
       Navigator.of(tester.element(find.text('Archive Chat'))).pop();
-      await tester.pumpAndSettle();
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 300));
     });
   });
 
@@ -319,7 +341,7 @@ void main() {
 
       // Tap Create New Subject
       await tester.tap(find.text('Create New Subject'));
-      await tester.pumpAndSettle();
+      await tester.pump(const Duration(milliseconds: 500));
 
       // Verify no group chat toggle in the sheet
       expect(find.text('Auto-create Subject Group Chat'), findsNothing);

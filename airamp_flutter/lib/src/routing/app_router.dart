@@ -26,6 +26,9 @@ import '../features/admin/presentation/web/admin_web_students_screen.dart';
 import '../features/admin/presentation/web/admin_web_keys_screen.dart';
 import '../features/admin/presentation/web/admin_web_announcements_screen.dart';
 import '../features/student/presentation/student_scaffold.dart';
+import '../features/teacher/presentation/teacher_scaffold.dart';
+import '../features/teacher/presentation/teacher_dashboard_screen.dart';
+import '../features/teacher/presentation/teacher_students_screen.dart';
 import '../features/chat/presentation/chat_list_screen.dart';
 import '../features/chat/presentation/chat_room_screen.dart';
 import '../features/quiz/presentation/quiz_screen.dart';
@@ -125,6 +128,71 @@ final routerProvider = Provider<GoRouter>((ref) {
             routes: [
               GoRoute(
                 path: '/student/profile',
+                builder: (context, state) => const StudentProfileScreen(),
+              ),
+            ],
+          ),
+        ],
+      ),
+      // Teacher Routes with Bottom Navigation
+      StatefulShellRoute.indexedStack(
+        builder: (context, state, navigationShell) {
+          return TeacherScaffold(navigationShell: navigationShell);
+        },
+        branches: [
+          StatefulShellBranch(
+            routes: [
+              GoRoute(
+                path: '/teacher/dashboard',
+                builder: (context, state) => const TeacherDashboardScreen(),
+              ),
+            ],
+          ),
+          StatefulShellBranch(
+            routes: [
+              GoRoute(
+                path: '/teacher/subjects',
+                builder: (context, state) => const SubjectsMgmtScreen(),
+                routes: [
+                  GoRoute(
+                    path: ':id',
+                    builder: (context, state) {
+                      final id = state.pathParameters['id']!;
+                      return SubjectDetailScreen(subjectId: id);
+                    },
+                  ),
+                ],
+              ),
+            ],
+          ),
+          StatefulShellBranch(
+            routes: [
+              GoRoute(
+                path: '/teacher/scores',
+                builder: (context, state) => const ScoresScreen(),
+              ),
+            ],
+          ),
+          StatefulShellBranch(
+            routes: [
+              GoRoute(
+                path: '/teacher/students',
+                builder: (context, state) => const TeacherStudentsScreen(),
+              ),
+            ],
+          ),
+          StatefulShellBranch(
+            routes: [
+              GoRoute(
+                path: '/teacher/chat',
+                builder: (context, state) => const ChatListScreen(),
+              ),
+            ],
+          ),
+          StatefulShellBranch(
+            routes: [
+              GoRoute(
+                path: '/teacher/profile',
                 builder: (context, state) => const StudentProfileScreen(),
               ),
             ],
@@ -294,6 +362,8 @@ final routerProvider = Provider<GoRouter>((ref) {
       if (isAuth && isLoginRoute) {
         if (authState.role == 'admin' || authState.role == 'super_admin') {
           return kIsWeb ? '/admin/dashboard' : '/login';
+        } else if (authState.role == 'teacher') {
+          return '/teacher/dashboard';
         } else {
           return kIsWeb ? '/' : '/student/home';
         }
@@ -302,14 +372,23 @@ final routerProvider = Provider<GoRouter>((ref) {
       // 4. Role-based Route Guard
       if (isAuth) {
         final isAdmin = authState.role == 'admin' || authState.role == 'super_admin';
-        final isNonAdmin = !isAdmin; // student or teacher
+        final isTeacher = authState.role == 'teacher';
+        final isStudent = authState.role == 'student';
 
-        if (isAdmin && matched.startsWith('/student')) {
+        if (isAdmin && (matched.startsWith('/student') || matched.startsWith('/teacher'))) {
           return kIsWeb ? '/admin/dashboard' : '/login';
         }
 
-        if (isNonAdmin && matched.startsWith('/admin') && matched != '/admin/login') {
-          return kIsWeb ? '/admin/login' : '/student/home';
+        if (!isAdmin && matched.startsWith('/admin') && matched != '/admin/login') {
+          return isTeacher ? '/teacher/dashboard' : (kIsWeb ? '/admin/login' : '/student/home');
+        }
+
+        if (isStudent && matched.startsWith('/teacher')) {
+          return '/student/home';
+        }
+
+        if (isTeacher && matched.startsWith('/student') && !matched.startsWith('/student/course')) {
+          return '/teacher/dashboard';
         }
       }
 

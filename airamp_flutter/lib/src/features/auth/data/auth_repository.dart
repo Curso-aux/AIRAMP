@@ -63,6 +63,8 @@ class AuthRepository {
         'email': user['email'],
         'role': role,
         'fullName': user['full_name'],
+        'section': user['section'],
+        'grade': user['grade'],
       },
       'session': token,
     };
@@ -73,6 +75,7 @@ class AuthRepository {
     required String email,
     required String password,
     required String role,
+    String? sectionCode,
   }) async {
     final db = await DatabaseHelper().database;
 
@@ -87,15 +90,47 @@ class AuthRepository {
     }
 
     final id = '${role}_${DateTime.now().millisecondsSinceEpoch}';
-
-    await db.insert('users', {
+    final userData = {
       'id': id,
       'email': email.trim(),
       'password': password,
       'role': role,
       'full_name': fullName.trim(),
       'created_at': DateTime.now().toIso8601String(),
-    });
+    };
+
+    // If student and section code provided, validate and bind
+    String? assignedSection;
+    String? assignedGrade;
+    if (role == 'student' && sectionCode != null && sectionCode.trim().isNotEmpty) {
+      final codeTrimmed = sectionCode.trim();
+      final linkRow = await db.query('reg_links', where: 'code = ?', whereArgs: [codeTrimmed]);
+      if (linkRow.isNotEmpty) {
+        assignedSection = linkRow.first['section'] as String?;
+        if (assignedSection != null && assignedSection.isNotEmpty) {
+          final secRow = await db.query('sections', where: 'name = ?', whereArgs: [assignedSection]);
+          if (secRow.isNotEmpty) {
+            assignedGrade = secRow.first['grade'] as String?;
+          }
+        }
+      }
+    }
+
+    if (assignedSection != null) {
+      userData['section'] = assignedSection;
+    }
+    if (assignedGrade != null) {
+      userData['grade'] = assignedGrade;
+    }
+
+    await db.insert('users', userData);
+
+    if (role == 'student' && sectionCode != null && sectionCode.trim().isNotEmpty) {
+      await DatabaseHelper().validateAndConsumeRegistrationKey(sectionCode.trim(), id);
+      if (assignedSection != null && assignedSection.isNotEmpty) {
+        await DatabaseHelper().autoEnrollStudentBySection(id, assignedSection, assignedGrade ?? '');
+      }
+    }
 
     return {
       'user': {
@@ -103,6 +138,8 @@ class AuthRepository {
         'email': email.trim(),
         'role': role,
         'fullName': fullName.trim(),
+        'section': assignedSection,
+        'grade': assignedGrade,
       }
     };
   }

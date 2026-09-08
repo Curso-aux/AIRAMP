@@ -14,7 +14,8 @@ String _getAvatarText(String name) {
 /// Helper to get a human-readable role label.
 String _getRoleLabel(String role) {
   if (role == 'super_admin') return 'Super Admin';
-  if (role == 'admin') return 'Teacher';
+  if (role == 'admin') return 'Administrator';
+  if (role == 'teacher') return 'Teacher';
   return 'Student';
 }
 
@@ -65,7 +66,7 @@ class _NewConversationModalState extends ConsumerState<NewConversationModal>
     var list = users;
 
     if (_selectedRole == 'teacher') {
-      list = list.where((u) => u.role == 'admin' || u.role == 'super_admin').toList();
+      list = list.where((u) => u.role == 'teacher' || u.role == 'admin' || u.role == 'super_admin').toList();
     } else if (_selectedRole == 'student') {
       list = list.where((u) => u.role == 'student').toList();
     }
@@ -391,7 +392,7 @@ class _NewConversationModalState extends ConsumerState<NewConversationModal>
                   itemBuilder: (context, index) {
                     final user = users[index];
                     final isCreating = _creatingChatUserId == user.id;
-                    final isTeacher = user.role == 'admin' || user.role == 'super_admin';
+                    final isTeacher = user.role == 'teacher';
 
                     return InkWell(
                       onTap: isCreating ? null : () => _handleStartChat(user),

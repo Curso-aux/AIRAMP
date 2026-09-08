@@ -10,6 +10,8 @@ class User {
   final String fullName;
   final String username;
   final String? profileImage;
+  final String? section;
+  final String? grade;
 
   User({
     required this.id,
@@ -18,7 +20,13 @@ class User {
     required this.fullName,
     this.username = '',
     this.profileImage,
+    this.section,
+    this.grade,
   });
+
+  bool get isTeacher => role == 'teacher';
+  bool get isStudent => role == 'student';
+  bool get isAdmin => role == 'admin' || role == 'super_admin';
 
   factory User.fromJson(Map<String, dynamic> json) {
     return User(
@@ -28,6 +36,8 @@ class User {
       fullName: json['fullName'] ?? '',
       username: json['username'] ?? json['fullName'] ?? '',
       profileImage: json['profileImage'],
+      section: json['section'],
+      grade: json['grade'],
     );
   }
 
@@ -38,6 +48,8 @@ class User {
     String? email,
     String? profileImage,
     String? role,
+    String? section,
+    String? grade,
   }) {
     return User(
       id: id,
@@ -46,6 +58,8 @@ class User {
       fullName: fullName ?? this.fullName,
       username: username ?? this.username,
       profileImage: profileImage ?? this.profileImage,
+      section: section ?? this.section,
+      grade: grade ?? this.grade,
     );
   }
 }
@@ -108,6 +122,7 @@ class AuthNotifier extends Notifier<User?> {
     required String email,
     required String password,
     required String role,
+    String? sectionCode,
   }) async {
     final repository = ref.read(authRepositoryProvider);
     isLoading = true;
@@ -118,6 +133,7 @@ class AuthNotifier extends Notifier<User?> {
         email: email,
         password: password,
         role: role,
+        sectionCode: sectionCode,
       );
       final user = User.fromJson(data['user']);
       state = user;

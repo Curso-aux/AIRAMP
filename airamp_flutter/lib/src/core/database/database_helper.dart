@@ -35,7 +35,7 @@ class DatabaseHelper {
         databaseFactory = databaseFactoryFfiWebNoWebWorker;
         return await openDatabase(
           'airamp_local.db',
-          version: 15,
+          version: 16,
           onCreate: _onCreate,
           onUpgrade: _onUpgrade,
           onOpen: (db) async {
@@ -50,7 +50,7 @@ class DatabaseHelper {
 
     return await openDatabase(
       path,
-      version: 15,
+      version: 16,
       onCreate: _onCreate,
       onUpgrade: _onUpgrade,
       onOpen: (db) async {
@@ -191,7 +191,8 @@ class DatabaseHelper {
     await db.execute('''
       CREATE TABLE questions (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
-        lo_id INTEGER NOT NULL,
+        lo_id INTEGER,
+        quiz_id INTEGER,
         question_text TEXT NOT NULL,
         option_a TEXT NOT NULL,
         option_b TEXT NOT NULL,
@@ -199,7 +200,8 @@ class DatabaseHelper {
         option_d TEXT NOT NULL,
         correct_option TEXT NOT NULL,
         created_at TEXT NOT NULL,
-        FOREIGN KEY (lo_id) REFERENCES learning_outcomes (id) ON DELETE CASCADE
+        FOREIGN KEY (lo_id) REFERENCES learning_outcomes (id) ON DELETE CASCADE,
+        FOREIGN KEY (quiz_id) REFERENCES quizzes (id) ON DELETE CASCADE
       )
     ''');
 
@@ -299,12 +301,51 @@ class DatabaseHelper {
       )
     ''');
 
+    // Quizzes Table
+    await db.execute('''
+      CREATE TABLE IF NOT EXISTS quizzes (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        title TEXT NOT NULL,
+        description TEXT,
+        subject_id INTEGER NOT NULL,
+        lo_id INTEGER,
+        teacher_id TEXT NOT NULL,
+        teacher_name TEXT,
+        time_limit_minutes INTEGER DEFAULT 0,
+        passing_score INTEGER DEFAULT 70,
+        status TEXT DEFAULT 'published',
+        due_date TEXT,
+        created_at TEXT NOT NULL,
+        FOREIGN KEY (subject_id) REFERENCES subjects (id) ON DELETE CASCADE
+      )
+    ''');
+
+    // Quiz Assignments Table
+    await db.execute('''
+      CREATE TABLE IF NOT EXISTS quiz_assignments (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        quiz_id INTEGER NOT NULL,
+        student_id TEXT NOT NULL,
+        assigned_at TEXT NOT NULL,
+        due_date TEXT,
+        status TEXT DEFAULT 'pending',
+        score INTEGER DEFAULT 0,
+        total_questions INTEGER DEFAULT 0,
+        percentage REAL DEFAULT 0.0,
+        completed_at TEXT,
+        UNIQUE(quiz_id, student_id),
+        FOREIGN KEY (quiz_id) REFERENCES quizzes (id) ON DELETE CASCADE,
+        FOREIGN KEY (student_id) REFERENCES users (id) ON DELETE CASCADE
+      )
+    ''');
+
     // Quiz Attempts Table
     await db.execute('''
       CREATE TABLE IF NOT EXISTS quiz_attempts (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         student_id TEXT NOT NULL,
-        lo_id INTEGER NOT NULL,
+        lo_id INTEGER,
+        quiz_id INTEGER,
         subject_id INTEGER NOT NULL,
         score INTEGER NOT NULL,
         total_questions INTEGER NOT NULL,
@@ -637,6 +678,54 @@ class DatabaseHelper {
       } catch (_) {}
       await _seedInitialData(db);
     }
+
+    if (oldVersion < 16) {
+      await db.execute('''
+        CREATE TABLE IF NOT EXISTS quizzes (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          title TEXT NOT NULL,
+          description TEXT,
+          subject_id INTEGER NOT NULL,
+          lo_id INTEGER,
+          teacher_id TEXT NOT NULL,
+          teacher_name TEXT,
+          time_limit_minutes INTEGER DEFAULT 0,
+          passing_score INTEGER DEFAULT 70,
+          status TEXT DEFAULT 'published',
+          due_date TEXT,
+          created_at TEXT NOT NULL,
+          FOREIGN KEY (subject_id) REFERENCES subjects (id) ON DELETE CASCADE
+        )
+      ''');
+
+      await db.execute('''
+        CREATE TABLE IF NOT EXISTS quiz_assignments (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          quiz_id INTEGER NOT NULL,
+          student_id TEXT NOT NULL,
+          assigned_at TEXT NOT NULL,
+          due_date TEXT,
+          status TEXT DEFAULT 'pending',
+          score INTEGER DEFAULT 0,
+          total_questions INTEGER DEFAULT 0,
+          percentage REAL DEFAULT 0.0,
+          completed_at TEXT,
+          UNIQUE(quiz_id, student_id),
+          FOREIGN KEY (quiz_id) REFERENCES quizzes (id) ON DELETE CASCADE,
+          FOREIGN KEY (student_id) REFERENCES users (id) ON DELETE CASCADE
+        )
+      ''');
+
+      try {
+        await db.execute('ALTER TABLE questions ADD COLUMN quiz_id INTEGER');
+      } catch (_) {}
+
+      try {
+        await db.execute('ALTER TABLE quiz_attempts ADD COLUMN quiz_id INTEGER');
+      } catch (_) {}
+
+      await _seedInitialData(db);
+    }
   }
 
   Future<String?> getSetting(String key) async {
@@ -707,6 +796,23 @@ class DatabaseHelper {
 
   Future<List<Map<String, dynamic>>> getMessages(String conversationId) async {
     final db = await database;
+    if (conversationId.startsWith('dm_')) {
+      final parts = conversationId.substring(3).split('_');
+      String? altId;
+      if (parts.length == 4 && parts[0] == 'teacher' && parts[2] == 'student') {
+        altId = 'dm_student_${parts[3]}_teacher_${parts[1]}';
+      } else if (parts.length == 4 && parts[0] == 'student' && parts[2] == 'teacher') {
+        altId = 'dm_teacher_${parts[3]}_student_${parts[1]}';
+      }
+      if (altId != null) {
+        return await db.query(
+          'messages',
+          where: 'conversation_id = ? OR conversation_id = ?',
+          whereArgs: [conversationId, altId],
+          orderBy: 'created_at ASC',
+        );
+      }
+    }
     return await db.query(
       'messages',
       where: 'conversation_id = ?',
@@ -718,6 +824,25 @@ class DatabaseHelper {
   Future<void> saveMessage(Map<String, dynamic> msg) async {
     final db = await database;
     await db.insert('messages', msg, conflictAlgorithm: ConflictAlgorithm.replace);
+  }
+
+  Future<void> markMessagesAsRead(String conversationId, {String? excludeSenderId}) async {
+    final db = await database;
+    if (excludeSenderId != null) {
+      await db.update(
+        'messages',
+        {'is_read': 1},
+        where: 'conversation_id = ? AND sender_id != ? AND is_read = 0',
+        whereArgs: [conversationId, excludeSenderId],
+      );
+    } else {
+      await db.update(
+        'messages',
+        {'is_read': 1},
+        where: 'conversation_id = ? AND is_read = 0',
+        whereArgs: [conversationId],
+      );
+    }
   }
 
   Future<Map<String, dynamic>?> getLastMessage(String conversationId) async {
@@ -741,15 +866,42 @@ class DatabaseHelper {
 
   Future<Map<String, dynamic>?> getDirectConversation(String userId1, String userId2) async {
     final db = await database;
+    final ids = [userId1, userId2]..sort();
+    final canonicalId = 'dm_${ids[0]}_${ids[1]}';
     final id1 = 'dm_${userId1}_$userId2';
     final id2 = 'dm_${userId2}_$userId1';
     final res = await db.query(
       'conversations',
-      where: 'id = ? OR id = ?',
-      whereArgs: [id1, id2],
+      where: 'id = ? OR id = ? OR id = ?',
+      whereArgs: [canonicalId, id1, id2],
       limit: 1,
     );
     return res.isNotEmpty ? res.first : null;
+  }
+
+  Future<void> normalizeDirectConversations() async {
+    final db = await database;
+    final rows = await db.query('conversations', where: "id LIKE 'dm_%'");
+    final userRows = await db.query('users');
+    final userIds = userRows.map((u) => u['id'] as String).toList();
+
+    for (final row in rows) {
+      final id = row['id'] as String;
+      final matchingUsers = userIds.where((uId) => id.contains(uId)).toList();
+      if (matchingUsers.length == 2) {
+        final sorted = [matchingUsers[0], matchingUsers[1]]..sort();
+        final canonicalId = 'dm_${sorted[0]}_${sorted[1]}';
+        if (id != canonicalId) {
+          final existingCanonical = await db.query('conversations', where: 'id = ?', whereArgs: [canonicalId]);
+          if (existingCanonical.isEmpty) {
+            await db.update('conversations', {'id': canonicalId}, where: 'id = ?', whereArgs: [id]);
+          } else {
+            await db.delete('conversations', where: 'id = ?', whereArgs: [id]);
+          }
+          await db.update('messages', {'conversation_id': canonicalId}, where: 'conversation_id = ?', whereArgs: [id]);
+        }
+      }
+    }
   }
 
   // ── Curriculum, Enrollment, Progress & Quizzes ─────────────
@@ -841,6 +993,7 @@ class DatabaseHelper {
   Future<void> recordQuizAttempt({
     required String studentId,
     required int loId,
+    int? quizId,
     required int subjectId,
     required int score,
     required int totalQuestions,
@@ -854,6 +1007,7 @@ class DatabaseHelper {
     await db.insert('quiz_attempts', {
       'student_id': studentId,
       'lo_id': loId,
+      'quiz_id': quizId,
       'subject_id': subjectId,
       'score': score,
       'total_questions': totalQuestions,
@@ -863,7 +1017,17 @@ class DatabaseHelper {
       'attempted_at': now,
     });
 
-    if (isPassed) {
+    if (quizId != null && quizId > 0) {
+      await completeQuizAssignment(
+        quizId: quizId,
+        studentId: studentId,
+        score: score,
+        totalQuestions: totalQuestions,
+        percentage: percentage,
+      );
+    }
+
+    if (isPassed && loId > 0) {
       await db.insert(
         'student_progress',
         {
@@ -883,19 +1047,29 @@ class DatabaseHelper {
     final db = await database;
     if (subjectId != null) {
       return await db.rawQuery('''
-        SELECT qa.*, s.name as subject_name, s.subject_code, lo.title as lo_title, lo.passing_score
+        SELECT qa.*, 
+               s.name as subject_name, 
+               s.subject_code, 
+               COALESCE(qz.title, lo.title, 'Quiz Assessment') as lo_title, 
+               COALESCE(qz.passing_score, lo.passing_score, 70) as passing_score
         FROM quiz_attempts qa
         JOIN subjects s ON qa.subject_id = s.id
-        JOIN learning_outcomes lo ON qa.lo_id = lo.id
+        LEFT JOIN learning_outcomes lo ON qa.lo_id = lo.id
+        LEFT JOIN quizzes qz ON qa.quiz_id = qz.id
         WHERE qa.student_id = ? AND qa.subject_id = ?
         ORDER BY qa.attempted_at DESC
       ''', [studentId, subjectId]);
     }
     return await db.rawQuery('''
-      SELECT qa.*, s.name as subject_name, s.subject_code, lo.title as lo_title, lo.passing_score
+      SELECT qa.*, 
+             s.name as subject_name, 
+             s.subject_code, 
+             COALESCE(qz.title, lo.title, 'Quiz Assessment') as lo_title, 
+             COALESCE(qz.passing_score, lo.passing_score, 70) as passing_score
       FROM quiz_attempts qa
       JOIN subjects s ON qa.subject_id = s.id
-      JOIN learning_outcomes lo ON qa.lo_id = lo.id
+      LEFT JOIN learning_outcomes lo ON qa.lo_id = lo.id
+      LEFT JOIN quizzes qz ON qa.quiz_id = qz.id
       WHERE qa.student_id = ?
       ORDER BY qa.attempted_at DESC
     ''', [studentId]);
@@ -972,12 +1146,13 @@ class DatabaseHelper {
              u.grade as student_grade,
              s.name as subject_name, 
              s.subject_code, 
-             lo.title as lo_title, 
-             lo.passing_score
+             COALESCE(qz.title, lo.title, 'Quiz Assessment') as lo_title, 
+             COALESCE(qz.passing_score, lo.passing_score, 70) as passing_score
       FROM quiz_attempts qa
       JOIN users u ON qa.student_id = u.id
       JOIN subjects s ON qa.subject_id = s.id
-      JOIN learning_outcomes lo ON qa.lo_id = lo.id
+      LEFT JOIN learning_outcomes lo ON qa.lo_id = lo.id
+      LEFT JOIN quizzes qz ON qa.quiz_id = qz.id
       ORDER BY qa.attempted_at DESC
     ''');
 
@@ -1524,6 +1699,79 @@ class DatabaseHelper {
         whereArgs: [''],
       );
     } catch (_) {}
+
+    // Seed Initial Assigned Quiz if none exists
+    try {
+      final existingQuizzes = await db.query('quizzes');
+      if (existingQuizzes.isEmpty) {
+        final subjects = await db.query('subjects', where: 'subject_code = ?', whereArgs: ['CS101']);
+        if (subjects.isNotEmpty) {
+          final cs101Id = subjects.first['id'] as int;
+          final quizId = await db.insert('quizzes', {
+            'title': 'CS101: Midterm Quiz Assessment',
+            'description': 'Comprehensive assessment covering Dart language fundamentals, sound null safety, and OOP concepts.',
+            'subject_id': cs101Id,
+            'lo_id': null,
+            'teacher_id': 'teacher_1',
+            'teacher_name': 'Sir John Reyes',
+            'time_limit_minutes': 15,
+            'passing_score': 70,
+            'status': 'published',
+            'due_date': DateTime.now().add(const Duration(days: 7)).toIso8601String(),
+            'created_at': DateTime.now().subtract(const Duration(hours: 4)).toIso8601String(),
+          });
+
+          await db.insert('questions', {
+            'lo_id': 0,
+            'quiz_id': quizId,
+            'question_text': 'What is the primary role of the "main()" function in a Dart and Flutter application?',
+            'option_a': 'To declare build-time styles',
+            'option_b': 'Entry point where program execution begins',
+            'option_c': 'To connect to local SQLite database',
+            'option_d': 'To configure HTTP headers',
+            'correct_option': 'B',
+            'created_at': DateTime.now().toIso8601String(),
+          });
+
+          await db.insert('questions', {
+            'lo_id': 0,
+            'quiz_id': quizId,
+            'question_text': 'Which keyword is used in Dart to declare a compile-time constant?',
+            'option_a': 'final',
+            'option_b': 'const',
+            'option_c': 'static',
+            'option_d': 'var',
+            'correct_option': 'B',
+            'created_at': DateTime.now().toIso8601String(),
+          });
+
+          await db.insert('questions', {
+            'lo_id': 0,
+            'quiz_id': quizId,
+            'question_text': 'In Flutter, what kind of widget should you use when parts of the UI need to change dynamically?',
+            'option_a': 'StatelessWidget',
+            'option_b': 'StatefulWidget',
+            'option_c': 'InheritedWidget',
+            'option_d': 'ImmutableWidget',
+            'correct_option': 'B',
+            'created_at': DateTime.now().toIso8601String(),
+          });
+
+          // Assign to student_1 (Maria Lopez)
+          await db.insert('quiz_assignments', {
+            'quiz_id': quizId,
+            'student_id': 'student_1',
+            'assigned_at': DateTime.now().subtract(const Duration(hours: 4)).toIso8601String(),
+            'due_date': DateTime.now().add(const Duration(days: 7)).toIso8601String(),
+            'status': 'pending',
+            'score': 0,
+            'total_questions': 3,
+            'percentage': 0.0,
+            'completed_at': null,
+          });
+        }
+      }
+    } catch (_) {}
   }
 
   // ── Sections Management (Admin) ──────────────────────────
@@ -1569,7 +1817,7 @@ class DatabaseHelper {
     );
   }
 
-  Future<int> assignTeacherToSubject(int subjectId, String teacherId, String teacherName) async {
+    Future<int> assignTeacherToSubject(int subjectId, String teacherId, String teacherName) async {
     final db = await database;
     return await db.update(
       'subjects',
@@ -1580,6 +1828,450 @@ class DatabaseHelper {
       where: 'id = ?',
       whereArgs: [subjectId],
     );
+  }
+
+  // ── Component 1: New Database Methods ──────────────────────
+
+  /// Returns exact student counts: total, active, unassigned, and breakdown per grade/section
+  Future<Map<String, dynamic>> getExactStudentCounts() async {
+    final db = await database;
+    final users = await db.query('users', where: "role = 'student'");
+    final total = users.length;
+    final active = users.where((u) => (u['section'] as String?)?.isNotEmpty == true).length;
+    final unassigned = total - active;
+
+    final gradeCounts = <String, int>{};
+    final sectionCounts = <String, int>{};
+    for (final u in users) {
+      final grade = (u['grade'] as String?)?.trim();
+      final section = (u['section'] as String?)?.trim();
+      if (grade != null && grade.isNotEmpty) {
+        gradeCounts[grade] = (gradeCounts[grade] ?? 0) + 1;
+      }
+      if (section != null && section.isNotEmpty) {
+        sectionCounts[section] = (sectionCounts[section] ?? 0) + 1;
+      }
+    }
+    return {
+      'total': total,
+      'active': active,
+      'unassigned': unassigned,
+      'gradeCounts': gradeCounts,
+      'sectionCounts': sectionCounts,
+    };
+  }
+
+  /// Teacher dashboard stats: subjects, unique students, attempts, pass rate, avg score, recent attempts
+  Future<Map<String, dynamic>> getTeacherDashboardStats(String teacherId) async {
+    final db = await database;
+    final subjects = await db.query('subjects', where: 'teacher_id = ?', whereArgs: [teacherId]);
+    final totalSubjects = subjects.length;
+    final subjectIds = subjects.map((s) => s['id'] as int).toList();
+
+    int totalStudents = 0;
+    int totalAttempts = 0;
+    int passedAttempts = 0;
+    double totalPct = 0.0;
+
+    final enrollments = await db.query('enrollments');
+    final attempts = await db.query('quiz_attempts');
+    final attemptsForTeacher = attempts.where((a) => subjectIds.contains(a['subject_id'])).toList();
+
+    if (subjectIds.isNotEmpty) {
+      final studentIds = <String>{};
+      for (final e in enrollments) {
+        if (subjectIds.contains(e['subject_id'])) {
+          studentIds.add(e['student_id'] as String);
+        }
+      }
+      totalStudents = studentIds.length;
+      totalAttempts = attemptsForTeacher.length;
+      passedAttempts = attemptsForTeacher.where((a) => (a['is_passed'] as int?) == 1).length;
+      if (totalAttempts > 0) {
+        totalPct = attemptsForTeacher.map((a) => (a['percentage'] as num?)?.toDouble() ?? 0.0).reduce((a, b) => a + b) / totalAttempts;
+      }
+    }
+
+    // Recent 10 attempts
+    final recent = await db.rawQuery('''
+      SELECT qa.*, u.full_name as student_name, s.name as subject_name
+      FROM quiz_attempts qa
+      JOIN users u ON qa.student_id = u.id
+      JOIN subjects s ON qa.subject_id = s.id
+      WHERE s.teacher_id = ?
+      ORDER BY qa.attempted_at DESC
+      LIMIT 10
+    ''', [teacherId]);
+
+    return {
+      'totalSubjects': totalSubjects,
+      'totalStudents': totalStudents,
+      'totalAttempts': totalAttempts,
+      'passedAttempts': passedAttempts,
+      'passRate': totalAttempts > 0 ? ((passedAttempts / totalAttempts) * 100).round() : 0,
+      'avgScore': totalPct.round(),
+      'recentAttempts': recent,
+    };
+  }
+
+  /// Student roster for teacher with progress per subject
+  Future<List<Map<String, dynamic>>> getStudentsForTeacher(String teacherId, {String? section, String? query}) async {
+    final db = await database;
+    final subjects = await getSubjectsForTeacher(teacherId);
+    final subjectIds = subjects.map((s) => s['id'] as int).toList();
+    if (subjectIds.isEmpty) return [];
+
+    final enrollments = await db.query('enrollments', where: 'subject_id IN (${subjectIds.map((_) => '?').join(',')})', whereArgs: subjectIds);
+    final studentIds = enrollments.map((e) => e['student_id'] as String).toSet().toList();
+    if (studentIds.isEmpty) return [];
+
+    final students = await db.query('users', where: 'id IN (${studentIds.map((_) => '?').join(',')})', whereArgs: studentIds);
+    final list = <Map<String, dynamic>>[];
+    for (final s in students) {
+      final sid = s['id'] as String;
+      final sec = (s['section'] as String?) ?? '';
+      if (section != null && section.isNotEmpty && section != 'All Sections' && sec != section) continue;
+      final name = (s['full_name'] as String?) ?? '';
+      final email = (s['email'] as String?) ?? '';
+      if (query != null && query.trim().isNotEmpty) {
+        final q = query.toLowerCase();
+        if (!name.toLowerCase().contains(q) && !email.toLowerCase().contains(q)) continue;
+      }
+      // Progress for this student in teacher's subjects
+      final progress = await db.rawQuery('''
+        SELECT * FROM student_progress WHERE student_id = ?
+      ''', [sid]);
+      final completedLos = progress.where((p) => (p['is_completed'] as int?) == 1).length;
+      list.add({
+        ...s,
+        'completed_los': completedLos,
+        'enrolled_subjects': enrollments.where((e) => e['student_id'] == sid).length,
+      });
+    }
+    return list;
+  }
+
+  /// Get students enrolled in a subject, or all students if subject enrollments are empty
+  Future<List<Map<String, dynamic>>> getStudentsForSubjectOrAll(int subjectId, {String? section, String? query}) async {
+    final db = await database;
+    try {
+      final enrollments = await db.query('enrollments', where: 'subject_id = ?', whereArgs: [subjectId]);
+      final studentIds = enrollments.map((e) => e['student_id'] as String).toSet().toList();
+
+      List<Map<String, dynamic>> students = [];
+      if (studentIds.isNotEmpty) {
+        students = await db.query(
+          'users',
+          where: 'id IN (${studentIds.map((_) => '?').join(',')}) AND role = ?',
+          whereArgs: [...studentIds, 'student'],
+          orderBy: 'full_name ASC',
+        );
+      }
+
+      // If no explicit enrollments for this subject yet, fallback to all registered students
+      if (students.isEmpty) {
+        students = await db.query(
+          'users',
+          where: 'role = ?',
+          whereArgs: ['student'],
+          orderBy: 'full_name ASC',
+        );
+      }
+
+      final list = <Map<String, dynamic>>[];
+      for (final s in students) {
+        final sec = (s['section'] as String?) ?? '';
+        if (section != null && section.isNotEmpty && section != 'All Sections' && sec != section) continue;
+        final name = (s['full_name'] as String?) ?? '';
+        final email = (s['email'] as String?) ?? '';
+        if (query != null && query.trim().isNotEmpty) {
+          final q = query.toLowerCase();
+          if (!name.toLowerCase().contains(q) && !email.toLowerCase().contains(q)) continue;
+        }
+        list.add(s);
+      }
+      return list;
+    } catch (e) {
+      return [];
+    }
+  }
+
+  /// Auto-enroll student in all subjects matching grade/section assigned to teachers
+  Future<void> autoEnrollStudentBySection(String studentId, String section, String grade) async {
+    final db = await database;
+    // Find subjects that match the grade level (via subjects.grade_level) or have teachers assigned
+    final subjects = await db.query('subjects');
+    for (final s in subjects) {
+      final subId = s['id'] as int;
+      final gradeLevel = (s['grade_level'] as String?) ?? '';
+      // Auto-enroll if subject grade matches student grade, or if no grade restriction
+      if (gradeLevel.isEmpty || gradeLevel == grade) {
+        await db.insert('enrollments', {
+          'student_id': studentId,
+          'subject_id': subId,
+          'enrolled_at': DateTime.now().toIso8601String(),
+          'status': 'active',
+        }, conflictAlgorithm: ConflictAlgorithm.ignore);
+      }
+    }
+  }
+
+  /// Validate and consume a registration key atomically
+  Future<bool> validateAndConsumeRegistrationKey(String code, String studentId) async {
+    final db = await database;
+    final res = await db.query('reg_links', where: 'code = ?', whereArgs: [code]);
+    if (res.isEmpty) return false;
+    final link = res.first;
+    final usedCount = (link['used_count'] as int?) ?? 0;
+    final maxUses = (link['max_uses'] as int?) ?? 0;
+    final expirationStr = link['expiration'] as String?;
+    if (expirationStr != null && expirationStr.isNotEmpty) {
+      final exp = DateTime.tryParse(expirationStr);
+      if (exp != null && exp.isBefore(DateTime.now())) return false;
+    }
+    if (maxUses > 0 && usedCount >= maxUses) return false;
+
+    // Atomically increment and bind student
+    await db.update('reg_links', {
+      'used_count': usedCount + 1,
+    }, where: 'code = ?', whereArgs: [code]);
+
+    final sectionName = link['section'] as String? ?? '';
+    if (sectionName.isNotEmpty) {
+      await db.update('users', {
+        'section': sectionName,
+      }, where: 'id = ?', whereArgs: [studentId]);
+      await db.execute('UPDATE sections SET student_count = student_count + 1 WHERE name = ?', [sectionName]);
+      await autoEnrollStudentBySection(studentId, sectionName, ''); // grade handled separately if needed
+    }
+    return true;
+  }
+
+  // ── First-Class Quizzes & Bulk Assignment Management ─────
+
+  Future<int> createQuiz({
+    required String title,
+    String? description,
+    required int subjectId,
+    int? loId,
+    required String teacherId,
+    String? teacherName,
+    int timeLimitMinutes = 0,
+    int passingScore = 70,
+    String? dueDate,
+    List<Map<String, dynamic>> questions = const [],
+  }) async {
+    final db = await database;
+    final now = DateTime.now().toIso8601String();
+
+    final quizId = await db.insert('quizzes', {
+      'title': title,
+      'description': description,
+      'subject_id': subjectId,
+      'lo_id': loId,
+      'teacher_id': teacherId,
+      'teacher_name': teacherName,
+      'time_limit_minutes': timeLimitMinutes,
+      'passing_score': passingScore,
+      'status': 'published',
+      'due_date': dueDate,
+      'created_at': now,
+    });
+
+    for (final q in questions) {
+      await db.insert('questions', {
+        'lo_id': loId ?? 0,
+        'quiz_id': quizId,
+        'question_text': q['question_text'] ?? '',
+        'option_a': q['option_a'] ?? '',
+        'option_b': q['option_b'] ?? '',
+        'option_c': q['option_c'] ?? '',
+        'option_d': q['option_d'] ?? '',
+        'correct_option': (q['correct_option'] ?? 'A').toString().toUpperCase().trim(),
+        'created_at': now,
+      });
+    }
+
+    return quizId;
+  }
+
+  Future<int> assignQuizToStudents({
+    required int quizId,
+    required List<String> studentIds,
+    String? dueDate,
+  }) async {
+    final db = await database;
+    final now = DateTime.now().toIso8601String();
+
+    final qCountRes = await db.rawQuery('SELECT COUNT(*) as count FROM questions WHERE quiz_id = ?', [quizId]);
+    final totalQuestions = (qCountRes.first['count'] as int?) ?? 0;
+
+    int assigned = 0;
+    for (final sid in studentIds) {
+      try {
+        await db.insert(
+          'quiz_assignments',
+          {
+            'quiz_id': quizId,
+            'student_id': sid,
+            'assigned_at': now,
+            'due_date': dueDate,
+            'status': 'pending',
+            'score': 0,
+            'total_questions': totalQuestions,
+            'percentage': 0.0,
+            'completed_at': null,
+          },
+          conflictAlgorithm: ConflictAlgorithm.replace,
+        );
+        assigned++;
+      } catch (e) {
+        debugPrint('Error assigning quiz $quizId to $sid: $e');
+      }
+    }
+    return assigned;
+  }
+
+  Future<List<Map<String, dynamic>>> getQuizzesForSubject(int subjectId) async {
+    final db = await database;
+    final quizzes = await db.query(
+      'quizzes',
+      where: 'subject_id = ?',
+      whereArgs: [subjectId],
+      orderBy: 'created_at DESC',
+    );
+
+    final List<Map<String, dynamic>> enriched = [];
+    for (final q in quizzes) {
+      final qId = q['id'] as int;
+      final qCountRes = await db.rawQuery('SELECT COUNT(*) as count FROM questions WHERE quiz_id = ?', [qId]);
+      final qCount = (qCountRes.first['count'] as int?) ?? 0;
+
+      final assignCountRes = await db.rawQuery('SELECT COUNT(*) as count FROM quiz_assignments WHERE quiz_id = ?', [qId]);
+      final assignCount = (assignCountRes.first['count'] as int?) ?? 0;
+
+      final compCountRes = await db.rawQuery("SELECT COUNT(*) as count FROM quiz_assignments WHERE quiz_id = ? AND status = 'completed'", [qId]);
+      final compCount = (compCountRes.first['count'] as int?) ?? 0;
+
+      enriched.add({
+        ...q,
+        'question_count': qCount,
+        'assigned_count': assignCount,
+        'completed_count': compCount,
+      });
+    }
+    return enriched;
+  }
+
+  Future<List<Map<String, dynamic>>> getAssignedQuizzesForStudent(String studentId, {int? subjectId}) async {
+    final db = await database;
+    String query = '''
+      SELECT qa.*, 
+             q.title, 
+             q.description, 
+             q.subject_id, 
+             q.lo_id, 
+             q.teacher_id, 
+             q.teacher_name, 
+             q.time_limit_minutes, 
+             q.passing_score, 
+             s.name as subject_name, 
+             s.subject_code,
+             (SELECT COUNT(*) FROM questions WHERE quiz_id = q.id) as question_count
+      FROM quiz_assignments qa
+      JOIN quizzes q ON qa.quiz_id = q.id
+      LEFT JOIN subjects s ON q.subject_id = s.id
+      WHERE qa.student_id = ?
+    ''';
+    List<dynamic> args = [studentId];
+    if (subjectId != null) {
+      query += ' AND q.subject_id = ?';
+      args.add(subjectId);
+    }
+    query += ' ORDER BY CASE WHEN qa.status = \'pending\' THEN 0 ELSE 1 END, qa.assigned_at DESC';
+
+    return await db.rawQuery(query, args);
+  }
+
+  Future<Map<String, dynamic>?> getQuizById(int quizId) async {
+    final db = await database;
+    final quizRes = await db.rawQuery('''
+      SELECT q.*, s.name as subject_name, s.subject_code
+      FROM quizzes q
+      LEFT JOIN subjects s ON q.subject_id = s.id
+      WHERE q.id = ?
+    ''', [quizId]);
+
+    if (quizRes.isEmpty) return null;
+    final quiz = quizRes.first;
+
+    final questions = await db.query(
+      'questions',
+      where: 'quiz_id = ?',
+      whereArgs: [quizId],
+      orderBy: 'id ASC',
+    );
+
+    return {
+      ...quiz,
+      'questions': questions,
+    };
+  }
+
+  Future<Map<String, dynamic>?> getQuizAssignment(int quizId, String studentId) async {
+    final db = await database;
+    final res = await db.query(
+      'quiz_assignments',
+      where: 'quiz_id = ? AND student_id = ?',
+      whereArgs: [quizId, studentId],
+    );
+    return res.isNotEmpty ? res.first : null;
+  }
+
+  Future<void> completeQuizAssignment({
+    required int quizId,
+    required String studentId,
+    required int score,
+    required int totalQuestions,
+    required double percentage,
+  }) async {
+    final db = await database;
+    final now = DateTime.now().toIso8601String();
+
+    await db.update(
+      'quiz_assignments',
+      {
+        'status': 'completed',
+        'score': score,
+        'total_questions': totalQuestions,
+        'percentage': percentage,
+        'completed_at': now,
+      },
+      where: 'quiz_id = ? AND student_id = ?',
+      whereArgs: [quizId, studentId],
+    );
+  }
+
+  Future<List<Map<String, dynamic>>> getQuizAssignmentRoster(int quizId) async {
+    final db = await database;
+    return await db.rawQuery('''
+      SELECT qa.*, 
+             u.full_name as student_name, 
+             u.email as student_email, 
+             u.section as student_section, 
+             u.grade as student_grade
+      FROM quiz_assignments qa
+      JOIN users u ON qa.student_id = u.id
+      WHERE qa.quiz_id = ?
+      ORDER BY CASE WHEN qa.status = 'completed' THEN 0 ELSE 1 END, qa.score DESC
+    ''', [quizId]);
+  }
+
+  Future<void> deleteQuiz(int quizId) async {
+    final db = await database;
+    await db.delete('quiz_assignments', where: 'quiz_id = ?', whereArgs: [quizId]);
+    await db.delete('questions', where: 'quiz_id = ?', whereArgs: [quizId]);
+    await db.delete('quizzes', where: 'id = ?', whereArgs: [quizId]);
   }
 }
 

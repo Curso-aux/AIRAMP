@@ -18,6 +18,16 @@ class _ChatRoomScreenState extends ConsumerState<ChatRoomScreen> {
   final TextEditingController _controller = TextEditingController();
 
   @override
+  void initState() {
+    super.initState();
+    // Ensure latest messages are loaded from DB and marked as read
+    Future.microtask(() async {
+      await ref.read(chatProvider.notifier).reloadMessages(widget.conversationId);
+      await ref.read(chatProvider.notifier).markConversationAsRead(widget.conversationId);
+    });
+  }
+
+  @override
   void dispose() {
     _controller.dispose();
     super.dispose();

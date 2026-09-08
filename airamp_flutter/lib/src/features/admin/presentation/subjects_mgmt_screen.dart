@@ -198,7 +198,8 @@ class _SubjectsMgmtScreenState extends ConsumerState<SubjectsMgmtScreen> {
 
     return GestureDetector(
       onTap: () {
-        context.push('/admin/subjects/${subject['id']}');
+        final basePath = isAdmin ? '/admin/subjects' : '/teacher/subjects';
+        context.push('$basePath/${subject['id']}');
       },
       child: Container(
         margin: const EdgeInsets.only(bottom: 16),

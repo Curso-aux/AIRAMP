@@ -70,7 +70,13 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
           return;
         }
 
-        if (mounted) context.go('/student/home');
+        if (user.role == 'teacher') {
+          if (mounted) context.go('/teacher/dashboard');
+        } else if (user.role == 'student') {
+          if (mounted) context.go('/student/home');
+        } else {
+          // admin / super_admin handled above
+        }
       }
     } catch (e) {
       setState(() {
