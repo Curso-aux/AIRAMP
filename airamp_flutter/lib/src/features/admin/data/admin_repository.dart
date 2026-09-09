@@ -93,11 +93,19 @@ class SubjectsNotifier extends Notifier<List<Map<String, dynamic>>> {
     await _loadSubjects();
   }
 
+  Future<void> updateUnlockType(int id, String unlockType) async {
+    final db = await DatabaseHelper().database;
+    await db.update('subjects', {'unlock_type': unlockType}, where: 'id = ?', whereArgs: [id]);
+    await _loadSubjects();
+  }
+
   Future<void> deleteSubject(int id) async {
     final db = await DatabaseHelper().database;
     await db.delete('subjects', where: 'id = ?', whereArgs: [id]);
     await _loadSubjects();
   }
+
+  Future<void> reload() async => _loadSubjects();
 
   Future<Map<String, dynamic>?> getSubjectById(int id) async {
     final db = await DatabaseHelper().database;
@@ -130,18 +138,24 @@ class SectionsNotifier extends Notifier<List<Map<String, dynamic>>> {
     final db = await DatabaseHelper().database;
     await db.insert('sections', section);
     await _loadSections();
+    ref.invalidate(availableSectionsProvider);
+    ref.read(adminTeachersProvider.notifier).loadTeachers();
   }
 
   Future<void> updateSection(int id, Map<String, dynamic> section) async {
     final db = await DatabaseHelper().database;
     await db.update('sections', section, where: 'id = ?', whereArgs: [id]);
     await _loadSections();
+    ref.invalidate(availableSectionsProvider);
+    ref.read(adminTeachersProvider.notifier).loadTeachers();
   }
   
   Future<void> deleteSection(int id) async {
     final db = await DatabaseHelper().database;
     await db.delete('sections', where: 'id = ?', whereArgs: [id]);
     await _loadSections();
+    ref.invalidate(availableSectionsProvider);
+    ref.read(adminTeachersProvider.notifier).loadTeachers();
   }
 }
 
@@ -406,6 +420,12 @@ class AdminStudentsNotifier extends Notifier<List<Map<String, dynamic>>> {
     await loadStudents();
     ref.read(adminAnalyticsProvider.notifier).loadAnalytics();
   }
+
+  Future<void> updateStudentEnrollments(String studentId, List<int> subjectIds) async {
+    await DatabaseHelper().setStudentEnrollments(studentId, subjectIds);
+    await loadStudents();
+    ref.read(adminAnalyticsProvider.notifier).loadAnalytics();
+  }
 }
 
 // --- Admin Enrollment Keys Provider ---
@@ -451,4 +471,59 @@ class AdminKeysNotifier extends Notifier<List<Map<String, dynamic>>> {
 final availableSectionsProvider = FutureProvider<List<String>>((ref) async {
   return await DatabaseHelper().getAvailableSectionsList();
 });
+
+// --- Admin Faculty / Teachers Provider ---
+final adminTeachersProvider = NotifierProvider<AdminTeachersNotifier, List<Map<String, dynamic>>>(() {
+  return AdminTeachersNotifier();
+});
+
+class AdminTeachersNotifier extends Notifier<List<Map<String, dynamic>>> {
+  @override
+  List<Map<String, dynamic>> build() {
+    loadTeachers();
+    return [];
+  }
+
+  Future<void> loadTeachers() async {
+    final teachers = await DatabaseHelper().getTeachersList();
+    if (!ref.mounted) return;
+    state = teachers;
+  }
+
+  Future<String> addTeacher({
+    required String fullName,
+    required String email,
+    required String password,
+    String? username,
+    List<int>? assignSubjectIds,
+  }) async {
+    final tid = await DatabaseHelper().createTeacher(
+      fullName: fullName,
+      email: email,
+      password: password,
+      username: username,
+      assignSubjectIds: assignSubjectIds,
+    );
+    await loadTeachers();
+    ref.read(subjectsProvider.notifier).reload();
+    return tid;
+  }
+
+  Future<void> updateTeacher(
+    String teacherId,
+    Map<String, dynamic> data, {
+    List<int>? assignSubjectIds,
+  }) async {
+    await DatabaseHelper().updateTeacher(teacherId, data, assignSubjectIds: assignSubjectIds);
+    await loadTeachers();
+    ref.read(subjectsProvider.notifier).reload();
+  }
+
+  Future<void> deleteTeacher(String teacherId) async {
+    await DatabaseHelper().deleteTeacher(teacherId);
+    await loadTeachers();
+    ref.read(subjectsProvider.notifier).reload();
+  }
+}
+
 

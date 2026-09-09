@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../core/database/database_helper.dart';
 import '../../../../core/theme/app_theme.dart';
+import '../../../../core/theme/theme_provider.dart';
 import '../../../auth/application/auth_provider.dart';
 import '../../../student/data/student_repository.dart';
 import '../../data/teacher_repository.dart';
@@ -102,7 +103,9 @@ Answer: B''';
           _availableStudents = students;
           _sections = secSet.toList();
           // By default, select all enrolled/available students
-          _selectedStudentIds.addAll(students.map((s) => s['id'] as String));
+          _selectedStudentIds.addAll(
+            students.map((s) => s['id']?.toString() ?? '').where((id) => id.isNotEmpty),
+          );
           _loadingStudents = false;
         });
       }
@@ -194,8 +197,15 @@ Answer: B''';
 
     try {
       final user = ref.read(authProvider);
-      final teacherId = user?.id ?? 'teacher_1';
-      final teacherName = user?.fullName ?? 'Instructor';
+      if (user == null || user.id.isEmpty) {
+        setState(() => _isSubmitting = false);
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('You must be logged in as a teacher to create quizzes.')),
+        );
+        return;
+      }
+      final teacherId = user.id;
+      final teacherName = user.fullName;
 
       final quizId = await DatabaseHelper().createQuiz(
         title: title,
@@ -254,6 +264,8 @@ Answer: B''';
 
   @override
   Widget build(BuildContext context) {
+    ref.watch(themeProvider);
+
     return Scaffold(
       backgroundColor: AppTheme.background,
       appBar: AppBar(
@@ -267,9 +279,9 @@ Answer: B''';
         title: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Text(
+            Text(
               'Create & Assign Quiz',
-              style: TextStyle(fontSize: 17, fontWeight: FontWeight.bold),
+              style: TextStyle(fontSize: 17, fontWeight: FontWeight.bold, color: AppTheme.text),
             ),
             Text(
               widget.subjectName,
@@ -279,105 +291,122 @@ Answer: B''';
         ),
       ),
       body: SafeArea(
-        child: Center(
+        child: Align(
+          alignment: Alignment.topCenter,
           child: ConstrainedBox(
             constraints: const BoxConstraints(maxWidth: 800),
-            child: Column(
-              children: [
-                // Stepper Indicator
-                Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                  child: Row(
-                    children: [
-                      _buildStepPill(0, '1. Details'),
-                      const SizedBox(width: 8),
-                      _buildStepPill(1, '2. Questions (${_parsedQuestions.length})'),
-                      const SizedBox(width: 8),
-                      _buildStepPill(2, '3. Assign (${_selectedStudentIds.length})'),
-                    ],
+            child: SizedBox.expand(
+              child: Column(
+                children: [
+                  // Stepper Indicator
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                    child: Row(
+                      children: [
+                        _buildStepPill(0, '1. Details'),
+                        const SizedBox(width: 8),
+                        _buildStepPill(1, '2. Questions (${_parsedQuestions.length})'),
+                        const SizedBox(width: 8),
+                        _buildStepPill(2, '3. Assign (${_selectedStudentIds.length})'),
+                      ],
+                    ),
                   ),
-                ),
-                const Divider(height: 1),
+                  Divider(height: 1, color: AppTheme.border),
 
-                // Body content per step
-                Expanded(
-                  child: Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                    child: _buildCurrentStepView(),
+                  // Body content per step
+                  Expanded(
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                      child: _buildCurrentStepView(),
+                    ),
                   ),
-                ),
-              ],
+                ],
+              ),
             ),
           ),
         ),
       ),
-      bottomNavigationBar: SafeArea(
-        child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-          decoration: BoxDecoration(
-            color: AppTheme.surface,
-            border: Border(top: BorderSide(color: AppTheme.border)),
-          ),
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              if (_currentStep > 0)
-                OutlinedButton.icon(
-                  onPressed: () => setState(() => _currentStep--),
-                  icon: const Icon(Icons.arrow_back, size: 16),
-                  label: const Text('Back'),
-                )
-              else
-                TextButton(
-                  onPressed: () => Navigator.pop(context),
-                  child: Text('Cancel', style: TextStyle(color: AppTheme.textSecondary)),
-                ),
-              Row(
-                children: [
-                  if (_currentStep < 2)
-                    ElevatedButton.icon(
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: AppTheme.primary,
-                        foregroundColor: Colors.black,
-                        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
-                      ),
-                      onPressed: () {
-                        if (_currentStep == 0 && _titleController.text.trim().isEmpty) {
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(content: Text('Please enter a quiz title')),
-                          );
-                          return;
-                        }
-                        if (_currentStep == 1 && _parsedQuestions.isEmpty) {
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(content: Text('Please add at least one question')),
-                          );
-                          return;
-                        }
-                        setState(() => _currentStep++);
-                      },
-                      icon: const Icon(Icons.arrow_forward, size: 16),
-                      label: const Text('Next Step', style: TextStyle(fontWeight: FontWeight.bold)),
-                    )
-                  else
-                    ElevatedButton.icon(
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: AppTheme.primary,
-                        foregroundColor: Colors.black,
-                        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
-                      ),
-                      onPressed: _isSubmitting ? null : _submitQuiz,
-                      icon: _isSubmitting
-                          ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2))
-                          : const Icon(Icons.check, size: 18),
-                      label: Text(
-                        _isSubmitting ? 'Publishing...' : 'Publish & Assign (${_selectedStudentIds.length})',
-                        style: const TextStyle(fontWeight: FontWeight.bold),
-                      ),
+      bottomNavigationBar: Container(
+        decoration: BoxDecoration(
+          color: AppTheme.surface,
+          border: Border(top: BorderSide(color: AppTheme.border)),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withValues(alpha: 0.04),
+              offset: const Offset(0, -2),
+              blurRadius: 6,
+            ),
+          ],
+        ),
+        child: SafeArea(
+          top: false,
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                if (_currentStep > 0)
+                  OutlinedButton.icon(
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: AppTheme.text,
+                      side: BorderSide(color: AppTheme.border),
                     ),
-                ],
-              ),
-            ],
+                    onPressed: () => setState(() => _currentStep--),
+                    icon: const Icon(Icons.arrow_back, size: 16),
+                    label: const Text('Back'),
+                  )
+                else
+                  TextButton(
+                    onPressed: () => Navigator.pop(context),
+                    child: Text('Cancel', style: TextStyle(color: AppTheme.textSecondary)),
+                  ),
+                Row(
+                  children: [
+                    if (_currentStep < 2)
+                      ElevatedButton.icon(
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: AppTheme.primary,
+                          foregroundColor: Colors.black,
+                          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+                        ),
+                        onPressed: () {
+                          if (_currentStep == 0 && _titleController.text.trim().isEmpty) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(content: Text('Please enter a quiz title')),
+                            );
+                            return;
+                          }
+                          if (_currentStep == 1 && _parsedQuestions.isEmpty) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(content: Text('Please add at least one question')),
+                            );
+                            return;
+                          }
+                          setState(() => _currentStep++);
+                        },
+                        icon: const Icon(Icons.arrow_forward, size: 16),
+                        label: const Text('Next Step', style: TextStyle(fontWeight: FontWeight.bold)),
+                      )
+                    else
+                      ElevatedButton.icon(
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: AppTheme.primary,
+                          foregroundColor: Colors.black,
+                          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+                        ),
+                        onPressed: _isSubmitting ? null : _submitQuiz,
+                        icon: _isSubmitting
+                            ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2))
+                            : const Icon(Icons.check, size: 18),
+                        label: Text(
+                          _isSubmitting ? 'Publishing...' : 'Publish & Assign (${_selectedStudentIds.length})',
+                          style: const TextStyle(fontWeight: FontWeight.bold),
+                        ),
+                      ),
+                  ],
+                ),
+              ],
+            ),
           ),
         ),
       ),
@@ -392,11 +421,11 @@ Answer: B''';
       child: GestureDetector(
         onTap: () => setState(() => _currentStep = index),
         child: Container(
-          padding: const EdgeInsets.symmetric(vertical: 8),
+          padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 4),
           decoration: BoxDecoration(
             color: isActive
                 ? AppTheme.primary
-                : (isDone ? AppTheme.primary.withValues(alpha: 0.15) : AppTheme.background),
+                : (isDone ? AppTheme.primary.withValues(alpha: 0.15) : AppTheme.surface),
             borderRadius: BorderRadius.circular(8),
             border: Border.all(
               color: isActive ? AppTheme.primary : AppTheme.border,
@@ -405,6 +434,8 @@ Answer: B''';
           alignment: Alignment.center,
           child: Text(
             label,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
             style: TextStyle(
               fontSize: 11,
               fontWeight: FontWeight.bold,
@@ -417,15 +448,34 @@ Answer: B''';
   }
 
   Widget _buildCurrentStepView() {
-    switch (_currentStep) {
-      case 0:
-        return _buildStep1Details();
-      case 1:
-        return _buildStep2Questions();
-      case 2:
-        return _buildStep3Students();
-      default:
-        return const SizedBox.shrink();
+    try {
+      switch (_currentStep) {
+        case 0:
+          return _buildStep1Details();
+        case 1:
+          return _buildStep2Questions();
+        case 2:
+          return _buildStep3Students();
+        default:
+          return const SizedBox.shrink();
+      }
+    } catch (e, stack) {
+      debugPrint('Error rendering step $_currentStep: $e\n$stack');
+      return Center(
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(Icons.error_outline, color: AppTheme.error, size: 36),
+              const SizedBox(height: 8),
+              Text('Unable to display step content', style: TextStyle(color: AppTheme.text, fontWeight: FontWeight.bold)),
+              const SizedBox(height: 4),
+              Text('$e', style: TextStyle(color: AppTheme.textMuted, fontSize: 12), textAlign: TextAlign.center),
+            ],
+          ),
+        ),
+      );
     }
   }
 
@@ -439,11 +489,15 @@ Answer: B''';
           const SizedBox(height: 6),
           TextField(
             controller: _titleController,
+            style: TextStyle(color: AppTheme.text, fontSize: 14),
             decoration: InputDecoration(
               hintText: 'e.g., CS101: Midterm Knowledge Check',
+              hintStyle: TextStyle(color: AppTheme.textMuted),
               filled: true,
-              fillColor: AppTheme.background,
+              fillColor: AppTheme.surface,
               border: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: BorderSide(color: AppTheme.border)),
+              enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: BorderSide(color: AppTheme.border)),
+              focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: BorderSide(color: AppTheme.primary, width: 1.5)),
             ),
           ),
           const SizedBox(height: 14),
@@ -453,11 +507,15 @@ Answer: B''';
           TextField(
             controller: _descController,
             maxLines: 2,
+            style: TextStyle(color: AppTheme.text, fontSize: 14),
             decoration: InputDecoration(
               hintText: 'Instructions, topics covered, or notes for students...',
+              hintStyle: TextStyle(color: AppTheme.textMuted),
               filled: true,
-              fillColor: AppTheme.background,
+              fillColor: AppTheme.surface,
               border: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: BorderSide(color: AppTheme.border)),
+              enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: BorderSide(color: AppTheme.border)),
+              focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: BorderSide(color: AppTheme.primary, width: 1.5)),
             ),
           ),
           const SizedBox(height: 16),
@@ -472,10 +530,14 @@ Answer: B''';
                     const SizedBox(height: 6),
                     DropdownButtonFormField<int>(
                       initialValue: _timeLimitMinutes,
+                      dropdownColor: AppTheme.surface,
+                      style: TextStyle(color: AppTheme.text, fontSize: 14),
                       decoration: InputDecoration(
                         filled: true,
-                        fillColor: AppTheme.background,
+                        fillColor: AppTheme.surface,
                         border: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: BorderSide(color: AppTheme.border)),
+                        enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: BorderSide(color: AppTheme.border)),
+                        focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: BorderSide(color: AppTheme.primary, width: 1.5)),
                       ),
                       items: const [
                         DropdownMenuItem(value: 0, child: Text('No Limit')),
@@ -503,10 +565,14 @@ Answer: B''';
                     const SizedBox(height: 6),
                     DropdownButtonFormField<int>(
                       initialValue: _passingScore,
+                      dropdownColor: AppTheme.surface,
+                      style: TextStyle(color: AppTheme.text, fontSize: 14),
                       decoration: InputDecoration(
                         filled: true,
-                        fillColor: AppTheme.background,
+                        fillColor: AppTheme.surface,
                         border: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: BorderSide(color: AppTheme.border)),
+                        enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: BorderSide(color: AppTheme.border)),
+                        focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: BorderSide(color: AppTheme.primary, width: 1.5)),
                       ),
                       items: const [
                         DropdownMenuItem(value: 50, child: Text('50%')),
@@ -544,7 +610,7 @@ Answer: B''';
             child: Container(
               padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
               decoration: BoxDecoration(
-                color: AppTheme.background,
+                color: AppTheme.surface,
                 borderRadius: BorderRadius.circular(8),
                 border: Border.all(color: AppTheme.border),
               ),
@@ -928,12 +994,14 @@ Answer: B''';
                     if (allFilteredSelected) {
                       // Deselect all filtered
                       for (final s in filtered) {
-                        _selectedStudentIds.remove(s['id']);
+                        final id = s['id']?.toString();
+                        if (id != null) _selectedStudentIds.remove(id);
                       }
                     } else {
                       // Select all filtered
                       for (final s in filtered) {
-                        _selectedStudentIds.add(s['id']);
+                        final id = s['id']?.toString();
+                        if (id != null && id.isNotEmpty) _selectedStudentIds.add(id);
                       }
                     }
                   });
@@ -964,7 +1032,9 @@ Answer: B''';
                       _selectedStudentIds.clear();
                     } else {
                       _selectedStudentIds.clear();
-                      _selectedStudentIds.addAll(_availableStudents.map((s) => s['id'] as String));
+                      _selectedStudentIds.addAll(
+                        _availableStudents.map((s) => s['id']?.toString() ?? '').where((id) => id.isNotEmpty),
+                      );
                     }
                   });
                 },
@@ -1018,7 +1088,7 @@ Answer: B''';
                   itemCount: filtered.length,
                   itemBuilder: (context, index) {
                     final s = filtered[index];
-                    final sid = s['id'] as String;
+                    final sid = s['id']?.toString() ?? '';
                     final isChecked = _selectedStudentIds.contains(sid);
                     final name = s['full_name']?.toString() ?? 'Student';
                     final email = s['email']?.toString() ?? '';

@@ -1,3 +1,4 @@
+import 'dart:math';
 import 'package:dio/dio.dart';
 import '../../../core/database/database_helper.dart';
 import '../../../core/api/api_client.dart';
@@ -17,18 +18,85 @@ class AuthRepository {
     final db = await DatabaseHelper().database;
     final identifierLower = identifier.toLowerCase().trim();
 
-    final results = await db.rawQuery(
-      '''SELECT * FROM users
-         WHERE (LOWER(email) = ? OR LOWER(full_name) = ?)
-         AND password = ?''',
-      [identifierLower, identifierLower, password],
-    );
+    try {
+      await db.execute('ALTER TABLE users ADD COLUMN username TEXT');
+    } catch (_) {}
+    try {
+      await db.execute('ALTER TABLE users ADD COLUMN password_salt TEXT');
+    } catch (_) {}
 
-    if (results.isEmpty) {
+    // Find candidate accounts by email, username, full name, or name prefix
+    List<Map<String, Object?>> candidateRows = [];
+    try {
+      candidateRows = await db.rawQuery(
+        '''SELECT * FROM users
+           WHERE LOWER(email) = ? 
+              OR LOWER(COALESCE(username, '')) = ?
+              OR LOWER(full_name) = ?
+              OR LOWER(REPLACE(REPLACE(COALESCE(username, ''), '.', ' '), '_', ' ')) = ?
+              OR LOWER(full_name) LIKE ?
+              OR LOWER(COALESCE(username, '')) LIKE ?''',
+        [identifierLower, identifierLower, identifierLower, identifierLower, '$identifierLower%', '$identifierLower%'],
+      );
+    } catch (_) {
+      candidateRows = await db.rawQuery(
+        '''SELECT * FROM users
+           WHERE LOWER(email) = ? 
+              OR LOWER(full_name) = ?
+              OR LOWER(full_name) LIKE ?''',
+        [identifierLower, identifierLower, '$identifierLower%'],
+      );
+    }
+
+    if (candidateRows.isEmpty) {
       throw Exception('Invalid email/username or password.');
     }
 
-    final user = results.first;
+    // Verify password with salted hash or verify & auto-upgrade legacy plaintext
+    final List<Map<String, Object?>> verifiedUsers = [];
+    for (final candidate in candidateRows) {
+      final storedHash = candidate['password'] as String? ?? '';
+      final storedSalt = candidate['password_salt'] as String?;
+
+      if (DatabaseHelper.verifyPassword(password, storedHash, storedSalt)) {
+        // Auto-upgrade legacy plaintext accounts to salted SHA-256 on successful login
+        if (storedSalt == null || storedSalt.isEmpty) {
+          final newSalt = DatabaseHelper.generateSalt();
+          final newHash = DatabaseHelper.hashPassword(password, newSalt);
+          await db.update('users', {
+            'password': newHash,
+            'password_salt': newSalt,
+          }, where: 'id = ?', whereArgs: [candidate['id']]);
+        }
+        verifiedUsers.add(candidate);
+      }
+    }
+
+    if (verifiedUsers.isEmpty) {
+      throw Exception('Invalid email/username or password.');
+    }
+
+    // If multiple accounts match, prioritize exact email/username and faculty roles over student
+    final sorted = List<Map<String, Object?>>.from(verifiedUsers);
+    if (sorted.length > 1) {
+      sorted.sort((a, b) {
+        final aEmail = (a['email'] as String? ?? '').toLowerCase();
+        final bEmail = (b['email'] as String? ?? '').toLowerCase();
+        final aUser = (a['username'] as String? ?? '').toLowerCase();
+        final bUser = (b['username'] as String? ?? '').toLowerCase();
+        final aExact = aEmail == identifierLower || aUser == identifierLower;
+        final bExact = bEmail == identifierLower || bUser == identifierLower;
+        if (aExact && !bExact) return -1;
+        if (!aExact && bExact) return 1;
+        final aRole = a['role'] as String? ?? '';
+        final bRole = b['role'] as String? ?? '';
+        if (aRole != 'student' && bRole == 'student') return -1;
+        if (aRole == 'student' && bRole != 'student') return 1;
+        return 0;
+      });
+    }
+
+    final user = sorted.first;
     final userId = user['id'] as String;
     final role = user['role'] as String;
 
@@ -63,6 +131,7 @@ class AuthRepository {
         'email': user['email'],
         'role': role,
         'fullName': user['full_name'],
+        'username': user['username'] ?? user['full_name'] ?? '',
         'section': user['section'],
         'grade': user['grade'],
       },
@@ -75,25 +144,50 @@ class AuthRepository {
     required String email,
     required String password,
     required String role,
+    String? username,
     String? sectionCode,
   }) async {
     final db = await DatabaseHelper().database;
 
-    final existing = await db.query(
+    try {
+      await db.execute('ALTER TABLE users ADD COLUMN username TEXT');
+    } catch (_) {}
+
+    final existingEmail = await db.query(
       'users',
       where: 'LOWER(email) = ?',
       whereArgs: [email.toLowerCase().trim()],
     );
 
-    if (existing.isNotEmpty) {
+    if (existingEmail.isNotEmpty) {
       throw Exception('An account with this email already exists.');
     }
 
+    if (username != null && username.trim().isNotEmpty) {
+      final existingUser = await db.query(
+        'users',
+        where: 'LOWER(COALESCE(username, "")) = ?',
+        whereArgs: [username.toLowerCase().trim()],
+      );
+      if (existingUser.isNotEmpty) {
+        throw Exception('An account with this username already exists.');
+      }
+    }
+
     final id = '${role}_${DateTime.now().millisecondsSinceEpoch}';
+    final resolvedUsername = username?.trim().isNotEmpty == true
+        ? username!.trim()
+        : (email.contains('@') ? email.split('@').first : fullName.trim());
+
+    final salt = DatabaseHelper.generateSalt();
+    final hashedPassword = DatabaseHelper.hashPassword(password, salt);
+
     final userData = {
       'id': id,
       'email': email.trim(),
-      'password': password,
+      'username': resolvedUsername,
+      'password': hashedPassword,
+      'password_salt': salt,
       'role': role,
       'full_name': fullName.trim(),
       'created_at': DateTime.now().toIso8601String(),
@@ -132,15 +226,21 @@ class AuthRepository {
       }
     }
 
+    final token = _localToken(id);
+    await _persistSession(userId: id, role: role, token: token);
+    ApiClient.setSession(session: token, userId: id);
+
     return {
       'user': {
         'id': id,
         'email': email.trim(),
+        'username': resolvedUsername,
         'role': role,
         'fullName': fullName.trim(),
         'section': assignedSection,
         'grade': assignedGrade,
-      }
+      },
+      'session': token,
     };
   }
 
@@ -164,6 +264,22 @@ class AuthRepository {
     String? profileImage,
     String? password,
   }) async {
+    final db = await DatabaseHelper().database;
+    final updates = <String, Object?>{};
+    if (fullName != null) updates['full_name'] = fullName;
+    if (username != null) updates['username'] = username;
+    if (email != null) updates['email'] = email;
+    if (password != null && password.isNotEmpty) {
+      final salt = DatabaseHelper.generateSalt();
+      updates['password'] = DatabaseHelper.hashPassword(password, salt);
+      updates['password_salt'] = salt;
+    }
+    if (updates.isNotEmpty) {
+      try {
+        await db.update('users', updates, where: 'id = ?', whereArgs: [userId]);
+      } catch (_) {}
+    }
+
     if (ApiClient.isCloudAvailable) {
       try {
         await _dio.put('/v1/api/users/$userId', data: {
@@ -174,7 +290,7 @@ class AuthRepository {
           'password': ?password,
         });
       } on DioException {
-        // Fall through; local SQLite is already updated via authProvider
+        // Fall through; local SQLite is already updated
       }
     }
   }
@@ -217,6 +333,9 @@ class AuthRepository {
   }
 
   String _localToken(String userId) {
-    return 'local-$userId-${DateTime.now().millisecondsSinceEpoch}';
+    final rand = Random.secure();
+    final bytes = List<int>.generate(32, (_) => rand.nextInt(256));
+    final tokenHex = bytes.map((b) => b.toRadixString(16).padLeft(2, '0')).join();
+    return 'aira_sec_${userId}_$tokenHex';
   }
 }

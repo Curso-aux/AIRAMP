@@ -193,6 +193,7 @@ class _SubjectsMgmtScreenState extends ConsumerState<SubjectsMgmtScreen> {
   Widget _buildSubjectCard(BuildContext context, Map<String, dynamic> subject, WidgetRef ref, {bool isAdmin = true}) {
     final code = subject['subject_code']?.toString() ?? '';
     final unlockType = subject['unlock_type']?.toString() ?? 'Sequential';
+    final semester = subject['semester']?.toString() ?? '';
     final isAdopted = code.isNotEmpty && (code == 'CSS-NC-II' || code == 'VGD-NC-III' || code == 'EMP-TECH');
     final teacherName = subject['teacher_name']?.toString() ?? '';
 
@@ -245,27 +246,56 @@ class _SubjectsMgmtScreenState extends ConsumerState<SubjectsMgmtScreen> {
                     ),
                   ),
                 const Spacer(),
-                // Unlock type badge
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                  decoration: BoxDecoration(
-                    color: Theme.of(context).scaffoldBackgroundColor,
-                    borderRadius: BorderRadius.circular(4),
+                // Semester badge (preserved for later use)
+                if (semester.isNotEmpty) ...[
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                    decoration: BoxDecoration(
+                      color: Theme.of(context).scaffoldBackgroundColor,
+                      borderRadius: BorderRadius.circular(4),
+                      border: Border.all(color: AppTheme.border),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(Icons.calendar_today_outlined, size: 11, color: AppTheme.textMuted),
+                        const SizedBox(width: 4),
+                        Text(
+                          semester,
+                          style: TextStyle(color: AppTheme.textSecondary, fontSize: 11, fontWeight: FontWeight.w500),
+                        ),
+                      ],
+                    ),
                   ),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Icon(
-                        unlockType == 'Sequential' ? Icons.lock_outline : Icons.lock_open_outlined,
-                        size: 12,
-                        color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6),
-                      ),
-                      const SizedBox(width: 4),
-                      Text(
-                        unlockType,
-                        style: TextStyle(color: AppTheme.textSecondary, fontSize: 11),
-                      ),
-                    ],
+                  const SizedBox(width: 8),
+                ],
+                // Unlock type badge (interactive toggle for teacher and admin)
+                GestureDetector(
+                  onTap: () => _showUnlockTypeDialog(context, subject['id'] as int, unlockType, ref),
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                    decoration: BoxDecoration(
+                      color: Theme.of(context).scaffoldBackgroundColor,
+                      borderRadius: BorderRadius.circular(4),
+                      border: Border.all(color: AppTheme.primary.withValues(alpha: 0.35)),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(
+                          unlockType == 'Sequential' ? Icons.lock_outline : Icons.lock_open_outlined,
+                          size: 12,
+                          color: AppTheme.primary,
+                        ),
+                        const SizedBox(width: 4),
+                        Text(
+                          unlockType,
+                          style: TextStyle(color: AppTheme.text, fontSize: 11, fontWeight: FontWeight.bold),
+                        ),
+                        const SizedBox(width: 3),
+                        Icon(Icons.arrow_drop_down, size: 14, color: AppTheme.primary),
+                      ],
+                    ),
                   ),
                 ),
               ],
@@ -328,27 +358,52 @@ class _SubjectsMgmtScreenState extends ConsumerState<SubjectsMgmtScreen> {
                   style: TextStyle(color: AppTheme.primary, fontSize: 13),
                 ),
                 const Spacer(),
-                if (isAdopted && isAdmin)
-                  _actionIconButton(
-                    icon: Icons.cancel_outlined,
-                    color: Theme.of(context).colorScheme.error,
-                    bgColor: AppTheme.error.withValues(alpha: 0.15),
-                    onTap: () => _confirmDelete(context, subject, ref),
-                  ),
-                if (isAdopted && isAdmin) const SizedBox(width: 8),
-                _actionIconButton(
-                  icon: Icons.edit_outlined,
-                  color: Theme.of(context).colorScheme.primary,
-                  bgColor: AppTheme.primary.withValues(alpha: 0.15),
-                  onTap: () => _showEditSubjectDialog(context, subject, ref),
-                ),
                 if (isAdmin) ...[
+                  if (isAdopted) ...[
+                    _actionIconButton(
+                      icon: Icons.cancel_outlined,
+                      color: Theme.of(context).colorScheme.error,
+                      bgColor: AppTheme.error.withValues(alpha: 0.15),
+                      onTap: () => _confirmDelete(context, subject, ref),
+                    ),
+                    const SizedBox(width: 8),
+                  ],
+                  _actionIconButton(
+                    icon: Icons.edit_outlined,
+                    color: Theme.of(context).colorScheme.primary,
+                    bgColor: AppTheme.primary.withValues(alpha: 0.15),
+                    onTap: () => _showEditSubjectDialog(context, subject, ref),
+                  ),
                   const SizedBox(width: 8),
                   _actionIconButton(
                     icon: Icons.delete_outline,
                     color: Theme.of(context).colorScheme.error,
                     bgColor: AppTheme.error.withValues(alpha: 0.15),
                     onTap: () => _confirmDelete(context, subject, ref),
+                  ),
+                ] else ...[
+                  // Teacher Action: Direct Curriculum Navigation (Edit Subject removed for teachers)
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                    decoration: BoxDecoration(
+                      color: AppTheme.primary.withValues(alpha: 0.12),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Text(
+                          'Curriculum',
+                          style: TextStyle(
+                            color: AppTheme.primary,
+                            fontSize: 12,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                        const SizedBox(width: 4),
+                        Icon(Icons.arrow_forward, size: 14, color: AppTheme.primary),
+                      ],
+                    ),
                   ),
                 ],
               ],
@@ -411,6 +466,163 @@ class _SubjectsMgmtScreenState extends ConsumerState<SubjectsMgmtScreen> {
       builder: (ctx) {
         return _EditSubjectSheet(subject: subject);
       },
+    );
+  }
+
+  void _showUnlockTypeDialog(BuildContext context, int subjectId, String currentUnlockType, WidgetRef ref) {
+    String selected = currentUnlockType;
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setModalState) => Container(
+          constraints: BoxConstraints(
+            maxHeight: MediaQuery.of(context).size.height * 0.85,
+          ),
+          padding: EdgeInsets.only(
+            left: 24,
+            right: 24,
+            top: 24,
+            bottom: MediaQuery.of(ctx).viewInsets.bottom + 24,
+          ),
+          decoration: BoxDecoration(
+            color: Theme.of(context).scaffoldBackgroundColor,
+            borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+          ),
+          child: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Text(
+                    'Curriculum Progression Mode',
+                    style: TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.bold,
+                      color: Theme.of(context).colorScheme.onSurface,
+                    ),
+                  ),
+                  IconButton(
+                    icon: Icon(Icons.close, color: AppTheme.textMuted),
+                    onPressed: () => Navigator.pop(ctx),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 8),
+              Text(
+                'Configure whether students advance sequentially or access all lessons flexibly.',
+                style: TextStyle(fontSize: 13, color: AppTheme.textSecondary),
+              ),
+              const SizedBox(height: 20),
+
+              // Option 1: Sequential
+              _buildProgressionOption(
+                title: 'Sequential Progression',
+                subtitle: 'Students must pass quizzes to unlock subsequent learning outcomes.',
+                icon: Icons.lock_outline,
+                isSelected: selected == 'Sequential',
+                onTap: () => setModalState(() => selected = 'Sequential'),
+              ),
+              const SizedBox(height: 12),
+
+              // Option 2: Flexible
+              _buildProgressionOption(
+                title: 'Flexible Progression',
+                subtitle: 'All topics and learning materials are open. Students can study at their own pace.',
+                icon: Icons.lock_open_outlined,
+                isSelected: selected == 'Flexible',
+                onTap: () => setModalState(() => selected = 'Flexible'),
+              ),
+              const SizedBox(height: 24),
+
+              SizedBox(
+                width: double.infinity,
+                child: ElevatedButton(
+                  onPressed: () async {
+                    Navigator.pop(ctx);
+                    await ref.read(subjectsProvider.notifier).updateUnlockType(subjectId, selected);
+                    if (context.mounted) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(
+                          content: Text('Progression mode set to "$selected"'),
+                          backgroundColor: AppTheme.success,
+                        ),
+                      );
+                    }
+                  },
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: AppTheme.primary,
+                    foregroundColor: Colors.black,
+                    padding: const EdgeInsets.symmetric(vertical: 14),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                  ),
+                  child: const Text('Save Progression Mode', style: TextStyle(fontWeight: FontWeight.bold)),
+                ),
+              ),
+            ],
+          ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildProgressionOption({
+    required String title,
+    required String subtitle,
+    required IconData icon,
+    required bool isSelected,
+    required VoidCallback onTap,
+  }) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: isSelected ? AppTheme.primary.withValues(alpha: 0.15) : AppTheme.surface,
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(
+            color: isSelected ? AppTheme.primary : AppTheme.border,
+            width: isSelected ? 2 : 1,
+          ),
+        ),
+        child: Row(
+          children: [
+            Icon(icon, color: isSelected ? AppTheme.primary : AppTheme.textSecondary),
+            const SizedBox(width: 14),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    title,
+                    style: TextStyle(
+                      color: isSelected ? AppTheme.primary : AppTheme.text,
+                      fontWeight: FontWeight.bold,
+                      fontSize: 15,
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    subtitle,
+                    style: TextStyle(
+                      color: AppTheme.textSecondary,
+                      fontSize: 12,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            if (isSelected)
+              Icon(Icons.check_circle, color: AppTheme.primary, size: 20),
+          ],
+        ),
+      ),
     );
   }
 

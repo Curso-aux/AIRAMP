@@ -1,6 +1,7 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/api/api_client.dart';
+import '../../../core/database/database_helper.dart';
 import '../data/auth_repository.dart';
 
 class User {
@@ -108,12 +109,29 @@ class AuthNotifier extends Notifier<User?> {
       return;
     }
 
-    state = User(
-      id: session.userId,
-      email: '',
-      role: session.role,
-      fullName: session.userId,
-    );
+    // Restore complete user profile from local database
+    final db = await DatabaseHelper().database;
+    final userRows = await db.query('users', where: 'id = ?', whereArgs: [session.userId]);
+    if (userRows.isNotEmpty) {
+      final u = userRows.first;
+      final actualRole = u['role'] as String? ?? session.role;
+      state = User(
+        id: session.userId,
+        email: u['email'] as String? ?? '',
+        role: actualRole,
+        fullName: u['full_name'] as String? ?? session.userId,
+        username: u['username'] as String? ?? '',
+        section: u['section'] as String?,
+        grade: u['grade'] as String?,
+      );
+    } else {
+      state = User(
+        id: session.userId,
+        email: '',
+        role: session.role,
+        fullName: session.userId,
+      );
+    }
     ApiClient.setSession(session: session.session, userId: session.userId);
   }
 
@@ -122,6 +140,7 @@ class AuthNotifier extends Notifier<User?> {
     required String email,
     required String password,
     required String role,
+    String? username,
     String? sectionCode,
   }) async {
     final repository = ref.read(authRepositoryProvider);
@@ -133,6 +152,7 @@ class AuthNotifier extends Notifier<User?> {
         email: email,
         password: password,
         role: role,
+        username: username,
         sectionCode: sectionCode,
       );
       final user = User.fromJson(data['user']);
@@ -161,21 +181,19 @@ class AuthNotifier extends Notifier<User?> {
       profileImage: profileImage,
     );
 
-    // Persist changes to backend when available
-    if (ApiClient.isCloudAvailable) {
-      final repository = ref.read(authRepositoryProvider);
-      try {
-        await repository.updateProfile(
-          userId: state!.id,
-          fullName: fullName,
-          email: email,
-          username: username,
-          profileImage: profileImage,
-          password: password,
-        );
-      } catch (_) {
-        // Silently continue; SQLite state already updated locally
-      }
+    // Persist changes to local SQLite and cloud backend
+    final repository = ref.read(authRepositoryProvider);
+    try {
+      await repository.updateProfile(
+        userId: state!.id,
+        fullName: fullName,
+        email: email,
+        username: username,
+        profileImage: profileImage,
+        password: password,
+      );
+    } catch (_) {
+      // Silently continue
     }
   }
 

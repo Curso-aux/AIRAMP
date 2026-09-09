@@ -57,7 +57,7 @@ class _AdminWebAnnouncementsScreenState extends ConsumerState<AdminWebAnnounceme
                 ),
                 const SizedBox(width: 16),
                 ElevatedButton.icon(
-                  onPressed: () => _showCreateAnnouncementDialog(),
+                  onPressed: () => _showAnnouncementDialog(),
                   icon: const Icon(Icons.campaign, size: 18),
                   label: const Text('Post Announcement'),
                   style: ElevatedButton.styleFrom(
@@ -165,11 +165,22 @@ class _AdminWebAnnouncementsScreenState extends ConsumerState<AdminWebAnnounceme
                                 ),
                               ],
                             ),
-                            IconButton(
-                              tooltip: 'Delete Announcement',
-                              icon: const Icon(Icons.delete_outline, size: 18),
-                              color: AppTheme.error,
-                              onPressed: () => _confirmDelete(id, title),
+                            Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                IconButton(
+                                  tooltip: 'Edit Announcement',
+                                  icon: const Icon(Icons.edit_outlined, size: 18),
+                                  color: AppTheme.primary,
+                                  onPressed: () => _showAnnouncementDialog(existing: a),
+                                ),
+                                IconButton(
+                                  tooltip: 'Delete Announcement',
+                                  icon: const Icon(Icons.delete_outline, size: 18),
+                                  color: AppTheme.error,
+                                  onPressed: () => _confirmDelete(id, title),
+                                ),
+                              ],
                             ),
                           ],
                         ),
@@ -202,11 +213,19 @@ class _AdminWebAnnouncementsScreenState extends ConsumerState<AdminWebAnnounceme
     );
   }
 
-  void _showCreateAnnouncementDialog() {
-    final titleController = TextEditingController();
-    final messageController = TextEditingController();
-    String selectedPriority = 'medium';
-    String selectedAudience = 'all';
+  void _showAnnouncementDialog({Map<String, dynamic>? existing}) {
+    final isEditing = existing != null;
+    final id = existing?['id'] as int? ?? 0;
+    final titleController = TextEditingController(text: existing?['title'] as String? ?? '');
+    final messageController = TextEditingController(text: existing?['message'] as String? ?? '');
+    String selectedPriority = (existing?['priority'] as String? ?? 'medium').toLowerCase();
+    if (!['high', 'medium', 'normal'].contains(selectedPriority)) {
+      selectedPriority = 'medium';
+    }
+    String selectedAudience = (existing?['target_audience'] as String? ?? 'all').toLowerCase();
+    if (!['all', 'students', 'teachers'].contains(selectedAudience)) {
+      selectedAudience = 'all';
+    }
 
     showDialog(
       context: context,
@@ -217,9 +236,16 @@ class _AdminWebAnnouncementsScreenState extends ConsumerState<AdminWebAnnounceme
             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
             title: Row(
               children: [
-                Icon(Icons.campaign, color: AppTheme.primary, size: 24),
+                Icon(
+                  isEditing ? Icons.edit_note_rounded : Icons.campaign,
+                  color: AppTheme.primary,
+                  size: 24,
+                ),
                 const SizedBox(width: 10),
-                Text('Post Announcement', style: TextStyle(fontSize: 18, color: AppTheme.text)),
+                Text(
+                  isEditing ? 'Edit Announcement' : 'Post Announcement',
+                  style: TextStyle(fontSize: 18, color: AppTheme.text),
+                ),
               ],
             ),
             content: SizedBox(
@@ -339,18 +365,27 @@ class _AdminWebAnnouncementsScreenState extends ConsumerState<AdminWebAnnounceme
 
                   final messenger = ScaffoldMessenger.of(context);
                   Navigator.pop(dialogCtx);
-                  await ref.read(announcementsProvider.notifier).addAnnouncement({
-                    'title': title,
-                    'message': message,
-                    'priority': selectedPriority,
-                    'target_audience': selectedAudience,
-                    'created_at': DateTime.now().toIso8601String(),
-                  });
+                  if (isEditing) {
+                    await ref.read(announcementsProvider.notifier).updateAnnouncement(id, {
+                      'title': title,
+                      'message': message,
+                      'priority': selectedPriority,
+                      'target_audience': selectedAudience,
+                    });
+                  } else {
+                    await ref.read(announcementsProvider.notifier).addAnnouncement({
+                      'title': title,
+                      'message': message,
+                      'priority': selectedPriority,
+                      'target_audience': selectedAudience,
+                      'created_at': DateTime.now().toIso8601String(),
+                    });
+                  }
                   ref.read(adminAnalyticsProvider.notifier).loadAnalytics();
                   if (mounted) {
                     messenger.showSnackBar(
                       SnackBar(
-                        content: const Text('Announcement posted successfully!'),
+                        content: Text(isEditing ? 'Announcement updated successfully!' : 'Announcement posted successfully!'),
                         backgroundColor: AppTheme.success,
                       ),
                     );
@@ -363,7 +398,10 @@ class _AdminWebAnnouncementsScreenState extends ConsumerState<AdminWebAnnounceme
                   padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 10),
                   minimumSize: const Size(0, 40),
                 ),
-                child: const Text('Publish Announcement', style: TextStyle(fontWeight: FontWeight.bold)),
+                child: Text(
+                  isEditing ? 'Save Changes' : 'Publish Announcement',
+                  style: const TextStyle(fontWeight: FontWeight.bold),
+                ),
               ),
             ],
           );

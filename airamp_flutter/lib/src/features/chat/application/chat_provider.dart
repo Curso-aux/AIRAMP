@@ -164,7 +164,13 @@ class ChatNotifier extends Notifier<ChatState> {
       if (_disposed) return;
 
       final currentUser = ref.read(authProvider);
-      final myId = currentUser?.id ?? 'teacher_1';
+      if (currentUser == null) {
+        if (!_disposed) {
+          state = state.copyWith(conversations: [], messages: {});
+        }
+        return;
+      }
+      final myId = currentUser.id;
 
       final allUserRows = await db.getUsers();
       if (_disposed) return;
@@ -373,9 +379,10 @@ class ChatNotifier extends Notifier<ChatState> {
 
     final convId = 'group_subject_${subjectId ?? DateTime.now().millisecondsSinceEpoch}';
     final user = ref.read(authProvider);
-    final creatorUser = user != null
-        ? ChatUser(id: user.id, fullName: user.fullName, email: user.email, role: user.role)
-        : ChatUser(id: 'teacher_1', fullName: 'Teacher', email: '', role: 'admin');
+    if (user == null) {
+      throw StateError('User must be logged in to create subject group chat.');
+    }
+    final creatorUser = ChatUser(id: user.id, fullName: user.fullName, email: user.email, role: user.role);
 
     final now = DateTime.now().toIso8601String();
     final welcomeMsgId = 'msg_${DateTime.now().millisecondsSinceEpoch}';
@@ -454,7 +461,8 @@ class ChatNotifier extends Notifier<ChatState> {
   /// Retrieves or creates a 1-on-1 direct conversation with the target user.
   Future<ChatConversation?> getOrCreateConversation(String targetUserId) async {
     final currentUser = ref.read(authProvider);
-    final myId = currentUser?.id ?? 'teacher_1';
+    if (currentUser == null) return null;
+    final myId = currentUser.id;
 
     // Canonical direct conversation ID: sorted so it is identical for both users
     final sortedIds = [myId, targetUserId]..sort();

@@ -1,3 +1,6 @@
+import 'dart:convert';
+import 'dart:math';
+import 'package:crypto/crypto.dart';
 import 'package:flutter/foundation.dart';
 import 'package:path/path.dart';
 import 'package:sqflite/sqflite.dart';
@@ -11,10 +14,53 @@ class DatabaseHelper {
 
   DatabaseHelper._internal();
 
+  // ── Password Hashing & Security Helpers ───────────────────
+  static String generateSalt([int length = 16]) {
+    final random = Random.secure();
+    final values = List<int>.generate(length, (i) => random.nextInt(256));
+    return base64Url.encode(values);
+  }
+
+  static String hashPassword(String password, String salt) {
+    if (salt.isEmpty) return password;
+    final bytes = utf8.encode('$password::$salt');
+    return sha256.convert(bytes).toString();
+  }
+
+  static bool verifyPassword(String password, String storedHash, String? salt) {
+    if (salt == null || salt.isEmpty) {
+      return password == storedHash;
+    }
+    final computed = hashPassword(password, salt);
+    return computed == storedHash;
+  }
+
   Future<Database> get database async {
     if (_database != null) return _database!;
     _database = await _initDatabase();
     return _database!;
+  }
+
+  Future<void> _onDatabaseOpen(Database db) async {
+    try {
+      await db.execute('ALTER TABLE announcements ADD COLUMN section TEXT');
+    } catch (_) {}
+    try {
+      await db.execute('ALTER TABLE announcements ADD COLUMN author_id TEXT');
+    } catch (_) {}
+    try {
+      await db.execute('ALTER TABLE announcements ADD COLUMN author_name TEXT');
+    } catch (_) {}
+    try {
+      await db.execute('ALTER TABLE announcements ADD COLUMN author_role TEXT');
+    } catch (_) {}
+    try {
+      await db.execute('ALTER TABLE users ADD COLUMN password_salt TEXT');
+    } catch (_) {}
+    try {
+      await db.execute('ALTER TABLE users ADD COLUMN username TEXT');
+    } catch (_) {}
+    await _seedInitialData(db);
   }
 
   Future<Database> _initDatabase() async {
@@ -23,24 +69,20 @@ class DatabaseHelper {
         databaseFactory = databaseFactoryFfiWeb;
         return await openDatabase(
           'airamp_local.db',
-          version: 15,
+          version: 18,
           onCreate: _onCreate,
           onUpgrade: _onUpgrade,
-          onOpen: (db) async {
-            await _seedInitialData(db);
-          },
+          onOpen: _onDatabaseOpen,
         );
       } catch (e) {
         debugPrint('Failed to open with shared worker, falling back to databaseFactoryFfiWebNoWebWorker: $e');
         databaseFactory = databaseFactoryFfiWebNoWebWorker;
         return await openDatabase(
           'airamp_local.db',
-          version: 16,
+          version: 18,
           onCreate: _onCreate,
           onUpgrade: _onUpgrade,
-          onOpen: (db) async {
-            await _seedInitialData(db);
-          },
+          onOpen: _onDatabaseOpen,
         );
       }
     }
@@ -50,12 +92,10 @@ class DatabaseHelper {
 
     return await openDatabase(
       path,
-      version: 16,
+      version: 18,
       onCreate: _onCreate,
       onUpgrade: _onUpgrade,
-      onOpen: (db) async {
-        await _seedInitialData(db);
-      },
+      onOpen: _onDatabaseOpen,
     );
   }
 
@@ -65,7 +105,9 @@ class DatabaseHelper {
       CREATE TABLE users (
         id TEXT PRIMARY KEY,
         email TEXT UNIQUE NOT NULL,
+        username TEXT,
         password TEXT NOT NULL,
+        password_salt TEXT,
         role TEXT NOT NULL,
         full_name TEXT NOT NULL,
         section TEXT,
@@ -74,13 +116,20 @@ class DatabaseHelper {
       )
     ''');
 
-    // Seed default authentic accounts
+    final saltAdmin1 = generateSalt();
+    final saltAdmin2 = generateSalt();
+    final saltTeacher1 = generateSalt();
+    final saltStudent1 = generateSalt();
+
+    // Seed default authentic accounts with salted hashes
     await db.insert('users', {
       'id': 'admin_1',
       'email': 'aira@admin',
-      'password': 'aira@admin',
+      'username': 'Aira Admin',
+      'password': hashPassword('aira@admin', saltAdmin1),
+      'password_salt': saltAdmin1,
       'role': 'super_admin',
-      'full_name': 'Aira Super Admin',
+      'full_name': 'Aira Admin',
       'section': null,
       'grade': null,
       'created_at': DateTime.now().toIso8601String(),
@@ -88,7 +137,9 @@ class DatabaseHelper {
     await db.insert('users', {
       'id': 'admin_2',
       'email': 'admin@aira.edu',
-      'password': 'Admin@123',
+      'username': 'admin',
+      'password': hashPassword('Admin@123', saltAdmin2),
+      'password_salt': saltAdmin2,
       'role': 'admin',
       'full_name': 'School Administrator',
       'section': null,
@@ -98,7 +149,9 @@ class DatabaseHelper {
     await db.insert('users', {
       'id': 'teacher_1',
       'email': 'john.reyes@deped.gov.ph',
-      'password': 'John@123',
+      'username': 'john.reyes',
+      'password': hashPassword('John@123', saltTeacher1),
+      'password_salt': saltTeacher1,
       'role': 'teacher',
       'full_name': 'Sir John Reyes',
       'section': null,
@@ -108,7 +161,9 @@ class DatabaseHelper {
     await db.insert('users', {
       'id': 'student_1',
       'email': 'maria@test.com',
-      'password': 'Maria@123',
+      'username': 'maria.lopez',
+      'password': hashPassword('Maria@123', saltStudent1),
+      'password_salt': saltStudent1,
       'role': 'student',
       'full_name': 'Maria Lopez',
       'section': 'Emerald',
@@ -124,6 +179,10 @@ class DatabaseHelper {
         message TEXT NOT NULL,
         priority TEXT NOT NULL,
         target_audience TEXT NOT NULL,
+        section TEXT,
+        author_id TEXT,
+        author_name TEXT,
+        author_role TEXT,
         created_at TEXT NOT NULL
       )
     ''');
@@ -388,7 +447,7 @@ class DatabaseHelper {
           'id': 'teacher_1',
           'email': 'john.reyes@deped.gov.ph',
           'password': 'John@123',
-          'role': 'admin',
+          'role': 'teacher',
           'full_name': 'Sir John',
           'created_at': DateTime.now().toIso8601String(),
         });
@@ -724,6 +783,29 @@ class DatabaseHelper {
         await db.execute('ALTER TABLE quiz_attempts ADD COLUMN quiz_id INTEGER');
       } catch (_) {}
 
+      await _seedInitialData(db);
+    }
+
+    if (oldVersion < 17) {
+      try {
+        await db.execute('ALTER TABLE users ADD COLUMN username TEXT');
+      } catch (_) {}
+      await _seedInitialData(db);
+    }
+
+    if (oldVersion < 18) {
+      try {
+        await db.execute('ALTER TABLE announcements ADD COLUMN section TEXT');
+      } catch (_) {}
+      try {
+        await db.execute('ALTER TABLE announcements ADD COLUMN author_id TEXT');
+      } catch (_) {}
+      try {
+        await db.execute('ALTER TABLE announcements ADD COLUMN author_name TEXT');
+      } catch (_) {}
+      try {
+        await db.execute('ALTER TABLE announcements ADD COLUMN author_role TEXT');
+      } catch (_) {}
       await _seedInitialData(db);
     }
   }
@@ -1306,17 +1388,20 @@ class DatabaseHelper {
 
   Future<List<String>> getAvailableSectionsList() async {
     final db = await database;
-    final List<String> list = ['STEM A', 'STEM B', 'STEM C', 'Emerald', 'Ruby', 'Gold', 'Diamond'];
     try {
-      final dbSections = await db.query('sections');
+      final dbSections = await db.query('sections', orderBy: 'grade ASC, name ASC');
+      final list = <String>[];
       for (final s in dbSections) {
         final name = s['name'] as String?;
-        if (name != null && name.isNotEmpty && !list.contains(name)) {
-          list.add(name);
+        if (name != null && name.trim().isNotEmpty && !list.contains(name.trim())) {
+          list.add(name.trim());
         }
       }
+      if (list.isNotEmpty) {
+        return list;
+      }
     } catch (_) {}
-    return list;
+    return ['Grade 10 - Emerald', 'Grade 11 - STEM B'];
   }
 
   Future<void> generateEnrollmentKey({
@@ -1356,22 +1441,117 @@ class DatabaseHelper {
     try {
       await db.execute('ALTER TABLE reg_links ADD COLUMN section TEXT');
     } catch (_) {}
-
-    // Ensure teacher role is properly set for teacher accounts
     try {
-      await db.update('users', {'role': 'teacher'}, where: 'email = ?', whereArgs: ['john.reyes@deped.gov.ph']);
-      final existingAdmin2 = await db.query('users', where: 'email = ?', whereArgs: ['admin@aira.edu']);
-      if (existingAdmin2.isEmpty) {
+      await db.execute('ALTER TABLE users ADD COLUMN username TEXT');
+    } catch (_) {}
+
+    // Ensure super admin account exists with username, email, and credentials
+    try {
+      final existingAdmin1 = await db.query('users', where: 'email = ?', whereArgs: ['aira@admin']);
+      final saltAdmin1 = generateSalt();
+      if (existingAdmin1.isEmpty) {
         await db.insert('users', {
-          'id': 'admin_2',
-          'email': 'admin@aira.edu',
-          'password': 'Admin@123',
-          'role': 'admin',
-          'full_name': 'School Administrator',
+          'id': 'admin_1',
+          'email': 'aira@admin',
+          'password': hashPassword('aira@admin', saltAdmin1),
+          'password_salt': saltAdmin1,
+          'role': 'super_admin',
+          'full_name': 'Aira Admin',
+          'username': 'Aira Admin',
           'section': null,
           'grade': null,
           'created_at': DateTime.now().toIso8601String(),
         });
+      } else {
+        final currentSalt = existingAdmin1.first['password_salt'] as String?;
+        final currentPass = existingAdmin1.first['password'] as String?;
+        if (currentSalt == null || currentSalt.isEmpty || currentPass == 'aira@admin') {
+          await db.update('users', {
+            'username': 'Aira Admin',
+            'full_name': 'Aira Admin',
+            'password': hashPassword('aira@admin', saltAdmin1),
+            'password_salt': saltAdmin1,
+            'role': 'super_admin',
+          }, where: 'email = ?', whereArgs: ['aira@admin']);
+        }
+      }
+    } catch (_) {}
+
+    // Ensure admin_2 has username & hashed password
+    try {
+      final existingAdmin2 = await db.query('users', where: 'email = ?', whereArgs: ['admin@aira.edu']);
+      final saltAdmin2 = generateSalt();
+      if (existingAdmin2.isEmpty) {
+        await db.insert('users', {
+          'id': 'admin_2',
+          'email': 'admin@aira.edu',
+          'password': hashPassword('Admin@123', saltAdmin2),
+          'password_salt': saltAdmin2,
+          'role': 'admin',
+          'full_name': 'School Administrator',
+          'username': 'admin',
+          'section': null,
+          'grade': null,
+          'created_at': DateTime.now().toIso8601String(),
+        });
+      } else {
+        final currentSalt = existingAdmin2.first['password_salt'] as String?;
+        final currentPass = existingAdmin2.first['password'] as String?;
+        if (currentSalt == null || currentSalt.isEmpty || currentPass == 'Admin@123') {
+          await db.update('users', {
+            'username': 'admin',
+            'password': hashPassword('Admin@123', saltAdmin2),
+            'password_salt': saltAdmin2,
+          }, where: 'email = ?', whereArgs: ['admin@aira.edu']);
+        }
+      }
+    } catch (_) {}
+
+    // Ensure username column exists on users table if not already present
+    try {
+      await db.execute('ALTER TABLE users ADD COLUMN username TEXT');
+    } catch (_) {}
+
+    // Ensure teacher and student have correct roles, usernames, and hashed passwords
+    try {
+      final teacherRow = await db.query('users', where: "email = 'john.reyes@deped.gov.ph' OR id = 'teacher_1'");
+      if (teacherRow.isNotEmpty) {
+        // Ensure teacher role is explicitly 'teacher'
+        await db.update(
+          'users',
+          {'role': 'teacher'},
+          where: "(email = 'john.reyes@deped.gov.ph' OR id = 'teacher_1') AND role != 'teacher'",
+        );
+
+        final currentSalt = teacherRow.first['password_salt'] as String?;
+        final currentPass = teacherRow.first['password'] as String?;
+        if (currentSalt == null || currentSalt.isEmpty || currentPass == 'John@123') {
+          final saltTeacher = generateSalt();
+          await db.update('users', {
+            'role': 'teacher',
+            'username': 'john.reyes',
+            'full_name': 'Sir John Reyes',
+            'password': hashPassword('John@123', saltTeacher),
+            'password_salt': saltTeacher,
+          }, where: "id = ?", whereArgs: [teacherRow.first['id']]);
+        }
+      }
+
+      final studentRow = await db.query('users', where: "email = 'maria@test.com' OR id = 'student_1'");
+      if (studentRow.isNotEmpty) {
+        final currentSalt = studentRow.first['password_salt'] as String?;
+        final currentPass = studentRow.first['password'] as String?;
+        if (currentSalt == null || currentSalt.isEmpty || currentPass == 'Maria@123') {
+          final saltStudent = generateSalt();
+          await db.update('users', {
+            'role': 'student',
+            'username': 'maria.lopez',
+            'section': 'Emerald',
+            'grade': 'Grade 10',
+            'password': hashPassword('Maria@123', saltStudent),
+            'password_salt': saltStudent,
+          }, where: "id = ?", whereArgs: [studentRow.first['id']]);
+        }
       }
     } catch (_) {}
 
@@ -1394,17 +1574,20 @@ class DatabaseHelper {
       });
     }
 
-    // Seed Subjects if empty
-    final existingSubjects = await db.query('subjects');
-    if (existingSubjects.isEmpty) {
-      // Subject 1: CS101
-      final cs101Id = await db.insert('subjects', {
+    // Ensure core curriculum subjects CS101 and CS202 exist
+    final existingCs101 = await db.query('subjects', where: 'subject_code = ?', whereArgs: ['CS101']);
+    int cs101Id = 0;
+    int lo1Id = 0;
+    if (existingCs101.isEmpty) {
+      cs101Id = await db.insert('subjects', {
         'name': 'Introduction to Flutter & Dart',
         'subject_code': 'CS101',
         'description': 'Master cross-platform mobile development with Flutter framework and the modern Dart language.',
         'grade_level': 'Grade 10',
         'semester': '1st Semester',
         'unlock_type': 'Sequential',
+        'teacher_id': 'teacher_1',
+        'teacher_name': 'Sir John Reyes',
         'created_at': DateTime.now().subtract(const Duration(days: 5)).toIso8601String(),
       });
 
@@ -1417,7 +1600,7 @@ class DatabaseHelper {
       });
 
       // LO 1
-      final lo1Id = await db.insert('learning_outcomes', {
+      lo1Id = await db.insert('learning_outcomes', {
         'topic_id': topic1Id,
         'title': 'Variables, Types, and Functions',
         'description': 'Understand variable declarations, data types, and functions in Dart.',
@@ -1478,12 +1661,20 @@ class DatabaseHelper {
         'created_at': DateTime.now().subtract(const Duration(days: 5)).toIso8601String(),
       });
 
+      // Topic 2
+      final topic2Id = await db.insert('topics', {
+        'subject_id': cs101Id,
+        'title': 'Topic 2: Flutter Widgets & Layouts',
+        'description': 'Master Stateless and Stateful widgets, layout composition, and Material Design components.',
+        'created_at': DateTime.now().subtract(const Duration(days: 4)).toIso8601String(),
+      });
+
       // LO 2
       final lo2Id = await db.insert('learning_outcomes', {
-        'topic_id': topic1Id,
-        'title': 'Classes, Objects & Sound Null Safety',
-        'description': 'Construct object classes and handle null safety responsibly.',
-        'performance_criteria': 'Apply encapsulation and sound null safety in classes.',
+        'topic_id': topic2Id,
+        'title': 'Widget Tree & Composition',
+        'description': 'Understand how Flutter builds and renders the widget tree hierarchy.',
+        'performance_criteria': 'Build responsive multi-child layouts using Column, Row, and Flex.',
         'passing_score': 70,
         'schedule_start': null,
         'schedule_end': null,
@@ -1495,46 +1686,28 @@ class DatabaseHelper {
       await db.insert('contents', {
         'lo_id': lo2Id,
         'content_type': 'Text',
-        'title': 'Null Safety in Dart',
-        'content_data': 'Sound null safety prevents null reference exceptions. By default, types cannot be null.\n\nTo allow a variable to be null, append a question mark (?):\nString? optionalText;\n\nUse the null assertion operator (!) only when you are sure the value is not null.',
+        'title': 'Stateless vs Stateful Widgets',
+        'content_data': 'In Flutter, almost everything is a widget. A StatelessWidget never changes its configuration during its lifetime, while a StatefulWidget maintains mutable state that can trigger rebuilds via setState().',
         'created_at': DateTime.now().subtract(const Duration(days: 4)).toIso8601String(),
       });
 
       await db.insert('questions', {
         'lo_id': lo2Id,
-        'question_text': 'How do you specify that a variable of type String can hold a null value in Dart?',
-        'option_a': 'String? text',
-        'option_b': 'String! text',
-        'option_c': 'nullable String text',
-        'option_d': 'String text = null',
+        'question_text': 'Which widget is best suited for displaying an immutable icon or label?',
+        'option_a': 'StatelessWidget',
+        'option_b': 'StatefulWidget',
+        'option_c': 'InheritedWidget',
+        'option_d': 'RenderObjectWidget',
         'correct_option': 'A',
         'created_at': DateTime.now().subtract(const Duration(days: 4)).toIso8601String(),
-      });
-      await db.insert('questions', {
-        'lo_id': lo2Id,
-        'question_text': 'Which keyword is used in Dart to inherit methods and properties from a parent class?',
-        'option_a': 'implements',
-        'option_b': 'extends',
-        'option_c': 'inherits',
-        'option_d': 'with',
-        'correct_option': 'B',
-        'created_at': DateTime.now().subtract(const Duration(days: 4)).toIso8601String(),
-      });
-
-      // Topic 2
-      final topic2Id = await db.insert('topics', {
-        'subject_id': cs101Id,
-        'title': 'Topic 2: Flutter Widget Tree & State',
-        'description': 'Explore widgets, stateless vs stateful design, and user interaction.',
-        'created_at': DateTime.now().subtract(const Duration(days: 3)).toIso8601String(),
       });
 
       // LO 3
       final lo3Id = await db.insert('learning_outcomes', {
         'topic_id': topic2Id,
-        'title': 'Stateless vs Stateful Widgets',
-        'description': 'Differentiate between immutable and mutable widgets.',
-        'performance_criteria': 'Choose appropriate widget types based on state requirements.',
+        'title': 'State Management Basics',
+        'description': 'Manage ephemeral state inside StatefulWidgets.',
+        'performance_criteria': 'Properly call setState() to trigger widget tree updates.',
         'passing_score': 70,
         'schedule_start': null,
         'schedule_end': null,
@@ -1546,18 +1719,18 @@ class DatabaseHelper {
       await db.insert('contents', {
         'lo_id': lo3Id,
         'content_type': 'Text',
-        'title': 'StatelessWidget vs StatefulWidget',
-        'content_data': 'A StatelessWidget never changes once created. Examples include Text, Icon, and Container.\n\nA StatefulWidget can change its appearance in response to user input or events using the setState() method.',
+        'title': 'Lifecycle of a StatefulWidget',
+        'content_data': 'A StatefulWidget creates a State object whose lifecycle includes createState(), initState(), didChangeDependencies(), build(), and dispose(). Always clean up controllers in dispose().',
         'created_at': DateTime.now().subtract(const Duration(days: 3)).toIso8601String(),
       });
 
       await db.insert('questions', {
         'lo_id': lo3Id,
-        'question_text': 'Which widget is best suited for displaying static content like text or icons that never changes?',
-        'option_a': 'StatefulWidget',
-        'option_b': 'StatelessWidget',
-        'option_c': 'InheritedWidget',
-        'option_d': 'AnimatedWidget',
+        'question_text': 'Which lifecycle method is called exactly once when a State object is inserted into the tree?',
+        'option_a': 'build()',
+        'option_b': 'initState()',
+        'option_c': 'didUpdateWidget()',
+        'option_d': 'dispose()',
         'correct_option': 'B',
         'created_at': DateTime.now().subtract(const Duration(days: 3)).toIso8601String(),
       });
@@ -1571,15 +1744,28 @@ class DatabaseHelper {
         'correct_option': 'B',
         'created_at': DateTime.now().subtract(const Duration(days: 3)).toIso8601String(),
       });
+    } else {
+      cs101Id = existingCs101.first['id'] as int;
+      await db.update('subjects', {
+        'teacher_id': 'teacher_1',
+        'teacher_name': 'Sir John Reyes',
+        'grade_level': 'Grade 10',
+      }, where: 'id = ?', whereArgs: [cs101Id]);
+    }
 
-      // Subject 2: CS202
-      final cs202Id = await db.insert('subjects', {
+    // Ensure Subject 2: CS202 exists
+    final existingCs202 = await db.query('subjects', where: 'subject_code = ?', whereArgs: ['CS202']);
+    int cs202Id = 0;
+    if (existingCs202.isEmpty) {
+      cs202Id = await db.insert('subjects', {
         'name': 'Mobile UI & State Management',
         'subject_code': 'CS202',
         'description': 'Advanced mobile UI development with Riverpod and responsive layout design.',
-        'grade_level': 'Grade 10',
+        'grade_level': 'Grade 11',
         'semester': '1st Semester',
         'unlock_type': 'Flexible',
+        'teacher_id': 'teacher_1',
+        'teacher_name': 'Sir John Reyes',
         'created_at': DateTime.now().subtract(const Duration(days: 2)).toIso8601String(),
       });
 
@@ -1631,8 +1817,17 @@ class DatabaseHelper {
         'correct_option': 'B',
         'created_at': DateTime.now().subtract(const Duration(days: 2)).toIso8601String(),
       });
+    } else {
+      cs202Id = existingCs202.first['id'] as int;
+      await db.update('subjects', {
+        'teacher_id': 'teacher_1',
+        'teacher_name': 'Sir John Reyes',
+        'grade_level': 'Grade 11',
+      }, where: 'id = ?', whereArgs: [cs202Id]);
+    }
 
-      // Pre-enroll student_1 (Maria Lopez) in CS101 and seed an initial quiz attempt
+    // Pre-enroll student_1 (Maria Lopez) in CS101 and seed an initial quiz attempt
+    if (cs101Id > 0 && lo1Id > 0) {
       await db.insert('enrollments', {
         'student_id': 'student_1',
         'subject_id': cs101Id,
@@ -1698,6 +1893,180 @@ class DatabaseHelper {
         where: 'teacher_id IS NULL OR teacher_id = ?',
         whereArgs: [''],
       );
+    } catch (_) {}
+
+    // Ensure authentic students across multiple sections exist and are enrolled in teacher courses
+    try {
+      final defaultStudents = [
+        {
+          'id': 'student_1',
+          'email': 'maria@test.com',
+          'username': 'maria.lopez',
+          'password': 'Maria@123',
+          'role': 'student',
+          'full_name': 'Maria Lopez',
+          'section': 'Grade 10 - Emerald',
+          'grade': 'Grade 10',
+          'created_at': DateTime.now().subtract(const Duration(days: 5)).toIso8601String(),
+        },
+        {
+          'id': 'student_2',
+          'email': 'juan.delacruz@school.edu',
+          'username': 'juan.delacruz',
+          'password': 'Juan@123',
+          'role': 'student',
+          'full_name': 'Juan Dela Cruz',
+          'section': 'Grade 10 - Emerald',
+          'grade': 'Grade 10',
+          'created_at': DateTime.now().subtract(const Duration(days: 4)).toIso8601String(),
+        },
+        {
+          'id': 'student_3',
+          'email': 'angela.santos@school.edu',
+          'username': 'angela.santos',
+          'password': 'Angela@123',
+          'role': 'student',
+          'full_name': 'Angela Santos',
+          'section': 'Grade 11 - STEM B',
+          'grade': 'Grade 11',
+          'created_at': DateTime.now().subtract(const Duration(days: 4)).toIso8601String(),
+        },
+        {
+          'id': 'student_4',
+          'email': 'mark.bautista@school.edu',
+          'username': 'mark.bautista',
+          'password': 'Mark@123',
+          'role': 'student',
+          'full_name': 'Mark Bautista',
+          'section': 'Grade 10 - Emerald',
+          'grade': 'Grade 10',
+          'created_at': DateTime.now().subtract(const Duration(days: 3)).toIso8601String(),
+        },
+      ];
+
+      for (final s in defaultStudents) {
+        final existing = await db.query('users', where: 'id = ? OR email = ?', whereArgs: [s['id'], s['email']]);
+        if (existing.isEmpty) {
+          final salt = generateSalt();
+          final userToInsert = Map<String, dynamic>.from(s);
+          userToInsert['password'] = hashPassword(s['password'] as String, salt);
+          userToInsert['password_salt'] = salt;
+          await db.insert('users', userToInsert);
+        } else {
+          final currentSalt = existing.first['password_salt'] as String?;
+          final currentPass = existing.first['password'] as String?;
+          final updateData = <String, dynamic>{
+            'section': s['section'],
+            'grade': s['grade'],
+            'role': 'student',
+            'full_name': s['full_name'],
+          };
+          if (currentSalt == null || currentSalt.isEmpty || currentPass == s['password']) {
+            final salt = generateSalt();
+            updateData['password'] = hashPassword(s['password'] as String, salt);
+            updateData['password_salt'] = salt;
+          }
+          await db.update('users', updateData, where: 'id = ?', whereArgs: [s['id']]);
+        }
+      }
+
+      // Normalize existing student records to valid section names from the sections table
+      await db.update(
+        'users',
+        {'section': 'Grade 10 - Emerald', 'grade': 'Grade 10'},
+        where: "role = 'student' AND (section IN ('Emerald', 'Ruby') OR id IN ('student_1', 'student_2', 'student_4'))",
+      );
+      await db.update(
+        'users',
+        {'section': 'Grade 11 - STEM B', 'grade': 'Grade 11'},
+        where: "role = 'student' AND (section IN ('Diamond', 'STEM B') OR id = 'student_3')",
+      );
+      // Remove any test section from sections table that isn't standard
+      await db.delete('sections', where: "name NOT IN ('Grade 10 - Emerald', 'Grade 11 - STEM B') AND name LIKE 'Sapphire%'");
+      // Update section student counts accurately
+      final emCount = Sqflite.firstIntValue(await db.rawQuery(
+        "SELECT COUNT(*) FROM users WHERE section = 'Grade 10 - Emerald' AND role = 'student'"
+      )) ?? 3;
+      final stemCount = Sqflite.firstIntValue(await db.rawQuery(
+        "SELECT COUNT(*) FROM users WHERE section = 'Grade 11 - STEM B' AND role = 'student'"
+      )) ?? 1;
+      await db.update('sections', {'student_count': emCount}, where: "name = 'Grade 10 - Emerald'");
+      await db.update('sections', {'student_count': stemCount}, where: "name = 'Grade 11 - STEM B'");
+
+      // Migrate any remaining unhashed passwords to salted SHA-256
+      try {
+        final unhashedUsers = await db.rawQuery(
+          "SELECT id, password FROM users WHERE password_salt IS NULL OR password_salt = ''"
+        );
+        for (final u in unhashedUsers) {
+          final id = u['id'] as String;
+          final pass = u['password'] as String;
+          final salt = generateSalt();
+          final hashed = hashPassword(pass, salt);
+          await db.update('users', {
+            'password': hashed,
+            'password_salt': salt,
+          }, where: 'id = ?', whereArgs: [id]);
+        }
+      } catch (_) {}
+
+      // Remove temporary test subjects that may linger from tests
+      await db.delete('subjects', where: "name LIKE 'Test Subject for Deletion%'");
+
+      // Ensure enrollments for CS101 and CS202
+      final cs101Rows = await db.query('subjects', where: 'subject_code = ?', whereArgs: ['CS101']);
+      final cs202Rows = await db.query('subjects', where: 'subject_code = ?', whereArgs: ['CS202']);
+
+      if (cs101Rows.isNotEmpty) {
+        final sub1Id = cs101Rows.first['id'] as int;
+        for (final sid in ['student_1', 'student_2', 'student_4']) {
+          final enr = await db.query('enrollments', where: 'student_id = ? AND subject_id = ?', whereArgs: [sid, sub1Id]);
+          if (enr.isEmpty) {
+            await db.insert('enrollments', {
+              'student_id': sid,
+              'subject_id': sub1Id,
+              'enrolled_at': DateTime.now().subtract(const Duration(days: 4)).toIso8601String(),
+              'status': 'active',
+            });
+          }
+        }
+      }
+
+      if (cs202Rows.isNotEmpty) {
+        final sub2Id = cs202Rows.first['id'] as int;
+        for (final sid in ['student_1', 'student_3']) {
+          final enr = await db.query('enrollments', where: 'student_id = ? AND subject_id = ?', whereArgs: [sid, sub2Id]);
+          if (enr.isEmpty) {
+            await db.insert('enrollments', {
+              'student_id': sid,
+              'subject_id': sub2Id,
+              'enrolled_at': DateTime.now().subtract(const Duration(days: 3)).toIso8601String(),
+              'status': 'active',
+            });
+          }
+        }
+      }
+
+      // If teacher_1 has any other subjects without enrollments, enroll authentic students
+      final otherTeacherSubjects = await db.query('subjects', where: "teacher_id = 'teacher_1' OR teacher_id LIKE '%reyes%'");
+      for (final sub in otherTeacherSubjects) {
+        final sid = sub['id'] as int;
+        final enrs = await db.query('enrollments', where: 'subject_id = ?', whereArgs: [sid]);
+        if (enrs.isEmpty) {
+          final g = (sub['grade_level'] as String?)?.toLowerCase() ?? '';
+          final targetStudents = g.contains('11')
+              ? ['student_3', 'student_1']
+              : ['student_1', 'student_2', 'student_4'];
+          for (final stId in targetStudents) {
+            await db.insert('enrollments', {
+              'student_id': stId,
+              'subject_id': sid,
+              'enrolled_at': DateTime.now().subtract(const Duration(days: 2)).toIso8601String(),
+              'status': 'active',
+            });
+          }
+        }
+      }
     } catch (_) {}
 
     // Seed Initial Assigned Quiz if none exists
@@ -1795,16 +2164,135 @@ class DatabaseHelper {
     return await db.delete('sections', where: 'id = ?', whereArgs: [id]);
   }
 
-  // ── Teachers & Subject Assignment ────────────────────────
+  // ── Teachers & Faculty Management ────────────────────────
   Future<List<Map<String, dynamic>>> getTeachersList() async {
     final db = await database;
-    return await db.query(
+    final teachers = await db.query(
       'users',
-      columns: ['id', 'email', 'full_name', 'role'],
       where: 'role = ?',
       whereArgs: ['teacher'],
       orderBy: 'full_name ASC',
     );
+
+    final List<Map<String, dynamic>> enriched = [];
+    for (final t in teachers) {
+      final tid = t['id'] as String;
+      final subjects = await getSubjectsForTeacher(tid);
+      final sections = await getSectionsForTeacher(tid);
+
+      // Student count across assigned subjects
+      int studentCount = 0;
+      final subIds = subjects.map((s) => s['id'] as int).toList();
+      if (subIds.isNotEmpty) {
+        final enrollments = await db.query(
+          'enrollments',
+          columns: ['student_id'],
+          where: 'subject_id IN (${subIds.map((_) => '?').join(',')}) AND status = ?',
+          whereArgs: [...subIds, 'active'],
+        );
+        studentCount = enrollments.map((e) => e['student_id'] as String).toSet().length;
+      }
+
+      enriched.add({
+        ...t,
+        'assigned_subjects_count': subjects.length,
+        'assigned_subjects': subjects,
+        'handled_sections': sections,
+        'student_count': studentCount,
+      });
+    }
+
+    return enriched;
+  }
+
+  Future<String> createTeacher({
+    required String fullName,
+    required String email,
+    required String password,
+    String? username,
+    List<int>? assignSubjectIds,
+  }) async {
+    final db = await database;
+    final salt = generateSalt();
+    final hashedPassword = hashPassword(password, salt);
+    final teacherId = 'teacher_${DateTime.now().millisecondsSinceEpoch}';
+    final resolvedUsername = (username != null && username.trim().isNotEmpty)
+        ? username.trim()
+        : (email.contains('@') ? email.split('@').first : fullName.trim().toLowerCase().replaceAll(' ', '.'));
+
+    await db.insert('users', {
+      'id': teacherId,
+      'email': email.trim(),
+      'username': resolvedUsername,
+      'password': hashedPassword,
+      'password_salt': salt,
+      'role': 'teacher',
+      'full_name': fullName.trim(),
+      'created_at': DateTime.now().toIso8601String(),
+    });
+
+    if (assignSubjectIds != null && assignSubjectIds.isNotEmpty) {
+      for (final subId in assignSubjectIds) {
+        await assignTeacherToSubject(subId, teacherId, fullName.trim());
+      }
+    }
+
+    return teacherId;
+  }
+
+  Future<void> updateTeacher(
+    String teacherId,
+    Map<String, dynamic> data, {
+    List<int>? assignSubjectIds,
+  }) async {
+    final db = await database;
+    final updates = <String, dynamic>{};
+    if (data.containsKey('full_name')) updates['full_name'] = (data['full_name'] as String).trim();
+    if (data.containsKey('email')) updates['email'] = (data['email'] as String).trim();
+    if (data.containsKey('username')) updates['username'] = (data['username'] as String).trim();
+    if (data.containsKey('password')) {
+      final rawPass = data['password'] as String;
+      if (rawPass.isNotEmpty) {
+        final salt = generateSalt();
+        updates['password'] = hashPassword(rawPass, salt);
+        updates['password_salt'] = salt;
+      }
+    }
+
+    if (updates.isNotEmpty) {
+      await db.update('users', updates, where: 'id = ?', whereArgs: [teacherId]);
+    }
+
+    final teacherRows = await db.query('users', columns: ['full_name'], where: 'id = ?', whereArgs: [teacherId]);
+    final teacherName = (teacherRows.isNotEmpty ? teacherRows.first['full_name'] as String? : null) ?? 'Teacher';
+
+    if (assignSubjectIds != null) {
+      // Unassign subjects previously assigned to this teacher
+      await db.update(
+        'subjects',
+        {'teacher_id': null, 'teacher_name': null},
+        where: 'teacher_id = ?',
+        whereArgs: [teacherId],
+      );
+
+      // Assign the new list
+      for (final subId in assignSubjectIds) {
+        await assignTeacherToSubject(subId, teacherId, teacherName);
+      }
+    }
+  }
+
+  Future<void> deleteTeacher(String teacherId) async {
+    final db = await database;
+    // Unassign all subjects
+    await db.update(
+      'subjects',
+      {'teacher_id': null, 'teacher_name': null},
+      where: 'teacher_id = ?',
+      whereArgs: [teacherId],
+    );
+    // Delete the teacher account
+    await db.delete('users', where: 'id = ?', whereArgs: [teacherId]);
   }
 
   Future<List<Map<String, dynamic>>> getSubjectsForTeacher(String teacherId) async {
@@ -1817,7 +2305,7 @@ class DatabaseHelper {
     );
   }
 
-    Future<int> assignTeacherToSubject(int subjectId, String teacherId, String teacherName) async {
+  Future<int> assignTeacherToSubject(int subjectId, String teacherId, String teacherName) async {
     final db = await database;
     return await db.update(
       'subjects',
@@ -1892,6 +2380,22 @@ class DatabaseHelper {
       }
     }
 
+    // Fallback: If totalStudents is 0 but teacher has subjects, count students from handled sections
+    if (totalStudents == 0 && subjectIds.isNotEmpty) {
+      final handledSections = await getSectionsForTeacher(teacherId);
+      if (handledSections.isNotEmpty) {
+        final handledLower = handledSections.map((s) => s.toLowerCase().trim()).toSet();
+        final allStudents = await db.query('users', where: 'role = ?', whereArgs: ['student']);
+        final matched = allStudents.where((s) {
+          final sec = (s['section'] as String?)?.toLowerCase().trim() ?? '';
+          return sec.isNotEmpty && (handledLower.contains(sec) || handledLower.any((h) => h.contains(sec) || sec.contains(h)));
+        }).length;
+        if (matched > 0) {
+          totalStudents = matched;
+        }
+      }
+    }
+
     // Recent 10 attempts
     final recent = await db.rawQuery('''
       SELECT qa.*, u.full_name as student_name, s.name as subject_name
@@ -1914,41 +2418,304 @@ class DatabaseHelper {
     };
   }
 
-  /// Student roster for teacher with progress per subject
+  /// Student roster for teacher with progress per subject and section-based queries
   Future<List<Map<String, dynamic>>> getStudentsForTeacher(String teacherId, {String? section, String? query}) async {
     final db = await database;
     final subjects = await getSubjectsForTeacher(teacherId);
     final subjectIds = subjects.map((s) => s['id'] as int).toList();
-    if (subjectIds.isEmpty) return [];
 
-    final enrollments = await db.query('enrollments', where: 'subject_id IN (${subjectIds.map((_) => '?').join(',')})', whereArgs: subjectIds);
-    final studentIds = enrollments.map((e) => e['student_id'] as String).toSet().toList();
-    if (studentIds.isEmpty) return [];
+    // Enrollments for this teacher's subjects
+    List<Map<String, dynamic>> enrollments = [];
+    if (subjectIds.isNotEmpty) {
+      enrollments = await db.query(
+        'enrollments',
+        where: 'subject_id IN (${subjectIds.map((_) => '?').join(',')})',
+        whereArgs: subjectIds,
+      );
+    }
+    final enrolledStudentIds = enrollments.map((e) => e['student_id'] as String).toSet();
 
-    final students = await db.query('users', where: 'id IN (${studentIds.map((_) => '?').join(',')})', whereArgs: studentIds);
+    // Query students
+    List<Map<String, dynamic>> students;
+    if (section != null && section.isNotEmpty && section != 'All Sections' && section != 'All Handled Sections') {
+      // Find students whose section matches or who are enrolled in teacher's subjects with this section
+      final cleanSection = section.trim().toLowerCase();
+      final candidates = await db.query(
+        'users',
+        where: 'role = ?',
+        whereArgs: ['student'],
+      );
+      students = candidates.where((s) {
+        final studentSec = (s['section'] as String?)?.trim().toLowerCase() ?? '';
+        if (studentSec.isEmpty) return false;
+        return studentSec == cleanSection || studentSec.contains(cleanSection);
+      }).toList();
+    } else {
+      // All sections: find all students enrolled in teacher's subjects,
+      // OR students belonging to any of teacher's handled sections
+      final handledSections = await getSectionsForTeacher(teacherId);
+      final handledLower = handledSections.map((s) => s.toLowerCase().trim()).toSet();
+
+      final allStudents = await db.query('users', where: 'role = ?', whereArgs: ['student']);
+      students = allStudents.where((s) {
+        final sid = s['id'] as String;
+        final sec = (s['section'] as String?)?.toLowerCase().trim() ?? '';
+        return enrolledStudentIds.contains(sid) ||
+            (sec.isNotEmpty && handledLower.contains(sec)) ||
+            handledLower.any((h) => h.isNotEmpty && sec.isNotEmpty && (sec.contains(h) || h.contains(sec)));
+      }).toList();
+    }
+
     final list = <Map<String, dynamic>>[];
     for (final s in students) {
       final sid = s['id'] as String;
-      final sec = (s['section'] as String?) ?? '';
-      if (section != null && section.isNotEmpty && section != 'All Sections' && sec != section) continue;
       final name = (s['full_name'] as String?) ?? '';
       final email = (s['email'] as String?) ?? '';
+      final username = (s['username'] as String?) ?? '';
+
       if (query != null && query.trim().isNotEmpty) {
-        final q = query.toLowerCase();
-        if (!name.toLowerCase().contains(q) && !email.toLowerCase().contains(q)) continue;
+        final q = query.toLowerCase().trim();
+        if (!name.toLowerCase().contains(q) &&
+            !email.toLowerCase().contains(q) &&
+            !username.toLowerCase().contains(q)) {
+          continue;
+        }
       }
+
       // Progress for this student in teacher's subjects
-      final progress = await db.rawQuery('''
-        SELECT * FROM student_progress WHERE student_id = ?
-      ''', [sid]);
-      final completedLos = progress.where((p) => (p['is_completed'] as int?) == 1).length;
+      int completedLos = 0;
+      if (subjectIds.isNotEmpty) {
+        final progress = await db.rawQuery('''
+          SELECT * FROM student_progress 
+          WHERE student_id = ? AND subject_id IN (${subjectIds.map((_) => '?').join(',')})
+        ''', [sid, ...subjectIds]);
+        completedLos = progress.where((p) => (p['is_completed'] as int?) == 1).length;
+      }
+
+      final studentSubjectEnrollments = enrollments.where((e) => e['student_id'] == sid).length;
+      final isEnrolled = enrolledStudentIds.contains(sid);
+
       list.add({
         ...s,
         'completed_los': completedLos,
-        'enrolled_subjects': enrollments.where((e) => e['student_id'] == sid).length,
+        'enrolled_subjects': studentSubjectEnrollments,
+        'is_enrolled': isEnrolled,
       });
     }
+
+    list.sort((a, b) => (a['full_name'] as String? ?? '').compareTo(b['full_name'] as String? ?? ''));
     return list;
+  }
+
+  /// Get handled sections with metadata, student counts, and enrolled courses
+  Future<List<Map<String, dynamic>>> getHandledSectionsWithDetails(String teacherId) async {
+    final db = await database;
+    final handledSectionNames = await getSectionsForTeacher(teacherId);
+    final subjects = await getSubjectsForTeacher(teacherId);
+    final subjectIds = subjects.map((s) => s['id'] as int).toList();
+
+    // Query sections table for metadata (room, description, grade)
+    final dbSections = await db.query('sections');
+    final sectionMetaMap = <String, Map<String, dynamic>>{};
+    for (final sec in dbSections) {
+      final name = (sec['name'] as String?)?.toLowerCase().trim() ?? '';
+      if (name.isNotEmpty) {
+        sectionMetaMap[name] = sec;
+      }
+    }
+
+    // Get all enrollments for teacher subjects
+    List<Map<String, dynamic>> teacherEnrollments = [];
+    if (subjectIds.isNotEmpty) {
+      teacherEnrollments = await db.query(
+        'enrollments',
+        where: 'subject_id IN (${subjectIds.map((_) => '?').join(',')})',
+        whereArgs: subjectIds,
+      );
+    }
+    final enrolledStudentIds = teacherEnrollments.map((e) => e['student_id'] as String).toSet();
+
+    final allStudents = await db.query('users', where: 'role = ?', whereArgs: ['student']);
+
+    final details = <Map<String, dynamic>>[];
+    for (final secName in handledSectionNames) {
+      final secLower = secName.toLowerCase().trim();
+
+      final studentsInSection = allStudents.where((s) {
+        final sSec = (s['section'] as String?)?.toLowerCase().trim() ?? '';
+        return sSec == secLower || (sSec.isNotEmpty && (sSec.contains(secLower) || secLower.contains(sSec)));
+      }).toList();
+
+      final totalStudents = studentsInSection.length;
+      final enrolledCount = studentsInSection.where((s) => enrolledStudentIds.contains(s['id'] as String)).length;
+
+      // Determine grade and room
+      String grade = '';
+      String room = '';
+      String description = '';
+
+      Map<String, dynamic>? meta = sectionMetaMap[secLower];
+      if (meta == null) {
+        for (final entry in sectionMetaMap.entries) {
+          if (entry.key.contains(secLower) || secLower.contains(entry.key)) {
+            meta = entry.value;
+            break;
+          }
+        }
+      }
+
+      if (meta != null) {
+        grade = meta['grade']?.toString() ?? '';
+        room = meta['room']?.toString() ?? '';
+        description = meta['description']?.toString() ?? '';
+      }
+      if (grade.isEmpty && studentsInSection.isNotEmpty) {
+        grade = studentsInSection.first['grade']?.toString() ?? '';
+      }
+      if (grade.isEmpty) {
+        grade = 'Senior High';
+      }
+
+      final subjectNames = subjects.map((s) => s['name']?.toString() ?? '').where((n) => n.isNotEmpty).toList();
+
+      details.add({
+        'name': secName,
+        'grade': grade,
+        'room': room,
+        'description': description,
+        'student_count': totalStudents > 0 ? totalStudents : enrolledCount,
+        'enrolled_count': enrolledCount,
+        'subjects': subjectNames,
+      });
+    }
+
+    details.sort((a, b) => (a['name'] as String? ?? '').compareTo(b['name'] as String? ?? ''));
+    return details;
+  }
+
+  /// Get distinct list of sections handled by a teacher (via students enrolled in assigned subjects)
+  Future<List<String>> getSectionsForTeacher(String teacherId) async {
+    final db = await database;
+    final subjects = await getSubjectsForTeacher(teacherId);
+    final subjectIds = subjects.map((s) => s['id'] as int).toList();
+    final sections = <String>{};
+
+    // Get all valid sections defined in the school sections table
+    final availableSections = await getAvailableSectionsList();
+
+    if (subjectIds.isNotEmpty) {
+      final enrollments = await db.query(
+        'enrollments',
+        where: 'subject_id IN (${subjectIds.map((_) => '?').join(',')})',
+        whereArgs: subjectIds,
+      );
+      final studentIds = enrollments.map((e) => e['student_id'] as String).toSet().toList();
+      if (studentIds.isNotEmpty) {
+        final students = await db.query(
+          'users',
+          columns: ['section'],
+          where: 'id IN (${studentIds.map((_) => '?').join(',')}) AND section IS NOT NULL',
+          whereArgs: studentIds,
+        );
+        for (final s in students) {
+          final sec = s['section']?.toString().trim();
+          if (sec != null && sec.isNotEmpty) {
+            // Match against available sections in the school
+            final matched = availableSections.firstWhere(
+              (avail) =>
+                  avail.toLowerCase() == sec.toLowerCase() ||
+                  avail.toLowerCase().contains(sec.toLowerCase()) ||
+                  sec.toLowerCase().contains(avail.toLowerCase()),
+              orElse: () => '',
+            );
+            if (matched.isNotEmpty) {
+              sections.add(matched);
+            }
+          }
+        }
+      }
+    }
+
+    // Resilient fallback: If no sections were found via enrollments, but the teacher has assigned subjects
+    if (sections.isEmpty && subjects.isNotEmpty) {
+      final subjectGrades = subjects
+          .map((s) => (s['grade_level'] as String?)?.trim().toLowerCase())
+          .where((g) => g != null && g.isNotEmpty)
+          .toSet();
+
+      if (subjectGrades.isNotEmpty) {
+        final secRows = await db.query('sections');
+        for (final r in secRows) {
+          final rGrade = (r['grade'] as String?)?.trim().toLowerCase();
+          final rName = (r['name'] as String?)?.trim();
+          if (rGrade != null && subjectGrades.contains(rGrade) && rName != null && rName.isNotEmpty) {
+            sections.add(rName);
+          }
+        }
+      }
+
+      // If still empty and teacher is teacher_1 (default faculty instructor), link to available school sections
+      if (sections.isEmpty && (teacherId == 'teacher_1' || teacherId.contains('reyes'))) {
+        sections.addAll(availableSections);
+      }
+    }
+
+    final sorted = sections.toList()..sort();
+    return sorted;
+  }
+
+  /// Get announcements for a teacher with optional section filtering
+  Future<List<Map<String, dynamic>>> getAnnouncementsForTeacher(String teacherId, {String? section}) async {
+    final db = await database;
+    final all = await db.query('announcements', orderBy: 'id DESC');
+    final handledSections = await getSectionsForTeacher(teacherId);
+
+    return all.where((a) {
+      final aSec = (a['section'] as String?)?.trim();
+      final isAuthor = a['author_id'] == teacherId;
+
+      // When filtered by a specific section (e.g. "Emerald")
+      if (section != null &&
+          section.isNotEmpty &&
+          section != 'All Handled Sections' &&
+          section != 'All Sections') {
+        return aSec == section;
+      }
+
+      // When set to 'All Handled Sections' or no filter:
+      // Show if authored by this teacher, or if broadcast to all sections,
+      // or if targeted to one of the teacher's handled sections
+      if (isAuthor) return true;
+      if (aSec == null ||
+          aSec.isEmpty ||
+          aSec == 'All Sections' ||
+          aSec == 'All Handled Sections') {
+        return true;
+      }
+      return handledSections.contains(aSec);
+    }).toList();
+  }
+
+  /// Get announcements targeted to a student based on audience and section
+  Future<List<Map<String, dynamic>>> getAnnouncementsForStudent(String? studentSection) async {
+    final db = await database;
+    final all = await db.query('announcements', orderBy: 'id DESC');
+    return all.where((a) {
+      final aud = (a['target_audience'] as String? ?? 'all').toLowerCase();
+      if (aud != 'all' && aud != 'students') return false;
+
+      final aSec = (a['section'] as String?)?.trim();
+      if (aSec == null ||
+          aSec.isEmpty ||
+          aSec == 'All Sections' ||
+          aSec == 'All Handled Sections') {
+        return true;
+      }
+      if (studentSection != null && studentSection.trim().isNotEmpty) {
+        return aSec.toLowerCase() == studentSection.trim().toLowerCase();
+      }
+      return false;
+    }).toList();
   }
 
   /// Get students enrolled in a subject, or all students if subject enrollments are empty
@@ -1993,6 +2760,78 @@ class DatabaseHelper {
       return list;
     } catch (e) {
       return [];
+    }
+  }
+
+  /// Returns all available subjects with is_enrolled flag and enrollment date for a given student
+  Future<List<Map<String, dynamic>>> getStudentEnrollmentsWithDetails(String studentId) async {
+    final db = await database;
+    final allSubjects = await db.query('subjects', orderBy: 'id ASC');
+    final activeEnrollments = await db.query(
+      'enrollments',
+      where: 'student_id = ? AND status = ?',
+      whereArgs: [studentId, 'active'],
+    );
+
+    final enrollmentMap = <int, Map<String, dynamic>>{};
+    for (final e in activeEnrollments) {
+      final subId = e['subject_id'] as int;
+      enrollmentMap[subId] = e;
+    }
+
+    return allSubjects.map((sub) {
+      final id = sub['id'] as int;
+      final isEnrolled = enrollmentMap.containsKey(id);
+      return {
+        ...sub,
+        'is_enrolled': isEnrolled,
+        'enrolled_at': isEnrolled ? enrollmentMap[id]!['enrolled_at'] : null,
+      };
+    }).toList();
+  }
+
+  /// Sets exactly which subjects a student is enrolled in, activating new ones and removing unselected ones
+  Future<void> setStudentEnrollments(String studentId, List<int> subjectIds) async {
+    final db = await database;
+    if (subjectIds.isEmpty) {
+      await db.delete(
+        'enrollments',
+        where: 'student_id = ?',
+        whereArgs: [studentId],
+      );
+      return;
+    }
+
+    // Delete enrollments not in subjectIds
+    await db.delete(
+      'enrollments',
+      where: 'student_id = ? AND subject_id NOT IN (${subjectIds.map((_) => '?').join(',')})',
+      whereArgs: [studentId, ...subjectIds],
+    );
+
+    // Insert or activate selected subjects
+    for (final subId in subjectIds) {
+      final existing = await db.query(
+        'enrollments',
+        where: 'student_id = ? AND subject_id = ?',
+        whereArgs: [studentId, subId],
+      );
+
+      if (existing.isEmpty) {
+        await db.insert('enrollments', {
+          'student_id': studentId,
+          'subject_id': subId,
+          'enrolled_at': DateTime.now().toIso8601String(),
+          'status': 'active',
+        });
+      } else {
+        await db.update(
+          'enrollments',
+          {'status': 'active'},
+          where: 'student_id = ? AND subject_id = ?',
+          whereArgs: [studentId, subId],
+        );
+      }
     }
   }
 
@@ -2250,6 +3089,36 @@ class DatabaseHelper {
       where: 'quiz_id = ? AND student_id = ?',
       whereArgs: [quizId, studentId],
     );
+
+    // Also ensure quiz_attempts has an entry if not already logged
+    final existing = await db.query(
+      'quiz_attempts',
+      where: 'quiz_id = ? AND student_id = ?',
+      whereArgs: [quizId, studentId],
+    );
+    if (existing.isEmpty) {
+      final qRes = await db.query('quizzes', where: 'id = ?', whereArgs: [quizId]);
+      if (qRes.isNotEmpty) {
+        final q = qRes.first;
+        final subjectId = (q['subject_id'] as int?) ?? 1;
+        final loId = (q['lo_id'] as int?) ?? 0;
+        final passingScore = (q['passing_score'] as int?) ?? 70;
+        final isPassed = percentage >= passingScore;
+
+        await db.insert('quiz_attempts', {
+          'student_id': studentId,
+          'lo_id': loId,
+          'quiz_id': quizId,
+          'subject_id': subjectId,
+          'score': score,
+          'total_questions': totalQuestions,
+          'percentage': percentage,
+          'is_passed': isPassed ? 1 : 0,
+          'duration_seconds': 0,
+          'attempted_at': now,
+        });
+      }
+    }
   }
 
   Future<List<Map<String, dynamic>>> getQuizAssignmentRoster(int quizId) async {
@@ -2272,6 +3141,11 @@ class DatabaseHelper {
     await db.delete('quiz_assignments', where: 'quiz_id = ?', whereArgs: [quizId]);
     await db.delete('questions', where: 'quiz_id = ?', whereArgs: [quizId]);
     await db.delete('quizzes', where: 'id = ?', whereArgs: [quizId]);
+  }
+
+  Future<void> updateSubjectUnlockType(int subjectId, String unlockType) async {
+    final db = await database;
+    await db.update('subjects', {'unlock_type': unlockType}, where: 'id = ?', whereArgs: [subjectId]);
   }
 }
 

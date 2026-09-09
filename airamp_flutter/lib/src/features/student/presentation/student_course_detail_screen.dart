@@ -20,6 +20,7 @@ class _StudentCourseDetailScreenState extends ConsumerState<StudentCourseDetailS
   Map<String, dynamic>? _subject;
   bool _loading = true;
   List<Map<String, dynamic>> _completedLos = [];
+  List<Map<String, dynamic>> _assignedQuizzes = [];
 
   @override
   void initState() {
@@ -35,7 +36,16 @@ class _StudentCourseDetailScreenState extends ConsumerState<StudentCourseDetailS
     await ref.read(subjectDetailProvider.notifier).loadHierarchy(id);
 
     final user = ref.read(authProvider);
-    final studentId = user?.id ?? 'student_1';
+    final studentId = user?.id;
+    if (studentId == null) {
+      if (mounted) {
+        setState(() {
+          _subject = subject;
+          _loading = false;
+        });
+      }
+      return;
+    }
 
     final db = await DatabaseHelper().database;
     final progressRows = await db.query(
@@ -44,10 +54,13 @@ class _StudentCourseDetailScreenState extends ConsumerState<StudentCourseDetailS
       whereArgs: [studentId, id],
     );
 
+    final assignedQuizzes = await DatabaseHelper().getAssignedQuizzesForStudent(studentId, subjectId: id);
+
     if (mounted) {
       setState(() {
         _subject = subject;
         _completedLos = progressRows;
+        _assignedQuizzes = assignedQuizzes;
         _loading = false;
       });
     }
@@ -257,6 +270,40 @@ class _StudentCourseDetailScreenState extends ConsumerState<StudentCourseDetailS
                 ),
               ),
               const SizedBox(height: 24),
+
+              // Assigned Quizzes Section
+              if (_assignedQuizzes.isNotEmpty) ...[
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Row(
+                      children: [
+                        Icon(Icons.quiz_outlined, color: AppTheme.primary, size: 22),
+                        const SizedBox(width: 8),
+                        Text(
+                          'Assigned Quizzes',
+                          style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: AppTheme.text),
+                        ),
+                      ],
+                    ),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                      decoration: BoxDecoration(
+                        color: AppTheme.primary.withValues(alpha: 0.15),
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(color: AppTheme.primary.withValues(alpha: 0.3)),
+                      ),
+                      child: Text(
+                        '${_assignedQuizzes.length} Quizzes',
+                        style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: AppTheme.primary),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 12),
+                ..._assignedQuizzes.map((q) => _buildCourseQuizCard(q)),
+                const SizedBox(height: 24),
+              ],
 
               // Curriculum Header
               Row(
@@ -718,6 +765,112 @@ class _StudentCourseDetailScreenState extends ConsumerState<StudentCourseDetailS
           ),
         );
       },
+    );
+  }
+
+  Widget _buildCourseQuizCard(Map<String, dynamic> q) {
+    final isCompleted = q['status'] == 'completed';
+    final title = q['title']?.toString() ?? 'Quiz';
+    final qCount = q['question_count'] ?? 0;
+    final timeLimit = q['time_limit_minutes'] ?? 0;
+    final score = q['score'] ?? 0;
+    final totalQ = q['total_questions'] ?? qCount;
+    final pct = (q['percentage'] as num?)?.toDouble() ?? 0.0;
+    final passingScore = (q['passing_score'] as int?) ?? 70;
+    final isPassed = pct >= passingScore;
+    final quizId = q['quiz_id'];
+
+    return Container(
+      margin: const EdgeInsets.only(bottom: 12),
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: AppTheme.surface,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(
+          color: isCompleted
+              ? (isPassed ? AppTheme.success.withValues(alpha: 0.4) : AppTheme.error.withValues(alpha: 0.4))
+              : AppTheme.warning.withValues(alpha: 0.4),
+        ),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Expanded(
+                child: Text(
+                  title,
+                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: AppTheme.text),
+                ),
+              ),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                decoration: BoxDecoration(
+                  color: isCompleted
+                      ? (isPassed ? AppTheme.success.withValues(alpha: 0.15) : AppTheme.error.withValues(alpha: 0.15))
+                      : AppTheme.warning.withValues(alpha: 0.15),
+                  borderRadius: BorderRadius.circular(6),
+                ),
+                child: Text(
+                  isCompleted ? (isPassed ? 'PASSED' : 'RETAKE REQUIRED') : 'PENDING',
+                  style: TextStyle(
+                    fontSize: 11,
+                    fontWeight: FontWeight.bold,
+                    color: isCompleted ? (isPassed ? AppTheme.success : AppTheme.error) : AppTheme.warning,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          Row(
+            children: [
+              Icon(Icons.help_outline, size: 14, color: AppTheme.textMuted),
+              const SizedBox(width: 4),
+              Text('$qCount questions', style: TextStyle(fontSize: 12, color: AppTheme.textSecondary)),
+              const SizedBox(width: 14),
+              Icon(Icons.timer_outlined, size: 14, color: AppTheme.textMuted),
+              const SizedBox(width: 4),
+              Text(
+                timeLimit > 0 ? '${timeLimit}m limit' : 'Untimed',
+                style: TextStyle(fontSize: 12, color: AppTheme.textSecondary),
+              ),
+              if (isCompleted) ...[
+                const SizedBox(width: 14),
+                Icon(Icons.grade_outlined, size: 14, color: AppTheme.textMuted),
+                const SizedBox(width: 4),
+                Text(
+                  'Score: $score/$totalQ (${pct.toStringAsFixed(0)}%)',
+                  style: TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w600,
+                    color: isPassed ? AppTheme.success : AppTheme.error,
+                  ),
+                ),
+              ],
+            ],
+          ),
+          const SizedBox(height: 12),
+          SizedBox(
+            width: double.infinity,
+            child: ElevatedButton.icon(
+              onPressed: () {
+                if (quizId != null) {
+                  context.push('/quiz/$quizId').then((_) => _loadData());
+                }
+              },
+              icon: Icon(isCompleted ? Icons.replay : Icons.play_arrow, size: 16),
+              label: Text(isCompleted ? 'Retake Quiz' : 'Start Quiz', style: const TextStyle(fontWeight: FontWeight.bold)),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: isCompleted ? AppTheme.surface : AppTheme.primary,
+                foregroundColor: isCompleted ? AppTheme.text : Colors.black,
+                side: isCompleted ? BorderSide(color: AppTheme.border) : null,
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+              ),
+            ),
+          ),
+        ],
+      ),
     );
   }
 }

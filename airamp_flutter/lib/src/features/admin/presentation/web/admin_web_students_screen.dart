@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../../core/theme/theme_provider.dart';
+import '../../../../core/database/database_helper.dart';
 import '../../data/admin_repository.dart';
 
 class AdminWebStudentsScreen extends ConsumerStatefulWidget {
@@ -281,7 +282,11 @@ class _AdminWebStudentsScreenState extends ConsumerState<AdminWebStudentsScreen>
       ),
       child: ClipRRect(
         borderRadius: BorderRadius.circular(16),
-        child: DataTable(
+        child: SingleChildScrollView(
+          scrollDirection: Axis.horizontal,
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(minWidth: 960),
+            child: DataTable(
           headingRowColor: WidgetStateProperty.all(AppTheme.background),
           dataRowMinHeight: 64,
           dataRowMaxHeight: 68,
@@ -380,22 +385,43 @@ class _AdminWebStudentsScreenState extends ConsumerState<AdminWebStudentsScreen>
                   ),
                 ),
 
-                // Action: Arrange Section
+                // Actions: Manage Courses & Arrange Section
                 DataCell(
-                  ElevatedButton.icon(
-                    onPressed: () => _showArrangeSectionDialog(studentId, name, section, grade, availableSections),
-                    icon: const Icon(Icons.sync_alt, size: 14),
-                    label: const Text('Move / Assign'),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: AppTheme.primary.withValues(alpha: 0.12),
-                      foregroundColor: AppTheme.primary,
-                      elevation: 0,
-                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(8),
-                        side: BorderSide(color: AppTheme.primary.withValues(alpha: 0.4)),
+                  Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      ElevatedButton.icon(
+                        onPressed: () => _showManageCoursesDialog(studentId, name),
+                        icon: const Icon(Icons.menu_book, size: 14),
+                        label: const Text('Courses'),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Colors.teal.withValues(alpha: 0.12),
+                          foregroundColor: Colors.teal,
+                          elevation: 0,
+                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(8),
+                            side: BorderSide(color: Colors.teal.withValues(alpha: 0.4)),
+                          ),
+                        ),
                       ),
-                    ),
+                      const SizedBox(width: 8),
+                      ElevatedButton.icon(
+                        onPressed: () => _showArrangeSectionDialog(studentId, name, section, grade, availableSections),
+                        icon: const Icon(Icons.sync_alt, size: 14),
+                        label: const Text('Move / Assign'),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: AppTheme.primary.withValues(alpha: 0.12),
+                          foregroundColor: AppTheme.primary,
+                          elevation: 0,
+                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(8),
+                            side: BorderSide(color: AppTheme.primary.withValues(alpha: 0.4)),
+                          ),
+                        ),
+                      ),
+                    ],
                   ),
                 ),
               ],
@@ -403,8 +429,10 @@ class _AdminWebStudentsScreenState extends ConsumerState<AdminWebStudentsScreen>
           }).toList(),
         ),
       ),
-    );
-  }
+    ),
+  ),
+);
+}
 
   Widget _buildMobileStudentCards(List<Map<String, dynamic>> students, List<String> availableSections) {
     return ListView.separated(
@@ -477,18 +505,34 @@ class _AdminWebStudentsScreenState extends ConsumerState<AdminWebStudentsScreen>
                 ],
               ),
               const SizedBox(height: 12),
-              SizedBox(
-                width: double.infinity,
-                child: OutlinedButton.icon(
-                  onPressed: () => _showArrangeSectionDialog(studentId, name, section, grade, availableSections),
-                  icon: const Icon(Icons.swap_horiz, size: 16),
-                  label: const Text('Arrange Perspective Section'),
-                  style: OutlinedButton.styleFrom(
-                    foregroundColor: AppTheme.primary,
-                    side: BorderSide(color: AppTheme.primary),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+              Row(
+                children: [
+                  Expanded(
+                    child: OutlinedButton.icon(
+                      onPressed: () => _showManageCoursesDialog(studentId, name),
+                      icon: const Icon(Icons.menu_book, size: 16),
+                      label: const Text('Courses'),
+                      style: OutlinedButton.styleFrom(
+                        foregroundColor: Colors.teal,
+                        side: const BorderSide(color: Colors.teal),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                      ),
+                    ),
                   ),
-                ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: OutlinedButton.icon(
+                      onPressed: () => _showArrangeSectionDialog(studentId, name, section, grade, availableSections),
+                      icon: const Icon(Icons.swap_horiz, size: 16),
+                      label: const Text('Section'),
+                      style: OutlinedButton.styleFrom(
+                        foregroundColor: AppTheme.primary,
+                        side: BorderSide(color: AppTheme.primary),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                      ),
+                    ),
+                  ),
+                ],
               ),
             ],
           ),
@@ -643,6 +687,139 @@ class _AdminWebStudentsScreenState extends ConsumerState<AdminWebStudentsScreen>
                   minimumSize: const Size(0, 40),
                 ),
                 child: const Text('Save & Reassign', style: TextStyle(fontWeight: FontWeight.bold)),
+              ),
+            ],
+          );
+        },
+      ),
+    );
+  }
+
+  Future<void> _showManageCoursesDialog(String studentId, String studentName) async {
+    final details = await DatabaseHelper().getStudentEnrollmentsWithDetails(studentId);
+    if (!mounted) return;
+
+    final selectedSubjectIds = details
+        .where((d) => d['is_enrolled'] == true)
+        .map((d) => d['id'] as int)
+        .toSet();
+
+    showDialog(
+      context: context,
+      builder: (dialogCtx) => StatefulBuilder(
+        builder: (context, setDialogState) {
+          return AlertDialog(
+            backgroundColor: AppTheme.surface,
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
+            title: Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: Colors.teal.withValues(alpha: 0.1),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: const Icon(Icons.menu_book, color: Colors.teal, size: 22),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text('Manage Course Enrollments', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: AppTheme.text)),
+                      Text('for $studentName', style: TextStyle(fontSize: 13, color: AppTheme.textSecondary)),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+            content: SizedBox(
+              width: 480,
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Select or unselect courses to customize this student\'s curriculum. Changes take effect immediately in the student app.',
+                    style: TextStyle(fontSize: 13, color: AppTheme.textSecondary),
+                  ),
+                  const SizedBox(height: 16),
+                  if (details.isEmpty)
+                    Text('No subjects created in curriculum yet.', style: TextStyle(color: AppTheme.textMuted))
+                  else
+                    Container(
+                      constraints: const BoxConstraints(maxHeight: 300),
+                      decoration: BoxDecoration(
+                        color: AppTheme.background,
+                        borderRadius: BorderRadius.circular(10),
+                        border: Border.all(color: AppTheme.border),
+                      ),
+                      child: ListView.separated(
+                        shrinkWrap: true,
+                        itemCount: details.length,
+                        separatorBuilder: (_, _) => Divider(height: 1, color: AppTheme.border),
+                        itemBuilder: (ctx, i) {
+                          final sub = details[i];
+                          final id = sub['id'] as int;
+                          final code = sub['subject_code'] as String? ?? '';
+                          final name = sub['name'] as String? ?? 'Course';
+                          final teacher = sub['teacher_name'] as String?;
+                          final isChecked = selectedSubjectIds.contains(id);
+
+                          return CheckboxListTile(
+                            value: isChecked,
+                            onChanged: (val) {
+                              setDialogState(() {
+                                if (val == true) {
+                                  selectedSubjectIds.add(id);
+                                } else {
+                                  selectedSubjectIds.remove(id);
+                                }
+                              });
+                            },
+                            title: Text(
+                              code.isNotEmpty ? '$code — $name' : name,
+                              style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: AppTheme.text),
+                            ),
+                            subtitle: teacher != null && teacher.isNotEmpty
+                                ? Text('Instructor: $teacher', style: TextStyle(fontSize: 11, color: AppTheme.textMuted))
+                                : null,
+                            activeColor: Colors.teal,
+                            dense: true,
+                          );
+                        },
+                      ),
+                    ),
+                ],
+              ),
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.of(dialogCtx).pop(),
+                child: Text('Cancel', style: TextStyle(color: AppTheme.textSecondary)),
+              ),
+              ElevatedButton(
+                onPressed: () async {
+                  await ref.read(adminStudentsProvider.notifier).updateStudentEnrollments(
+                        studentId,
+                        selectedSubjectIds.toList(),
+                      );
+                  if (context.mounted) {
+                    Navigator.of(dialogCtx).pop();
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                        content: Text('Updated course enrollments for $studentName (${selectedSubjectIds.length} courses)'),
+                        backgroundColor: Colors.green,
+                      ),
+                    );
+                  }
+                },
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Colors.teal,
+                  foregroundColor: Colors.white,
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                ),
+                child: const Text('Save Enrollments'),
               ),
             ],
           );

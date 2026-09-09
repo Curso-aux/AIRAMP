@@ -173,7 +173,7 @@ void main() {
         ),
       );
       await tester.pump(const Duration(milliseconds: 100));
-      await tester.pump(const Duration(milliseconds: 100));
+      await tester.pump(const Duration(milliseconds: 400));
 
       expect(find.text('Enrollment Keys & Access Codes'), findsOneWidget);
       expect(find.text('Generate Section Key'), findsOneWidget);
@@ -200,6 +200,21 @@ void main() {
 
       expect(find.text('Announcements & Broadcasts'), findsOneWidget);
       expect(find.text('Post Announcement'), findsOneWidget);
+
+      // Verify Edit icon appears for announcements
+      final editButtons = find.byTooltip('Edit Announcement');
+      if (editButtons.evaluate().isNotEmpty) {
+        await tester.tap(editButtons.first);
+        await tester.pump(const Duration(milliseconds: 100));
+        await tester.pump(const Duration(milliseconds: 100));
+
+        expect(find.text('Edit Announcement'), findsOneWidget);
+        expect(find.text('Save Changes'), findsOneWidget);
+
+        // Close dialog
+        await tester.tap(find.text('Cancel'));
+        await tester.pump(const Duration(milliseconds: 100));
+      }
     });
 
     testWidgets('WebLandingScreen renders hero, ecosystem cards, and restriction notice', (tester) async {

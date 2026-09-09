@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -32,6 +33,12 @@ class _AdminWebScaffoldState extends ConsumerState<AdminWebScaffold> {
       icon: Icons.people_outline,
       activeIcon: Icons.people,
       route: '/admin/students',
+    ),
+    AdminNavItem(
+      label: 'Faculty & Teachers',
+      icon: Icons.badge_outlined,
+      activeIcon: Icons.badge,
+      route: '/admin/teachers',
     ),
     AdminNavItem(
       label: 'Subjects & Courses',
@@ -445,10 +452,7 @@ class _AdminWebScaffoldState extends ConsumerState<AdminWebScaffold> {
               ],
               // Logout Action
               InkWell(
-                onTap: () {
-                  ref.read(authProvider.notifier).logout();
-                  context.go('/login');
-                },
+                onTap: () => _confirmLogout(context),
                 borderRadius: BorderRadius.circular(10),
                 child: Container(
                   width: double.infinity,
@@ -477,6 +481,62 @@ class _AdminWebScaffoldState extends ConsumerState<AdminWebScaffold> {
           ),
         ),
       ],
+    );
+  }
+
+  void _confirmLogout(BuildContext context) {
+    showDialog(
+      context: context,
+      builder: (dialogCtx) => AlertDialog(
+        backgroundColor: AppTheme.surface,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: Row(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                color: AppTheme.error.withValues(alpha: 0.12),
+                shape: BoxShape.circle,
+              ),
+              child: Icon(Icons.logout_rounded, color: AppTheme.error, size: 20),
+            ),
+            const SizedBox(width: 12),
+            Text(
+              'Sign Out',
+              style: TextStyle(color: AppTheme.text, fontWeight: FontWeight.bold, fontSize: 18),
+            ),
+          ],
+        ),
+        content: Text(
+          'Are you sure you want to sign out of the Admin Console?',
+          style: TextStyle(color: AppTheme.textSecondary, fontSize: 14, height: 1.4),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(dialogCtx).pop(),
+            child: Text(
+              'Cancel',
+              style: TextStyle(color: AppTheme.textMuted, fontWeight: FontWeight.w600),
+            ),
+          ),
+          ElevatedButton(
+            onPressed: () async {
+              Navigator.of(dialogCtx).pop();
+              await ref.read(authProvider.notifier).logout();
+              if (context.mounted) {
+                context.go(kIsWeb ? '/admin/login' : '/login');
+              }
+            },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppTheme.error,
+              foregroundColor: Colors.white,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+              padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 10),
+            ),
+            child: const Text('Sign Out', style: TextStyle(fontWeight: FontWeight.bold)),
+          ),
+        ],
+      ),
     );
   }
 }

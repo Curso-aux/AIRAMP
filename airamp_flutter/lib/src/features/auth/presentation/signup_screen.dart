@@ -16,6 +16,7 @@ class _SignupScreenState extends ConsumerState<SignupScreen> {
   String _error = '';
 
   final _fullNameController = TextEditingController();
+  final _usernameController = TextEditingController();
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
   final _confirmPasswordController = TextEditingController();
@@ -24,6 +25,7 @@ class _SignupScreenState extends ConsumerState<SignupScreen> {
   @override
   void dispose() {
     _fullNameController.dispose();
+    _usernameController.dispose();
     _emailController.dispose();
     _passwordController.dispose();
     _confirmPasswordController.dispose();
@@ -52,6 +54,9 @@ class _SignupScreenState extends ConsumerState<SignupScreen> {
             email: _emailController.text.trim(),
             password: _passwordController.text,
             role: 'student',
+            username: _usernameController.text.trim().isNotEmpty
+                ? _usernameController.text.trim()
+                : null,
             sectionCode: _invitationCodeController.text.trim().isEmpty
                 ? null
                 : _invitationCodeController.text.trim(),
@@ -180,6 +185,8 @@ class _SignupScreenState extends ConsumerState<SignupScreen> {
               if (_step == 1) ...[
                 _buildTextField('Full Name', Icons.person_outline, controller: _fullNameController),
                 const SizedBox(height: 14),
+                _buildTextField('Username (Optional)', Icons.alternate_email, controller: _usernameController),
+                const SizedBox(height: 14),
                 _buildTextField('Email', Icons.mail_outline, controller: _emailController),
                 const SizedBox(height: 14),
                 _buildTextField('Password', Icons.lock_outline, isPassword: true, controller: _passwordController),
@@ -217,6 +224,25 @@ class _SignupScreenState extends ConsumerState<SignupScreen> {
                     child: Text('Sign In', style: TextStyle(color: AppTheme.primary, fontWeight: FontWeight.bold)),
                   ),
                 ],
+              ),
+              const SizedBox(height: 12),
+              GestureDetector(
+                onTap: () => context.pushReplacement('/admin-signup'),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(Icons.school_outlined, size: 16, color: Theme.of(context).colorScheme.secondary),
+                    const SizedBox(width: 6),
+                    Text(
+                      'Are you a teacher? Register as Teacher',
+                      style: TextStyle(
+                        color: Theme.of(context).colorScheme.secondary,
+                        fontSize: 13,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ],
+                ),
               ),
             ],
           ),

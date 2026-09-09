@@ -229,11 +229,11 @@ class _AdminWebLoginScreenState extends ConsumerState<AdminWebLoginScreen> {
                   const SizedBox(height: 8),
                   TextField(
                     controller: _identifierController,
-                    keyboardType: TextInputType.emailAddress,
+                    keyboardType: TextInputType.text,
                     autofocus: true,
                     decoration: InputDecoration(
-                      hintText: 'e.g. aira@admin or admin@aira.edu',
-                      prefixIcon: const Icon(Icons.email_outlined, size: 20),
+                      hintText: 'e.g. Aira Admin, aira@admin, or admin@aira.edu',
+                      prefixIcon: const Icon(Icons.person_outline_rounded, size: 20),
                       filled: true,
                       fillColor: isDark ? Colors.black.withValues(alpha: 0.25) : Colors.black.withValues(alpha: 0.03),
                       border: OutlineInputBorder(

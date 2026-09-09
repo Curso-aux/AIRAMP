@@ -13,6 +13,7 @@ class AdminSignupScreen extends ConsumerStatefulWidget {
 
 class _AdminSignupScreenState extends ConsumerState<AdminSignupScreen> {
   final _fullNameController = TextEditingController();
+  final _usernameController = TextEditingController();
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
   final _codeController = TextEditingController();
@@ -21,6 +22,7 @@ class _AdminSignupScreenState extends ConsumerState<AdminSignupScreen> {
   @override
   void dispose() {
     _fullNameController.dispose();
+    _usernameController.dispose();
     _emailController.dispose();
     _passwordController.dispose();
     _codeController.dispose();
@@ -43,10 +45,13 @@ class _AdminSignupScreenState extends ConsumerState<AdminSignupScreen> {
             email: _emailController.text.trim(),
             password: _passwordController.text,
             role: 'teacher',
+            username: _usernameController.text.trim().isNotEmpty
+                ? _usernameController.text.trim()
+                : null,
           );
       final user = ref.read(authProvider);
       if (user != null && mounted) {
-        context.go('/student/home');
+        context.go('/teacher/dashboard');
       }
     } catch (e) {
       setState(() => _error = e.toString().replaceFirst('Exception: ', ''));
@@ -112,6 +117,8 @@ class _AdminSignupScreenState extends ConsumerState<AdminSignupScreen> {
                 ),
               
               _buildTextField('Full Name', Icons.person_outline, controller: _fullNameController),
+              const SizedBox(height: 14),
+              _buildTextField('Username (Optional)', Icons.alternate_email, controller: _usernameController),
               const SizedBox(height: 14),
               _buildTextField('Email (@deped.gov.ph)', Icons.mail_outline, controller: _emailController),
               const SizedBox(height: 14),

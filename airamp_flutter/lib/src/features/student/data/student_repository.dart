@@ -16,13 +16,17 @@ class StudentCoursesNotifier extends Notifier<List<Map<String, dynamic>>> {
     return [];
   }
 
-  String _getStudentId() {
+  String? _getStudentId() {
     final user = ref.watch(authProvider);
-    return user?.id ?? 'student_1';
+    return user?.id;
   }
 
   Future<void> _loadCourses() async {
     final studentId = _getStudentId();
+    if (studentId == null) {
+      if (ref.mounted) state = [];
+      return;
+    }
     final results = await DatabaseHelper().getEnrolledSubjects(studentId);
     if (!ref.mounted) return;
     state = results;
@@ -34,6 +38,7 @@ class StudentCoursesNotifier extends Notifier<List<Map<String, dynamic>>> {
 
   Future<void> enrollCourse(int subjectId) async {
     final studentId = _getStudentId();
+    if (studentId == null) return;
     await DatabaseHelper().enrollSubject(studentId, subjectId);
     await _loadCourses();
     ref.invalidate(availableCoursesProvider);
@@ -42,6 +47,7 @@ class StudentCoursesNotifier extends Notifier<List<Map<String, dynamic>>> {
 
   Future<void> unenrollCourse(int subjectId) async {
     final studentId = _getStudentId();
+    if (studentId == null) return;
     await DatabaseHelper().unenrollSubject(studentId, subjectId);
     await _loadCourses();
     ref.invalidate(availableCoursesProvider);
@@ -61,13 +67,17 @@ class AvailableCoursesNotifier extends Notifier<List<Map<String, dynamic>>> {
     return [];
   }
 
-  String _getStudentId() {
+  String? _getStudentId() {
     final user = ref.watch(authProvider);
-    return user?.id ?? 'student_1';
+    return user?.id;
   }
 
   Future<void> _loadAvailable() async {
     final studentId = _getStudentId();
+    if (studentId == null) {
+      if (ref.mounted) state = [];
+      return;
+    }
     final results = await DatabaseHelper().getAvailableSubjects(studentId);
     if (!ref.mounted) return;
     state = results;
@@ -99,13 +109,28 @@ class StudentProgressNotifier extends Notifier<Map<String, dynamic>> {
     };
   }
 
-  String _getStudentId() {
+  String? _getStudentId() {
     final user = ref.watch(authProvider);
-    return user?.id ?? 'student_1';
+    return user?.id;
   }
 
   Future<void> loadProgress({int? subjectId}) async {
     final studentId = _getStudentId();
+    if (studentId == null) {
+      if (ref.mounted) {
+        state = {
+          'activeCourses': 0,
+          'completed': 0,
+          'total': 0,
+          'pending': 0,
+          'average': 0.0,
+          'best': 0.0,
+          'totalAttempts': 0,
+          'passedAttempts': 0,
+        };
+      }
+      return;
+    }
     final summary = await DatabaseHelper().getStudentProgressSummary(studentId, subjectId: subjectId);
     if (!ref.mounted) return;
     state = summary;
@@ -126,14 +151,18 @@ class StudentQuizAssignmentsNotifier extends Notifier<List<Map<String, dynamic>>
     return [];
   }
 
-  String _getStudentId() {
+  String? _getStudentId() {
     final user = ref.watch(authProvider);
-    return user?.id ?? 'student_1';
+    return user?.id;
   }
 
   Future<void> loadAssignedQuizzes({int? subjectId}) async {
     _activeSubjectFilter = subjectId;
     final studentId = _getStudentId();
+    if (studentId == null) {
+      if (ref.mounted) state = [];
+      return;
+    }
     final results = await DatabaseHelper().getAssignedQuizzesForStudent(studentId, subjectId: subjectId);
     if (!ref.mounted) return;
     state = results;
@@ -156,14 +185,18 @@ class StudentQuizAttemptsNotifier extends Notifier<List<Map<String, dynamic>>> {
     return [];
   }
 
-  String _getStudentId() {
+  String? _getStudentId() {
     final user = ref.watch(authProvider);
-    return user?.id ?? 'student_1';
+    return user?.id;
   }
 
   Future<void> loadAttempts({int? subjectId}) async {
     _activeSubjectFilter = subjectId;
     final studentId = _getStudentId();
+    if (studentId == null) {
+      if (ref.mounted) state = [];
+      return;
+    }
     final results = await DatabaseHelper().getStudentQuizAttempts(studentId, subjectId: subjectId);
     if (!ref.mounted) return;
     state = results;
@@ -180,6 +213,7 @@ class StudentQuizAttemptsNotifier extends Notifier<List<Map<String, dynamic>>> {
     int durationSeconds = 0,
   }) async {
     final studentId = _getStudentId();
+    if (studentId == null) return;
     await DatabaseHelper().recordQuizAttempt(
       studentId: studentId,
       loId: loId,

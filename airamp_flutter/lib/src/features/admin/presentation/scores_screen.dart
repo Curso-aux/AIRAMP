@@ -107,35 +107,62 @@ class _ScoresScreenState extends ConsumerState<ScoresScreen> {
                       child: Icon(Icons.assignment_turned_in, color: Theme.of(context).colorScheme.primary, size: 28),
                     ),
                     const SizedBox(width: 12),
-                    Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          'Student Quiz Scores',
-                          style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: Theme.of(context).colorScheme.onSurface),
-                        ),
-                        const SizedBox(height: 2),
-                        Text(
-                          '$uniqueStudents active students · $totalAttempts total attempts',
-                          style: TextStyle(color: AppTheme.textSecondary, fontSize: 13),
-                        ),
-                      ],
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'Student Quiz Scores',
+                            style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: Theme.of(context).colorScheme.onSurface),
+                          ),
+                          const SizedBox(height: 2),
+                          Text(
+                            '$uniqueStudents active students · $totalAttempts total attempts',
+                            style: TextStyle(color: AppTheme.textSecondary, fontSize: 13),
+                          ),
+                        ],
+                      ),
                     ),
                   ],
                 ),
                 const SizedBox(height: 20),
 
                 // Stats Bar
-                Row(
-                  children: [
-                    Expanded(child: _buildTeacherStatCard('Records', '$totalAttempts', Icons.receipt_long, AppTheme.primary)),
-                    const SizedBox(width: 8),
-                    Expanded(child: _buildTeacherStatCard('Students', '$uniqueStudents', Icons.people, AppTheme.accent)),
-                    const SizedBox(width: 8),
-                    Expanded(child: _buildTeacherStatCard('Pass Rate', passRate, Icons.check_circle, AppTheme.success)),
-                    const SizedBox(width: 8),
-                    Expanded(child: _buildTeacherStatCard('Avg Score', avgScore, Icons.trending_up, AppTheme.warning)),
-                  ],
+                LayoutBuilder(
+                  builder: (context, constraints) {
+                    if (constraints.maxWidth < 600) {
+                      return Column(
+                        children: [
+                          Row(
+                            children: [
+                              Expanded(child: _buildTeacherStatCard('Records', '$totalAttempts', Icons.receipt_long, AppTheme.primary)),
+                              const SizedBox(width: 8),
+                              Expanded(child: _buildTeacherStatCard('Students', '$uniqueStudents', Icons.people, AppTheme.accent)),
+                            ],
+                          ),
+                          const SizedBox(height: 8),
+                          Row(
+                            children: [
+                              Expanded(child: _buildTeacherStatCard('Pass Rate', passRate, Icons.check_circle, AppTheme.success)),
+                              const SizedBox(width: 8),
+                              Expanded(child: _buildTeacherStatCard('Avg Score', avgScore, Icons.trending_up, AppTheme.warning)),
+                            ],
+                          ),
+                        ],
+                      );
+                    }
+                    return Row(
+                      children: [
+                        Expanded(child: _buildTeacherStatCard('Records', '$totalAttempts', Icons.receipt_long, AppTheme.primary)),
+                        const SizedBox(width: 8),
+                        Expanded(child: _buildTeacherStatCard('Students', '$uniqueStudents', Icons.people, AppTheme.accent)),
+                        const SizedBox(width: 8),
+                        Expanded(child: _buildTeacherStatCard('Pass Rate', passRate, Icons.check_circle, AppTheme.success)),
+                        const SizedBox(width: 8),
+                        Expanded(child: _buildTeacherStatCard('Avg Score', avgScore, Icons.trending_up, AppTheme.warning)),
+                      ],
+                    );
+                  },
                 ),
                 const SizedBox(height: 20),
 
@@ -444,10 +471,14 @@ class _ScoresScreenState extends ConsumerState<ScoresScreen> {
               const SizedBox(height: 10),
 
               // Score and timing bar
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              Wrap(
+                alignment: WrapAlignment.spaceBetween,
+                crossAxisAlignment: WrapCrossAlignment.center,
+                spacing: 12,
+                runSpacing: 6,
                 children: [
                   Row(
+                    mainAxisSize: MainAxisSize.min,
                     children: [
                       Text(
                         '$score/$total',
@@ -465,6 +496,7 @@ class _ScoresScreenState extends ConsumerState<ScoresScreen> {
                     ],
                   ),
                   Row(
+                    mainAxisSize: MainAxisSize.min,
                     children: [
                       Icon(Icons.calendar_today, size: 12, color: AppTheme.textMuted),
                       const SizedBox(width: 4),
@@ -503,100 +535,107 @@ class _ScoresScreenState extends ConsumerState<ScoresScreen> {
 
     showModalBottomSheet(
       context: context,
+      isScrollControlled: true,
       backgroundColor: AppTheme.surface,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
       ),
+      constraints: BoxConstraints(
+        maxWidth: 540,
+        maxHeight: MediaQuery.of(context).size.height * 0.88,
+      ),
       builder: (ctx) {
-        return Padding(
-          padding: EdgeInsets.only(
-            left: 24,
-            right: 24,
-            top: 20,
-            bottom: MediaQuery.of(ctx).padding.bottom + 20,
-          ),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Center(
-                child: Container(
-                  width: 40,
-                  height: 4,
-                  decoration: BoxDecoration(
-                    color: AppTheme.border,
-                    borderRadius: BorderRadius.circular(2),
+        return SafeArea(
+          child: SingleChildScrollView(
+            padding: EdgeInsets.only(
+              left: 24,
+              right: 24,
+              top: 16,
+              bottom: MediaQuery.of(ctx).padding.bottom + 20,
+            ),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Center(
+                  child: Container(
+                    width: 40,
+                    height: 4,
+                    decoration: BoxDecoration(
+                      color: AppTheme.border,
+                      borderRadius: BorderRadius.circular(2),
+                    ),
                   ),
                 ),
-              ),
-              const SizedBox(height: 16),
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Text(
-                    'Student Attempt Record',
-                    style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: AppTheme.text),
-                  ),
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                    decoration: BoxDecoration(
-                      color: isPassed ? AppTheme.success.withValues(alpha: 0.15) : AppTheme.error.withValues(alpha: 0.15),
-                      borderRadius: BorderRadius.circular(20),
+                const SizedBox(height: 16),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Text(
+                      'Student Attempt Record',
+                      style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: AppTheme.text),
                     ),
-                    child: Text(
-                      isPassed ? 'PASSED' : 'FAILED',
-                      style: TextStyle(
-                        fontSize: 12,
-                        fontWeight: FontWeight.bold,
-                        color: isPassed ? AppTheme.success : AppTheme.error,
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                      decoration: BoxDecoration(
+                        color: isPassed ? AppTheme.success.withValues(alpha: 0.15) : AppTheme.error.withValues(alpha: 0.15),
+                        borderRadius: BorderRadius.circular(20),
+                      ),
+                      child: Text(
+                        isPassed ? 'PASSED' : 'FAILED',
+                        style: TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.bold,
+                          color: isPassed ? AppTheme.success : AppTheme.error,
+                        ),
                       ),
                     ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 16),
-              Container(
-                padding: const EdgeInsets.all(16),
-                decoration: BoxDecoration(
-                  color: AppTheme.background,
-                  borderRadius: BorderRadius.circular(16),
-                  border: Border.all(color: AppTheme.border),
-                ),
-                child: Column(
-                  children: [
-                    _buildModalRow('Student Name', studentName),
-                    const Divider(height: 14),
-                    _buildModalRow('Email', email),
-                    const Divider(height: 14),
-                    _buildModalRow('Section & Grade', '$studentSection · $studentGrade'),
-                    const Divider(height: 14),
-                    _buildModalRow('Subject', subjectName),
-                    const Divider(height: 14),
-                    _buildModalRow('Quiz / LO', loTitle),
-                    const Divider(height: 14),
-                    _buildModalRow('Score', '$score / $total (${percentage.toStringAsFixed(0)}%)'),
-                    const Divider(height: 14),
-                    _buildModalRow('Completed', '$date at $time'),
-                    const Divider(height: 14),
-                    _buildModalRow('Duration', duration),
                   ],
                 ),
-              ),
-              const SizedBox(height: 16),
-              SizedBox(
-                width: double.infinity,
-                child: ElevatedButton(
-                  onPressed: () => Navigator.pop(ctx),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: AppTheme.primary,
-                    foregroundColor: Colors.white,
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                    padding: const EdgeInsets.symmetric(vertical: 14),
+                const SizedBox(height: 16),
+                Container(
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    color: AppTheme.background,
+                    borderRadius: BorderRadius.circular(16),
+                    border: Border.all(color: AppTheme.border),
                   ),
-                  child: const Text('Close', style: TextStyle(fontWeight: FontWeight.bold)),
+                  child: Column(
+                    children: [
+                      _buildModalRow('Student Name', studentName),
+                      const Divider(height: 14),
+                      _buildModalRow('Email', email),
+                      const Divider(height: 14),
+                      _buildModalRow('Section & Grade', '$studentSection · $studentGrade'),
+                      const Divider(height: 14),
+                      _buildModalRow('Subject', subjectName),
+                      const Divider(height: 14),
+                      _buildModalRow('Quiz / LO', loTitle),
+                      const Divider(height: 14),
+                      _buildModalRow('Score', '$score / $total (${percentage.toStringAsFixed(0)}%)'),
+                      const Divider(height: 14),
+                      _buildModalRow('Completed', '$date at $time'),
+                      const Divider(height: 14),
+                      _buildModalRow('Duration', duration),
+                    ],
+                  ),
                 ),
-              ),
-            ],
+                const SizedBox(height: 16),
+                SizedBox(
+                  width: double.infinity,
+                  child: ElevatedButton(
+                    onPressed: () => Navigator.pop(ctx),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: AppTheme.primary,
+                      foregroundColor: Colors.white,
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                      padding: const EdgeInsets.symmetric(vertical: 14),
+                    ),
+                    child: const Text('Close', style: TextStyle(fontWeight: FontWeight.bold)),
+                  ),
+                ),
+              ],
+            ),
           ),
         );
       },

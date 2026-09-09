@@ -7,6 +7,15 @@ import 'src/features/auth/application/auth_provider.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  FlutterError.onError = (FlutterErrorDetails details) {
+    FlutterError.presentError(details);
+    debugPrint('FLUTTER_ERROR_START');
+    debugPrint('EXCEPTION: ${details.exceptionAsString()}');
+    debugPrint('LIBRARY: ${details.library}');
+    debugPrint('CONTEXT: ${details.context}');
+    debugPrint('STACK: ${details.stack}');
+    debugPrint('FLUTTER_ERROR_END');
+  };
   runApp(
     const ProviderScope(
       child: AirampApp(),

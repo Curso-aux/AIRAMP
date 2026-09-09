@@ -79,29 +79,59 @@ class _StudentHomeScreenState extends ConsumerState<StudentHomeScreen> {
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              Row(
-                                children: [
-                                  Container(
-                                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                                    decoration: BoxDecoration(
-                                      color: isHigh ? AppTheme.warning.withValues(alpha: 0.2) : AppTheme.primary.withValues(alpha: 0.1),
-                                      borderRadius: BorderRadius.circular(4),
-                                    ),
-                                    child: Text(
-                                      priority.toUpperCase(),
-                                      style: TextStyle(
-                                        fontSize: 10,
-                                        fontWeight: FontWeight.bold,
-                                        color: isHigh ? AppTheme.warning : AppTheme.primary,
+                              Builder(
+                                builder: (_) {
+                                  final sec = a['section']?.toString();
+                                  final hasSpecificSec = sec != null &&
+                                      sec.isNotEmpty &&
+                                      sec != 'All Sections' &&
+                                      sec != 'All Handled Sections';
+                                  return Row(
+                                    children: [
+                                      Container(
+                                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                        decoration: BoxDecoration(
+                                          color: isHigh
+                                              ? AppTheme.warning.withValues(alpha: 0.2)
+                                              : AppTheme.primary.withValues(alpha: 0.1),
+                                          borderRadius: BorderRadius.circular(4),
+                                        ),
+                                        child: Text(
+                                          priority.toUpperCase(),
+                                          style: TextStyle(
+                                            fontSize: 10,
+                                            fontWeight: FontWeight.bold,
+                                            color: isHigh ? AppTheme.warning : AppTheme.primary,
+                                          ),
+                                        ),
                                       ),
-                                    ),
-                                  ),
-                                  const Spacer(),
-                                  Text(
-                                    a['created_at'] != null ? a['created_at'].toString().split('T').first : '',
-                                    style: TextStyle(color: AppTheme.textMuted, fontSize: 11),
-                                  ),
-                                ],
+                                      if (hasSpecificSec) ...[
+                                        const SizedBox(width: 6),
+                                        Container(
+                                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                          decoration: BoxDecoration(
+                                            color: AppTheme.surface,
+                                            borderRadius: BorderRadius.circular(4),
+                                            border: Border.all(color: AppTheme.border),
+                                          ),
+                                          child: Text(
+                                            'Section: $sec',
+                                            style: TextStyle(
+                                              fontSize: 10,
+                                              fontWeight: FontWeight.w600,
+                                              color: AppTheme.textSecondary,
+                                            ),
+                                          ),
+                                        ),
+                                      ],
+                                      const Spacer(),
+                                      Text(
+                                        a['created_at'] != null ? a['created_at'].toString().split('T').first : '',
+                                        style: TextStyle(color: AppTheme.textMuted, fontSize: 11),
+                                      ),
+                                    ],
+                                  );
+                                },
                               ),
                               const SizedBox(height: 8),
                               Text(
@@ -113,6 +143,19 @@ class _StudentHomeScreenState extends ConsumerState<StudentHomeScreen> {
                                 a['message']?.toString() ?? '',
                                 style: TextStyle(color: AppTheme.textSecondary, fontSize: 13, height: 1.4),
                               ),
+                              if (a['author_name'] != null && a['author_name'].toString().isNotEmpty) ...[
+                                const SizedBox(height: 8),
+                                Row(
+                                  children: [
+                                    Icon(Icons.person_outline, size: 12, color: AppTheme.textMuted),
+                                    const SizedBox(width: 4),
+                                    Text(
+                                      'Posted by ${a['author_name']}',
+                                      style: TextStyle(fontSize: 11, color: AppTheme.textMuted, fontStyle: FontStyle.italic),
+                                    ),
+                                  ],
+                                ),
+                              ],
                             ],
                           ),
                         );
@@ -138,11 +181,26 @@ class _StudentHomeScreenState extends ConsumerState<StudentHomeScreen> {
     final activeCourses = courses.length;
     final lessonsDone = progress['completed'] ?? 0;
     final pending = progress['pending'] ?? 0;
+    final assignedQuizzes = ref.watch(studentQuizAssignmentsProvider);
+    final pendingQuizzes = assignedQuizzes.where((q) => q['status'] == 'pending').toList();
 
-    // Filter announcements for students
+    // Filter announcements for students (considering audience and section)
+    final studentSection = currentUser.section?.trim().toLowerCase();
     final studentAnnouncements = allAnnouncements.where((a) {
       final aud = (a['target_audience'] as String? ?? 'all').toLowerCase();
-      return aud == 'all' || aud == 'students';
+      if (aud != 'all' && aud != 'students') return false;
+
+      final aSec = (a['section'] as String?)?.trim();
+      if (aSec == null ||
+          aSec.isEmpty ||
+          aSec == 'All Sections' ||
+          aSec == 'All Handled Sections') {
+        return true;
+      }
+      if (studentSection != null && studentSection.isNotEmpty) {
+        return aSec.toLowerCase() == studentSection;
+      }
+      return false;
     }).toList();
 
     // Determine Continue Learning subject
@@ -159,8 +217,11 @@ class _StudentHomeScreenState extends ConsumerState<StudentHomeScreen> {
       body: SafeArea(
         child: RefreshIndicator(
           onRefresh: () async {
-            await ref.read(studentCoursesProvider.notifier).reload();
-            await ref.read(studentProgressProvider.notifier).loadProgress();
+            await Future.wait([
+              ref.read(studentCoursesProvider.notifier).reload(),
+              ref.read(studentProgressProvider.notifier).loadProgress(),
+              ref.read(studentQuizAssignmentsProvider.notifier).reload(),
+            ]);
             ref.invalidate(announcementsProvider);
           },
           color: AppTheme.primary,
@@ -228,6 +289,63 @@ class _StudentHomeScreenState extends ConsumerState<StudentHomeScreen> {
                 ),
                 const SizedBox(height: 32),
 
+                // Assigned Quizzes & Tasks
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Row(
+                      children: [
+                        Icon(Icons.quiz_outlined, color: AppTheme.primary, size: 20),
+                        const SizedBox(width: 8),
+                        Text(
+                          'Assigned Quizzes',
+                          style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: AppTheme.text),
+                        ),
+                      ],
+                    ),
+                    if (pendingQuizzes.isNotEmpty)
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                        decoration: BoxDecoration(
+                          color: AppTheme.warning.withValues(alpha: 0.15),
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(color: AppTheme.warning.withValues(alpha: 0.4)),
+                        ),
+                        child: Text(
+                          '${pendingQuizzes.length} Due',
+                          style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: AppTheme.warning),
+                        ),
+                      ),
+                  ],
+                ),
+                const SizedBox(height: 12),
+                if (pendingQuizzes.isEmpty)
+                  Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.all(16),
+                    decoration: BoxDecoration(
+                      color: AppTheme.surface,
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(color: AppTheme.border),
+                    ),
+                    child: Row(
+                      children: [
+                        Icon(Icons.task_alt, color: AppTheme.success, size: 20),
+                        const SizedBox(width: 10),
+                        Expanded(
+                          child: Text(
+                            'All caught up! No pending quizzes assigned right now.',
+                            style: TextStyle(color: AppTheme.textMuted, fontSize: 13),
+                          ),
+                        ),
+                      ],
+                    ),
+                  )
+                else
+                  ...pendingQuizzes.map((q) => _buildQuizCard(q)),
+
+                const SizedBox(height: 32),
+
                 // Active Announcements
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -266,9 +384,11 @@ class _StudentHomeScreenState extends ConsumerState<StudentHomeScreen> {
                   )
                 else
                   _buildAnnouncementCard(
-                    studentAnnouncements.first['title']?.toString() ?? '',
-                    studentAnnouncements.first['message']?.toString() ?? '',
-                    studentAnnouncements.first['priority']?.toString() ?? 'medium',
+                    title: studentAnnouncements.first['title']?.toString() ?? '',
+                    body: studentAnnouncements.first['message']?.toString() ?? '',
+                    priority: studentAnnouncements.first['priority']?.toString() ?? 'medium',
+                    section: studentAnnouncements.first['section']?.toString(),
+                    authorName: studentAnnouncements.first['author_name']?.toString(),
                   ),
                 
                 const SizedBox(height: 32),
@@ -392,8 +512,16 @@ class _StudentHomeScreenState extends ConsumerState<StudentHomeScreen> {
     );
   }
 
-  Widget _buildAnnouncementCard(String title, String body, String priority) {
+  Widget _buildAnnouncementCard({
+    required String title,
+    required String body,
+    required String priority,
+    String? section,
+    String? authorName,
+  }) {
     final isHigh = priority.toLowerCase() == 'high';
+    final hasSpecificSec = section != null && section.isNotEmpty && section != 'All Sections' && section != 'All Handled Sections';
+
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
@@ -421,6 +549,21 @@ class _StudentHomeScreenState extends ConsumerState<StudentHomeScreen> {
                   ),
                 ),
               ),
+              if (hasSpecificSec) ...[
+                const SizedBox(width: 6),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                  decoration: BoxDecoration(
+                    color: AppTheme.background,
+                    borderRadius: BorderRadius.circular(4),
+                    border: Border.all(color: AppTheme.border),
+                  ),
+                  child: Text(
+                    'Section: $section',
+                    style: TextStyle(fontSize: 10, fontWeight: FontWeight.w600, color: AppTheme.textSecondary),
+                  ),
+                ),
+              ],
               const SizedBox(width: 8),
               Expanded(
                 child: Text(
@@ -439,6 +582,19 @@ class _StudentHomeScreenState extends ConsumerState<StudentHomeScreen> {
             maxLines: 2,
             overflow: TextOverflow.ellipsis,
           ),
+          if (authorName != null && authorName.isNotEmpty) ...[
+            const SizedBox(height: 8),
+            Row(
+              children: [
+                Icon(Icons.person_outline, size: 12, color: AppTheme.textMuted),
+                const SizedBox(width: 4),
+                Text(
+                  'By $authorName',
+                  style: TextStyle(fontSize: 11, color: AppTheme.textMuted),
+                ),
+              ],
+            ),
+          ],
         ],
       ),
     );
@@ -492,6 +648,115 @@ class _StudentHomeScreenState extends ConsumerState<StudentHomeScreen> {
             Icon(Icons.chevron_right, color: AppTheme.textMuted),
           ],
         ),
+      ),
+    );
+  }
+
+  Widget _buildQuizCard(Map<String, dynamic> q) {
+    final title = q['title']?.toString() ?? 'Quiz';
+    final subjectCode = q['subject_code']?.toString() ?? '';
+    final teacherName = q['teacher_name']?.toString() ?? '';
+    final qCount = q['question_count'] ?? 0;
+    final timeLimit = q['time_limit_minutes'] ?? 0;
+    final dueDate = q['due_date']?.toString();
+    final quizId = q['quiz_id'];
+
+    return Container(
+      margin: const EdgeInsets.only(bottom: 12),
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: AppTheme.surface,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: AppTheme.border),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              if (subjectCode.isNotEmpty) ...[
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                  decoration: BoxDecoration(
+                    color: AppTheme.primary.withValues(alpha: 0.12),
+                    borderRadius: BorderRadius.circular(4),
+                  ),
+                  child: Text(
+                    subjectCode,
+                    style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: AppTheme.primary),
+                  ),
+                ),
+                const SizedBox(width: 8),
+              ],
+              Expanded(
+                child: Text(
+                  title,
+                  style: TextStyle(fontWeight: FontWeight.bold, color: AppTheme.text, fontSize: 15),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
+              if (dueDate != null && dueDate.isNotEmpty)
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                  decoration: BoxDecoration(
+                    color: AppTheme.error.withValues(alpha: 0.1),
+                    borderRadius: BorderRadius.circular(4),
+                  ),
+                  child: Text(
+                    'Due $dueDate',
+                    style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: AppTheme.error),
+                  ),
+                ),
+            ],
+          ),
+          const SizedBox(height: 10),
+          Row(
+            children: [
+              Icon(Icons.help_outline, size: 13, color: AppTheme.textMuted),
+              const SizedBox(width: 4),
+              Text('$qCount questions', style: TextStyle(fontSize: 12, color: AppTheme.textSecondary)),
+              const SizedBox(width: 14),
+              Icon(Icons.timer_outlined, size: 13, color: AppTheme.textMuted),
+              const SizedBox(width: 4),
+              Text(
+                timeLimit > 0 ? '${timeLimit}m limit' : 'Untimed',
+                style: TextStyle(fontSize: 12, color: AppTheme.textSecondary),
+              ),
+              if (teacherName.isNotEmpty) ...[
+                const SizedBox(width: 14),
+                Icon(Icons.person_outline, size: 13, color: AppTheme.textMuted),
+                const SizedBox(width: 4),
+                Expanded(
+                  child: Text(
+                    teacherName,
+                    style: TextStyle(fontSize: 12, color: AppTheme.textSecondary),
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
+              ],
+            ],
+          ),
+          const SizedBox(height: 14),
+          SizedBox(
+            width: double.infinity,
+            child: ElevatedButton.icon(
+              onPressed: () {
+                if (quizId != null) {
+                  context.push('/quiz/$quizId');
+                }
+              },
+              icon: const Icon(Icons.play_arrow, size: 16),
+              label: const Text('Start Quiz', style: TextStyle(fontWeight: FontWeight.bold)),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppTheme.primary,
+                foregroundColor: Colors.black,
+                padding: const EdgeInsets.symmetric(vertical: 10),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }

@@ -41,6 +41,164 @@ class _SubjectDetailScreenState extends ConsumerState<SubjectDetailScreen> {
     }
   }
 
+  void _showUnlockTypeSelector(int subjectId, String currentUnlockType) {
+    String selected = currentUnlockType;
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setModalState) => Container(
+          constraints: BoxConstraints(
+            maxHeight: MediaQuery.of(context).size.height * 0.85,
+          ),
+          padding: EdgeInsets.only(
+            left: 24,
+            right: 24,
+            top: 24,
+            bottom: MediaQuery.of(ctx).viewInsets.bottom + 24,
+          ),
+          decoration: BoxDecoration(
+            color: Theme.of(context).scaffoldBackgroundColor,
+            borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+          ),
+          child: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Text(
+                    'Curriculum Progression Mode',
+                    style: TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.bold,
+                      color: Theme.of(context).colorScheme.onSurface,
+                    ),
+                  ),
+                  IconButton(
+                    icon: Icon(Icons.close, color: AppTheme.textMuted),
+                    onPressed: () => Navigator.pop(ctx),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 8),
+              Text(
+                'Configure whether students advance sequentially or access all lessons flexibly.',
+                style: TextStyle(fontSize: 13, color: AppTheme.textSecondary),
+              ),
+              const SizedBox(height: 20),
+
+              // Option 1: Sequential
+              _buildProgressionCard(
+                title: 'Sequential Progression',
+                subtitle: 'Students must pass quizzes to unlock subsequent learning outcomes.',
+                icon: Icons.lock_outline,
+                isSelected: selected == 'Sequential',
+                onTap: () => setModalState(() => selected = 'Sequential'),
+              ),
+              const SizedBox(height: 12),
+
+              // Option 2: Flexible
+              _buildProgressionCard(
+                title: 'Flexible Progression',
+                subtitle: 'All topics and learning materials are open. Students can study at their own pace.',
+                icon: Icons.lock_open_outlined,
+                isSelected: selected == 'Flexible',
+                onTap: () => setModalState(() => selected = 'Flexible'),
+              ),
+              const SizedBox(height: 24),
+
+              SizedBox(
+                width: double.infinity,
+                child: ElevatedButton(
+                  onPressed: () async {
+                    Navigator.pop(ctx);
+                    await ref.read(subjectsProvider.notifier).updateUnlockType(subjectId, selected);
+                    await _loadSubject();
+                    if (mounted) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(
+                          content: Text('Progression mode updated to "$selected"'),
+                          backgroundColor: AppTheme.success,
+                        ),
+                      );
+                    }
+                  },
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: AppTheme.primary,
+                    foregroundColor: Colors.black,
+                    padding: const EdgeInsets.symmetric(vertical: 14),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                  ),
+                  child: const Text('Save Progression Mode', style: TextStyle(fontWeight: FontWeight.bold)),
+                ),
+              ),
+            ],
+          ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildProgressionCard({
+    required String title,
+    required String subtitle,
+    required IconData icon,
+    required bool isSelected,
+    required VoidCallback onTap,
+  }) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: isSelected ? AppTheme.primary.withValues(alpha: 0.15) : AppTheme.surface,
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(
+            color: isSelected ? AppTheme.primary : AppTheme.border,
+            width: isSelected ? 2 : 1,
+          ),
+        ),
+        child: Row(
+          children: [
+            Icon(icon, color: isSelected ? AppTheme.primary : AppTheme.textSecondary),
+            const SizedBox(width: 14),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    title,
+                    style: TextStyle(
+                      color: isSelected ? AppTheme.primary : AppTheme.text,
+                      fontWeight: FontWeight.bold,
+                      fontSize: 15,
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    subtitle,
+                    style: TextStyle(
+                      color: AppTheme.textSecondary,
+                      fontSize: 12,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            if (isSelected)
+              Icon(Icons.check_circle, color: AppTheme.primary, size: 20),
+          ],
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     ref.watch(themeProvider);
@@ -73,6 +231,7 @@ class _SubjectDetailScreenState extends ConsumerState<SubjectDetailScreen> {
     final subjectId = int.parse(widget.subjectId);
     final subjectName = _subject!['name'] ?? 'Untitled';
     final unlockType = _subject!['unlock_type'] ?? 'Sequential';
+    final semester = _subject!['semester']?.toString() ?? '';
     final topics = ref.watch(subjectDetailProvider);
 
     return Scaffold(
@@ -137,13 +296,63 @@ class _SubjectDetailScreenState extends ConsumerState<SubjectDetailScreen> {
                             fontSize: 18,
                           ),
                         ),
-                        const SizedBox(height: 4),
-                        Text(
-                          'Private subject · Unlock: $unlockType',
-                          style: TextStyle(
-                            color: Colors.black.withValues(alpha: 0.7),
-                            fontSize: 13,
-                          ),
+                        const SizedBox(height: 8),
+                        Wrap(
+                          spacing: 8,
+                          runSpacing: 6,
+                          crossAxisAlignment: WrapCrossAlignment.center,
+                          children: [
+                            // Interactive Progression Mode Chip
+                            InkWell(
+                              onTap: () => _showUnlockTypeSelector(subjectId, unlockType),
+                              borderRadius: BorderRadius.circular(6),
+                              child: Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                decoration: BoxDecoration(
+                                  color: Colors.black.withValues(alpha: 0.15),
+                                  borderRadius: BorderRadius.circular(6),
+                                  border: Border.all(color: Colors.black26),
+                                ),
+                                child: Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    Icon(
+                                      unlockType == 'Sequential' ? Icons.lock_outline : Icons.lock_open_outlined,
+                                      size: 13,
+                                      color: Colors.black,
+                                    ),
+                                    const SizedBox(width: 4),
+                                    Text(
+                                      'Progression: $unlockType',
+                                      style: const TextStyle(
+                                        fontSize: 12,
+                                        fontWeight: FontWeight.bold,
+                                        color: Colors.black,
+                                      ),
+                                    ),
+                                    const SizedBox(width: 4),
+                                    const Icon(Icons.edit, size: 12, color: Colors.black54),
+                                  ],
+                                ),
+                              ),
+                            ),
+                            if (semester.isNotEmpty)
+                              Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                decoration: BoxDecoration(
+                                  color: Colors.black.withValues(alpha: 0.1),
+                                  borderRadius: BorderRadius.circular(6),
+                                ),
+                                child: Text(
+                                  semester,
+                                  style: const TextStyle(
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.w600,
+                                    color: Colors.black87,
+                                  ),
+                                ),
+                              ),
+                          ],
                         ),
                         if (_subject!['teacher_name'] != null && _subject!['teacher_name'].toString().isNotEmpty) ...[
                           const SizedBox(height: 6),
@@ -272,9 +481,8 @@ class _SubjectDetailScreenState extends ConsumerState<SubjectDetailScreen> {
                     SizedBox(
                       width: double.infinity,
                       child: ElevatedButton.icon(
-                        onPressed: () {
-                          Navigator.push(
-                            context,
+                        onPressed: () async {
+                          final created = await Navigator.of(context, rootNavigator: true).push<bool>(
                             MaterialPageRoute(
                               fullscreenDialog: true,
                               builder: (ctx) => CreateQuizDialog(
@@ -283,6 +491,10 @@ class _SubjectDetailScreenState extends ConsumerState<SubjectDetailScreen> {
                               ),
                             ),
                           );
+                          if (created == true && context.mounted) {
+                            ref.invalidate(subjectQuizzesProvider(subjectId));
+                            ref.invalidate(teacherDashboardProvider);
+                          }
                         },
                         icon: const Icon(
                           Icons.assignment_add,
@@ -352,6 +564,7 @@ class _SubjectDetailScreenState extends ConsumerState<SubjectDetailScreen> {
 
   Widget _buildQuizzesList(List<Map<String, dynamic>> topics, int subjectId) {
     final quizzesAsync = ref.watch(subjectQuizzesProvider(subjectId));
+    final subjectName = _subject?['name']?.toString() ?? 'Subject';
 
     return ListView(
       padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
@@ -382,9 +595,35 @@ class _SubjectDetailScreenState extends ConsumerState<SubjectDetailScreen> {
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Text('No assigned quizzes created yet', style: TextStyle(fontWeight: FontWeight.bold, color: AppTheme.text, fontSize: 13)),
-                          Text('Tap "Create & Assign Quiz" above to author questions and assign them in bulk to students.', style: TextStyle(color: AppTheme.textSecondary, fontSize: 11)),
+                          const SizedBox(height: 2),
+                          Text('Author questions and assign them in bulk to students.', style: TextStyle(color: AppTheme.textSecondary, fontSize: 11)),
                         ],
                       ),
+                    ),
+                    const SizedBox(width: 8),
+                    ElevatedButton(
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: AppTheme.primary,
+                        foregroundColor: Colors.black,
+                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                        textStyle: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
+                      ),
+                      onPressed: () async {
+                        final created = await Navigator.of(context, rootNavigator: true).push<bool>(
+                          MaterialPageRoute(
+                            fullscreenDialog: true,
+                            builder: (ctx) => CreateQuizDialog(
+                              subjectId: subjectId,
+                              subjectName: subjectName,
+                            ),
+                          ),
+                        );
+                        if (created == true && context.mounted) {
+                          ref.invalidate(subjectQuizzesProvider(subjectId));
+                          ref.invalidate(teacherDashboardProvider);
+                        }
+                      },
+                      child: const Text('Create'),
                     ),
                   ],
                 ),

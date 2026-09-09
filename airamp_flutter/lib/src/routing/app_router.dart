@@ -23,6 +23,7 @@ import '../features/admin/presentation/admin_management_screen.dart';
 import '../features/admin/presentation/web/admin_web_scaffold.dart';
 import '../features/admin/presentation/web/admin_web_analytics_view.dart';
 import '../features/admin/presentation/web/admin_web_students_screen.dart';
+import '../features/admin/presentation/web/admin_web_teachers_screen.dart';
 import '../features/admin/presentation/web/admin_web_keys_screen.dart';
 import '../features/admin/presentation/web/admin_web_announcements_screen.dart';
 import '../features/student/presentation/student_scaffold.dart';
@@ -51,8 +52,16 @@ class PlaceholderScreen extends StatelessWidget {
 final routerProvider = Provider<GoRouter>((ref) {
   final authState = ref.watch(authProvider);
 
+  final initialLoc = (authState != null && (authState.role == 'admin' || authState.role == 'super_admin'))
+      ? '/admin/dashboard'
+      : (authState != null && authState.role == 'teacher'
+          ? '/teacher/dashboard'
+          : (authState != null && !kIsWeb
+              ? '/student/home'
+              : (kIsWeb ? '/' : '/login')));
+
   return GoRouter(
-    initialLocation: kIsWeb ? '/' : '/login',
+    initialLocation: initialLoc,
     routes: [
       GoRoute(
         path: '/',
@@ -177,7 +186,10 @@ final routerProvider = Provider<GoRouter>((ref) {
             routes: [
               GoRoute(
                 path: '/teacher/students',
-                builder: (context, state) => const TeacherStudentsScreen(),
+                builder: (context, state) {
+                  final initialSection = state.uri.queryParameters['section'];
+                  return TeacherStudentsScreen(initialSection: initialSection);
+                },
               ),
             ],
           ),
@@ -218,6 +230,14 @@ final routerProvider = Provider<GoRouter>((ref) {
               GoRoute(
                 path: '/admin/students',
                 builder: (context, state) => const AdminWebStudentsScreen(),
+              ),
+            ],
+          ),
+          StatefulShellBranch(
+            routes: [
+              GoRoute(
+                path: '/admin/teachers',
+                builder: (context, state) => const AdminWebTeachersScreen(),
               ),
             ],
           ),
@@ -352,20 +372,36 @@ final routerProvider = Provider<GoRouter>((ref) {
         return '/';
       }
 
-      // 3. Authenticated user visiting login routes
-      final isLoginRoute = matched == '/login' ||
-          matched == '/admin/login' ||
-          matched == '/signup' ||
-          matched == '/admin-signup' ||
-          matched == '/forgot-password';
+      // 3. Authenticated user visiting landing page '/' or login routes
+      if (isAuth) {
+        final isAdmin = authState.role == 'admin' || authState.role == 'super_admin';
+        final isTeacher = authState.role == 'teacher';
 
-      if (isAuth && isLoginRoute) {
-        if (authState.role == 'admin' || authState.role == 'super_admin') {
-          return kIsWeb ? '/admin/dashboard' : '/login';
-        } else if (authState.role == 'teacher') {
-          return '/teacher/dashboard';
-        } else {
-          return kIsWeb ? '/' : '/student/home';
+        // When authenticated, visiting '/' automatically routes to the appropriate portal
+        if (matched == '/') {
+          if (isAdmin) {
+            return '/admin/dashboard';
+          } else if (isTeacher) {
+            return '/teacher/dashboard';
+          } else if (!kIsWeb) {
+            return '/student/home';
+          }
+        }
+
+        final isLoginRoute = matched == '/login' ||
+            matched == '/admin/login' ||
+            matched == '/signup' ||
+            matched == '/admin-signup' ||
+            matched == '/forgot-password';
+
+        if (isLoginRoute) {
+          if (isAdmin) {
+            return kIsWeb ? '/admin/dashboard' : '/login';
+          } else if (isTeacher) {
+            return '/teacher/dashboard';
+          } else {
+            return kIsWeb ? '/' : '/student/home';
+          }
         }
       }
 

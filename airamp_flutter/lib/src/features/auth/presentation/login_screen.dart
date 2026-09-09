@@ -80,7 +80,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
       }
     } catch (e) {
       setState(() {
-        _error = e.toString();
+        _error = e.toString().replaceFirst('Exception: ', '');
       });
     }
   }
@@ -231,11 +231,13 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
                           color: Theme.of(context).colorScheme.onSurface,
                           fontSize: 15,
                         ),
-                        keyboardType: TextInputType.emailAddress,
+                        keyboardType: TextInputType.text,
+                        autocorrect: false,
+                        enableSuggestions: true,
                         decoration: InputDecoration(
                           hintText: 'Email or Username',
                           prefixIcon: Icon(
-                            Icons.mail_outline,
+                            Icons.alternate_email,
                             color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.4),
                             size: 20,
                           ),

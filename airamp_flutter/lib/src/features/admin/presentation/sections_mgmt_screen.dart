@@ -14,24 +14,12 @@ class SectionsMgmtScreen extends ConsumerStatefulWidget {
 }
 
 class _SectionsMgmtScreenState extends ConsumerState<SectionsMgmtScreen> {
-  bool _showForm = false;
-  final _nameController = TextEditingController();
-  final _descController = TextEditingController();
-  final _roomController = TextEditingController();
-  String _selectedGrade = '';
+  String _selectedGradeFilter = 'All';
 
   final List<String> _grades = [
     'Grade 7', 'Grade 8', 'Grade 9', 'Grade 10',
     'Grade 11', 'Grade 12',
   ];
-
-  @override
-  void dispose() {
-    _nameController.dispose();
-    _descController.dispose();
-    _roomController.dispose();
-    super.dispose();
-  }
 
   Future<void> _showConfirmation({
     required String title,
@@ -129,7 +117,7 @@ class _SectionsMgmtScreenState extends ConsumerState<SectionsMgmtScreen> {
                           selectedColor: Theme.of(context).colorScheme.primary,
                           backgroundColor: Theme.of(context).colorScheme.surface,
                           labelStyle: TextStyle(
-                            color: isSelected ? Colors.black : AppTheme.textSecondary,
+                            color: isSelected ? Colors.white : AppTheme.textSecondary,
                             fontWeight: FontWeight.w600,
                             fontSize: 12,
                           ),
@@ -181,10 +169,376 @@ class _SectionsMgmtScreenState extends ConsumerState<SectionsMgmtScreen> {
     );
   }
 
+  void _showAddSectionDialog({String? initialGrade}) {
+    final formKey = GlobalKey<FormState>();
+    final addNameController = TextEditingController();
+    final addDescController = TextEditingController();
+    final addRoomController = TextEditingController();
+    String addSelectedGrade = (initialGrade != null && _grades.contains(initialGrade))
+        ? initialGrade
+        : (_selectedGradeFilter != 'All' && _grades.contains(_selectedGradeFilter)
+            ? _selectedGradeFilter
+            : 'Grade 10');
+
+    showDialog(
+      context: context,
+      builder: (dialogCtx) {
+        return StatefulBuilder(
+          builder: (context, setDialogState) {
+            return AlertDialog(
+              backgroundColor: Theme.of(context).colorScheme.surface,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+              title: Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(8),
+                    decoration: BoxDecoration(
+                      color: Theme.of(context).colorScheme.primary.withValues(alpha: 0.12),
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: Icon(Icons.groups_outlined, size: 20, color: Theme.of(context).colorScheme.primary),
+                  ),
+                  const SizedBox(width: 12),
+                  Text(
+                    'Add New Section',
+                    style: TextStyle(color: AppTheme.text, fontWeight: FontWeight.bold, fontSize: 18),
+                  ),
+                ],
+              ),
+              content: SizedBox(
+                width: 480,
+                child: Form(
+                  key: formKey,
+                  child: SingleChildScrollView(
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        TextFormField(
+                          controller: addNameController,
+                          style: TextStyle(color: AppTheme.text),
+                          decoration: const InputDecoration(
+                            labelText: 'Section Name',
+                            hintText: 'e.g., Grade 10 - Sapphire',
+                            prefixIcon: Icon(Icons.badge_outlined, size: 20),
+                          ),
+                          validator: (val) {
+                            if (val == null || val.trim().isEmpty) {
+                              return 'Please enter section name';
+                            }
+                            return null;
+                          },
+                          autofocus: true,
+                        ),
+                        const SizedBox(height: 14),
+                        TextFormField(
+                          controller: addRoomController,
+                          style: TextStyle(color: AppTheme.text),
+                          decoration: const InputDecoration(
+                            labelText: 'Room / Building',
+                            hintText: 'e.g., Room 304 - Science Bldg',
+                            prefixIcon: Icon(Icons.meeting_room_outlined, size: 20),
+                          ),
+                        ),
+                        const SizedBox(height: 14),
+                        TextFormField(
+                          controller: addDescController,
+                          style: TextStyle(color: AppTheme.text),
+                          decoration: const InputDecoration(
+                            labelText: 'Description (optional)',
+                            hintText: 'e.g., Senior High STEM Section',
+                            prefixIcon: Icon(Icons.notes_outlined, size: 20),
+                          ),
+                          maxLines: 2,
+                        ),
+                        const SizedBox(height: 16),
+                        Text(
+                          'Assign Grade Level',
+                          style: TextStyle(color: AppTheme.textSecondary, fontSize: 13, fontWeight: FontWeight.w600),
+                        ),
+                        const SizedBox(height: 10),
+                        Wrap(
+                          spacing: 8,
+                          runSpacing: 8,
+                          children: _grades.map((grade) {
+                            final isSelected = addSelectedGrade == grade;
+                            return ChoiceChip(
+                              label: Text(grade),
+                              selected: isSelected,
+                              onSelected: (selected) {
+                                if (selected) {
+                                  setDialogState(() => addSelectedGrade = grade);
+                                }
+                              },
+                              selectedColor: Theme.of(context).colorScheme.primary,
+                              backgroundColor: Theme.of(context).colorScheme.surface,
+                              labelStyle: TextStyle(
+                                color: isSelected ? Colors.white : AppTheme.textSecondary,
+                                fontWeight: FontWeight.w600,
+                                fontSize: 12,
+                              ),
+                              side: BorderSide(color: isSelected ? AppTheme.primary : AppTheme.border),
+                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+                            );
+                          }).toList(),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.pop(dialogCtx),
+                  child: const Text('Cancel'),
+                ),
+                ElevatedButton(
+                  onPressed: () async {
+                    if (formKey.currentState?.validate() ?? false) {
+                      final name = addNameController.text.trim();
+                      final messenger = ScaffoldMessenger.of(context);
+                      Navigator.pop(dialogCtx);
+                      await ref.read(sectionsProvider.notifier).addSection({
+                        'name': name,
+                        'description': addDescController.text.trim(),
+                        'grade': addSelectedGrade.isNotEmpty ? addSelectedGrade : 'Grade 10',
+                        'room': addRoomController.text.trim(),
+                        'student_count': 0,
+                        'created_at': DateTime.now().toIso8601String(),
+                      });
+                      if (mounted) {
+                        messenger.showSnackBar(
+                          SnackBar(
+                            content: Text('Successfully created section "$name" ($addSelectedGrade)'),
+                            backgroundColor: AppTheme.success,
+                          ),
+                        );
+                      }
+                    }
+                  },
+                  style: ElevatedButton.styleFrom(
+                    minimumSize: const Size(0, 40),
+                  ),
+                  child: const Text('Create Section'),
+                ),
+              ],
+            );
+          },
+        );
+      },
+    );
+  }
+
+  Widget _buildGradeFilterChip(String label, int count) {
+    final isSelected = _selectedGradeFilter == label;
+    final primary = Theme.of(context).colorScheme.primary;
+
+    return Padding(
+      padding: const EdgeInsets.only(right: 8),
+      child: FilterChip(
+        selected: isSelected,
+        showCheckmark: false,
+        label: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(label),
+            const SizedBox(width: 6),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 1),
+              decoration: BoxDecoration(
+                color: isSelected ? Colors.white.withValues(alpha: 0.25) : primary.withValues(alpha: 0.12),
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: Text(
+                '$count',
+                style: TextStyle(
+                  fontSize: 11,
+                  fontWeight: FontWeight.bold,
+                  color: isSelected ? Colors.white : primary,
+                ),
+              ),
+            ),
+          ],
+        ),
+        labelStyle: TextStyle(
+          color: isSelected ? Colors.white : AppTheme.textSecondary,
+          fontWeight: isSelected ? FontWeight.bold : FontWeight.w500,
+          fontSize: 13,
+        ),
+        backgroundColor: Theme.of(context).colorScheme.surface,
+        selectedColor: primary,
+        side: BorderSide(
+          color: isSelected ? primary : AppTheme.border,
+          width: 1,
+        ),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+        onSelected: (_) {
+          setState(() {
+            _selectedGradeFilter = label;
+          });
+        },
+      ),
+    );
+  }
+
+  Widget _buildGradeGroupHeader(String grade, int sectionCount) {
+    final isJuniorHigh = ['Grade 7', 'Grade 8', 'Grade 9', 'Grade 10'].contains(grade);
+    final isSeniorHigh = ['Grade 11', 'Grade 12'].contains(grade);
+    final division = isJuniorHigh ? 'Junior High School' : (isSeniorHigh ? 'Senior High School' : 'Classroom Department');
+
+    return Container(
+      margin: const EdgeInsets.only(top: 16, bottom: 12),
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+      decoration: BoxDecoration(
+        color: Theme.of(context).colorScheme.surface,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: AppTheme.border),
+      ),
+      child: Row(
+        children: [
+          Container(
+            padding: const EdgeInsets.all(8),
+            decoration: BoxDecoration(
+              color: Theme.of(context).colorScheme.primary.withValues(alpha: 0.12),
+              borderRadius: BorderRadius.circular(10),
+            ),
+            child: Icon(Icons.school_outlined, size: 20, color: Theme.of(context).colorScheme.primary),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Text(
+                      grade,
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.bold,
+                        color: Theme.of(context).colorScheme.onSurface,
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                      decoration: BoxDecoration(
+                        color: Theme.of(context).colorScheme.primary.withValues(alpha: 0.12),
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: Text(
+                        '$sectionCount ${sectionCount == 1 ? 'Section' : 'Sections'}',
+                        style: TextStyle(
+                          fontSize: 11,
+                          fontWeight: FontWeight.bold,
+                          color: Theme.of(context).colorScheme.primary,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  division,
+                  style: TextStyle(fontSize: 12, color: AppTheme.textSecondary),
+                ),
+              ],
+            ),
+          ),
+          ElevatedButton.icon(
+            onPressed: () => _showAddSectionDialog(initialGrade: grade),
+            icon: const Icon(Icons.add, size: 14),
+            label: Text('Add $grade Section', style: const TextStyle(fontSize: 12)),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Theme.of(context).colorScheme.primary,
+              foregroundColor: Colors.white,
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+              minimumSize: const Size(0, 34),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+              elevation: 0,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildEmptyGradeState(String grade) {
+    return Container(
+      width: double.infinity,
+      margin: const EdgeInsets.only(top: 12),
+      padding: const EdgeInsets.symmetric(vertical: 40, horizontal: 20),
+      alignment: Alignment.center,
+      decoration: BoxDecoration(
+        color: Theme.of(context).colorScheme.surface,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: AppTheme.border),
+      ),
+      child: Column(
+        children: [
+          Icon(Icons.groups_outlined, size: 48, color: AppTheme.textMuted.withValues(alpha: 0.5)),
+          const SizedBox(height: 12),
+          Text(
+            'No sections created for $grade yet',
+            style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: AppTheme.text),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            'Click the button below to add your first $grade section with room assignment.',
+            style: TextStyle(color: AppTheme.textSecondary, fontSize: 13),
+          ),
+          const SizedBox(height: 16),
+          ElevatedButton.icon(
+            onPressed: () => _showAddSectionDialog(initialGrade: grade),
+            icon: const Icon(Icons.add, size: 16),
+            label: Text('Create $grade Section'),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Theme.of(context).colorScheme.primary,
+              foregroundColor: Colors.white,
+              minimumSize: const Size(0, 38),
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+              elevation: 0,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     ref.watch(themeProvider);
     final sections = ref.watch(sectionsProvider);
+
+    // Calculate section counts per grade
+    final Map<String, int> gradeSectionCounts = {};
+    for (final g in _grades) {
+      gradeSectionCounts[g] = 0;
+    }
+    for (final s in sections) {
+      final g = s['grade']?.toString() ?? '';
+      if (gradeSectionCounts.containsKey(g)) {
+        gradeSectionCounts[g] = (gradeSectionCounts[g] ?? 0) + 1;
+      }
+    }
+
+    // Group sections by grade level
+    final Map<String, List<Map<String, dynamic>>> groupedSections = {};
+    for (final s in sections) {
+      final g = s['grade']?.toString() ?? 'Unassigned';
+      groupedSections.putIfAbsent(g, () => []).add(s);
+    }
+    final sortedGrades = groupedSections.keys.toList()
+      ..sort((a, b) {
+        final iA = _grades.indexOf(a);
+        final iB = _grades.indexOf(b);
+        if (iA != -1 && iB != -1) return iA.compareTo(iB);
+        if (iA != -1) return -1;
+        if (iB != -1) return 1;
+        return a.compareTo(b);
+      });
 
     return Scaffold(
       body: SafeArea(
@@ -206,149 +560,43 @@ class _SectionsMgmtScreenState extends ConsumerState<SectionsMgmtScreen> {
                       ),
                       const SizedBox(height: 4),
                       Text(
-                        '${sections.length} active sections',
+                        '${sections.length} active sections · Separated by grade level',
                         style: TextStyle(color: AppTheme.textSecondary, fontSize: 14),
                       ),
                     ],
                   ),
-                  FloatingActionButton.small(
-                    onPressed: () {
-                      setState(() => _showForm = !_showForm);
-                    },
-                    backgroundColor: Theme.of(context).colorScheme.primary,
-                    child: Icon(_showForm ? Icons.close : Icons.add, color: Colors.black),
+                  ElevatedButton.icon(
+                    onPressed: () => _showAddSectionDialog(
+                      initialGrade: _selectedGradeFilter != 'All' ? _selectedGradeFilter : 'Grade 10',
+                    ),
+                    icon: const Icon(Icons.add, size: 18),
+                    label: const Text('Add Section'),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Theme.of(context).colorScheme.primary,
+                      foregroundColor: Colors.white,
+                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                      elevation: 0,
+                      minimumSize: const Size(0, 42),
+                    ),
                   ),
                 ],
               ),
-              const SizedBox(height: 24),
+              const SizedBox(height: 20),
 
-              // Add New Section Form
-              if (_showForm) ...[
-                Container(
-                  padding: const EdgeInsets.all(20),
-                  decoration: BoxDecoration(
-                    color: Theme.of(context).colorScheme.surface,
-                    borderRadius: BorderRadius.circular(16),
-                    border: Border.all(color: AppTheme.border),
-                  ),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        'Add New Section',
-                        style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Theme.of(context).colorScheme.onSurface),
-                      ),
-                      const SizedBox(height: 16),
-                      TextField(
-                        controller: _nameController,
-                        style: TextStyle(color: AppTheme.text),
-                        decoration: const InputDecoration(
-                          hintText: 'Section Name (e.g., Grade 12 - ICT A)',
-                        ),
-                      ),
-                      const SizedBox(height: 12),
-                      TextField(
-                        controller: _roomController,
-                        style: TextStyle(color: AppTheme.text),
-                        decoration: const InputDecoration(
-                          hintText: 'Room / Building (e.g., Room 304, Science Bldg)',
-                          prefixIcon: Icon(Icons.meeting_room_outlined, size: 20),
-                        ),
-                      ),
-                      const SizedBox(height: 12),
-                      TextField(
-                        controller: _descController,
-                        style: TextStyle(color: AppTheme.text),
-                        decoration: const InputDecoration(
-                          hintText: 'Description (optional)',
-                        ),
-                        maxLines: 3,
-                      ),
-                      const SizedBox(height: 16),
-                      Text(
-                        'Assign Grade Level',
-                        style: TextStyle(color: AppTheme.textSecondary, fontSize: 14),
-                      ),
-                      const SizedBox(height: 10),
-                      Wrap(
-                        spacing: 8,
-                        runSpacing: 8,
-                        children: _grades.map((grade) {
-                          final isSelected = _selectedGrade == grade;
-                          return ChoiceChip(
-                            label: Text(grade),
-                            selected: isSelected,
-                            onSelected: (selected) {
-                              setState(() => _selectedGrade = selected ? grade : '');
-                            },
-                            selectedColor: Theme.of(context).colorScheme.primary,
-                            backgroundColor: Theme.of(context).colorScheme.surface,
-                            labelStyle: TextStyle(
-                              color: isSelected ? Colors.black : AppTheme.textSecondary,
-                              fontWeight: FontWeight.w600,
-                              fontSize: 12,
-                            ),
-                            side: BorderSide(color: isSelected ? AppTheme.primary : AppTheme.border),
-                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-                          );
-                        }).toList(),
-                      ),
-                      const SizedBox(height: 20),
-                      Row(
-                        children: [
-                          Expanded(
-                            child: OutlinedButton(
-                              onPressed: () {
-                                setState(() {
-                                  _showForm = false;
-                                  _nameController.clear();
-                                  _descController.clear();
-                                  _roomController.clear();
-                                  _selectedGrade = '';
-                                });
-                              },
-                              style: OutlinedButton.styleFrom(
-                                foregroundColor: AppTheme.textSecondary,
-                                side: BorderSide(color: AppTheme.border),
-                                padding: const EdgeInsets.symmetric(vertical: 14),
-                              ),
-                              child: const Text('Cancel'),
-                            ),
-                          ),
-                          const SizedBox(width: 12),
-                          Expanded(
-                            child: ElevatedButton(
-                              onPressed: () async {
-                                if (_nameController.text.trim().isNotEmpty) {
-                                  await ref.read(sectionsProvider.notifier).addSection({
-                                    'name': _nameController.text.trim(),
-                                    'description': _descController.text.trim(),
-                                    'grade': _selectedGrade.isNotEmpty ? _selectedGrade : 'Grade 11',
-                                    'room': _roomController.text.trim(),
-                                    'student_count': 0,
-                                    'created_at': DateTime.now().toIso8601String(),
-                                  });
-                                  setState(() {
-                                    _showForm = false;
-                                    _nameController.clear();
-                                    _descController.clear();
-                                    _roomController.clear();
-                                    _selectedGrade = '';
-                                  });
-                                }
-                              },
-                              child: const Text('Save'),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ],
-                  ),
+              // Grade Level Filter Chips Bar
+              SingleChildScrollView(
+                scrollDirection: Axis.horizontal,
+                child: Row(
+                  children: [
+                    _buildGradeFilterChip('All', sections.length),
+                    ..._grades.map((g) => _buildGradeFilterChip(g, gradeSectionCounts[g] ?? 0)),
+                  ],
                 ),
-                const SizedBox(height: 20),
-              ],
+              ),
+              const SizedBox(height: 20),
 
-              // Empty state
+              // Empty state when no sections exist overall
               if (sections.isEmpty)
                 Container(
                   padding: const EdgeInsets.symmetric(vertical: 40, horizontal: 20),
@@ -359,28 +607,76 @@ class _SectionsMgmtScreenState extends ConsumerState<SectionsMgmtScreen> {
                       const SizedBox(height: 12),
                       Text('No class sections created yet.', style: TextStyle(color: AppTheme.textSecondary, fontSize: 16)),
                       const SizedBox(height: 4),
-                      Text('Click "+" above to add your first classroom section with room assignment.', style: TextStyle(color: AppTheme.textMuted, fontSize: 13)),
+                      Text('Click "+ Add Section" above to add your first classroom section with room assignment.', style: TextStyle(color: AppTheme.textMuted, fontSize: 13)),
+                      const SizedBox(height: 16),
+                      ElevatedButton.icon(
+                        onPressed: () => _showAddSectionDialog(initialGrade: 'Grade 10'),
+                        icon: const Icon(Icons.add, size: 18),
+                        label: const Text('Create First Section'),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Theme.of(context).colorScheme.primary,
+                          foregroundColor: Colors.white,
+                          minimumSize: const Size(0, 40),
+                        ),
+                      ),
                     ],
                   ),
-                ),
-
-              // Section Cards
-              ...sections.map((section) => _SectionCard(
-                section: section,
-                onEdit: () => _showEditDialog(section),
-                onDelete: () {
-                  _showConfirmation(
-                    title: 'Delete Section',
-                    content: 'Are you sure you want to delete "${section['name']}"?',
-                    onConfirm: () async {
-                      final sectionId = section['id'];
-                      if (sectionId is int) {
-                        await ref.read(sectionsProvider.notifier).deleteSection(sectionId);
-                      }
-                    },
+                )
+              else if (_selectedGradeFilter == 'All') ...[
+                // Render sections separated into Grade Level groups
+                ...sortedGrades.expand((grade) {
+                  final gradeSecs = groupedSections[grade] ?? [];
+                  return [
+                    _buildGradeGroupHeader(grade, gradeSecs.length),
+                    ...gradeSecs.map((section) => _SectionCard(
+                      section: section,
+                      onEdit: () => _showEditDialog(section),
+                      onDelete: () {
+                        _showConfirmation(
+                          title: 'Delete Section',
+                          content: 'Are you sure you want to delete "${section['name']}"?',
+                          onConfirm: () async {
+                            final sectionId = section['id'];
+                            if (sectionId is int) {
+                              await ref.read(sectionsProvider.notifier).deleteSection(sectionId);
+                            }
+                          },
+                        );
+                      },
+                    )),
+                  ];
+                }),
+              ] else ...[
+                // Render only selected grade level
+                () {
+                  final specificSecs = sections.where((s) => s['grade']?.toString() == _selectedGradeFilter).toList();
+                  if (specificSecs.isEmpty) {
+                    return _buildEmptyGradeState(_selectedGradeFilter);
+                  }
+                  return Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      _buildGradeGroupHeader(_selectedGradeFilter, specificSecs.length),
+                      ...specificSecs.map((section) => _SectionCard(
+                        section: section,
+                        onEdit: () => _showEditDialog(section),
+                        onDelete: () {
+                          _showConfirmation(
+                            title: 'Delete Section',
+                            content: 'Are you sure you want to delete "${section['name']}"?',
+                            onConfirm: () async {
+                              final sectionId = section['id'];
+                              if (sectionId is int) {
+                                await ref.read(sectionsProvider.notifier).deleteSection(sectionId);
+                              }
+                            },
+                          );
+                        },
+                      )),
+                    ],
                   );
-                },
-              )),
+                }(),
+              ],
             ],
           ),
         ),
@@ -419,7 +715,10 @@ class _SectionCardState extends ConsumerState<_SectionCard> {
       final sectionName = widget.section['name']?.toString().toLowerCase().trim() ?? '';
       final matched = allStudents.where((s) {
         final sSection = s['section']?.toString().toLowerCase().trim() ?? '';
-        return sSection.isNotEmpty && (sSection == sectionName || sectionName.contains(sSection));
+        if (sSection.isEmpty) return false;
+        return sSection == sectionName ||
+            sectionName.contains(sSection) ||
+            sSection.contains(sectionName);
       }).toList();
       if (mounted) {
         setState(() {

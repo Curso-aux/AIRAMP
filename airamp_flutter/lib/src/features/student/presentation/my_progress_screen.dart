@@ -38,7 +38,13 @@ class _MyProgressScreenState extends ConsumerState<MyProgressScreen> {
     await ref.read(subjectDetailProvider.notifier).loadHierarchy(subjectId);
 
     final user = ref.read(authProvider);
-    final studentId = user?.id ?? 'student_1';
+    final studentId = user?.id;
+    if (studentId == null) {
+      if (mounted) {
+        setState(() => _loadingHierarchy = false);
+      }
+      return;
+    }
 
     final db = await DatabaseHelper().database;
     final progressRows = await db.query(
