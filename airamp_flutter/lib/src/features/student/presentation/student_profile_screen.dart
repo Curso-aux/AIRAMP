@@ -45,6 +45,7 @@ class _StudentProfileScreenState extends ConsumerState<StudentProfileScreen> {
   String _getRoleLabel(String role) {
     if (role == 'super_admin') return 'Super Administrator';
     if (role == 'admin') return 'Administrator';
+    if (role == 'teacher') return 'Teacher';
     return 'Student';
   }
 
@@ -268,7 +269,7 @@ class _StudentProfileScreenState extends ConsumerState<StudentProfileScreen> {
         const SizedBox(height: 32),
         // Activity Timeline
         Text(
-          'Student Activity',
+          '${currentUser.role == 'teacher' ? 'Teacher' : 'Student'} Activity',
           style: TextStyle(
               fontSize: 18, fontWeight: FontWeight.bold, color: AppTheme.text),
         ),

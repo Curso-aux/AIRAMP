@@ -202,6 +202,48 @@ class StudentQuizAttemptsNotifier extends Notifier<List<Map<String, dynamic>>> {
     state = results;
   }
 
+  Future<void> recordAttemptWithValidation({
+    required int loId,
+    int? quizId,
+    required int subjectId,
+    required int score,
+    required int totalQuestions,
+    required double percentage,
+    required bool isPassed,
+    int durationSeconds = 0,
+  }) async {
+    final studentId = _getStudentId();
+    if (studentId == null) return;
+
+    // Validate quiz attempt - check if student already completed
+    if (quizId != null && quizId > 0) {
+      final canAttempt = await DatabaseHelper().hasStudentCompletedQuiz(studentId: studentId, quizId: quizId);
+      if (!canAttempt) {
+        throw Exception('You have already completed this quiz. Contact your teacher for a reset if needed.');
+      }
+    }
+
+    await DatabaseHelper().recordQuizAttempt(
+      studentId: studentId,
+      loId: loId,
+      quizId: quizId,
+      subjectId: subjectId,
+      score: score,
+      totalQuestions: totalQuestions,
+      percentage: percentage,
+      isPassed: isPassed,
+      durationSeconds: durationSeconds,
+    );
+
+    await loadAttempts(subjectId: _activeSubjectFilter);
+    ref.invalidate(studentQuizAssignmentsProvider);
+    ref.invalidate(studentCoursesProvider);
+    ref.invalidate(studentProgressProvider);
+    ref.invalidate(teacherScoresProvider);
+    ref.invalidate(teacherDashboardProvider);
+    ref.invalidate(adminAnalyticsProvider);
+  }
+
   Future<void> recordAttempt({
     required int loId,
     int? quizId,
@@ -214,6 +256,8 @@ class StudentQuizAttemptsNotifier extends Notifier<List<Map<String, dynamic>>> {
   }) async {
     final studentId = _getStudentId();
     if (studentId == null) return;
+
+    // Legacy method - direct record attempt without validation
     await DatabaseHelper().recordQuizAttempt(
       studentId: studentId,
       loId: loId,

@@ -69,7 +69,7 @@ class DatabaseHelper {
         databaseFactory = databaseFactoryFfiWeb;
         return await openDatabase(
           'airamp_local.db',
-          version: 18,
+          version: 19,
           onCreate: _onCreate,
           onUpgrade: _onUpgrade,
           onOpen: _onDatabaseOpen,
@@ -79,7 +79,7 @@ class DatabaseHelper {
         databaseFactory = databaseFactoryFfiWebNoWebWorker;
         return await openDatabase(
           'airamp_local.db',
-          version: 18,
+          version: 19,
           onCreate: _onCreate,
           onUpgrade: _onUpgrade,
           onOpen: _onDatabaseOpen,
@@ -92,7 +92,7 @@ class DatabaseHelper {
 
     return await openDatabase(
       path,
-      version: 18,
+      version: 19,
       onCreate: _onCreate,
       onUpgrade: _onUpgrade,
       onOpen: _onDatabaseOpen,
@@ -374,6 +374,8 @@ class DatabaseHelper {
         passing_score INTEGER DEFAULT 70,
         status TEXT DEFAULT 'published',
         due_date TEXT,
+        schedule_start TEXT,
+        schedule_end TEXT,
         created_at TEXT NOT NULL,
         FOREIGN KEY (subject_id) REFERENCES subjects (id) ON DELETE CASCADE
       )
@@ -793,18 +795,15 @@ class DatabaseHelper {
       await _seedInitialData(db);
     }
 
-    if (oldVersion < 18) {
+    if (oldVersion < 19) {
       try {
-        await db.execute('ALTER TABLE announcements ADD COLUMN section TEXT');
+        await db.execute('ALTER TABLE quizzes ADD COLUMN schedule_start TEXT');
       } catch (_) {}
       try {
-        await db.execute('ALTER TABLE announcements ADD COLUMN author_id TEXT');
+        await db.execute('ALTER TABLE quizzes ADD COLUMN schedule_end TEXT');
       } catch (_) {}
       try {
-        await db.execute('ALTER TABLE announcements ADD COLUMN author_name TEXT');
-      } catch (_) {}
-      try {
-        await db.execute('ALTER TABLE announcements ADD COLUMN author_role TEXT');
+        await db.execute('ALTER TABLE quizzes ADD COLUMN status TEXT DEFAULT \'published\'');
       } catch (_) {}
       await _seedInitialData(db);
     }
@@ -1072,6 +1071,105 @@ class DatabaseHelper {
     );
   }
 
+  // ── Student Quiz Attempt Validation ───────────────────────
+
+  /// Check if a student has already completed a specific quiz
+  /// Returns true if student has NOT completed the quiz, false if already completed
+  Future<bool> hasStudentCompletedQuiz({
+    required String studentId,
+    required int quizId,
+  }) async {
+    final db = await database;
+    final results = await db.rawQuery('''
+      SELECT COUNT(*) as count
+      FROM quiz_attempts
+      WHERE student_id = ? AND quiz_id = ? AND quiz_id IS NOT NULL
+    ''', [studentId, quizId]);
+
+    return (results.first['count'] as int) == 0;
+  }
+
+  /// Get the latest quiz attempt status for a student on a specific quiz
+  /// Returns a map with attempt status information
+  Future<Map<String, dynamic>> getStudentQuizAttemptStatus({
+    required String studentId,
+    required int quizId,
+  }) async {
+    final db = await database;
+    final attempts = await db.rawQuery('''
+      SELECT * FROM quiz_attempts
+      WHERE student_id = ? AND quiz_id = ? AND quiz_id IS NOT NULL
+      ORDER BY attempted_at DESC LIMIT 1
+    ''', [studentId, quizId]);
+
+    if (attempts.isEmpty) {
+      return {
+        'canAttempt': true,
+        'attemptsCount': 0,
+        'lastAttempt': null,
+        'lastScore': null,
+        'lastPercentage': null,
+        'lastPassed': null,
+      };
+    }
+
+    final attempt = attempts.first;
+    return {
+      'canAttempt': false,
+      'attemptsCount': await db.rawQuery('''
+        SELECT COUNT(*) as count
+        FROM quiz_attempts
+        WHERE student_id = ? AND quiz_id = ? AND quiz_id IS NOT NULL
+      ''', [studentId, quizId]),
+      'lastAttempt': attempt['attempted_at'],
+      'lastScore': attempt['score'],
+      'lastPercentage': attempt['percentage'],
+      'lastPassed': attempt['is_passed'] == 1,
+    };
+  }
+
+  /// Get the current quiz assignment status for a student
+  Future<Map<String, dynamic>?> getStudentQuizAssignment({
+    required String studentId,
+    required int quizId,
+  }) async {
+    final db = await database;
+    final assignments = await db.query(
+      'quiz_assignments',
+      where: 'student_id = ? AND quiz_id = ?',
+      whereArgs: [studentId, quizId],
+    );
+
+    if (assignments.isEmpty) return null;
+    return assignments.first;
+  }
+
+  /// Teacher reset functionality - clear all quiz attempts for a specific student
+  Future<void> resetStudentQuizAttempts({
+    required int quizId,
+    required String studentId,
+  }) async {
+    final db = await database;
+    await db.delete(
+      'quiz_attempts',
+      where: 'quiz_id = ? AND student_id = ?',
+      whereArgs: [quizId, studentId],
+    );
+
+    // Reset assignment status
+    await db.update(
+      'quiz_assignments',
+      {
+        'status': 'pending',
+        'score': 0,
+        'percentage': 0.0,
+        'completed_at': null,
+      },
+      where: 'quiz_id = ? AND student_id = ?',
+      whereArgs: [quizId, studentId],
+    );
+  }
+
   Future<void> recordQuizAttempt({
     required String studentId,
     required int loId,
@@ -1085,6 +1183,14 @@ class DatabaseHelper {
   }) async {
     final db = await database;
     final now = DateTime.now().toIso8601String();
+
+    // Validate quiz attempt - check if student already completed
+    if (quizId != null && quizId > 0) {
+      final canAttempt = await hasStudentCompletedQuiz(studentId: studentId, quizId: quizId);
+      if (!canAttempt) {
+        throw Exception('Student has already completed this quiz. Contact the teacher for a reset if needed.');
+      }
+    }
 
     await db.insert('quiz_attempts', {
       'student_id': studentId,
@@ -1123,6 +1229,29 @@ class DatabaseHelper {
         conflictAlgorithm: ConflictAlgorithm.replace,
       );
     }
+  }
+
+  /// Get comprehensive attempt statistics for a quiz (teacher perspective)
+  Future<List<Map<String, dynamic>>> getQuizAttemptStats({
+    required int quizId,
+  }) async {
+    final db = await database;
+    return await db.rawQuery('''
+      SELECT
+        qa.*,
+        u.full_name as student_name,
+        u.email as student_email,
+        CASE
+          WHEN qa.score >= q.passing_score THEN 'Passed'
+          ELSE 'Failed'
+        END as result,
+        strftime('%Y-%m-%d %H:%M:%S', qa.attempted_at) as formatted_attempt_time
+      FROM quiz_attempts qa
+      JOIN users u ON qa.student_id = u.id
+      JOIN quizzes q ON qa.quiz_id = q.id
+      WHERE qa.quiz_id = ?
+      ORDER BY qa.attempted_at DESC
+    ''', [quizId]);
   }
 
   Future<List<Map<String, dynamic>>> getStudentQuizAttempts(String studentId, {int? subjectId}) async {
@@ -1216,6 +1345,119 @@ class DatabaseHelper {
       'subject_id': subjectId,
       'questions': questions,
     };
+  }
+
+  /// Load existing quiz data for editing (includes questions, assignments)
+  Future<Map<String, dynamic>?> getQuizForEditing(int quizId) async {
+    final db = await database;
+
+    // Load quiz metadata
+    final quizzes = await db.query('quizzes', where: 'id = ?', whereArgs: [quizId]);
+    if (quizzes.isEmpty) return null;
+
+    final quiz = quizzes.first;
+
+    // Load related questions
+    final questions = await db.query(
+      'questions',
+      where: 'quiz_id = ?',
+      whereArgs: [quizId],
+      orderBy: 'id ASC',
+    );
+
+    // Load assigned students
+    final assignments = await db.query(
+      'quiz_assignments',
+      where: 'quiz_id = ?',
+      whereArgs: [quizId],
+    );
+
+    // Load assigned student IDs for selection
+    final assignedStudentIds = assignments
+        .map((a) => a['student_id']?.toString() ?? '')
+        .where((id) => id.isNotEmpty)
+        .toList();
+
+    return {
+      ...quiz,
+      'questions': questions,
+      'assigned_student_ids': assignedStudentIds,
+      'assignment_count': assignments.length,
+    };
+  }
+
+  /// Update quiz student assignments (clear old and add new)
+  Future<void> updateQuizAssignments({
+    required int quizId,
+    required List<String> studentIds,
+    String? dueDate,
+  }) async {
+    final db = await database;
+
+    // Clear existing assignments for this quiz
+    await db.delete('quiz_assignments', where: 'quiz_id = ?', whereArgs: [quizId]);
+
+    // Add updated assignments
+    for (final studentId in studentIds) {
+      await db.insert('quiz_assignments', {
+        'quiz_id': quizId,
+        'student_id': studentId,
+        'assigned_at': DateTime.now().toIso8601String(),
+        'due_date': dueDate,
+        'status': 'pending',
+        'score': 0,
+        'total_questions': 0,
+        'percentage': 0.0,
+        'completed_at': null,
+      });
+    }
+  }
+
+  /// Update an existing quiz with new data
+  Future<void> updateQuiz({
+    required int quizId,
+    required String title,
+    String? description,
+    required int subjectId,
+    required int timeLimitMinutes,
+    required int passingScore,
+    String? status,
+    String? dueDate,
+    String? scheduleStart,
+    String? scheduleEnd,
+    required List<Map<String, dynamic>> questions,
+  }) async {
+    final db = await database;
+
+    // Update quiz basic info
+    await db.update(
+      'quizzes',
+      {
+        'title': title.trim(),
+        'description': description?.trim(),
+        'subject_id': subjectId,
+        'time_limit_minutes': timeLimitMinutes,
+        'passing_score': passingScore,
+        'status': status ?? 'published',
+        'due_date': dueDate,
+        'schedule_start': scheduleStart,
+        'schedule_end': scheduleEnd,
+        'updated_at': DateTime.now().toIso8601String(),
+      },
+      where: 'id = ?',
+      whereArgs: [quizId],
+    );
+
+    // Clear old questions for this quiz
+    await db.delete('questions', where: 'quiz_id = ?', whereArgs: [quizId]);
+
+    // Insert updated questions
+    for (final q in questions) {
+      await db.insert('questions', {
+        ...q,
+        'quiz_id': quizId,
+      });
+    }
   }
 
   Future<List<Map<String, dynamic>>> getAllQuizScores({String? section, String? query}) async {
@@ -2898,6 +3140,9 @@ class DatabaseHelper {
     int timeLimitMinutes = 0,
     int passingScore = 70,
     String? dueDate,
+    String? scheduleStart,
+    String? scheduleEnd,
+    String status = 'published',
     List<Map<String, dynamic>> questions = const [],
   }) async {
     final db = await database;
@@ -2912,8 +3157,10 @@ class DatabaseHelper {
       'teacher_name': teacherName,
       'time_limit_minutes': timeLimitMinutes,
       'passing_score': passingScore,
-      'status': 'published',
+      'status': status,
       'due_date': dueDate,
+      'schedule_start': scheduleStart,
+      'schedule_end': scheduleEnd,
       'created_at': now,
     });
 
@@ -3005,16 +3252,19 @@ class DatabaseHelper {
   Future<List<Map<String, dynamic>>> getAssignedQuizzesForStudent(String studentId, {int? subjectId}) async {
     final db = await database;
     String query = '''
-      SELECT qa.*, 
-             q.title, 
-             q.description, 
-             q.subject_id, 
-             q.lo_id, 
-             q.teacher_id, 
-             q.teacher_name, 
-             q.time_limit_minutes, 
-             q.passing_score, 
-             s.name as subject_name, 
+      SELECT qa.*,
+             q.title,
+             q.description,
+             q.subject_id,
+             q.lo_id,
+             q.teacher_id,
+             q.teacher_name,
+             q.time_limit_minutes,
+             q.passing_score,
+             q.status as quiz_status,
+             q.schedule_start,
+             q.schedule_end,
+             s.name as subject_name,
              s.subject_code,
              (SELECT COUNT(*) FROM questions WHERE quiz_id = q.id) as question_count
       FROM quiz_assignments qa
@@ -3124,16 +3374,72 @@ class DatabaseHelper {
   Future<List<Map<String, dynamic>>> getQuizAssignmentRoster(int quizId) async {
     final db = await database;
     return await db.rawQuery('''
-      SELECT qa.*, 
-             u.full_name as student_name, 
-             u.email as student_email, 
-             u.section as student_section, 
-             u.grade as student_grade
+      SELECT qa.*,
+             u.full_name as student_name,
+             u.email as student_email,
+             u.section as student_section,
+             u.grade as student_grade,
+             CASE
+               WHEN qa.status = 'completed' AND qa.score >= (
+                 SELECT passing_score FROM quizzes WHERE id = qa.quiz_id
+               ) THEN 'Passed'
+               WHEN qa.status = 'completed' THEN 'Failed'
+               ELSE 'Pending'
+             END as result
       FROM quiz_assignments qa
       JOIN users u ON qa.student_id = u.id
       WHERE qa.quiz_id = ?
       ORDER BY CASE WHEN qa.status = 'completed' THEN 0 ELSE 1 END, qa.score DESC
     ''', [quizId]);
+  }
+
+  /// Reset a single student's quiz attempt (teacher resets individual student)
+  Future<void> resetStudentQuizAttempt({
+    required int quizId,
+    required String studentId,
+  }) async {
+    final db = await database;
+    final now = DateTime.now().toIso8601String();
+
+    // Delete quiz attempts
+    await db.delete(
+      'quiz_attempts',
+      where: 'quiz_id = ? AND student_id = ?',
+      whereArgs: [quizId, studentId],
+    );
+
+    // Reset assignment
+    await db.update(
+      'quiz_assignments',
+      {
+        'status': 'pending',
+        'score': 0,
+        'total_questions': 0,
+        'percentage': 0.0,
+        'completed_at': null,
+      },
+      where: 'quiz_id = ? AND student_id = ?',
+      whereArgs: [quizId, studentId],
+    );
+  }
+
+  /// Check if a student has a pending retry eligibility
+  Future<bool> canStudentRetryQuiz({
+    required int quizId,
+    required String studentId,
+  }) async {
+    final db = await database;
+    final assignment = await db.query(
+      'quiz_assignments',
+      where: 'quiz_id = ? AND student_id = ?',
+      whereArgs: [quizId, studentId],
+    );
+
+    if (assignment.isEmpty) return false;
+
+    final status = assignment.first['status'];
+    // Student can retry if they previously completed the quiz
+    return status == 'completed';
   }
 
   Future<void> deleteQuiz(int quizId) async {

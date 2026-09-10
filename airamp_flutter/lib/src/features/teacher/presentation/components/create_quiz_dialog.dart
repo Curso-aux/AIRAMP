@@ -9,14 +9,17 @@ import '../../data/teacher_repository.dart';
 import 'quiz_parser.dart';
 
 class CreateQuizDialog extends ConsumerStatefulWidget {
-  final int subjectId;
+  final int? initialSubjectId;
   final String subjectName;
+  final int? quizId; // For editing existing quizzes
 
   const CreateQuizDialog({
     super.key,
-    required this.subjectId,
+    int? subjectId,
+    int? initialSubjectId,
     required this.subjectName,
-  });
+    this.quizId,
+  }) : initialSubjectId = initialSubjectId ?? subjectId;
 
   @override
   ConsumerState<CreateQuizDialog> createState() => _CreateQuizDialogState();
@@ -31,6 +34,9 @@ class _CreateQuizDialogState extends ConsumerState<CreateQuizDialog> {
   int _timeLimitMinutes = 15;
   int _passingScore = 70;
   DateTime? _dueDate;
+  DateTime? _scheduleStart;
+  DateTime? _scheduleEnd;
+  String _quizStatus = 'published'; // 'published' or 'draft'
 
   // Step 2: Questions
   int _questionInputMode = 0; // 0: Bulk Paste / Upload, 1: Manual
@@ -52,6 +58,8 @@ class _CreateQuizDialogState extends ConsumerState<CreateQuizDialog> {
   bool _loadingStudents = true;
   String _activeSectionFilter = 'All Sections';
   List<String> _sections = ['All Sections'];
+  String _studentSearchQuery = '';
+  int _subjectId = 0;
 
   bool _isSubmitting = false;
 
@@ -59,8 +67,52 @@ class _CreateQuizDialogState extends ConsumerState<CreateQuizDialog> {
   void initState() {
     super.initState();
     _dueDate = DateTime.now().add(const Duration(days: 7));
-    _loadStudents();
-    _initSampleBulkText();
+    if (widget.initialSubjectId != null) {
+      _subjectId = widget.initialSubjectId!;
+    }
+    // Load existing quiz data if editing
+    if (widget.quizId != null) {
+      _loadExistingQuiz();
+    } else {
+      _loadStudents();
+      _initSampleBulkText();
+    }
+  }
+
+  Future<void> _loadExistingQuiz() async {
+    final quizData = await DatabaseHelper().getQuizForEditing(widget.quizId!);
+    if (quizData != null && mounted) {
+      setState(() {
+        // Load quiz details into controllers
+        _titleController.text = quizData['title']?.toString() ?? '';
+        _descController.text = quizData['description']?.toString() ?? '';
+        _timeLimitMinutes = (quizData['time_limit_minutes'] as int?) ?? 15;
+        _passingScore = (quizData['passing_score'] as int?) ?? 70;
+        _quizStatus = (quizData['status']?.toString() ?? 'published');
+        _dueDate = quizData['due_date'] != null
+            ? DateTime.tryParse(quizData['due_date'].toString())
+            : DateTime.now().add(const Duration(days: 7));
+
+        // Load questions from database
+        final questions = quizData['questions'] as List<dynamic>? ?? [];
+        _parsedQuestions = questions.map((q) => ParsedQuestion.fromJson(q)).toList();
+
+        // Load assigned student IDs for selection
+        final assignedIds = quizData['assigned_student_ids'] as List<dynamic>? ?? [];
+        _selectedStudentIds.addAll(assignedIds.map((id) => id.toString()));
+
+        // Update bulk text controller with existing questions
+        _updateBulkTextFromQuestions();
+      });
+    }
+    await _loadStudents();
+  }
+
+  void _updateBulkTextFromQuestions() {
+    final text = _parsedQuestions.map((q) {
+      return '${q.questionText}\nA) ${q.optionA}\nB) ${q.optionB}\nC) ${q.optionC}\nD) ${q.optionD}\nAnswer: ${q.correctOption}';
+    }).join('\n\n');
+    _bulkTextController.text = text;
   }
 
   void _initSampleBulkText() {
@@ -89,7 +141,7 @@ Answer: B''';
 
   Future<void> _loadStudents() async {
     try {
-      final students = await DatabaseHelper().getStudentsForSubjectOrAll(widget.subjectId);
+      final students = await DatabaseHelper().getStudentsForSubjectOrAll(_subjectId);
       final secSet = <String>{'All Sections'};
       for (final s in students) {
         final sec = s['section']?.toString();
@@ -102,10 +154,13 @@ Answer: B''';
         setState(() {
           _availableStudents = students;
           _sections = secSet.toList();
-          // By default, select all enrolled/available students
-          _selectedStudentIds.addAll(
-            students.map((s) => s['id']?.toString() ?? '').where((id) => id.isNotEmpty),
-          );
+          // If editing an existing quiz, preserve current selection;
+          // otherwise select all available students
+          if (widget.quizId == null) {
+            _selectedStudentIds.addAll(
+              students.map((s) => s['id']?.toString() ?? '').where((id) => id.isNotEmpty),
+            );
+          }
           _loadingStudents = false;
         });
       }
@@ -207,37 +262,78 @@ Answer: B''';
       final teacherId = user.id;
       final teacherName = user.fullName;
 
-      final quizId = await DatabaseHelper().createQuiz(
-        title: title,
-        description: _descController.text.trim(),
-        subjectId: widget.subjectId,
-        teacherId: teacherId,
-        teacherName: teacherName,
-        timeLimitMinutes: _timeLimitMinutes,
-        passingScore: _passingScore,
-        dueDate: _dueDate?.toIso8601String(),
-        questions: _parsedQuestions.map((q) => q.toMap()).toList(),
-      );
-
-      final assignedCount = await DatabaseHelper().assignQuizToStudents(
-        quizId: quizId,
-        studentIds: _selectedStudentIds.toList(),
-        dueDate: _dueDate?.toIso8601String(),
-      );
-
-      ref.invalidate(subjectQuizzesProvider(widget.subjectId));
-      ref.invalidate(teacherDashboardProvider);
-      ref.invalidate(studentQuizAssignmentsProvider);
-      ref.invalidate(studentQuizAttemptsProvider);
-
-      if (mounted) {
-        Navigator.pop(context, true);
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            backgroundColor: AppTheme.success,
-            content: Text('Quiz "$title" created and assigned to $assignedCount students!'),
-          ),
+      if (widget.quizId != null) {
+        // Update existing quiz
+        await DatabaseHelper().updateQuiz(
+          quizId: widget.quizId!,
+          title: title,
+          description: _descController.text.trim(),
+          subjectId: _subjectId,
+          timeLimitMinutes: _timeLimitMinutes,
+          passingScore: _passingScore,
+          status: _quizStatus,
+          dueDate: _dueDate?.toIso8601String(),
+          scheduleStart: _scheduleStart?.toIso8601String(),
+          scheduleEnd: _scheduleEnd?.toIso8601String(),
+          questions: _parsedQuestions.map((q) => q.toMap()).toList(),
         );
+
+        // Update assignments
+        await DatabaseHelper().updateQuizAssignments(
+          quizId: widget.quizId!,
+          studentIds: _selectedStudentIds.toList(),
+          dueDate: _dueDate?.toIso8601String(),
+        );
+
+        ref.invalidate(subjectQuizzesProvider(_subjectId));
+        ref.invalidate(teacherDashboardProvider);
+
+        if (mounted) {
+          Navigator.pop(context, true);
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              backgroundColor: AppTheme.success,
+              content: Text('Quiz "$title" updated successfully!'),
+            ),
+          );
+        }
+      } else {
+        // Create new quiz
+        final quizId = await DatabaseHelper().createQuiz(
+          title: title,
+          description: _descController.text.trim(),
+          subjectId: _subjectId,
+          teacherId: teacherId,
+          teacherName: teacherName,
+          timeLimitMinutes: _timeLimitMinutes,
+          passingScore: _passingScore,
+          dueDate: _dueDate?.toIso8601String(),
+          scheduleStart: _scheduleStart?.toIso8601String(),
+          scheduleEnd: _scheduleEnd?.toIso8601String(),
+          status: _quizStatus,
+          questions: _parsedQuestions.map((q) => q.toMap()).toList(),
+        );
+
+        final assignedCount = await DatabaseHelper().assignQuizToStudents(
+          quizId: quizId,
+          studentIds: _selectedStudentIds.toList(),
+          dueDate: _dueDate?.toIso8601String(),
+        );
+
+        ref.invalidate(subjectQuizzesProvider(_subjectId));
+        ref.invalidate(teacherDashboardProvider);
+        ref.invalidate(studentQuizAssignmentsProvider);
+        ref.invalidate(studentQuizAttemptsProvider);
+
+        if (mounted) {
+          Navigator.pop(context, true);
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              backgroundColor: AppTheme.success,
+              content: Text('Quiz "$title" created and assigned to $assignedCount students!'),
+            ),
+          );
+        }
       }
     } catch (e) {
       if (mounted) {
@@ -295,7 +391,8 @@ Answer: B''';
           alignment: Alignment.topCenter,
           child: ConstrainedBox(
             constraints: const BoxConstraints(maxWidth: 800),
-            child: SizedBox.expand(
+            child: SizedBox(
+              width: double.infinity,
               child: Column(
                 children: [
                   // Stepper Indicator
@@ -368,6 +465,7 @@ Answer: B''';
                           backgroundColor: AppTheme.primary,
                           foregroundColor: Colors.black,
                           padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+                          minimumSize: const Size(0, 44),
                         ),
                         onPressed: () {
                           if (_currentStep == 0 && _titleController.text.trim().isEmpty) {
@@ -393,13 +491,18 @@ Answer: B''';
                           backgroundColor: AppTheme.primary,
                           foregroundColor: Colors.black,
                           padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+                          minimumSize: const Size(0, 44),
                         ),
                         onPressed: _isSubmitting ? null : _submitQuiz,
                         icon: _isSubmitting
                             ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2))
                             : const Icon(Icons.check, size: 18),
                         label: Text(
-                          _isSubmitting ? 'Publishing...' : 'Publish & Assign (${_selectedStudentIds.length})',
+                          _isSubmitting
+                              ? 'Saving...'
+                              : _quizStatus == 'draft'
+                                  ? 'Save Draft (${_selectedStudentIds.length})'
+                                  : 'Publish & Assign (${_selectedStudentIds.length})',
                           style: const TextStyle(fontWeight: FontWeight.bold),
                         ),
                       ),
@@ -628,6 +731,139 @@ Answer: B''';
               ),
             ),
           ),
+          const SizedBox(height: 16),
+
+          // Availability Window: Schedule Start
+          Text('Quiz Available From', style: TextStyle(fontWeight: FontWeight.bold, color: AppTheme.text, fontSize: 13)),
+          const SizedBox(height: 6),
+          InkWell(
+            onTap: () async {
+              final picked = await showDatePicker(
+                context: context,
+                initialDate: _scheduleStart ?? DateTime.now(),
+                firstDate: DateTime.now(),
+                lastDate: DateTime.now().add(const Duration(days: 365)),
+              );
+              if (picked != null) {
+                setState(() => _scheduleStart = picked);
+              }
+            },
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
+              decoration: BoxDecoration(
+                color: AppTheme.surface,
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: AppTheme.border),
+              ),
+              child: Row(
+                children: [
+                  Icon(Icons.schedule_outlined, size: 18, color: AppTheme.primary),
+                  const SizedBox(width: 10),
+                  Text(
+                    _scheduleStart != null
+                        ? 'Starts: ${_scheduleStart!.year}-${_scheduleStart!.month.toString().padLeft(2, '0')}-${_scheduleStart!.day.toString().padLeft(2, '0')}'
+                        : 'Available immediately',
+                    style: TextStyle(color: AppTheme.text),
+                  ),
+                ],
+              ),
+            ),
+          ),
+          const SizedBox(height: 12),
+
+          // Availability Window: Schedule End
+          Text('Quiz Available Until', style: TextStyle(fontWeight: FontWeight.bold, color: AppTheme.text, fontSize: 13)),
+          const SizedBox(height: 6),
+          InkWell(
+            onTap: () async {
+              final picked = await showDatePicker(
+                context: context,
+                initialDate: _scheduleEnd ?? DateTime.now().add(const Duration(days: 7)),
+                firstDate: DateTime.now(),
+                lastDate: DateTime.now().add(const Duration(days: 365)),
+              );
+              if (picked != null) {
+                setState(() => _scheduleEnd = picked);
+              }
+            },
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
+              decoration: BoxDecoration(
+                color: AppTheme.surface,
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: AppTheme.border),
+              ),
+              child: Row(
+                children: [
+                  Icon(Icons.event_outlined, size: 18, color: AppTheme.primary),
+                  const SizedBox(width: 10),
+                  Text(
+                    _scheduleEnd != null
+                        ? 'Ends: ${_scheduleEnd!.year}-${_scheduleEnd!.month.toString().padLeft(2, '0')}-${_scheduleEnd!.day.toString().padLeft(2, '0')}'
+                        : 'No end date',
+                    style: TextStyle(color: AppTheme.text),
+                  ),
+                ],
+              ),
+            ),
+          ),
+          const SizedBox(height: 16),
+
+          // Status Selector
+          Text('Quiz Status', style: TextStyle(fontWeight: FontWeight.bold, color: AppTheme.text, fontSize: 13)),
+          const SizedBox(height: 6),
+          Container(
+            decoration: BoxDecoration(
+              color: AppTheme.background,
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: Row(
+              children: [
+                Expanded(
+                  child: GestureDetector(
+                    onTap: () => setState(() => _quizStatus = 'published'),
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(vertical: 12),
+                      decoration: BoxDecoration(
+                        color: _quizStatus == 'published' ? AppTheme.success : Colors.transparent,
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      alignment: Alignment.center,
+                      child: Text(
+                        'Publish Now',
+                        style: TextStyle(
+                          fontWeight: FontWeight.bold,
+                          fontSize: 13,
+                          color: _quizStatus == 'published' ? Colors.white : AppTheme.textSecondary,
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+                Expanded(
+                  child: GestureDetector(
+                    onTap: () => setState(() => _quizStatus = 'draft'),
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(vertical: 12),
+                      decoration: BoxDecoration(
+                        color: _quizStatus == 'draft' ? Colors.orange : Colors.transparent,
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      alignment: Alignment.center,
+                      child: Text(
+                        'Save as Draft',
+                        style: TextStyle(
+                          fontWeight: FontWeight.bold,
+                          fontSize: 13,
+                          color: _quizStatus == 'draft' ? Colors.white : AppTheme.textSecondary,
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
         ],
       ),
     );
@@ -721,6 +957,7 @@ Answer: B''';
                     backgroundColor: AppTheme.primary,
                     foregroundColor: Colors.black,
                     padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                    minimumSize: const Size(0, 36),
                   ),
                   onPressed: _parseBulkQuestions,
                   icon: const Icon(Icons.sync, size: 14),
@@ -874,6 +1111,7 @@ Answer: B''';
                 style: ElevatedButton.styleFrom(
                   backgroundColor: AppTheme.primary,
                   foregroundColor: Colors.black,
+                  minimumSize: const Size(0, 40),
                 ),
                 onPressed: _addManualQuestion,
                 icon: const Icon(Icons.add, size: 16),
@@ -950,6 +1188,7 @@ Answer: B''';
                 style: ElevatedButton.styleFrom(
                   backgroundColor: AppTheme.primary,
                   foregroundColor: Colors.black,
+                  minimumSize: const Size(0, 44),
                 ),
                 onPressed: () {
                   setState(() => _loadingStudents = true);
@@ -964,10 +1203,20 @@ Answer: B''';
       );
     }
 
-    // Filter students by section
+    // Filter students by section and search query
     final filtered = _activeSectionFilter == 'All Sections'
         ? _availableStudents
         : _availableStudents.where((s) => s['section'] == _activeSectionFilter).toList();
+
+    // Apply name search filter
+    final searchedStudents = _studentSearchQuery.isEmpty
+        ? filtered
+        : filtered.where((s) {
+            final name = s['full_name']?.toString().toLowerCase() ?? '';
+            final email = s['email']?.toString().toLowerCase() ?? '';
+            final query = _studentSearchQuery.toLowerCase();
+            return name.contains(query) || email.contains(query);
+          }).toList();
 
     final allFilteredSelected = filtered.isNotEmpty && filtered.every((s) => _selectedStudentIds.contains(s['id']));
 
@@ -1017,7 +1266,7 @@ Answer: B''';
                       style: TextStyle(fontWeight: FontWeight.bold, color: AppTheme.text, fontSize: 13),
                     ),
                     Text(
-                      '${_selectedStudentIds.length} total selected to receive this quiz',
+                      '${_selectedStudentIds.length} of ${searchedStudents.length} shown selected',
                       style: TextStyle(fontSize: 11, color: AppTheme.primary),
                     ),
                   ],
@@ -1028,18 +1277,18 @@ Answer: B''';
                 style: TextButton.styleFrom(foregroundColor: AppTheme.primary),
                 onPressed: () {
                   setState(() {
-                    if (_selectedStudentIds.length == _availableStudents.length) {
+                    if (_selectedStudentIds.length == searchedStudents.length) {
                       _selectedStudentIds.clear();
                     } else {
                       _selectedStudentIds.clear();
                       _selectedStudentIds.addAll(
-                        _availableStudents.map((s) => s['id']?.toString() ?? '').where((id) => id.isNotEmpty),
+                        searchedStudents.map((s) => s['id']?.toString() ?? '').where((id) => id.isNotEmpty),
                       );
                     }
                   });
                 },
                 icon: Icon(
-                  _selectedStudentIds.length == _availableStudents.length ? Icons.clear_all : Icons.done_all,
+                  _selectedStudentIds.length == searchedStudents.length ? Icons.clear_all : Icons.done_all,
                   size: 16,
                 ),
                 label: Text(
@@ -1051,6 +1300,24 @@ Answer: B''';
           ),
         ),
         const SizedBox(height: 10),
+
+        // Student Name Search
+        TextField(
+          onChanged: (val) => setState(() => _studentSearchQuery = val),
+          style: TextStyle(color: AppTheme.text, fontSize: 13),
+          decoration: InputDecoration(
+            hintText: 'Search students by name or email...',
+            hintStyle: TextStyle(color: AppTheme.textMuted, fontSize: 12),
+            prefixIcon: Icon(Icons.search, size: 18, color: AppTheme.textMuted),
+            filled: true,
+            fillColor: AppTheme.background,
+            contentPadding: const EdgeInsets.symmetric(vertical: 8, horizontal: 12),
+            border: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: BorderSide(color: AppTheme.border)),
+            enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: BorderSide(color: AppTheme.border)),
+            focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: BorderSide(color: AppTheme.primary, width: 1.5)),
+          ),
+        ),
+        const SizedBox(height: 8),
 
         // Section Filter Chips
         if (_sections.length > 1)
@@ -1080,14 +1347,26 @@ Answer: B''';
 
         // Student checklist
         Expanded(
-          child: filtered.isEmpty
+          child: searchedStudents.isEmpty
               ? Center(
-                  child: Text('No students found in this section.', style: TextStyle(color: AppTheme.textMuted)),
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Icon(Icons.search_off, size: 48, color: AppTheme.textMuted),
+                      const SizedBox(height: 12),
+                      Text(
+                        _studentSearchQuery.isNotEmpty
+                            ? 'No students matching $_studentSearchQuery'
+                            : 'No students found in this section.',
+                        style: TextStyle(color: AppTheme.textMuted, fontSize: 13),
+                      ),
+                    ],
+                  ),
                 )
               : ListView.builder(
-                  itemCount: filtered.length,
+                  itemCount: searchedStudents.length,
                   itemBuilder: (context, index) {
-                    final s = filtered[index];
+                    final s = searchedStudents[index];
                     final sid = s['id']?.toString() ?? '';
                     final isChecked = _selectedStudentIds.contains(sid);
                     final name = s['full_name']?.toString() ?? 'Student';

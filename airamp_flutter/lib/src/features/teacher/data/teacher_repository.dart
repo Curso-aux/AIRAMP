@@ -98,6 +98,16 @@ class TeacherSubjectsNotifier extends Notifier<List<Map<String, dynamic>>> {
   }
 
   Future<void> reload() async => _load();
+
+  Future<Map<String, dynamic>?> getSubjectById(int id) async {
+    final teacherId = _getTeacherId();
+    if (teacherId == null) return null;
+    final db = await DatabaseHelper().database;
+    final results = await db
+        .query('subjects', where: 'id = ? AND teacher_id = ?', whereArgs: [id, teacherId]);
+    if (results.isNotEmpty) return results.first;
+    return null;
+  }
 }
 
 // Subject Quizzes Provider

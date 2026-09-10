@@ -6,6 +6,7 @@ import '../../../core/theme/app_theme.dart';
 import '../../../core/theme/theme_provider.dart';
 import '../../../core/database/database_helper.dart';
 import '../../student/data/student_repository.dart';
+import '../../auth/application/auth_provider.dart';
 
 class QuizScreen extends ConsumerStatefulWidget {
   final String quizId;
@@ -17,7 +18,7 @@ class QuizScreen extends ConsumerStatefulWidget {
 }
 
 class _QuizScreenState extends ConsumerState<QuizScreen> {
-  int _state = 0; // 0: intro, 1: active, 2: results
+  int _state = 0; // 0: intro, 1: active, 2: results, 3: countdown
   bool _loading = true;
 
   int? _quizId;
@@ -28,6 +29,8 @@ class _QuizScreenState extends ConsumerState<QuizScreen> {
   int _subjectId = 0;
   String _quizTitle = '';
   int _timeLimitMinutes = 0;
+  String? _scheduleStart;
+  String? _scheduleEnd;
 
   int _currentIndex = 0;
   final Map<int, String> _selectedAnswers = {}; // question index -> 'A' | 'B' | 'C' | 'D'
@@ -35,10 +38,12 @@ class _QuizScreenState extends ConsumerState<QuizScreen> {
   double _percentage = 0.0;
   bool _isPassed = false;
   DateTime? _startTime;
+  bool _hasAlreadyTaken = false; // Track if student already completed this quiz
 
   // Countdown Timer
   Timer? _countdownTimer;
   int _remainingSeconds = 0;
+  DateTime? _scheduleStartDate;
 
   @override
   void initState() {
@@ -49,7 +54,29 @@ class _QuizScreenState extends ConsumerState<QuizScreen> {
   @override
   void dispose() {
     _countdownTimer?.cancel();
+    _scheduleTimer?.cancel();
     super.dispose();
+  }
+
+  Timer? _scheduleTimer;
+
+  /// Periodically check if the quiz has become available
+  void _startScheduleCheck() {
+    _scheduleTimer?.cancel();
+    _scheduleTimer = Timer.periodic(const Duration(seconds: 10), (timer) {
+      if (!mounted) {
+        timer.cancel();
+        return;
+      }
+      if (_scheduleStartDate != null && _isQuizAvailable()) {
+        timer.cancel();
+        if (mounted) {
+          setState(() {
+            _state = 0; // Go to intro screen
+          });
+        }
+      }
+    });
   }
 
   Future<void> _loadQuiz() async {
@@ -59,11 +86,36 @@ class _QuizScreenState extends ConsumerState<QuizScreen> {
       return;
     }
 
+    // Check if student already completed this quiz
+    final student = ref.read(authProvider);
+    final studentId = student?.id ?? '';
+    // After teacher reset, attempts are deleted so student can retake
+    final canAttempt = await DatabaseHelper().hasStudentCompletedQuiz(
+      studentId: studentId,
+      quizId: parsedId,
+    );
+    if (!canAttempt && mounted) {
+      setState(() {
+        _loading = false;
+        _hasAlreadyTaken = true;
+      });
+      return;
+    }
+
     // 1. Try loading as first-class quiz from `quizzes` table
     final quizData = await DatabaseHelper().getQuizById(parsedId);
     if (quizData != null && mounted) {
       final qList = (quizData['questions'] as List?)?.cast<Map<String, dynamic>>() ?? [];
       final tLimit = (quizData['time_limit_minutes'] as int?) ?? 0;
+      _scheduleStart = quizData['schedule_start'] as String?;
+      _scheduleEnd = quizData['schedule_end'] as String?;
+      DateTime? scheduleDate;
+      if (_scheduleStart != null && _scheduleStart!.isNotEmpty) {
+        try {
+          scheduleDate = DateTime.parse(_scheduleStart!).toLocal();
+        } catch (_) {}
+      }
+
       setState(() {
         _quizId = parsedId;
         _loId = (quizData['lo_id'] as int?) ?? 0;
@@ -74,8 +126,13 @@ class _QuizScreenState extends ConsumerState<QuizScreen> {
         _subjectId = (quizData['subject_id'] as int?) ?? 0;
         _timeLimitMinutes = tLimit;
         _remainingSeconds = tLimit * 60;
+        _scheduleStartDate = scheduleDate;
         _loading = false;
       });
+      // Start schedule check if quiz has a future start time
+      if (_scheduleStartDate != null && !_isQuizAvailable()) {
+        _startScheduleCheck();
+      }
       return;
     }
 
@@ -120,6 +177,18 @@ class _QuizScreenState extends ConsumerState<QuizScreen> {
     });
   }
 
+  // Check if the quiz is available now based on schedule_start
+  bool _isQuizAvailable() {
+    if (_scheduleStartDate == null) return true; // No schedule restriction
+    return DateTime.now().isAfter(_scheduleStartDate!);
+  }
+
+  // Time remaining until quiz becomes available
+  Duration _timeUntilAvailable() {
+    if (_scheduleStartDate == null) return Duration.zero;
+    return _scheduleStartDate!.difference(DateTime.now());
+  }
+
   String _formatTimer(int totalSecs) {
     final m = totalSecs ~/ 60;
     final s = totalSecs % 60;
@@ -127,47 +196,59 @@ class _QuizScreenState extends ConsumerState<QuizScreen> {
   }
 
   Future<void> _submitQuiz({bool isTimeout = false}) async {
-    _countdownTimer?.cancel();
+    try {
+      _countdownTimer?.cancel();
 
-    int score = 0;
-    for (int i = 0; i < _questions.length; i++) {
-      final q = _questions[i];
-      final correct = (q['correct_option']?.toString() ?? '').toUpperCase().trim();
-      final selected = (_selectedAnswers[i] ?? '').toUpperCase().trim();
-      if (selected == correct) {
-        score++;
+      int score = 0;
+      for (int i = 0; i < _questions.length; i++) {
+        final q = _questions[i];
+        final correct = (q['correct_option']?.toString() ?? '').toUpperCase().trim();
+        final selected = (_selectedAnswers[i] ?? '').toUpperCase().trim();
+        if (selected == correct) {
+          score++;
+        }
       }
-    }
 
-    final total = _questions.length;
-    final pct = total > 0 ? (score / total) * 100 : 0.0;
-    final passed = pct >= _passingScore;
-    final duration = _startTime != null ? DateTime.now().difference(_startTime!).inSeconds : 0;
+      final total = _questions.length;
+      final pct = total > 0 ? (score / total) * 100 : 0.0;
+      final passed = pct >= _passingScore;
+      final duration = _startTime != null ? DateTime.now().difference(_startTime!).inSeconds : 0;
 
-    await ref.read(studentQuizAttemptsProvider.notifier).recordAttempt(
-      loId: _loId,
-      quizId: _quizId,
-      subjectId: _subjectId,
-      score: score,
-      totalQuestions: total,
-      percentage: pct,
-      isPassed: passed,
-      durationSeconds: duration,
-    );
+      // Use validation method to prevent duplicate attempts
+      await ref.read(studentQuizAttemptsProvider.notifier).recordAttemptWithValidation(
+        loId: _loId,
+        quizId: _quizId,
+        subjectId: _subjectId,
+        score: score,
+        totalQuestions: total,
+        percentage: pct,
+        isPassed: passed,
+        durationSeconds: duration,
+      );
 
-    if (mounted) {
-      setState(() {
-        _score = score;
-        _percentage = pct;
-        _isPassed = passed;
-        _state = 2;
-      });
+      if (mounted) {
+        setState(() {
+          _score = score;
+          _percentage = pct;
+          _isPassed = passed;
+          _state = 2;
+        });
+      }
 
       if (isTimeout) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             backgroundColor: AppTheme.error,
             content: const Text("Time is up! Your quiz has been automatically submitted."),
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            backgroundColor: AppTheme.error,
+            content: Text('Quiz submission error: $e'),
           ),
         );
       }
@@ -205,12 +286,14 @@ class _QuizScreenState extends ConsumerState<QuizScreen> {
                 Icon(Icons.assignment_outlined, size: 64, color: AppTheme.textMuted),
                 const SizedBox(height: 16),
                 Text(
-                  'No Assessment Questions',
+                  _hasAlreadyTaken ? 'Quiz Already Completed' : 'No Assessment Questions',
                   style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: AppTheme.text),
                 ),
                 const SizedBox(height: 8),
                 Text(
-                  'The instructor has not added quiz questions for this assessment yet.',
+                  _hasAlreadyTaken
+                      ? 'You have already completed this quiz. Contact your instructor if you need to retake it.'
+                      : 'The instructor has not added quiz questions for this assessment yet.',
                   textAlign: TextAlign.center,
                   style: TextStyle(color: AppTheme.textSecondary),
                 ),
@@ -228,6 +311,11 @@ class _QuizScreenState extends ConsumerState<QuizScreen> {
           ),
         ),
       );
+    }
+
+    // Check schedule — if not yet available, show countdown
+    if (_state == 3 || (_scheduleStartDate != null && !_isQuizAvailable())) {
+      _state = 3; // Show countdown state
     }
 
     return Scaffold(
@@ -284,6 +372,8 @@ class _QuizScreenState extends ConsumerState<QuizScreen> {
 
   Widget _buildContent() {
     switch (_state) {
+      case 3:
+        return _buildScheduleCountdown();
       case 0:
         return _buildIntro();
       case 1:
@@ -293,6 +383,111 @@ class _QuizScreenState extends ConsumerState<QuizScreen> {
       default:
         return const SizedBox();
     }
+  }
+
+  /// Show a countdown until the quiz becomes available
+  Widget _buildScheduleCountdown() {
+    final duration = _timeUntilAvailable();
+    final hours = duration.inHours;
+    final minutes = (duration.inMinutes % 60);
+    final seconds = (duration.inSeconds % 60);
+
+    return Scaffold(
+      backgroundColor: AppTheme.background,
+      body: Center(
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.all(32),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Container(
+                padding: const EdgeInsets.all(32),
+                decoration: BoxDecoration(
+                  color: AppTheme.primary.withValues(alpha: 0.1),
+                  shape: BoxShape.circle,
+                ),
+                child: Icon(Icons.schedule_outlined, size: 64, color: AppTheme.primary),
+              ),
+              const SizedBox(height: 24),
+              Text(
+                'Quiz Not Available Yet',
+                style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: AppTheme.text),
+              ),
+              const SizedBox(height: 8),
+              Text(
+                'This quiz will be available at:',
+                style: TextStyle(color: AppTheme.textSecondary, fontSize: 14),
+              ),
+              const SizedBox(height: 16),
+              if (_scheduleStart != null && _scheduleStart!.isNotEmpty)
+                Text(
+                  _scheduleStart!.substring(0, _scheduleStart!.length - 3),
+                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: AppTheme.primary),
+                ),
+              const SizedBox(height: 32),
+              // Countdown timer
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
+                decoration: BoxDecoration(
+                  color: AppTheme.surface,
+                  borderRadius: BorderRadius.circular(16),
+                  border: Border.all(color: AppTheme.border),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    _buildCountdownBlock(hours.toString().padLeft(2, '0'), 'HOURS'),
+                    const SizedBox(width: 12),
+                    Text(':', style: TextStyle(fontSize: 28, fontWeight: FontWeight.bold, color: AppTheme.text)),
+                    const SizedBox(width: 12),
+                    _buildCountdownBlock(minutes.toString().padLeft(2, '0'), 'MINS'),
+                    const SizedBox(width: 12),
+                    Text(':', style: TextStyle(fontSize: 28, fontWeight: FontWeight.bold, color: AppTheme.text)),
+                    const SizedBox(width: 12),
+                    _buildCountdownBlock(seconds.toString().padLeft(2, '0'), 'SECS'),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 24),
+              if (_scheduleEnd != null && _scheduleEnd!.isNotEmpty)
+                Text(
+                  'Quiz will close at ${_scheduleEnd!.substring(0, _scheduleEnd!.length - 3)}',
+                  style: TextStyle(fontSize: 12, color: AppTheme.textMuted),
+                ),
+              const SizedBox(height: 32),
+              // Auto-refresh countdown
+              Text(
+                'This page will auto-refresh when the quiz becomes available.',
+                style: TextStyle(fontSize: 12, color: AppTheme.textMuted),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildCountdownBlock(String value, String label) {
+    return Column(
+      children: [
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+          decoration: BoxDecoration(
+            color: AppTheme.primary.withValues(alpha: 0.15),
+            borderRadius: BorderRadius.circular(12),
+          ),
+          child: Text(
+            value,
+            style: TextStyle(fontSize: 28, fontWeight: FontWeight.bold, color: AppTheme.primary),
+          ),
+        ),
+        const SizedBox(height: 4),
+        Text(
+          label,
+          style: TextStyle(fontSize: 10, color: AppTheme.textMuted, fontWeight: FontWeight.w600),
+        ),
+      ],
+    );
   }
 
   Widget _buildIntro() {
@@ -741,18 +936,6 @@ class _QuizScreenState extends ConsumerState<QuizScreen> {
               ),
             ),
             const SizedBox(height: 10),
-            TextButton.icon(
-              onPressed: () {
-                setState(() {
-                  _state = 0;
-                  _currentIndex = 0;
-                  _selectedAnswers.clear();
-                  _score = 0;
-                });
-              },
-              icon: Icon(Icons.refresh, color: AppTheme.primary, size: 18),
-              label: Text('Retake Assessment', style: TextStyle(color: AppTheme.primary, fontWeight: FontWeight.w600)),
-            ),
           ],
         ),
       ),

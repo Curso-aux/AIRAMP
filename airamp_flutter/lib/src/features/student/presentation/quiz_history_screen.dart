@@ -19,11 +19,20 @@ class _QuizHistoryScreenState extends ConsumerState<QuizHistoryScreen> {
   String _formatDate(String? isoString) {
     if (isoString == null || isoString.isEmpty) return 'Recent';
     try {
-      final dt = DateTime.parse(isoString);
+      final dt = DateTime.parse(isoString).toLocal();
       const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
       return '${months[dt.month - 1]} ${dt.day.toString().padLeft(2, '0')}, ${dt.year}';
     } catch (_) {
       return 'Recent';
+    }
+  }
+
+  bool _isDatePassed(String isoString) {
+    try {
+      final dt = DateTime.parse(isoString).toLocal();
+      return dt.isBefore(DateTime.now());
+    } catch (_) {
+      return true;
     }
   }
 
@@ -296,10 +305,13 @@ class _QuizHistoryScreenState extends ConsumerState<QuizHistoryScreen> {
             final qCount = item['question_count'] ?? item['total_questions'] ?? 0;
             final timeLimit = item['time_limit_minutes'] ?? 0;
             final passingScore = item['passing_score'] ?? 70;
-            final dueDate = item['due_date']?.toString();
+                        final dueDate = item['due_date']?.toString();
             final isCompleted = item['status'] == 'completed';
+            final quizStatus = item['quiz_status']?.toString();
             final score = item['score'] ?? 0;
             final pct = (item['percentage'] as num?)?.round() ?? 0;
+            final scheduleStart = item['schedule_start']?.toString();
+            final scheduleEnd = item['schedule_end']?.toString();
 
             return Container(
               padding: const EdgeInsets.all(16),
@@ -356,6 +368,29 @@ class _QuizHistoryScreenState extends ConsumerState<QuizHistoryScreen> {
                   ),
                   const SizedBox(height: 10),
 
+                  // Not Yet Available banner
+                  if (scheduleStart != null && scheduleStart.isNotEmpty && !_isDatePassed(scheduleStart))
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                      decoration: BoxDecoration(
+                        color: Colors.blue.withValues(alpha: 0.1),
+                        borderRadius: BorderRadius.circular(8),
+                        border: Border.all(color: Colors.blue.withValues(alpha: 0.3)),
+                      ),
+                      child: Row(
+                        children: [
+                          const Icon(Icons.access_time, size: 16, color: Colors.blue),
+                          const SizedBox(width: 8),
+                          Text(
+                            'Available from ${_formatDate(scheduleStart)}',
+                            style: const TextStyle(color: Colors.blue, fontWeight: FontWeight.w600, fontSize: 12),
+                          ),
+                        ],
+                      ),
+                    ),
+                  if (scheduleStart != null && scheduleStart.isNotEmpty && !_isDatePassed(scheduleStart))
+                    const SizedBox(height: 10),
+
                   // Quiz Title
                   Text(
                     title,
@@ -383,6 +418,12 @@ class _QuizHistoryScreenState extends ConsumerState<QuizHistoryScreen> {
                       _buildMetaChip(Icons.verified_outlined, 'Pass: $passingScore%'),
                       if (dueDate != null && dueDate.isNotEmpty)
                         _buildMetaChip(Icons.calendar_today, 'Due ${_formatDate(dueDate)}'),
+                      if (scheduleStart != null && scheduleStart.isNotEmpty)
+                        _buildMetaChip(Icons.schedule, 'Starts ${_formatDate(scheduleStart)}'),
+                      if (scheduleEnd != null && scheduleEnd.isNotEmpty)
+                        _buildMetaChip(Icons.access_time, 'Until ${_formatDate(scheduleEnd)}'),
+                      if (quizStatus == 'draft')
+                        _buildMetaChip(Icons.save, 'Draft'),
                     ],
                   ),
                   const SizedBox(height: 14),

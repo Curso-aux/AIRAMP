@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../../../../core/database/database_helper.dart';
 import '../../../../core/theme/app_theme.dart';
+import '../../../auth/application/auth_provider.dart';
 import '../../data/teacher_repository.dart';
 
 class QuizRosterDialog extends ConsumerWidget {
@@ -125,6 +127,8 @@ class QuizRosterDialog extends ConsumerWidget {
                             final score = row['score'] ?? 0;
                             final total = row['total_questions'] ?? 0;
                             final pct = (row['percentage'] as num?)?.round() ?? 0;
+                            final result = row['result']?.toString() ?? 'Pending';
+                            final studentId = row['student_id']?.toString() ?? '';
 
                             return Container(
                               margin: const EdgeInsets.only(bottom: 8),
@@ -158,37 +162,53 @@ class QuizRosterDialog extends ConsumerWidget {
                                       ],
                                     ),
                                   ),
-                                  if (isCompleted)
-                                    Column(
-                                      crossAxisAlignment: CrossAxisAlignment.end,
-                                      children: [
+                                  Column(
+                                    crossAxisAlignment: CrossAxisAlignment.end,
+                                    children: [
+                                      // Reset/Retake button for completed students
+                                      if (isCompleted)
+                                        Tooltip(
+                                          message: 'Reset this student to allow retake',
+                                          child: IconButton(
+                                            icon: const Icon(Icons.refresh, size: 18),
+                                            color: AppTheme.accent,
+                                            onPressed: () => _showResetConfirmation(context, ref, studentId, name),
+                                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                                          ),
+                                        ),
+                                      // Score display or Pending
+                                      if (isCompleted)
                                         Container(
                                           padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
                                           decoration: BoxDecoration(
-                                            color: AppTheme.success.withValues(alpha: 0.15),
+                                            color: result == 'Passed' ? AppTheme.success.withValues(alpha: 0.15) : Colors.red.withValues(alpha: 0.15),
                                             borderRadius: BorderRadius.circular(6),
                                           ),
                                           child: Text(
-                                            '$pct%',
-                                            style: TextStyle(color: AppTheme.success, fontWeight: FontWeight.bold, fontSize: 12),
+                                            result == 'Passed' ? 'Passed ($pct%)' : 'Failed',
+                                            style: TextStyle(
+                                              color: result == 'Passed' ? AppTheme.success : Colors.red,
+                                              fontWeight: FontWeight.bold,
+                                              fontSize: 11,
+                                            ),
+                                          ),
+                                        )
+                                      else
+                                        Container(
+                                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                                          decoration: BoxDecoration(
+                                            color: Colors.orange.withValues(alpha: 0.15),
+                                            borderRadius: BorderRadius.circular(6),
+                                          ),
+                                          child: const Text(
+                                            'Pending',
+                                            style: TextStyle(color: Colors.orange, fontWeight: FontWeight.bold, fontSize: 11),
                                           ),
                                         ),
-                                        const SizedBox(height: 2),
-                                        Text('$score / $total pts', style: TextStyle(fontSize: 11, color: AppTheme.textSecondary)),
-                                      ],
-                                    )
-                                  else
-                                    Container(
-                                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                                      decoration: BoxDecoration(
-                                        color: Colors.orange.withValues(alpha: 0.15),
-                                        borderRadius: BorderRadius.circular(6),
-                                      ),
-                                      child: const Text(
-                                        'Pending',
-                                        style: TextStyle(color: Colors.orange, fontWeight: FontWeight.bold, fontSize: 11),
-                                      ),
-                                    ),
+                                      const SizedBox(height: 2),
+                                      Text('$score / $total pts', style: TextStyle(fontSize: 11, color: AppTheme.textSecondary)),
+                                    ],
+                                  )
                                 ],
                               ),
                             );
@@ -202,6 +222,41 @@ class QuizRosterDialog extends ConsumerWidget {
             ),
           ],
         ),
+      ),
+    );
+  }
+
+  void _showResetConfirmation(BuildContext context, WidgetRef ref, String studentId, String studentName) {
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: AppTheme.surface,
+        title: const Text('Reset Student Quiz'),
+        content: Text('Reset attempt for $studentName? They will be able to retake the quiz.'),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancel')),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(backgroundColor: AppTheme.accent, foregroundColor: Colors.black),
+            onPressed: () async {
+              Navigator.pop(ctx);
+              await DatabaseHelper().resetStudentQuizAttempt(
+                quizId: quizId,
+                studentId: studentId,
+              );
+              // Refresh the roster so the reset shows immediately
+              ref.invalidate(quizRosterProvider(quizId));
+              if (context.mounted) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(
+                    backgroundColor: AppTheme.success,
+                    content: Text('$studentName can now retake the quiz.'),
+                  ),
+                );
+              }
+            },
+            child: const Text('Reset'),
+          ),
+        ],
       ),
     );
   }

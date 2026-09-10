@@ -221,7 +221,7 @@ class AppTheme {
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(14),
           ),
-          minimumSize: const Size.fromHeight(54),
+          minimumSize: const Size(0, 54),
         ),
       ),
       inputDecorationTheme: InputDecorationTheme(
@@ -308,7 +308,7 @@ class AppTheme {
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(14),
           ),
-          minimumSize: const Size.fromHeight(54),
+          minimumSize: const Size(0, 54),
         ),
       ),
       inputDecorationTheme: InputDecorationTheme(

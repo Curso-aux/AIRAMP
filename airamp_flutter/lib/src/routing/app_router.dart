@@ -29,7 +29,9 @@ import '../features/admin/presentation/web/admin_web_announcements_screen.dart';
 import '../features/student/presentation/student_scaffold.dart';
 import '../features/teacher/presentation/teacher_scaffold.dart';
 import '../features/teacher/presentation/teacher_dashboard_screen.dart';
+import '../features/teacher/presentation/teacher_profile_screen.dart';
 import '../features/teacher/presentation/teacher_students_screen.dart';
+import '../features/teacher/presentation/teacher_subject_detail_screen.dart';
 import '../features/chat/presentation/chat_list_screen.dart';
 import '../features/chat/presentation/chat_room_screen.dart';
 import '../features/quiz/presentation/quiz_screen.dart';
@@ -167,7 +169,7 @@ final routerProvider = Provider<GoRouter>((ref) {
                     path: ':id',
                     builder: (context, state) {
                       final id = state.pathParameters['id']!;
-                      return SubjectDetailScreen(subjectId: id);
+                      return TeacherSubjectDetailScreen(subjectId: id);
                     },
                   ),
                 ],
@@ -205,7 +207,7 @@ final routerProvider = Provider<GoRouter>((ref) {
             routes: [
               GoRoute(
                 path: '/teacher/profile',
-                builder: (context, state) => const StudentProfileScreen(),
+                builder: (context, state) => const TeacherProfileScreen(),
               ),
             ],
           ),

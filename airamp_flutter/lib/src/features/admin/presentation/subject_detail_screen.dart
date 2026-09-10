@@ -486,7 +486,7 @@ class _SubjectDetailScreenState extends ConsumerState<SubjectDetailScreen> {
                             MaterialPageRoute(
                               fullscreenDialog: true,
                               builder: (ctx) => CreateQuizDialog(
-                                subjectId: subjectId,
+                                initialSubjectId: subjectId,
                                 subjectName: subjectName,
                               ),
                             ),
@@ -613,7 +613,7 @@ class _SubjectDetailScreenState extends ConsumerState<SubjectDetailScreen> {
                           MaterialPageRoute(
                             fullscreenDialog: true,
                             builder: (ctx) => CreateQuizDialog(
-                              subjectId: subjectId,
+                              initialSubjectId: subjectId,
                               subjectName: subjectName,
                             ),
                           ),

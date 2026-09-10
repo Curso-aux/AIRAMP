@@ -3,6 +3,7 @@ import 'package:go_router/go_router.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/theme/theme_provider.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'teacher_profile_screen.dart';
 
 class TeacherScaffold extends ConsumerWidget {
   final StatefulNavigationShell navigationShell;

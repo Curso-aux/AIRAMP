@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 import 'package:airamp_flutter/src/core/database/database_helper.dart';
+import 'package:airamp_flutter/src/core/theme/app_theme.dart';
 import 'package:airamp_flutter/src/features/teacher/presentation/components/create_quiz_dialog.dart';
 
 void main() {
@@ -13,9 +14,10 @@ void main() {
   });
 
   Widget buildTestWidget() {
-    return const ProviderScope(
+    return ProviderScope(
       child: MaterialApp(
-        home: CreateQuizDialog(
+        theme: AppTheme.darkTheme,
+        home: const CreateQuizDialog(
           subjectId: 1,
           subjectName: 'Test Subject',
         ),

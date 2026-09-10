@@ -17,6 +17,28 @@ class ParsedQuestion {
     required this.correctOption,
   });
 
+  factory ParsedQuestion.fromJson(dynamic json) {
+    if (json is Map) {
+      return ParsedQuestion(
+        questionText: (json['question_text'] ?? json['question'] ?? '').toString().trim(),
+        optionA: (json['option_a'] ?? json['a'] ?? '').toString().trim(),
+        optionB: (json['option_b'] ?? json['b'] ?? '').toString().trim(),
+        optionC: (json['option_c'] ?? json['c'] ?? '').toString().trim(),
+        optionD: (json['option_d'] ?? json['d'] ?? '').toString().trim(),
+        correctOption: (json['correct_option'] ?? json['correct'] ?? 'A').toString().toUpperCase().trim(),
+      );
+    }
+    // Handle database format
+    return ParsedQuestion(
+      questionText: (json['question_text'] ?? '').toString().trim(),
+      optionA: (json['option_a'] ?? '').toString().trim(),
+      optionB: (json['option_b'] ?? '').toString().trim(),
+      optionC: (json['option_c'] ?? '').toString().trim(),
+      optionD: (json['option_d'] ?? '').toString().trim(),
+      correctOption: (json['correct_option'] ?? 'A').toString().toUpperCase().trim(),
+    );
+  }
+
   Map<String, dynamic> toMap() {
     return {
       'question_text': questionText,

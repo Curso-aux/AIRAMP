@@ -5,6 +5,7 @@ import '../../../core/theme/app_theme.dart';
 import '../../../core/theme/theme_provider.dart';
 import '../../auth/application/auth_provider.dart';
 import '../data/teacher_repository.dart';
+import 'components/create_quiz_dialog.dart';
 import 'components/post_announcement_dialog.dart';
 
 class TeacherDashboardScreen extends ConsumerStatefulWidget {
@@ -237,9 +238,18 @@ class _TeacherDashboardScreenState extends ConsumerState<TeacherDashboardScreen>
                     const SizedBox(width: 8),
                     Expanded(
                       child: _buildActionTile(
+                        icon: Icons.add_circle_outline,
+                        label: 'Create Quiz',
+                        color: const Color(0xFF0D9488),
+                        onTap: () => _showCreateQuizDialog(context),
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: _buildActionTile(
                         icon: Icons.assignment_turned_in,
                         label: 'Live Scores',
-                        color: const Color(0xFF0D9488),
+                        color: AppTheme.accent,
                         onTap: () => context.go('/teacher/scores'),
                       ),
                     ),
@@ -248,7 +258,7 @@ class _TeacherDashboardScreenState extends ConsumerState<TeacherDashboardScreen>
                       child: _buildActionTile(
                         icon: Icons.people_alt,
                         label: 'Student Roster',
-                        color: AppTheme.accent,
+                        color: AppTheme.primary.withValues(alpha: 0.7),
                         onTap: () => context.go('/teacher/students'),
                       ),
                     ),
@@ -1172,6 +1182,28 @@ class _TeacherDashboardScreenState extends ConsumerState<TeacherDashboardScreen>
             ),
           ),
       ],
+    );
+  }
+
+  void _showCreateQuizDialog(BuildContext context) {
+    final subjects = ref.watch(teacherSubjectsProvider);
+    if (subjects.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('No subjects assigned. Please contact your admin to assign subjects first.'),
+          backgroundColor: Colors.orange,
+        ),
+      );
+      return;
+    }
+    Navigator.of(context, rootNavigator: true).push<bool>(
+      MaterialPageRoute(
+        fullscreenDialog: true,
+        builder: (ctx) => CreateQuizDialog(
+          initialSubjectId: subjects.first['id'] as int?,
+          subjectName: subjects.first['name']?.toString() ?? 'Subject',
+        ),
+      ),
     );
   }
 }
