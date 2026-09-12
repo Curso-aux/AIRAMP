@@ -127,7 +127,8 @@ void main() {
 
       final teacherSubjects = await dbHelper.getSubjectsForTeacher(teacherId);
       expect(teacherSubjects.isNotEmpty, isTrue);
-      final subjectId = teacherSubjects.first['id'] as int;
+      final subject = teacherSubjects.firstWhere((s) => s['subject_code'] == 'CS101', orElse: () => teacherSubjects.first);
+      final subjectId = subject['id'] as int;
 
       await dbHelper.enrollSubject(studentId, subjectId);
 

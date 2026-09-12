@@ -1,8 +1,11 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 import '../../../core/database/database_helper.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/theme/theme_provider.dart';
+import '../../../core/utils/section_key_helper.dart';
 import '../data/admin_repository.dart';
 import 'student_profile_screen.dart';
 
@@ -54,6 +57,7 @@ class _SectionsMgmtScreenState extends ConsumerState<SectionsMgmtScreen> {
     final editNameController = TextEditingController(text: section['name']);
     final editDescController = TextEditingController(text: section['description'] ?? '');
     final editRoomController = TextEditingController(text: section['room'] ?? '');
+    final editKeyController = TextEditingController(text: section['enrollment_key'] ?? '');
     String editSelectedGrade = section['grade'] ?? '';
 
     showDialog(
@@ -85,6 +89,27 @@ class _SectionsMgmtScreenState extends ConsumerState<SectionsMgmtScreen> {
                         labelText: 'Room / Building',
                         hintText: 'Room (e.g., Room 304 - Science Bldg)',
                         prefixIcon: Icon(Icons.meeting_room_outlined, size: 20),
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    TextField(
+                      controller: editKeyController,
+                      style: TextStyle(color: AppTheme.text),
+                      textCapitalization: TextCapitalization.characters,
+                      decoration: InputDecoration(
+                        labelText: 'Enrollment Key (for Students)',
+                        hintText: 'e.g., SEC-EMR10',
+                        prefixIcon: const Icon(Icons.vpn_key_outlined, size: 20),
+                        suffixIcon: IconButton(
+                          tooltip: 'Auto-generate standard key',
+                          icon: const Icon(Icons.auto_fix_high_rounded, size: 18),
+                          onPressed: () {
+                            editKeyController.text = SectionKeyHelper.generateKey(
+                              sectionName: editNameController.text.isNotEmpty ? editNameController.text : (section['name'] ?? 'Section'),
+                              gradeLevel: editSelectedGrade.isNotEmpty ? editSelectedGrade : section['grade'],
+                            );
+                          },
+                        ),
                       ),
                     ),
                     const SizedBox(height: 12),
@@ -144,6 +169,8 @@ class _SectionsMgmtScreenState extends ConsumerState<SectionsMgmtScreen> {
                           final sectionId = section['id'];
                           final nav = Navigator.of(context);
                           if (sectionId is int) {
+                            final rawKey = editKeyController.text.trim().toUpperCase();
+                            final key = rawKey.isNotEmpty ? rawKey : (section['enrollment_key'] ?? 'SEC-${section['id']}');
                             await ref.read(sectionsProvider.notifier).updateSection(
                               sectionId,
                               {
@@ -151,6 +178,7 @@ class _SectionsMgmtScreenState extends ConsumerState<SectionsMgmtScreen> {
                                 'description': editDescController.text.trim(),
                                 'grade': editSelectedGrade.isNotEmpty ? editSelectedGrade : (section['grade'] ?? 'Grade 11'),
                                 'room': editRoomController.text.trim(),
+                                'enrollment_key': key,
                               },
                             );
                           }
@@ -174,11 +202,17 @@ class _SectionsMgmtScreenState extends ConsumerState<SectionsMgmtScreen> {
     final addNameController = TextEditingController();
     final addDescController = TextEditingController();
     final addRoomController = TextEditingController();
+    final addKeyController = TextEditingController();
     String addSelectedGrade = (initialGrade != null && _grades.contains(initialGrade))
         ? initialGrade
         : (_selectedGradeFilter != 'All' && _grades.contains(_selectedGradeFilter)
             ? _selectedGradeFilter
             : 'Grade 10');
+    String autoEnrollmentKey = SectionKeyHelper.generateKey(
+      sectionName: 'Section',
+      gradeLevel: addSelectedGrade,
+    );
+    bool isCustomKey = false;
 
     showDialog(
       context: context,
@@ -222,6 +256,16 @@ class _SectionsMgmtScreenState extends ConsumerState<SectionsMgmtScreen> {
                             hintText: 'e.g., Grade 10 - Sapphire',
                             prefixIcon: Icon(Icons.badge_outlined, size: 20),
                           ),
+                          onChanged: (val) {
+                            if (!isCustomKey) {
+                              setDialogState(() {
+                                autoEnrollmentKey = SectionKeyHelper.generateKey(
+                                  sectionName: val.trim().isNotEmpty ? val.trim() : 'Section',
+                                  gradeLevel: addSelectedGrade,
+                                );
+                              });
+                            }
+                          },
                           validator: (val) {
                             if (val == null || val.trim().isEmpty) {
                               return 'Please enter section name';
@@ -240,6 +284,136 @@ class _SectionsMgmtScreenState extends ConsumerState<SectionsMgmtScreen> {
                             prefixIcon: Icon(Icons.meeting_room_outlined, size: 20),
                           ),
                         ),
+                        const SizedBox(height: 14),
+
+                        // Auto-Generated Enrollment Key Card - Zero typing required!
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                          decoration: BoxDecoration(
+                            color: Theme.of(context).colorScheme.primary.withValues(alpha: 0.08),
+                            borderRadius: BorderRadius.circular(12),
+                            border: Border.all(color: Theme.of(context).colorScheme.primary.withValues(alpha: 0.25)),
+                          ),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Wrap(
+                                alignment: WrapAlignment.spaceBetween,
+                                crossAxisAlignment: WrapCrossAlignment.center,
+                                spacing: 8,
+                                runSpacing: 4,
+                                children: [
+                                  Row(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      Icon(Icons.vpn_key_rounded, size: 16, color: Theme.of(context).colorScheme.primary),
+                                      const SizedBox(width: 6),
+                                      Text(
+                                        'Enrollment Key (optional)', // Exact text preserved for widget test compatibility
+                                        style: TextStyle(
+                                          color: Theme.of(context).colorScheme.primary,
+                                          fontWeight: FontWeight.bold,
+                                          fontSize: 12,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                  Container(
+                                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                                    decoration: BoxDecoration(
+                                      color: Theme.of(context).colorScheme.primary.withValues(alpha: 0.15),
+                                      borderRadius: BorderRadius.circular(10),
+                                    ),
+                                    child: Text(
+                                      'AUTO-GENERATED',
+                                      style: TextStyle(
+                                        color: Theme.of(context).colorScheme.primary,
+                                        fontWeight: FontWeight.w700,
+                                        fontSize: 10,
+                                        letterSpacing: 0.5,
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                              const SizedBox(height: 8),
+                              Row(
+                                children: [
+                                  Expanded(
+                                    child: SelectableText(
+                                      isCustomKey && addKeyController.text.isNotEmpty ? addKeyController.text : autoEnrollmentKey,
+                                      style: TextStyle(
+                                        color: AppTheme.text,
+                                        fontFamily: 'monospace',
+                                        fontWeight: FontWeight.bold,
+                                        fontSize: 18,
+                                        letterSpacing: 1.2,
+                                      ),
+                                    ),
+                                  ),
+                                  IconButton(
+                                    tooltip: 'Shuffle variant suffix',
+                                    icon: Icon(Icons.shuffle_rounded, size: 18, color: Theme.of(context).colorScheme.primary),
+                                    onPressed: () {
+                                      setDialogState(() {
+                                        isCustomKey = false;
+                                        addKeyController.clear();
+                                        autoEnrollmentKey = SectionKeyHelper.generateRandomVariation(
+                                          sectionName: addNameController.text.trim().isNotEmpty ? addNameController.text.trim() : 'Section',
+                                          gradeLevel: addSelectedGrade,
+                                        );
+                                      });
+                                    },
+                                  ),
+                                  IconButton(
+                                    tooltip: 'Copy key',
+                                    icon: Icon(Icons.copy_rounded, size: 16, color: AppTheme.textSecondary),
+                                    onPressed: () {
+                                      final keyToCopy = isCustomKey && addKeyController.text.isNotEmpty ? addKeyController.text : autoEnrollmentKey;
+                                      Clipboard.setData(ClipboardData(text: keyToCopy));
+                                      ScaffoldMessenger.of(context).showSnackBar(
+                                        SnackBar(
+                                          content: Text('Copied key "$keyToCopy"'),
+                                          duration: const Duration(seconds: 1),
+                                        ),
+                                      );
+                                    },
+                                  ),
+                                ],
+                              ),
+                              const SizedBox(height: 2),
+                              Text(
+                                'Generated automatically when creating this section. Zero typing needed.',
+                                style: TextStyle(fontSize: 11, color: AppTheme.textSecondary),
+                              ),
+                            ],
+                          ),
+                        ),
+                        const SizedBox(height: 8),
+                        if (!isCustomKey)
+                          GestureDetector(
+                            onTap: () {
+                              setDialogState(() {
+                                isCustomKey = true;
+                                addKeyController.text = autoEnrollmentKey;
+                              });
+                            },
+                            child: Text(
+                              '+ Customize key manually (optional)',
+                              style: TextStyle(fontSize: 11, color: AppTheme.primary, decoration: TextDecoration.underline),
+                            ),
+                          )
+                        else
+                          TextFormField(
+                            controller: addKeyController,
+                            style: TextStyle(color: AppTheme.text),
+                            textCapitalization: TextCapitalization.characters,
+                            decoration: const InputDecoration(
+                              labelText: 'Custom Key Override',
+                              hintText: 'e.g., SEC-CUSTOM10',
+                              prefixIcon: Icon(Icons.edit_outlined, size: 18),
+                            ),
+                          ),
                         const SizedBox(height: 14),
                         TextFormField(
                           controller: addDescController,
@@ -267,7 +441,15 @@ class _SectionsMgmtScreenState extends ConsumerState<SectionsMgmtScreen> {
                               selected: isSelected,
                               onSelected: (selected) {
                                 if (selected) {
-                                  setDialogState(() => addSelectedGrade = grade);
+                                  setDialogState(() {
+                                    addSelectedGrade = grade;
+                                    if (!isCustomKey) {
+                                      autoEnrollmentKey = SectionKeyHelper.generateKey(
+                                        sectionName: addNameController.text.trim().isNotEmpty ? addNameController.text.trim() : 'Section',
+                                        gradeLevel: grade,
+                                      );
+                                    }
+                                  });
                                 }
                               },
                               selectedColor: Theme.of(context).colorScheme.primary,
@@ -296,23 +478,31 @@ class _SectionsMgmtScreenState extends ConsumerState<SectionsMgmtScreen> {
                   onPressed: () async {
                     if (formKey.currentState?.validate() ?? false) {
                       final name = addNameController.text.trim();
+                      final rawKey = addKeyController.text.trim().toUpperCase();
+                      final enrollmentKey = (isCustomKey && rawKey.isNotEmpty) ? rawKey : autoEnrollmentKey;
+
                       final messenger = ScaffoldMessenger.of(context);
+                      final router = GoRouter.maybeOf(context);
                       Navigator.pop(dialogCtx);
                       await ref.read(sectionsProvider.notifier).addSection({
                         'name': name,
                         'description': addDescController.text.trim(),
                         'grade': addSelectedGrade.isNotEmpty ? addSelectedGrade : 'Grade 10',
                         'room': addRoomController.text.trim(),
+                        'enrollment_key': enrollmentKey,
                         'student_count': 0,
                         'created_at': DateTime.now().toIso8601String(),
                       });
                       if (mounted) {
                         messenger.showSnackBar(
                           SnackBar(
-                            content: Text('Successfully created section "$name" ($addSelectedGrade)'),
+                            content: Text('Created section "$name" with Key: $enrollmentKey'),
                             backgroundColor: AppTheme.success,
                           ),
                         );
+                        try {
+                          router?.go('/admin/keys');
+                        } catch (_) {}
                       }
                     }
                   },
@@ -804,6 +994,49 @@ class _SectionCardState extends ConsumerState<_SectionCard> {
                             ),
                           ],
                         ),
+                        if (widget.section['enrollment_key'] != null &&
+                            widget.section['enrollment_key'].toString().isNotEmpty) ...[
+                          InkWell(
+                            onTap: () {
+                              final key = widget.section['enrollment_key'].toString();
+                              Clipboard.setData(ClipboardData(text: key));
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                SnackBar(
+                                  content: Text('Section Key "$key" copied to clipboard! Provide this to students.'),
+                                  backgroundColor: AppTheme.success,
+                                  duration: const Duration(seconds: 2),
+                                ),
+                              );
+                            },
+                            borderRadius: BorderRadius.circular(6),
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                              decoration: BoxDecoration(
+                                color: Theme.of(context).colorScheme.primary.withValues(alpha: 0.12),
+                                borderRadius: BorderRadius.circular(6),
+                                border: Border.all(color: Theme.of(context).colorScheme.primary.withValues(alpha: 0.35)),
+                              ),
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Icon(Icons.vpn_key, size: 12, color: Theme.of(context).colorScheme.primary),
+                                  const SizedBox(width: 4),
+                                  Text(
+                                    'Key: ${widget.section['enrollment_key']}',
+                                    style: TextStyle(
+                                      color: Theme.of(context).colorScheme.primary,
+                                      fontSize: 11,
+                                      fontWeight: FontWeight.bold,
+                                      letterSpacing: 0.5,
+                                    ),
+                                  ),
+                                  const SizedBox(width: 4),
+                                  Icon(Icons.copy, size: 11, color: Theme.of(context).colorScheme.primary),
+                                ],
+                              ),
+                            ),
+                          ),
+                        ],
                       ],
                     ),
                   ],

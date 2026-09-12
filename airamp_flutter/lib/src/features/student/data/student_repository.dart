@@ -4,6 +4,13 @@ import '../../auth/application/auth_provider.dart';
 import '../../admin/data/admin_repository.dart';
 import '../../teacher/data/teacher_repository.dart';
 
+// --- Student Section Details ---
+final studentSectionDetailsProvider = FutureProvider<Map<String, dynamic>?>((ref) async {
+  final user = ref.watch(authProvider);
+  if (user == null) return null;
+  return await DatabaseHelper().getSectionDetailsForStudent(user.id);
+});
+
 // --- Student Enrolled Courses ---
 final studentCoursesProvider = NotifierProvider<StudentCoursesNotifier, List<Map<String, dynamic>>>(() {
   return StudentCoursesNotifier();
@@ -34,6 +41,48 @@ class StudentCoursesNotifier extends Notifier<List<Map<String, dynamic>>> {
 
   Future<void> reload() async {
     await _loadCourses();
+  }
+
+  /// Verify an admin-provided section key and get curriculum preview
+  Future<Map<String, dynamic>?> verifyKey(String key) async {
+    return await DatabaseHelper().verifySectionKey(key);
+  }
+
+  /// Enroll in a section and all its assigned curriculum subjects using an admin key
+  Future<bool> enrollBySectionKey(String key) async {
+    final studentId = _getStudentId();
+    if (studentId == null) return false;
+
+    final success = await DatabaseHelper().enrollStudentBySectionKey(studentId, key);
+    if (!success) return false;
+
+    // Retrieve updated section info and update in-memory auth user
+    final secDetails = await DatabaseHelper().getSectionDetailsForStudent(studentId);
+    if (secDetails != null) {
+      final secName = secDetails['name']?.toString() ?? '';
+      final grade = secDetails['grade']?.toString() ?? '';
+      ref.read(authProvider.notifier).updateUserSection(section: secName, grade: grade);
+    }
+
+    await _loadCourses();
+    ref.invalidate(studentSectionDetailsProvider);
+    ref.invalidate(availableCoursesProvider);
+    ref.invalidate(studentProgressProvider);
+    ref.invalidate(studentQuizAssignmentsProvider);
+    return true;
+  }
+
+  /// Leave the current section curriculum
+  Future<void> leaveSection() async {
+    final studentId = _getStudentId();
+    if (studentId == null) return;
+    await DatabaseHelper().leaveSectionForStudent(studentId);
+    ref.read(authProvider.notifier).clearUserSection();
+    await _loadCourses();
+    ref.invalidate(studentSectionDetailsProvider);
+    ref.invalidate(availableCoursesProvider);
+    ref.invalidate(studentProgressProvider);
+    ref.invalidate(studentQuizAssignmentsProvider);
   }
 
   Future<void> enrollCourse(int subjectId) async {

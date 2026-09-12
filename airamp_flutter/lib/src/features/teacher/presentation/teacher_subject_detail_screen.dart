@@ -1,13 +1,17 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:go_router/go_router.dart';
 import '../../../core/database/database_helper.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/theme/theme_provider.dart';
+import '../../admin/data/admin_repository.dart';
+import '../../curriculum/presentation/curriculum_hierarchy_widgets.dart';
 import '../../teacher/data/teacher_repository.dart';
 import 'package:airamp_flutter/src/features/quiz/presentation/quiz_screen.dart';
 import 'components/create_quiz_dialog.dart';
 import 'components/quiz_roster_dialog.dart';
+import 'components/create_assignment_dialog.dart';
+import 'components/assignment_roster_dialog.dart';
+import '../../submissions/data/submissions_repository.dart';
 
 class TeacherSubjectDetailScreen extends ConsumerStatefulWidget {
   final String subjectId;
@@ -18,7 +22,7 @@ class TeacherSubjectDetailScreen extends ConsumerStatefulWidget {
 }
 
 class _TeacherSubjectDetailScreenState extends ConsumerState<TeacherSubjectDetailScreen> {
-  int _selectedTab = 1; // 0 = Curriculum, 1 = My Quizzes
+  int _selectedTab = 0; // 0 = Curriculum, 1 = My Quizzes
   Map<String, dynamic>? _subject;
   bool _loading = true;
 
@@ -37,6 +41,23 @@ class _TeacherSubjectDetailScreenState extends ConsumerState<TeacherSubjectDetai
         _subject = subject;
         _loading = false;
       });
+      ref.read(subjectDetailProvider.notifier).loadHierarchy(id);
+    }
+  }
+
+  Future<void> _openCreateQuiz() async {
+    final created = await Navigator.of(context, rootNavigator: true).push<bool>(
+      MaterialPageRoute(
+        fullscreenDialog: true,
+        builder: (ctx) => CreateQuizDialog(
+          initialSubjectId: int.parse(widget.subjectId),
+          subjectName: _subject?['name']?.toString() ?? 'Subject',
+        ),
+      ),
+    );
+    if (created == true && mounted) {
+      ref.invalidate(subjectQuizzesProvider(int.parse(widget.subjectId)));
+      ref.invalidate(teacherDashboardProvider);
     }
   }
 
@@ -70,161 +91,344 @@ class _TeacherSubjectDetailScreenState extends ConsumerState<TeacherSubjectDetai
       );
     }
 
+    final subjectName = _subject?['name']?.toString() ?? 'Subject';
+    final subjectDescription = _subject?['description']?.toString() ?? '';
+
     return Scaffold(
       backgroundColor: AppTheme.background,
       appBar: AppBar(
         backgroundColor: AppTheme.surface,
         elevation: 0,
+        scrolledUnderElevation: 1,
         leading: IconButton(
           icon: Icon(Icons.arrow_back, color: AppTheme.text),
           onPressed: () => Navigator.pop(context),
         ),
         title: Text(
-          _subject?['name']?.toString() ?? 'Subject',
-          style: const TextStyle(fontWeight: FontWeight.bold),
+          subjectName,
+          style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18, color: AppTheme.text),
         ),
         actions: [
           if (_selectedTab == 1)
             IconButton(
-              icon: const Icon(Icons.assignment_add),
+              icon: Icon(Icons.assignment_add, color: AppTheme.primary),
               tooltip: 'Create Quiz',
-              onPressed: () async {
-                final created = await Navigator.of(context, rootNavigator: true).push<bool>(
-                  MaterialPageRoute(
-                    fullscreenDialog: true,
-                    builder: (ctx) => CreateQuizDialog(
-                      initialSubjectId: int.parse(widget.subjectId),
-                      subjectName: _subject?['name']?.toString() ?? 'Subject',
-                    ),
-                  ),
-                );
-                if (created == true && context.mounted) {
-                  ref.invalidate(subjectQuizzesProvider(int.parse(widget.subjectId)));
-                  ref.invalidate(teacherDashboardProvider);
-                }
-              },
+              onPressed: _openCreateQuiz,
+            )
+          else if (_selectedTab == 2)
+            IconButton(
+              icon: Icon(Icons.add_task, color: AppTheme.primary),
+              tooltip: 'Create Assignment',
+              onPressed: _openCreateAssignment,
+            )
+          else
+            IconButton(
+              icon: Icon(Icons.add_circle_outline, color: AppTheme.primary),
+              tooltip: 'Add Topic',
+              onPressed: _openAddTopic,
             ),
         ],
       ),
       body: Column(
         children: [
-          // Subject info banner
-          Container(
-            width: double.infinity,
-            padding: const EdgeInsets.all(16),
-            color: AppTheme.primary.withValues(alpha: 0.08),
-            child: Row(
-              children: [
-                Icon(Icons.auto_awesome, color: AppTheme.primary, size: 24),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        _subject?['name']?.toString() ?? '',
-                        style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: AppTheme.text),
-                      ),
-                      Text(
-                        _subject?['description']?.toString() ?? '',
-                        style: TextStyle(fontSize: 12, color: AppTheme.textSecondary),
-                      ),
-                    ],
+          // Course Info Card
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
+            child: Container(
+              padding: const EdgeInsets.all(14),
+              decoration: BoxDecoration(
+                color: AppTheme.surface,
+                borderRadius: BorderRadius.circular(16),
+                border: Border.all(color: AppTheme.border),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withValues(alpha: 0.03),
+                    blurRadius: 10,
+                    offset: const Offset(0, 3),
                   ),
-                ),
-              ],
-            ),
-          ),
-          // Tab selector
-          Container(
-            color: AppTheme.surface,
-            child: Row(
-              children: [
-                Expanded(
-                  child: GestureDetector(
-                    onTap: () => setState(() => _selectedTab = 0),
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(vertical: 12),
-                      decoration: BoxDecoration(
-                        color: _selectedTab == 0 ? AppTheme.primary : Colors.transparent,
-                        borderRadius: BorderRadius.circular(0),
-                      ),
-                      alignment: Alignment.center,
-                      child: Text(
-                        'Curriculum',
-                        style: TextStyle(
-                          fontWeight: FontWeight.bold,
-                          color: _selectedTab == 0 ? Colors.black : AppTheme.textSecondary,
+                ],
+              ),
+              child: Row(
+                children: [
+                  Container(
+                    width: 44,
+                    height: 44,
+                    decoration: BoxDecoration(
+                      color: AppTheme.primary.withValues(alpha: 0.12),
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: Icon(Icons.menu_book_rounded, color: AppTheme.primary, size: 22),
+                  ),
+                  const SizedBox(width: 14),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          children: [
+                            Text(
+                              'Course Overview',
+                              style: TextStyle(
+                                fontSize: 11,
+                                fontWeight: FontWeight.bold,
+                                letterSpacing: 0.6,
+                                color: AppTheme.primary,
+                              ),
+                            ),
+                            const Spacer(),
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                              decoration: BoxDecoration(
+                                color: AppTheme.primary.withValues(alpha: 0.1),
+                                borderRadius: BorderRadius.circular(6),
+                              ),
+                              child: Text(
+                                'Teacher Console',
+                                style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: AppTheme.primary),
+                              ),
+                            ),
+                          ],
                         ),
-                      ),
+                        const SizedBox(height: 3),
+                        Text(
+                          subjectDescription.isNotEmpty
+                              ? subjectDescription
+                              : 'Manage classroom quizzes, track student evaluations, and review curriculum.',
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: AppTheme.textSecondary,
+                            height: 1.3,
+                          ),
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ],
                     ),
                   ),
-                ),
-                Expanded(
-                  child: GestureDetector(
-                    onTap: () => setState(() => _selectedTab = 1),
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(vertical: 12),
-                      decoration: BoxDecoration(
-                        color: _selectedTab == 1 ? AppTheme.primary : Colors.transparent,
-                        borderRadius: BorderRadius.circular(0),
-                      ),
-                      alignment: Alignment.center,
-                      child: Text(
-                        'My Quizzes',
-                        style: TextStyle(
-                          fontWeight: FontWeight.bold,
-                          color: _selectedTab == 1 ? Colors.black : AppTheme.textSecondary,
-                        ),
-                      ),
-                    ),
-                  ),
-                ),
-              ],
+                ],
+              ),
             ),
           ),
+
+          // Segmented Floating Tab Selector
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+            child: Container(
+              padding: const EdgeInsets.all(4),
+              decoration: BoxDecoration(
+                color: AppTheme.surface,
+                borderRadius: BorderRadius.circular(14),
+                border: Border.all(color: AppTheme.border),
+              ),
+              child: Row(
+                children: [
+                  _buildTabPill(
+                    index: 0,
+                    label: 'Curriculum',
+                    icon: Icons.menu_book_outlined,
+                  ),
+                  _buildTabPill(
+                    index: 1,
+                    label: 'Quizzes',
+                    icon: Icons.quiz_outlined,
+                  ),
+                  _buildTabPill(
+                    index: 2,
+                    label: 'Assignments',
+                    icon: Icons.assignment_outlined,
+                  ),
+                ],
+              ),
+            ),
+          ),
+          const SizedBox(height: 4),
+
           // Tab content
           Expanded(
             child: _selectedTab == 0
                 ? _buildCurriculumTab()
-                : _buildQuizzesTab(),
+                : _selectedTab == 1
+                    ? _buildQuizzesTab()
+                    : _buildAssignmentsTab(),
           ),
         ],
       ),
     );
   }
 
+  Widget _buildTabPill({required int index, required String label, required IconData icon}) {
+    final isSelected = _selectedTab == index;
+    return Expanded(
+      child: GestureDetector(
+        onTap: () => setState(() => _selectedTab = index),
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 180),
+          curve: Curves.easeInOut,
+          padding: const EdgeInsets.symmetric(vertical: 10),
+          decoration: BoxDecoration(
+            color: isSelected ? AppTheme.primary : Colors.transparent,
+            borderRadius: BorderRadius.circular(10),
+            boxShadow: isSelected
+                ? [
+                    BoxShadow(
+                      color: AppTheme.primary.withValues(alpha: 0.25),
+                      blurRadius: 6,
+                      offset: const Offset(0, 2),
+                    ),
+                  ]
+                : null,
+          ),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(
+                icon,
+                size: 16,
+                color: isSelected ? Colors.black : AppTheme.textSecondary,
+              ),
+              const SizedBox(width: 8),
+              Text(
+                label,
+                style: TextStyle(
+                  fontSize: 13,
+                  fontWeight: isSelected ? FontWeight.bold : FontWeight.w600,
+                  color: isSelected ? Colors.black : AppTheme.textSecondary,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  void _openAddTopic() {
+    final subjectId = int.tryParse(widget.subjectId);
+    if (subjectId == null) return;
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (ctx) => AddTopicSheet(subjectId: subjectId),
+    );
+  }
+
   Widget _buildCurriculumTab() {
-    // Placeholder — teachers can view the curriculum structure
-    // Full curriculum editing is admin-only; teachers can view
-    return Center(
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
+    final subjectId = int.tryParse(widget.subjectId);
+    if (subjectId == null) return const SizedBox.shrink();
+
+    final topics = ref.watch(subjectDetailProvider);
+
+    if (topics.isEmpty) {
+      return Center(
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.all(32),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Container(
+                width: 80,
+                height: 80,
+                decoration: BoxDecoration(
+                  color: AppTheme.primary.withValues(alpha: 0.12),
+                  shape: BoxShape.circle,
+                ),
+                child: Icon(Icons.menu_book_outlined, size: 40, color: AppTheme.primary),
+              ),
+              const SizedBox(height: 20),
+              Text(
+                'No Curriculum Topics Yet',
+                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: AppTheme.text),
+              ),
+              const SizedBox(height: 8),
+              Text(
+                'Create course topics, define learning outcomes, and upload real lecture materials (PDF, PPT, Word, Video).',
+                textAlign: TextAlign.center,
+                style: TextStyle(color: AppTheme.textSecondary, fontSize: 13, height: 1.4),
+              ),
+              const SizedBox(height: 24),
+              ElevatedButton.icon(
+                onPressed: _openAddTopic,
+                icon: const Icon(Icons.add, size: 18),
+                label: const Text('Add First Topic', style: TextStyle(fontWeight: FontWeight.bold)),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AppTheme.primary,
+                  foregroundColor: Colors.black,
+                  padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                ),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+
+    return RefreshIndicator(
+      color: AppTheme.primary,
+      onRefresh: () async {
+        await ref.read(subjectDetailProvider.notifier).loadHierarchy(subjectId);
+      },
+      child: ListView(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
         children: [
-          Icon(Icons.menu_book_outlined, size: 64, color: AppTheme.textMuted),
-          const SizedBox(height: 16),
-          Text(
-            'Curriculum view',
-            style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: AppTheme.text),
-          ),
-          const SizedBox(height: 8),
-          Text(
-            'Curriculum content is managed by administrators.',
-            style: TextStyle(color: AppTheme.textSecondary, fontSize: 14),
-          ),
-          const SizedBox(height: 24),
-          ElevatedButton.icon(
-            onPressed: () {
-              // Navigate to admin subject detail if needed
-              context.push('/admin/subjects/${widget.subjectId}');
-            },
-            icon: const Icon(Icons.open_in_new),
-            label: const Text('Open in Admin View'),
-            style: ElevatedButton.styleFrom(
-              backgroundColor: AppTheme.primary,
-              foregroundColor: Colors.black,
+          // Top action bar
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+            margin: const EdgeInsets.only(bottom: 14),
+            decoration: BoxDecoration(
+              color: AppTheme.surface,
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: AppTheme.border),
+            ),
+            child: Row(
+              children: [
+                Icon(Icons.layers_outlined, color: AppTheme.primary, size: 20),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Course Curriculum',
+                        style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: AppTheme.text),
+                      ),
+                      Text(
+                        '${topics.length} Topic${topics.length == 1 ? '' : 's'} · Topics, Outcomes & Materials',
+                        style: TextStyle(fontSize: 11, color: AppTheme.textSecondary),
+                      ),
+                    ],
+                  ),
+                ),
+                ElevatedButton.icon(
+                  onPressed: _openAddTopic,
+                  icon: const Icon(Icons.add, size: 14),
+                  label: const Text('Add Topic', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: AppTheme.primary,
+                    foregroundColor: Colors.black,
+                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                    minimumSize: const Size(0, 32),
+                    elevation: 0,
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                  ),
+                ),
+              ],
             ),
           ),
+
+          // Topic cards
+          ...topics.asMap().entries.map((entry) {
+            final index = entry.key + 1;
+            final topic = entry.value;
+            return TopicCard(
+              topic: topic,
+              topicIndex: index,
+              subjectId: subjectId,
+              canEdit: true,
+            );
+          }),
+          const SizedBox(height: 24),
         ],
       ),
     );
@@ -240,26 +444,51 @@ class _TeacherSubjectDetailScreenState extends ConsumerState<TeacherSubjectDetai
       data: (quizzes) {
         if (quizzes.isEmpty) {
           return Center(
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Icon(Icons.assignment_outlined, size: 64, color: AppTheme.textMuted),
-                const SizedBox(height: 16),
-                Text(
-                  'No quizzes yet',
-                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: AppTheme.text),
-                ),
-                const SizedBox(height: 8),
-                Text(
-                  'Create your first quiz to get started!',
-                  style: TextStyle(color: AppTheme.textSecondary, fontSize: 14),
-                ),
-              ],
+            child: SingleChildScrollView(
+              padding: const EdgeInsets.all(32),
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Container(
+                    width: 88,
+                    height: 88,
+                    decoration: BoxDecoration(
+                      color: AppTheme.primary.withValues(alpha: 0.1),
+                      shape: BoxShape.circle,
+                    ),
+                    child: Icon(Icons.assignment_outlined, size: 44, color: AppTheme.primary),
+                  ),
+                  const SizedBox(height: 20),
+                  Text(
+                    'No quizzes yet',
+                    style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: AppTheme.text),
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    'Create your first quiz to assess students, automate grading, and track subject performance.',
+                    textAlign: TextAlign.center,
+                    style: TextStyle(color: AppTheme.textSecondary, fontSize: 13, height: 1.4),
+                  ),
+                  const SizedBox(height: 24),
+                  ElevatedButton.icon(
+                    onPressed: _openCreateQuiz,
+                    icon: const Icon(Icons.add_task_rounded, size: 18),
+                    label: const Text('Create First Quiz'),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: AppTheme.primary,
+                      foregroundColor: Colors.black,
+                      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                      elevation: 2,
+                    ),
+                  ),
+                ],
+              ),
             ),
           );
         }
         return ListView.builder(
-          padding: const EdgeInsets.all(16),
+          padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
           itemCount: quizzes.length,
           itemBuilder: (context, index) {
             final quiz = quizzes[index];
@@ -277,8 +506,15 @@ class _TeacherSubjectDetailScreenState extends ConsumerState<TeacherSubjectDetai
               padding: const EdgeInsets.all(16),
               decoration: BoxDecoration(
                 color: AppTheme.surface,
-                borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: AppTheme.primary.withValues(alpha: 0.3)),
+                borderRadius: BorderRadius.circular(14),
+                border: Border.all(color: AppTheme.border),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withValues(alpha: 0.02),
+                    blurRadius: 8,
+                    offset: const Offset(0, 2),
+                  ),
+                ],
               ),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -289,9 +525,9 @@ class _TeacherSubjectDetailScreenState extends ConsumerState<TeacherSubjectDetai
                         padding: const EdgeInsets.all(8),
                         decoration: BoxDecoration(
                           color: AppTheme.primary.withValues(alpha: 0.15),
-                          borderRadius: BorderRadius.circular(8),
+                          borderRadius: BorderRadius.circular(10),
                         ),
-                        child: Icon(Icons.quiz, color: AppTheme.primary, size: 20),
+                        child: Icon(Icons.quiz_outlined, color: AppTheme.primary, size: 20),
                       ),
                       const SizedBox(width: 12),
                       Expanded(
@@ -317,7 +553,7 @@ class _TeacherSubjectDetailScreenState extends ConsumerState<TeacherSubjectDetai
                           child: const Text('Draft', style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Colors.orange)),
                         ),
                       IconButton(
-                        icon: const Icon(Icons.edit, color: Colors.blue, size: 20),
+                        icon: const Icon(Icons.edit_outlined, color: Colors.blue, size: 20),
                         tooltip: 'Edit Quiz',
                         onPressed: () async {
                           final edited = await Navigator.of(context, rootNavigator: true).push<bool>(
@@ -330,7 +566,7 @@ class _TeacherSubjectDetailScreenState extends ConsumerState<TeacherSubjectDetai
                               ),
                             ),
                           );
-                          if (edited == true && context.mounted) {
+                          if (edited == true && mounted) {
                             ref.invalidate(subjectQuizzesProvider(int.parse(widget.subjectId)));
                             ref.invalidate(teacherDashboardProvider);
                           }
@@ -363,7 +599,7 @@ class _TeacherSubjectDetailScreenState extends ConsumerState<TeacherSubjectDetai
                       ),
                     ],
                   ),
-                  const SizedBox(height: 8),
+                  const SizedBox(height: 10),
                   Row(
                     children: [
                       Expanded(
@@ -373,6 +609,7 @@ class _TeacherSubjectDetailScreenState extends ConsumerState<TeacherSubjectDetai
                             foregroundColor: Colors.black,
                             padding: const EdgeInsets.symmetric(vertical: 8),
                             textStyle: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
                           ),
                           onPressed: () {
                             Navigator.push(
@@ -382,7 +619,7 @@ class _TeacherSubjectDetailScreenState extends ConsumerState<TeacherSubjectDetai
                               ),
                             );
                           },
-                          icon: const Icon(Icons.people, size: 16),
+                          icon: const Icon(Icons.people_outline, size: 16),
                           label: const Text('Roster'),
                         ),
                       ),
@@ -393,6 +630,7 @@ class _TeacherSubjectDetailScreenState extends ConsumerState<TeacherSubjectDetai
                             foregroundColor: AppTheme.primary,
                             side: BorderSide(color: AppTheme.primary),
                             padding: const EdgeInsets.symmetric(vertical: 8),
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
                           ),
                           onPressed: () {
                             Navigator.push(
@@ -402,7 +640,7 @@ class _TeacherSubjectDetailScreenState extends ConsumerState<TeacherSubjectDetai
                               ),
                             );
                           },
-                          icon: const Icon(Icons.play_arrow, size: 16),
+                          icon: const Icon(Icons.play_arrow_outlined, size: 16),
                           label: const Text('Take Quiz'),
                         ),
                       ),
@@ -432,15 +670,231 @@ class _TeacherSubjectDetailScreenState extends ConsumerState<TeacherSubjectDetai
           TextButton(
             onPressed: () async {
               await DatabaseHelper().deleteQuiz(quizId);
-              if (!mounted) return;
-              Navigator.pop(context);
-              ref.invalidate(subjectQuizzesProvider(subjectId));
-              ref.invalidate(teacherDashboardProvider);
+              if (ctx.mounted) {
+                Navigator.pop(ctx);
+              }
+              if (mounted) {
+                ref.invalidate(subjectQuizzesProvider(subjectId));
+                ref.invalidate(teacherDashboardProvider);
+              }
             },
             child: Text('Delete', style: TextStyle(color: AppTheme.error)),
           ),
         ],
       ),
+    );
+  }
+
+  Future<void> _openCreateAssignment() async {
+    final subId = int.tryParse(widget.subjectId);
+    if (subId == null) return;
+
+    final created = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => CreateAssignmentDialog(
+        subjectId: subId,
+        subjectName: _subject?['name']?.toString() ?? 'Subject',
+      ),
+    );
+
+    if (created == true && mounted) {
+      ref.invalidate(subjectAssignmentsProvider(subId));
+    }
+  }
+
+  void _confirmDeleteAssignment(BuildContext context, int assignmentId, String title, int subjectId) {
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: AppTheme.surface,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: const Text('Delete Assignment'),
+        content: Text('Are you sure you want to delete "$title" and all student submissions?'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () async {
+              final messenger = ScaffoldMessenger.of(context);
+              await DatabaseHelper().deleteAssignment(assignmentId);
+              if (ctx.mounted) {
+                Navigator.pop(ctx);
+              }
+              if (mounted) {
+                ref.invalidate(subjectAssignmentsProvider(subjectId));
+                messenger.showSnackBar(
+                  const SnackBar(content: Text('Assignment deleted')),
+                );
+              }
+            },
+            child: Text('Delete', style: TextStyle(color: AppTheme.error)),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildAssignmentsTab() {
+    final subjectId = int.tryParse(widget.subjectId);
+    if (subjectId == null) {
+      return const Center(child: Text('Invalid subject'));
+    }
+
+    final assignmentsAsync = ref.watch(subjectAssignmentsProvider(subjectId));
+
+    return assignmentsAsync.when(
+      loading: () => Center(child: CircularProgressIndicator(color: AppTheme.primary)),
+      error: (err, stack) => Center(child: Text('Error loading assignments: $err', style: TextStyle(color: AppTheme.error))),
+      data: (assignments) {
+        if (assignments.isEmpty) {
+          return Center(
+            child: Padding(
+              padding: const EdgeInsets.all(32.0),
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(Icons.assignment_outlined, size: 56, color: AppTheme.textMuted),
+                  const SizedBox(height: 16),
+                  Text(
+                    'No Assignments Created',
+                    style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: AppTheme.text),
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    'Create assignments and projects for your students to submit files or project links.',
+                    style: TextStyle(color: AppTheme.textSecondary, fontSize: 13),
+                    textAlign: TextAlign.center,
+                  ),
+                  const SizedBox(height: 24),
+                  ElevatedButton.icon(
+                    onPressed: _openCreateAssignment,
+                    icon: const Icon(Icons.add, color: Colors.black),
+                    label: const Text('Create First Assignment', style: TextStyle(color: Colors.black, fontWeight: FontWeight.bold)),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: AppTheme.primary,
+                      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          );
+        }
+
+        return RefreshIndicator(
+          onRefresh: () async {
+            ref.invalidate(subjectAssignmentsProvider(subjectId));
+          },
+          child: ListView.builder(
+            padding: const EdgeInsets.fromLTRB(16, 8, 16, 80),
+            itemCount: assignments.length,
+            itemBuilder: (context, index) {
+              final a = assignments[index];
+              return Container(
+                margin: const EdgeInsets.only(bottom: 12),
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: AppTheme.surface,
+                  borderRadius: BorderRadius.circular(16),
+                  border: Border.all(color: AppTheme.border),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.all(8),
+                          decoration: BoxDecoration(
+                            color: AppTheme.primary.withValues(alpha: 0.15),
+                            borderRadius: BorderRadius.circular(10),
+                          ),
+                          child: Icon(Icons.assignment_outlined, color: AppTheme.primary, size: 20),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                a.title,
+                                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15, color: AppTheme.text),
+                              ),
+                              const SizedBox(height: 3),
+                              Text(
+                                '${a.totalPoints} pts · Format: ${a.submissionType.toUpperCase()}',
+                                style: TextStyle(fontSize: 12, color: AppTheme.textSecondary),
+                              ),
+                            ],
+                          ),
+                        ),
+                        IconButton(
+                          icon: Icon(Icons.delete_outline, color: AppTheme.error, size: 20),
+                          tooltip: 'Delete Assignment',
+                          onPressed: () => _confirmDeleteAssignment(context, a.id, a.title, subjectId),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 12),
+                    Row(
+                      children: [
+                        Icon(Icons.people_alt_outlined, size: 14, color: AppTheme.textMuted),
+                        const SizedBox(width: 4),
+                        Text(
+                          '${a.submissionCount} submissions · ${a.gradedCount} graded',
+                          style: TextStyle(fontSize: 12, color: AppTheme.textMuted),
+                        ),
+                        const Spacer(),
+                        if (a.dueDate != null && a.dueDate!.isNotEmpty) ...[
+                          Icon(Icons.calendar_today_outlined, size: 13, color: AppTheme.textMuted),
+                          const SizedBox(width: 4),
+                          Text(
+                            'Due: ${a.dueDate!.substring(0, 10)}',
+                            style: TextStyle(fontSize: 11, color: AppTheme.textMuted),
+                          ),
+                        ],
+                      ],
+                    ),
+                    const SizedBox(height: 12),
+                    SizedBox(
+                      width: double.infinity,
+                      child: ElevatedButton.icon(
+                        onPressed: () {
+                          showDialog(
+                            context: context,
+                            builder: (ctx) => AssignmentRosterDialog(
+                              assignmentId: a.id,
+                              assignmentTitle: a.title,
+                              totalPoints: a.totalPoints,
+                              dueDate: a.dueDate,
+                            ),
+                          ).then((_) {
+                            ref.invalidate(subjectAssignmentsProvider(subjectId));
+                          });
+                        },
+                        icon: const Icon(Icons.rate_review_outlined, size: 16),
+                        label: Text(
+                          a.submissionCount > 0 ? 'Review Submissions (${a.submissionCount})' : 'Review Submissions',
+                          style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+                        ),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: AppTheme.primary,
+                          foregroundColor: Colors.black,
+                          padding: const EdgeInsets.symmetric(vertical: 10),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              );
+            },
+          ),
+        );
+      },
     );
   }
 }

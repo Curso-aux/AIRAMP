@@ -3,14 +3,16 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 import 'package:airamp_flutter/src/core/database/database_helper.dart';
+import 'package:airamp_flutter/src/features/auth/application/auth_provider.dart';
 import 'package:airamp_flutter/src/features/chat/application/chat_provider.dart';
 import 'package:airamp_flutter/src/features/chat/presentation/chat_list_screen.dart';
 import 'package:airamp_flutter/src/features/admin/presentation/subjects_mgmt_screen.dart';
 
 void main() {
-  setUpAll(() {
+  setUpAll(() async {
     sqfliteFfiInit();
     databaseFactory = databaseFactoryFfi;
+    await DatabaseHelper().database;
   });
 
   tearDown(() async {
@@ -37,7 +39,7 @@ void main() {
 
       final maria = students.firstWhere((s) => s['id'] == 'student_1');
       expect(maria['full_name'], 'Maria Lopez');
-      expect(maria['section'], 'Emerald');
+      expect(maria['section'], contains('Emerald'));
       expect(maria['grade'], 'Grade 10');
     });
 
@@ -52,7 +54,7 @@ void main() {
 
       final maria = chatState.availableUsers.firstWhere((u) => u.id == 'student_1');
       expect(maria.role, 'student');
-      expect(maria.section, 'Emerald');
+      expect(maria.section, contains('Emerald'));
       expect(maria.grade, 'Grade 10');
 
       final teacher = chatState.availableUsers.firstWhere((u) => u.id == 'teacher_1');
@@ -62,6 +64,12 @@ void main() {
     test('getOrCreateConversation creates a 1-on-1 direct conversation with target user', () async {
       final container = ProviderContainer();
       addTearDown(container.dispose);
+      container.read(authProvider.notifier).state = User(
+        id: 'teacher_1',
+        email: 'john.reyes@deped.gov.ph',
+        role: 'teacher',
+        fullName: 'Sir John Reyes',
+      );
 
       await container.read(chatProvider.notifier).loadAvailableUsers();
 
@@ -89,9 +97,24 @@ void main() {
       addTearDown(tester.view.resetPhysicalSize);
       addTearDown(tester.view.resetDevicePixelRatio);
 
+      final container = ProviderContainer();
+      addTearDown(container.dispose);
+      container.read(authProvider.notifier).state = User(
+        id: 'admin_1',
+        email: 'aira@admin',
+        role: 'admin',
+        fullName: 'Aira Admin',
+      );
+
+      await tester.runAsync(() async {
+        await container.read(chatProvider.notifier).loadAvailableUsers();
+        await container.read(chatProvider.notifier).loadLocalConversations();
+      });
+
       await tester.pumpWidget(
-        const ProviderScope(
-          child: MaterialApp(
+        UncontrolledProviderScope(
+          container: container,
+          child: const MaterialApp(
             home: ChatListScreen(),
           ),
         ),
@@ -138,7 +161,7 @@ void main() {
       expect(find.text('Grade Level'), findsOneWidget);
       expect(find.text('Grade 10'), findsOneWidget);
       expect(find.text('Section'), findsOneWidget);
-      expect(find.text('Emerald'), findsOneWidget);
+      expect(find.textContaining('Emerald'), findsOneWidget);
       expect(find.text('Account Role'), findsOneWidget);
       expect(find.text('Learner'), findsOneWidget);
       expect(find.text('Message Maria'), findsOneWidget);
@@ -154,9 +177,24 @@ void main() {
       addTearDown(tester.view.resetPhysicalSize);
       addTearDown(tester.view.resetDevicePixelRatio);
 
+      final container = ProviderContainer();
+      addTearDown(container.dispose);
+      container.read(authProvider.notifier).state = User(
+        id: 'admin_1',
+        email: 'aira@admin',
+        role: 'admin',
+        fullName: 'Aira Admin',
+      );
+
+      await tester.runAsync(() async {
+        await container.read(chatProvider.notifier).loadAvailableUsers();
+        await container.read(chatProvider.notifier).loadLocalConversations();
+      });
+
       await tester.pumpWidget(
-        const ProviderScope(
-          child: MaterialApp(
+        UncontrolledProviderScope(
+          container: container,
+          child: const MaterialApp(
             home: ChatListScreen(),
           ),
         ),
@@ -188,6 +226,12 @@ void main() {
 
       final container = ProviderContainer();
       addTearDown(container.dispose);
+      container.read(authProvider.notifier).state = User(
+        id: 'teacher_1',
+        email: 'john.reyes@deped.gov.ph',
+        role: 'teacher',
+        fullName: 'Sir John Reyes',
+      );
 
       // Initialize users and create a test conversation
       await tester.runAsync(() async {
@@ -272,6 +316,12 @@ void main() {
 
       final container = ProviderContainer();
       addTearDown(container.dispose);
+      container.read(authProvider.notifier).state = User(
+        id: 'teacher_1',
+        email: 'john.reyes@deped.gov.ph',
+        role: 'teacher',
+        fullName: 'Sir John Reyes',
+      );
 
       await tester.runAsync(() async {
         await container.read(chatProvider.notifier).loadAvailableUsers();

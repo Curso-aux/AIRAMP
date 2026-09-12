@@ -60,7 +60,8 @@ void main() {
     // 1. Check available subjects
     final available = await helper.getAvailableSubjects(testStudentId);
     expect(available.isNotEmpty, isTrue);
-    final subjectId = available.first['id'] as int;
+    final subject = available.firstWhere((s) => s['subject_code'] == 'CS101', orElse: () => available.first);
+    final subjectId = subject['id'] as int;
 
     // 2. Enroll
     await helper.enrollSubject(testStudentId, subjectId);

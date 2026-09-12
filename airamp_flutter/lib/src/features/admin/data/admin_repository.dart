@@ -3,6 +3,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:sqflite/sqflite.dart';
 import '../../../core/database/database_helper.dart';
 import '../../../core/api/api_client.dart';
+import '../../../core/utils/section_key_helper.dart';
+import '../../../core/utils/csv_helper.dart';
 
 // --- Announcements ---
 final announcementsProvider = NotifierProvider<AnnouncementsNotifier, List<Map<String, dynamic>>>(() {
@@ -134,19 +136,54 @@ class SectionsNotifier extends Notifier<List<Map<String, dynamic>>> {
     state = maps;
   }
 
+  Future<void> reload() async => _loadSections();
+
   Future<void> addSection(Map<String, dynamic> section) async {
     final db = await DatabaseHelper().database;
-    await db.insert('sections', section);
+    final mutableSection = Map<String, dynamic>.from(section);
+
+    // Auto-generate key if empty
+    final rawKey = mutableSection['enrollment_key']?.toString().trim().toUpperCase() ?? '';
+    final sectionName = mutableSection['name']?.toString() ?? 'Section';
+    final gradeLevel = mutableSection['grade']?.toString() ?? 'Grade 10';
+    final resolvedKey = rawKey.isNotEmpty
+        ? rawKey
+        : SectionKeyHelper.generateKey(sectionName: sectionName, gradeLevel: gradeLevel);
+
+    mutableSection['enrollment_key'] = resolvedKey;
+
+    await db.insert('sections', mutableSection);
+
+    // Automatically sync to reg_links so it appears in Enrollment Keys table
+    await DatabaseHelper().generateEnrollmentKey(
+      code: resolvedKey,
+      section: sectionName,
+      maxUses: 50,
+    );
+
     await _loadSections();
     ref.invalidate(availableSectionsProvider);
+    ref.read(adminKeysProvider.notifier).loadKeys();
     ref.read(adminTeachersProvider.notifier).loadTeachers();
   }
 
   Future<void> updateSection(int id, Map<String, dynamic> section) async {
     final db = await DatabaseHelper().database;
     await db.update('sections', section, where: 'id = ?', whereArgs: [id]);
+
+    final rawKey = section['enrollment_key']?.toString().trim().toUpperCase();
+    final secName = section['name']?.toString();
+    if (rawKey != null && rawKey.isNotEmpty && secName != null && secName.isNotEmpty) {
+      await DatabaseHelper().generateEnrollmentKey(
+        code: rawKey,
+        section: secName,
+        maxUses: 50,
+      );
+    }
+
     await _loadSections();
     ref.invalidate(availableSectionsProvider);
+    ref.read(adminKeysProvider.notifier).loadKeys();
     ref.read(adminTeachersProvider.notifier).loadTeachers();
   }
   
@@ -421,10 +458,57 @@ class AdminStudentsNotifier extends Notifier<List<Map<String, dynamic>>> {
     ref.read(adminAnalyticsProvider.notifier).loadAnalytics();
   }
 
+  Future<void> updateStudentClassification(String studentId, String studentType, {String? notes}) async {
+    await DatabaseHelper().updateStudentClassification(studentId, studentType, notes: notes);
+    await loadStudents();
+    ref.read(adminAnalyticsProvider.notifier).loadAnalytics();
+  }
+
   Future<void> updateStudentEnrollments(String studentId, List<int> subjectIds) async {
     await DatabaseHelper().setStudentEnrollments(studentId, subjectIds);
     await loadStudents();
     ref.read(adminAnalyticsProvider.notifier).loadAnalytics();
+  }
+
+  Future<Map<String, dynamic>> bulkImportUsers(List<Map<String, dynamic>> rows) async {
+    final result = await DatabaseHelper().bulkImportUsers(rows);
+    await loadStudents();
+    ref.read(adminAnalyticsProvider.notifier).loadAnalytics();
+    ref.read(sectionsProvider.notifier).reload();
+    return result;
+  }
+
+  String exportStudentsCsv({List<Map<String, dynamic>>? studentsToExport}) {
+    final list = studentsToExport ?? state;
+    final headers = [
+      'Full Name',
+      'Email',
+      'Role',
+      'Grade',
+      'Section',
+      'Student Type',
+      'Special Notes',
+      'Enrolled Courses',
+      'Completed Outcomes',
+      'Average Score',
+    ];
+
+    final rows = list.map((s) {
+      return [
+        s['full_name'] ?? '',
+        s['email'] ?? '',
+        s['role'] ?? 'student',
+        s['grade'] ?? '',
+        s['section'] ?? '',
+        s['student_type'] ?? 'regular',
+        s['special_notes'] ?? '',
+        s['enrolled_courses']?.toString() ?? '0',
+        s['completed_los']?.toString() ?? '0',
+        '${s['avg_score'] ?? 0}%',
+      ];
+    }).toList();
+
+    return CsvHelper.generate(headers: headers, rows: rows);
   }
 }
 

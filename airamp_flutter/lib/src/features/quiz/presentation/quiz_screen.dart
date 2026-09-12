@@ -235,7 +235,7 @@ class _QuizScreenState extends ConsumerState<QuizScreen> {
         });
       }
 
-      if (isTimeout) {
+      if (isTimeout && mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             backgroundColor: AppTheme.error,

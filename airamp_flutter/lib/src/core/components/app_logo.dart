@@ -18,40 +18,34 @@ class AppLogo extends StatelessWidget {
     return Column(
       mainAxisSize: MainAxisSize.min,
       children: [
-        // Logo Image Container
+        // Logo Image Container (blends seamlessly in light & dark mode)
         Container(
           width: size,
           height: size,
           decoration: BoxDecoration(
-            color: themeState.colorScheme.surface,
-            borderRadius: BorderRadius.circular(size * 0.25),
-            border: Border.all(color: AppTheme.border),
+            shape: BoxShape.circle,
             boxShadow: [
               BoxShadow(
-                color: AppTheme.glowPrimary,
-                blurRadius: 32,
-                offset: const Offset(0, 8),
+                color: AppTheme.primary.withValues(alpha: AppTheme.isDark ? 0.22 : 0.10),
+                blurRadius: 40,
+                spreadRadius: 4,
               ),
             ],
           ),
           alignment: Alignment.center,
-          padding: EdgeInsets.all(size * 0.08),
-          child: ClipRRect(
-            borderRadius: BorderRadius.circular(size * 0.18),
-            child: Image.asset(
-              'assets/images/aira_logo.png',
-              width: size * 0.84,
-              height: size * 0.84,
-              fit: BoxFit.contain,
-              errorBuilder: (context, error, stackTrace) {
-                // Fallback to icon if image fails to load
-                return Icon(
-                  Icons.school,
-                  size: size * 0.5,
-                  color: themeState.colorScheme.primary,
-                );
-              },
-            ),
+          child: Image.asset(
+            'assets/images/aira_logo.png',
+            width: size,
+            height: size,
+            fit: BoxFit.contain,
+            errorBuilder: (context, error, stackTrace) {
+              // Fallback to icon if image fails to load
+              return Icon(
+                Icons.school,
+                size: size * 0.5,
+                color: themeState.colorScheme.primary,
+              );
+            },
           ),
         ),
         if (showText) ...[

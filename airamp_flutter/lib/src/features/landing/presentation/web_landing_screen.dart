@@ -53,51 +53,54 @@ class WebLandingScreen extends ConsumerWidget {
                     ),
                     child: Icon(Icons.school_rounded, color: AppTheme.primary, size: 26),
                   ),
-                  const SizedBox(width: 14),
-                  Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Row(
-                        children: [
-                          Text(
-                            'AIRA',
-                            style: TextStyle(
-                              color: AppTheme.text,
-                              fontWeight: FontWeight.w900,
-                              fontSize: 20,
-                              letterSpacing: 1.2,
-                            ),
-                          ),
-                          const SizedBox(width: 6),
-                          Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                            decoration: BoxDecoration(
-                              color: AppTheme.primary.withValues(alpha: 0.15),
-                              borderRadius: BorderRadius.circular(6),
-                            ),
-                            child: Text(
-                              'WEB ADMIN',
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          children: [
+                            Text(
+                              'AIRA',
                               style: TextStyle(
-                                color: AppTheme.primary,
-                                fontSize: 10,
-                                fontWeight: FontWeight.w800,
-                                letterSpacing: 0.8,
+                                color: AppTheme.text,
+                                fontWeight: FontWeight.w900,
+                                fontSize: 20,
+                                letterSpacing: 1.2,
                               ),
                             ),
-                          ),
-                        ],
-                      ),
-                      Text(
-                        'Academic Integrated Review & Assessment Management Platform',
-                        style: TextStyle(
-                          color: AppTheme.textSecondary,
-                          fontSize: 11,
-                          fontWeight: FontWeight.w500,
+                            const SizedBox(width: 6),
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                              decoration: BoxDecoration(
+                                color: AppTheme.primary.withValues(alpha: 0.15),
+                                borderRadius: BorderRadius.circular(6),
+                              ),
+                              child: Text(
+                                'WEB ADMIN',
+                                style: TextStyle(
+                                  color: AppTheme.primary,
+                                  fontSize: 10,
+                                  fontWeight: FontWeight.w800,
+                                  letterSpacing: 0.8,
+                                ),
+                              ),
+                            ),
+                          ],
                         ),
-                      ),
-                    ],
+                        Text(
+                          'Academic Integrated Review & Assessment Management Platform',
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(
+                            color: AppTheme.textSecondary,
+                            fontSize: 11,
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                      ],
+                    ),
                   ),
-                  const Spacer(),
+                  const SizedBox(width: 16),
 
                   // Theme Mode Switcher
                   IconButton(
@@ -124,11 +127,11 @@ class WebLandingScreen extends ConsumerWidget {
                         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
                       ),
                     )
-                  else
+                  else if (user != null && user.role == 'teacher')
                     ElevatedButton.icon(
-                      onPressed: () => context.go('/admin/login'),
-                      icon: const Icon(Icons.shield_outlined, size: 18),
-                      label: const Text('Admin Login'),
+                      onPressed: () => context.go('/teacher/dashboard'),
+                      icon: const Icon(Icons.school_rounded, size: 18),
+                      label: const Text('Teacher Portal'),
                       style: ElevatedButton.styleFrom(
                         backgroundColor: AppTheme.primary,
                         foregroundColor: Colors.black,
@@ -136,6 +139,47 @@ class WebLandingScreen extends ConsumerWidget {
                         padding: const EdgeInsets.symmetric(horizontal: 20),
                         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
                       ),
+                    )
+                  else if (user != null)
+                    ElevatedButton.icon(
+                      onPressed: () => context.go('/student/home'),
+                      icon: const Icon(Icons.auto_stories_rounded, size: 18),
+                      label: const Text('Student Portal'),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: AppTheme.primary,
+                        foregroundColor: Colors.black,
+                        minimumSize: const Size(0, 42),
+                        padding: const EdgeInsets.symmetric(horizontal: 20),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                      ),
+                    )
+                  else
+                    Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        TextButton.icon(
+                          onPressed: () => context.go('/login'),
+                          icon: const Icon(Icons.person_outline_rounded, size: 18),
+                          label: const Text('Student / Teacher'),
+                          style: TextButton.styleFrom(
+                            foregroundColor: AppTheme.text,
+                            padding: const EdgeInsets.symmetric(horizontal: 16),
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        ElevatedButton.icon(
+                          onPressed: () => context.go('/admin/login'),
+                          icon: const Icon(Icons.shield_outlined, size: 18),
+                          label: const Text('Admin Login'),
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: AppTheme.primary,
+                            foregroundColor: Colors.black,
+                            minimumSize: const Size(0, 42),
+                            padding: const EdgeInsets.symmetric(horizontal: 20),
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                          ),
+                        ),
+                      ],
                     ),
                 ],
               ),
@@ -212,9 +256,38 @@ class WebLandingScreen extends ConsumerWidget {
                     alignment: WrapAlignment.center,
                     children: [
                       ElevatedButton.icon(
-                        onPressed: () => context.go('/admin/login'),
-                        icon: const Icon(Icons.admin_panel_settings_rounded, size: 20),
-                        label: const Text('Access Admin Portal'),
+                        onPressed: () {
+                          if (user != null) {
+                            if (user.role == 'admin' || user.role == 'super_admin') {
+                              context.go('/admin/dashboard');
+                            } else if (user.role == 'teacher') {
+                              context.go('/teacher/dashboard');
+                            } else {
+                              context.go('/student/home');
+                            }
+                          } else {
+                            context.go('/admin/login');
+                          }
+                        },
+                        icon: Icon(
+                          user != null
+                              ? (user.role == 'teacher'
+                                  ? Icons.school_rounded
+                                  : (user.role == 'student'
+                                      ? Icons.auto_stories_rounded
+                                      : Icons.dashboard_rounded))
+                              : Icons.admin_panel_settings_rounded,
+                          size: 20,
+                        ),
+                        label: Text(
+                          user != null
+                              ? (user.role == 'teacher'
+                                  ? 'Go to Teacher Portal'
+                                  : (user.role == 'student'
+                                      ? 'Go to Student Portal'
+                                      : 'Go to Admin Console'))
+                              : 'Access Admin Portal',
+                        ),
                         style: ElevatedButton.styleFrom(
                           backgroundColor: AppTheme.primary,
                           foregroundColor: Colors.black,

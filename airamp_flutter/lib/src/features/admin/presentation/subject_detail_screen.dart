@@ -7,6 +7,7 @@ import '../../../core/database/database_helper.dart';
 import '../../teacher/data/teacher_repository.dart';
 import '../../teacher/presentation/components/create_quiz_dialog.dart';
 import '../../teacher/presentation/components/quiz_roster_dialog.dart';
+import '../../curriculum/presentation/curriculum_content_sheet.dart';
 import '../data/admin_repository.dart';
 
 class SubjectDetailScreen extends ConsumerStatefulWidget {
@@ -1154,7 +1155,7 @@ class _LOCardState extends ConsumerState<_LOCard> {
                     context: context,
                     isScrollControlled: true,
                     backgroundColor: Colors.transparent,
-                    builder: (ctx) => _AddContentSheet(loId: widget.lo['id'], subjectId: widget.subjectId),
+                    builder: (ctx) => AddContentSheet(loId: widget.lo['id'], subjectId: widget.subjectId),
                   );
                 },
                 icon: Icon(Icons.add, color: Theme.of(context).colorScheme.primary, size: 16),
@@ -1172,7 +1173,7 @@ class _LOCardState extends ConsumerState<_LOCard> {
             // Content List
             if (contents.isEmpty)
               Padding(
-                padding: EdgeInsets.only(bottom: 20),
+                padding: const EdgeInsets.only(bottom: 20),
                 child: Center(
                   child: Text('No content yet', style: TextStyle(color: AppTheme.textMuted, fontStyle: FontStyle.italic, fontSize: 12)),
                 ),
@@ -1204,18 +1205,8 @@ class _ContentCard extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    IconData getIconForType(String type) {
-      switch (type) {
-        case 'Text': return Icons.article_outlined;
-        case 'YouTube': return Icons.play_circle_outline;
-        case 'PDF': return Icons.picture_as_pdf_outlined;
-        case 'PPT': return Icons.slideshow_outlined;
-        case 'Doc': return Icons.description_outlined;
-        case 'Image': return Icons.image_outlined;
-        case 'Video': return Icons.videocam_outlined;
-        default: return Icons.insert_drive_file_outlined;
-      }
-    }
+    final type = content['content_type']?.toString() ?? 'Text';
+    final fileInfo = MaterialFileInfo.tryParse(content['content_data']);
 
     return Container(
       margin: const EdgeInsets.only(bottom: 8),
@@ -1227,7 +1218,7 @@ class _ContentCard extends ConsumerWidget {
       ),
       child: Row(
         children: [
-          Icon(getIconForType(content['content_type']), color: Theme.of(context).colorScheme.primary, size: 20),
+          Icon(getIconForType(type), color: Theme.of(context).colorScheme.primary, size: 20),
           const SizedBox(width: 12),
           Expanded(
             child: Column(
@@ -1237,10 +1228,32 @@ class _ContentCard extends ConsumerWidget {
                   content['title'],
                   style: TextStyle(color: AppTheme.text, fontSize: 13, fontWeight: FontWeight.w600),
                 ),
-                Text(
-                  content['content_type'],
-                  style: TextStyle(color: AppTheme.textMuted, fontSize: 11),
-                ),
+                if (fileInfo != null)
+                  Row(
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
+                        decoration: BoxDecoration(
+                          color: Theme.of(context).colorScheme.primary.withValues(alpha: 0.15),
+                          borderRadius: BorderRadius.circular(4),
+                        ),
+                        child: Text(
+                          fileInfo.fileExtension.toUpperCase(),
+                          style: TextStyle(fontSize: 9, fontWeight: FontWeight.bold, color: Theme.of(context).colorScheme.primary),
+                        ),
+                      ),
+                      const SizedBox(width: 6),
+                      Text(
+                        formatFileSize(fileInfo.fileSize),
+                        style: TextStyle(color: AppTheme.textMuted, fontSize: 11),
+                      ),
+                    ],
+                  )
+                else
+                  Text(
+                    type,
+                    style: TextStyle(color: AppTheme.textMuted, fontSize: 11),
+                  ),
               ],
             ),
           ),
@@ -1253,7 +1266,7 @@ class _ContentCard extends ConsumerWidget {
                 context: context,
                 isScrollControlled: true,
                 backgroundColor: Colors.transparent,
-                builder: (ctx) => _EditContentSheet(contentItem: content, subjectId: subjectId),
+                builder: (ctx) => EditContentSheet(contentItem: content, subjectId: subjectId),
               );
             },
           ),
@@ -1379,85 +1392,6 @@ class _AddLOSheetState extends ConsumerState<_AddLOSheet> {
   }
 }
 
-class _AddContentSheet extends ConsumerStatefulWidget {
-  final int loId;
-  final int subjectId;
-  const _AddContentSheet({required this.loId, required this.subjectId});
-
-  @override
-  ConsumerState<_AddContentSheet> createState() => _AddContentSheetState();
-}
-
-class _AddContentSheetState extends ConsumerState<_AddContentSheet> {
-  final _titleController = TextEditingController();
-  final _contentController = TextEditingController();
-  String _selectedType = 'Text';
-
-  final List<Map<String, dynamic>> _types = [
-    {'name': 'Text', 'icon': Icons.article_outlined},
-    {'name': 'YouTube', 'icon': Icons.play_circle_outline},
-    {'name': 'PDF', 'icon': Icons.picture_as_pdf_outlined},
-    {'name': 'PPT', 'icon': Icons.slideshow_outlined},
-    {'name': 'Doc', 'icon': Icons.description_outlined},
-    {'name': 'Image', 'icon': Icons.image_outlined},
-    {'name': 'Video', 'icon': Icons.videocam_outlined},
-  ];
-
-  void _save() {
-    ref.read(subjectDetailProvider.notifier).addContent(widget.loId, {
-      'title': _titleController.text.trim(),
-      'content_type': _selectedType,
-      'content_data': _contentController.text.trim(),
-    });
-    Navigator.pop(context);
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return _BaseBottomSheet(
-      title: 'Add Content',
-      onSave: _save,
-      children: [
-        Text('Content Type', style: TextStyle(color: AppTheme.textSecondary, fontSize: 12)),
-        const SizedBox(height: 8),
-        SingleChildScrollView(
-          scrollDirection: Axis.horizontal,
-          child: Row(
-            children: _types.map((type) {
-              final isSelected = _selectedType == type['name'];
-              return Padding(
-                padding: const EdgeInsets.only(right: 8),
-                child: ChoiceChip(
-                  avatar: Icon(type['icon'], color: isSelected ? Colors.black : AppTheme.textMuted, size: 16),
-                  label: Text(type['name']),
-                  selected: isSelected,
-                  onSelected: (selected) => setState(() => _selectedType = type['name']),
-                  selectedColor: Theme.of(context).colorScheme.primary,
-                  backgroundColor: Theme.of(context).colorScheme.surface,
-                  labelStyle: TextStyle(
-                    color: isSelected ? Colors.black : AppTheme.textMuted,
-                    fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
-                    fontSize: 12,
-                  ),
-                  side: BorderSide(color: isSelected ? AppTheme.primary : AppTheme.border),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                ),
-              );
-            }).toList(),
-          ),
-        ),
-        const SizedBox(height: 16),
-        Text('Title', style: TextStyle(color: AppTheme.textSecondary, fontSize: 12)),
-        const SizedBox(height: 8),
-        _buildTextField(_titleController, 'Content title'),
-        const SizedBox(height: 16),
-        Text('Content', style: TextStyle(color: AppTheme.textSecondary, fontSize: 12)),
-        const SizedBox(height: 8),
-        _buildTextField(_contentController, 'Enter text content...', maxLines: 5),
-      ],
-    );
-  }
-}
 
 // Helper Widget for Bottom Sheets
 class _BaseBottomSheet extends StatelessWidget {
@@ -2175,93 +2109,6 @@ class _EditLOSheetState extends ConsumerState<_EditLOSheet> {
   }
 }
 
-class _EditContentSheet extends ConsumerStatefulWidget {
-  final Map<String, dynamic> contentItem;
-  final int subjectId;
-  const _EditContentSheet({required this.contentItem, required this.subjectId});
-
-  @override
-  ConsumerState<_EditContentSheet> createState() => _EditContentSheetState();
-}
-
-class _EditContentSheetState extends ConsumerState<_EditContentSheet> {
-  late TextEditingController _titleController;
-  late TextEditingController _contentController;
-  late String _selectedType;
-
-  final List<Map<String, dynamic>> _types = [
-    {'name': 'Text', 'icon': Icons.article_outlined},
-    {'name': 'YouTube', 'icon': Icons.play_circle_outline},
-    {'name': 'PDF', 'icon': Icons.picture_as_pdf_outlined},
-    {'name': 'PPT', 'icon': Icons.slideshow_outlined},
-    {'name': 'Doc', 'icon': Icons.description_outlined},
-    {'name': 'Image', 'icon': Icons.image_outlined},
-    {'name': 'Video', 'icon': Icons.videocam_outlined},
-  ];
-
-  @override
-  void initState() {
-    super.initState();
-    _titleController = TextEditingController(text: widget.contentItem['title']);
-    _contentController = TextEditingController(text: widget.contentItem['content_data']);
-    _selectedType = widget.contentItem['content_type'] ?? 'Text';
-  }
-
-  void _save() {
-    ref.read(subjectDetailProvider.notifier).updateContent(widget.contentItem['id'], {
-      'title': _titleController.text.trim(),
-      'content_type': _selectedType,
-      'content_data': _contentController.text.trim(),
-    });
-    Navigator.pop(context);
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return _BaseBottomSheet(
-      title: 'Edit Content',
-      onSave: _save,
-      children: [
-        Text('Content Type', style: TextStyle(color: AppTheme.textSecondary, fontSize: 12)),
-        const SizedBox(height: 8),
-        SingleChildScrollView(
-          scrollDirection: Axis.horizontal,
-          child: Row(
-            children: _types.map((type) {
-              final isSelected = _selectedType == type['name'];
-              return Padding(
-                padding: const EdgeInsets.only(right: 8),
-                child: ChoiceChip(
-                  avatar: Icon(type['icon'], color: isSelected ? Colors.black : AppTheme.textMuted, size: 16),
-                  label: Text(type['name']),
-                  selected: isSelected,
-                  onSelected: (selected) => setState(() => _selectedType = type['name']),
-                  selectedColor: Theme.of(context).colorScheme.primary,
-                  backgroundColor: Theme.of(context).colorScheme.surface,
-                  labelStyle: TextStyle(
-                    color: isSelected ? Colors.black : AppTheme.textMuted,
-                    fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
-                    fontSize: 12,
-                  ),
-                  side: BorderSide(color: isSelected ? AppTheme.primary : AppTheme.border),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                ),
-              );
-            }).toList(),
-          ),
-        ),
-        const SizedBox(height: 16),
-        Text('Title', style: TextStyle(color: AppTheme.textSecondary, fontSize: 12)),
-        const SizedBox(height: 8),
-        _buildTextField(_titleController, 'Content title'),
-        const SizedBox(height: 16),
-        Text('Content', style: TextStyle(color: AppTheme.textSecondary, fontSize: 12)),
-        const SizedBox(height: 8),
-        _buildTextField(_contentController, 'Enter text content...', maxLines: 5),
-      ],
-    );
-  }
-}
 
 class _EditQuestionSheet extends ConsumerStatefulWidget {
   final Map<String, dynamic> question;

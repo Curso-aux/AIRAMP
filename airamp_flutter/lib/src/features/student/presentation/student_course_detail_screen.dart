@@ -6,6 +6,7 @@ import '../../../core/theme/theme_provider.dart';
 import '../../../core/database/database_helper.dart';
 import '../../admin/data/admin_repository.dart';
 import '../../auth/application/auth_provider.dart';
+import '../../curriculum/presentation/curriculum_content_sheet.dart';
 
 class StudentCourseDetailScreen extends ConsumerStatefulWidget {
   final String courseId;
@@ -21,6 +22,7 @@ class _StudentCourseDetailScreenState extends ConsumerState<StudentCourseDetailS
   bool _loading = true;
   List<Map<String, dynamic>> _completedLos = [];
   List<Map<String, dynamic>> _assignedQuizzes = [];
+  List<Map<String, dynamic>> _assignments = [];
 
   @override
   void initState() {
@@ -55,12 +57,14 @@ class _StudentCourseDetailScreenState extends ConsumerState<StudentCourseDetailS
     );
 
     final assignedQuizzes = await DatabaseHelper().getAssignedQuizzesForStudent(studentId, subjectId: id);
+    final assignments = await DatabaseHelper().getAssignmentsForStudent(studentId, subjectId: id);
 
     if (mounted) {
       setState(() {
         _subject = subject;
         _completedLos = progressRows;
         _assignedQuizzes = assignedQuizzes;
+        _assignments = assignments;
         _loading = false;
       });
     }
@@ -311,12 +315,46 @@ class _StudentCourseDetailScreenState extends ConsumerState<StudentCourseDetailS
                       shrinkWrap: true,
                       physics: const AlwaysScrollableScrollPhysics(),
                       itemCount: _assignedQuizzes.length,
-                      separatorBuilder: (_, __) => const SizedBox(height: 12),
+                      separatorBuilder: (context, index) => const SizedBox(height: 12),
                       itemBuilder: (context, index) => _buildCourseQuizCard(_assignedQuizzes[index]),
                     ),
                   )
                 else
                   ..._assignedQuizzes.map((q) => _buildCourseQuizCard(q)),
+                const SizedBox(height: 24),
+              ],
+
+              // Assignments & Projects Section
+              if (_assignments.isNotEmpty) ...[
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Row(
+                      children: [
+                        Icon(Icons.assignment_outlined, color: AppTheme.primary, size: 22),
+                        const SizedBox(width: 8),
+                        Text(
+                          'Assignments & Projects',
+                          style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: AppTheme.text),
+                        ),
+                      ],
+                    ),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                      decoration: BoxDecoration(
+                        color: AppTheme.primary.withValues(alpha: 0.15),
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(color: AppTheme.primary.withValues(alpha: 0.3)),
+                      ),
+                      child: Text(
+                        '${_assignments.length} Tasks',
+                        style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: AppTheme.primary),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 12),
+                ..._assignments.map((a) => _buildCourseAssignmentCard(a)),
                 const SizedBox(height: 24),
               ],
 
@@ -671,37 +709,109 @@ class _StudentCourseDetailScreenState extends ConsumerState<StudentCourseDetailS
                         ),
                       )
                     else
-                      ...contents.map((c) => Container(
-                        margin: const EdgeInsets.only(bottom: 12),
-                        padding: const EdgeInsets.all(16),
-                        decoration: BoxDecoration(
-                          color: AppTheme.background,
-                          borderRadius: BorderRadius.circular(12),
-                          border: Border.all(color: AppTheme.border),
-                        ),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Row(
-                              children: [
-                                Icon(Icons.menu_book, size: 18, color: AppTheme.primary),
-                                const SizedBox(width: 8),
-                                Expanded(
-                                  child: Text(
-                                    c['title']?.toString() ?? 'Material',
-                                    style: TextStyle(fontWeight: FontWeight.bold, color: AppTheme.text, fontSize: 15),
+                      ...contents.map((c) {
+                        final type = c['content_type']?.toString() ?? 'Text';
+                        final icon = getIconForType(type);
+                        final color = getColorForType(type);
+                        final fileInfo = MaterialFileInfo.tryParse(c['content_data']);
+
+                        return Container(
+                          margin: const EdgeInsets.only(bottom: 12),
+                          padding: const EdgeInsets.all(16),
+                          decoration: BoxDecoration(
+                            color: AppTheme.background,
+                            borderRadius: BorderRadius.circular(12),
+                            border: Border.all(color: AppTheme.border),
+                          ),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Row(
+                                children: [
+                                  Container(
+                                    width: 32,
+                                    height: 32,
+                                    decoration: BoxDecoration(
+                                      color: color.withValues(alpha: 0.12),
+                                      borderRadius: BorderRadius.circular(8),
+                                    ),
+                                    child: Icon(icon, size: 18, color: color),
+                                  ),
+                                  const SizedBox(width: 10),
+                                  Expanded(
+                                    child: Column(
+                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                      children: [
+                                        Text(
+                                          c['title']?.toString() ?? 'Material',
+                                          style: TextStyle(fontWeight: FontWeight.bold, color: AppTheme.text, fontSize: 15),
+                                        ),
+                                        if (fileInfo != null)
+                                          Row(
+                                            children: [
+                                              Container(
+                                                padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
+                                                decoration: BoxDecoration(
+                                                  color: color.withValues(alpha: 0.15),
+                                                  borderRadius: BorderRadius.circular(4),
+                                                ),
+                                                child: Text(
+                                                  fileInfo.fileExtension.toUpperCase(),
+                                                  style: TextStyle(fontSize: 9, fontWeight: FontWeight.bold, color: color),
+                                                ),
+                                              ),
+                                              const SizedBox(width: 6),
+                                              Text(
+                                                formatFileSize(fileInfo.fileSize),
+                                                style: TextStyle(color: AppTheme.textMuted, fontSize: 11),
+                                              ),
+                                            ],
+                                          ),
+                                      ],
+                                    ),
+                                  ),
+                                ],
+                              ),
+                              const SizedBox(height: 10),
+                              if (fileInfo != null) ...[
+                                if (fileInfo.description != null && fileInfo.description!.isNotEmpty)
+                                  Text(
+                                    fileInfo.description!,
+                                    style: TextStyle(color: AppTheme.textSecondary, fontSize: 13, height: 1.5),
+                                  ),
+                                const SizedBox(height: 6),
+                                Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                                  decoration: BoxDecoration(
+                                    color: AppTheme.surface,
+                                    borderRadius: BorderRadius.circular(6),
+                                    border: Border.all(color: AppTheme.border),
+                                  ),
+                                  child: Row(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      Icon(Icons.attach_file, size: 14, color: AppTheme.primary),
+                                      const SizedBox(width: 6),
+                                      Flexible(
+                                        child: Text(
+                                          fileInfo.fileName,
+                                          style: TextStyle(fontSize: 12, color: AppTheme.text, fontWeight: FontWeight.w500),
+                                          maxLines: 1,
+                                          overflow: TextOverflow.ellipsis,
+                                        ),
+                                      ),
+                                    ],
                                   ),
                                 ),
-                              ],
-                            ),
-                            const SizedBox(height: 8),
-                            Text(
-                              c['content_data']?.toString() ?? '',
-                              style: TextStyle(color: AppTheme.textSecondary, fontSize: 13, height: 1.5),
-                            ),
-                          ],
-                        ),
-                      )),
+                              ] else
+                                Text(
+                                  c['content_data']?.toString() ?? '',
+                                  style: TextStyle(color: AppTheme.textSecondary, fontSize: 13, height: 1.5),
+                                ),
+                            ],
+                          ),
+                        );
+                      }),
 
                     const SizedBox(height: 24),
                     Text(
@@ -880,6 +990,131 @@ class _StudentCourseDetailScreenState extends ConsumerState<StudentCourseDetailS
                 backgroundColor: isCompleted ? AppTheme.surface : AppTheme.primary,
                 foregroundColor: isCompleted ? AppTheme.text : Colors.black,
                 side: isCompleted ? BorderSide(color: AppTheme.border) : null,
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildCourseAssignmentCard(Map<String, dynamic> assignment) {
+    final id = assignment['id'];
+    final title = assignment['title']?.toString() ?? 'Assignment';
+    final points = assignment['total_points'] ?? 100;
+    final dueDateStr = assignment['due_date']?.toString();
+    final submissionStatus = assignment['submission_status']?.toString();
+    final isSubmitted = submissionStatus != null;
+    final isGraded = submissionStatus == 'graded';
+    final grade = assignment['grade'];
+
+    String formattedDue = 'No due date';
+    bool isOverdue = false;
+    if (dueDateStr != null && dueDateStr.isNotEmpty) {
+      try {
+        final dt = DateTime.parse(dueDateStr);
+        final months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+        formattedDue = 'Due: ${months[dt.month - 1]} ${dt.day}, ${dt.year}';
+        isOverdue = DateTime.now().isAfter(dt);
+      } catch (_) {
+        formattedDue = 'Due: $dueDateStr';
+      }
+    }
+
+    Color statusColor = AppTheme.warning;
+    String statusLabel = 'PENDING';
+    if (isGraded) {
+      statusColor = AppTheme.success;
+      statusLabel = 'GRADED: ${grade is num ? grade.toStringAsFixed(0) : grade}/$points';
+    } else if (isSubmitted) {
+      statusColor = AppTheme.primary;
+      statusLabel = 'SUBMITTED';
+    } else if (isOverdue) {
+      statusColor = AppTheme.error;
+      statusLabel = 'OVERDUE';
+    }
+
+    return Container(
+      margin: const EdgeInsets.only(bottom: 12),
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: AppTheme.surface,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: AppTheme.border),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Expanded(
+                child: Text(
+                  title,
+                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: AppTheme.text),
+                ),
+              ),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                decoration: BoxDecoration(
+                  color: statusColor.withValues(alpha: 0.15),
+                  borderRadius: BorderRadius.circular(6),
+                ),
+                child: Text(
+                  statusLabel,
+                  style: TextStyle(
+                    fontSize: 11,
+                    fontWeight: FontWeight.bold,
+                    color: statusColor,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          Row(
+            children: [
+              Icon(
+                Icons.calendar_today_outlined,
+                size: 14,
+                color: (isOverdue && !isSubmitted) ? AppTheme.error : AppTheme.textMuted,
+              ),
+              const SizedBox(width: 4),
+              Text(
+                formattedDue,
+                style: TextStyle(
+                  fontSize: 12,
+                  color: (isOverdue && !isSubmitted) ? AppTheme.error : AppTheme.textSecondary,
+                  fontWeight: (isOverdue && !isSubmitted) ? FontWeight.w600 : FontWeight.normal,
+                ),
+              ),
+              const SizedBox(width: 14),
+              Icon(Icons.military_tech_outlined, size: 14, color: AppTheme.textMuted),
+              const SizedBox(width: 4),
+              Text(
+                '$points points',
+                style: TextStyle(fontSize: 12, color: AppTheme.textSecondary),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          SizedBox(
+            width: double.infinity,
+            child: ElevatedButton.icon(
+              onPressed: () {
+                if (id != null) {
+                  context.push('/submissions/$id').then((_) => _loadData());
+                }
+              },
+              icon: Icon(isSubmitted ? Icons.visibility_outlined : Icons.upload_file_outlined, size: 16),
+              label: Text(
+                isSubmitted ? 'View Submission' : 'Submit Assignment',
+                style: const TextStyle(fontWeight: FontWeight.bold),
+              ),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: isSubmitted ? AppTheme.surface : AppTheme.primary,
+                foregroundColor: isSubmitted ? AppTheme.text : Colors.black,
+                side: isSubmitted ? BorderSide(color: AppTheme.border) : null,
                 shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
               ),
             ),

@@ -1,10 +1,12 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../../core/theme/theme_provider.dart';
 import '../../../auth/application/auth_provider.dart';
+import 'components/admin_command_palette.dart';
 
 class AdminWebScaffold extends ConsumerStatefulWidget {
   final StatefulNavigationShell navigationShell;
@@ -79,6 +81,10 @@ class _AdminWebScaffoldState extends ConsumerState<AdminWebScaffold> {
     );
   }
 
+  void _openCommandPalette() {
+    AdminCommandPalette.show(context, onSelectTab: _onSelectTab);
+  }
+
   String _getPageTitle() {
     final currentIndex = widget.navigationShell.currentIndex;
     if (currentIndex >= 0 && currentIndex < _navItems.length) {
@@ -93,41 +99,53 @@ class _AdminWebScaffoldState extends ConsumerState<AdminWebScaffold> {
     final isDark = AppTheme.isDark;
     final currentUser = ref.watch(authProvider);
 
-    return LayoutBuilder(
-      builder: (context, constraints) {
-        final isDesktop = constraints.maxWidth >= 1024;
-        final isTablet = constraints.maxWidth >= 720 && constraints.maxWidth < 1024;
-        final isMobile = constraints.maxWidth < 720;
+    return CallbackShortcuts(
+      bindings: <ShortcutActivator, VoidCallback>{
+        const SingleActivator(LogicalKeyboardKey.keyK, control: true): _openCommandPalette,
+        const SingleActivator(LogicalKeyboardKey.keyK, meta: true): _openCommandPalette,
+      },
+      child: Focus(
+        autofocus: true,
+        child: LayoutBuilder(
+          builder: (context, constraints) {
+            final isDesktop = constraints.maxWidth >= 1024;
+            final isTablet = constraints.maxWidth >= 720 && constraints.maxWidth < 1024;
+            final isMobile = constraints.maxWidth < 720;
 
-        final effectiveCollapsed = isTablet || _isSidebarCollapsed;
+            final effectiveCollapsed = isTablet || _isSidebarCollapsed;
 
-        if (isMobile) {
-          return Scaffold(
-            backgroundColor: AppTheme.background,
-            appBar: AppBar(
-              backgroundColor: AppTheme.surface,
-              elevation: 0,
-              title: Text(
-                _getPageTitle(),
-                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: AppTheme.text),
-              ),
-              actions: [
-                IconButton(
-                  tooltip: isDark ? 'Switch to Light Mode' : 'Switch to Dark Mode',
-                  icon: Icon(isDark ? Icons.light_mode : Icons.dark_mode, color: AppTheme.text),
-                  onPressed: () => ref.read(themeProvider.notifier).toggleTheme(),
+            if (isMobile) {
+              return Scaffold(
+                backgroundColor: AppTheme.background,
+                appBar: AppBar(
+                  backgroundColor: AppTheme.surface,
+                  elevation: 0,
+                  title: Text(
+                    _getPageTitle(),
+                    style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: AppTheme.text),
+                  ),
+                  actions: [
+                    IconButton(
+                      tooltip: 'Search (Ctrl+K)',
+                      icon: Icon(Icons.search, color: AppTheme.text),
+                      onPressed: _openCommandPalette,
+                    ),
+                    IconButton(
+                      tooltip: isDark ? 'Switch to Light Mode' : 'Switch to Dark Mode',
+                      icon: Icon(isDark ? Icons.light_mode : Icons.dark_mode, color: AppTheme.text),
+                      onPressed: () => ref.read(themeProvider.notifier).toggleTheme(),
+                    ),
+                  ],
                 ),
-              ],
-            ),
-            drawer: Drawer(
-              backgroundColor: AppTheme.surface,
-              child: _buildSidebarContent(
-                isCollapsed: false,
-                isDrawer: true,
-                currentUser: currentUser,
-                isDark: isDark,
-              ),
-            ),
+                drawer: Drawer(
+                  backgroundColor: AppTheme.surface,
+                  child: _buildSidebarContent(
+                    isCollapsed: false,
+                    isDrawer: true,
+                    currentUser: currentUser,
+                    isDark: isDark,
+                  ),
+                ),
             body: widget.navigationShell,
             bottomNavigationBar: Container(
               decoration: BoxDecoration(
@@ -160,54 +178,74 @@ class _AdminWebScaffoldState extends ConsumerState<AdminWebScaffold> {
           backgroundColor: AppTheme.background,
           body: Row(
             children: [
-              // Persistent Responsive Sidebar
-              AnimatedContainer(
-                duration: const Duration(milliseconds: 200),
-                width: effectiveCollapsed ? 76 : 260,
-                decoration: BoxDecoration(
-                  color: AppTheme.surface,
-                  border: Border(right: BorderSide(color: AppTheme.border, width: 1)),
-                ),
-                child: _buildSidebarContent(
-                  isCollapsed: effectiveCollapsed,
-                  isDrawer: false,
-                  currentUser: currentUser,
-                  isDark: isDark,
+              // Persistent Responsive Sidebar with Smooth Hardware-Accelerated Clipping
+              RepaintBoundary(
+                child: AnimatedContainer(
+                  duration: const Duration(milliseconds: 160),
+                  curve: Curves.easeOutCubic,
+                  width: effectiveCollapsed ? 76 : 260,
+                  clipBehavior: Clip.hardEdge,
+                  decoration: BoxDecoration(
+                    color: AppTheme.surface,
+                    border: Border(right: BorderSide(color: AppTheme.border, width: 1)),
+                  ),
+                  child: OverflowBox(
+                    minWidth: 76,
+                    maxWidth: 260,
+                    alignment: Alignment.topLeft,
+                    child: SizedBox(
+                      width: 260,
+                      child: _buildSidebarContent(
+                        isCollapsed: effectiveCollapsed,
+                        isDrawer: false,
+                        currentUser: currentUser,
+                        isDark: isDark,
+                      ),
+                    ),
+                  ),
                 ),
               ),
 
-              // Main Content Area
+              // Main Content Area with Isolated RepaintBoundary
               Expanded(
-                child: Column(
-                  children: [
-                    // Top Navigation Bar
-                    _buildTopBar(context, isDark, currentUser, isDesktop),
-                    // Main View Content
-                    Expanded(
-                      child: widget.navigationShell,
-                    ),
-                  ],
+                child: RepaintBoundary(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      // Top Navigation Bar (Stretches full width, pushing theme toggle and role badge to far right)
+                      _buildTopBar(context, isDark, currentUser, isDesktop, constraints.maxWidth),
+                      // Main View Content
+                      Expanded(
+                        child: widget.navigationShell,
+                      ),
+                    ],
+                  ),
                 ),
               ),
             ],
           ),
         );
       },
-    );
+    ),
+  ),
+);
   }
 
-  Widget _buildTopBar(BuildContext context, bool isDark, dynamic currentUser, bool isDesktop) {
+  Widget _buildTopBar(BuildContext context, bool isDark, dynamic currentUser, bool isDesktop, double screenWidth) {
     return Container(
       height: 64,
+      width: double.infinity,
       padding: const EdgeInsets.symmetric(horizontal: 24),
       decoration: BoxDecoration(
         color: AppTheme.surface,
         border: Border(bottom: BorderSide(color: AppTheme.border, width: 1)),
       ),
       child: Row(
+        crossAxisAlignment: CrossAxisAlignment.center,
         children: [
           // Sidebar Toggle Button
           IconButton(
+            tooltip: _isSidebarCollapsed ? 'Expand sidebar' : 'Collapse sidebar',
             icon: Icon(
               _isSidebarCollapsed ? Icons.menu_open : Icons.menu,
               color: AppTheme.textSecondary,
@@ -218,20 +256,69 @@ class _AdminWebScaffoldState extends ConsumerState<AdminWebScaffold> {
           ),
           const SizedBox(width: 8),
 
-          // Breadcrumb Title
-          Text(
-            'Portal',
-            style: TextStyle(fontSize: 14, color: AppTheme.textMuted),
-          ),
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 8),
-            child: Icon(Icons.chevron_right, size: 16, color: AppTheme.textMuted),
-          ),
-          Text(
-            _getPageTitle(),
-            style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: AppTheme.text),
+          // Breadcrumb Title (Non-flex so Spacer takes 100% of remaining space)
+          Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(
+                'Portal',
+                style: TextStyle(fontSize: 14, color: AppTheme.textMuted),
+              ),
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 8),
+                child: Icon(Icons.chevron_right, size: 16, color: AppTheme.textMuted),
+              ),
+              Text(
+                _getPageTitle(),
+                style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: AppTheme.text),
+              ),
+            ],
           ),
 
+          // Command Palette Quick Search Pill
+          if (isDesktop) ...[
+            const SizedBox(width: 16),
+            InkWell(
+              onTap: _openCommandPalette,
+              borderRadius: BorderRadius.circular(10),
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                decoration: BoxDecoration(
+                  color: AppTheme.background,
+                  borderRadius: BorderRadius.circular(10),
+                  border: Border.all(color: AppTheme.border),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(Icons.search, size: 16, color: AppTheme.textMuted),
+                    if (screenWidth >= 1400) ...[
+                      const SizedBox(width: 8),
+                      Text(
+                        'Search or jump to...',
+                        style: TextStyle(fontSize: 13, color: AppTheme.textMuted),
+                      ),
+                    ],
+                    const SizedBox(width: 8),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                      decoration: BoxDecoration(
+                        color: AppTheme.surface,
+                        borderRadius: BorderRadius.circular(5),
+                        border: Border.all(color: AppTheme.border),
+                      ),
+                      child: Text(
+                        'Ctrl K',
+                        style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: AppTheme.textMuted),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ],
+
+          // Spacer pushes theme toggle and role badge to the absolute far right
           const Spacer(),
 
           // Theme Toggle Icon
@@ -288,14 +375,14 @@ class _AdminWebScaffoldState extends ConsumerState<AdminWebScaffold> {
         // App Brand Header
         Container(
           height: 72,
-          padding: EdgeInsets.symmetric(horizontal: isCollapsed ? 12 : 20),
+          padding: const EdgeInsets.symmetric(horizontal: 19),
           alignment: Alignment.centerLeft,
           decoration: BoxDecoration(
             border: Border(bottom: BorderSide(color: AppTheme.border, width: 1)),
           ),
           child: Row(
-            mainAxisAlignment: isCollapsed ? MainAxisAlignment.center : MainAxisAlignment.start,
             children: [
+              // Logo: 38px width. With 19px left margin, center is at 19 + 19 = 38px (precisely 76 / 2)
               Container(
                 width: 38,
                 height: 38,
@@ -313,9 +400,10 @@ class _AdminWebScaffoldState extends ConsumerState<AdminWebScaffold> {
                   style: TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.bold),
                 ),
               ),
-              if (!isCollapsed) ...[
-                const SizedBox(width: 12),
-                Expanded(
+              const SizedBox(width: 14),
+              Expanded(
+                child: Opacity(
+                  opacity: isCollapsed ? 0.0 : 1.0,
                   child: Column(
                     mainAxisAlignment: MainAxisAlignment.center,
                     crossAxisAlignment: CrossAxisAlignment.start,
@@ -323,41 +411,40 @@ class _AdminWebScaffoldState extends ConsumerState<AdminWebScaffold> {
                       Text(
                         'AIRAMP',
                         style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: AppTheme.text, letterSpacing: 1),
+                        maxLines: 1,
+                        overflow: TextOverflow.clip,
                       ),
                       Text(
                         'Web Admin Portal',
                         style: TextStyle(fontSize: 11, color: AppTheme.primary, fontWeight: FontWeight.w600),
+                        maxLines: 1,
+                        overflow: TextOverflow.clip,
                       ),
                     ],
                   ),
                 ),
-              ],
+              ),
             ],
           ),
         ),
 
-        // Navigation Items
+        // Navigation Items - SingleChildScrollView + Column for zero sliver overhead
         Expanded(
-          child: ListView(
+          child: SingleChildScrollView(
             padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 10),
-            children: List.generate(_navItems.length, (index) {
-              final item = _navItems[index];
-              final isSelected = activeIndex == index;
+            child: Column(
+              children: List.generate(_navItems.length, (index) {
+                final item = _navItems[index];
+                final isSelected = activeIndex == index;
 
-              return Padding(
-                padding: const EdgeInsets.only(bottom: 6),
-                child: InkWell(
+                final navItemWidget = InkWell(
                   onTap: () {
                     if (isDrawer) Navigator.pop(context);
                     _onSelectTab(index);
                   },
                   borderRadius: BorderRadius.circular(12),
-                  child: AnimatedContainer(
-                    duration: const Duration(milliseconds: 150),
-                    padding: EdgeInsets.symmetric(
-                      horizontal: isCollapsed ? 12 : 14,
-                      vertical: 12,
-                    ),
+                  child: Container(
+                    height: 46,
                     decoration: BoxDecoration(
                       color: isSelected ? AppTheme.primary.withValues(alpha: 0.15) : Colors.transparent,
                       borderRadius: BorderRadius.circular(12),
@@ -366,115 +453,161 @@ class _AdminWebScaffoldState extends ConsumerState<AdminWebScaffold> {
                           : Border.all(color: Colors.transparent),
                     ),
                     child: Row(
-                      mainAxisAlignment: isCollapsed ? MainAxisAlignment.center : MainAxisAlignment.start,
                       children: [
-                        Icon(
-                          isSelected ? item.activeIcon : item.icon,
-                          color: isSelected ? AppTheme.primary : AppTheme.textSecondary,
-                          size: 22,
-                        ),
-                        if (!isCollapsed) ...[
-                          const SizedBox(width: 12),
-                          Expanded(
-                            child: Text(
-                              item.label,
-                              style: TextStyle(
-                                fontSize: 13,
-                                fontWeight: isSelected ? FontWeight.bold : FontWeight.w500,
-                                color: isSelected ? AppTheme.text : AppTheme.textSecondary,
-                              ),
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
+                        // Fixed Leading Icon Box (56px width): With 10px list margin, icon center is at 10 + 28 = 38px
+                        SizedBox(
+                          width: 56,
+                          child: Center(
+                            child: Icon(
+                              isSelected ? item.activeIcon : item.icon,
+                              color: isSelected ? AppTheme.primary : AppTheme.textSecondary,
+                              size: 22,
                             ),
                           ),
-                          if (isSelected)
-                            Container(
-                              width: 6,
-                              height: 6,
-                              decoration: BoxDecoration(
-                                color: AppTheme.primary,
-                                shape: BoxShape.circle,
-                              ),
+                        ),
+                        // Label & Selection Indicator Dot
+                        Expanded(
+                          child: Opacity(
+                            opacity: isCollapsed ? 0.0 : 1.0,
+                            child: Row(
+                              children: [
+                                Expanded(
+                                  child: Text(
+                                    item.label,
+                                    style: TextStyle(
+                                      fontSize: 13,
+                                      fontWeight: isSelected ? FontWeight.bold : FontWeight.w500,
+                                      color: isSelected ? AppTheme.text : AppTheme.textSecondary,
+                                    ),
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
+                                ),
+                                if (isSelected)
+                                  Container(
+                                    width: 6,
+                                    height: 6,
+                                    margin: const EdgeInsets.only(right: 14),
+                                    decoration: BoxDecoration(
+                                      color: AppTheme.primary,
+                                      shape: BoxShape.circle,
+                                    ),
+                                  ),
+                              ],
                             ),
-                        ],
+                          ),
+                        ),
                       ],
                     ),
                   ),
-                ),
-              );
-            }),
+                );
+
+                return Padding(
+                  padding: const EdgeInsets.only(bottom: 6),
+                  child: isCollapsed
+                      ? Tooltip(
+                          message: item.label,
+                          preferBelow: false,
+                          waitDuration: const Duration(milliseconds: 250),
+                          child: navItemWidget,
+                        )
+                      : navItemWidget,
+                );
+              }),
+            ),
           ),
         ),
 
-        // Bottom User Card & Actions
+        // Bottom User Card & Sign Out
         Container(
-          padding: EdgeInsets.all(isCollapsed ? 10 : 16),
+          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 14),
           decoration: BoxDecoration(
             color: AppTheme.surface,
             border: Border(top: BorderSide(color: AppTheme.border, width: 1)),
           ),
           child: Column(
+            mainAxisSize: MainAxisSize.min,
             children: [
-              if (!isCollapsed) ...[
-                Row(
+              // User Profile Section
+              Container(
+                height: 44,
+                padding: const EdgeInsets.symmetric(horizontal: 4),
+                child: Row(
                   children: [
-                    CircleAvatar(
-                      radius: 18,
-                      backgroundColor: AppTheme.primarySoft,
-                      child: Text(
-                        currentUser?.fullName.isNotEmpty == true ? currentUser.fullName[0].toUpperCase() : 'A',
-                        style: TextStyle(fontWeight: FontWeight.bold, color: AppTheme.primary),
+                    SizedBox(
+                      width: 48,
+                      child: Center(
+                        child: CircleAvatar(
+                          radius: 18,
+                          backgroundColor: AppTheme.primarySoft,
+                          child: Text(
+                            currentUser?.fullName.isNotEmpty == true ? currentUser.fullName[0].toUpperCase() : 'A',
+                            style: TextStyle(fontWeight: FontWeight.bold, color: AppTheme.primary),
+                          ),
+                        ),
                       ),
                     ),
-                    const SizedBox(width: 10),
                     Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            currentUser?.fullName ?? 'Administrator',
-                            style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: AppTheme.text),
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
+                      child: Opacity(
+                        opacity: isCollapsed ? 0.0 : 1.0,
+                        child: Padding(
+                          padding: const EdgeInsets.only(left: 8),
+                          child: Column(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                currentUser?.fullName ?? 'Administrator',
+                                style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: AppTheme.text),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                              Text(
+                                currentUser?.email ?? 'admin@airamp.edu',
+                                style: TextStyle(fontSize: 11, color: AppTheme.textMuted),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ],
                           ),
-                          Text(
-                            currentUser?.email ?? 'admin@airamp.edu',
-                            style: TextStyle(fontSize: 11, color: AppTheme.textMuted),
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                        ],
+                        ),
                       ),
                     ),
                   ],
                 ),
-                const SizedBox(height: 12),
-              ],
+              ),
+              const SizedBox(height: 10),
+
               // Logout Action
               InkWell(
                 onTap: () => _confirmLogout(context),
                 borderRadius: BorderRadius.circular(10),
                 child: Container(
-                  width: double.infinity,
-                  padding: const EdgeInsets.symmetric(vertical: 10),
-                  alignment: Alignment.center,
+                  height: 40,
                   decoration: BoxDecoration(
                     color: AppTheme.error.withValues(alpha: 0.1),
                     borderRadius: BorderRadius.circular(10),
                   ),
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Icon(Icons.logout, size: 16, color: AppTheme.error),
-                      if (!isCollapsed) ...[
-                        const SizedBox(width: 8),
-                        Text(
-                          'Sign Out',
-                          style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: AppTheme.error),
+                  child: isCollapsed
+                      ? Tooltip(
+                          message: 'Sign Out',
+                          preferBelow: false,
+                          waitDuration: const Duration(milliseconds: 250),
+                          child: Center(
+                            child: Icon(Icons.logout, size: 18, color: AppTheme.error),
+                          ),
+                        )
+                      : Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Icon(Icons.logout, size: 16, color: AppTheme.error),
+                            const SizedBox(width: 8),
+                            Text(
+                              'Sign Out',
+                              style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: AppTheme.error),
+                            ),
+                          ],
                         ),
-                      ],
-                    ],
-                  ),
                 ),
               ),
             ],

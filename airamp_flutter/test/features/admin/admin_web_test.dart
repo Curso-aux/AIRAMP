@@ -12,6 +12,22 @@ import 'package:airamp_flutter/src/features/landing/presentation/web_landing_scr
 import 'package:airamp_flutter/src/features/auth/presentation/web/admin_web_login_screen.dart';
 import 'package:airamp_flutter/src/features/admin/data/admin_repository.dart';
 
+class _MockAdminKeysNotifier extends AdminKeysNotifier {
+  @override
+  List<Map<String, dynamic>> build() => [
+    {
+      'code': 'SEC-EMR10',
+      'section': 'Grade 10 - Emerald',
+      'max_uses': 50,
+      'times_used': 2,
+      'created_at': '2026-09-12 10:00:00',
+    }
+  ];
+
+  @override
+  Future<void> loadKeys() async {}
+}
+
 void main() {
   setUpAll(() {
     sqfliteFfiInit();
@@ -147,7 +163,8 @@ void main() {
         ),
       );
       await tester.pump(const Duration(milliseconds: 100));
-      await tester.pump(const Duration(milliseconds: 100));
+      await tester.pump(const Duration(seconds: 1));
+      await tester.pumpAndSettle(const Duration(milliseconds: 500));
 
       expect(find.text('Student Management & Section Arrangement'), findsOneWidget);
       expect(find.byType(TextField), findsOneWidget); // Search bar
@@ -165,6 +182,7 @@ void main() {
         ProviderScope(
           overrides: [
             availableSectionsProvider.overrideWith((ref) => ['STEM A', 'Emerald', 'Ruby', 'Diamond']),
+            adminKeysProvider.overrideWith(() => _MockAdminKeysNotifier()),
           ],
           child: MaterialApp(
             theme: AppTheme.darkTheme,
@@ -176,7 +194,8 @@ void main() {
       await tester.pump(const Duration(milliseconds: 400));
 
       expect(find.text('Enrollment Keys & Access Codes'), findsOneWidget);
-      expect(find.text('Generate Section Key'), findsOneWidget);
+      expect(find.text('Manage Class Sections'), findsOneWidget);
+      expect(find.text('Grade 10'), findsWidgets);
     });
 
     testWidgets('AdminWebAnnouncementsScreen renders broadcast hub and compose button', (tester) async {

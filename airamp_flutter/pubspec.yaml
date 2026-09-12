@@ -43,6 +43,8 @@ dependencies:
   path: ^1.9.1
   sqflite_common_ffi_web: ^1.1.2
   crypto: ^3.0.3
+  file_picker: ^12.3.0
+  desktop_drop: ^0.8.4
 
 dev_dependencies:
   flutter_test:

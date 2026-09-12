@@ -197,6 +197,30 @@ class AuthNotifier extends Notifier<User?> {
     }
   }
 
+  /// Update the current student's section and grade upon key enrollment
+  void updateUserSection({required String section, required String grade}) {
+    if (state == null) return;
+    state = state!.copyWith(
+      section: section,
+      grade: grade,
+    );
+  }
+
+  /// Clear student's current section and grade
+  void clearUserSection() {
+    if (state == null) return;
+    state = User(
+      id: state!.id,
+      email: state!.email,
+      role: state!.role,
+      fullName: state!.fullName,
+      username: state!.username,
+      profileImage: state!.profileImage,
+      section: null,
+      grade: null,
+    );
+  }
+
   Future<void> logout() async {
     final repository = ref.read(authRepositoryProvider);
     isLoading = true;

@@ -77,12 +77,19 @@ class _ChatListScreenState extends ConsumerState<ChatListScreen> {
 
     // Filter by grade
     if (_selectedGrade != 'All') {
-      list = list.where((u) => u.grade == _selectedGrade).toList();
+      list = list.where((u) =>
+        u.grade == _selectedGrade ||
+        (u.section != null && u.section!.startsWith(_selectedGrade))).toList();
     }
 
     // Filter by section
     if (_selectedSection != 'All') {
-      list = list.where((u) => u.section == _selectedSection).toList();
+      list = list.where((u) =>
+        u.section != null && (
+          u.section == _selectedSection ||
+          u.section!.endsWith(_selectedSection) ||
+          u.section!.contains(_selectedSection)
+        )).toList();
     }
 
     // Filter by search query

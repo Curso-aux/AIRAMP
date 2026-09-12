@@ -449,9 +449,29 @@ class ChatNotifier extends Notifier<ChatState> {
       final currentUser = ref.read(authProvider);
 
       final users = rows.map((r) => ChatUser.fromJson(r)).toList();
-      final filtered = currentUser != null
+      List<ChatUser> filtered = currentUser != null
           ? users.where((u) => u.id != currentUser.id).toList()
           : users;
+
+      // Apply institutional privacy boundaries
+      if (currentUser != null) {
+        if (currentUser.role == 'student') {
+          final studentSection = currentUser.section?.trim().toLowerCase();
+          filtered = filtered.where((u) {
+            // Students can always contact teachers and school administrators
+            if (u.role == 'teacher' || u.role == 'admin' || u.role == 'super_admin') {
+              return true;
+            }
+            // For fellow students, scope to the same section (if section assigned)
+            if (u.role == 'student') {
+              if (studentSection == null || studentSection.isEmpty) return true;
+              final otherSection = u.section?.trim().toLowerCase();
+              return otherSection == studentSection;
+            }
+            return false;
+          }).toList();
+        }
+      }
 
       if (_disposed) return;
       state = state.copyWith(availableUsers: filtered);

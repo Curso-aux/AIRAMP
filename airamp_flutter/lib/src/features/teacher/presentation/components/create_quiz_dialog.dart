@@ -1106,18 +1106,21 @@ Answer: B''';
                   ),
                 );
               }),
-              const Spacer(),
-              ElevatedButton.icon(
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: AppTheme.primary,
-                  foregroundColor: Colors.black,
-                  minimumSize: const Size(0, 40),
-                ),
-                onPressed: _addManualQuestion,
-                icon: const Icon(Icons.add, size: 16),
-                label: const Text('Add Question'),
-              ),
             ],
+          ),
+          const SizedBox(height: 10),
+          SizedBox(
+            width: double.infinity,
+            child: ElevatedButton.icon(
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppTheme.primary,
+                foregroundColor: Colors.black,
+                minimumSize: const Size(0, 40),
+              ),
+              onPressed: _addManualQuestion,
+              icon: const Icon(Icons.add, size: 16),
+              label: const Text('Add Question'),
+            ),
           ),
           const Divider(height: 20),
 

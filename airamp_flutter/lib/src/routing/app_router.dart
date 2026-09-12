@@ -58,7 +58,7 @@ final routerProvider = Provider<GoRouter>((ref) {
       ? '/admin/dashboard'
       : (authState != null && authState.role == 'teacher'
           ? '/teacher/dashboard'
-          : (authState != null && !kIsWeb
+          : (authState != null
               ? '/student/home'
               : (kIsWeb ? '/' : '/login')));
 
@@ -365,13 +365,15 @@ final routerProvider = Provider<GoRouter>((ref) {
         return kIsWeb ? '/' : '/login';
       }
 
-      // 2. On Web, visiting generic /login routes to /admin/login
+      // 2. On Web, visiting generic /login routes to appropriate portal or admin login
       if (kIsWeb && matched == '/login') {
         if (!isAuth) return '/admin/login';
         if (authState.role == 'admin' || authState.role == 'super_admin') {
           return '/admin/dashboard';
+        } else if (authState.role == 'teacher') {
+          return '/teacher/dashboard';
         }
-        return '/';
+        return '/student/home';
       }
 
       // 3. Authenticated user visiting landing page '/' or login routes
@@ -385,7 +387,7 @@ final routerProvider = Provider<GoRouter>((ref) {
             return '/admin/dashboard';
           } else if (isTeacher) {
             return '/teacher/dashboard';
-          } else if (!kIsWeb) {
+          } else {
             return '/student/home';
           }
         }
@@ -398,11 +400,11 @@ final routerProvider = Provider<GoRouter>((ref) {
 
         if (isLoginRoute) {
           if (isAdmin) {
-            return kIsWeb ? '/admin/dashboard' : '/login';
+            return '/admin/dashboard';
           } else if (isTeacher) {
             return '/teacher/dashboard';
           } else {
-            return kIsWeb ? '/' : '/student/home';
+            return '/student/home';
           }
         }
       }
@@ -414,11 +416,11 @@ final routerProvider = Provider<GoRouter>((ref) {
         final isStudent = authState.role == 'student';
 
         if (isAdmin && (matched.startsWith('/student') || matched.startsWith('/teacher'))) {
-          return kIsWeb ? '/admin/dashboard' : '/login';
+          return '/admin/dashboard';
         }
 
         if (!isAdmin && matched.startsWith('/admin') && matched != '/admin/login') {
-          return isTeacher ? '/teacher/dashboard' : (kIsWeb ? '/admin/login' : '/student/home');
+          return isTeacher ? '/teacher/dashboard' : '/student/home';
         }
 
         if (isStudent && matched.startsWith('/teacher')) {

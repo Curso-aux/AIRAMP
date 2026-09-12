@@ -41,10 +41,14 @@ class _AirampAppState extends ConsumerState<AirampApp> {
   }
 
   Future<void> _bootstrap() async {
-    await Future.wait([
-      ref.read(authProvider.notifier).bootstrap(),
-      ref.read(themeProvider.notifier).loadSavedTheme(),
-    ]);
+    try {
+      await Future.wait([
+        ref.read(authProvider.notifier).bootstrap(),
+        ref.read(themeProvider.notifier).loadSavedTheme(),
+      ]);
+    } catch (e) {
+      debugPrint('Error during app bootstrap: $e');
+    }
     if (mounted) {
       setState(() => _bootstrapped = true);
     }
@@ -74,11 +78,11 @@ class _AirampAppState extends ConsumerState<AirampApp> {
     final router = ref.watch(routerProvider);
 
     return MaterialApp.router(
-      key: ValueKey(themeState.isDark),
       title: 'AIRAMP',
       theme: AppTheme.lightTheme,
       darkTheme: AppTheme.darkTheme,
       themeMode: themeState.isDark ? ThemeMode.dark : ThemeMode.light,
+      themeAnimationDuration: Duration.zero,
       routerConfig: router,
       debugShowCheckedModeBanner: false,
     );

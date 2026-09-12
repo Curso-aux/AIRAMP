@@ -162,5 +162,37 @@ void main() {
 
       expect(find.byType(AlertDialog), findsNothing);
     });
+
+    testWidgets('Displays enrollment key chip on section cards and enrollment key field in Add dialog', (tester) async {
+      tester.view.physicalSize = const Size(1200, 900);
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(() => tester.view.resetPhysicalSize());
+
+      final sectionsWithKey = [
+        {
+          'id': 1,
+          'name': 'Grade 10 - Emerald',
+          'description': 'Junior High Class Emerald',
+          'grade': 'Grade 10',
+          'room': 'Room 201 - Main Bldg',
+          'student_count': 3,
+          'enrollment_key': 'SEC-EMR10',
+          'created_at': DateTime.now().toIso8601String(),
+        },
+      ];
+
+      await tester.pumpWidget(createWidgetUnderTest(customSections: sectionsWithKey));
+      await tester.pumpAndSettle();
+
+      // Verify Enrollment key chip is displayed
+      expect(find.text('Key: SEC-EMR10'), findsOneWidget);
+
+      // Open Add Section Dialog
+      await tester.tap(find.widgetWithText(ElevatedButton, 'Add Section'));
+      await tester.pumpAndSettle();
+
+      // Verify Enrollment Key input field is present in the dialog
+      expect(find.text('Enrollment Key (optional)'), findsOneWidget);
+    });
   });
 }

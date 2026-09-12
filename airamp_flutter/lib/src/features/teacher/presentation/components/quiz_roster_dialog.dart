@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../core/database/database_helper.dart';
 import '../../../../core/theme/app_theme.dart';
-import '../../../auth/application/auth_provider.dart';
 import '../../data/teacher_repository.dart';
 
 class QuizRosterDialog extends ConsumerWidget {

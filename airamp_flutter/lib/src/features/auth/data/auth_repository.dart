@@ -166,7 +166,7 @@ class AuthRepository {
     if (username != null && username.trim().isNotEmpty) {
       final existingUser = await db.query(
         'users',
-        where: 'LOWER(COALESCE(username, "")) = ?',
+        where: "LOWER(COALESCE(username, '')) = ?",
         whereArgs: [username.toLowerCase().trim()],
       );
       if (existingUser.isNotEmpty) {
@@ -198,13 +198,23 @@ class AuthRepository {
     String? assignedGrade;
     if (role == 'student' && sectionCode != null && sectionCode.trim().isNotEmpty) {
       final codeTrimmed = sectionCode.trim();
-      final linkRow = await db.query('reg_links', where: 'code = ?', whereArgs: [codeTrimmed]);
-      if (linkRow.isNotEmpty) {
-        assignedSection = linkRow.first['section'] as String?;
-        if (assignedSection != null && assignedSection.isNotEmpty) {
-          final secRow = await db.query('sections', where: 'name = ?', whereArgs: [assignedSection]);
-          if (secRow.isNotEmpty) {
-            assignedGrade = secRow.first['grade'] as String?;
+
+      // 1. Check sections table by enrollment_key or section name
+      final verified = await DatabaseHelper().verifySectionKey(codeTrimmed);
+      if (verified != null) {
+        final sec = verified['section'] as Map<String, dynamic>;
+        assignedSection = sec['name']?.toString();
+        assignedGrade = sec['grade']?.toString();
+      } else {
+        // 2. Fallback to reg_links table
+        final linkRow = await db.query('reg_links', where: 'code = ?', whereArgs: [codeTrimmed]);
+        if (linkRow.isNotEmpty) {
+          assignedSection = linkRow.first['section'] as String?;
+          if (assignedSection != null && assignedSection.isNotEmpty) {
+            final secRow = await db.query('sections', where: 'name = ?', whereArgs: [assignedSection]);
+            if (secRow.isNotEmpty) {
+              assignedGrade = secRow.first['grade'] as String?;
+            }
           }
         }
       }
@@ -220,9 +230,14 @@ class AuthRepository {
     await db.insert('users', userData);
 
     if (role == 'student' && sectionCode != null && sectionCode.trim().isNotEmpty) {
-      await DatabaseHelper().validateAndConsumeRegistrationKey(sectionCode.trim(), id);
-      if (assignedSection != null && assignedSection.isNotEmpty) {
-        await DatabaseHelper().autoEnrollStudentBySection(id, assignedSection, assignedGrade ?? '');
+      // First attempt section-key enrollment (binds section + subjects atomically)
+      final enrolled = await DatabaseHelper().enrollStudentBySectionKey(id, sectionCode.trim());
+      if (!enrolled) {
+        // Fallback to legacy registration key validation
+        await DatabaseHelper().validateAndConsumeRegistrationKey(sectionCode.trim(), id);
+        if (assignedSection != null && assignedSection.isNotEmpty) {
+          await DatabaseHelper().autoEnrollStudentBySection(id, assignedSection, assignedGrade ?? '');
+        }
       }
     }
 

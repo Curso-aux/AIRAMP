@@ -351,7 +351,7 @@ class _StudentHomeScreenState extends ConsumerState<StudentHomeScreen> {
                       shrinkWrap: true,
                       physics: const AlwaysScrollableScrollPhysics(),
                       itemCount: pendingQuizzes.length,
-                      separatorBuilder: (_, __) => const SizedBox(height: 12),
+                      separatorBuilder: (context, index) => const SizedBox(height: 12),
                       itemBuilder: (context, index) => _buildQuizCard(pendingQuizzes[index]),
                     ),
                   )

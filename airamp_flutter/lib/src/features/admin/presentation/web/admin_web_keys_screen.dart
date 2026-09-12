@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../../core/theme/theme_provider.dart';
+import '../../../../core/utils/section_key_helper.dart';
 import '../../data/admin_repository.dart';
 
 class AdminWebKeysScreen extends ConsumerStatefulWidget {
@@ -13,12 +15,38 @@ class AdminWebKeysScreen extends ConsumerStatefulWidget {
 }
 
 class _AdminWebKeysScreenState extends ConsumerState<AdminWebKeysScreen> {
+  String _selectedGradeFilter = 'All';
+
+  final List<String> _gradeLevels = [
+    'All',
+    'Grade 7',
+    'Grade 8',
+    'Grade 9',
+    'Grade 10',
+    'Grade 11',
+    'Grade 12',
+  ];
+
   @override
   Widget build(BuildContext context) {
     ref.watch(themeProvider);
     final keys = ref.watch(adminKeysProvider);
-    final availableSectionsAsync = ref.watch(availableSectionsProvider);
-    final availableSections = availableSectionsAsync.value ?? ['STEM A', 'STEM B', 'STEM C', 'Emerald', 'Ruby'];
+
+    // Group keys by year level
+    final Map<String, List<Map<String, dynamic>>> groupedKeys = {
+      for (final g in _gradeLevels.where((g) => g != 'All')) g: [],
+    };
+    final List<Map<String, dynamic>> otherKeys = [];
+
+    for (final k in keys) {
+      final rawSec = k['section']?.toString() ?? '';
+      final grade = (k['grade'] as String?) ?? SectionKeyHelper.extractGradeFromSection(rawSec);
+      if (groupedKeys.containsKey(grade)) {
+        groupedKeys[grade]!.add(k);
+      } else {
+        otherKeys.add(k);
+      }
+    }
 
     return Scaffold(
       backgroundColor: AppTheme.background,
@@ -32,7 +60,7 @@ class _AdminWebKeysScreenState extends ConsumerState<AdminWebKeysScreen> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // Header & Generate Action
+              // Header & Section Management Action
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
@@ -46,7 +74,7 @@ class _AdminWebKeysScreenState extends ConsumerState<AdminWebKeysScreen> {
                         ),
                         const SizedBox(height: 4),
                         Text(
-                          'Generate and distribute perspective section enrollment keys to students for registration and course onboarding',
+                          'Active enrollment keys organized by year level. Keys are automatically generated when creating class sections.',
                           style: TextStyle(fontSize: 14, color: AppTheme.textSecondary),
                         ),
                       ],
@@ -54,9 +82,13 @@ class _AdminWebKeysScreenState extends ConsumerState<AdminWebKeysScreen> {
                   ),
                   const SizedBox(width: 16),
                   ElevatedButton.icon(
-                    onPressed: () => _showGenerateKeyDialog(availableSections),
-                    icon: const Icon(Icons.add, size: 18),
-                    label: const Text('Generate Section Key'),
+                    onPressed: () {
+                      try {
+                        GoRouter.maybeOf(context)?.go('/admin/sections');
+                      } catch (_) {}
+                    },
+                    icon: const Icon(Icons.groups_outlined, size: 18),
+                    label: const Text('Manage Class Sections'),
                     style: ElevatedButton.styleFrom(
                       backgroundColor: AppTheme.primary,
                       foregroundColor: Colors.white,
@@ -98,7 +130,7 @@ class _AdminWebKeysScreenState extends ConsumerState<AdminWebKeysScreen> {
                           ),
                           const SizedBox(height: 2),
                           Text(
-                            'When students sign up or enroll in the app, providing a valid Section Key automatically arranges them into their designated section and unlocks associated curriculum.',
+                            'Keys are automatically created when you add a class section. Distribute these codes so students can self-enroll into their classrooms and subjects.',
                             style: TextStyle(fontSize: 12, color: AppTheme.textSecondary),
                           ),
                         ],
@@ -120,9 +152,13 @@ class _AdminWebKeysScreenState extends ConsumerState<AdminWebKeysScreen> {
                   ],
                 ),
               ),
-              const SizedBox(height: 24),
+              const SizedBox(height: 20),
 
-              // Keys Table or Empty State
+              // Year Level Filter Bar
+              _buildGradeFilterBar(keys, groupedKeys),
+              const SizedBox(height: 20),
+
+              // Keys Display Separated by Year Level
               if (keys.isEmpty)
                 Container(
                   width: double.infinity,
@@ -137,13 +173,29 @@ class _AdminWebKeysScreenState extends ConsumerState<AdminWebKeysScreen> {
                       Icon(Icons.key_off_outlined, size: 54, color: AppTheme.textMuted),
                       const SizedBox(height: 16),
                       Text(
-                        'No Enrollment Keys Created',
+                        'No Enrollment Keys Created Yet',
                         style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: AppTheme.text),
                       ),
                       const SizedBox(height: 6),
                       Text(
-                        'Click "Generate Section Key" above to create an access key for your students.',
+                        'Class sections you create will automatically generate active keys and appear here categorized by year level.',
                         style: TextStyle(fontSize: 13, color: AppTheme.textSecondary),
+                        textAlign: TextAlign.center,
+                      ),
+                      const SizedBox(height: 20),
+                      ElevatedButton.icon(
+                        onPressed: () {
+                          try {
+                            GoRouter.maybeOf(context)?.go('/admin/sections');
+                          } catch (_) {}
+                        },
+                        icon: const Icon(Icons.add, size: 18),
+                        label: const Text('Add Class Section'),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: AppTheme.primary,
+                          foregroundColor: Colors.white,
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                        ),
                       ),
                     ],
                   ),
@@ -153,10 +205,34 @@ class _AdminWebKeysScreenState extends ConsumerState<AdminWebKeysScreen> {
                   builder: (context, constraints) {
                     final isWide = constraints.maxWidth >= 800;
 
-                    if (isWide) {
-                      return _buildDesktopKeysTable(keys);
+                    if (_selectedGradeFilter == 'All') {
+                      // Render separated sections for each year level with active keys
+                      final activeYearLevels = _gradeLevels
+                          .where((g) => g != 'All' && (groupedKeys[g]?.isNotEmpty ?? false))
+                          .toList();
+
+                      if (activeYearLevels.isEmpty && otherKeys.isEmpty) {
+                        return _buildEmptyGradeCard('All Year Levels');
+                      }
+
+                      return Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          ...activeYearLevels.map((grade) {
+                            final gradeKeys = groupedKeys[grade] ?? [];
+                            return _buildYearLevelGroup(grade, gradeKeys, isWide);
+                          }),
+                          if (otherKeys.isNotEmpty)
+                            _buildYearLevelGroup('General / Other Sections', otherKeys, isWide),
+                        ],
+                      );
                     } else {
-                      return _buildMobileKeysList(keys);
+                      // Filtered to a specific year level
+                      final gradeKeys = groupedKeys[_selectedGradeFilter] ?? [];
+                      if (gradeKeys.isEmpty) {
+                        return _buildEmptyGradeCard(_selectedGradeFilter);
+                      }
+                      return _buildYearLevelGroup(_selectedGradeFilter, gradeKeys, isWide);
                     }
                   },
                 ),
@@ -167,135 +243,339 @@ class _AdminWebKeysScreenState extends ConsumerState<AdminWebKeysScreen> {
     );
   }
 
-  Widget _buildDesktopKeysTable(List<Map<String, dynamic>> keys) {
+  Widget _buildGradeFilterBar(
+    List<Map<String, dynamic>> allKeys,
+    Map<String, List<Map<String, dynamic>>> groupedKeys,
+  ) {
+    return SingleChildScrollView(
+      scrollDirection: Axis.horizontal,
+      child: Row(
+        children: _gradeLevels.map((grade) {
+          final isSelected = _selectedGradeFilter == grade;
+          final count = grade == 'All'
+              ? allKeys.length
+              : (groupedKeys[grade]?.length ?? 0);
+
+          return Padding(
+            padding: const EdgeInsets.only(right: 8),
+            child: ChoiceChip(
+              label: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(grade),
+                  const SizedBox(width: 6),
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1),
+                    decoration: BoxDecoration(
+                      color: isSelected
+                          ? Colors.white.withValues(alpha: 0.25)
+                          : AppTheme.primary.withValues(alpha: 0.12),
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: Text(
+                      '$count',
+                      style: TextStyle(
+                        fontSize: 11,
+                        fontWeight: FontWeight.bold,
+                        color: isSelected ? Colors.white : AppTheme.primary,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+              selected: isSelected,
+              onSelected: (selected) {
+                if (selected) {
+                  setState(() => _selectedGradeFilter = grade);
+                }
+              },
+              selectedColor: AppTheme.primary,
+              backgroundColor: AppTheme.surface,
+              labelStyle: TextStyle(
+                color: isSelected ? Colors.white : AppTheme.textSecondary,
+                fontWeight: FontWeight.w600,
+                fontSize: 13,
+              ),
+              side: BorderSide(color: isSelected ? AppTheme.primary : AppTheme.border),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+            ),
+          );
+        }).toList(),
+      ),
+    );
+  }
+
+  Widget _buildYearLevelGroup(String grade, List<Map<String, dynamic>> gradeKeys, bool isWide) {
     return Container(
+      margin: const EdgeInsets.only(bottom: 24),
       decoration: BoxDecoration(
         color: AppTheme.surface,
         borderRadius: BorderRadius.circular(16),
         border: Border.all(color: AppTheme.border),
       ),
-      child: ClipRRect(
-        borderRadius: BorderRadius.circular(16),
-        child: DataTable(
-          headingRowColor: WidgetStateProperty.all(AppTheme.background),
-          dataRowMinHeight: 64,
-          dataRowMaxHeight: 68,
-          horizontalMargin: 20,
-          columnSpacing: 24,
-          columns: const [
-            DataColumn(label: Text('ACCESS KEY', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold))),
-            DataColumn(label: Text('TARGET SECTION', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold))),
-            DataColumn(label: Text('USAGE / LIMIT', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold))),
-            DataColumn(label: Text('EXPIRATION', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold))),
-            DataColumn(label: Text('STATUS', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold))),
-            DataColumn(label: Text('ACTIONS', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold))),
-          ],
-          rows: keys.map((k) {
-            final code = k['code'] as String? ?? '';
-            final section = k['section'] as String? ?? 'General';
-            final used = k['used_count'] as int? ?? 0;
-            final max = k['max_uses'] as int? ?? 50;
-            final expiration = k['expiration'] as String? ?? 'Never';
-
-            return DataRow(
-              cells: [
-                // Code Cell
-                DataCell(
-                  Row(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Year Level Header
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
+            decoration: BoxDecoration(
+              color: AppTheme.background,
+              borderRadius: const BorderRadius.vertical(top: Radius.circular(16)),
+              border: Border(bottom: BorderSide(color: AppTheme.border)),
+            ),
+            child: Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                  decoration: BoxDecoration(
+                    color: AppTheme.primary.withValues(alpha: 0.15),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
                     children: [
-                      Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                        decoration: BoxDecoration(
-                          color: AppTheme.background,
-                          borderRadius: BorderRadius.circular(8),
-                          border: Border.all(color: AppTheme.border),
+                      Icon(Icons.school_rounded, size: 16, color: AppTheme.primary),
+                      const SizedBox(width: 6),
+                      Text(
+                        grade,
+                        style: TextStyle(
+                          fontSize: 13,
+                          fontWeight: FontWeight.bold,
+                          color: AppTheme.primary,
                         ),
-                        child: Text(
-                          code,
-                          style: TextStyle(
-                            fontFamily: 'monospace',
-                            fontSize: 13,
-                            fontWeight: FontWeight.bold,
-                            color: AppTheme.primary,
-                          ),
-                        ),
-                      ),
-                      IconButton(
-                        tooltip: 'Copy Key',
-                        icon: const Icon(Icons.copy, size: 16),
-                        color: AppTheme.textMuted,
-                        onPressed: () => _copyKey(code),
                       ),
                     ],
                   ),
                 ),
-
-                // Section Cell
-                DataCell(
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                    decoration: BoxDecoration(
-                      color: AppTheme.primary.withValues(alpha: 0.12),
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    child: Text(
-                      section,
-                      style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: AppTheme.primary),
-                    ),
+                const SizedBox(width: 12),
+                Text(
+                  '${gradeKeys.length} ${gradeKeys.length == 1 ? 'Active Section Key' : 'Active Section Keys'}',
+                  style: TextStyle(fontSize: 13, color: AppTheme.textSecondary, fontWeight: FontWeight.w500),
+                ),
+                const Spacer(),
+                TextButton.icon(
+                  onPressed: () {
+                    try {
+                      GoRouter.maybeOf(context)?.go('/admin/sections');
+                    } catch (_) {}
+                  },
+                  icon: const Icon(Icons.add, size: 15),
+                  label: Text(
+                    grade.startsWith('Grade') ? 'Add $grade Section' : 'Add Section',
                   ),
-                ),
-
-                // Usage Cell
-                DataCell(
-                  Text('$used / $max', style: TextStyle(fontSize: 13, color: AppTheme.textSecondary)),
-                ),
-
-                // Expiration Cell
-                DataCell(
-                  Text(expiration, style: TextStyle(fontSize: 12, color: AppTheme.textMuted)),
-                ),
-
-                // Status Pill
-                DataCell(
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                    decoration: BoxDecoration(
-                      color: AppTheme.success.withValues(alpha: 0.12),
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    child: Text(
-                      'ACTIVE',
-                      style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: AppTheme.success),
-                    ),
-                  ),
-                ),
-
-                // Actions Cell
-                DataCell(
-                  Row(
-                    children: [
-                      TextButton.icon(
-                        onPressed: () => _showShareModal(code, section),
-                        icon: const Icon(Icons.share, size: 14),
-                        label: const Text('Give to Student'),
-                        style: TextButton.styleFrom(
-                          foregroundColor: AppTheme.primary,
-                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                        ),
-                      ),
-                      IconButton(
-                        tooltip: 'Delete Key',
-                        icon: const Icon(Icons.delete_outline, size: 18),
-                        color: AppTheme.error,
-                        onPressed: () => _confirmDeleteKey(code),
-                      ),
-                    ],
+                  style: TextButton.styleFrom(
+                    foregroundColor: AppTheme.primary,
+                    textStyle: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
                   ),
                 ),
               ],
-            );
-          }).toList(),
-        ),
+            ),
+          ),
+
+          // Year Level Keys Table / Cards
+          if (isWide)
+            _buildDesktopKeysTable(gradeKeys)
+          else
+            _buildMobileKeysList(gradeKeys),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildEmptyGradeCard(String grade) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.symmetric(vertical: 40, horizontal: 24),
+      decoration: BoxDecoration(
+        color: AppTheme.surface,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: AppTheme.border),
+      ),
+      child: Column(
+        children: [
+          Icon(Icons.key_off_outlined, size: 48, color: AppTheme.textMuted),
+          const SizedBox(height: 14),
+          Text(
+            'No Active Keys for $grade',
+            style: TextStyle(fontSize: 17, fontWeight: FontWeight.bold, color: AppTheme.text),
+          ),
+          const SizedBox(height: 6),
+          Text(
+            'Creating a class section in $grade will automatically generate and activate its key here.',
+            style: TextStyle(fontSize: 13, color: AppTheme.textSecondary),
+            textAlign: TextAlign.center,
+          ),
+          const SizedBox(height: 18),
+          ElevatedButton.icon(
+            onPressed: () {
+              try {
+                GoRouter.maybeOf(context)?.go('/admin/sections');
+              } catch (_) {}
+            },
+            icon: const Icon(Icons.add, size: 16),
+            label: Text('Create $grade Section'),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppTheme.primary,
+              foregroundColor: Colors.white,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildDesktopKeysTable(List<Map<String, dynamic>> keys) {
+    return SingleChildScrollView(
+      scrollDirection: Axis.horizontal,
+      child: DataTable(
+        headingRowColor: WidgetStateProperty.all(AppTheme.background),
+        dataRowMinHeight: 64,
+        dataRowMaxHeight: 68,
+        horizontalMargin: 20,
+        columnSpacing: 24,
+        columns: const [
+          DataColumn(label: Text('ACCESS KEY', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold))),
+          DataColumn(label: Text('TARGET SECTION', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold))),
+          DataColumn(label: Text('USAGE / LIMIT', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold))),
+          DataColumn(label: Text('EXPIRATION', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold))),
+          DataColumn(label: Text('STATUS', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold))),
+          DataColumn(label: Text('ACTIONS', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold))),
+        ],
+        rows: keys.map((k) {
+          final code = k['code'] as String? ?? '';
+          final section = k['section'] as String? ?? 'General';
+          final maxUses = k['max_uses'] as int? ?? 50;
+          final timesUsed = k['used_count'] as int? ?? 0;
+          final expiration = k['expiration'] as String? ?? 'Never (Standard)';
+
+          return DataRow(
+            cells: [
+              // Key Code Cell
+              DataCell(
+                Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                      decoration: BoxDecoration(
+                        color: AppTheme.background,
+                        borderRadius: BorderRadius.circular(8),
+                        border: Border.all(color: AppTheme.border),
+                      ),
+                      child: Text(
+                        code,
+                        style: TextStyle(
+                          fontFamily: 'monospace',
+                          fontWeight: FontWeight.bold,
+                          fontSize: 14,
+                          color: AppTheme.text,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    IconButton(
+                      tooltip: 'Copy Access Key',
+                      icon: const Icon(Icons.copy, size: 16),
+                      color: AppTheme.textSecondary,
+                      onPressed: () => _copyKey(code),
+                    ),
+                  ],
+                ),
+              ),
+
+              // Target Section Cell
+              DataCell(
+                Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(Icons.class_outlined, size: 16, color: AppTheme.primary),
+                    const SizedBox(width: 8),
+                    Text(
+                      section,
+                      style: TextStyle(fontWeight: FontWeight.w600, color: AppTheme.text),
+                    ),
+                  ],
+                ),
+              ),
+
+              // Usage Limits Cell
+              DataCell(
+                Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      '$timesUsed / $maxUses uses',
+                      style: TextStyle(fontSize: 12, color: AppTheme.text),
+                    ),
+                    const SizedBox(height: 4),
+                    SizedBox(
+                      width: 100,
+                      child: LinearProgressIndicator(
+                        value: maxUses > 0 ? (timesUsed / maxUses).clamp(0.0, 1.0) : 0.0,
+                        backgroundColor: AppTheme.border,
+                        valueColor: AlwaysStoppedAnimation(
+                          timesUsed >= maxUses ? AppTheme.error : AppTheme.primary,
+                        ),
+                        minHeight: 4,
+                        borderRadius: BorderRadius.circular(2),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+
+              // Expiration Cell
+              DataCell(
+                Text(
+                  expiration,
+                  style: TextStyle(fontSize: 12, color: AppTheme.textSecondary),
+                ),
+              ),
+
+              // Status Cell
+              DataCell(
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                  decoration: BoxDecoration(
+                    color: AppTheme.success.withValues(alpha: 0.12),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Text(
+                    'ACTIVE',
+                    style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: AppTheme.success),
+                  ),
+                ),
+              ),
+
+              // Actions Cell
+              DataCell(
+                Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    TextButton.icon(
+                      onPressed: () => _showShareModal(code, section),
+                      icon: const Icon(Icons.share, size: 14),
+                      label: const Text('Share'),
+                      style: TextButton.styleFrom(
+                        foregroundColor: AppTheme.primary,
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+                      ),
+                    ),
+                    IconButton(
+                      tooltip: 'Delete Key',
+                      icon: const Icon(Icons.delete_outline, size: 18),
+                      color: AppTheme.error,
+                      onPressed: () => _confirmDeleteKey(code),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          );
+        }).toList(),
       ),
     );
   }
@@ -304,6 +584,7 @@ class _AdminWebKeysScreenState extends ConsumerState<AdminWebKeysScreen> {
     return ListView.separated(
       shrinkWrap: true,
       physics: const NeverScrollableScrollPhysics(),
+      padding: const EdgeInsets.all(16),
       itemCount: keys.length,
       separatorBuilder: (_, _) => const SizedBox(height: 12),
       itemBuilder: (context, index) {
@@ -314,10 +595,10 @@ class _AdminWebKeysScreenState extends ConsumerState<AdminWebKeysScreen> {
         final max = k['max_uses'] as int? ?? 50;
 
         return Container(
-          padding: const EdgeInsets.all(16),
+          padding: const EdgeInsets.all(14),
           decoration: BoxDecoration(
-            color: AppTheme.surface,
-            borderRadius: BorderRadius.circular(16),
+            color: AppTheme.background,
+            borderRadius: BorderRadius.circular(12),
             border: Border.all(color: AppTheme.border),
           ),
           child: Column(
@@ -326,7 +607,10 @@ class _AdminWebKeysScreenState extends ConsumerState<AdminWebKeysScreen> {
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  Text(code, style: TextStyle(fontFamily: 'monospace', fontSize: 16, fontWeight: FontWeight.bold, color: AppTheme.primary)),
+                  Text(
+                    code,
+                    style: TextStyle(fontFamily: 'monospace', fontSize: 16, fontWeight: FontWeight.bold, color: AppTheme.primary),
+                  ),
                   Container(
                     padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                     decoration: BoxDecoration(
@@ -339,7 +623,7 @@ class _AdminWebKeysScreenState extends ConsumerState<AdminWebKeysScreen> {
               ),
               const SizedBox(height: 8),
               Text('Usage: $used / $max uses', style: TextStyle(fontSize: 12, color: AppTheme.textSecondary)),
-              const SizedBox(height: 14),
+              const SizedBox(height: 12),
               Row(
                 children: [
                   Expanded(
@@ -422,7 +706,7 @@ class _AdminWebKeysScreenState extends ConsumerState<AdminWebKeysScreen> {
               ),
               child: SelectableText(
                 invitationText,
-                style: TextStyle(fontSize: 13, color: AppTheme.text, height: 1.4),
+                style: TextStyle(fontFamily: 'monospace', fontSize: 13, color: AppTheme.text),
               ),
             ),
             const SizedBox(height: 20),
@@ -434,7 +718,7 @@ class _AdminWebKeysScreenState extends ConsumerState<AdminWebKeysScreen> {
                   Navigator.pop(ctx);
                   ScaffoldMessenger.of(context).showSnackBar(
                     SnackBar(
-                      content: const Text('Invitation copied to clipboard!'),
+                      content: const Text('Invitation message copied to clipboard!'),
                       backgroundColor: AppTheme.success,
                     ),
                   );
@@ -451,150 +735,6 @@ class _AdminWebKeysScreenState extends ConsumerState<AdminWebKeysScreen> {
             ),
           ],
         ),
-      ),
-    );
-  }
-
-  void _showGenerateKeyDialog(List<String> availableSections) {
-    String selectedSection = availableSections.isNotEmpty ? availableSections.first : 'STEM A';
-    final randomSuffix = (DateTime.now().millisecondsSinceEpoch % 10000).toString();
-    final codeController = TextEditingController(text: '${selectedSection.replaceAll(' ', '-')}-2026-$randomSuffix');
-    final usesController = TextEditingController(text: '50');
-
-    showDialog(
-      context: context,
-      builder: (dialogCtx) => StatefulBuilder(
-        builder: (context, setDialogState) {
-          return AlertDialog(
-            backgroundColor: AppTheme.surface,
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
-            title: Row(
-              children: [
-                Icon(Icons.key, color: AppTheme.primary, size: 24),
-                const SizedBox(width: 10),
-                Text('Generate Section Key', style: TextStyle(fontSize: 18, color: AppTheme.text)),
-              ],
-            ),
-            content: SizedBox(
-              width: 420,
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text('Target Enrollment Section', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: AppTheme.textSecondary)),
-                  const SizedBox(height: 6),
-                  DropdownButtonFormField<String>(
-                    initialValue: selectedSection,
-                    dropdownColor: AppTheme.surface,
-                    style: TextStyle(color: AppTheme.text, fontSize: 13),
-                    decoration: InputDecoration(
-                      filled: true,
-                      fillColor: AppTheme.background,
-                      isDense: true,
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(10),
-                        borderSide: BorderSide(color: AppTheme.border),
-                      ),
-                      enabledBorder: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(10),
-                        borderSide: BorderSide(color: AppTheme.border),
-                      ),
-                    ),
-                    items: availableSections.map((s) => DropdownMenuItem(value: s, child: Text(s))).toList(),
-                    onChanged: (val) {
-                      if (val != null) {
-                        setDialogState(() {
-                          selectedSection = val;
-                          codeController.text = '${val.replaceAll(' ', '-')}-2026-$randomSuffix';
-                        });
-                      }
-                    },
-                  ),
-                  const SizedBox(height: 14),
-
-                  Text('Access Key Code', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: AppTheme.textSecondary)),
-                  const SizedBox(height: 6),
-                  TextField(
-                    controller: codeController,
-                    style: TextStyle(color: AppTheme.text, fontFamily: 'monospace', fontWeight: FontWeight.bold),
-                    decoration: InputDecoration(
-                      filled: true,
-                      fillColor: AppTheme.background,
-                      isDense: true,
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(10),
-                        borderSide: BorderSide(color: AppTheme.border),
-                      ),
-                      enabledBorder: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(10),
-                        borderSide: BorderSide(color: AppTheme.border),
-                      ),
-                    ),
-                  ),
-                  const SizedBox(height: 14),
-
-                  Text('Maximum Uses (Capacity)', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: AppTheme.textSecondary)),
-                  const SizedBox(height: 6),
-                  TextField(
-                    controller: usesController,
-                    keyboardType: TextInputType.number,
-                    style: TextStyle(color: AppTheme.text),
-                    decoration: InputDecoration(
-                      filled: true,
-                      fillColor: AppTheme.background,
-                      isDense: true,
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(10),
-                        borderSide: BorderSide(color: AppTheme.border),
-                      ),
-                      enabledBorder: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(10),
-                        borderSide: BorderSide(color: AppTheme.border),
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.pop(dialogCtx),
-                child: Text('Cancel', style: TextStyle(color: AppTheme.textMuted)),
-              ),
-              ElevatedButton(
-                onPressed: () async {
-                  final code = codeController.text.trim();
-                  final uses = int.tryParse(usesController.text) ?? 50;
-                  if (code.isEmpty) return;
-
-                  final messenger = ScaffoldMessenger.of(context);
-                  Navigator.pop(dialogCtx);
-                  await ref.read(adminKeysProvider.notifier).createKey(
-                        code: code,
-                        section: selectedSection,
-                        maxUses: uses,
-                      );
-                  if (mounted) {
-                    messenger.showSnackBar(
-                      SnackBar(
-                        content: Text('Generated key "$code" for section $selectedSection'),
-                        backgroundColor: AppTheme.success,
-                      ),
-                    );
-                  }
-                },
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: AppTheme.primary,
-                  foregroundColor: Colors.white,
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                  padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 10),
-                  minimumSize: const Size(0, 40),
-                ),
-                child: const Text('Create Key', style: TextStyle(fontWeight: FontWeight.bold)),
-              ),
-            ],
-          );
-        },
       ),
     );
   }
