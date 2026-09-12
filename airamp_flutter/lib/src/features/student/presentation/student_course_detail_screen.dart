@@ -301,7 +301,22 @@ class _StudentCourseDetailScreenState extends ConsumerState<StudentCourseDetailS
                   ],
                 ),
                 const SizedBox(height: 12),
-                ..._assignedQuizzes.map((q) => _buildCourseQuizCard(q)),
+                if (_assignedQuizzes.length >= 3)
+                  // Scaffold layout for 3+ quizzes: ListView with separators
+                  Container(
+                    constraints: BoxConstraints(
+                      maxHeight: MediaQuery.of(context).size.height * 0.45,
+                    ),
+                    child: ListView.separated(
+                      shrinkWrap: true,
+                      physics: const AlwaysScrollableScrollPhysics(),
+                      itemCount: _assignedQuizzes.length,
+                      separatorBuilder: (_, __) => const SizedBox(height: 12),
+                      itemBuilder: (context, index) => _buildCourseQuizCard(_assignedQuizzes[index]),
+                    ),
+                  )
+                else
+                  ..._assignedQuizzes.map((q) => _buildCourseQuizCard(q)),
                 const SizedBox(height: 24),
               ],
 

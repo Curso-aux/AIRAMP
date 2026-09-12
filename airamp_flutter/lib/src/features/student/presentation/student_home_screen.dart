@@ -341,7 +341,22 @@ class _StudentHomeScreenState extends ConsumerState<StudentHomeScreen> {
                       ],
                     ),
                   )
+                else if (pendingQuizzes.length >= 3)
+                  // Scaffold layout for 3+ quizzes: ListView with separators
+                  Container(
+                    constraints: BoxConstraints(
+                      maxHeight: MediaQuery.of(context).size.height * 0.45,
+                    ),
+                    child: ListView.separated(
+                      shrinkWrap: true,
+                      physics: const AlwaysScrollableScrollPhysics(),
+                      itemCount: pendingQuizzes.length,
+                      separatorBuilder: (_, __) => const SizedBox(height: 12),
+                      itemBuilder: (context, index) => _buildQuizCard(pendingQuizzes[index]),
+                    ),
+                  )
                 else
+                  // Column layout for 1-2 quizzes
                   ...pendingQuizzes.map((q) => _buildQuizCard(q)),
 
                 const SizedBox(height: 32),
