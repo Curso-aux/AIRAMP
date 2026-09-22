@@ -13,6 +13,7 @@ class User {
   final String? profileImage;
   final String? section;
   final String? grade;
+  final List<String> availableRoles;
 
   User({
     required this.id,
@@ -23,6 +24,7 @@ class User {
     this.profileImage,
     this.section,
     this.grade,
+    this.availableRoles = const ['student', 'teacher'],
   });
 
   bool get isTeacher => role == 'teacher';
@@ -39,6 +41,7 @@ class User {
       profileImage: json['profileImage'],
       section: json['section'],
       grade: json['grade'],
+      availableRoles: (json['availableRoles'] as List?)?.cast<String>() ?? const ['student', 'teacher'],
     );
   }
 
@@ -51,6 +54,7 @@ class User {
     String? role,
     String? section,
     String? grade,
+    List<String>? availableRoles,
   }) {
     return User(
       id: id,
@@ -61,6 +65,7 @@ class User {
       profileImage: profileImage ?? this.profileImage,
       section: section ?? this.section,
       grade: grade ?? this.grade,
+      availableRoles: availableRoles ?? this.availableRoles,
     );
   }
 }
@@ -88,6 +93,27 @@ class AuthNotifier extends Notifier<User?> {
     } finally {
       isLoading = false;
     }
+  }
+
+  /// Switch the active role between student and teacher (Multi-Role support)
+  Future<void> switchRole(String newRole) async {
+    if (state == null) return;
+    state = state!.copyWith(role: newRole);
+
+    // Update active session role in local database if a session exists
+    try {
+      final repository = ref.read(authRepositoryProvider);
+      final session = await repository.currentSession();
+      if (session != null) {
+        final db = await DatabaseHelper().database;
+        await db.update(
+          'sessions',
+          {'role': newRole},
+          where: 'token = ?',
+          whereArgs: [session.session],
+        );
+      }
+    } catch (_) {}
   }
 
   /// Restore user from persisted session on app start.

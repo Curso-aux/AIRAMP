@@ -7,6 +7,7 @@ import '../../../core/database/database_helper.dart';
 import '../../admin/data/admin_repository.dart';
 import '../../auth/application/auth_provider.dart';
 import '../../curriculum/presentation/curriculum_content_sheet.dart';
+import '../data/student_repository.dart';
 
 class StudentCourseDetailScreen extends ConsumerStatefulWidget {
   final String courseId;
@@ -86,6 +87,14 @@ class _StudentCourseDetailScreenState extends ConsumerState<StudentCourseDetailS
   Widget build(BuildContext context) {
     ref.watch(themeProvider);
     final topics = ref.watch(subjectDetailProvider);
+
+    // Dynamically react to quiz attempts or resets
+    ref.listen(studentQuizAssignmentsProvider, (prev, next) {
+      _loadData();
+    });
+    ref.listen(studentProgressProvider, (prev, next) {
+      _loadData();
+    });
 
     if (_loading) {
       return Scaffold(

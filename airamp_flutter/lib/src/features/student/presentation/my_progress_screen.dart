@@ -79,6 +79,14 @@ class _MyProgressScreenState extends ConsumerState<MyProgressScreen> {
     final courses = ref.watch(studentCoursesProvider);
     final topics = ref.watch(subjectDetailProvider);
 
+    // Dynamically react to progress or course updates
+    ref.listen(studentProgressProvider, (prev, next) {
+      _loadSelectedHierarchy();
+    });
+    ref.listen(studentCoursesProvider, (prev, next) {
+      _loadSelectedHierarchy();
+    });
+
     return Scaffold(
       backgroundColor: AppTheme.background,
       body: SafeArea(

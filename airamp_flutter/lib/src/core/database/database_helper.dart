@@ -78,6 +78,32 @@ class DatabaseHelper {
     try {
       await db.execute('ALTER TABLE sections ADD COLUMN enrollment_key TEXT');
     } catch (_) {}
+    try {
+      await db.execute('ALTER TABLE quiz_attempts ADD COLUMN answers TEXT');
+    } catch (_) {}
+    try {
+      await db.execute('ALTER TABLE submissions ADD COLUMN text_response TEXT');
+    } catch (_) {}
+    try {
+      await db.execute('ALTER TABLE submissions ADD COLUMN image_path TEXT');
+    } catch (_) {}
+    try {
+      await db.execute('''
+        CREATE TABLE IF NOT EXISTS notifications (
+          id TEXT PRIMARY KEY,
+          user_id TEXT NOT NULL,
+          type TEXT NOT NULL,
+          title TEXT NOT NULL,
+          message TEXT NOT NULL,
+          is_read INTEGER DEFAULT 0,
+          created_at TEXT NOT NULL,
+          related_id TEXT,
+          subject_id INTEGER,
+          actor_id TEXT,
+          actor_name TEXT
+        )
+      ''');
+    } catch (_) {}
     await _seedInitialData(db);
   }
 
@@ -434,7 +460,8 @@ class DatabaseHelper {
         percentage REAL NOT NULL,
         is_passed INTEGER NOT NULL,
         duration_seconds INTEGER,
-        attempted_at TEXT NOT NULL
+        attempted_at TEXT NOT NULL,
+        answers TEXT
       )
     ''');
 
@@ -469,6 +496,8 @@ class DatabaseHelper {
         file_size INTEGER,
         file_path TEXT,
         notes TEXT,
+        text_response TEXT,
+        image_path TEXT,
         submitted_at TEXT NOT NULL,
         status TEXT DEFAULT 'submitted',
         grade REAL,
@@ -478,6 +507,23 @@ class DatabaseHelper {
         UNIQUE(assignment_id, student_id),
         FOREIGN KEY (assignment_id) REFERENCES assignments (id) ON DELETE CASCADE,
         FOREIGN KEY (student_id) REFERENCES users (id) ON DELETE CASCADE
+      )
+    ''');
+
+    // Notifications Table
+    await db.execute('''
+      CREATE TABLE IF NOT EXISTS notifications (
+        id TEXT PRIMARY KEY,
+        user_id TEXT NOT NULL,
+        type TEXT NOT NULL,
+        title TEXT NOT NULL,
+        message TEXT NOT NULL,
+        is_read INTEGER DEFAULT 0,
+        created_at TEXT NOT NULL,
+        related_id TEXT,
+        subject_id INTEGER,
+        actor_id TEXT,
+        actor_name TEXT
       )
     ''');
 
@@ -1432,7 +1478,37 @@ class DatabaseHelper {
       'lastScore': attempt['score'],
       'lastPercentage': attempt['percentage'],
       'lastPassed': attempt['is_passed'] == 1,
+      'answers': attempt['answers'],
     };
+  }
+
+  /// Get the latest quiz attempt with answers for offline flashcard review
+  Future<Map<String, dynamic>?> getQuizAttemptWithAnswers({
+    required String studentId,
+    int? quizId,
+    int? loId,
+  }) async {
+    final db = await database;
+    String whereClause;
+    List<dynamic> whereArgs;
+    if (quizId != null && quizId > 0) {
+      whereClause = 'student_id = ? AND quiz_id = ?';
+      whereArgs = [studentId, quizId];
+    } else if (loId != null && loId > 0) {
+      whereClause = 'student_id = ? AND lo_id = ? AND (quiz_id IS NULL OR quiz_id = 0)';
+      whereArgs = [studentId, loId];
+    } else {
+      return null;
+    }
+
+    final attempts = await db.query(
+      'quiz_attempts',
+      where: whereClause,
+      whereArgs: whereArgs,
+      orderBy: 'attempted_at DESC',
+      limit: 1,
+    );
+    return attempts.isNotEmpty ? attempts.first : null;
   }
 
   /// Get the current quiz assignment status for a student
@@ -1456,24 +1532,24 @@ class DatabaseHelper {
     required int quizId,
     required String studentId,
   }) async {
+    await resetStudentQuizAttempt(quizId: quizId, studentId: studentId);
+  }
+
+  /// Reset learning outcome quiz attempt
+  Future<void> resetStudentLoQuizAttempt({
+    required int loId,
+    required String studentId,
+  }) async {
     final db = await database;
     await db.delete(
       'quiz_attempts',
-      where: 'quiz_id = ? AND student_id = ?',
-      whereArgs: [quizId, studentId],
+      where: 'lo_id = ? AND student_id = ? AND (quiz_id IS NULL OR quiz_id = 0)',
+      whereArgs: [loId, studentId],
     );
-
-    // Reset assignment status
-    await db.update(
-      'quiz_assignments',
-      {
-        'status': 'pending',
-        'score': 0,
-        'percentage': 0.0,
-        'completed_at': null,
-      },
-      where: 'quiz_id = ? AND student_id = ?',
-      whereArgs: [quizId, studentId],
+    await db.delete(
+      'student_progress',
+      where: 'lo_id = ? AND student_id = ?',
+      whereArgs: [loId, studentId],
     );
   }
 
@@ -1487,6 +1563,7 @@ class DatabaseHelper {
     required double percentage,
     required bool isPassed,
     int durationSeconds = 0,
+    Map<int, String>? selectedAnswers,
   }) async {
     final db = await database;
     final now = DateTime.now().toIso8601String();
@@ -1497,6 +1574,13 @@ class DatabaseHelper {
       if (!canAttempt) {
         throw Exception('Student has already completed this quiz. Contact the teacher for a reset if needed.');
       }
+    }
+
+    String? answersJson;
+    if (selectedAnswers != null && selectedAnswers.isNotEmpty) {
+      try {
+        answersJson = jsonEncode(selectedAnswers.map((k, v) => MapEntry(k.toString(), v)));
+      } catch (_) {}
     }
 
     await db.insert('quiz_attempts', {
@@ -1510,6 +1594,7 @@ class DatabaseHelper {
       'is_passed': isPassed ? 1 : 0,
       'duration_seconds': durationSeconds,
       'attempted_at': now,
+      'answers': answersJson,
     });
 
     if (quizId != null && quizId > 0) {
@@ -3903,7 +3988,7 @@ class DatabaseHelper {
              u.section as student_section,
              u.grade as student_grade,
              CASE
-               WHEN qa.status = 'completed' AND qa.score >= (
+               WHEN qa.status = 'completed' AND qa.percentage >= (
                  SELECT passing_score FROM quizzes WHERE id = qa.quiz_id
                ) THEN 'Passed'
                WHEN qa.status = 'completed' THEN 'Failed'
@@ -3922,6 +4007,13 @@ class DatabaseHelper {
     required String studentId,
   }) async {
     final db = await database;
+
+    // Look up quiz to check if it is tied to a learning outcome
+    int? loId;
+    final qRes = await db.query('quizzes', columns: ['lo_id'], where: 'id = ?', whereArgs: [quizId]);
+    if (qRes.isNotEmpty) {
+      loId = qRes.first['lo_id'] as int?;
+    }
 
     // Delete quiz attempts
     await db.delete(
@@ -3943,6 +4035,15 @@ class DatabaseHelper {
       where: 'quiz_id = ? AND student_id = ?',
       whereArgs: [quizId, studentId],
     );
+
+    // If linked to an LO, also clear from student_progress
+    if (loId != null && loId > 0) {
+      await db.delete(
+        'student_progress',
+        where: 'lo_id = ? AND student_id = ?',
+        whereArgs: [loId, studentId],
+      );
+    }
   }
 
   /// Check if a student has a pending retry eligibility
@@ -4039,6 +4140,8 @@ class DatabaseHelper {
              sub.content_link,
              sub.file_name,
              sub.file_size,
+             sub.text_response,
+             sub.image_path,
              sub.notes,
              sub.submitted_at,
              sub.grade,
@@ -4078,6 +4181,126 @@ class DatabaseHelper {
     ''', [assignmentId]);
   }
 
+  /// Get complete student submission roster for an assignment:
+  /// Returns all enrolled students in the subject with their submission status:
+  /// 'not submitted', 'submitted', 'late', 'graded'
+  Future<List<Map<String, dynamic>>> getActivityRosterForTeacher(int assignmentId) async {
+    final db = await database;
+    final assignment = await getAssignmentById(assignmentId);
+    if (assignment == null) return [];
+
+    final subjectId = (assignment['subject_id'] as int?) ?? 0;
+    final dueDateStr = assignment['due_date'] as String?;
+    DateTime? dueDate;
+    if (dueDateStr != null && dueDateStr.isNotEmpty) {
+      try {
+        dueDate = DateTime.parse(dueDateStr);
+      } catch (_) {}
+    }
+
+    // 1. Query enrolled students for this subject with their submissions
+    final rows = await db.rawQuery('''
+      SELECT 
+        u.id as student_id,
+        u.full_name,
+        u.email,
+        u.section,
+        u.grade as student_grade_level,
+        sub.id as submission_id,
+        sub.submission_type,
+        sub.content_link,
+        sub.file_name,
+        sub.file_size,
+        sub.file_path,
+        sub.text_response,
+        sub.image_path,
+        sub.notes,
+        sub.submitted_at,
+        sub.grade,
+        sub.feedback,
+        sub.graded_at,
+        sub.graded_by,
+        sub.status as raw_status
+      FROM users u
+      JOIN enrollments e ON e.student_id = u.id AND e.subject_id = ?
+      LEFT JOIN submissions sub ON sub.assignment_id = ? AND sub.student_id = u.id
+      WHERE u.role = 'student'
+      ORDER BY u.full_name ASC
+    ''', [subjectId, assignmentId]);
+
+    // Also find any submissions by students not currently in enrollments table
+    final enrolledStudentIds = rows.map((r) => r['student_id'] as String).toSet();
+    final orphanSubmissions = await db.rawQuery('''
+      SELECT 
+        sub.student_id,
+        u.full_name,
+        u.email,
+        u.section,
+        u.grade as student_grade_level,
+        sub.id as submission_id,
+        sub.submission_type,
+        sub.content_link,
+        sub.file_name,
+        sub.file_size,
+        sub.file_path,
+        sub.text_response,
+        sub.image_path,
+        sub.notes,
+        sub.submitted_at,
+        sub.grade,
+        sub.feedback,
+        sub.graded_at,
+        sub.graded_by,
+        sub.status as raw_status
+      FROM submissions sub
+      LEFT JOIN users u ON sub.student_id = u.id
+      WHERE sub.assignment_id = ?
+    ''', [assignmentId]);
+
+    final allRows = <Map<String, dynamic>>[...rows];
+    for (final orphan in orphanSubmissions) {
+      final sId = orphan['student_id'] as String?;
+      if (sId != null && !enrolledStudentIds.contains(sId)) {
+        allRows.add(orphan);
+      }
+    }
+
+    // 2. Compute 4-state lifecycle status for each student
+    final now = DateTime.now();
+    return allRows.map((r) {
+      final map = Map<String, dynamic>.from(r);
+      final rawStatus = map['raw_status']?.toString();
+      final submittedAtStr = map['submitted_at']?.toString();
+      DateTime? submittedAt;
+      if (submittedAtStr != null && submittedAtStr.isNotEmpty) {
+        try {
+          submittedAt = DateTime.parse(submittedAtStr);
+        } catch (_) {}
+      }
+
+      String computedStatus;
+      if (rawStatus == 'graded' || map['grade'] != null) {
+        computedStatus = 'graded';
+      } else if (map['submission_id'] != null) {
+        if (dueDate != null && submittedAt != null && submittedAt.isAfter(dueDate)) {
+          computedStatus = 'late';
+        } else {
+          computedStatus = 'submitted';
+        }
+      } else {
+        // No submission
+        if (dueDate != null && now.isAfter(dueDate)) {
+          computedStatus = 'late'; // overdue / missing
+        } else {
+          computedStatus = 'not submitted';
+        }
+      }
+
+      map['computed_status'] = computedStatus;
+      return map;
+    }).toList();
+  }
+
   Future<int> submitAssignment({
     required int assignmentId,
     required String studentId,
@@ -4087,11 +4310,26 @@ class DatabaseHelper {
     String? fileName,
     int? fileSize,
     String? filePath,
+    String? textResponse,
+    String? imagePath,
     String? notes,
   }) async {
     final db = await database;
     final now = DateTime.now().toIso8601String();
-    return await db.insert(
+
+    // Check if submission is late based on assignment due_date
+    String status = 'submitted';
+    final assignment = await getAssignmentById(assignmentId);
+    if (assignment != null && assignment['due_date'] != null && (assignment['due_date'] as String).isNotEmpty) {
+      try {
+        final due = DateTime.parse(assignment['due_date'] as String);
+        if (DateTime.now().isAfter(due)) {
+          status = 'late';
+        }
+      } catch (_) {}
+    }
+
+    final id = await db.insert(
       'submissions',
       {
         'assignment_id': assignmentId,
@@ -4102,12 +4340,34 @@ class DatabaseHelper {
         'file_name': fileName,
         'file_size': fileSize,
         'file_path': filePath,
+        'text_response': textResponse,
+        'image_path': imagePath,
         'notes': notes,
         'submitted_at': now,
-        'status': 'submitted',
+        'status': status,
       },
       conflictAlgorithm: ConflictAlgorithm.replace,
     );
+
+    // Automatically notify the assignment's teacher!
+    if (assignment != null && assignment['teacher_id'] != null) {
+      final teacherId = assignment['teacher_id'] as String;
+      final aTitle = assignment['title'] as String? ?? 'Activity';
+      final sName = studentName ?? 'A student';
+      final subName = assignment['subject_name'] as String? ?? '';
+      await createNotification(
+        userId: teacherId,
+        type: 'activity_submission',
+        title: 'New Activity Submission: $aTitle',
+        message: '$sName submitted "$aTitle"${subName.isNotEmpty ? " for $subName" : ""}${status == "late" ? " (Late Submission)" : ""}.',
+        relatedId: assignmentId.toString(),
+        subjectId: assignment['subject_id'] as int?,
+        actorId: studentId,
+        actorName: studentName,
+      );
+    }
+
+    return id;
   }
 
   Future<int> gradeSubmission({
@@ -4118,7 +4378,7 @@ class DatabaseHelper {
   }) async {
     final db = await database;
     final now = DateTime.now().toIso8601String();
-    return await db.update(
+    final updated = await db.update(
       'submissions',
       {
         'grade': grade,
@@ -4130,12 +4390,108 @@ class DatabaseHelper {
       where: 'id = ?',
       whereArgs: [submissionId],
     );
+
+    // Notify the student about the grade
+    try {
+      final subRows = await db.query('submissions', where: 'id = ?', whereArgs: [submissionId]);
+      if (subRows.isNotEmpty) {
+        final sub = subRows.first;
+        final studentId = sub['student_id'] as String?;
+        final assignmentId = sub['assignment_id'] as int?;
+        if (studentId != null && assignmentId != null) {
+          final assignment = await getAssignmentById(assignmentId);
+          final title = assignment?['title'] ?? 'Activity';
+          final totalPoints = assignment?['total_points'] ?? 100;
+          await createNotification(
+            userId: studentId,
+            type: 'grade_released',
+            title: 'Activity Graded: $title',
+            message: 'Your submission for "$title" was graded: ${grade.toStringAsFixed(1)}/$totalPoints pts.${feedback != null && feedback.isNotEmpty ? " Feedback: $feedback" : ""}',
+            relatedId: assignmentId.toString(),
+            subjectId: assignment?['subject_id'] as int?,
+            actorId: gradedBy,
+          );
+        }
+      }
+    } catch (_) {}
+
+    return updated;
   }
 
   Future<int> deleteAssignment(int id) async {
     final db = await database;
     await db.delete('submissions', where: 'assignment_id = ?', whereArgs: [id]);
     return await db.delete('assignments', where: 'id = ?', whereArgs: [id]);
+  }
+
+  // ── Notifications Management ──────────────────────────────
+
+  Future<void> createNotification({
+    required String userId,
+    required String type,
+    required String title,
+    required String message,
+    String? relatedId,
+    int? subjectId,
+    String? actorId,
+    String? actorName,
+  }) async {
+    final db = await database;
+    final now = DateTime.now().toIso8601String();
+    final id = 'notif_${DateTime.now().millisecondsSinceEpoch}_${(userId.hashCode % 1000).abs()}';
+    await db.insert('notifications', {
+      'id': id,
+      'user_id': userId,
+      'type': type,
+      'title': title,
+      'message': message,
+      'is_read': 0,
+      'created_at': now,
+      'related_id': relatedId,
+      'subject_id': subjectId,
+      'actor_id': actorId,
+      'actor_name': actorName,
+    });
+  }
+
+  Future<List<Map<String, dynamic>>> getNotificationsForUser(String userId) async {
+    final db = await database;
+    return await db.query(
+      'notifications',
+      where: 'user_id = ?',
+      whereArgs: [userId],
+      orderBy: 'created_at DESC',
+      limit: 50,
+    );
+  }
+
+  Future<int> getUnreadNotificationCount(String userId) async {
+    final db = await database;
+    final res = await db.rawQuery(
+      'SELECT COUNT(*) as count FROM notifications WHERE user_id = ? AND is_read = 0',
+      [userId],
+    );
+    return (res.first['count'] as int?) ?? 0;
+  }
+
+  Future<void> markNotificationRead(String id) async {
+    final db = await database;
+    await db.update(
+      'notifications',
+      {'is_read': 1},
+      where: 'id = ?',
+      whereArgs: [id],
+    );
+  }
+
+  Future<void> markAllNotificationsRead(String userId) async {
+    final db = await database;
+    await db.update(
+      'notifications',
+      {'is_read': 1},
+      where: 'user_id = ?',
+      whereArgs: [userId],
+    );
   }
 }
 

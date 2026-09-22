@@ -3,6 +3,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../core/database/database_helper.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../data/teacher_repository.dart';
+import '../../../student/data/student_repository.dart';
+import '../../../admin/data/admin_repository.dart';
 
 class QuizRosterDialog extends ConsumerWidget {
   final int quizId;
@@ -242,8 +244,16 @@ class QuizRosterDialog extends ConsumerWidget {
                 quizId: quizId,
                 studentId: studentId,
               );
-              // Refresh the roster so the reset shows immediately
+              // Invalidate all affected providers across teacher, student, and admin views
               ref.invalidate(quizRosterProvider(quizId));
+              ref.invalidate(subjectQuizzesProvider);
+              ref.invalidate(teacherDashboardProvider);
+              ref.invalidate(teacherScoresProvider);
+              ref.invalidate(adminAnalyticsProvider);
+              ref.invalidate(studentQuizAssignmentsProvider);
+              ref.invalidate(studentQuizAttemptsProvider);
+              ref.invalidate(studentProgressProvider);
+              ref.invalidate(studentCoursesProvider);
               if (context.mounted) {
                 ScaffoldMessenger.of(context).showSnackBar(
                   SnackBar(

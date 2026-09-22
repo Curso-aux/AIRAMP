@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/theme/theme_provider.dart';
 import '../../auth/application/auth_provider.dart';
@@ -67,6 +68,8 @@ class _TeacherProfileScreenState extends ConsumerState<TeacherProfileScreen> {
               const SizedBox(height: 16),
               _buildAvatarSection(currentUser, initial),
               const SizedBox(height: 20),
+              _buildRoleSwitcherCard(currentUser),
+              const SizedBox(height: 16),
               _buildAppearanceCard(themeState),
               const SizedBox(height: 16),
               _buildPersonalInfoCard(currentUser),
@@ -116,6 +119,98 @@ class _TeacherProfileScreenState extends ConsumerState<TeacherProfileScreen> {
         const SizedBox(height: 2),
         Text('Teacher', style: TextStyle(fontSize: 13, color: AppTheme.primary, fontWeight: FontWeight.w600)),
       ],
+    );
+  }
+
+  // ═══════════════════════════════════════════════════════════
+  //  MULTI-ROLE SWITCHER CARD
+  // ═══════════════════════════════════════════════════════════
+  Widget _buildRoleSwitcherCard(User currentUser) {
+    return _sectionCard(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: AppTheme.primary.withValues(alpha: 0.15),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Icon(Icons.swap_horiz, color: AppTheme.primary, size: 20),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Multi-Role Mode',
+                      style: TextStyle(
+                        fontSize: 15,
+                        fontWeight: FontWeight.bold,
+                        color: AppTheme.text,
+                      ),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      'Current active role: Faculty / Teacher',
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: AppTheme.textMuted,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                decoration: BoxDecoration(
+                  color: AppTheme.primary.withValues(alpha: 0.2),
+                  borderRadius: BorderRadius.circular(6),
+                ),
+                child: Text(
+                  'TEACHER',
+                  style: TextStyle(
+                    fontSize: 10,
+                    fontWeight: FontWeight.bold,
+                    color: AppTheme.primary,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          Text(
+            'Switch to Student View to test courses, submit activities, and review learning outcomes as a student.',
+            style: TextStyle(fontSize: 12, color: AppTheme.textSecondary, height: 1.3),
+          ),
+          const SizedBox(height: 12),
+          SizedBox(
+            width: double.infinity,
+            child: OutlinedButton.icon(
+              style: OutlinedButton.styleFrom(
+                foregroundColor: AppTheme.primary,
+                side: BorderSide(color: AppTheme.primary),
+                padding: const EdgeInsets.symmetric(vertical: 11),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+              ),
+              onPressed: () async {
+                await ref.read(authProvider.notifier).switchRole('student');
+                if (mounted) {
+                  context.go('/student/home');
+                }
+              },
+              icon: const Icon(Icons.person_outline, size: 18),
+              label: const Text(
+                'Switch to Student View',
+                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+              ),
+            ),
+          ),
+        ],
+      ),
     );
   }
 

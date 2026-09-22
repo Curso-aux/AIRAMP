@@ -812,57 +812,41 @@ Answer: B''';
           // Status Selector
           Text('Quiz Status', style: TextStyle(fontWeight: FontWeight.bold, color: AppTheme.text, fontSize: 13)),
           const SizedBox(height: 6),
-          Container(
-            decoration: BoxDecoration(
-              color: AppTheme.background,
-              borderRadius: BorderRadius.circular(8),
+          DropdownButtonFormField<String>(
+            initialValue: _quizStatus,
+            dropdownColor: AppTheme.surface,
+            style: TextStyle(color: AppTheme.text, fontSize: 14),
+            decoration: InputDecoration(
+              filled: true,
+              fillColor: AppTheme.surface,
+              prefixIcon: Icon(
+                _quizStatus == 'published' ? Icons.check_circle_outline : Icons.edit_note,
+                color: _quizStatus == 'published' ? AppTheme.success : Colors.orange,
+              ),
+              border: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: BorderSide(color: AppTheme.border)),
+              enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: BorderSide(color: AppTheme.border)),
+              focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: BorderSide(color: AppTheme.primary, width: 1.5)),
             ),
-            child: Row(
-              children: [
-                Expanded(
-                  child: GestureDetector(
-                    onTap: () => setState(() => _quizStatus = 'published'),
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(vertical: 12),
-                      decoration: BoxDecoration(
-                        color: _quizStatus == 'published' ? AppTheme.success : Colors.transparent,
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                      alignment: Alignment.center,
-                      child: Text(
-                        'Publish Now',
-                        style: TextStyle(
-                          fontWeight: FontWeight.bold,
-                          fontSize: 13,
-                          color: _quizStatus == 'published' ? Colors.white : AppTheme.textSecondary,
-                        ),
-                      ),
-                    ),
-                  ),
-                ),
-                Expanded(
-                  child: GestureDetector(
-                    onTap: () => setState(() => _quizStatus = 'draft'),
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(vertical: 12),
-                      decoration: BoxDecoration(
-                        color: _quizStatus == 'draft' ? Colors.orange : Colors.transparent,
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                      alignment: Alignment.center,
-                      child: Text(
-                        'Save as Draft',
-                        style: TextStyle(
-                          fontWeight: FontWeight.bold,
-                          fontSize: 13,
-                          color: _quizStatus == 'draft' ? Colors.white : AppTheme.textSecondary,
-                        ),
-                      ),
-                    ),
-                  ),
-                ),
-              ],
-            ),
+            items: const [
+              DropdownMenuItem(
+                value: 'published',
+                child: Text('Published — Active for assigned students'),
+              ),
+              DropdownMenuItem(
+                value: 'draft',
+                child: Text('Draft — Saved as draft, hidden from students'),
+              ),
+            ],
+            onChanged: (val) {
+              if (val != null) setState(() => _quizStatus = val);
+            },
+          ),
+          const SizedBox(height: 6),
+          Text(
+            _quizStatus == 'published'
+                ? 'Assigned students can view and take this quiz once created in Step 3.'
+                : 'Quiz will be saved as draft and kept hidden until you publish it.',
+            style: TextStyle(fontSize: 12, color: AppTheme.textMuted),
           ),
         ],
       ),

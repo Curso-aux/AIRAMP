@@ -201,7 +201,7 @@ class StudentQuizAssignmentsNotifier extends Notifier<List<Map<String, dynamic>>
   }
 
   String? _getStudentId() {
-    final user = ref.watch(authProvider);
+    final user = ref.read(authProvider);
     return user?.id;
   }
 
@@ -235,7 +235,7 @@ class StudentQuizAttemptsNotifier extends Notifier<List<Map<String, dynamic>>> {
   }
 
   String? _getStudentId() {
-    final user = ref.watch(authProvider);
+    final user = ref.read(authProvider);
     return user?.id;
   }
 
@@ -251,6 +251,35 @@ class StudentQuizAttemptsNotifier extends Notifier<List<Map<String, dynamic>>> {
     state = results;
   }
 
+  Future<void> resetQuizAttempt({
+    required int quizId,
+    int? loId,
+    int? subjectId,
+  }) async {
+    final studentId = _getStudentId();
+    if (studentId == null) return;
+
+    if (quizId > 0) {
+      await DatabaseHelper().resetStudentQuizAttempt(quizId: quizId, studentId: studentId);
+    } else if (loId != null && loId > 0) {
+      await DatabaseHelper().resetStudentLoQuizAttempt(loId: loId, studentId: studentId);
+    }
+
+    await loadAttempts(subjectId: _activeSubjectFilter);
+    ref.invalidate(studentQuizAssignmentsProvider);
+    ref.invalidate(studentCoursesProvider);
+    ref.invalidate(studentProgressProvider);
+    ref.invalidate(teacherScoresProvider);
+    ref.invalidate(teacherDashboardProvider);
+    ref.invalidate(adminAnalyticsProvider);
+    if (quizId > 0) {
+      ref.invalidate(quizRosterProvider(quizId));
+    }
+    if (subjectId != null && subjectId > 0) {
+      ref.invalidate(subjectQuizzesProvider(subjectId));
+    }
+  }
+
   Future<void> recordAttemptWithValidation({
     required int loId,
     int? quizId,
@@ -260,6 +289,7 @@ class StudentQuizAttemptsNotifier extends Notifier<List<Map<String, dynamic>>> {
     required double percentage,
     required bool isPassed,
     int durationSeconds = 0,
+    Map<int, String>? selectedAnswers,
   }) async {
     final studentId = _getStudentId();
     if (studentId == null) return;
@@ -282,6 +312,7 @@ class StudentQuizAttemptsNotifier extends Notifier<List<Map<String, dynamic>>> {
       percentage: percentage,
       isPassed: isPassed,
       durationSeconds: durationSeconds,
+      selectedAnswers: selectedAnswers,
     );
 
     await loadAttempts(subjectId: _activeSubjectFilter);
@@ -291,6 +322,12 @@ class StudentQuizAttemptsNotifier extends Notifier<List<Map<String, dynamic>>> {
     ref.invalidate(teacherScoresProvider);
     ref.invalidate(teacherDashboardProvider);
     ref.invalidate(adminAnalyticsProvider);
+    if (quizId != null && quizId > 0) {
+      ref.invalidate(quizRosterProvider(quizId));
+    }
+    if (subjectId > 0) {
+      ref.invalidate(subjectQuizzesProvider(subjectId));
+    }
   }
 
   Future<void> recordAttempt({
@@ -302,6 +339,7 @@ class StudentQuizAttemptsNotifier extends Notifier<List<Map<String, dynamic>>> {
     required double percentage,
     required bool isPassed,
     int durationSeconds = 0,
+    Map<int, String>? selectedAnswers,
   }) async {
     final studentId = _getStudentId();
     if (studentId == null) return;
@@ -317,6 +355,7 @@ class StudentQuizAttemptsNotifier extends Notifier<List<Map<String, dynamic>>> {
       percentage: percentage,
       isPassed: isPassed,
       durationSeconds: durationSeconds,
+      selectedAnswers: selectedAnswers,
     );
 
     await loadAttempts(subjectId: _activeSubjectFilter);
@@ -326,6 +365,12 @@ class StudentQuizAttemptsNotifier extends Notifier<List<Map<String, dynamic>>> {
     ref.invalidate(teacherScoresProvider);
     ref.invalidate(teacherDashboardProvider);
     ref.invalidate(adminAnalyticsProvider);
+    if (quizId != null && quizId > 0) {
+      ref.invalidate(quizRosterProvider(quizId));
+    }
+    if (subjectId > 0) {
+      ref.invalidate(subjectQuizzesProvider(subjectId));
+    }
   }
 }
 

@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/theme/theme_provider.dart';
 import '../data/student_repository.dart';
+import '../../quiz/presentation/quiz_flashcard_screen.dart';
 
 class QuizHistoryScreen extends ConsumerStatefulWidget {
   const QuizHistoryScreen({super.key});
@@ -432,31 +433,67 @@ class _QuizHistoryScreenState extends ConsumerState<QuizHistoryScreen> {
                   SizedBox(
                     width: double.infinity,
                     child: isCompleted
-                        ? Row(
+                        ? Column(
                             children: [
-                              Expanded(
+                              Row(
+                                children: [
+                                  Expanded(
+                                    child: ElevatedButton.icon(
+                                      style: ElevatedButton.styleFrom(
+                                        backgroundColor: AppTheme.primary,
+                                        foregroundColor: Colors.black,
+                                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                                        padding: const EdgeInsets.symmetric(vertical: 12),
+                                      ),
+                                      onPressed: () {
+                                        Navigator.push(
+                                          context,
+                                          MaterialPageRoute(
+                                            builder: (ctx) => QuizFlashcardScreen(
+                                              quizTitle: title,
+                                              quizId: quizId,
+                                            ),
+                                          ),
+                                        );
+                                      },
+                                      icon: const Icon(Icons.style, size: 16),
+                                      label: const Text('Review Flashcards', style: TextStyle(fontWeight: FontWeight.bold)),
+                                    ),
+                                  ),
+                                  const SizedBox(width: 8),
+                                  Container(
+                                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                                    decoration: BoxDecoration(
+                                      color: AppTheme.success.withValues(alpha: 0.1),
+                                      borderRadius: BorderRadius.circular(10),
+                                    ),
+                                    child: Text(
+                                      'Score: $score / $qCount',
+                                      style: TextStyle(fontWeight: FontWeight.bold, color: AppTheme.success, fontSize: 13),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                              const SizedBox(height: 8),
+                              SizedBox(
+                                width: double.infinity,
                                 child: OutlinedButton.icon(
                                   style: OutlinedButton.styleFrom(
-                                    foregroundColor: AppTheme.primary,
-                                    side: BorderSide(color: AppTheme.primary),
+                                    foregroundColor: AppTheme.textMuted,
+                                    side: BorderSide(color: AppTheme.border),
                                     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                                    padding: const EdgeInsets.symmetric(vertical: 12),
+                                    padding: const EdgeInsets.symmetric(vertical: 10),
                                   ),
-                                  onPressed: () => context.push('/quiz/$quizId'),
+                                  onPressed: () async {
+                                    await context.push('/quiz/$quizId');
+                                    if (context.mounted) {
+                                      ref.read(studentQuizAssignmentsProvider.notifier).reload();
+                                      ref.read(studentQuizAttemptsProvider.notifier).loadAttempts();
+                                      ref.read(studentCoursesProvider.notifier).reload();
+                                    }
+                                  },
                                   icon: const Icon(Icons.refresh, size: 16),
-                                  label: const Text('Retake Quiz', style: TextStyle(fontWeight: FontWeight.bold)),
-                                ),
-                              ),
-                              const SizedBox(width: 8),
-                              Container(
-                                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-                                decoration: BoxDecoration(
-                                  color: AppTheme.success.withValues(alpha: 0.1),
-                                  borderRadius: BorderRadius.circular(10),
-                                ),
-                                child: Text(
-                                  'Score: $score / $qCount',
-                                  style: TextStyle(fontWeight: FontWeight.bold, color: AppTheme.success, fontSize: 13),
+                                  label: const Text('Retake Quiz', style: TextStyle(fontWeight: FontWeight.w600)),
                                 ),
                               ),
                             ],
@@ -468,7 +505,14 @@ class _QuizHistoryScreenState extends ConsumerState<QuizHistoryScreen> {
                               padding: const EdgeInsets.symmetric(vertical: 13),
                               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
                             ),
-                            onPressed: () => context.push('/quiz/$quizId'),
+                            onPressed: () async {
+                              await context.push('/quiz/$quizId');
+                              if (context.mounted) {
+                                ref.read(studentQuizAssignmentsProvider.notifier).reload();
+                                ref.read(studentQuizAttemptsProvider.notifier).loadAttempts();
+                                ref.read(studentCoursesProvider.notifier).reload();
+                              }
+                            },
                             icon: const Icon(Icons.play_arrow, size: 18),
                             label: const Text('Take Quiz Now', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
                           ),
@@ -737,6 +781,34 @@ class _QuizHistoryScreenState extends ConsumerState<QuizHistoryScreen> {
                   style: TextStyle(fontSize: 11, color: AppTheme.textMuted),
                 ),
               ],
+            ),
+            const SizedBox(height: 12),
+            SizedBox(
+              width: double.infinity,
+              child: OutlinedButton.icon(
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: AppTheme.primary,
+                  side: BorderSide(color: AppTheme.primary.withValues(alpha: 0.5)),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                  padding: const EdgeInsets.symmetric(vertical: 10),
+                ),
+                onPressed: () {
+                  final qId = attempt['quiz_id'] as int?;
+                  final loId = attempt['lo_id'] as int?;
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (ctx) => QuizFlashcardScreen(
+                        quizTitle: quizTitle,
+                        quizId: qId,
+                        loId: loId,
+                      ),
+                    ),
+                  );
+                },
+                icon: const Icon(Icons.style, size: 16),
+                label: const Text('Review Flashcards', style: TextStyle(fontWeight: FontWeight.bold)),
+              ),
             ),
           ],
         ),

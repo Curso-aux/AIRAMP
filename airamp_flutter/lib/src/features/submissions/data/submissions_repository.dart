@@ -26,6 +26,8 @@ class Assignment {
   final String? studentContentLink;
   final String? studentFileName;
   final int? studentFileSize;
+  final String? studentTextResponse;
+  final String? studentImagePath;
 
   const Assignment({
     required this.id,
@@ -50,6 +52,8 @@ class Assignment {
     this.studentContentLink,
     this.studentFileName,
     this.studentFileSize,
+    this.studentTextResponse,
+    this.studentImagePath,
   });
 
   factory Assignment.fromMap(Map<String, dynamic> map) {
@@ -76,6 +80,8 @@ class Assignment {
       studentContentLink: map['content_link'] as String?,
       studentFileName: map['file_name'] as String?,
       studentFileSize: (map['file_size'] as num?)?.toInt(),
+      studentTextResponse: map['text_response'] as String?,
+      studentImagePath: map['image_path'] as String?,
     );
   }
 }
@@ -93,6 +99,8 @@ class Submission {
   final String? fileName;
   final int? fileSize;
   final String? filePath;
+  final String? textResponse;
+  final String? imagePath;
   final String? notes;
   final String submittedAt;
   final String status;
@@ -114,6 +122,8 @@ class Submission {
     this.fileName,
     this.fileSize,
     this.filePath,
+    this.textResponse,
+    this.imagePath,
     this.notes,
     required this.submittedAt,
     this.status = 'submitted',
@@ -131,12 +141,14 @@ class Submission {
       studentName: map['student_name'] as String? ?? map['full_name'] as String?,
       studentEmail: map['email'] as String?,
       studentSection: map['section'] as String?,
-      studentGradeLevel: map['student_grade_level'] as String? ?? map['grade'] as String?,
+      studentGradeLevel: map['student_grade_level'] as String? ?? (map['grade'] is String ? map['grade'] as String : null),
       submissionType: map['submission_type'] as String? ?? 'link',
       contentLink: map['content_link'] as String?,
       fileName: map['file_name'] as String?,
       fileSize: (map['file_size'] as num?)?.toInt(),
       filePath: map['file_path'] as String?,
+      textResponse: map['text_response'] as String?,
+      imagePath: map['image_path'] as String?,
       notes: map['notes'] as String?,
       submittedAt: map['submitted_at'] as String? ?? '',
       status: map['status'] as String? ?? 'submitted',
@@ -180,6 +192,10 @@ class SubmissionsRepository {
     return list.map((m) => Submission.fromMap(m)).toList();
   }
 
+  Future<List<Map<String, dynamic>>> getActivityRosterForTeacher(int assignmentId) {
+    return _dbHelper.getActivityRosterForTeacher(assignmentId);
+  }
+
   Future<int> createAssignment({
     required String title,
     String? description,
@@ -211,6 +227,8 @@ class SubmissionsRepository {
     String? fileName,
     int? fileSize,
     String? filePath,
+    String? textResponse,
+    String? imagePath,
     String? notes,
   }) {
     return _dbHelper.submitAssignment(
@@ -222,6 +240,8 @@ class SubmissionsRepository {
       fileName: fileName,
       fileSize: fileSize,
       filePath: filePath,
+      textResponse: textResponse,
+      imagePath: imagePath,
       notes: notes,
     );
   }
@@ -273,4 +293,17 @@ final studentAssignmentsProvider = FutureProvider.family<List<Assignment>, ({Str
 final assignmentSubmissionsProvider = FutureProvider.family<List<Submission>, int>((ref, assignmentId) async {
   final repo = ref.watch(submissionsRepositoryProvider);
   return repo.getSubmissionsForAssignment(assignmentId);
+});
+
+final activityRosterProvider = FutureProvider.family<List<Map<String, dynamic>>, int>((ref, assignmentId) async {
+  final repo = ref.watch(submissionsRepositoryProvider);
+  return repo.getActivityRosterForTeacher(assignmentId);
+});
+
+final userNotificationsProvider = FutureProvider.family<List<Map<String, dynamic>>, String>((ref, userId) async {
+  return DatabaseHelper().getNotificationsForUser(userId);
+});
+
+final unreadNotificationsCountProvider = FutureProvider.family<int, String>((ref, userId) async {
+  return DatabaseHelper().getUnreadNotificationCount(userId);
 });

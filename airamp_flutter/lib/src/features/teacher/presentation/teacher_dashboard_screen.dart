@@ -7,6 +7,9 @@ import '../../auth/application/auth_provider.dart';
 import '../data/teacher_repository.dart';
 import 'components/create_quiz_dialog.dart';
 import 'components/post_announcement_dialog.dart';
+import 'components/assignment_roster_dialog.dart';
+import '../../../core/database/database_helper.dart';
+import '../../submissions/data/submissions_repository.dart';
 
 class TeacherDashboardScreen extends ConsumerStatefulWidget {
   const TeacherDashboardScreen({super.key});
@@ -37,6 +40,174 @@ class _TeacherDashboardScreenState extends ConsumerState<TeacherDashboardScreen>
     } catch (_) {
       return 'Recent';
     }
+  }
+
+  void _showNotificationsDialog(BuildContext context, String teacherId) {
+    showDialog(
+      context: context,
+      builder: (ctx) {
+        return Consumer(
+          builder: (context, ref, _) {
+            final notifsAsync = ref.watch(userNotificationsProvider(teacherId));
+            return AlertDialog(
+              backgroundColor: AppTheme.surface,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+              title: Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(8),
+                    decoration: BoxDecoration(
+                      color: AppTheme.primary.withValues(alpha: 0.15),
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: Icon(Icons.notifications_outlined, color: AppTheme.primary, size: 22),
+                  ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Text(
+                      'Activity Notifications',
+                      style: TextStyle(fontSize: 17, fontWeight: FontWeight.bold, color: AppTheme.text),
+                    ),
+                  ),
+                  TextButton(
+                    onPressed: () async {
+                      await DatabaseHelper().markAllNotificationsRead(teacherId);
+                      ref.invalidate(userNotificationsProvider(teacherId));
+                      ref.invalidate(unreadNotificationsCountProvider(teacherId));
+                    },
+                    child: const Text('Mark All Read', style: TextStyle(fontSize: 12)),
+                  ),
+                ],
+              ),
+              content: SizedBox(
+                width: 480,
+                height: 400,
+                child: notifsAsync.when(
+                  loading: () => Center(child: CircularProgressIndicator(color: AppTheme.primary)),
+                  error: (err, _) => Center(
+                    child: Text('Failed to load notifications: $err', style: TextStyle(color: AppTheme.textMuted)),
+                  ),
+                  data: (notifs) {
+                    if (notifs.isEmpty) {
+                      return Center(
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(Icons.notifications_none_outlined, size: 48, color: AppTheme.textMuted),
+                            const SizedBox(height: 10),
+                            Text('No notifications yet', style: TextStyle(color: AppTheme.text, fontWeight: FontWeight.bold)),
+                            const SizedBox(height: 4),
+                            Text(
+                              'New student activity submissions will appear here.',
+                              style: TextStyle(color: AppTheme.textMuted, fontSize: 12),
+                            ),
+                          ],
+                        ),
+                      );
+                    }
+                    return ListView.separated(
+                      itemCount: notifs.length,
+                      separatorBuilder: (_, _) => const SizedBox(height: 8),
+                      itemBuilder: (context, index) {
+                        final n = notifs[index];
+                        final id = n['id'].toString();
+                        final title = n['title'] as String? ?? 'Notification';
+                        final message = n['message'] as String? ?? '';
+                        final isRead = (n['is_read'] as int? ?? 0) == 1;
+                        final relatedId = n['related_id'] as String?;
+                        final assignmentId = relatedId != null ? int.tryParse(relatedId) : null;
+
+                        return InkWell(
+                          onTap: () async {
+                            await DatabaseHelper().markNotificationRead(id);
+                            ref.invalidate(userNotificationsProvider(teacherId));
+                            ref.invalidate(unreadNotificationsCountProvider(teacherId));
+
+                            if (assignmentId != null && ctx.mounted) {
+                              Navigator.pop(ctx);
+                              final assignment = await DatabaseHelper().getAssignmentById(assignmentId);
+                              if (context.mounted && assignment != null) {
+                                showDialog(
+                                  context: context,
+                                  builder: (c) => AssignmentRosterDialog(
+                                    assignmentId: assignmentId,
+                                    assignmentTitle: assignment['title'] as String? ?? 'Activity',
+                                    totalPoints: (assignment['total_points'] as num?)?.toInt() ?? 100,
+                                    dueDate: assignment['due_date'] as String?,
+                                  ),
+                                );
+                              }
+                            }
+                          },
+                          borderRadius: BorderRadius.circular(12),
+                          child: Container(
+                            padding: const EdgeInsets.all(12),
+                            decoration: BoxDecoration(
+                              color: isRead ? AppTheme.background : AppTheme.primary.withValues(alpha: 0.08),
+                              borderRadius: BorderRadius.circular(12),
+                              border: Border.all(
+                                color: isRead ? AppTheme.border : AppTheme.primary.withValues(alpha: 0.3),
+                              ),
+                            ),
+                            child: Row(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Icon(
+                                  Icons.assignment_turned_in_outlined,
+                                  size: 20,
+                                  color: isRead ? AppTheme.textMuted : AppTheme.primary,
+                                ),
+                                const SizedBox(width: 10),
+                                Expanded(
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      Text(
+                                        title,
+                                        style: TextStyle(
+                                          fontWeight: isRead ? FontWeight.w600 : FontWeight.bold,
+                                          fontSize: 13,
+                                          color: AppTheme.text,
+                                        ),
+                                      ),
+                                      const SizedBox(height: 3),
+                                      Text(
+                                        message,
+                                        style: TextStyle(fontSize: 12, color: AppTheme.textSecondary),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                                if (!isRead)
+                                  Container(
+                                    width: 8,
+                                    height: 8,
+                                    margin: const EdgeInsets.only(top: 4, left: 6),
+                                    decoration: BoxDecoration(
+                                      color: AppTheme.primary,
+                                      shape: BoxShape.circle,
+                                    ),
+                                  ),
+                              ],
+                            ),
+                          ),
+                        );
+                      },
+                    );
+                  },
+                ),
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.pop(ctx),
+                  child: Text('Close', style: TextStyle(color: AppTheme.textSecondary)),
+                ),
+              ],
+            );
+          },
+        );
+      },
+    );
   }
 
   @override
@@ -142,6 +313,43 @@ class _TeacherDashboardScreenState extends ConsumerState<TeacherDashboardScreen>
                         ],
                       ),
                     ),
+                    Consumer(
+                      builder: (context, ref, _) {
+                        final unreadCount = ref.watch(unreadNotificationsCountProvider(currentUser?.id ?? '')).value ?? 0;
+                        return Stack(
+                          clipBehavior: Clip.none,
+                          children: [
+                            IconButton(
+                              icon: Icon(Icons.notifications_outlined, color: AppTheme.text),
+                              tooltip: 'Activity Notifications',
+                              onPressed: () => _showNotificationsDialog(context, currentUser?.id ?? ''),
+                            ),
+                            if (unreadCount > 0)
+                              Positioned(
+                                right: 6,
+                                top: 6,
+                                child: Container(
+                                  padding: const EdgeInsets.all(4),
+                                  decoration: const BoxDecoration(
+                                    color: Colors.redAccent,
+                                    shape: BoxShape.circle,
+                                  ),
+                                  constraints: const BoxConstraints(minWidth: 16, minHeight: 16),
+                                  child: Text(
+                                    unreadCount > 9 ? '9+' : '$unreadCount',
+                                    style: const TextStyle(
+                                      color: Colors.white,
+                                      fontSize: 9,
+                                      fontWeight: FontWeight.bold,
+                                    ),
+                                    textAlign: TextAlign.center,
+                                  ),
+                                ),
+                              ),
+                          ],
+                        );
+                      },
+                    ),
                     IconButton(
                       icon: Icon(Icons.refresh, color: AppTheme.primary),
                       tooltip: 'Refresh Dashboard',
@@ -151,6 +359,10 @@ class _TeacherDashboardScreenState extends ConsumerState<TeacherDashboardScreen>
                         ref.read(teacherAnnouncementsProvider.notifier).reload(sectionFilter: _activeSectionFilter);
                         ref.invalidate(teacherHandledSectionsProvider);
                         ref.invalidate(teacherHandledSectionsDetailsProvider);
+                        if (currentUser != null) {
+                          ref.invalidate(unreadNotificationsCountProvider(currentUser.id));
+                          ref.invalidate(userNotificationsProvider(currentUser.id));
+                        }
                       },
                     ),
                   ],

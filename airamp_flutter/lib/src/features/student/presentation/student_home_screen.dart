@@ -756,9 +756,14 @@ class _StudentHomeScreenState extends ConsumerState<StudentHomeScreen> {
           SizedBox(
             width: double.infinity,
             child: ElevatedButton.icon(
-              onPressed: () {
+              onPressed: () async {
                 if (quizId != null) {
-                  context.push('/quiz/$quizId');
+                  await context.push('/quiz/$quizId');
+                  if (context.mounted) {
+                    ref.read(studentQuizAssignmentsProvider.notifier).reload();
+                    ref.read(studentProgressProvider.notifier).loadProgress();
+                    ref.read(studentCoursesProvider.notifier).reload();
+                  }
                 }
               },
               icon: const Icon(Icons.play_arrow, size: 16),

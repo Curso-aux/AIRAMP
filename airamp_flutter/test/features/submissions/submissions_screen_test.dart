@@ -15,9 +15,10 @@ class MockAuthNotifier extends AuthNotifier {
 }
 
 void main() {
-  setUpAll(() {
+  setUpAll(() async {
     sqfliteFfiInit();
     databaseFactory = databaseFactoryFfi;
+    await DatabaseHelper().database;
   });
 
   group('SubmissionsScreen Widget & Integration Tests', () {
@@ -26,48 +27,48 @@ void main() {
     testWidgets('1. SubmissionsScreen loads assignment from DB and renders details', (tester) async {
       final now = DateTime.now().millisecondsSinceEpoch;
       final db = await dbHelper.database;
+      int assignmentId = 0;
 
-      final subjectId = await db.insert('subjects', {
-        'name': 'Widget Test Subject $now',
-        'subject_code': 'WID-$now',
-        'description': 'Testing SubmissionsScreen rendering',
-        'teacher_id': 'teacher_1',
-        'teacher_name': 'Sir John Reyes',
-        'created_at': DateTime.now().toIso8601String(),
+      await tester.runAsync(() async {
+        final subjectId = await db.insert('subjects', {
+          'name': 'Widget Test Subject $now',
+          'subject_code': 'WID-$now',
+          'description': 'Testing SubmissionsScreen rendering',
+          'teacher_id': 'teacher_1',
+          'teacher_name': 'Sir John Reyes',
+          'created_at': DateTime.now().toIso8601String(),
+        });
+
+        assignmentId = await dbHelper.createAssignment(
+          title: 'Final Portfolio & Widget Project $now',
+          description: 'Submit your Flutter source code link or bundle file for assessment.',
+          subjectId: subjectId,
+          teacherId: 'teacher_1',
+          teacherName: 'Sir John Reyes',
+          totalPoints: 100,
+          dueDate: DateTime.now().add(const Duration(days: 10)).toIso8601String(),
+        );
       });
 
-      final assignmentId = await dbHelper.createAssignment(
-        title: 'Final Portfolio & Widget Project $now',
-        description: 'Submit your Flutter source code link or bundle file for assessment.',
-        subjectId: subjectId,
-        teacherId: 'teacher_1',
-        teacherName: 'Sir John Reyes',
-        totalPoints: 100,
-        dueDate: DateTime.now().add(const Duration(days: 10)).toIso8601String(),
-      );
-
-      final container = ProviderContainer(
-        overrides: [
-          authProvider.overrideWith(() => MockAuthNotifier(
-            User(
-              id: 'test_student_screen',
-              email: 'student@test.com',
-              role: 'student',
-              fullName: 'Screen Test Student',
-            ),
-          )),
-        ],
-      );
-
       await tester.pumpWidget(
-        UncontrolledProviderScope(
-          container: container,
+        ProviderScope(
+          overrides: [
+            authProvider.overrideWith(() => MockAuthNotifier(
+              User(
+                id: 'test_student_screen',
+                email: 'student@test.com',
+                role: 'student',
+                fullName: 'Screen Test Student',
+              ),
+            )),
+          ],
           child: MaterialApp(
             home: SubmissionsScreen(assignmentId: assignmentId.toString()),
           ),
         ),
       );
 
+      await tester.runAsync(() => Future.delayed(const Duration(milliseconds: 150)));
       await tester.pumpAndSettle();
 
       expect(find.text('Final Portfolio & Widget Project $now'), findsOneWidget);
@@ -78,56 +79,61 @@ void main() {
     });
 
     testWidgets('2. Submitting a link transitions screen to submitted view', (tester) async {
+      tester.view.physicalSize = const Size(1000, 2000);
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+
       final now = DateTime.now().millisecondsSinceEpoch;
       final studentId = 'student_flow_$now';
       final db = await dbHelper.database;
+      int assignmentId = 0;
 
-      await db.insert('users', {
-        'id': studentId,
-        'email': '$studentId@school.edu',
-        'password': 'pass',
-        'role': 'student',
-        'full_name': 'Flow Student',
-        'created_at': DateTime.now().toIso8601String(),
+      await tester.runAsync(() async {
+        await db.insert('users', {
+          'id': studentId,
+          'email': '$studentId@school.edu',
+          'password': 'pass',
+          'role': 'student',
+          'full_name': 'Flow Student',
+          'created_at': DateTime.now().toIso8601String(),
+        });
+
+        final subjectId = await db.insert('subjects', {
+          'name': 'Submission Flow Subject $now',
+          'subject_code': 'SFS-$now',
+          'description': 'Testing submission flow',
+          'teacher_id': 'teacher_1',
+          'created_at': DateTime.now().toIso8601String(),
+        });
+
+        assignmentId = await dbHelper.createAssignment(
+          title: 'Project Submission Flow $now',
+          subjectId: subjectId,
+          teacherId: 'teacher_1',
+          dueDate: DateTime.now().add(const Duration(days: 10)).toIso8601String(),
+        );
       });
-
-      final subjectId = await db.insert('subjects', {
-        'name': 'Submission Flow Subject $now',
-        'subject_code': 'SFS-$now',
-        'description': 'Testing submission flow',
-        'teacher_id': 'teacher_1',
-        'created_at': DateTime.now().toIso8601String(),
-      });
-
-      final assignmentId = await dbHelper.createAssignment(
-        title: 'Project Submission Flow $now',
-        subjectId: subjectId,
-        teacherId: 'teacher_1',
-        dueDate: DateTime.now().add(const Duration(days: 10)).toIso8601String(),
-      );
-
-      final container = ProviderContainer(
-        overrides: [
-          authProvider.overrideWith(() => MockAuthNotifier(
-            User(
-              id: studentId,
-              email: '$studentId@school.edu',
-              role: 'student',
-              fullName: 'Flow Student',
-            ),
-          )),
-        ],
-      );
 
       await tester.pumpWidget(
-        UncontrolledProviderScope(
-          container: container,
+        ProviderScope(
+          overrides: [
+            authProvider.overrideWith(() => MockAuthNotifier(
+              User(
+                id: studentId,
+                email: '$studentId@school.edu',
+                role: 'student',
+                fullName: 'Flow Student',
+              ),
+            )),
+          ],
           child: MaterialApp(
             home: SubmissionsScreen(assignmentId: assignmentId.toString()),
           ),
         ),
       );
 
+      await tester.runAsync(() => Future.delayed(const Duration(milliseconds: 150)));
       await tester.pumpAndSettle();
 
       // Enter link in text field
@@ -137,8 +143,19 @@ void main() {
 
       // Tap Submit Assignment button
       final submitBtn = find.widgetWithText(ElevatedButton, 'Submit Assignment');
+      await tester.ensureVisible(submitBtn);
       await tester.tap(submitBtn);
       await tester.pumpAndSettle();
+
+      // Tap Confirm in confirmation modal dialog
+      final confirmBtn = find.text('Confirm & Submit');
+      expect(confirmBtn, findsOneWidget);
+      await tester.runAsync(() async {
+        await tester.tap(confirmBtn);
+        await Future.delayed(const Duration(milliseconds: 400));
+      });
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 200));
 
       // Verify success state displayed
       expect(find.text('Submitted Successfully!'), findsOneWidget);
@@ -146,7 +163,10 @@ void main() {
       expect(find.text('Edit / Resubmit'), findsOneWidget);
 
       // Verify saved in DB
-      final savedSub = await dbHelper.getSubmissionForAssignment(assignmentId, studentId);
+      Map<String, dynamic>? savedSub;
+      await tester.runAsync(() async {
+        savedSub = await dbHelper.getSubmissionForAssignment(assignmentId, studentId);
+      });
       expect(savedSub, isNotNull);
       expect(savedSub!['content_link'], 'https://github.com/flowstudent/flutter-app');
     });
@@ -155,68 +175,68 @@ void main() {
       final now = DateTime.now().millisecondsSinceEpoch;
       final studentId = 'student_graded_$now';
       final db = await dbHelper.database;
+      int assignmentId = 0;
 
-      await db.insert('users', {
-        'id': studentId,
-        'email': '$studentId@school.edu',
-        'password': 'pass',
-        'role': 'student',
-        'full_name': 'Graded Student',
-        'created_at': DateTime.now().toIso8601String(),
+      await tester.runAsync(() async {
+        await db.insert('users', {
+          'id': studentId,
+          'email': '$studentId@school.edu',
+          'password': 'pass',
+          'role': 'student',
+          'full_name': 'Graded Student',
+          'created_at': DateTime.now().toIso8601String(),
+        });
+
+        final subjectId = await db.insert('subjects', {
+          'name': 'Grading Flow Subject $now',
+          'subject_code': 'GFS-$now',
+          'description': 'Testing grading view',
+          'teacher_id': 'teacher_1',
+          'created_at': DateTime.now().toIso8601String(),
+        });
+
+        assignmentId = await dbHelper.createAssignment(
+          title: 'Graded Assignment $now',
+          subjectId: subjectId,
+          teacherId: 'teacher_1',
+          totalPoints: 100,
+        );
+
+        final subId = await dbHelper.submitAssignment(
+          assignmentId: assignmentId,
+          studentId: studentId,
+          submissionType: 'link',
+          contentLink: 'https://github.com/graded/repo',
+          notes: 'Final commit ready for evaluation.',
+        );
+
+        await dbHelper.gradeSubmission(
+          submissionId: subId,
+          grade: 98.0,
+          feedback: 'Superb architecture and test coverage!',
+          gradedBy: 'Sir John Reyes',
+        );
       });
-
-      final subjectId = await db.insert('subjects', {
-        'name': 'Grading Flow Subject $now',
-        'subject_code': 'GFS-$now',
-        'description': 'Testing grading view',
-        'teacher_id': 'teacher_1',
-        'created_at': DateTime.now().toIso8601String(),
-      });
-
-      final assignmentId = await dbHelper.createAssignment(
-        title: 'Graded Assignment $now',
-        subjectId: subjectId,
-        teacherId: 'teacher_1',
-        totalPoints: 100,
-      );
-
-      final subId = await dbHelper.submitAssignment(
-        assignmentId: assignmentId,
-        studentId: studentId,
-        submissionType: 'link',
-        contentLink: 'https://github.com/graded/repo',
-        notes: 'Final commit ready for evaluation.',
-      );
-
-      await dbHelper.gradeSubmission(
-        submissionId: subId,
-        grade: 98.0,
-        feedback: 'Superb architecture and test coverage!',
-        gradedBy: 'Sir John Reyes',
-      );
-
-      final container = ProviderContainer(
-        overrides: [
-          authProvider.overrideWith(() => MockAuthNotifier(
-            User(
-              id: studentId,
-              email: '$studentId@school.edu',
-              role: 'student',
-              fullName: 'Graded Student',
-            ),
-          )),
-        ],
-      );
 
       await tester.pumpWidget(
-        UncontrolledProviderScope(
-          container: container,
+        ProviderScope(
+          overrides: [
+            authProvider.overrideWith(() => MockAuthNotifier(
+              User(
+                id: studentId,
+                email: '$studentId@school.edu',
+                role: 'student',
+                fullName: 'Graded Student',
+              ),
+            )),
+          ],
           child: MaterialApp(
             home: SubmissionsScreen(assignmentId: assignmentId.toString()),
           ),
         ),
       );
 
+      await tester.runAsync(() => Future.delayed(const Duration(milliseconds: 150)));
       await tester.pumpAndSettle();
 
       expect(find.text('Assignment Graded'), findsOneWidget);

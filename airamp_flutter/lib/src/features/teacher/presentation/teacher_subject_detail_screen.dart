@@ -6,9 +6,9 @@ import '../../../core/theme/theme_provider.dart';
 import '../../admin/data/admin_repository.dart';
 import '../../curriculum/presentation/curriculum_hierarchy_widgets.dart';
 import '../../teacher/data/teacher_repository.dart';
-import 'package:airamp_flutter/src/features/quiz/presentation/quiz_screen.dart';
 import 'components/create_quiz_dialog.dart';
 import 'components/quiz_roster_dialog.dart';
+import 'components/quiz_view_dialog.dart';
 import 'components/create_assignment_dialog.dart';
 import 'components/assignment_roster_dialog.dart';
 import '../../submissions/data/submissions_repository.dart';
@@ -633,15 +633,23 @@ class _TeacherSubjectDetailScreenState extends ConsumerState<TeacherSubjectDetai
                             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
                           ),
                           onPressed: () {
-                            Navigator.push(
-                              context,
-                              MaterialPageRoute(
-                                builder: (ctx) => QuizScreen(quizId: qId.toString()),
+                            showDialog(
+                              context: context,
+                              builder: (ctx) => QuizViewDialog(
+                                quizId: qId,
+                                quizTitle: title,
+                                subjectId: int.parse(widget.subjectId),
+                                subjectName: _subject?['name']?.toString() ?? 'Subject',
                               ),
-                            );
+                            ).then((_) {
+                              if (mounted) {
+                                ref.invalidate(subjectQuizzesProvider(int.parse(widget.subjectId)));
+                                ref.invalidate(teacherDashboardProvider);
+                              }
+                            });
                           },
-                          icon: const Icon(Icons.play_arrow_outlined, size: 16),
-                          label: const Text('Take Quiz'),
+                          icon: const Icon(Icons.visibility_outlined, size: 16),
+                          label: const Text('View Quiz'),
                         ),
                       ),
                     ],

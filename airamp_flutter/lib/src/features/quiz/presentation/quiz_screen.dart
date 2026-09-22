@@ -7,11 +7,13 @@ import '../../../core/theme/theme_provider.dart';
 import '../../../core/database/database_helper.dart';
 import '../../student/data/student_repository.dart';
 import '../../auth/application/auth_provider.dart';
+import 'quiz_flashcard_screen.dart';
 
 class QuizScreen extends ConsumerStatefulWidget {
   final String quizId;
+  final bool isTeacherPreview;
 
-  const QuizScreen({super.key, required this.quizId});
+  const QuizScreen({super.key, required this.quizId, this.isTeacherPreview = false});
 
   @override
   ConsumerState<QuizScreen> createState() => _QuizScreenState();
@@ -89,17 +91,20 @@ class _QuizScreenState extends ConsumerState<QuizScreen> {
     // Check if student already completed this quiz
     final student = ref.read(authProvider);
     final studentId = student?.id ?? '';
-    // After teacher reset, attempts are deleted so student can retake
-    final canAttempt = await DatabaseHelper().hasStudentCompletedQuiz(
-      studentId: studentId,
-      quizId: parsedId,
-    );
-    if (!canAttempt && mounted) {
-      setState(() {
-        _loading = false;
-        _hasAlreadyTaken = true;
-      });
-      return;
+    final isTeacher = widget.isTeacherPreview || (student?.role == 'teacher');
+    if (!isTeacher) {
+      // After teacher reset, attempts are deleted so student can retake
+      final canAttempt = await DatabaseHelper().hasStudentCompletedQuiz(
+        studentId: studentId,
+        quizId: parsedId,
+      );
+      if (!canAttempt && mounted) {
+        setState(() {
+          _loading = false;
+          _hasAlreadyTaken = true;
+        });
+        return;
+      }
     }
 
     // 1. Try loading as first-class quiz from `quizzes` table
@@ -159,6 +164,119 @@ class _QuizScreenState extends ConsumerState<QuizScreen> {
     }
   }
 
+  /// Reset in-memory quiz state (answers, score, timer, question index)
+  void _resetQuizState() {
+    _countdownTimer?.cancel();
+    if (mounted) {
+      setState(() {
+        _currentIndex = 0;
+        _selectedAnswers.clear();
+        _score = 0;
+        _percentage = 0.0;
+        _isPassed = false;
+        _startTime = null;
+        _remainingSeconds = _timeLimitMinutes * 60;
+        _state = 0; // return to intro
+        _hasAlreadyTaken = false;
+      });
+    }
+  }
+
+  /// Full reset: resets DB attempt and clears all in-memory quiz state
+  Future<void> _resetAndRetakeQuiz() async {
+    final student = ref.read(authProvider);
+    final studentId = student?.id ?? '';
+    final parsedId = int.tryParse(widget.quizId);
+
+    if (parsedId != null && studentId.isNotEmpty) {
+      if (_quizId != null && _quizId! > 0) {
+        await ref.read(studentQuizAttemptsProvider.notifier).resetQuizAttempt(
+          quizId: _quizId!,
+          loId: _loId,
+          subjectId: _subjectId,
+        );
+      } else if (_loId > 0) {
+        await ref.read(studentQuizAttemptsProvider.notifier).resetQuizAttempt(
+          quizId: 0,
+          loId: _loId,
+          subjectId: _subjectId,
+        );
+      } else {
+        await ref.read(studentQuizAttemptsProvider.notifier).resetQuizAttempt(
+          quizId: parsedId,
+          subjectId: _subjectId,
+        );
+      }
+    }
+
+    _resetQuizState();
+    await _loadQuiz();
+  }
+
+  Future<void> _showMidQuizResetConfirmation() async {
+    final shouldReset = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: AppTheme.surface,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: Text('Reset Quiz?', style: TextStyle(color: AppTheme.text, fontWeight: FontWeight.bold)),
+        content: Text(
+          'This will clear all your answers, reset the timer to the beginning, and return to Question 1.',
+          style: TextStyle(color: AppTheme.textSecondary),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: Text('Cancel', style: TextStyle(color: AppTheme.textMuted)),
+          ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(backgroundColor: AppTheme.error, foregroundColor: Colors.white),
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text('Reset Quiz'),
+          ),
+        ],
+      ),
+    );
+
+    if (shouldReset == true && mounted) {
+      _resetQuizState();
+    }
+  }
+
+  Future<bool> _handlePopScope() async {
+    if (_state != 1) return true;
+
+    final shouldLeave = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: AppTheme.surface,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: Text('Leave Quiz?', style: TextStyle(color: AppTheme.text, fontWeight: FontWeight.bold)),
+        content: Text(
+          'Your progress will be reset. Selected answers, question index, and timer will not be saved.',
+          style: TextStyle(color: AppTheme.textSecondary),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: Text('Continue Quiz', style: TextStyle(color: AppTheme.textMuted)),
+          ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(backgroundColor: AppTheme.error, foregroundColor: Colors.white),
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text('Reset & Exit'),
+          ),
+        ],
+      ),
+    );
+
+    if (shouldLeave == true) {
+      _resetQuizState();
+      return true;
+    }
+    return false;
+  }
+
   void _startTimer() {
     if (_timeLimitMinutes <= 0) return;
     _remainingSeconds = _timeLimitMinutes * 60;
@@ -214,17 +332,21 @@ class _QuizScreenState extends ConsumerState<QuizScreen> {
       final passed = pct >= _passingScore;
       final duration = _startTime != null ? DateTime.now().difference(_startTime!).inSeconds : 0;
 
-      // Use validation method to prevent duplicate attempts
-      await ref.read(studentQuizAttemptsProvider.notifier).recordAttemptWithValidation(
-        loId: _loId,
-        quizId: _quizId,
-        subjectId: _subjectId,
-        score: score,
-        totalQuestions: total,
-        percentage: pct,
-        isPassed: passed,
-        durationSeconds: duration,
-      );
+      final isTeacher = widget.isTeacherPreview || (ref.read(authProvider)?.role == 'teacher');
+      if (!isTeacher) {
+        // Use validation method to prevent duplicate attempts
+        await ref.read(studentQuizAttemptsProvider.notifier).recordAttemptWithValidation(
+          loId: _loId,
+          quizId: _quizId,
+          subjectId: _subjectId,
+          score: score,
+          totalQuestions: total,
+          percentage: pct,
+          isPassed: passed,
+          durationSeconds: duration,
+          selectedAnswers: Map<int, String>.from(_selectedAnswers),
+        );
+      }
 
       if (mounted) {
         setState(() {
@@ -298,14 +420,39 @@ class _QuizScreenState extends ConsumerState<QuizScreen> {
                   style: TextStyle(color: AppTheme.textSecondary),
                 ),
                 const SizedBox(height: 24),
-                ElevatedButton(
-                  onPressed: () => context.pop(),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: AppTheme.primary,
-                    foregroundColor: Colors.black,
+                if (_hasAlreadyTaken) ...[
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      OutlinedButton(
+                        onPressed: () => context.pop(),
+                        style: OutlinedButton.styleFrom(
+                          foregroundColor: AppTheme.text,
+                          side: BorderSide(color: AppTheme.border),
+                        ),
+                        child: const Text('Back to Course'),
+                      ),
+                      const SizedBox(width: 12),
+                      ElevatedButton.icon(
+                        onPressed: () => _resetAndRetakeQuiz(),
+                        icon: const Icon(Icons.refresh, size: 16),
+                        label: const Text('Reset & Retake', style: TextStyle(fontWeight: FontWeight.bold)),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: AppTheme.primary,
+                          foregroundColor: Colors.black,
+                        ),
+                      ),
+                    ],
                   ),
-                  child: const Text('Back to Course', style: TextStyle(fontWeight: FontWeight.bold)),
-                ),
+                ] else
+                  ElevatedButton(
+                    onPressed: () => context.pop(),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: AppTheme.primary,
+                      foregroundColor: Colors.black,
+                    ),
+                    child: const Text('Back to Course', style: TextStyle(fontWeight: FontWeight.bold)),
+                  ),
               ],
             ),
           ),
@@ -318,55 +465,81 @@ class _QuizScreenState extends ConsumerState<QuizScreen> {
       _state = 3; // Show countdown state
     }
 
-    return Scaffold(
-      backgroundColor: AppTheme.background,
-      appBar: AppBar(
-        title: Text(
-          _quizTitle,
-          style: TextStyle(color: AppTheme.text, fontSize: 16, fontWeight: FontWeight.bold),
-        ),
-        iconTheme: IconThemeData(color: AppTheme.text),
-        actions: [
-          if (_state == 1 && _timeLimitMinutes > 0)
-            Padding(
-              padding: const EdgeInsets.only(right: 16),
-              child: Center(
-                child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                  decoration: BoxDecoration(
-                    color: _remainingSeconds < 60
-                        ? AppTheme.error.withValues(alpha: 0.15)
-                        : AppTheme.primary.withValues(alpha: 0.15),
-                    borderRadius: BorderRadius.circular(20),
-                    border: Border.all(
-                      color: _remainingSeconds < 60 ? AppTheme.error : AppTheme.primary,
-                    ),
-                  ),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Icon(
-                        Icons.timer_outlined,
-                        size: 15,
+    return PopScope(
+      canPop: _state != 1,
+      onPopInvokedWithResult: (didPop, result) async {
+        if (didPop) return;
+        final canLeave = await _handlePopScope();
+        if (canLeave && context.mounted) {
+          Navigator.of(context).pop();
+        }
+      },
+      child: Scaffold(
+        backgroundColor: AppTheme.background,
+        appBar: AppBar(
+          title: Text(
+            _quizTitle,
+            style: TextStyle(color: AppTheme.text, fontSize: 16, fontWeight: FontWeight.bold),
+          ),
+          iconTheme: IconThemeData(color: AppTheme.text),
+          leading: IconButton(
+            icon: const Icon(Icons.arrow_back),
+            onPressed: () async {
+              final canLeave = await _handlePopScope();
+              if (canLeave && context.mounted) {
+                Navigator.of(context).pop();
+              }
+            },
+          ),
+          actions: [
+            if (_state == 1)
+              IconButton(
+                icon: const Icon(Icons.refresh),
+                tooltip: 'Reset Quiz',
+                color: AppTheme.textSecondary,
+                onPressed: _showMidQuizResetConfirmation,
+              ),
+            if (_state == 1 && _timeLimitMinutes > 0)
+              Padding(
+                padding: const EdgeInsets.only(right: 16),
+                child: Center(
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                    decoration: BoxDecoration(
+                      color: _remainingSeconds < 60
+                          ? AppTheme.error.withValues(alpha: 0.15)
+                          : AppTheme.primary.withValues(alpha: 0.15),
+                      borderRadius: BorderRadius.circular(20),
+                      border: Border.all(
                         color: _remainingSeconds < 60 ? AppTheme.error : AppTheme.primary,
                       ),
-                      const SizedBox(width: 4),
-                      Text(
-                        _formatTimer(_remainingSeconds),
-                        style: TextStyle(
-                          fontSize: 12,
-                          fontWeight: FontWeight.bold,
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(
+                          Icons.timer_outlined,
+                          size: 15,
                           color: _remainingSeconds < 60 ? AppTheme.error : AppTheme.primary,
                         ),
-                      ),
-                    ],
+                        const SizedBox(width: 4),
+                        Text(
+                          _formatTimer(_remainingSeconds),
+                          style: TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.bold,
+                            color: _remainingSeconds < 60 ? AppTheme.error : AppTheme.primary,
+                          ),
+                        ),
+                      ],
+                    ),
                   ),
                 ),
               ),
-            ),
-        ],
+          ],
+        ),
+        body: _buildContent(),
       ),
-      body: _buildContent(),
     );
   }
 
@@ -506,6 +679,29 @@ class _QuizScreenState extends ConsumerState<QuizScreen> {
               child: Icon(Icons.quiz_outlined, size: 64, color: AppTheme.primary),
             ),
             const SizedBox(height: 24),
+            if (widget.isTeacherPreview || (ref.read(authProvider)?.role == 'teacher')) ...[
+              Container(
+                margin: const EdgeInsets.only(bottom: 20),
+                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                decoration: BoxDecoration(
+                  color: AppTheme.primary.withValues(alpha: 0.15),
+                  borderRadius: BorderRadius.circular(10),
+                  border: Border.all(color: AppTheme.primary.withValues(alpha: 0.4)),
+                ),
+                child: Row(
+                  children: [
+                    Icon(Icons.visibility, color: AppTheme.primary, size: 20),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: Text(
+                        'Teacher Preview Mode — Answers and scores will not be recorded in student records.',
+                        style: TextStyle(fontSize: 12, color: AppTheme.text, fontWeight: FontWeight.w600),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
             Text(
               _quizTitle,
               style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: AppTheme.text),
@@ -572,8 +768,27 @@ class _QuizScreenState extends ConsumerState<QuizScreen> {
     final selectedOption = _selectedAnswers[_currentIndex];
     final isLast = _currentIndex == _questions.length - 1;
 
+    final isTeacher = widget.isTeacherPreview || (ref.read(authProvider)?.role == 'teacher');
+
     return Column(
       children: [
+        if (isTeacher)
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+            color: AppTheme.primary.withValues(alpha: 0.15),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(Icons.visibility, size: 14, color: AppTheme.primary),
+                const SizedBox(width: 6),
+                Text(
+                  'Teacher Preview Mode — No score will be recorded',
+                  style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: AppTheme.primary),
+                ),
+              ],
+            ),
+          ),
         // Top Progress Indicator
         Padding(
           padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
@@ -773,6 +988,21 @@ class _QuizScreenState extends ConsumerState<QuizScreen> {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
+            if (widget.isTeacherPreview || (ref.read(authProvider)?.role == 'teacher'))
+              Container(
+                margin: const EdgeInsets.only(bottom: 16),
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: AppTheme.primary.withValues(alpha: 0.15),
+                  borderRadius: BorderRadius.circular(10),
+                  border: Border.all(color: AppTheme.primary.withValues(alpha: 0.3)),
+                ),
+                child: Text(
+                  'Teacher Preview Complete — No student scores or records were modified.',
+                  style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: AppTheme.primary),
+                  textAlign: TextAlign.center,
+                ),
+              ),
             Container(
               padding: const EdgeInsets.all(20),
               decoration: BoxDecoration(
@@ -918,8 +1148,59 @@ class _QuizScreenState extends ConsumerState<QuizScreen> {
             const SizedBox(height: 24),
             SizedBox(
               width: double.infinity,
+              height: 50,
+              child: ElevatedButton.icon(
+                icon: const Icon(Icons.style, size: 20),
+                onPressed: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (ctx) => QuizFlashcardScreen(
+                        quizTitle: _quizTitle,
+                        initialQuestions: _questions,
+                        initialSelectedAnswers: _selectedAnswers,
+                        quizId: _quizId,
+                        loId: _loId,
+                      ),
+                    ),
+                  );
+                },
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AppTheme.primary,
+                  foregroundColor: Colors.black,
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                ),
+                label: const Text(
+                  'Review as Flashcards',
+                  style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
+                ),
+              ),
+            ),
+            const SizedBox(height: 12),
+            SizedBox(
+              width: double.infinity,
               height: 48,
-              child: ElevatedButton(
+              child: OutlinedButton.icon(
+                icon: const Icon(Icons.refresh, size: 18),
+                onPressed: () => _resetAndRetakeQuiz(),
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: AppTheme.text,
+                  side: BorderSide(color: AppTheme.border),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                ),
+                label: Text(
+                  (widget.isTeacherPreview || (ref.read(authProvider)?.role == 'teacher'))
+                      ? 'Restart Preview'
+                      : 'Retake Assessment',
+                  style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
+                ),
+              ),
+            ),
+            const SizedBox(height: 12),
+            SizedBox(
+              width: double.infinity,
+              height: 48,
+              child: OutlinedButton(
                 onPressed: () {
                   if (Navigator.of(context).canPop()) {
                     Navigator.of(context).pop();
@@ -927,9 +1208,9 @@ class _QuizScreenState extends ConsumerState<QuizScreen> {
                     context.go('/student/quiz-history');
                   }
                 },
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: AppTheme.primary,
-                  foregroundColor: Colors.black,
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: AppTheme.text,
+                  side: BorderSide(color: AppTheme.border),
                   shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                 ),
                 child: const Text('Back to Quizzes', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
