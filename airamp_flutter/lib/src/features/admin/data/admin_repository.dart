@@ -608,6 +608,167 @@ class AdminTeachersNotifier extends Notifier<List<Map<String, dynamic>>> {
     await loadTeachers();
     ref.read(subjectsProvider.notifier).reload();
   }
+
+  Future<Map<String, dynamic>> bulkImportTeachers(
+    List<Map<String, dynamic>> teachersToImport, {
+    String? defaultPassword,
+  }) async {
+    final result = await DatabaseHelper().bulkImportTeachers(
+      teachersToImport,
+      defaultPassword: defaultPassword,
+    );
+    await loadTeachers();
+    ref.read(subjectsProvider.notifier).reload();
+    return result;
+  }
 }
+
+// --- School Administrators Provider (Super Admin Console) ---
+final schoolAdminsProvider = NotifierProvider<SchoolAdminsNotifier, List<Map<String, dynamic>>>(() {
+  return SchoolAdminsNotifier();
+});
+
+class SchoolAdminsNotifier extends Notifier<List<Map<String, dynamic>>> {
+  String? _selectedSchoolId;
+  String _searchQuery = '';
+
+  @override
+  List<Map<String, dynamic>> build() {
+    loadAdmins();
+    return [];
+  }
+
+  Future<void> loadAdmins({String? schoolId, String? query}) async {
+    if (schoolId != null) _selectedSchoolId = schoolId;
+    if (query != null) _searchQuery = query;
+
+    final admins = await DatabaseHelper().getAdminsList(
+      schoolId: _selectedSchoolId,
+      query: _searchQuery,
+    );
+    if (!ref.mounted) return;
+    state = admins;
+  }
+
+  Future<String> addAdmin({
+    required String fullName,
+    required String email,
+    required String password,
+    String? username,
+    String role = 'admin',
+    String? schoolId = 'sch_main',
+  }) async {
+    final aid = await DatabaseHelper().createAdmin(
+      fullName: fullName,
+      email: email,
+      password: password,
+      username: username,
+      role: role,
+      schoolId: schoolId,
+    );
+    await loadAdmins();
+    ref.read(adminAnalyticsProvider.notifier).loadAnalytics();
+    return aid;
+  }
+
+  Future<void> updateAdmin(
+    String adminId,
+    Map<String, dynamic> data,
+  ) async {
+    await DatabaseHelper().updateAdmin(adminId, data);
+    await loadAdmins();
+  }
+
+  Future<void> deleteAdmin(String adminId) async {
+    await DatabaseHelper().deleteAdmin(adminId);
+    await loadAdmins();
+    ref.read(adminAnalyticsProvider.notifier).loadAnalytics();
+  }
+}
+
+// --- Schools Management (Item 8: Super Admin manages schools) ---
+class SchoolsNotifier extends Notifier<List<Map<String, dynamic>>> {
+  @override
+  List<Map<String, dynamic>> build() {
+    loadSchools();
+    return [];
+  }
+
+  Future<void> loadSchools() async {
+    final list = await DatabaseHelper().getSchoolsList();
+    if (!ref.mounted) return;
+    state = list;
+  }
+
+  Future<String> addSchool({
+    required String name,
+    required String code,
+    String? address,
+    String? adminId,
+    String status = 'active',
+  }) async {
+    final id = await DatabaseHelper().createSchool(
+      name: name.trim(),
+      code: code.trim().toUpperCase(),
+      address: address?.trim(),
+      adminId: adminId,
+    );
+    if (adminId != null && adminId.isNotEmpty) {
+      await DatabaseHelper().assignSchoolAdmin(id, adminId);
+    }
+    await loadSchools();
+    return id;
+  }
+
+  Future<void> updateSchool({
+    required String id,
+    required String name,
+    required String code,
+    String? address,
+    String? adminId,
+    required String status,
+  }) async {
+    await DatabaseHelper().updateSchool(id, {
+      'name': name.trim(),
+      'code': code.trim().toUpperCase(),
+      'address': address?.trim(),
+      'admin_id': adminId,
+      'status': status,
+    });
+    if (adminId != null && adminId.isNotEmpty) {
+      await DatabaseHelper().assignSchoolAdmin(id, adminId);
+    }
+    await loadSchools();
+  }
+
+  Future<void> deleteSchool(String id) async {
+    await DatabaseHelper().deleteSchool(id);
+    await loadSchools();
+  }
+}
+
+final schoolsListProvider = NotifierProvider<SchoolsNotifier, List<Map<String, dynamic>>>(() {
+  return SchoolsNotifier();
+});
+
+// Backward-compatible AsyncValue provider
+final schoolsProvider = FutureProvider<List<Map<String, dynamic>>>((ref) async {
+  return ref.watch(schoolsListProvider);
+});
+
+// Selected school scope filter for Super Admin (null means all schools)
+class SuperAdminCampusFilterNotifier extends Notifier<String?> {
+  @override
+  String? build() => null;
+
+  @override
+  set state(String? val) => super.state = val;
+}
+
+final superAdminSelectedSchoolProvider = NotifierProvider<SuperAdminCampusFilterNotifier, String?>(() {
+  return SuperAdminCampusFilterNotifier();
+});
+
+
 
 

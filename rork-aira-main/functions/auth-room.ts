@@ -47,8 +47,10 @@ export class AuthRoom extends DurableObject<AuthEnv> {
       if (!body.token) return json({ error: "Missing token" }, 401);
       const tokenHash = await hashSecret(body.token);
       const session = await this.ctx.storage.get<Session>(`session:${tokenHash}`);
-      if (!session || session.expiresAt <= Date.now()) return json({ error: "Session expired" }, 401);
-      return json({ ok: true, userId: session.userId });
+      const account = await this.ctx.storage.get<StoredAccount>(`account:${session.userId}`);
+      const role = (account?.profile?.role as string) ?? "student";
+      const schoolId = (account?.profile?.schoolId as string) ?? (account?.profile?.school_id as string) ?? "sch_main";
+      return json({ ok: true, userId: session.userId, role, schoolId });
     }
 
     if (request.method === "POST" && url.pathname === "/revoke") {

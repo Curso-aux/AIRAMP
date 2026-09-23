@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../../core/theme/theme_provider.dart';
 import '../../data/admin_repository.dart';
+import 'components/teacher_bulk_import_modal.dart';
 
 class AdminWebTeachersScreen extends ConsumerStatefulWidget {
   const AdminWebTeachersScreen({super.key});
@@ -92,6 +93,19 @@ class _AdminWebTeachersScreenState extends ConsumerState<AdminWebTeachersScreen>
                     ),
                   ),
                   const SizedBox(width: 16),
+                  OutlinedButton.icon(
+                    onPressed: () => TeacherBulkImportModal.show(context),
+                    icon: const Icon(Icons.upload_file_outlined, size: 18),
+                    label: const Text('Bulk Import (CSV)', style: TextStyle(fontWeight: FontWeight.bold)),
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: AppTheme.primary,
+                      side: BorderSide(color: AppTheme.primary.withValues(alpha: 0.5)),
+                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                      minimumSize: const Size(0, 42),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
                   ElevatedButton.icon(
                     onPressed: () => _openAddTeacherDialog(context, subjects),
                     icon: const Icon(Icons.person_add_alt_1, size: 18),

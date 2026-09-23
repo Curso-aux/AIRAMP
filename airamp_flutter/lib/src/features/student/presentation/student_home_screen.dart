@@ -5,7 +5,9 @@ import '../../../core/theme/app_theme.dart';
 import '../../../core/theme/theme_provider.dart';
 import '../../auth/application/auth_provider.dart';
 import '../../admin/data/admin_repository.dart';
+import '../../teacher/data/teacher_schedule_repository.dart';
 import '../data/student_repository.dart';
+import 'components/student_schedule_widget.dart';
 
 class StudentHomeScreen extends ConsumerStatefulWidget {
   const StudentHomeScreen({super.key});
@@ -217,6 +219,11 @@ class _StudentHomeScreenState extends ConsumerState<StudentHomeScreen> {
       body: SafeArea(
         child: RefreshIndicator(
           onRefresh: () async {
+            if (currentUser.section != null && currentUser.section!.isNotEmpty) {
+              ref.invalidate(sectionSchedulesProvider(currentUser.section!.trim()));
+            }
+            ref.invalidate(allClassSchedulesProvider);
+            ref.invalidate(scheduledSectionsProvider);
             await Future.wait([
               ref.read(studentCoursesProvider.notifier).reload(),
               ref.read(studentProgressProvider.notifier).loadProgress(),
@@ -256,6 +263,8 @@ class _StudentHomeScreenState extends ConsumerState<StudentHomeScreen> {
                     ),
                     Row(
                       children: [
+                        _buildScheduleHeaderButton(context, currentUser.section),
+                        const SizedBox(width: 8),
                         _buildBellButton(studentAnnouncements),
                         const SizedBox(width: 12),
                         GestureDetector(
@@ -287,7 +296,68 @@ class _StudentHomeScreenState extends ConsumerState<StudentHomeScreen> {
                     Expanded(child: _buildStatCard('Pending', Icons.schedule, pending.toString(), AppTheme.warning)),
                   ],
                 ),
-                const SizedBox(height: 32),
+                const SizedBox(height: 20),
+
+                // Quick Class Schedule Banner & Shortcut
+                GestureDetector(
+                  onTap: () => showStudentTimetableModal(context, initialSection: currentUser.section),
+                  child: Container(
+                    margin: const EdgeInsets.only(bottom: 20),
+                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(
+                        colors: [
+                          AppTheme.primary.withValues(alpha: 0.15),
+                          AppTheme.surface,
+                        ],
+                        begin: Alignment.topLeft,
+                        end: Alignment.bottomRight,
+                      ),
+                      borderRadius: BorderRadius.circular(14),
+                      border: Border.all(color: AppTheme.primary.withValues(alpha: 0.3)),
+                    ),
+                    child: Row(
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.all(8),
+                          decoration: BoxDecoration(
+                            color: AppTheme.primary,
+                            borderRadius: BorderRadius.circular(10),
+                          ),
+                          child: const Icon(Icons.calendar_month_rounded, color: Colors.black, size: 20),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                'Teacher Class Schedules',
+                                style: TextStyle(
+                                  fontSize: 13,
+                                  fontWeight: FontWeight.bold,
+                                  color: AppTheme.text,
+                                ),
+                              ),
+                              const SizedBox(height: 2),
+                              Text(
+                                (currentUser.section != null && currentUser.section!.isNotEmpty)
+                                    ? 'Section ${currentUser.section} • Tap to view weekly timetable'
+                                    : 'No section assigned • Contact administrator',
+                                style: TextStyle(fontSize: 11, color: AppTheme.textSecondary),
+                              ),
+                            ],
+                          ),
+                        ),
+                        Icon(Icons.arrow_forward_ios_rounded, size: 14, color: AppTheme.primary),
+                      ],
+                    ),
+                  ),
+                ),
+
+                // Student Section Class Schedule
+                StudentScheduleWidget(sectionName: currentUser.section),
+                const SizedBox(height: 12),
 
                 // Assigned Quizzes & Tasks
                 Row(
@@ -489,6 +559,27 @@ class _StudentHomeScreenState extends ConsumerState<StudentHomeScreen> {
             textAlign: TextAlign.center,
           ),
         ],
+      ),
+    );
+  }
+
+  Widget _buildScheduleHeaderButton(BuildContext context, String? section) {
+    return Tooltip(
+      message: 'View Class Timetable & Teacher Schedules',
+      child: GestureDetector(
+        onTap: () => showStudentTimetableModal(context, initialSection: section),
+        child: Container(
+          width: 44,
+          height: 44,
+          decoration: BoxDecoration(
+            color: AppTheme.surface,
+            shape: BoxShape.circle,
+            border: Border.all(color: AppTheme.border),
+          ),
+          child: Center(
+            child: Icon(Icons.calendar_month_outlined, color: AppTheme.primary, size: 20),
+          ),
+        ),
       ),
     );
   }

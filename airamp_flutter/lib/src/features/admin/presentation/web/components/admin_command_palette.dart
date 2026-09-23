@@ -2,11 +2,14 @@ import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 import '../../../../../core/theme/app_theme.dart';
 import '../../../../../core/theme/theme_provider.dart';
 import '../../../../../core/utils/file_download_helper.dart';
+import '../../../../auth/application/auth_provider.dart';
 import '../../../data/admin_repository.dart';
 import 'bulk_import_modal.dart';
+import 'teacher_bulk_import_modal.dart';
 
 enum CommandCategory {
   navigation('Pages & Screens', Icons.explore_outlined),
@@ -126,13 +129,25 @@ class _AdminCommandPaletteState extends ConsumerState<AdminCommandPalette> {
     // 2. Quick Actions
     items.add(CommandPaletteItem(
       id: 'action_import_csv',
-      title: 'Bulk Import Students & Faculty (CSV)',
+      title: 'Bulk Import Students (CSV)',
       subtitle: 'Upload CSV or paste student list',
       icon: Icons.upload_file_rounded,
       category: CommandCategory.actions,
       onSelect: () {
         _safeClose();
         BulkImportModal.show(context);
+      },
+    ));
+
+    items.add(CommandPaletteItem(
+      id: 'action_import_teachers_csv',
+      title: 'Bulk Import Faculty & Teachers (CSV)',
+      subtitle: 'Upload CSV or paste teacher roster with credentials generation',
+      icon: Icons.badge_outlined,
+      category: CommandCategory.actions,
+      onSelect: () {
+        _safeClose();
+        TeacherBulkImportModal.show(context);
       },
     ));
 
@@ -174,6 +189,21 @@ class _AdminCommandPaletteState extends ConsumerState<AdminCommandPalette> {
         widget.onSelectTab(7); // Class Sections tab
       },
     ));
+
+    final currentUser = ref.read(authProvider);
+    if (currentUser?.role == 'super_admin') {
+      items.add(CommandPaletteItem(
+        id: 'action_super_admin_console',
+        title: 'Super Administrator Console',
+        subtitle: 'Manage administrative accounts, authority, and schools',
+        icon: Icons.admin_panel_settings,
+        category: CommandCategory.actions,
+        onSelect: () {
+          _safeClose();
+          context.go('/admin/admin-management');
+        },
+      ));
+    }
 
     // 3. Students (up to 30 items)
     for (final s in students.take(30)) {

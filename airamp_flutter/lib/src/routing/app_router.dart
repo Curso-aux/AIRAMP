@@ -29,6 +29,7 @@ import '../features/admin/presentation/web/admin_web_announcements_screen.dart';
 import '../features/student/presentation/student_scaffold.dart';
 import '../features/teacher/presentation/teacher_scaffold.dart';
 import '../features/teacher/presentation/teacher_dashboard_screen.dart';
+import '../features/teacher/presentation/teacher_schedule_screen.dart';
 import '../features/teacher/presentation/teacher_profile_screen.dart';
 import '../features/teacher/presentation/teacher_students_screen.dart';
 import '../features/teacher/presentation/teacher_subject_detail_screen.dart';
@@ -173,6 +174,14 @@ final routerProvider = Provider<GoRouter>((ref) {
                     },
                   ),
                 ],
+              ),
+            ],
+          ),
+          StatefulShellBranch(
+            routes: [
+              GoRoute(
+                path: '/teacher/schedule',
+                builder: (context, state) => const TeacherScheduleScreen(),
               ),
             ],
           ),
@@ -411,9 +420,15 @@ final routerProvider = Provider<GoRouter>((ref) {
 
       // 4. Role-based Route Guard
       if (isAuth) {
-        final isAdmin = authState.role == 'admin' || authState.role == 'super_admin';
+        final isSuperAdmin = authState.role == 'super_admin';
+        final isAdmin = authState.role == 'admin' || isSuperAdmin;
         final isTeacher = authState.role == 'teacher';
         final isStudent = authState.role == 'student';
+
+        // Super Admin Guard: Only super_admin can access the Super Admin Console
+        if (matched.startsWith('/admin/admin-management') && !isSuperAdmin) {
+          return '/admin/dashboard';
+        }
 
         if (isAdmin && (matched.startsWith('/student') || matched.startsWith('/teacher'))) {
           return '/admin/dashboard';

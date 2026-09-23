@@ -39,6 +39,16 @@ class CsvHelper {
       case 'remarks':
       case 'note':
         return 'special_notes';
+      case 'handled_sections':
+      case 'sections':
+      case 'handled_section':
+      case 'assigned_sections':
+        return 'handled_sections';
+      case 'specialty':
+      case 'subject':
+      case 'specialization':
+      case 'assigned_subject':
+        return 'specialty';
       case 'password':
       case 'initial_password':
       case 'pass':
@@ -190,6 +200,16 @@ class CsvHelper {
       'Angela Reyes,angela.reyes@school.edu,student,Grade 10,Grade 10 - Emerald,regular,',
       'Carlos Ramos,carlos.ramos@school.edu,student,Grade 11,Grade 11 - STEM B,sped,Requires visual magnification',
       'Sir Robert Lim,robert.lim@deped.gov.ph,teacher,,,regular,Senior High Mathematics Faculty',
+    ].join('\r\n');
+  }
+
+  /// Generates a standardized template CSV specifically for faculty (teacher) onboarding.
+  static String getTeacherTemplateCsv() {
+    return [
+      'full_name,email,handled_sections,specialty,notes',
+      'Mr. Arthur Santos,arthur.santos@school.edu,"STEM 12-A, STEM 12-B",General Mathematics,Senior High Lead Instructor',
+      'Ms. Elena Rivera,elena.rivera@school.edu,"STEM 12-A, ABM 12-A",Earth & Life Science,Science Dept Coordinator',
+      'Dr. Roberto Dizon,roberto.dizon@school.edu,STEM 12-B,Physics & Chemistry,Guest Lecturer',
     ].join('\r\n');
   }
 }

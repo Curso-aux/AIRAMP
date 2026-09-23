@@ -7,7 +7,8 @@ class AuthSession {
   final String session;
   final String userId;
   final String role;
-  AuthSession({required this.session, required this.userId, required this.role});
+  final String? schoolId;
+  AuthSession({required this.session, required this.userId, required this.role, this.schoolId = 'sch_main'});
 }
 
 class AuthRepository {
@@ -134,6 +135,7 @@ class AuthRepository {
         'username': user['username'] ?? user['full_name'] ?? '',
         'section': user['section'],
         'grade': user['grade'],
+        'schoolId': user['school_id'] ?? 'sch_main',
       },
       'session': token,
     };
@@ -254,6 +256,7 @@ class AuthRepository {
         'fullName': fullName.trim(),
         'section': assignedSection,
         'grade': assignedGrade,
+        'schoolId': 'sch_main',
       },
       'session': token,
     };

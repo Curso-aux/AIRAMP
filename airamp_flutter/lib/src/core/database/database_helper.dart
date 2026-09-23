@@ -104,6 +104,139 @@ class DatabaseHelper {
         )
       ''');
     } catch (_) {}
+    try {
+      await db.execute("ALTER TABLE users ADD COLUMN school_id TEXT DEFAULT 'sch_main'");
+    } catch (_) {}
+    try {
+      await db.execute("ALTER TABLE subjects ADD COLUMN school_id TEXT DEFAULT 'sch_main'");
+    } catch (_) {}
+    try {
+      await db.execute("ALTER TABLE sections ADD COLUMN school_id TEXT DEFAULT 'sch_main'");
+    } catch (_) {}
+    try {
+      await db.execute("ALTER TABLE announcements ADD COLUMN school_id TEXT DEFAULT 'sch_main'");
+    } catch (_) {}
+    try {
+      await db.execute("ALTER TABLE conversations ADD COLUMN school_id TEXT DEFAULT 'sch_main'");
+    } catch (_) {}
+    try {
+      await db.execute('''
+        CREATE TABLE IF NOT EXISTS schools (
+          id TEXT PRIMARY KEY,
+          name TEXT NOT NULL,
+          code TEXT UNIQUE NOT NULL,
+          address TEXT,
+          logo_url TEXT,
+          admin_id TEXT,
+          status TEXT DEFAULT 'active',
+          created_at TEXT NOT NULL
+        )
+      ''');
+    } catch (_) {}
+    try {
+      final existingSchool = await db.query('schools', where: 'id = ?', whereArgs: ['sch_main']);
+      if (existingSchool.isEmpty) {
+        await db.insert('schools', {
+          'id': 'sch_main',
+          'name': 'AIRAMP Demonstration High School',
+          'code': 'ADM-01',
+          'address': 'DepEd Campus, Manila, Philippines',
+          'status': 'active',
+          'created_at': DateTime.now().toIso8601String(),
+        });
+      }
+    } catch (_) {}
+    try {
+      await db.execute('''
+        CREATE TABLE IF NOT EXISTS class_schedules (
+          id TEXT PRIMARY KEY,
+          school_id TEXT DEFAULT 'sch_main',
+          teacher_id TEXT NOT NULL,
+          teacher_name TEXT NOT NULL,
+          subject_id INTEGER NOT NULL,
+          subject_name TEXT NOT NULL,
+          section_id INTEGER,
+          section_name TEXT NOT NULL,
+          day_of_week TEXT NOT NULL,
+          start_time TEXT NOT NULL,
+          end_time TEXT NOT NULL,
+          room TEXT,
+          color_code TEXT,
+          created_at TEXT NOT NULL,
+          updated_at TEXT
+        )
+      ''');
+    } catch (_) {}
+    try {
+      final existingCount = Sqflite.firstIntValue(await db.rawQuery('SELECT COUNT(*) FROM class_schedules')) ?? 0;
+      if (existingCount == 0) {
+        final now = DateTime.now().toIso8601String();
+        await db.insert('class_schedules', {
+          'id': 'sched_seed_1',
+          'school_id': 'sch_main',
+          'teacher_id': 'teacher_1',
+          'teacher_name': 'Mr. Santos',
+          'subject_id': 1,
+          'subject_name': 'General Mathematics',
+          'section_id': 1,
+          'section_name': 'STEM 12-A',
+          'day_of_week': 'Monday',
+          'start_time': '08:00',
+          'end_time': '09:30',
+          'room': 'Room 302',
+          'color_code': '#0D9488',
+          'created_at': now,
+        });
+        await db.insert('class_schedules', {
+          'id': 'sched_seed_2',
+          'school_id': 'sch_main',
+          'teacher_id': 'teacher_1',
+          'teacher_name': 'Mr. Santos',
+          'subject_id': 2,
+          'subject_name': 'Earth & Life Science',
+          'section_id': 2,
+          'section_name': 'STEM 12-B',
+          'day_of_week': 'Monday',
+          'start_time': '10:00',
+          'end_time': '11:30',
+          'room': 'Science Lab 1',
+          'color_code': '#2563EB',
+          'created_at': now,
+        });
+        await db.insert('class_schedules', {
+          'id': 'sched_seed_3',
+          'school_id': 'sch_main',
+          'teacher_id': 'teacher_1',
+          'teacher_name': 'Mr. Santos',
+          'subject_id': 1,
+          'subject_name': 'General Mathematics',
+          'section_id': 1,
+          'section_name': 'STEM 12-A',
+          'day_of_week': 'Wednesday',
+          'start_time': '08:00',
+          'end_time': '09:30',
+          'room': 'Room 302',
+          'color_code': '#0D9488',
+          'created_at': now,
+        });
+        await db.insert('class_schedules', {
+          'id': 'sched_seed_4',
+          'school_id': 'sch_main',
+          'teacher_id': 'teacher_1',
+          'teacher_name': 'Mr. Santos',
+          'subject_id': 2,
+          'subject_name': 'Earth & Life Science',
+          'section_id': 2,
+          'section_name': 'STEM 12-B',
+          'day_of_week': 'Friday',
+          'start_time': '13:00',
+          'end_time': '14:30',
+          'room': 'Science Lab 1',
+          'color_code': '#2563EB',
+          'created_at': now,
+        });
+      }
+    } catch (_) {}
     await _seedInitialData(db);
   }
 
@@ -113,7 +246,7 @@ class DatabaseHelper {
         databaseFactory = databaseFactoryFfiWeb;
         return await openDatabase(
           'airamp_local.db',
-          version: 20,
+          version: 21,
           onCreate: _onCreate,
           onUpgrade: _onUpgrade,
           onOpen: _onDatabaseOpen,
@@ -123,7 +256,7 @@ class DatabaseHelper {
         databaseFactory = databaseFactoryFfiWebNoWebWorker;
         return await openDatabase(
           'airamp_local.db',
-          version: 20,
+          version: 21,
           onCreate: _onCreate,
           onUpgrade: _onUpgrade,
           onOpen: _onDatabaseOpen,
@@ -136,7 +269,7 @@ class DatabaseHelper {
 
     return await openDatabase(
       path,
-      version: 20,
+      version: 21,
       onCreate: _onCreate,
       onUpgrade: _onUpgrade,
       onOpen: _onDatabaseOpen,
@@ -961,6 +1094,66 @@ class DatabaseHelper {
       ''');
 
       await _seedInitialData(db);
+    }
+
+    if (oldVersion < 21) {
+      await db.execute('''
+        CREATE TABLE IF NOT EXISTS schools (
+          id TEXT PRIMARY KEY,
+          name TEXT NOT NULL,
+          code TEXT UNIQUE NOT NULL,
+          address TEXT,
+          logo_url TEXT,
+          admin_id TEXT,
+          status TEXT DEFAULT 'active',
+          created_at TEXT NOT NULL
+        )
+      ''');
+
+      final existingSchool = await db.query('schools', where: 'id = ?', whereArgs: ['sch_main']);
+      if (existingSchool.isEmpty) {
+        await db.insert('schools', {
+          'id': 'sch_main',
+          'name': 'AIRAMP Demonstration High School',
+          'code': 'ADM-01',
+          'address': 'DepEd Campus, Manila, Philippines',
+          'status': 'active',
+          'created_at': DateTime.now().toIso8601String(),
+        });
+      }
+
+      await db.execute('''
+        CREATE TABLE IF NOT EXISTS class_schedules (
+          id TEXT PRIMARY KEY,
+          school_id TEXT DEFAULT 'sch_main',
+          teacher_id TEXT NOT NULL,
+          teacher_name TEXT NOT NULL,
+          subject_id INTEGER NOT NULL,
+          subject_name TEXT NOT NULL,
+          section_id INTEGER,
+          section_name TEXT NOT NULL,
+          day_of_week TEXT NOT NULL,
+          start_time TEXT NOT NULL,
+          end_time TEXT NOT NULL,
+          room TEXT,
+          color_code TEXT,
+          created_at TEXT NOT NULL,
+          updated_at TEXT
+        )
+      ''');
+
+      final tablesToScope = ['users', 'subjects', 'sections', 'announcements', 'conversations'];
+      for (final table in tablesToScope) {
+        try {
+          await db.execute("ALTER TABLE $table ADD COLUMN school_id TEXT DEFAULT 'sch_main'");
+        } catch (_) {}
+      }
+
+      for (final table in tablesToScope) {
+        try {
+          await db.execute("UPDATE $table SET school_id = 'sch_main' WHERE school_id IS NULL");
+        } catch (_) {}
+      }
     }
   }
 
@@ -2154,6 +2347,99 @@ class DatabaseHelper {
       'failedCount': errors.length,
       'errors': errors,
       'insertedUsers': insertedUsers,
+    };
+  }
+
+  /// Bulk import faculty members with atomic validation, auto-generated
+  /// credentials, salt hashing, and handled section/specialty assignment.
+  Future<Map<String, dynamic>> bulkImportTeachers(
+    List<Map<String, dynamic>> teachersToImport, {
+    String? defaultPassword,
+  }) async {
+    final db = await database;
+    int successCount = 0;
+    final List<Map<String, dynamic>> errors = [];
+    final List<Map<String, dynamic>> insertedTeachers = [];
+
+    final existingUsers = await db.query('users', columns: ['email']);
+    final Set<String> existingEmails = existingUsers
+        .map((u) => (u['email'] as String? ?? '').toLowerCase().trim())
+        .where((e) => e.isNotEmpty)
+        .toSet();
+
+    final now = DateTime.now();
+
+    for (int i = 0; i < teachersToImport.length; i++) {
+      final row = teachersToImport[i];
+      final fullName = (row['full_name'] as String? ?? '').trim();
+      final email = (row['email'] as String? ?? '').trim().toLowerCase();
+      final rawSections = (row['handled_sections'] as String? ?? row['section'] as String? ?? '').trim();
+      final specialty = (row['specialty'] as String? ?? '').trim();
+      final notes = (row['notes'] as String? ?? row['special_notes'] as String? ?? '').trim();
+      final customPassword = (row['password'] as String? ?? '').trim();
+
+      if (fullName.isEmpty) {
+        errors.add({'row': i + 1, 'email': email, 'reason': 'Missing full name'});
+        continue;
+      }
+      if (email.isEmpty || !email.contains('@') || !email.contains('.')) {
+        errors.add({'row': i + 1, 'email': email, 'reason': 'Invalid email address format'});
+        continue;
+      }
+      if (existingEmails.contains(email)) {
+        errors.add({'row': i + 1, 'email': email, 'reason': 'Email already registered in system'});
+        continue;
+      }
+
+      final teacherId = 'teacher_${now.millisecondsSinceEpoch}_$i';
+      final plainPassword = customPassword.isNotEmpty
+          ? customPassword
+          : (defaultPassword?.isNotEmpty == true
+              ? defaultPassword!
+              : 'Teach_${(1000 + (i * 37 + DateTime.now().millisecond) % 9000)}#');
+      final salt = generateSalt();
+      final hashedPassword = hashPassword(plainPassword, salt);
+      final username = email.split('@').first;
+
+      final teacherRecord = <String, dynamic>{
+        'id': teacherId,
+        'email': email,
+        'username': username,
+        'password': hashedPassword,
+        'password_salt': salt,
+        'role': 'teacher',
+        'full_name': fullName,
+        'section': rawSections.isNotEmpty ? rawSections : null,
+        'special_notes': [
+          if (specialty.isNotEmpty) 'Specialty: $specialty',
+          if (notes.isNotEmpty) notes,
+        ].join(' | '),
+        'created_at': now.toIso8601String(),
+        'school_id': 'sch_main',
+      };
+
+      try {
+        await db.insert('users', teacherRecord);
+        existingEmails.add(email);
+
+        insertedTeachers.add({
+          ...teacherRecord,
+          'plain_password': plainPassword,
+          'handled_sections': rawSections,
+          'specialty': specialty,
+        });
+        successCount++;
+      } catch (e) {
+        errors.add({'row': i + 1, 'email': email, 'reason': 'Database error: $e'});
+      }
+    }
+
+    return {
+      'total': teachersToImport.length,
+      'successCount': successCount,
+      'failedCount': errors.length,
+      'errors': errors,
+      'insertedTeachers': insertedTeachers,
     };
   }
 
@@ -4493,6 +4779,389 @@ class DatabaseHelper {
       whereArgs: [userId],
     );
   }
+
+  // ── School Administrators & Super Admin Management ─────────
+  Future<List<Map<String, dynamic>>> getAdminsList({String? query, String? schoolId}) async {
+    final db = await database;
+    String whereClause = "(role = 'admin' OR role = 'super_admin')";
+    final List<dynamic> whereArgs = [];
+
+    if (schoolId != null && schoolId.isNotEmpty && schoolId != 'all') {
+      whereClause += " AND (school_id = ? OR school_id IS NULL OR role = 'super_admin')";
+      whereArgs.add(schoolId);
+    }
+
+    if (query != null && query.trim().isNotEmpty) {
+      final q = '%${query.trim().toLowerCase()}%';
+      whereClause += " AND (LOWER(full_name) LIKE ? OR LOWER(email) LIKE ? OR LOWER(COALESCE(username, '')) LIKE ?)";
+      whereArgs.addAll([q, q, q]);
+    }
+
+    final admins = await db.query(
+      'users',
+      where: whereClause,
+      whereArgs: whereArgs.isNotEmpty ? whereArgs : null,
+      orderBy: "CASE WHEN role = 'super_admin' THEN 0 ELSE 1 END, full_name ASC",
+    );
+
+    return admins;
+  }
+
+  Future<String> createAdmin({
+    required String fullName,
+    required String email,
+    required String password,
+    String? username,
+    String role = 'admin',
+    String? schoolId = 'sch_main',
+  }) async {
+    final db = await database;
+    final salt = generateSalt();
+    final hashedPassword = hashPassword(password, salt);
+    final adminId = 'admin_${DateTime.now().millisecondsSinceEpoch}';
+    final resolvedUsername = (username != null && username.trim().isNotEmpty)
+        ? username.trim()
+        : (email.contains('@') ? email.split('@').first : fullName.trim().toLowerCase().replaceAll(' ', '.'));
+
+    await db.insert('users', {
+      'id': adminId,
+      'email': email.trim().toLowerCase(),
+      'username': resolvedUsername,
+      'password': hashedPassword,
+      'password_salt': salt,
+      'role': role,
+      'full_name': fullName.trim(),
+      'school_id': schoolId ?? 'sch_main',
+      'created_at': DateTime.now().toIso8601String(),
+    });
+
+    return adminId;
+  }
+
+  Future<void> updateAdmin(
+    String adminId,
+    Map<String, dynamic> data,
+  ) async {
+    final db = await database;
+    final updates = <String, dynamic>{};
+    if (data.containsKey('full_name')) updates['full_name'] = (data['full_name'] as String).trim();
+    if (data.containsKey('email')) updates['email'] = (data['email'] as String).trim().toLowerCase();
+    if (data.containsKey('username')) updates['username'] = (data['username'] as String).trim();
+    if (data.containsKey('school_id')) updates['school_id'] = data['school_id'];
+    if (data.containsKey('role')) updates['role'] = data['role'];
+    if (data.containsKey('student_type')) updates['student_type'] = data['student_type'];
+    if (data.containsKey('special_notes')) updates['special_notes'] = data['special_notes'];
+    if (data.containsKey('password')) {
+      final rawPass = data['password'] as String;
+      if (rawPass.isNotEmpty) {
+        final salt = generateSalt();
+        updates['password'] = hashPassword(rawPass, salt);
+        updates['password_salt'] = salt;
+      }
+    }
+
+    if (updates.isNotEmpty) {
+      await db.update('users', updates, where: 'id = ?', whereArgs: [adminId]);
+    }
+  }
+
+  Future<void> deleteAdmin(String adminId) async {
+    final db = await database;
+    // Prevent deleting primary super admin
+    final row = await db.query('users', where: 'id = ?', whereArgs: [adminId]);
+    if (row.isNotEmpty && row.first['id'] == 'admin_1') {
+      throw StateError('Cannot delete primary system super administrator');
+    }
+    await db.delete('users', where: 'id = ?', whereArgs: [adminId]);
+  }
+
+  // ── Schools Management (Item 8 — P2) ─────────────────────────
+  Future<List<Map<String, dynamic>>> getSchoolsList() async {
+    final db = await database;
+    try {
+      final results = await db.query('schools', orderBy: 'created_at ASC');
+      if (results.isEmpty) {
+        return [
+          {
+            'id': 'sch_main',
+            'name': 'AIRAMP Demonstration High School',
+            'code': 'ADM-01',
+            'address': 'DepEd Campus, Manila, Philippines',
+            'status': 'active',
+            'created_at': DateTime.now().toIso8601String(),
+          }
+        ];
+      }
+      return results;
+    } catch (_) {
+      return [
+        {
+          'id': 'sch_main',
+          'name': 'AIRAMP Demonstration High School',
+          'code': 'ADM-01',
+          'address': 'DepEd Campus, Manila, Philippines',
+          'status': 'active',
+          'created_at': DateTime.now().toIso8601String(),
+        }
+      ];
+    }
+  }
+
+  Future<Map<String, dynamic>?> getSchoolById(String id) async {
+    final db = await database;
+    final results = await db.query('schools', where: 'id = ?', whereArgs: [id]);
+    if (results.isNotEmpty) return results.first;
+    return null;
+  }
+
+  Future<String> createSchool({
+    required String name,
+    required String code,
+    String? address,
+    String? logoUrl,
+    String? adminId,
+    String status = 'active',
+  }) async {
+    final db = await database;
+    final schoolId = 'sch_${DateTime.now().millisecondsSinceEpoch}';
+    await db.insert('schools', {
+      'id': schoolId,
+      'name': name.trim(),
+      'code': code.trim().toUpperCase(),
+      'address': address?.trim(),
+      'logo_url': logoUrl?.trim(),
+      'admin_id': adminId,
+      'status': status,
+      'created_at': DateTime.now().toIso8601String(),
+    }, conflictAlgorithm: ConflictAlgorithm.replace);
+    return schoolId;
+  }
+
+  Future<void> updateSchool(String id, Map<String, dynamic> data) async {
+    final db = await database;
+    final row = Map<String, dynamic>.from(data);
+    row.remove('id');
+    await db.update('schools', row, where: 'id = ?', whereArgs: [id]);
+  }
+
+  Future<bool> deleteSchool(String id) async {
+    if (id == 'sch_main') {
+      throw Exception('The primary default demonstration school cannot be deleted.');
+    }
+    final db = await database;
+    final usersCount = Sqflite.firstIntValue(
+      await db.rawQuery('SELECT COUNT(*) FROM users WHERE school_id = ?', [id]),
+    ) ?? 0;
+    if (usersCount > 0) {
+      throw Exception('Cannot delete school with $usersCount enrolled users. Reassign or remove users first.');
+    }
+    await db.delete('schools', where: 'id = ?', whereArgs: [id]);
+    return true;
+  }
+
+  Future<Map<String, int>> getSchoolStats(String schoolId) async {
+    final db = await database;
+    final studentCount = Sqflite.firstIntValue(
+      await db.rawQuery(
+        "SELECT COUNT(*) FROM users WHERE role = 'student' AND (school_id = ? OR (? = 'sch_main' AND school_id IS NULL))",
+        [schoolId, schoolId],
+      ),
+    ) ?? 0;
+    final teacherCount = Sqflite.firstIntValue(
+      await db.rawQuery(
+        "SELECT COUNT(*) FROM users WHERE role = 'teacher' AND (school_id = ? OR (? = 'sch_main' AND school_id IS NULL))",
+        [schoolId, schoolId],
+      ),
+    ) ?? 0;
+    final sectionCount = Sqflite.firstIntValue(
+      await db.rawQuery(
+        "SELECT COUNT(*) FROM sections WHERE school_id = ? OR (? = 'sch_main' AND school_id IS NULL)",
+        [schoolId, schoolId],
+      ),
+    ) ?? 0;
+    final subjectCount = Sqflite.firstIntValue(
+      await db.rawQuery(
+        "SELECT COUNT(*) FROM subjects WHERE school_id = ? OR (? = 'sch_main' AND school_id IS NULL)",
+        [schoolId, schoolId],
+      ),
+    ) ?? 0;
+    return {
+      'students': studentCount,
+      'teachers': teacherCount,
+      'sections': sectionCount,
+      'subjects': subjectCount,
+    };
+  }
+
+  Future<void> assignSchoolAdmin(String schoolId, String adminId) async {
+    final db = await database;
+    await db.update('schools', {'admin_id': adminId}, where: 'id = ?', whereArgs: [schoolId]);
+    await db.update('users', {'school_id': schoolId}, where: 'id = ?', whereArgs: [adminId]);
+  }
+
+  // ── Class Schedules Management ──────────────────────────────
+  Future<List<Map<String, dynamic>>> getClassSchedules({
+    String? teacherId,
+    int? sectionId,
+    String? sectionName,
+    String? schoolId,
+    String? dayOfWeek,
+  }) async {
+    final db = await database;
+    final whereClauses = <String>[];
+    final whereArgs = <dynamic>[];
+
+    if (teacherId != null && teacherId.isNotEmpty) {
+      whereClauses.add('teacher_id = ?');
+      whereArgs.add(teacherId);
+    }
+    if (sectionId != null) {
+      whereClauses.add('section_id = ?');
+      whereArgs.add(sectionId);
+    }
+    if (sectionName != null && sectionName.trim().isNotEmpty && sectionName != 'All Sections' && sectionName != 'All Handled Sections') {
+      final clean = sectionName.trim();
+      final normalized = clean.replaceAll('–', '-').replaceAll('—', '-');
+      String keyword = '';
+      if (normalized.contains('-')) {
+        keyword = normalized.split('-').last.trim();
+      }
+
+      if (keyword.isNotEmpty && keyword.length >= 3) {
+        whereClauses.add('''
+          (
+            LOWER(TRIM(section_name)) = LOWER(?)
+            OR LOWER(REPLACE(REPLACE(section_name, '–', '-'), '—', '-')) = LOWER(?)
+            OR LOWER(TRIM(section_name)) = LOWER(?)
+            OR LOWER(TRIM(section_name)) LIKE ?
+            OR LOWER(?) LIKE '%' || LOWER(TRIM(section_name)) || '%'
+          )
+        ''');
+        whereArgs.addAll([clean, normalized, keyword, '%$keyword%', clean]);
+      } else {
+        whereClauses.add('''
+          (
+            LOWER(TRIM(section_name)) = LOWER(?)
+            OR LOWER(REPLACE(REPLACE(section_name, '–', '-'), '—', '-')) = LOWER(?)
+            OR LOWER(TRIM(section_name)) LIKE ?
+            OR LOWER(?) LIKE '%' || LOWER(TRIM(section_name)) || '%'
+          )
+        ''');
+        whereArgs.addAll([clean, normalized, '%$clean%', clean]);
+      }
+    }
+    if (schoolId != null && schoolId.isNotEmpty) {
+      whereClauses.add('school_id = ?');
+      whereArgs.add(schoolId);
+    }
+    if (dayOfWeek != null && dayOfWeek.isNotEmpty && dayOfWeek != 'All Days') {
+      whereClauses.add('day_of_week = ?');
+      whereArgs.add(dayOfWeek);
+    }
+
+    final whereString = whereClauses.isNotEmpty ? whereClauses.join(' AND ') : null;
+    final results = await db.query(
+      'class_schedules',
+      where: whereString,
+      whereArgs: whereArgs.isNotEmpty ? whereArgs : null,
+      orderBy: 'start_time ASC',
+    );
+    return results;
+  }
+
+  Future<String> createClassSchedule(Map<String, dynamic> data) async {
+    final db = await database;
+    final id = data['id'] as String? ?? 'sched_${DateTime.now().millisecondsSinceEpoch}';
+    final now = DateTime.now().toIso8601String();
+    final row = Map<String, dynamic>.from(data);
+    row['id'] = id;
+    row['created_at'] ??= now;
+    row['school_id'] ??= 'sch_main';
+    await db.insert('class_schedules', row, conflictAlgorithm: ConflictAlgorithm.replace);
+    return id;
+  }
+
+  Future<void> updateClassSchedule(String id, Map<String, dynamic> data) async {
+    final db = await database;
+    final row = Map<String, dynamic>.from(data);
+    row['updated_at'] = DateTime.now().toIso8601String();
+    row.remove('id');
+    await db.update('class_schedules', row, where: 'id = ?', whereArgs: [id]);
+  }
+
+  Future<void> deleteClassSchedule(String id) async {
+    final db = await database;
+    await db.delete('class_schedules', where: 'id = ?', whereArgs: [id]);
+  }
+
+  Future<Map<String, dynamic>> checkScheduleConflict({
+    required String dayOfWeek,
+    required String startTime,
+    required String endTime,
+    String? teacherId,
+    String? sectionName,
+    String? room,
+    String? excludeScheduleId,
+    String? schoolId,
+  }) async {
+    final db = await database;
+    final whereClauses = <String>['day_of_week = ?'];
+    final whereArgs = <dynamic>[dayOfWeek];
+
+    if (schoolId != null && schoolId.isNotEmpty) {
+      whereClauses.add('school_id = ?');
+      whereArgs.add(schoolId);
+    }
+    if (excludeScheduleId != null && excludeScheduleId.isNotEmpty) {
+      whereClauses.add('id != ?');
+      whereArgs.add(excludeScheduleId);
+    }
+
+    final query = '''
+      SELECT * FROM class_schedules
+      WHERE ${whereClauses.join(' AND ')}
+      AND (start_time < ? AND end_time > ?)
+    ''';
+    whereArgs.add(endTime);
+    whereArgs.add(startTime);
+
+    final candidates = await db.rawQuery(query, whereArgs);
+
+    for (final c in candidates) {
+      if (teacherId != null && c['teacher_id'] == teacherId) {
+        return {
+          'hasConflict': true,
+          'type': 'teacher',
+          'conflict': c,
+          'reason': 'Teacher is already scheduled for "${c['subject_name']}" (${c['section_name']}) at ${c['start_time']} - ${c['end_time']}.',
+        };
+      }
+      if (sectionName != null &&
+          sectionName.trim().isNotEmpty &&
+          (c['section_name'] as String).trim().toLowerCase() == sectionName.trim().toLowerCase()) {
+        return {
+          'hasConflict': true,
+          'type': 'section',
+          'conflict': c,
+          'reason': 'Section "$sectionName" already has "${c['subject_name']}" scheduled at ${c['start_time']} - ${c['end_time']}.',
+        };
+      }
+      if (room != null &&
+          room.trim().isNotEmpty &&
+          c['room'] != null &&
+          (c['room'] as String).trim().toLowerCase() == room.trim().toLowerCase()) {
+        return {
+          'hasConflict': true,
+          'type': 'room',
+          'conflict': c,
+          'reason': 'Room "$room" is already occupied by ${c['teacher_name']} for "${c['subject_name']}" at ${c['start_time']} - ${c['end_time']}.',
+        };
+      }
+    }
+
+    return {'hasConflict': false, 'conflicts': <Map<String, dynamic>>[]};
+  }
 }
+
 
 

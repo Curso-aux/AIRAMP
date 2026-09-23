@@ -18,16 +18,16 @@ function dispatch(env: Env, className: string, id: string, request: Request): Pr
   return env.DO.fetch(wrapped);
 }
 
-async function validateSession(env: Env, request: Request): Promise<{ userId: string; token: string } | null> {
+async function validateSession(env: Env, request: Request): Promise<{ userId: string; role: string; schoolId: string; token: string } | null> {
   const url = new URL(request.url);
   const token = request.headers.get("X-School-Session") ?? url.searchParams.get("token");
   if (!token) return null;
   const validation = await dispatch(env, "AuthRoom", "global", new Request("https://internal/validate", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ token }) }));
   if (!validation.ok) return null;
-  const result = (await validation.json()) as { userId?: string };
+  const result = (await validation.json()) as { userId?: string; role?: string; schoolId?: string };
   const requestedUserId = request.headers.get("X-School-User-Id") ?? url.searchParams.get("userId");
   if (!result.userId || (requestedUserId && requestedUserId !== result.userId)) return null;
-  return { userId: result.userId, token };
+  return { userId: result.userId, role: result.role ?? "student", schoolId: result.schoolId ?? "sch_main", token };
 }
 
 export default {
@@ -44,6 +44,8 @@ export default {
       if (!session) return json({ error: "Unauthorized" }, 401);
       const forwarded = new Request(request.url, request);
       forwarded.headers.set("X-Resolved-User-Id", session.userId);
+      forwarded.headers.set("X-Resolved-Role", session.role);
+      forwarded.headers.set("X-Resolved-School-Id", session.schoolId);
       const chatRequest = new URL(request.url);
       chatRequest.pathname = chatRequest.pathname.replace(/^\/v1\/chat/, "") || "/";
       // Add token to query for WebSocket upgrade
@@ -61,6 +63,8 @@ export default {
       if (!session) return json({ error: "Unauthorized" }, 401);
       const forwarded = new Request(request.url, request);
       forwarded.headers.set("X-Resolved-User-Id", session.userId);
+      forwarded.headers.set("X-Resolved-Role", session.role);
+      forwarded.headers.set("X-Resolved-School-Id", session.schoolId);
       const apiRequest = new URL(request.url);
       apiRequest.pathname = apiRequest.pathname.replace(/^\/v1\/api/, "") || "/";
       return dispatch(env, "ApiRoom", "shared", new Request(apiRequest.toString(), forwarded));
@@ -73,6 +77,8 @@ export default {
 
     const forwarded = new Request(request.url, request);
     forwarded.headers.set("X-Resolved-User-Id", session.userId);
+    forwarded.headers.set("X-Resolved-Role", session.role);
+    forwarded.headers.set("X-Resolved-School-Id", session.schoolId);
     const doRequest = new URL(request.url);
     doRequest.pathname = doRequest.pathname.replace(/^\/v1\/sync/, "").replace(/^\/v1/, "") || "/";
     return dispatch(env, "SyncRoom", session.userId, new Request(doRequest.toString(), forwarded));

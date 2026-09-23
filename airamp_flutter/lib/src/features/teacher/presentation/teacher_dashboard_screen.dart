@@ -8,6 +8,7 @@ import '../data/teacher_repository.dart';
 import 'components/create_quiz_dialog.dart';
 import 'components/post_announcement_dialog.dart';
 import 'components/assignment_roster_dialog.dart';
+import 'components/class_overview_widget.dart';
 import '../../../core/database/database_helper.dart';
 import '../../submissions/data/submissions_repository.dart';
 
@@ -232,6 +233,8 @@ class _TeacherDashboardScreenState extends ConsumerState<TeacherDashboardScreen>
         [];
 
     final teacherName = currentUser?.fullName ?? 'Faculty Instructor';
+    final screenWidth = MediaQuery.of(context).size.width;
+    final isDesktop = screenWidth >= 1050;
 
     return Scaffold(
       backgroundColor: AppTheme.background,
@@ -369,396 +372,508 @@ class _TeacherDashboardScreenState extends ConsumerState<TeacherDashboardScreen>
                 ),
                 const SizedBox(height: 20),
 
-                // KPI Metric Cards Grid
-                LayoutBuilder(
-                  builder: (context, constraints) {
-                    return Column(
-                      children: [
-                        Row(
-                          children: [
-                            Expanded(
-                              child: _buildMetricCard(
-                                title: 'Assigned Subjects',
-                                value: '$totalSubjects',
-                                subtitle: 'Active courses',
-                                icon: Icons.menu_book_outlined,
-                                color: AppTheme.primary,
-                              ),
-                            ),
-                            const SizedBox(width: 12),
-                            Expanded(
-                              child: _buildMetricCard(
-                                title: 'Enrolled Students',
-                                value: '$totalStudents',
-                                subtitle: 'Across your classes',
-                                icon: Icons.people_alt_outlined,
-                                color: const Color(0xFF0D9488),
-                              ),
-                            ),
-                          ],
+                // KPI Metric Cards (Row on wide screens, 2x2 on mobile)
+                if (isDesktop)
+                  Row(
+                    children: [
+                      Expanded(
+                        child: _buildMetricCard(
+                          title: 'Assigned Subjects',
+                          value: '$totalSubjects',
+                          subtitle: 'Active courses',
+                          icon: Icons.menu_book_outlined,
+                          color: AppTheme.primary,
                         ),
-                        const SizedBox(height: 12),
-                        Row(
-                          children: [
-                            Expanded(
-                              child: _buildMetricCard(
-                                title: 'Class Pass Rate',
-                                value: '$passRate%',
-                                subtitle: '$passedAttempts passed ($totalAttempts attempts)',
-                                icon: Icons.verified_outlined,
-                                color: passRate >= 75 ? AppTheme.success : AppTheme.warning,
-                              ),
-                            ),
-                            const SizedBox(width: 12),
-                            Expanded(
-                              child: _buildMetricCard(
-                                title: 'Average Score',
-                                value: '$avgScore%',
-                                subtitle: 'Overall assessments',
-                                icon: Icons.trending_up,
-                                color: AppTheme.accent,
-                              ),
-                            ),
-                          ],
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: _buildMetricCard(
+                          title: 'Enrolled Students',
+                          value: '$totalStudents',
+                          subtitle: 'Across your classes',
+                          icon: Icons.people_alt_outlined,
+                          color: const Color(0xFF0D9488),
                         ),
-                      ],
-                    );
-                  },
-                ),
-                const SizedBox(height: 24),
-
-                // Quick Action Buttons
-                Text(
-                  'Quick Actions',
-                  style: TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.bold,
-                    color: AppTheme.text,
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: _buildMetricCard(
+                          title: 'Class Pass Rate',
+                          value: '$passRate%',
+                          subtitle: '$passedAttempts passed ($totalAttempts attempts)',
+                          icon: Icons.verified_outlined,
+                          color: passRate >= 75 ? AppTheme.success : AppTheme.warning,
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: _buildMetricCard(
+                          title: 'Average Score',
+                          value: '$avgScore%',
+                          subtitle: 'Overall assessments',
+                          icon: Icons.trending_up,
+                          color: AppTheme.accent,
+                        ),
+                      ),
+                    ],
+                  )
+                else
+                  Column(
+                    children: [
+                      Row(
+                        children: [
+                          Expanded(
+                            child: _buildMetricCard(
+                              title: 'Assigned Subjects',
+                              value: '$totalSubjects',
+                              subtitle: 'Active courses',
+                              icon: Icons.menu_book_outlined,
+                              color: AppTheme.primary,
+                            ),
+                          ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: _buildMetricCard(
+                              title: 'Enrolled Students',
+                              value: '$totalStudents',
+                              subtitle: 'Across your classes',
+                              icon: Icons.people_alt_outlined,
+                              color: const Color(0xFF0D9488),
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 12),
+                      Row(
+                        children: [
+                          Expanded(
+                            child: _buildMetricCard(
+                              title: 'Class Pass Rate',
+                              value: '$passRate%',
+                              subtitle: '$passedAttempts passed ($totalAttempts attempts)',
+                              icon: Icons.verified_outlined,
+                              color: passRate >= 75 ? AppTheme.success : AppTheme.warning,
+                            ),
+                          ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: _buildMetricCard(
+                              title: 'Average Score',
+                              value: '$avgScore%',
+                              subtitle: 'Overall assessments',
+                              icon: Icons.trending_up,
+                              color: AppTheme.accent,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
                   ),
-                ),
-                const SizedBox(height: 12),
-                Row(
-                  children: [
-                    Expanded(
-                      child: _buildActionTile(
-                        icon: Icons.menu_book,
-                        label: 'Curriculum & Quizzes',
-                        color: AppTheme.primary,
-                        onTap: () => context.go('/teacher/subjects'),
-                      ),
-                    ),
-                    const SizedBox(width: 8),
-                    Expanded(
-                      child: _buildActionTile(
-                        icon: Icons.add_circle_outline,
-                        label: 'Create Quiz',
-                        color: const Color(0xFF0D9488),
-                        onTap: () => _showCreateQuizDialog(context),
-                      ),
-                    ),
-                    const SizedBox(width: 8),
-                    Expanded(
-                      child: _buildActionTile(
-                        icon: Icons.assignment_turned_in,
-                        label: 'Live Scores',
-                        color: AppTheme.accent,
-                        onTap: () => context.go('/teacher/scores'),
-                      ),
-                    ),
-                    const SizedBox(width: 8),
-                    Expanded(
-                      child: _buildActionTile(
-                        icon: Icons.people_alt,
-                        label: 'Student Roster',
-                        color: AppTheme.primary.withValues(alpha: 0.7),
-                        onTap: () => context.go('/teacher/students'),
-                      ),
-                    ),
-                    const SizedBox(width: 8),
-                    Expanded(
-                      child: _buildActionTile(
-                        icon: Icons.campaign_rounded,
-                        label: 'Announce',
-                        color: const Color(0xFF8B5CF6),
-                        onTap: () => PostAnnouncementDialog.show(
-                          context,
-                          defaultSection: _activeSectionFilter,
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 28),
+                const SizedBox(height: 20),
 
-                // Handled Class Sections Block
-                _buildHandledSectionsSection(context, handledSectionsDetailsAsync),
-                const SizedBox(height: 28),
+                // Today's Class Schedule Banner
+                const TodayScheduleBanner(),
 
-                // Announcements & Broadcasts Section
-                _buildAnnouncementsSection(currentUser, announcements, handledSections),
-                const SizedBox(height: 28),
-
-                // Recent Student Submissions Section
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Text(
-                      'Live Student Quiz Submissions',
-                      style: TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.bold,
-                        color: AppTheme.text,
-                      ),
-                    ),
-                    TextButton(
-                      onPressed: () => context.go('/teacher/scores'),
-                      child: Text('View All', style: TextStyle(color: AppTheme.primary, fontSize: 13)),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 8),
-
-                if (recentAttempts.isEmpty)
-                  Container(
-                    width: double.infinity,
-                    padding: const EdgeInsets.all(24),
-                    decoration: BoxDecoration(
-                      color: AppTheme.surface,
-                      borderRadius: BorderRadius.circular(14),
-                      border: Border.all(color: AppTheme.border),
-                    ),
-                    child: Center(
-                      child: Column(
-                        children: [
-                          Icon(Icons.quiz_outlined, size: 40, color: AppTheme.textMuted),
-                          const SizedBox(height: 8),
-                          Text(
-                            'No quiz submissions yet',
-                            style: TextStyle(fontWeight: FontWeight.w600, color: AppTheme.text),
-                          ),
-                          const SizedBox(height: 4),
-                          Text(
-                            'When enrolled students complete quizzes in your subjects, their live results will appear here.',
-                            textAlign: TextAlign.center,
-                            style: TextStyle(fontSize: 12, color: AppTheme.textSecondary),
-                          ),
-                        ],
-                      ),
-                    ),
-                  )
-                else
-                  ...recentAttempts.take(5).map((attempt) {
-                    final isPassed = attempt['is_passed'] == 1 || attempt['is_passed'] == true;
-                    final studentName = attempt['student_name']?.toString() ?? 'Student';
-                    final subjectName = attempt['subject_name']?.toString() ?? 'Subject';
-                    final score = attempt['score'] ?? 0;
-                    final total = attempt['total_questions'] ?? 0;
-                    final pct = (attempt['percentage'] as num?)?.round() ?? 0;
-
-                    return Container(
-                      margin: const EdgeInsets.only(bottom: 10),
-                      padding: const EdgeInsets.all(14),
-                      decoration: BoxDecoration(
-                        color: AppTheme.surface,
-                        borderRadius: BorderRadius.circular(12),
-                        border: Border.all(color: AppTheme.border),
-                      ),
-                      child: Row(
-                        children: [
-                          CircleAvatar(
-                            radius: 18,
-                            backgroundColor: isPassed
-                                ? AppTheme.success.withValues(alpha: 0.15)
-                                : AppTheme.error.withValues(alpha: 0.15),
-                            child: Icon(
-                              isPassed ? Icons.check_circle : Icons.cancel,
-                              color: isPassed ? AppTheme.success : AppTheme.error,
-                              size: 20,
-                            ),
-                          ),
-                          const SizedBox(width: 12),
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(
-                                  studentName,
-                                  style: TextStyle(
-                                    fontWeight: FontWeight.bold,
-                                    fontSize: 14,
-                                    color: AppTheme.text,
-                                  ),
-                                ),
-                                const SizedBox(height: 2),
-                                Text(
-                                  subjectName,
-                                  style: TextStyle(fontSize: 12, color: AppTheme.textSecondary),
-                                ),
-                              ],
-                            ),
-                          ),
-                          Column(
-                            crossAxisAlignment: CrossAxisAlignment.end,
-                            children: [
-                              Text(
-                                '$score / $total ($pct%)',
-                                style: TextStyle(
-                                  fontWeight: FontWeight.bold,
-                                  fontSize: 13,
-                                  color: isPassed ? AppTheme.success : AppTheme.error,
-                                ),
-                              ),
-                              const SizedBox(height: 2),
-                              Container(
-                                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                                decoration: BoxDecoration(
-                                  color: isPassed
-                                      ? AppTheme.success.withValues(alpha: 0.1)
-                                      : AppTheme.error.withValues(alpha: 0.1),
-                                  borderRadius: BorderRadius.circular(4),
-                                ),
-                                child: Text(
-                                  isPassed ? 'PASSED' : 'FAILED',
-                                  style: TextStyle(
-                                    fontSize: 9,
-                                    fontWeight: FontWeight.bold,
-                                    color: isPassed ? AppTheme.success : AppTheme.error,
-                                  ),
-                                ),
-                              ),
-                            ],
-                          ),
-                        ],
-                      ),
-                    );
-                  }),
-
+                // Direct Action Hub
+                _buildActionHub(context),
                 const SizedBox(height: 24),
 
-                // Assigned Subjects Section
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Text(
-                      'Your Assigned Subjects',
-                      style: TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.bold,
-                        color: AppTheme.text,
+                // Responsive Area: 2 Columns on Desktop, 1 Column on Mobile
+                if (isDesktop)
+                  Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      // Left Column: Class Overview & Submissions & Subjects
+                      Expanded(
+                        flex: 7,
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            const ClassOverviewWidget(),
+                            const SizedBox(height: 28),
+                            _buildSubmissionsSection(context, recentAttempts),
+                            const SizedBox(height: 28),
+                            _buildAssignedSubjectsSection(context, subjects),
+                          ],
+                        ),
                       ),
-                    ),
-                    TextButton(
-                      onPressed: () => context.go('/teacher/subjects'),
-                      child: Text('Manage', style: TextStyle(color: AppTheme.primary, fontSize: 13)),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 8),
-
-                if (subjects.isEmpty)
-                  Container(
-                    width: double.infinity,
-                    padding: const EdgeInsets.all(20),
-                    decoration: BoxDecoration(
-                      color: AppTheme.surface,
-                      borderRadius: BorderRadius.circular(14),
-                      border: Border.all(color: AppTheme.border),
-                    ),
-                    child: Center(
-                      child: Text(
-                        'No subjects currently assigned. School Administrators assign subjects in the Admin Portal.',
-                        textAlign: TextAlign.center,
-                        style: TextStyle(fontSize: 12, color: AppTheme.textSecondary),
+                      const SizedBox(width: 24),
+                      // Right Column: Handled Sections & Announcements
+                      Expanded(
+                        flex: 5,
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            _buildHandledSectionsSection(context, handledSectionsDetailsAsync),
+                            const SizedBox(height: 28),
+                            _buildAnnouncementsSection(currentUser, announcements, handledSections),
+                          ],
+                        ),
                       ),
-                    ),
+                    ],
                   )
                 else
-                  ...subjects.map((sub) {
-                    final subId = sub['id'] as int;
-                    final name = sub['name']?.toString() ?? 'Subject';
-                    final code = sub['subject_code']?.toString() ?? '';
-                    final unlockType = sub['unlock_type']?.toString() ?? 'Sequential';
-                    final semester = sub['semester']?.toString() ?? '';
-
-                    return Container(
-                      margin: const EdgeInsets.only(bottom: 10),
-                      padding: const EdgeInsets.all(14),
-                      decoration: BoxDecoration(
-                        color: AppTheme.surface,
-                        borderRadius: BorderRadius.circular(12),
-                        border: Border.all(color: AppTheme.border),
-                      ),
-                      child: Row(
-                        children: [
-                          Container(
-                            padding: const EdgeInsets.all(8),
-                            decoration: BoxDecoration(
-                              color: AppTheme.primary.withValues(alpha: 0.1),
-                              borderRadius: BorderRadius.circular(8),
-                            ),
-                            child: Icon(Icons.menu_book, color: AppTheme.primary, size: 20),
-                          ),
-                          const SizedBox(width: 12),
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Row(
-                                  children: [
-                                    if (code.isNotEmpty) ...[
-                                      Container(
-                                        padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
-                                        decoration: BoxDecoration(
-                                          color: AppTheme.border.withValues(alpha: 0.6),
-                                          borderRadius: BorderRadius.circular(4),
-                                        ),
-                                        child: Text(
-                                          code,
-                                          style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: AppTheme.text),
-                                        ),
-                                      ),
-                                      const SizedBox(width: 6),
-                                    ],
-                                    Text(
-                                      unlockType,
-                                      style: TextStyle(fontSize: 11, color: AppTheme.textSecondary),
-                                    ),
-                                    if (semester.isNotEmpty) ...[
-                                      const SizedBox(width: 6),
-                                      Text(
-                                        '· $semester',
-                                        style: TextStyle(fontSize: 11, color: AppTheme.textMuted),
-                                      ),
-                                    ],
-                                  ],
-                                ),
-                                const SizedBox(height: 3),
-                                Text(
-                                  name,
-                                  style: TextStyle(
-                                    fontWeight: FontWeight.bold,
-                                    fontSize: 14,
-                                    color: AppTheme.text,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                          IconButton(
-                            icon: Icon(Icons.arrow_forward_ios, size: 16, color: AppTheme.primary),
-                            tooltip: 'Open Curriculum & Quizzes',
-                            onPressed: () => context.push('/teacher/subjects/$subId'),
-                          ),
-                        ],
-                      ),
-                    );
-                  }),
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const ClassOverviewWidget(),
+                      const SizedBox(height: 28),
+                      _buildHandledSectionsSection(context, handledSectionsDetailsAsync),
+                      const SizedBox(height: 28),
+                      _buildAnnouncementsSection(currentUser, announcements, handledSections),
+                      const SizedBox(height: 28),
+                      _buildSubmissionsSection(context, recentAttempts),
+                      const SizedBox(height: 28),
+                      _buildAssignedSubjectsSection(context, subjects),
+                    ],
+                  ),
                 const SizedBox(height: 20),
               ],
             ),
           ),
         ),
       ),
+    );
+  }
+
+  Widget _buildActionHub(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          'Quick Actions Hub',
+          style: TextStyle(
+            fontSize: 16,
+            fontWeight: FontWeight.bold,
+            color: AppTheme.text,
+          ),
+        ),
+        const SizedBox(height: 12),
+        Row(
+          children: [
+            Expanded(
+              child: _buildActionTile(
+                icon: Icons.menu_book,
+                label: 'Curriculum & Quizzes',
+                color: AppTheme.primary,
+                onTap: () => context.go('/teacher/subjects'),
+              ),
+            ),
+            const SizedBox(width: 8),
+            Expanded(
+              child: _buildActionTile(
+                icon: Icons.calendar_month,
+                label: 'Class Scheduling',
+                color: Colors.teal,
+                onTap: () => context.go('/teacher/schedule'),
+              ),
+            ),
+            const SizedBox(width: 8),
+            Expanded(
+              child: _buildActionTile(
+                icon: Icons.assignment_turned_in,
+                label: 'Live Scores',
+                color: AppTheme.accent,
+                onTap: () => context.go('/teacher/scores'),
+              ),
+            ),
+            const SizedBox(width: 8),
+            Expanded(
+              child: _buildActionTile(
+                icon: Icons.people_alt,
+                label: 'Student Roster',
+                color: AppTheme.primary.withValues(alpha: 0.7),
+                onTap: () => context.go('/teacher/students'),
+              ),
+            ),
+            const SizedBox(width: 8),
+            Expanded(
+              child: _buildActionTile(
+                icon: Icons.add_circle_outline,
+                label: 'Create Quiz',
+                color: const Color(0xFF0D9488),
+                onTap: () => _showCreateQuizDialog(context),
+              ),
+            ),
+            const SizedBox(width: 8),
+            Expanded(
+              child: _buildActionTile(
+                icon: Icons.campaign_rounded,
+                label: 'Announce',
+                color: const Color(0xFF8B5CF6),
+                onTap: () => PostAnnouncementDialog.show(
+                  context,
+                  defaultSection: _activeSectionFilter,
+                ),
+              ),
+            ),
+          ],
+        ),
+      ],
+    );
+  }
+
+  Widget _buildSubmissionsSection(BuildContext context, List<Map<String, dynamic>> recentAttempts) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Text(
+              'Live Student Quiz Submissions',
+              style: TextStyle(
+                fontSize: 16,
+                fontWeight: FontWeight.bold,
+                color: AppTheme.text,
+              ),
+            ),
+            TextButton(
+              onPressed: () => context.go('/teacher/scores'),
+              child: Text('View All', style: TextStyle(color: AppTheme.primary, fontSize: 13)),
+            ),
+          ],
+        ),
+        const SizedBox(height: 8),
+        if (recentAttempts.isEmpty)
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.all(24),
+            decoration: BoxDecoration(
+              color: AppTheme.surface,
+              borderRadius: BorderRadius.circular(14),
+              border: Border.all(color: AppTheme.border),
+            ),
+            child: Center(
+              child: Column(
+                children: [
+                  Icon(Icons.quiz_outlined, size: 40, color: AppTheme.textMuted),
+                  const SizedBox(height: 8),
+                  Text(
+                    'No quiz submissions yet',
+                    style: TextStyle(fontWeight: FontWeight.w600, color: AppTheme.text),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    'When enrolled students complete quizzes in your subjects, their live results will appear here.',
+                    textAlign: TextAlign.center,
+                    style: TextStyle(fontSize: 12, color: AppTheme.textSecondary),
+                  ),
+                ],
+              ),
+            ),
+          )
+        else
+          ...recentAttempts.take(5).map((attempt) {
+            final isPassed = attempt['is_passed'] == 1 || attempt['is_passed'] == true;
+            final studentName = attempt['student_name']?.toString() ?? 'Student';
+            final subjectName = attempt['subject_name']?.toString() ?? 'Subject';
+            final score = attempt['score'] ?? 0;
+            final total = attempt['total_questions'] ?? 0;
+            final pct = (attempt['percentage'] as num?)?.round() ?? 0;
+
+            return Container(
+              margin: const EdgeInsets.only(bottom: 10),
+              padding: const EdgeInsets.all(14),
+              decoration: BoxDecoration(
+                color: AppTheme.surface,
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: AppTheme.border),
+              ),
+              child: Row(
+                children: [
+                  CircleAvatar(
+                    radius: 18,
+                    backgroundColor: isPassed
+                        ? AppTheme.success.withValues(alpha: 0.15)
+                        : AppTheme.error.withValues(alpha: 0.15),
+                    child: Icon(
+                      isPassed ? Icons.check_circle : Icons.cancel,
+                      color: isPassed ? AppTheme.success : AppTheme.error,
+                      size: 20,
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          studentName,
+                          style: TextStyle(
+                            fontWeight: FontWeight.bold,
+                            fontSize: 14,
+                            color: AppTheme.text,
+                          ),
+                        ),
+                        const SizedBox(height: 2),
+                        Text(
+                          subjectName,
+                          style: TextStyle(fontSize: 12, color: AppTheme.textSecondary),
+                        ),
+                      ],
+                    ),
+                  ),
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.end,
+                    children: [
+                      Text(
+                        '$score / $total ($pct%)',
+                        style: TextStyle(
+                          fontWeight: FontWeight.bold,
+                          fontSize: 13,
+                          color: isPassed ? AppTheme.success : AppTheme.error,
+                        ),
+                      ),
+                      const SizedBox(height: 2),
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                        decoration: BoxDecoration(
+                          color: isPassed
+                              ? AppTheme.success.withValues(alpha: 0.1)
+                              : AppTheme.error.withValues(alpha: 0.1),
+                          borderRadius: BorderRadius.circular(4),
+                        ),
+                        child: Text(
+                          isPassed ? 'PASSED' : 'FAILED',
+                          style: TextStyle(
+                            fontSize: 9,
+                            fontWeight: FontWeight.bold,
+                            color: isPassed ? AppTheme.success : AppTheme.error,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            );
+          }),
+      ],
+    );
+  }
+
+  Widget _buildAssignedSubjectsSection(BuildContext context, List<Map<String, dynamic>> subjects) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Text(
+              'Your Assigned Subjects',
+              style: TextStyle(
+                fontSize: 16,
+                fontWeight: FontWeight.bold,
+                color: AppTheme.text,
+              ),
+            ),
+            TextButton(
+              onPressed: () => context.go('/teacher/subjects'),
+              child: Text('Manage', style: TextStyle(color: AppTheme.primary, fontSize: 13)),
+            ),
+          ],
+        ),
+        const SizedBox(height: 8),
+        if (subjects.isEmpty)
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.all(20),
+            decoration: BoxDecoration(
+              color: AppTheme.surface,
+              borderRadius: BorderRadius.circular(14),
+              border: Border.all(color: AppTheme.border),
+            ),
+            child: Center(
+              child: Text(
+                'No subjects currently assigned. School Administrators assign subjects in the Admin Portal.',
+                textAlign: TextAlign.center,
+                style: TextStyle(fontSize: 12, color: AppTheme.textSecondary),
+              ),
+            ),
+          )
+        else
+          ...subjects.map((sub) {
+            final subId = sub['id'] as int;
+            final name = sub['name']?.toString() ?? 'Subject';
+            final code = sub['subject_code']?.toString() ?? '';
+            final unlockType = sub['unlock_type']?.toString() ?? 'Sequential';
+            final semester = sub['semester']?.toString() ?? '';
+
+            return Container(
+              margin: const EdgeInsets.only(bottom: 10),
+              padding: const EdgeInsets.all(14),
+              decoration: BoxDecoration(
+                color: AppTheme.surface,
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: AppTheme.border),
+              ),
+              child: Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(8),
+                    decoration: BoxDecoration(
+                      color: AppTheme.primary.withValues(alpha: 0.1),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: Icon(Icons.menu_book, color: AppTheme.primary, size: 20),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          children: [
+                            if (code.isNotEmpty) ...[
+                              Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
+                                decoration: BoxDecoration(
+                                  color: AppTheme.border.withValues(alpha: 0.6),
+                                  borderRadius: BorderRadius.circular(4),
+                                ),
+                                child: Text(
+                                  code,
+                                  style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: AppTheme.text),
+                                ),
+                              ),
+                              const SizedBox(width: 6),
+                            ],
+                            Text(
+                              unlockType,
+                              style: TextStyle(fontSize: 11, color: AppTheme.textSecondary),
+                            ),
+                            if (semester.isNotEmpty) ...[
+                              const SizedBox(width: 6),
+                              Text(
+                                '· $semester',
+                                style: TextStyle(fontSize: 11, color: AppTheme.textMuted),
+                              ),
+                            ],
+                          ],
+                        ),
+                        const SizedBox(height: 3),
+                        Text(
+                          name,
+                          style: TextStyle(
+                            fontWeight: FontWeight.bold,
+                            fontSize: 14,
+                            color: AppTheme.text,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  IconButton(
+                    icon: Icon(Icons.arrow_forward_ios, size: 16, color: AppTheme.primary),
+                    tooltip: 'Open Curriculum & Quizzes',
+                    onPressed: () => context.push('/teacher/subjects/$subId'),
+                  ),
+                ],
+              ),
+            );
+          }),
+      ],
     );
   }
 

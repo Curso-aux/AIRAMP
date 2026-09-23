@@ -44,6 +44,8 @@ const ENTITY_MAP: Record<string, EntityMeta> = {
   "activity-logs": { collection: "activityLogs", idField: "id" },
   "invite-codes": { collection: "inviteCodes", idField: "id" },
   "playback-positions": { collection: "playbackPositions", idField: "id" },
+  "schedules": { collection: "schedules", idField: "id" },
+  "schools": { collection: "schools", idField: "id" },
 };
 
 function json(data: unknown, status = 200): Response {
@@ -129,10 +131,43 @@ export class ApiRoom extends DurableObject<ApiEnv> {
     const itemId = segments[1];
     const subAction = segments[2];
 
+    const resolvedRole = request.headers.get("X-Resolved-Role") || "student";
+    const resolvedSchoolId = request.headers.get("X-Resolved-School-Id") || "sch_main";
+
+    // ── Server-Side RBAC Enforcement ──
+    const isMutation = ["POST", "PUT", "PATCH", "DELETE"].includes(request.method);
+
+    // 1. School Management: Only super_admin can mutate schools
+    if (entityKey === "schools" && isMutation && resolvedRole !== "super_admin") {
+      return json({ error: "Forbidden: Super Administrator access required" }, 403);
+    }
+
+    // 2. User Management Guard: Students and teachers cannot create/edit/delete users
+    if (entityKey === "users" && isMutation) {
+      if (resolvedRole === "student" || resolvedRole === "teacher") {
+        return json({ error: "Forbidden: Insufficient privileges to modify user accounts" }, 403);
+      }
+    }
+
+    // 3. Subjects Deletion: Only Admins can delete subjects
+    if (entityKey === "subjects" && request.method === "DELETE" && resolvedRole !== "admin" && resolvedRole !== "super_admin") {
+      return json({ error: "Forbidden: Only Administrators can delete courses" }, 403);
+    }
+
     try {
       // GET /:entity — list all (with optional filters via query params)
       if (request.method === "GET" && !itemId) {
         let items = await this.getCollection<Record<string, unknown>>(meta.collection);
+
+        // Scope by school_id for non-super_admin users
+        if (resolvedRole !== "super_admin") {
+          items = items.filter(item => 
+            !item["school_id"] && !item["schoolId"] || 
+            item["school_id"] === resolvedSchoolId || 
+            item["schoolId"] === resolvedSchoolId
+          );
+        }
+
         // Apply query param filters
         for (const [key, value] of url.searchParams.entries()) {
           if (key === "limit") {

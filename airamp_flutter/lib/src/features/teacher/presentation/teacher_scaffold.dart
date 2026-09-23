@@ -1,8 +1,10 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/theme/theme_provider.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'web/teacher_web_scaffold.dart';
 
 class TeacherScaffold extends ConsumerWidget {
   final StatefulNavigationShell navigationShell;
@@ -19,7 +21,14 @@ class TeacherScaffold extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     ref.watch(themeProvider);
+    final screenWidth = MediaQuery.of(context).size.width;
 
+    // Responsive Desktop Web layout with Collapsible Sidebar
+    if (kIsWeb || screenWidth >= 900) {
+      return TeacherWebScaffold(navigationShell: navigationShell);
+    }
+
+    // Mobile / Tablet layout with BottomNavigationBar
     return Scaffold(
       backgroundColor: AppTheme.background,
       body: navigationShell,
@@ -34,8 +43,8 @@ class TeacherScaffold extends ConsumerWidget {
           selectedItemColor: AppTheme.primary,
           unselectedItemColor: AppTheme.textMuted,
           showUnselectedLabels: true,
-          selectedFontSize: 10,
-          unselectedFontSize: 10,
+          selectedFontSize: 9,
+          unselectedFontSize: 9,
           currentIndex: navigationShell.currentIndex,
           onTap: _goBranch,
           items: const [
@@ -48,6 +57,11 @@ class TeacherScaffold extends ConsumerWidget {
               icon: Icon(Icons.menu_book_outlined),
               activeIcon: Icon(Icons.menu_book),
               label: 'Subjects',
+            ),
+            BottomNavigationBarItem(
+              icon: Icon(Icons.calendar_month_outlined),
+              activeIcon: Icon(Icons.calendar_month),
+              label: 'Schedule',
             ),
             BottomNavigationBarItem(
               icon: Icon(Icons.assignment_turned_in_outlined),

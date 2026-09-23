@@ -42,15 +42,16 @@ class _AdminWebLoginScreenState extends ConsumerState<AdminWebLoginScreen> {
       final user = ref.read(authProvider);
 
       if (user != null) {
-        // Strict Authorization: Only admin and super_admin allowed on Web!
+        // Strict Authorization: Administrators and Teachers allowed on Web!
         if (user.role == 'admin' || user.role == 'super_admin') {
           if (mounted) context.go('/admin/dashboard');
+        } else if (user.role == 'teacher') {
+          if (mounted) context.go('/teacher/dashboard');
         } else {
-          // Immediately revoke session on web for non-admin roles
+          // Immediately revoke session on web for student roles
           await ref.read(authProvider.notifier).logout();
           setState(() {
-            final roleName = user.role == 'teacher' ? 'Teacher' : 'Student';
-            _error = 'Access Restricted: You are signed in with a $roleName account. The Web Portal is exclusively reserved for School Administrators. Please open the AIRAMP application on your mobile device or Windows computer.';
+            _error = 'Access Restricted: You are signed in with a Student account. The Web Portal is exclusively reserved for School Administrators and Faculty Members. Students must open the AIRAMP app on a mobile device or classroom tablet.';
           });
         }
       }
@@ -137,7 +138,7 @@ class _AdminWebLoginScreenState extends ConsumerState<AdminWebLoginScreen> {
 
                   // Title & Subtitle
                   Text(
-                    'AIRA Admin Console',
+                    'AIRA Web Portal',
                     textAlign: TextAlign.center,
                     style: TextStyle(
                       fontSize: 24,
@@ -148,7 +149,7 @@ class _AdminWebLoginScreenState extends ConsumerState<AdminWebLoginScreen> {
                   ),
                   const SizedBox(height: 6),
                   Text(
-                    'Institutional Governance & Curriculum Management',
+                    'Institutional Governance & Faculty Portal',
                     textAlign: TextAlign.center,
                     style: TextStyle(
                       color: AppTheme.textSecondary,
@@ -162,18 +163,18 @@ class _AdminWebLoginScreenState extends ConsumerState<AdminWebLoginScreen> {
                   Container(
                     padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
                     decoration: BoxDecoration(
-                      color: AppTheme.warning.withValues(alpha: 0.1),
+                      color: AppTheme.primary.withValues(alpha: 0.08),
                       borderRadius: BorderRadius.circular(10),
-                      border: Border.all(color: AppTheme.warning.withValues(alpha: 0.25)),
+                      border: Border.all(color: AppTheme.primary.withValues(alpha: 0.2)),
                     ),
                     child: Row(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Icon(Icons.info_outline_rounded, color: AppTheme.warning, size: 18),
+                        Icon(Icons.info_outline_rounded, color: AppTheme.primary, size: 18),
                         const SizedBox(width: 10),
                         Expanded(
                           child: Text(
-                            'Authorized School Administrators only. Teachers and students must use the AIRAMP mobile/desktop app.',
+                            'Authorized School Administrators and Faculty Members. Students must sign in via the AIRAMP mobile app.',
                             style: TextStyle(
                               color: AppTheme.text,
                               fontSize: 12,

@@ -6,6 +6,7 @@ import 'package:go_router/go_router.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../../core/theme/theme_provider.dart';
 import '../../../auth/application/auth_provider.dart';
+import '../../data/admin_repository.dart';
 import 'components/admin_command_palette.dart';
 
 class AdminWebScaffold extends ConsumerStatefulWidget {
@@ -321,6 +322,10 @@ class _AdminWebScaffoldState extends ConsumerState<AdminWebScaffold> {
           // Spacer pushes theme toggle and role badge to the absolute far right
           const Spacer(),
 
+          // Campus Switcher for Super Admin or School Badge for Admin
+          _buildCampusSwitcher(currentUser),
+          const SizedBox(width: 12),
+
           // Theme Toggle Icon
           Container(
             decoration: BoxDecoration(
@@ -358,6 +363,146 @@ class _AdminWebScaffoldState extends ConsumerState<AdminWebScaffold> {
             ),
           ),
         ],
+      ),
+    );
+  }
+
+  Widget _buildCampusSwitcher(dynamic currentUser) {
+    final schools = ref.watch(schoolsListProvider);
+    final selectedSchoolId = ref.watch(superAdminSelectedSchoolProvider);
+    final isSuperAdmin = currentUser?.role == 'super_admin';
+
+    if (!isSuperAdmin) {
+      final userSchoolId = currentUser?.schoolId ?? 'sch_main';
+      final matchedSchool = schools.firstWhere(
+        (s) => s['id'] == userSchoolId,
+        orElse: () => {'name': 'Default Campus', 'code': 'ADM-01'},
+      );
+      return Container(
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+        decoration: BoxDecoration(
+          color: AppTheme.background,
+          borderRadius: BorderRadius.circular(8),
+          border: Border.all(color: AppTheme.border),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(Icons.account_balance_outlined, size: 14, color: AppTheme.textSecondary),
+            const SizedBox(width: 6),
+            Text(
+              '${matchedSchool['code']}',
+              style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: AppTheme.text),
+            ),
+          ],
+        ),
+      );
+    }
+
+    final currentSchoolName = selectedSchoolId == null
+        ? 'All Campuses'
+        : (schools.firstWhere(
+            (s) => s['id'] == selectedSchoolId,
+            orElse: () => {'name': 'Campus', 'code': selectedSchoolId},
+          )['code'] ?? selectedSchoolId);
+
+    return PopupMenuButton<String?>(
+      tooltip: 'Filter or Switch Campus Scope',
+      initialValue: selectedSchoolId,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      color: AppTheme.surface,
+      elevation: 6,
+      onSelected: (val) {
+        ref.read(superAdminSelectedSchoolProvider.notifier).state = val;
+      },
+      itemBuilder: (context) {
+        return [
+          PopupMenuItem<String?>(
+            value: null,
+            child: Row(
+              children: [
+                Icon(
+                  Icons.public_rounded,
+                  size: 16,
+                  color: selectedSchoolId == null ? AppTheme.primary : AppTheme.textSecondary,
+                ),
+                const SizedBox(width: 10),
+                Text(
+                  'All Campuses (Global View)',
+                  style: TextStyle(
+                    fontSize: 13,
+                    fontWeight: selectedSchoolId == null ? FontWeight.bold : FontWeight.normal,
+                    color: selectedSchoolId == null ? AppTheme.primary : AppTheme.text,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const PopupMenuDivider(),
+          ...schools.map((s) {
+            final sId = s['id'] as String;
+            final isSelected = sId == selectedSchoolId;
+            return PopupMenuItem<String?>(
+              value: sId,
+              child: Row(
+                children: [
+                  Icon(
+                    Icons.account_balance_rounded,
+                    size: 16,
+                    color: isSelected ? Colors.teal : AppTheme.textSecondary,
+                  ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Text(
+                      '${s['name']} (${s['code']})',
+                      style: TextStyle(
+                        fontSize: 13,
+                        fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+                        color: isSelected ? Colors.teal : AppTheme.text,
+                      ),
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+                ],
+              ),
+            );
+          }),
+        ];
+      },
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+        decoration: BoxDecoration(
+          color: selectedSchoolId == null
+              ? AppTheme.background
+              : Colors.teal.withValues(alpha: 0.1),
+          borderRadius: BorderRadius.circular(8),
+          border: Border.all(
+            color: selectedSchoolId == null
+                ? AppTheme.border
+                : Colors.teal.withValues(alpha: 0.4),
+          ),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(
+              selectedSchoolId == null ? Icons.public_rounded : Icons.account_balance_rounded,
+              size: 14,
+              color: selectedSchoolId == null ? AppTheme.textSecondary : Colors.teal,
+            ),
+            const SizedBox(width: 6),
+            Text(
+              currentSchoolName,
+              style: TextStyle(
+                fontSize: 11,
+                fontWeight: FontWeight.bold,
+                color: selectedSchoolId == null ? AppTheme.text : Colors.teal,
+              ),
+            ),
+            const SizedBox(width: 4),
+            Icon(Icons.arrow_drop_down, size: 16, color: AppTheme.textSecondary),
+          ],
+        ),
       ),
     );
   }
@@ -528,6 +673,46 @@ class _AdminWebScaffoldState extends ConsumerState<AdminWebScaffold> {
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
+              // Super Admin Console Access for Super Admins
+              if (currentUser?.role == 'super_admin') ...[
+                InkWell(
+                  onTap: () => context.go('/admin/admin-management'),
+                  borderRadius: BorderRadius.circular(10),
+                  child: Container(
+                    height: 40,
+                    margin: const EdgeInsets.only(bottom: 10),
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(
+                        colors: [Colors.purple.shade700, Colors.deepPurple.shade900],
+                        begin: Alignment.topLeft,
+                        end: Alignment.bottomRight,
+                      ),
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: isCollapsed
+                        ? const Tooltip(
+                            message: 'Super Admin Console',
+                            preferBelow: false,
+                            waitDuration: Duration(milliseconds: 250),
+                            child: Center(
+                              child: Icon(Icons.admin_panel_settings, size: 18, color: Colors.white),
+                            ),
+                          )
+                        : const Row(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Icon(Icons.admin_panel_settings, size: 16, color: Colors.white),
+                              SizedBox(width: 8),
+                              Text(
+                                'Super Admin Console',
+                                style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.white),
+                              ),
+                            ],
+                          ),
+                  ),
+                ),
+              ],
+
               // User Profile Section
               Container(
                 height: 44,

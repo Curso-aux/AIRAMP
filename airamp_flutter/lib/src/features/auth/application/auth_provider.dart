@@ -13,6 +13,7 @@ class User {
   final String? profileImage;
   final String? section;
   final String? grade;
+  final String? schoolId;
   final List<String> availableRoles;
 
   User({
@@ -24,23 +25,57 @@ class User {
     this.profileImage,
     this.section,
     this.grade,
+    this.schoolId = 'sch_main',
     this.availableRoles = const ['student', 'teacher'],
   });
 
+  bool get isSuperAdmin => role == 'super_admin';
+  bool get isSchoolAdmin => role == 'admin';
+  bool get isAdmin => role == 'admin' || role == 'super_admin';
   bool get isTeacher => role == 'teacher';
   bool get isStudent => role == 'student';
-  bool get isAdmin => role == 'admin' || role == 'super_admin';
+
+  /// Permission Matrix evaluator for Role-Based Access Control (RBAC)
+  bool hasPermission(String permission) {
+    if (isSuperAdmin) return true;
+    switch (permission) {
+      case 'manage_schools':
+      case 'manage_admins':
+      case 'system_audit':
+        return false;
+      case 'manage_teachers':
+      case 'manage_students':
+      case 'manage_subjects':
+      case 'manage_sections':
+      case 'bulk_import':
+      case 'school_announcements':
+        return isSchoolAdmin;
+      case 'manage_schedules':
+      case 'grade_submissions':
+      case 'create_quizzes':
+      case 'section_announcements':
+        return isSchoolAdmin || isTeacher;
+      case 'view_courses':
+      case 'view_schedules':
+      case 'take_quizzes':
+      case 'submit_assignments':
+        return true;
+      default:
+        return false;
+    }
+  }
 
   factory User.fromJson(Map<String, dynamic> json) {
     return User(
       id: json['id'] ?? '',
       email: json['email'] ?? '',
       role: json['role'] ?? 'student',
-      fullName: json['fullName'] ?? '',
-      username: json['username'] ?? json['fullName'] ?? '',
+      fullName: json['fullName'] ?? json['full_name'] ?? '',
+      username: json['username'] ?? json['fullName'] ?? json['full_name'] ?? '',
       profileImage: json['profileImage'],
       section: json['section'],
       grade: json['grade'],
+      schoolId: json['schoolId'] ?? json['school_id'] ?? 'sch_main',
       availableRoles: (json['availableRoles'] as List?)?.cast<String>() ?? const ['student', 'teacher'],
     );
   }
@@ -54,6 +89,7 @@ class User {
     String? role,
     String? section,
     String? grade,
+    String? schoolId,
     List<String>? availableRoles,
   }) {
     return User(
@@ -65,6 +101,7 @@ class User {
       profileImage: profileImage ?? this.profileImage,
       section: section ?? this.section,
       grade: grade ?? this.grade,
+      schoolId: schoolId ?? this.schoolId,
       availableRoles: availableRoles ?? this.availableRoles,
     );
   }
@@ -129,8 +166,8 @@ class AuthNotifier extends Notifier<User?> {
       return;
     }
 
-    // On Web (kIsWeb): Non-admin sessions are NOT permitted. Web is exclusively for School Administrators!
-    if (kIsWeb && (session.role != 'admin' && session.role != 'super_admin')) {
+    // On Web (kIsWeb): Web portal is available for Administrators, Super Administrators, and Teachers (Faculty).
+    if (kIsWeb && (session.role != 'admin' && session.role != 'super_admin' && session.role != 'teacher')) {
       await repository.logout();
       return;
     }
@@ -149,6 +186,7 @@ class AuthNotifier extends Notifier<User?> {
         username: u['username'] as String? ?? '',
         section: u['section'] as String?,
         grade: u['grade'] as String?,
+        schoolId: u['school_id'] as String? ?? 'sch_main',
       );
     } else {
       state = User(
@@ -156,6 +194,7 @@ class AuthNotifier extends Notifier<User?> {
         email: '',
         role: session.role,
         fullName: session.userId,
+        schoolId: 'sch_main',
       );
     }
     ApiClient.setSession(session: session.session, userId: session.userId);
