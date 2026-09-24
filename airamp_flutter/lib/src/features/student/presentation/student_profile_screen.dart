@@ -314,7 +314,7 @@ class _StudentProfileScreenState extends ConsumerState<StudentProfileScreen> {
           ),
           const SizedBox(height: 8),
           Text(
-            'Choose your preferred theme. Auto follows your system setting.',
+            'Choose your preferred theme between Light and Dark mode.',
             style: TextStyle(
               fontSize: 13,
               color: AppTheme.textMuted,
@@ -332,19 +332,12 @@ class _StudentProfileScreenState extends ConsumerState<StudentProfileScreen> {
                 mode: AppThemeMode.light,
                 isActive: themeState.preference == AppThemeMode.light,
               ),
-              const SizedBox(width: 8),
+              const SizedBox(width: 12),
               _buildThemePill(
                 icon: Icons.dark_mode,
                 label: 'Dark',
                 mode: AppThemeMode.dark,
                 isActive: themeState.preference == AppThemeMode.dark,
-              ),
-              const SizedBox(width: 8),
-              _buildThemePill(
-                icon: Icons.computer,
-                label: 'Auto',
-                mode: AppThemeMode.auto,
-                isActive: themeState.preference == AppThemeMode.auto,
               ),
             ],
           ),

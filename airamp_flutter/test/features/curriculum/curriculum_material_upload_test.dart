@@ -158,9 +158,10 @@ void main() {
       // Subject info is present
       expect(find.text('Mobile Development with Flutter'), findsOneWidget);
 
-      // Tab selector: Curriculum and My Quizzes
+      // Tab selector: Curriculum, Quizzes, and Assignments
       expect(find.text('Curriculum'), findsOneWidget);
-      expect(find.text('My Quizzes'), findsOneWidget);
+      expect(find.text('Quizzes'), findsOneWidget);
+      expect(find.text('Assignments'), findsOneWidget);
 
       // Curriculum action bar is present
       expect(find.text('Course Curriculum'), findsOneWidget);

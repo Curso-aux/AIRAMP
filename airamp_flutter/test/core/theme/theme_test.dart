@@ -98,5 +98,9 @@ void main() {
       expect(AppTheme.lightTheme.outlinedButtonTheme.style, isNotNull);
       expect(AppTheme.darkTheme.outlinedButtonTheme.style, isNotNull);
     });
+
+    test('AppThemeMode contains exactly light and dark modes (legacy auto brightness removed)', () {
+      expect(AppThemeMode.values, equals([AppThemeMode.light, AppThemeMode.dark]));
+    });
   });
 }

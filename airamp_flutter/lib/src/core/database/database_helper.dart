@@ -2085,25 +2085,117 @@ class DatabaseHelper {
 
   // ── Admin Web Analytics & Student Management ───────────────
 
-  Future<Map<String, dynamic>> getAdminAnalyticsSummary() async {
+  Future<Map<String, dynamic>> getAdminAnalyticsSummary({
+    int? subjectId,
+    String? section,
+    String? timeframe,
+    String? studentCategory,
+    String? role,
+  }) async {
     final db = await database;
 
-    final users = await db.query('users');
+    final allUsers = await db.query('users');
+    
+    // 1. Filter Users by role, section, and student category
+    final users = allUsers.where((u) {
+      final uRole = u['role'] as String? ?? 'student';
+      if (role != null && role != 'all' && role.isNotEmpty && uRole != role) return false;
+
+      final sec = (u['section'] as String? ?? '').trim();
+      if (section != null && section.isNotEmpty && section != 'All Sections') {
+        if (section == 'Unassigned') {
+          if (sec.isNotEmpty && sec.toLowerCase() != 'unassigned') return false;
+        } else {
+          if (sec != section) return false;
+        }
+      }
+
+      if (studentCategory != null && studentCategory != 'all' && studentCategory.isNotEmpty) {
+        final type = (u['student_type'] as String? ?? 'regular').toLowerCase();
+        final secLower = sec.toLowerCase();
+        if (studentCategory == 'unassigned') {
+          if (secLower.isNotEmpty && secLower != 'unassigned') return false;
+        } else if (studentCategory == 'irregular') {
+          if (!type.contains('irregular') && !type.contains('cross')) return false;
+        } else if (studentCategory == 'sped') {
+          if (!type.contains('sped') && !type.contains('accommodat')) return false;
+        } else if (studentCategory == 'transferee') {
+          if (!type.contains('transferee')) return false;
+        } else if (studentCategory == 'regular') {
+          if (type != 'regular' || secLower.isEmpty || secLower == 'unassigned') return false;
+        }
+      }
+      return true;
+    }).toList();
+
     final totalUsers = users.length;
     final totalStudents = users.where((u) => u['role'] == 'student').length;
     final totalTeachers = users.where((u) => u['role'] == 'teacher').length;
     final totalAdmins = users.where((u) => u['role'] == 'admin' || u['role'] == 'super_admin').length;
+    final matchingStudentIds = users.where((u) => u['role'] == 'student').map((u) => u['id'] as String).toSet();
 
-    final subjects = await db.query('subjects');
+    // 2. Filter Subjects
+    final allSubjects = await db.query('subjects');
+    final subjects = subjectId != null
+        ? allSubjects.where((s) => s['id'] == subjectId).toList()
+        : allSubjects;
     final totalSubjects = subjects.length;
 
-    final enrollments = await db.query('enrollments');
+    // 3. Filter Enrollments (scoped to matching students & subject)
+    final allEnrollments = await db.query('enrollments');
+    final enrollments = allEnrollments.where((e) {
+      if ((section != null && section != 'All Sections') ||
+          (studentCategory != null && studentCategory != 'all' && studentCategory.isNotEmpty)) {
+        if (!matchingStudentIds.contains(e['student_id'])) return false;
+      }
+      if (subjectId != null && e['subject_id'] != subjectId) return false;
+      return true;
+    }).toList();
     final totalEnrollments = enrollments.length;
 
-    final topics = await db.query('topics');
-    final los = await db.query('learning_outcomes');
+    // Topics & LOs
+    final allTopics = await db.query('topics');
+    final topics = subjectId != null
+        ? allTopics.where((t) => t['subject_id'] == subjectId).toList()
+        : allTopics;
+    final topicIds = topics.map((t) => t['id'] as int).toSet();
 
-    final attempts = await db.query('quiz_attempts');
+    final allLos = await db.query('learning_outcomes');
+    final los = subjectId != null
+        ? allLos.where((l) => topicIds.contains(l['topic_id'])).toList()
+        : allLos;
+
+    // 4. Date calculation for timeframe
+    DateTime? startDate;
+    final now = DateTime.now();
+    if (timeframe == 'today') {
+      startDate = DateTime(now.year, now.month, now.day);
+    } else if (timeframe == '7days') {
+      startDate = now.subtract(const Duration(days: 7));
+    } else if (timeframe == '30days') {
+      startDate = now.subtract(const Duration(days: 30));
+    } else if (timeframe == 'this_month') {
+      startDate = DateTime(now.year, now.month, 1);
+    }
+
+    // 5. Filter Quiz Attempts (AND logic: matching students, subject, and timeframe)
+    final allAttempts = await db.query('quiz_attempts');
+    final attempts = allAttempts.where((a) {
+      if ((section != null && section != 'All Sections') ||
+          (studentCategory != null && studentCategory != 'all' && studentCategory.isNotEmpty)) {
+        if (!matchingStudentIds.contains(a['student_id'])) return false;
+      }
+      if (subjectId != null && a['subject_id'] != subjectId) return false;
+      if (startDate != null) {
+        final dateStr = a['attempted_at']?.toString();
+        if (dateStr != null) {
+          final d = DateTime.tryParse(dateStr);
+          if (d == null || d.isBefore(startDate)) return false;
+        }
+      }
+      return true;
+    }).toList();
+
     final totalAttempts = attempts.length;
     final passedAttempts = attempts.where((a) => a['is_passed'] == 1 || a['is_passed'] == true).length;
     final passRate = totalAttempts > 0 ? ((passedAttempts / totalAttempts) * 100).round() : 0;
@@ -2111,6 +2203,7 @@ class DatabaseHelper {
         ? (attempts.map((a) => (a['percentage'] as num?)?.toDouble() ?? 0.0).reduce((a, b) => a + b) / totalAttempts).round()
         : 0;
 
+    // 6. Subject Enrollments breakdown
     final List<Map<String, dynamic>> subjectEnrollments = [];
     for (final s in subjects) {
       final subId = s['id'] as int;
@@ -2122,7 +2215,9 @@ class DatabaseHelper {
         'enrollments': subEnrollments,
       });
     }
+    subjectEnrollments.sort((a, b) => (b['enrollments'] as int).compareTo(a['enrollments'] as int));
 
+    // 7. Section Distribution breakdown (matching students)
     final Map<String, int> sectionMap = {};
     for (final u in users) {
       if (u['role'] == 'student') {
@@ -2134,9 +2229,30 @@ class DatabaseHelper {
     final List<Map<String, dynamic>> sectionDistribution = sectionMap.entries
         .map((e) => {'section': e.key, 'count': e.value})
         .toList();
+    sectionDistribution.sort((a, b) => (b['count'] as int).compareTo(a['count'] as int));
 
     final announcements = await db.query('announcements', orderBy: 'id DESC', limit: 5);
-    final recentAttempts = await getAllQuizScores();
+
+    // 8. Filtered recent attempts matching all criteria
+    final allRecentAttempts = await getAllQuizScores();
+    final recentAttempts = allRecentAttempts.where((a) {
+      if ((section != null && section != 'All Sections') ||
+          (studentCategory != null && studentCategory != 'all' && studentCategory.isNotEmpty)) {
+        final studentId = a['student_id'] as String?;
+        if (studentId == null || !matchingStudentIds.contains(studentId)) return false;
+      }
+      if (subjectId != null && a['subject_id'] != subjectId) return false;
+      if (startDate != null) {
+        final dateStr = a['attempted_at']?.toString();
+        if (dateStr != null) {
+          final d = DateTime.tryParse(dateStr);
+          if (d == null || d.isBefore(startDate)) return false;
+        }
+      }
+      return true;
+    }).take(8).toList();
+
+    final bool hasData = totalUsers > 0 || totalAttempts > 0 || totalEnrollments > 0;
 
     return {
       'totalUsers': totalUsers,
@@ -2154,7 +2270,8 @@ class DatabaseHelper {
       'subjectEnrollments': subjectEnrollments,
       'sectionDistribution': sectionDistribution,
       'recentAnnouncements': announcements,
-      'recentAttempts': recentAttempts.take(6).toList(),
+      'recentAttempts': recentAttempts,
+      'hasData': hasData,
     };
   }
 

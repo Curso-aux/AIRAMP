@@ -103,6 +103,11 @@ void main() {
 
       await tester.pumpWidget(
         ProviderScope(
+          overrides: [
+            adminAnalyticsProvider.overrideWith(() => _TestAnalyticsNotifier()),
+            subjectsProvider.overrideWith(() => _TestSubjectsNotifier()),
+            sectionsProvider.overrideWith(() => _TestSectionsNotifier()),
+          ],
           child: MaterialApp(
             theme: AppTheme.darkTheme,
             home: const Scaffold(body: AdminWebAnalyticsView()),
@@ -130,6 +135,8 @@ void main() {
         ProviderScope(
           overrides: [
             adminAnalyticsProvider.overrideWith(() => _TestAnalyticsNotifier()),
+            subjectsProvider.overrideWith(() => _TestSubjectsNotifier()),
+            sectionsProvider.overrideWith(() => _TestSectionsNotifier()),
           ],
           child: MaterialApp(
             theme: AppTheme.lightTheme,
@@ -279,7 +286,7 @@ void main() {
       );
       await tester.pump(const Duration(milliseconds: 100));
 
-      expect(find.text('AIRA Admin Console'), findsOneWidget);
+      expect(find.text('AIRA Web Portal'), findsOneWidget);
       expect(find.text('Sign In to Web Admin'), findsOneWidget);
       expect(find.text('Return to AIRA Home Page'), findsOneWidget);
     });
@@ -391,6 +398,24 @@ class _TestAnalyticsNotifier extends AdminAnalyticsNotifier {
       'sectionDistribution': <Map<String, dynamic>>[],
       'recentAnnouncements': <Map<String, dynamic>>[],
       'recentAttempts': <Map<String, dynamic>>[],
+      'hasData': true,
     };
   }
+
+  @override
+  Future<void> loadAnalytics({AnalyticsFilter? filter}) async {}
+}
+
+class _TestSubjectsNotifier extends SubjectsNotifier {
+  @override
+  List<Map<String, dynamic>> build() => [
+    {'id': 1, 'name': 'Computer Systems Servicing', 'subject_code': 'CSS-NC-II'},
+  ];
+}
+
+class _TestSectionsNotifier extends SectionsNotifier {
+  @override
+  List<Map<String, dynamic>> build() => [
+    {'id': 1, 'name': 'Emerald', 'grade': 'Grade 10'},
+  ];
 }

@@ -386,12 +386,104 @@ class SubjectDetailNotifier extends Notifier<List<Map<String, dynamic>>> {
   }
 }
 
+// --- Admin Web Analytics Model & Filter ---
+class AnalyticsFilter {
+  final int? subjectId;
+  final String? subjectName;
+  final String? section;
+  final String timeframe; // 'all', 'today', '7days', '30days', 'this_month'
+  final String category; // 'all', 'regular', 'irregular', 'transferee', 'sped', 'unassigned'
+
+  const AnalyticsFilter({
+    this.subjectId,
+    this.subjectName,
+    this.section,
+    this.timeframe = 'all',
+    this.category = 'all',
+  });
+
+  bool get hasActiveFilters =>
+      subjectId != null ||
+      (section != null && section != 'All Sections' && section!.isNotEmpty) ||
+      timeframe != 'all' ||
+      category != 'all';
+
+  int get activeFilterCount {
+    int count = 0;
+    if (subjectId != null) count++;
+    if (section != null && section != 'All Sections' && section!.isNotEmpty) count++;
+    if (timeframe != 'all') count++;
+    if (category != 'all') count++;
+    return count;
+  }
+
+  AnalyticsFilter copyWith({
+    int? subjectId,
+    bool clearSubject = false,
+    String? subjectName,
+    String? section,
+    bool clearSection = false,
+    String? timeframe,
+    String? category,
+  }) {
+    return AnalyticsFilter(
+      subjectId: clearSubject ? null : (subjectId ?? this.subjectId),
+      subjectName: clearSubject ? null : (subjectName ?? this.subjectName),
+      section: clearSection ? null : (section ?? this.section),
+      timeframe: timeframe ?? this.timeframe,
+      category: category ?? this.category,
+    );
+  }
+}
+
+final analyticsFilterProvider = NotifierProvider<AnalyticsFilterNotifier, AnalyticsFilter>(() {
+  return AnalyticsFilterNotifier();
+});
+
+class AnalyticsFilterNotifier extends Notifier<AnalyticsFilter> {
+  @override
+  AnalyticsFilter build() => const AnalyticsFilter();
+
+  void setFilter(AnalyticsFilter filter) {
+    state = filter;
+    ref.read(adminAnalyticsProvider.notifier).loadAnalytics(filter: filter);
+  }
+
+  void updateSubject(int? id, String? name) {
+    final next = state.copyWith(subjectId: id, subjectName: name, clearSubject: id == null);
+    setFilter(next);
+  }
+
+  void updateSection(String? sec) {
+    final next = state.copyWith(section: sec, clearSection: sec == null || sec == 'All Sections');
+    setFilter(next);
+  }
+
+  void updateTimeframe(String tf) {
+    final next = state.copyWith(timeframe: tf);
+    setFilter(next);
+  }
+
+  void updateCategory(String cat) {
+    final next = state.copyWith(category: cat);
+    setFilter(next);
+  }
+
+  void reset() {
+    const defaultFilter = AnalyticsFilter();
+    state = defaultFilter;
+    ref.read(adminAnalyticsProvider.notifier).loadAnalytics(filter: defaultFilter);
+  }
+}
+
 // --- Admin Web Analytics Provider ---
 final adminAnalyticsProvider = NotifierProvider<AdminAnalyticsNotifier, Map<String, dynamic>>(() {
   return AdminAnalyticsNotifier();
 });
 
 class AdminAnalyticsNotifier extends Notifier<Map<String, dynamic>> {
+  AnalyticsFilter _currentFilter = const AnalyticsFilter();
+
   @override
   Map<String, dynamic> build() {
     loadAnalytics();
@@ -412,11 +504,20 @@ class AdminAnalyticsNotifier extends Notifier<Map<String, dynamic>> {
       'sectionDistribution': <Map<String, dynamic>>[],
       'recentAnnouncements': <Map<String, dynamic>>[],
       'recentAttempts': <Map<String, dynamic>>[],
+      'hasData': true,
     };
   }
 
-  Future<void> loadAnalytics() async {
-    final summary = await DatabaseHelper().getAdminAnalyticsSummary();
+  Future<void> loadAnalytics({AnalyticsFilter? filter}) async {
+    if (filter != null) {
+      _currentFilter = filter;
+    }
+    final summary = await DatabaseHelper().getAdminAnalyticsSummary(
+      subjectId: _currentFilter.subjectId,
+      section: _currentFilter.section,
+      timeframe: _currentFilter.timeframe,
+      studentCategory: _currentFilter.category,
+    );
     if (!ref.mounted) return;
     state = summary;
   }

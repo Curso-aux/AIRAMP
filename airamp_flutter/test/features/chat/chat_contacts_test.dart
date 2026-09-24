@@ -19,7 +19,6 @@ void main() {
     final db = await DatabaseHelper().database;
     await db.delete('conversations');
     await db.delete('messages');
-    await db.delete('subjects');
   });
 
   group('Contacts Database & State Integration', () {
@@ -144,17 +143,28 @@ void main() {
       expect(find.text('Teachers'), findsOneWidget);
       expect(find.text('Students'), findsOneWidget);
 
+      // Search for Maria Lopez
+      await tester.enterText(find.byType(TextField).last, 'Maria Lopez');
+      await tester.pumpAndSettle();
+
       // Verify student labeling and clean contact card
-      expect(find.text('Maria Lopez'), findsOneWidget);
+      expect(find.widgetWithText(ListTile, 'Maria Lopez'), findsOneWidget);
       expect(find.text('Student'), findsWidgets);
       expect(find.text('maria@test.com'), findsOneWidget);
 
+      // Search for Sir John Reyes
+      await tester.enterText(find.byType(TextField).last, 'Sir John Reyes');
+      await tester.pumpAndSettle();
+
       // Verify teacher labeling
-      expect(find.text('Sir John Reyes'), findsOneWidget);
+      expect(find.widgetWithText(ListTile, 'Sir John Reyes'), findsOneWidget);
       expect(find.text('Teacher'), findsWidgets);
 
-      // Tap on Maria Lopez contact to view profile modal
-      await tester.tap(find.text('Maria Lopez'));
+      // Search for Maria Lopez again to tap on contact and view profile modal
+      await tester.enterText(find.byType(TextField).last, 'Maria Lopez');
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.widgetWithText(ListTile, 'Maria Lopez'));
       await tester.pumpAndSettle();
 
       // Verify profile modal contents
@@ -212,6 +222,10 @@ void main() {
 
       // Tap Teachers filter pill
       await tester.tap(find.text('Teachers'));
+      await tester.pumpAndSettle();
+
+      // Search for Sir John Reyes
+      await tester.enterText(find.byType(TextField).last, 'Sir John');
       await tester.pumpAndSettle();
 
       expect(find.text('Sir John Reyes'), findsOneWidget);

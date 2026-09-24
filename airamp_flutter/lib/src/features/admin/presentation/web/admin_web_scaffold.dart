@@ -257,23 +257,28 @@ class _AdminWebScaffoldState extends ConsumerState<AdminWebScaffold> {
           ),
           const SizedBox(width: 8),
 
-          // Breadcrumb Title (Non-flex so Spacer takes 100% of remaining space)
-          Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Text(
-                'Portal',
-                style: TextStyle(fontSize: 14, color: AppTheme.textMuted),
-              ),
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 8),
-                child: Icon(Icons.chevron_right, size: 16, color: AppTheme.textMuted),
-              ),
-              Text(
-                _getPageTitle(),
-                style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: AppTheme.text),
-              ),
-            ],
+          // Breadcrumb Title (Flexible so it contracts if space is tight, while Spacer pushes right elements)
+          Flexible(
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  'Portal',
+                  style: TextStyle(fontSize: 14, color: AppTheme.textMuted),
+                ),
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 8),
+                  child: Icon(Icons.chevron_right, size: 16, color: AppTheme.textMuted),
+                ),
+                Flexible(
+                  child: Text(
+                    _getPageTitle(),
+                    style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: AppTheme.text),
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
+              ],
+            ),
           ),
 
           // Command Palette Quick Search Pill

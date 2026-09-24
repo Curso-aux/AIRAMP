@@ -1,11 +1,9 @@
-import 'package:flutter/material.dart';
-import 'package:flutter/scheduler.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'app_theme.dart';
 import '../database/database_helper.dart';
 
-/// Theme modes matching rork's ThemeMode type.
-enum AppThemeMode { light, dark, auto }
+/// Theme modes for the application (light and dark).
+enum AppThemeMode { light, dark }
 
 /// State holding the user's theme preference and computed dark mode flag.
 class ThemeState {
@@ -33,24 +31,9 @@ class ThemeNotifier extends Notifier<ThemeState> {
 
   @override
   ThemeState build() {
-    // Default to dark mode (matches rork's default)
+    // Default to dark mode
     AppTheme.setDark(true);
-    _initPlatformListener();
     return const ThemeState(preference: AppThemeMode.dark, isDark: true);
-  }
-
-  void _initPlatformListener() {
-    try {
-      SchedulerBinding.instance.platformDispatcher.onPlatformBrightnessChanged = () {
-        if (state.preference == AppThemeMode.auto) {
-          final isDark = _computeIsDark(AppThemeMode.auto);
-          AppTheme.setDark(isDark);
-          state = state.copyWith(isDark: isDark);
-        }
-      };
-    } catch (_) {
-      // In testing environments where SchedulerBinding is not yet initialized
-    }
   }
 
   /// Load persisted theme preference from SQLite database.
@@ -58,13 +41,8 @@ class ThemeNotifier extends Notifier<ThemeState> {
     try {
       final saved = await DatabaseHelper().getSetting(_settingKey);
       if (saved != null) {
-        AppThemeMode mode = AppThemeMode.dark;
-        if (saved == 'light') {
-          mode = AppThemeMode.light;
-        } else if (saved == 'auto') {
-          mode = AppThemeMode.auto;
-        }
-        final isDark = _computeIsDark(mode);
+        final mode = saved == 'light' ? AppThemeMode.light : AppThemeMode.dark;
+        final isDark = mode == AppThemeMode.dark;
         AppTheme.setDark(isDark);
         state = ThemeState(preference: mode, isDark: isDark);
       }
@@ -73,10 +51,9 @@ class ThemeNotifier extends Notifier<ThemeState> {
     }
   }
 
-  /// Set the theme mode (light, dark, or auto).
-  /// Mirrors rork's ThemeContext.setTheme().
+  /// Set the theme mode (light or dark).
   void setTheme(AppThemeMode mode) {
-    final isDark = _computeIsDark(mode);
+    final isDark = mode == AppThemeMode.dark;
     AppTheme.setDark(isDark);
     state = state.copyWith(preference: mode, isDark: isDark);
 
@@ -88,19 +65,6 @@ class ThemeNotifier extends Notifier<ThemeState> {
   void toggleTheme() {
     final next = state.isDark ? AppThemeMode.light : AppThemeMode.dark;
     setTheme(next);
-  }
-
-  bool _computeIsDark(AppThemeMode mode) {
-    switch (mode) {
-      case AppThemeMode.light:
-        return false;
-      case AppThemeMode.dark:
-        return true;
-      case AppThemeMode.auto:
-        final brightness =
-            SchedulerBinding.instance.platformDispatcher.platformBrightness;
-        return brightness == Brightness.dark;
-    }
   }
 
   /// Label for the current active mode.

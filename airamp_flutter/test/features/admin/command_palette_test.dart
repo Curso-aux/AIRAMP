@@ -70,7 +70,8 @@ void main() {
       await tester.enterText(find.byType(TextField), 'CSV');
       await tester.pumpAndSettle();
 
-      expect(find.text('Bulk Import Students & Faculty (CSV)'), findsOneWidget);
+      expect(find.text('Bulk Import Students (CSV)'), findsOneWidget);
+      expect(find.text('Bulk Import Faculty & Teachers (CSV)'), findsOneWidget);
       expect(find.text('Export Student Roster (CSV)'), findsOneWidget);
       expect(find.text('Class Sections'), findsNothing);
     });

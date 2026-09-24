@@ -5,6 +5,7 @@ import '../../../core/theme/app_theme.dart';
 import '../../../core/theme/theme_provider.dart';
 import '../../auth/application/auth_provider.dart';
 import '../data/admin_repository.dart';
+import 'components/teacher_picker_field.dart';
 
 class SubjectsMgmtScreen extends ConsumerStatefulWidget {
   const SubjectsMgmtScreen({super.key});
@@ -214,89 +215,102 @@ class _SubjectsMgmtScreenState extends ConsumerState<SubjectsMgmtScreen> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             // Top row: badges
-            Row(
+            Wrap(
+              spacing: 8,
+              runSpacing: 6,
+              alignment: WrapAlignment.spaceBetween,
+              crossAxisAlignment: WrapCrossAlignment.center,
               children: [
-                if (code.isNotEmpty)
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                    decoration: BoxDecoration(
-                      color: Theme.of(context).colorScheme.primary.withValues(alpha: 0.15),
-                      borderRadius: BorderRadius.circular(4),
-                    ),
-                    child: Text(
-                      code,
-                      style: TextStyle(color: AppTheme.primary, fontSize: 11, fontWeight: FontWeight.bold),
-                    ),
-                  ),
-                if (code.isNotEmpty) const SizedBox(width: 8),
-                if (isAdopted)
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                    decoration: BoxDecoration(
-                      color: Theme.of(context).colorScheme.primary.withValues(alpha: 0.1),
-                      borderRadius: BorderRadius.circular(4),
-                    ),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Icon(Icons.auto_awesome, size: 12, color: Theme.of(context).colorScheme.primary),
-                        const SizedBox(width: 4),
-                        Text('Adapted Copy', style: TextStyle(color: AppTheme.primary, fontSize: 11)),
-                      ],
-                    ),
-                  ),
-                const Spacer(),
-                // Semester badge (preserved for later use)
-                if (semester.isNotEmpty) ...[
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                    decoration: BoxDecoration(
-                      color: Theme.of(context).scaffoldBackgroundColor,
-                      borderRadius: BorderRadius.circular(4),
-                      border: Border.all(color: AppTheme.border),
-                    ),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Icon(Icons.calendar_today_outlined, size: 11, color: AppTheme.textMuted),
-                        const SizedBox(width: 4),
-                        Text(
-                          semester,
-                          style: TextStyle(color: AppTheme.textSecondary, fontSize: 11, fontWeight: FontWeight.w500),
+                Wrap(
+                  spacing: 8,
+                  runSpacing: 6,
+                  crossAxisAlignment: WrapCrossAlignment.center,
+                  children: [
+                    if (code.isNotEmpty)
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                        decoration: BoxDecoration(
+                          color: Theme.of(context).colorScheme.primary.withValues(alpha: 0.15),
+                          borderRadius: BorderRadius.circular(4),
                         ),
-                      ],
-                    ),
-                  ),
-                  const SizedBox(width: 8),
-                ],
-                // Unlock type badge (interactive toggle for teacher and admin)
-                GestureDetector(
-                  onTap: () => _showUnlockTypeDialog(context, subject['id'] as int, unlockType, ref),
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                    decoration: BoxDecoration(
-                      color: Theme.of(context).scaffoldBackgroundColor,
-                      borderRadius: BorderRadius.circular(4),
-                      border: Border.all(color: AppTheme.primary.withValues(alpha: 0.35)),
-                    ),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Icon(
-                          unlockType == 'Sequential' ? Icons.lock_outline : Icons.lock_open_outlined,
-                          size: 12,
-                          color: AppTheme.primary,
+                        child: Text(
+                          code,
+                          style: TextStyle(color: AppTheme.primary, fontSize: 11, fontWeight: FontWeight.bold),
                         ),
-                        const SizedBox(width: 4),
-                        Text(
-                          unlockType,
-                          style: TextStyle(color: AppTheme.text, fontSize: 11, fontWeight: FontWeight.bold),
+                      ),
+                    if (isAdopted)
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                        decoration: BoxDecoration(
+                          color: Theme.of(context).colorScheme.primary.withValues(alpha: 0.1),
+                          borderRadius: BorderRadius.circular(4),
                         ),
-                        const SizedBox(width: 3),
-                        Icon(Icons.arrow_drop_down, size: 14, color: AppTheme.primary),
-                      ],
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(Icons.auto_awesome, size: 12, color: Theme.of(context).colorScheme.primary),
+                            const SizedBox(width: 4),
+                            Text('Adapted Copy', style: TextStyle(color: AppTheme.primary, fontSize: 11)),
+                          ],
+                        ),
+                      ),
+                  ],
+                ),
+                Wrap(
+                  spacing: 8,
+                  runSpacing: 6,
+                  crossAxisAlignment: WrapCrossAlignment.center,
+                  children: [
+                    if (semester.isNotEmpty)
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                        decoration: BoxDecoration(
+                          color: Theme.of(context).scaffoldBackgroundColor,
+                          borderRadius: BorderRadius.circular(4),
+                          border: Border.all(color: AppTheme.border),
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(Icons.calendar_today_outlined, size: 11, color: AppTheme.textMuted),
+                            const SizedBox(width: 4),
+                            Text(
+                              semester,
+                              style: TextStyle(color: AppTheme.textSecondary, fontSize: 11, fontWeight: FontWeight.w500),
+                            ),
+                          ],
+                        ),
+                      ),
+                    // Unlock type badge (interactive toggle for teacher and admin)
+                    GestureDetector(
+                      onTap: () => _showUnlockTypeDialog(context, subject['id'] as int, unlockType, ref),
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                        decoration: BoxDecoration(
+                          color: Theme.of(context).scaffoldBackgroundColor,
+                          borderRadius: BorderRadius.circular(4),
+                          border: Border.all(color: AppTheme.primary.withValues(alpha: 0.35)),
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(
+                              unlockType == 'Sequential' ? Icons.lock_outline : Icons.lock_open_outlined,
+                              size: 12,
+                              color: AppTheme.primary,
+                            ),
+                            const SizedBox(width: 4),
+                            Text(
+                              unlockType,
+                              style: TextStyle(color: AppTheme.text, fontSize: 11, fontWeight: FontWeight.bold),
+                            ),
+                            const SizedBox(width: 3),
+                            Icon(Icons.arrow_drop_down, size: 14, color: AppTheme.primary),
+                          ],
+                        ),
+                      ),
                     ),
-                  ),
+                  ],
                 ),
               ],
             ),
@@ -331,16 +345,19 @@ class _SubjectsMgmtScreenState extends ConsumerState<SubjectsMgmtScreen> {
                 children: [
                   Icon(Icons.school_outlined, size: 14, color: AppTheme.primary),
                   const SizedBox(width: 6),
-                  Text(
-                    teacherName.isNotEmpty
-                        ? 'Faculty: $teacherName'
-                        : 'Faculty: Unassigned',
-                    style: TextStyle(
-                      color: teacherName.isNotEmpty
-                          ? AppTheme.text
-                          : AppTheme.textSecondary,
-                      fontSize: 12,
-                      fontWeight: FontWeight.w500,
+                  Flexible(
+                    child: Text(
+                      teacherName.isNotEmpty
+                          ? 'Faculty: $teacherName'
+                          : 'Faculty: Unassigned',
+                      style: TextStyle(
+                        color: teacherName.isNotEmpty
+                            ? AppTheme.text
+                            : AppTheme.textSecondary,
+                        fontSize: 12,
+                        fontWeight: FontWeight.w500,
+                      ),
+                      overflow: TextOverflow.ellipsis,
                     ),
                   ),
                 ],
@@ -915,45 +932,21 @@ class _CreateSubjectSheetState extends ConsumerState<_CreateSubjectSheet> {
                   ),
                   const SizedBox(height: 24),
 
-                  // Teacher Assignment Dropdown
-                  Text('Assigned Faculty / Teacher', style: TextStyle(color: AppTheme.textSecondary, fontSize: 14)),
-                  const SizedBox(height: 8),
-                  ref.watch(teachersListProvider).when(
-                    data: (teachers) => DropdownButtonFormField<String?>(
-                      initialValue: _selectedTeacherId,
-                      dropdownColor: Theme.of(context).colorScheme.surface,
-                      style: TextStyle(color: AppTheme.text),
-                      decoration: InputDecoration(
-                        hintText: 'Select teacher handling this subject',
-                        filled: true,
-                        fillColor: Theme.of(context).colorScheme.surface,
-                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
-                        prefixIcon: Icon(Icons.school_outlined, size: 20, color: AppTheme.primary),
-                      ),
-                      items: [
-                        DropdownMenuItem<String?>(
-                          value: null,
-                          child: Text('Unassigned / To Be Designated', style: TextStyle(color: AppTheme.textSecondary)),
-                        ),
-                        ...teachers.map((t) => DropdownMenuItem<String?>(
-                          value: t['id']?.toString(),
-                          child: Text('${t['full_name']} (${t['role'] ?? 'teacher'})'),
-                        )),
-                      ],
-                      onChanged: (val) {
-                        setState(() {
-                          _selectedTeacherId = val;
-                          if (val != null) {
-                            final found = teachers.firstWhere((t) => t['id']?.toString() == val, orElse: () => {});
-                            _selectedTeacherName = found['full_name']?.toString();
-                          } else {
-                            _selectedTeacherName = null;
-                          }
-                        });
-                      },
-                    ),
-                    loading: () => const LinearProgressIndicator(),
-                    error: (err, stack) => const SizedBox.shrink(),
+                  // Teacher Assignment Searchable Picker
+                  TeacherPickerField(
+                    selectedTeacherId: _selectedTeacherId,
+                    selectedTeacherName: _selectedTeacherName,
+                    onTeacherSelected: (teacher) {
+                      setState(() {
+                        if (teacher != null) {
+                          _selectedTeacherId = teacher['id']?.toString();
+                          _selectedTeacherName = teacher['full_name']?.toString();
+                        } else {
+                          _selectedTeacherId = null;
+                          _selectedTeacherName = null;
+                        }
+                      });
+                    },
                   ),
                   const SizedBox(height: 24),
                 ],
@@ -1252,45 +1245,21 @@ class _EditSubjectSheetState extends ConsumerState<_EditSubjectSheet> {
                   ),
                   const SizedBox(height: 24),
 
-                  // Teacher Assignment Dropdown
-                  Text('Assigned Faculty / Teacher', style: TextStyle(color: AppTheme.textSecondary, fontSize: 14)),
-                  const SizedBox(height: 8),
-                  ref.watch(teachersListProvider).when(
-                    data: (teachers) => DropdownButtonFormField<String?>(
-                      initialValue: _selectedTeacherId,
-                      dropdownColor: Theme.of(context).colorScheme.surface,
-                      style: TextStyle(color: AppTheme.text),
-                      decoration: InputDecoration(
-                        hintText: 'Select teacher handling this subject',
-                        filled: true,
-                        fillColor: Theme.of(context).colorScheme.surface,
-                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
-                        prefixIcon: Icon(Icons.school_outlined, size: 20, color: AppTheme.primary),
-                      ),
-                      items: [
-                        DropdownMenuItem<String?>(
-                          value: null,
-                          child: Text('Unassigned / To Be Designated', style: TextStyle(color: AppTheme.textSecondary)),
-                        ),
-                        ...teachers.map((t) => DropdownMenuItem<String?>(
-                          value: t['id']?.toString(),
-                          child: Text('${t['full_name']} (${t['role'] ?? 'teacher'})'),
-                        )),
-                      ],
-                      onChanged: (val) {
-                        setState(() {
-                          _selectedTeacherId = val;
-                          if (val != null) {
-                            final found = teachers.firstWhere((t) => t['id']?.toString() == val, orElse: () => {});
-                            _selectedTeacherName = found['full_name']?.toString();
-                          } else {
-                            _selectedTeacherName = null;
-                          }
-                        });
-                      },
-                    ),
-                    loading: () => const LinearProgressIndicator(),
-                    error: (err, stack) => const SizedBox.shrink(),
+                  // Teacher Assignment Searchable Picker
+                  TeacherPickerField(
+                    selectedTeacherId: _selectedTeacherId,
+                    selectedTeacherName: _selectedTeacherName,
+                    onTeacherSelected: (teacher) {
+                      setState(() {
+                        if (teacher != null) {
+                          _selectedTeacherId = teacher['id']?.toString();
+                          _selectedTeacherName = teacher['full_name']?.toString();
+                        } else {
+                          _selectedTeacherId = null;
+                          _selectedTeacherName = null;
+                        }
+                      });
+                    },
                   ),
                   const SizedBox(height: 24),
                 ],

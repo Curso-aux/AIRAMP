@@ -5,8 +5,13 @@ import 'package:go_router/go_router.dart';
 import 'package:airamp_flutter/src/core/theme/app_theme.dart';
 import 'package:airamp_flutter/src/core/theme/theme_provider.dart';
 import 'package:airamp_flutter/src/features/admin/presentation/web/admin_web_scaffold.dart';
+import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 
 void main() {
+  setUpAll(() {
+    sqfliteFfiInit();
+    databaseFactory = databaseFactoryFfi;
+  });
   testWidgets('AdminWebScaffold sidebar toggles between expanded and collapsed smoothly with ZERO overflow errors', (tester) async {
     tester.view.physicalSize = const Size(1280, 800);
     tester.view.devicePixelRatio = 1.0;
