@@ -771,8 +771,8 @@ class _TeacherScheduleScreenState extends ConsumerState<TeacherScheduleScreen> {
             children: [
               // Time & Day Block
               Container(
-                width: 120,
-                padding: const EdgeInsets.all(10),
+                width: 95,
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 10),
                 decoration: BoxDecoration(
                   color: AppTheme.background,
                   borderRadius: BorderRadius.circular(10),
@@ -787,20 +787,26 @@ class _TeacherScheduleScreenState extends ConsumerState<TeacherScheduleScreen> {
                         fontWeight: FontWeight.bold,
                         color: day == getCurrentDayOfWeek() ? AppTheme.primary : AppTheme.text,
                       ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
                     ),
                     const SizedBox(height: 4),
                     Text(
                       startTime,
-                      style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: AppTheme.text),
+                      style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: AppTheme.text),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
                     ),
                     Text(
                       'to $endTime',
-                      style: TextStyle(fontSize: 11, color: AppTheme.textSecondary),
+                      style: TextStyle(fontSize: 10, color: AppTheme.textSecondary),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
                     ),
                   ],
                 ),
               ),
-              const SizedBox(width: 16),
+              const SizedBox(width: 12),
 
               // Subject & Info
               Expanded(
@@ -809,24 +815,28 @@ class _TeacherScheduleScreenState extends ConsumerState<TeacherScheduleScreen> {
                   children: [
                     Row(
                       children: [
-                        Text(
-                          subject,
-                          style: TextStyle(
-                            fontSize: 15,
-                            fontWeight: FontWeight.bold,
-                            color: AppTheme.text,
+                        Expanded(
+                          child: Text(
+                            subject,
+                            style: TextStyle(
+                              fontSize: 14,
+                              fontWeight: FontWeight.bold,
+                              color: AppTheme.text,
+                            ),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
                           ),
                         ),
                         if (isOngoing) ...[
-                          const SizedBox(width: 8),
+                          const SizedBox(width: 6),
                           Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                            padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
                             decoration: BoxDecoration(
                               color: AppTheme.success.withValues(alpha: 0.15),
                               borderRadius: BorderRadius.circular(4),
                             ),
                             child: Text(
-                              'LIVE NOW',
+                              'LIVE',
                               style: TextStyle(fontSize: 9, fontWeight: FontWeight.bold, color: AppTheme.success),
                             ),
                           ),
@@ -837,7 +847,7 @@ class _TeacherScheduleScreenState extends ConsumerState<TeacherScheduleScreen> {
                     Row(
                       children: [
                         Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                          padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
                           decoration: BoxDecoration(
                             color: color.withValues(alpha: 0.12),
                             borderRadius: BorderRadius.circular(6),
@@ -845,15 +855,21 @@ class _TeacherScheduleScreenState extends ConsumerState<TeacherScheduleScreen> {
                           child: Text(
                             section,
                             style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: color),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
                           ),
                         ),
                         if (room != null && room.isNotEmpty) ...[
-                          const SizedBox(width: 10),
-                          Icon(Icons.meeting_room_outlined, size: 14, color: AppTheme.textSecondary),
-                          const SizedBox(width: 4),
-                          Text(
-                            room,
-                            style: TextStyle(fontSize: 12, color: AppTheme.textSecondary),
+                          const SizedBox(width: 8),
+                          Icon(Icons.meeting_room_outlined, size: 13, color: AppTheme.textSecondary),
+                          const SizedBox(width: 3),
+                          Flexible(
+                            child: Text(
+                              room,
+                              style: TextStyle(fontSize: 11, color: AppTheme.textSecondary),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            ),
                           ),
                         ],
                       ],
@@ -862,16 +878,20 @@ class _TeacherScheduleScreenState extends ConsumerState<TeacherScheduleScreen> {
                 ),
               ),
 
-              // Actions
+              // Compact Actions
               IconButton(
                 icon: const Icon(Icons.edit_outlined, size: 18),
                 tooltip: 'Edit Schedule',
+                padding: const EdgeInsets.all(6),
+                constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
                 color: AppTheme.textSecondary,
                 onPressed: () => CreateEditScheduleDialog.show(context, initialSchedule: sched),
               ),
               IconButton(
                 icon: Icon(Icons.delete_outline, size: 18, color: AppTheme.error),
                 tooltip: 'Delete Schedule',
+                padding: const EdgeInsets.all(6),
+                constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
                 onPressed: () => _confirmDelete(sched),
               ),
             ],

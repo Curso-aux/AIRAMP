@@ -9,6 +9,12 @@ final teacherDashboardProvider = NotifierProvider<TeacherDashboardNotifier, Map<
 });
 
 class TeacherDashboardNotifier extends Notifier<Map<String, dynamic>> {
+  String? _section;
+  String? _studentId;
+
+  String? get currentSection => _section;
+  String? get currentStudentId => _studentId;
+
   @override
   Map<String, dynamic> build() {
     _load();
@@ -20,21 +26,45 @@ class TeacherDashboardNotifier extends Notifier<Map<String, dynamic>> {
     return user?.id;
   }
 
-  Future<void> _load() async {
+  Future<void> _load({String? section, String? studentId}) async {
+    if (section != null) _section = section;
+    if (studentId != null) _studentId = studentId;
+
     final teacherId = _getTeacherId();
     if (teacherId == null) {
       if (ref.mounted) state = {};
       return;
     }
-    final stats = await DatabaseHelper().getTeacherDashboardStats(teacherId);
+
+    final sFilter = (_section == null ||
+            _section == 'All' ||
+            _section == 'All Handled Sections' ||
+            _section == 'All Sections')
+        ? null
+        : _section;
+    final stFilter = (_studentId == null ||
+            _studentId == 'All' ||
+            _studentId == 'All Students')
+        ? null
+        : _studentId;
+
+    final stats = await DatabaseHelper().getTeacherDashboardStats(
+      teacherId,
+      section: sFilter,
+      studentId: stFilter,
+    );
     if (!ref.mounted) return;
     state = stats;
   }
 
-  Future<void> reload() async {
+  Future<void> reload({String? section, String? studentId, bool resetFilters = false}) async {
+    if (resetFilters) {
+      _section = null;
+      _studentId = null;
+    }
     ref.invalidate(teacherHandledSectionsProvider);
     ref.invalidate(teacherHandledSectionsDetailsProvider);
-    await _load();
+    await _load(section: section, studentId: studentId);
   }
 }
 

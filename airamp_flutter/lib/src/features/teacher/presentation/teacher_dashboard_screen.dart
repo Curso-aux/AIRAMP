@@ -21,6 +21,9 @@ class TeacherDashboardScreen extends ConsumerStatefulWidget {
 
 class _TeacherDashboardScreenState extends ConsumerState<TeacherDashboardScreen> {
   String _activeSectionFilter = 'All Handled Sections';
+  bool _isAnalyticsExpanded = false; // Analytics hidden by default; tap to expand
+  String _analyticsSectionFilter = 'All Handled Sections';
+  String _analyticsStudentFilter = 'All';
 
   @override
   void initState() {
@@ -28,7 +31,10 @@ class _TeacherDashboardScreenState extends ConsumerState<TeacherDashboardScreen>
     WidgetsBinding.instance.addPostFrameCallback((_) {
       ref.invalidate(teacherHandledSectionsDetailsProvider);
       ref.invalidate(teacherHandledSectionsProvider);
-      ref.read(teacherDashboardProvider.notifier).reload();
+      ref.read(teacherDashboardProvider.notifier).reload(
+        section: _analyticsSectionFilter,
+        studentId: _analyticsStudentFilter,
+      );
     });
   }
 
@@ -221,6 +227,7 @@ class _TeacherDashboardScreenState extends ConsumerState<TeacherDashboardScreen>
     final handledSectionsAsync = ref.watch(teacherHandledSectionsProvider);
     final handledSections = handledSectionsAsync.value ?? [];
     final handledSectionsDetailsAsync = ref.watch(teacherHandledSectionsDetailsProvider);
+    final allStudents = ref.watch(teacherStudentsProvider);
 
     final totalSubjects = stats['totalSubjects'] as int? ?? 0;
     final totalStudents = stats['totalStudents'] as int? ?? 0;
@@ -242,7 +249,10 @@ class _TeacherDashboardScreenState extends ConsumerState<TeacherDashboardScreen>
         child: RefreshIndicator(
           onRefresh: () async {
             await Future.wait([
-              ref.read(teacherDashboardProvider.notifier).reload(),
+              ref.read(teacherDashboardProvider.notifier).reload(
+                section: _analyticsSectionFilter,
+                studentId: _analyticsStudentFilter,
+              ),
               ref.read(teacherSubjectsProvider.notifier).reload(),
               ref.read(teacherAnnouncementsProvider.notifier).reload(sectionFilter: _activeSectionFilter),
               ref.refresh(teacherHandledSectionsProvider.future),
@@ -357,7 +367,10 @@ class _TeacherDashboardScreenState extends ConsumerState<TeacherDashboardScreen>
                       icon: Icon(Icons.refresh, color: AppTheme.primary),
                       tooltip: 'Refresh Dashboard',
                       onPressed: () {
-                        ref.read(teacherDashboardProvider.notifier).reload();
+                        ref.read(teacherDashboardProvider.notifier).reload(
+                          section: _analyticsSectionFilter,
+                          studentId: _analyticsStudentFilter,
+                        );
                         ref.read(teacherSubjectsProvider.notifier).reload();
                         ref.read(teacherAnnouncementsProvider.notifier).reload(sectionFilter: _activeSectionFilter);
                         ref.invalidate(teacherHandledSectionsProvider);
@@ -372,103 +385,18 @@ class _TeacherDashboardScreenState extends ConsumerState<TeacherDashboardScreen>
                 ),
                 const SizedBox(height: 20),
 
-                // KPI Metric Cards (Row on wide screens, 2x2 on mobile)
-                if (isDesktop)
-                  Row(
-                    children: [
-                      Expanded(
-                        child: _buildMetricCard(
-                          title: 'Assigned Subjects',
-                          value: '$totalSubjects',
-                          subtitle: 'Active courses',
-                          icon: Icons.menu_book_outlined,
-                          color: AppTheme.primary,
-                        ),
-                      ),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: _buildMetricCard(
-                          title: 'Enrolled Students',
-                          value: '$totalStudents',
-                          subtitle: 'Across your classes',
-                          icon: Icons.people_alt_outlined,
-                          color: const Color(0xFF0D9488),
-                        ),
-                      ),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: _buildMetricCard(
-                          title: 'Class Pass Rate',
-                          value: '$passRate%',
-                          subtitle: '$passedAttempts passed ($totalAttempts attempts)',
-                          icon: Icons.verified_outlined,
-                          color: passRate >= 75 ? AppTheme.success : AppTheme.warning,
-                        ),
-                      ),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: _buildMetricCard(
-                          title: 'Average Score',
-                          value: '$avgScore%',
-                          subtitle: 'Overall assessments',
-                          icon: Icons.trending_up,
-                          color: AppTheme.accent,
-                        ),
-                      ),
-                    ],
-                  )
-                else
-                  Column(
-                    children: [
-                      Row(
-                        children: [
-                          Expanded(
-                            child: _buildMetricCard(
-                              title: 'Assigned Subjects',
-                              value: '$totalSubjects',
-                              subtitle: 'Active courses',
-                              icon: Icons.menu_book_outlined,
-                              color: AppTheme.primary,
-                            ),
-                          ),
-                          const SizedBox(width: 12),
-                          Expanded(
-                            child: _buildMetricCard(
-                              title: 'Enrolled Students',
-                              value: '$totalStudents',
-                              subtitle: 'Across your classes',
-                              icon: Icons.people_alt_outlined,
-                              color: const Color(0xFF0D9488),
-                            ),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 12),
-                      Row(
-                        children: [
-                          Expanded(
-                            child: _buildMetricCard(
-                              title: 'Class Pass Rate',
-                              value: '$passRate%',
-                              subtitle: '$passedAttempts passed ($totalAttempts attempts)',
-                              icon: Icons.verified_outlined,
-                              color: passRate >= 75 ? AppTheme.success : AppTheme.warning,
-                            ),
-                          ),
-                          const SizedBox(width: 12),
-                          Expanded(
-                            child: _buildMetricCard(
-                              title: 'Average Score',
-                              value: '$avgScore%',
-                              subtitle: 'Overall assessments',
-                              icon: Icons.trending_up,
-                              color: AppTheme.accent,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ],
-                  ),
+                // Collapsible & Filterable Performance Analytics Section
+                _buildAnalyticsSection(
+                  isDesktop: isDesktop,
+                  totalSubjects: totalSubjects,
+                  totalStudents: totalStudents,
+                  totalAttempts: totalAttempts,
+                  passedAttempts: passedAttempts,
+                  passRate: passRate,
+                  avgScore: avgScore,
+                  handledSections: handledSections,
+                  allStudents: allStudents,
+                ),
                 const SizedBox(height: 20),
 
                 // Today's Class Schedule Banner
@@ -874,6 +802,501 @@ class _TeacherDashboardScreenState extends ConsumerState<TeacherDashboardScreen>
             );
           }),
       ],
+    );
+  }
+
+  Widget _buildAnalyticsSection({
+    required bool isDesktop,
+    required int totalSubjects,
+    required int totalStudents,
+    required int totalAttempts,
+    required int passedAttempts,
+    required int passRate,
+    required int avgScore,
+    required List<String> handledSections,
+    required List<Map<String, dynamic>> allStudents,
+  }) {
+    // Determine effective section and students available for filter
+    final sectionOptions = <String>[
+      'All Handled Sections',
+      ...handledSections.where((s) => s.isNotEmpty && s != 'All Handled Sections'),
+    ];
+    final effectiveSection = sectionOptions.contains(_analyticsSectionFilter)
+        ? _analyticsSectionFilter
+        : 'All Handled Sections';
+
+    final availableStudents = effectiveSection == 'All Handled Sections'
+        ? allStudents
+        : allStudents.where((s) {
+            final sec = (s['section'] as String?)?.toLowerCase().trim() ?? '';
+            return sec == effectiveSection.toLowerCase().trim();
+          }).toList();
+
+    final effectiveStudentId = availableStudents.any((s) => s['id'] == _analyticsStudentFilter)
+        ? _analyticsStudentFilter
+        : 'All';
+
+    final hasActiveFilter = effectiveSection != 'All Handled Sections' || effectiveStudentId != 'All';
+
+    String selectedStudentName = 'Student';
+    if (effectiveStudentId != 'All') {
+      final match = availableStudents.firstWhere(
+        (s) => s['id'] == effectiveStudentId,
+        orElse: () => <String, dynamic>{},
+      );
+      selectedStudentName = match['full_name'] as String? ?? 'Student';
+    }
+
+    if (!_isAnalyticsExpanded) {
+      // Collapsed View: Compact banner with quick stats and expand button
+      return Container(
+        decoration: BoxDecoration(
+          color: AppTheme.surface,
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: AppTheme.border),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withValues(alpha: 0.03),
+              blurRadius: 10,
+              offset: const Offset(0, 2),
+            ),
+          ],
+        ),
+        child: InkWell(
+          borderRadius: BorderRadius.circular(16),
+          onTap: () => setState(() => _isAnalyticsExpanded = true),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+            child: Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: AppTheme.primary.withValues(alpha: 0.12),
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: Icon(Icons.analytics_outlined, size: 20, color: AppTheme.primary),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          Flexible(
+                            child: Text(
+                              'Performance & Analytics',
+                              style: TextStyle(
+                                fontSize: 15,
+                                fontWeight: FontWeight.bold,
+                                color: AppTheme.text,
+                              ),
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+                            decoration: BoxDecoration(
+                              color: (passRate >= 75 ? AppTheme.success : AppTheme.warning).withValues(alpha: 0.12),
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            child: Text(
+                              '$passRate% Pass Rate',
+                              style: TextStyle(
+                                fontSize: 11,
+                                fontWeight: FontWeight.w600,
+                                color: passRate >= 75 ? AppTheme.success : AppTheme.warning,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        hasActiveFilter
+                            ? 'Filtered: ${effectiveStudentId != 'All' ? selectedStudentName : effectiveSection} • Tap to view'
+                            : 'Tap to view metrics, pass rates & section/student filters',
+                        style: TextStyle(fontSize: 11, color: AppTheme.textSecondary),
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ],
+                  ),
+                ),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                  decoration: BoxDecoration(
+                    color: AppTheme.primary.withValues(alpha: 0.08),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(
+                        'Show',
+                        style: TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w600,
+                          color: AppTheme.primary,
+                        ),
+                      ),
+                      const SizedBox(width: 2),
+                      Icon(Icons.keyboard_arrow_down, size: 18, color: AppTheme.primary),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      );
+    }
+
+    // Expanded View: Filter controls + 4 Metric Cards
+    return Container(
+      decoration: BoxDecoration(
+        color: AppTheme.surface,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: AppTheme.border),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.03),
+            blurRadius: 10,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      padding: const EdgeInsets.all(16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Header: Title, Subtitle, and Hide Toggle
+          Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: AppTheme.primary.withValues(alpha: 0.12),
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: Icon(Icons.analytics_outlined, size: 20, color: AppTheme.primary),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Performance & Analytics',
+                      style: TextStyle(
+                        fontSize: 15,
+                        fontWeight: FontWeight.bold,
+                        color: AppTheme.text,
+                      ),
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      'Real-time metrics filtered by section or student',
+                      style: TextStyle(fontSize: 11, color: AppTheme.textSecondary),
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ],
+                ),
+              ),
+              TextButton.icon(
+                onPressed: () => setState(() => _isAnalyticsExpanded = false),
+                icon: Icon(Icons.keyboard_arrow_up, size: 18, color: AppTheme.textSecondary),
+                label: Text(
+                  'Hide',
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: AppTheme.textSecondary,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+                style: TextButton.styleFrom(
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                  minimumSize: Size.zero,
+                  tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 14),
+
+          // Filters: Section Dropdown & Student Dropdown
+          Row(
+            children: [
+              // Section Filter Dropdown
+              Expanded(
+                flex: 5,
+                child: Container(
+                  height: 40,
+                  padding: const EdgeInsets.symmetric(horizontal: 10),
+                  decoration: BoxDecoration(
+                    color: AppTheme.background,
+                    borderRadius: BorderRadius.circular(10),
+                    border: Border.all(color: AppTheme.border),
+                  ),
+                  child: DropdownButtonHideUnderline(
+                    child: DropdownButton<String>(
+                      isExpanded: true,
+                      value: effectiveSection,
+                      icon: Icon(Icons.keyboard_arrow_down, size: 18, color: AppTheme.textSecondary),
+                      style: TextStyle(fontSize: 12, color: AppTheme.text, fontWeight: FontWeight.w500),
+                      dropdownColor: AppTheme.surface,
+                      items: sectionOptions.map((sec) {
+                        return DropdownMenuItem(
+                          value: sec,
+                          child: Text(
+                            sec == 'All Handled Sections' ? 'All Sections' : sec,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        );
+                      }).toList(),
+                      onChanged: (val) {
+                        if (val != null) {
+                          setState(() {
+                            _analyticsSectionFilter = val;
+                            // Reset student filter if not available in selected section
+                            if (val != 'All Handled Sections' && _analyticsStudentFilter != 'All') {
+                              final inSec = allStudents.any((s) =>
+                                  s['id'] == _analyticsStudentFilter &&
+                                  (s['section'] as String?)?.toLowerCase().trim() == val.toLowerCase().trim());
+                              if (!inSec) _analyticsStudentFilter = 'All';
+                            }
+                          });
+                          ref.read(teacherDashboardProvider.notifier).reload(
+                            section: _analyticsSectionFilter,
+                            studentId: _analyticsStudentFilter,
+                          );
+                        }
+                      },
+                    ),
+                  ),
+                ),
+              ),
+              const SizedBox(width: 8),
+
+              // Student Filter Dropdown
+              Expanded(
+                flex: 5,
+                child: Container(
+                  height: 40,
+                  padding: const EdgeInsets.symmetric(horizontal: 10),
+                  decoration: BoxDecoration(
+                    color: AppTheme.background,
+                    borderRadius: BorderRadius.circular(10),
+                    border: Border.all(color: AppTheme.border),
+                  ),
+                  child: DropdownButtonHideUnderline(
+                    child: DropdownButton<String>(
+                      isExpanded: true,
+                      value: effectiveStudentId,
+                      icon: Icon(Icons.keyboard_arrow_down, size: 18, color: AppTheme.textSecondary),
+                      style: TextStyle(fontSize: 12, color: AppTheme.text, fontWeight: FontWeight.w500),
+                      dropdownColor: AppTheme.surface,
+                      items: [
+                        const DropdownMenuItem(
+                          value: 'All',
+                          child: Text('All Students', overflow: TextOverflow.ellipsis),
+                        ),
+                        ...availableStudents.map((st) {
+                          final name = st['full_name'] as String? ?? 'Student';
+                          final sec = st['section'] as String? ?? '';
+                          final label = effectiveSection == 'All Handled Sections' && sec.isNotEmpty
+                              ? '$name ($sec)'
+                              : name;
+                          return DropdownMenuItem(
+                            value: st['id'] as String,
+                            child: Text(label, overflow: TextOverflow.ellipsis),
+                          );
+                        }),
+                      ],
+                      onChanged: (val) {
+                        if (val != null) {
+                          setState(() => _analyticsStudentFilter = val);
+                          ref.read(teacherDashboardProvider.notifier).reload(
+                            section: _analyticsSectionFilter,
+                            studentId: _analyticsStudentFilter,
+                          );
+                        }
+                      },
+                    ),
+                  ),
+                ),
+              ),
+
+              // Reset Filter Button if active
+              if (hasActiveFilter) ...[
+                const SizedBox(width: 6),
+                IconButton(
+                  icon: const Icon(Icons.close, size: 18),
+                  tooltip: 'Reset Analytics Filter',
+                  constraints: const BoxConstraints(minWidth: 36, minHeight: 36),
+                  style: IconButton.styleFrom(
+                    backgroundColor: AppTheme.background,
+                    padding: EdgeInsets.zero,
+                  ),
+                  onPressed: () {
+                    setState(() {
+                      _analyticsSectionFilter = 'All Handled Sections';
+                      _analyticsStudentFilter = 'All';
+                    });
+                    ref.read(teacherDashboardProvider.notifier).reload(
+                      section: 'All Handled Sections',
+                      studentId: 'All',
+                    );
+                  },
+                ),
+              ],
+            ],
+          ),
+
+          // Active filter indicator badge
+          if (hasActiveFilter)
+            Padding(
+              padding: const EdgeInsets.only(top: 8),
+              child: Row(
+                children: [
+                  Icon(Icons.filter_alt_outlined, size: 13, color: AppTheme.primary),
+                  const SizedBox(width: 4),
+                  Text(
+                    'Showing stats for: ',
+                    style: TextStyle(fontSize: 11, color: AppTheme.textSecondary),
+                  ),
+                  Text(
+                    effectiveStudentId != 'All'
+                        ? selectedStudentName
+                        : effectiveSection,
+                    style: TextStyle(
+                      fontSize: 11,
+                      fontWeight: FontWeight.bold,
+                      color: AppTheme.primary,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          const SizedBox(height: 14),
+
+          // 4 Metric Cards (Row on Desktop, 2x2 on Mobile)
+          if (isDesktop)
+            Row(
+              children: [
+                Expanded(
+                  child: _buildMetricCard(
+                    title: 'Assigned Subjects',
+                    value: '$totalSubjects',
+                    subtitle: effectiveStudentId != 'All'
+                        ? 'Enrolled subjects'
+                        : 'Active courses',
+                    icon: Icons.menu_book_outlined,
+                    color: AppTheme.primary,
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: _buildMetricCard(
+                    title: effectiveStudentId != 'All' ? 'Target Student' : 'Enrolled Students',
+                    value: '$totalStudents',
+                    subtitle: effectiveStudentId != 'All'
+                        ? selectedStudentName
+                        : effectiveSection != 'All Handled Sections'
+                            ? 'In $effectiveSection'
+                            : 'Across your classes',
+                    icon: Icons.people_alt_outlined,
+                    color: const Color(0xFF0D9488),
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: _buildMetricCard(
+                    title: effectiveStudentId != 'All' ? 'Student Pass Rate' : 'Class Pass Rate',
+                    value: '$passRate%',
+                    subtitle: totalAttempts == 0
+                        ? 'No attempts yet'
+                        : '$passedAttempts passed ($totalAttempts attempts)',
+                    icon: Icons.verified_outlined,
+                    color: passRate >= 75 ? AppTheme.success : AppTheme.warning,
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: _buildMetricCard(
+                    title: effectiveStudentId != 'All' ? 'Student Avg Score' : 'Average Score',
+                    value: '$avgScore%',
+                    subtitle: totalAttempts == 0 ? 'No attempts yet' : 'Overall assessments',
+                    icon: Icons.trending_up,
+                    color: AppTheme.accent,
+                  ),
+                ),
+              ],
+            )
+          else
+            Column(
+              children: [
+                Row(
+                  children: [
+                    Expanded(
+                      child: _buildMetricCard(
+                        title: 'Assigned Subjects',
+                        value: '$totalSubjects',
+                        subtitle: effectiveStudentId != 'All'
+                            ? 'Enrolled subjects'
+                            : 'Active courses',
+                        icon: Icons.menu_book_outlined,
+                        color: AppTheme.primary,
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: _buildMetricCard(
+                        title: effectiveStudentId != 'All' ? 'Target Student' : 'Enrolled Students',
+                        value: '$totalStudents',
+                        subtitle: effectiveStudentId != 'All'
+                            ? selectedStudentName
+                            : effectiveSection != 'All Handled Sections'
+                                ? 'In $effectiveSection'
+                                : 'Across your classes',
+                        icon: Icons.people_alt_outlined,
+                        color: const Color(0xFF0D9488),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 12),
+                Row(
+                  children: [
+                    Expanded(
+                      child: _buildMetricCard(
+                        title: effectiveStudentId != 'All' ? 'Student Pass Rate' : 'Class Pass Rate',
+                        value: '$passRate%',
+                        subtitle: totalAttempts == 0
+                            ? 'No attempts yet'
+                            : '$passedAttempts passed ($totalAttempts attempts)',
+                        icon: Icons.verified_outlined,
+                        color: passRate >= 75 ? AppTheme.success : AppTheme.warning,
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: _buildMetricCard(
+                        title: effectiveStudentId != 'All' ? 'Student Avg Score' : 'Average Score',
+                        value: '$avgScore%',
+                        subtitle: totalAttempts == 0 ? 'No attempts yet' : 'Overall assessments',
+                        icon: Icons.trending_up,
+                        color: AppTheme.accent,
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+        ],
+      ),
     );
   }
 

@@ -3603,7 +3603,8 @@ class DatabaseHelper {
   }
 
   /// Teacher dashboard stats: subjects, unique students, attempts, pass rate, avg score, recent attempts
-  Future<Map<String, dynamic>> getTeacherDashboardStats(String teacherId) async {
+  /// Supports optional filtering by section or specific student
+  Future<Map<String, dynamic>> getTeacherDashboardStats(String teacherId, {String? section, String? studentId}) async {
     final db = await database;
     final subjects = await db.query('subjects', where: 'teacher_id = ?', whereArgs: [teacherId]);
     final totalSubjects = subjects.length;
@@ -3616,13 +3617,36 @@ class DatabaseHelper {
 
     final enrollments = await db.query('enrollments');
     final attempts = await db.query('quiz_attempts');
-    final attemptsForTeacher = attempts.where((a) => subjectIds.contains(a['subject_id'])).toList();
+    var attemptsForTeacher = attempts.where((a) => subjectIds.contains(a['subject_id'])).toList();
+
+    // Determine target student IDs if filtering by section or student
+    Set<String>? allowedStudentIds;
+    final hasSectionFilter = section != null && section.isNotEmpty && section != 'All Handled Sections' && section != 'All Sections';
+    final hasStudentFilter = studentId != null && studentId.isNotEmpty && studentId != 'All';
+
+    if (hasStudentFilter) {
+      allowedStudentIds = {studentId};
+    } else if (hasSectionFilter) {
+      final secLower = section.toLowerCase().trim();
+      final secStudents = await db.query('users', where: "role = 'student'");
+      allowedStudentIds = secStudents
+          .where((s) => ((s['section'] as String?)?.toLowerCase().trim() ?? '') == secLower)
+          .map((s) => s['id'] as String)
+          .toSet();
+    }
+
+    if (allowedStudentIds != null) {
+      attemptsForTeacher = attemptsForTeacher.where((a) => allowedStudentIds!.contains(a['student_id'] as String?)).toList();
+    }
 
     if (subjectIds.isNotEmpty) {
       final studentIds = <String>{};
       for (final e in enrollments) {
         if (subjectIds.contains(e['subject_id'])) {
-          studentIds.add(e['student_id'] as String);
+          final sId = e['student_id'] as String;
+          if (allowedStudentIds == null || allowedStudentIds.contains(sId)) {
+            studentIds.add(sId);
+          }
         }
       }
       totalStudents = studentIds.length;
@@ -3635,30 +3659,45 @@ class DatabaseHelper {
 
     // Fallback: If totalStudents is 0 but teacher has subjects, count students from handled sections
     if (totalStudents == 0 && subjectIds.isNotEmpty) {
-      final handledSections = await getSectionsForTeacher(teacherId);
-      if (handledSections.isNotEmpty) {
-        final handledLower = handledSections.map((s) => s.toLowerCase().trim()).toSet();
-        final allStudents = await db.query('users', where: 'role = ?', whereArgs: ['student']);
-        final matched = allStudents.where((s) {
-          final sec = (s['section'] as String?)?.toLowerCase().trim() ?? '';
-          return sec.isNotEmpty && (handledLower.contains(sec) || handledLower.any((h) => h.contains(sec) || sec.contains(h)));
-        }).length;
-        if (matched > 0) {
-          totalStudents = matched;
+      if (hasStudentFilter && allowedStudentIds != null) {
+        totalStudents = allowedStudentIds.length;
+      } else {
+        final handledSections = await getSectionsForTeacher(teacherId);
+        if (handledSections.isNotEmpty) {
+          final targetSections = hasSectionFilter ? [section] : handledSections;
+          final handledLower = targetSections.map((s) => s.toLowerCase().trim()).toSet();
+          final allStudents = await db.query('users', where: 'role = ?', whereArgs: ['student']);
+          final matched = allStudents.where((s) {
+            final sec = (s['section'] as String?)?.toLowerCase().trim() ?? '';
+            return sec.isNotEmpty && (handledLower.contains(sec) || handledLower.any((h) => h.contains(sec) || sec.contains(h)));
+          }).length;
+          if (matched > 0) {
+            totalStudents = matched;
+          }
         }
       }
     }
 
-    // Recent 10 attempts
-    final recent = await db.rawQuery('''
+    // Recent attempts with section/student filtering
+    String recentQuery = '''
       SELECT qa.*, u.full_name as student_name, s.name as subject_name
       FROM quiz_attempts qa
       JOIN users u ON qa.student_id = u.id
       JOIN subjects s ON qa.subject_id = s.id
       WHERE s.teacher_id = ?
-      ORDER BY qa.attempted_at DESC
-      LIMIT 10
-    ''', [teacherId]);
+    ''';
+    final recentArgs = <dynamic>[teacherId];
+
+    if (hasStudentFilter) {
+      recentQuery += ' AND qa.student_id = ?';
+      recentArgs.add(studentId);
+    } else if (hasSectionFilter) {
+      recentQuery += ' AND LOWER(TRIM(u.section)) = ?';
+      recentArgs.add(section.toLowerCase().trim());
+    }
+
+    recentQuery += ' ORDER BY qa.attempted_at DESC LIMIT 10';
+    final recent = await db.rawQuery(recentQuery, recentArgs);
 
     return {
       'totalSubjects': totalSubjects,
