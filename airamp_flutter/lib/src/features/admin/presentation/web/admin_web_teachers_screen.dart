@@ -1,9 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../../core/theme/theme_provider.dart';
 import '../../data/admin_repository.dart';
 import 'components/teacher_bulk_import_modal.dart';
+import 'components/teacher_schedule_modal.dart';
 
 class AdminWebTeachersScreen extends ConsumerStatefulWidget {
   const AdminWebTeachersScreen({super.key});
@@ -93,6 +95,19 @@ class _AdminWebTeachersScreenState extends ConsumerState<AdminWebTeachersScreen>
                     ),
                   ),
                   const SizedBox(width: 16),
+                  OutlinedButton.icon(
+                    onPressed: () => context.go('/admin/schedules'),
+                    icon: const Icon(Icons.calendar_month_outlined, size: 18),
+                    label: const Text('Master Timetable', style: TextStyle(fontWeight: FontWeight.bold)),
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: Colors.teal,
+                      side: BorderSide(color: Colors.teal.withValues(alpha: 0.5)),
+                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                      minimumSize: const Size(0, 42),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
                   OutlinedButton.icon(
                     onPressed: () => TeacherBulkImportModal.show(context),
                     icon: const Icon(Icons.upload_file_outlined, size: 18),
@@ -478,6 +493,12 @@ class _AdminWebTeachersScreenState extends ConsumerState<AdminWebTeachersScreen>
                                   Row(
                                     mainAxisSize: MainAxisSize.min,
                                     children: [
+                                      IconButton(
+                                        icon: const Icon(Icons.calendar_month_outlined, size: 18),
+                                        tooltip: 'Manage Teacher Schedule',
+                                        color: Colors.teal,
+                                        onPressed: () => TeacherScheduleModal.show(context, teacher),
+                                      ),
                                       IconButton(
                                         icon: const Icon(Icons.assignment_ind_outlined, size: 18),
                                         tooltip: 'Assign Courses',

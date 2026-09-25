@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../../../core/theme/app_theme.dart';
+import '../../../../core/theme/theme_provider.dart';
 import '../../data/teacher_repository.dart';
 import '../../data/teacher_schedule_repository.dart';
 
@@ -20,6 +21,9 @@ class _ClassOverviewWidgetState extends ConsumerState<ClassOverviewWidget> {
 
   @override
   Widget build(BuildContext context) {
+    ref.watch(themeProvider);
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    AppTheme.setDark(isDark);
     final handledSectionsAsync = ref.watch(teacherHandledSectionsProvider);
     final sections = handledSectionsAsync.value ?? [];
     final students = ref.watch(teacherStudentsProvider);
@@ -118,10 +122,15 @@ class _ClassOverviewWidgetState extends ConsumerState<ClassOverviewWidget> {
                 ),
               ),
               IconButton(
-                icon: Icon(
-                  _isCollapsed ? Icons.keyboard_arrow_down : Icons.keyboard_arrow_up,
-                  color: AppTheme.textMuted,
-                  size: 22,
+                icon: AnimatedRotation(
+                  turns: _isCollapsed ? 0.0 : 0.5,
+                  duration: const Duration(milliseconds: 280),
+                  curve: Curves.easeInOutCubic,
+                  child: Icon(
+                    Icons.keyboard_arrow_down,
+                    color: AppTheme.textMuted,
+                    size: 22,
+                  ),
                 ),
                 tooltip: _isCollapsed ? 'Expand Student List' : 'Collapse Student List',
                 onPressed: () => setState(() => _isCollapsed = !_isCollapsed),
@@ -259,111 +268,118 @@ class _ClassOverviewWidgetState extends ConsumerState<ClassOverviewWidget> {
           ),
           const SizedBox(height: 14),
 
-          // Student Activity List or Collapsed State
-          if (_isCollapsed)
-            InkWell(
-              onTap: () => setState(() => _isCollapsed = false),
-              borderRadius: BorderRadius.circular(10),
-              child: Container(
-                width: double.infinity,
-                padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 14),
-                decoration: BoxDecoration(
-                  color: AppTheme.background,
-                  borderRadius: BorderRadius.circular(10),
-                  border: Border.all(color: AppTheme.border),
-                ),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Icon(Icons.unfold_more, size: 16, color: AppTheme.primary),
-                    const SizedBox(width: 6),
-                    Text(
-                      'Showing ${filteredStudents.length} students (Collapsed) • Tap to view',
-                      style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: AppTheme.primary),
-                    ),
-                  ],
-                ),
-              ),
-            )
-          else if (filteredStudents.isEmpty)
-            Container(
-              padding: const EdgeInsets.symmetric(vertical: 24),
-              alignment: Alignment.center,
-              child: Column(
-                children: [
-                  Icon(Icons.person_search_outlined, size: 32, color: AppTheme.textMuted),
-                  const SizedBox(height: 6),
-                  Text(
-                    'No students match "$_activityFilter" in $_activeSection',
-                    style: TextStyle(color: AppTheme.textSecondary, fontSize: 12),
-                  ),
-                ],
-              ),
-            )
-          else ...[
-            ListView.separated(
-              shrinkWrap: true,
-              physics: const NeverScrollableScrollPhysics(),
-              itemCount: displayStudents.length,
-              separatorBuilder: (_, _) => const SizedBox(height: 8),
-              itemBuilder: (context, index) {
-                final student = displayStudents[index];
-                return _buildStudentRow(student, context);
-              },
-            ),
-
-            const SizedBox(height: 12),
-
-            // Controls: Show More / Show Less & View All in Roster
-            Wrap(
-              alignment: WrapAlignment.spaceBetween,
-              crossAxisAlignment: WrapCrossAlignment.center,
-              spacing: 8,
-              runSpacing: 8,
-              children: [
-                if (sortedStudents.length > 3)
-                  InkWell(
-                    onTap: () => setState(() => _showAllStudents = !_showAllStudents),
-                    borderRadius: BorderRadius.circular(8),
-                    child: Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+          // Student Activity List or Collapsed State with smooth slide animation
+          AnimatedSize(
+            duration: const Duration(milliseconds: 300),
+            curve: Curves.easeInOutCubic,
+            child: _isCollapsed
+                ? InkWell(
+                    key: const ValueKey('student_list_collapsed'),
+                    onTap: () => setState(() => _isCollapsed = false),
+                    borderRadius: BorderRadius.circular(10),
+                    child: Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 14),
+                      decoration: BoxDecoration(
+                        color: AppTheme.background,
+                        borderRadius: BorderRadius.circular(10),
+                        border: Border.all(color: AppTheme.border),
+                      ),
                       child: Row(
-                        mainAxisSize: MainAxisSize.min,
+                        mainAxisAlignment: MainAxisAlignment.center,
                         children: [
-                          Icon(
-                            _showAllStudents ? Icons.keyboard_arrow_up : Icons.keyboard_arrow_down,
-                            size: 16,
-                            color: AppTheme.primary,
-                          ),
-                          const SizedBox(width: 4),
+                          Icon(Icons.unfold_more, size: 16, color: AppTheme.primary),
+                          const SizedBox(width: 6),
                           Text(
-                            _showAllStudents
-                                ? 'Show Less'
-                                : 'Show More (${sortedStudents.length - 3} more)',
-                            style: TextStyle(
-                              color: AppTheme.primary,
-                              fontWeight: FontWeight.bold,
-                              fontSize: 12,
-                            ),
+                            'Showing ${filteredStudents.length} students (Collapsed) • Tap to view',
+                            style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: AppTheme.primary),
                           ),
                         ],
                       ),
                     ),
                   )
-                else
-                  const SizedBox.shrink(),
-
-                TextButton.icon(
-                  onPressed: () => context.go('/teacher/students?section=$_activeSection'),
-                  icon: const Icon(Icons.arrow_forward, size: 14),
-                  label: Text(
-                    'View All (${sectionStudents.length}) in Roster',
-                    style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12),
-                  ),
-                ),
-              ],
-            ),
-          ],
+                : filteredStudents.isEmpty
+                    ? Container(
+                        key: const ValueKey('student_list_empty'),
+                        padding: const EdgeInsets.symmetric(vertical: 24),
+                        alignment: Alignment.center,
+                        child: Column(
+                          children: [
+                            Icon(Icons.person_search_outlined, size: 32, color: AppTheme.textMuted),
+                            const SizedBox(height: 6),
+                            Text(
+                              'No students match "$_activityFilter" in $_activeSection',
+                              style: TextStyle(color: AppTheme.textSecondary, fontSize: 12),
+                            ),
+                          ],
+                        ),
+                      )
+                    : Column(
+                        key: const ValueKey('student_list_expanded'),
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          ListView.separated(
+                            shrinkWrap: true,
+                            physics: const NeverScrollableScrollPhysics(),
+                            itemCount: displayStudents.length,
+                            separatorBuilder: (_, _) => const SizedBox(height: 8),
+                            itemBuilder: (context, index) {
+                              final student = displayStudents[index];
+                              return _buildStudentRow(student, context);
+                            },
+                          ),
+                          const SizedBox(height: 12),
+                          // Controls: Show More / Show Less & View All in Roster
+                          Wrap(
+                            alignment: WrapAlignment.spaceBetween,
+                            crossAxisAlignment: WrapCrossAlignment.center,
+                            spacing: 8,
+                            runSpacing: 8,
+                            children: [
+                              if (sortedStudents.length > 3)
+                                InkWell(
+                                  onTap: () => setState(() => _showAllStudents = !_showAllStudents),
+                                  borderRadius: BorderRadius.circular(8),
+                                  child: Padding(
+                                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+                                    child: Row(
+                                      mainAxisSize: MainAxisSize.min,
+                                      children: [
+                                        Icon(
+                                          _showAllStudents ? Icons.keyboard_arrow_up : Icons.keyboard_arrow_down,
+                                          size: 16,
+                                          color: AppTheme.primary,
+                                        ),
+                                        const SizedBox(width: 4),
+                                        Text(
+                                          _showAllStudents
+                                              ? 'Show Less'
+                                              : 'Show More (${sortedStudents.length - 3} more)',
+                                          style: TextStyle(
+                                            color: AppTheme.primary,
+                                            fontWeight: FontWeight.bold,
+                                            fontSize: 12,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                )
+                              else
+                                const SizedBox.shrink(),
+                              TextButton.icon(
+                                onPressed: () => context.go('/teacher/students?section=$_activeSection'),
+                                icon: const Icon(Icons.arrow_forward, size: 14),
+                                label: Text(
+                                  'View All (${sectionStudents.length}) in Roster',
+                                  style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ],
+                      ),
+          ),
         ],
       ),
     );
@@ -577,6 +593,8 @@ class TodayScheduleBanner extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    ref.watch(themeProvider);
+
     final todayAsync = ref.watch(todayTeacherSchedulesProvider);
     final todayName = getCurrentDayOfWeek();
 
@@ -589,16 +607,31 @@ class TodayScheduleBanner extends ConsumerWidget {
             margin: const EdgeInsets.only(bottom: 20),
             padding: const EdgeInsets.all(16),
             decoration: BoxDecoration(
-              color: AppTheme.surface,
-              borderRadius: BorderRadius.circular(14),
-              border: Border.all(color: AppTheme.border),
+              gradient: const LinearGradient(
+                colors: [
+                  Color(0xFF0F2027),
+                  Color(0xFF203A43),
+                  Color(0xFF2C5364),
+                ],
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+              ),
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(color: AppTheme.primary.withValues(alpha: 0.35)),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withValues(alpha: 0.18),
+                  blurRadius: 10,
+                  offset: const Offset(0, 3),
+                ),
+              ],
             ),
             child: Row(
               children: [
                 Container(
                   padding: const EdgeInsets.all(10),
                   decoration: BoxDecoration(
-                    color: AppTheme.primary.withValues(alpha: 0.12),
+                    color: AppTheme.primary.withValues(alpha: 0.2),
                     borderRadius: BorderRadius.circular(10),
                   ),
                   child: Icon(Icons.free_cancellation_outlined, color: AppTheme.primary, size: 22),
@@ -610,17 +643,19 @@ class TodayScheduleBanner extends ConsumerWidget {
                     children: [
                       Text(
                         'No Classes Scheduled for Today ($todayName)',
-                        style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: AppTheme.text),
+                        style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: Colors.white),
                       ),
-                      Text(
+                      const SizedBox(height: 2),
+                      const Text(
                         'You have no assigned class hours for today. Click below to view the full timetable.',
-                        style: TextStyle(fontSize: 12, color: AppTheme.textSecondary),
+                        style: TextStyle(fontSize: 12, color: Colors.white70),
                       ),
                     ],
                   ),
                 ),
                 TextButton(
                   onPressed: () => context.go('/teacher/schedule'),
+                  style: TextButton.styleFrom(foregroundColor: AppTheme.primary),
                   child: const Text('View Timetable'),
                 ),
               ],
@@ -632,41 +667,80 @@ class TodayScheduleBanner extends ConsumerWidget {
           margin: const EdgeInsets.only(bottom: 20),
           padding: const EdgeInsets.all(16),
           decoration: BoxDecoration(
-            gradient: LinearGradient(
+            gradient: const LinearGradient(
               colors: [
-                AppTheme.primary.withValues(alpha: 0.15),
-                AppTheme.surface,
+                Color(0xFF0F2027),
+                Color(0xFF203A43),
+                Color(0xFF2C5364),
               ],
               begin: Alignment.topLeft,
               end: Alignment.bottomRight,
             ),
             borderRadius: BorderRadius.circular(16),
-            border: Border.all(color: AppTheme.primary.withValues(alpha: 0.3)),
+            border: Border.all(color: AppTheme.primary.withValues(alpha: 0.35)),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withValues(alpha: 0.2),
+                blurRadius: 10,
+                offset: const Offset(0, 3),
+              ),
+            ],
           ),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Row(
                 children: [
-                  Icon(Icons.calendar_today_rounded, size: 18, color: AppTheme.primary),
-                  const SizedBox(width: 8),
-                  Text(
-                    "Today's Class Schedule ($todayName)",
-                    style: TextStyle(
-                      fontWeight: FontWeight.bold,
-                      fontSize: 14,
-                      color: AppTheme.text,
+                  Container(
+                    padding: const EdgeInsets.all(6),
+                    decoration: BoxDecoration(
+                      color: AppTheme.primary.withValues(alpha: 0.2),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: Icon(Icons.calendar_today_rounded, size: 16, color: AppTheme.primary),
+                  ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Text(
+                      "Today's Class Schedule ($todayName)",
+                      style: const TextStyle(
+                        fontWeight: FontWeight.bold,
+                        fontSize: 14,
+                        color: Colors.white,
+                      ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
                     ),
                   ),
-                  const Spacer(),
-                  TextButton.icon(
-                    onPressed: () => context.go('/teacher/schedule'),
-                    icon: const Icon(Icons.arrow_forward, size: 14),
-                    label: const Text('Manage Timetable', style: TextStyle(fontSize: 12)),
+                  const SizedBox(width: 8),
+                  Material(
+                    color: Colors.transparent,
+                    child: InkWell(
+                      onTap: () => context.go('/teacher/schedule'),
+                      borderRadius: BorderRadius.circular(8),
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Text(
+                              'View Timetable',
+                              style: TextStyle(
+                                fontSize: 12,
+                                fontWeight: FontWeight.w600,
+                                color: AppTheme.primary,
+                              ),
+                            ),
+                            const SizedBox(width: 4),
+                            Icon(Icons.arrow_forward_rounded, size: 14, color: AppTheme.primary),
+                          ],
+                        ),
+                      ),
+                    ),
                   ),
                 ],
               ),
-              const SizedBox(height: 10),
+              const SizedBox(height: 12),
               SingleChildScrollView(
                 scrollDirection: Axis.horizontal,
                 child: Row(
@@ -679,34 +753,42 @@ class TodayScheduleBanner extends ConsumerWidget {
 
                     return Container(
                       margin: const EdgeInsets.only(right: 12),
-                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
                       decoration: BoxDecoration(
-                        color: AppTheme.surface,
+                        color: const Color(0xFF0C1926).withValues(alpha: 0.85),
                         borderRadius: BorderRadius.circular(12),
-                        border: Border.all(color: AppTheme.border),
+                        border: Border.all(color: Colors.white.withValues(alpha: 0.12)),
                       ),
                       child: Row(
                         children: [
                           Container(
                             width: 3,
-                            height: 36,
+                            height: 38,
                             decoration: BoxDecoration(
                               color: AppTheme.primary,
                               borderRadius: BorderRadius.circular(2),
                             ),
                           ),
-                          const SizedBox(width: 10),
+                          const SizedBox(width: 12),
                           Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
                               Text(
                                 subject,
-                                style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: AppTheme.text),
+                                style: const TextStyle(
+                                  fontSize: 13.5,
+                                  fontWeight: FontWeight.bold,
+                                  color: Colors.white,
+                                ),
                               ),
-                              const SizedBox(height: 2),
+                              const SizedBox(height: 3),
                               Text(
                                 '$section • $start - $end • $room',
-                                style: TextStyle(fontSize: 11, color: AppTheme.textSecondary),
+                                style: TextStyle(
+                                  fontSize: 11,
+                                  color: Colors.white.withValues(alpha: 0.78),
+                                  fontWeight: FontWeight.w500,
+                                ),
                               ),
                             ],
                           ),

@@ -154,7 +154,7 @@ void main() {
       expect(find.text('Profile Screen Content'), findsNothing);
     });
 
-    testWidgets('6. Auto-hide bottom bar on downward scroll and reveal on upward scroll', (tester) async {
+    testWidgets('6. Auto-hide bottom bar while actively scrolling and reveal when scrolling stops', (tester) async {
       final router = createTestRouter();
       await tester.pumpWidget(buildTestApp(router: router));
       await tester.pumpAndSettle();
@@ -164,26 +164,24 @@ void main() {
       expect(initialBarFinder, findsOneWidget);
       expect(tester.getBottomLeft(initialBarFinder).dy, greaterThan(500));
 
-      // Scroll DOWN on the list view
-      await tester.drag(find.byKey(const Key('tab0_list')), const Offset(0, -300));
-      // Pump animation frames
-      await tester.pump(const Duration(milliseconds: 100));
-      await tester.pump(const Duration(milliseconds: 200));
-      await tester.pumpAndSettle();
+      // Start scrolling / dragging on the list view past touch slop
+      final gesture = await tester.startGesture(tester.getCenter(find.byKey(const Key('tab0_list'))));
+      await gesture.moveBy(const Offset(0, -40));
+      await tester.pump();
+      await gesture.moveBy(const Offset(0, -60));
+      await tester.pump();
 
-      // In hidden state, the AnimatedContainer height shrinks to 0.0
-      final animatedContainer = tester.widget<AnimatedContainer>(
+      // While actively scrolling, bar hides (height set to 0.0)
+      final hiddenDuringScroll = tester.widget<AnimatedContainer>(
         find.ancestor(of: find.byType(BottomNavigationBar), matching: find.byType(AnimatedContainer)).first,
       );
-      expect(animatedContainer.constraints?.maxHeight, equals(0.0));
+      expect(hiddenDuringScroll.constraints?.maxHeight, equals(0.0));
 
-      // Scroll UP on the list view
-      await tester.drag(find.byKey(const Key('tab0_list')), const Offset(0, 300));
-      await tester.pump(const Duration(milliseconds: 100));
-      await tester.pump(const Duration(milliseconds: 200));
+      // Release gesture: user stops scrolling
+      await gesture.up();
       await tester.pumpAndSettle();
 
-      // Bottom bar is revealed again
+      // Bottom bar is revealed again once scrolling stops
       final revealedContainer = tester.widget<AnimatedContainer>(
         find.ancestor(of: find.byType(BottomNavigationBar), matching: find.byType(AnimatedContainer)).first,
       );
@@ -196,14 +194,18 @@ void main() {
       await tester.pumpWidget(buildTestApp(router: router));
       await tester.pumpAndSettle();
 
-      // Scroll down to hide bar
-      await tester.drag(find.byKey(const Key('tab0_list')), const Offset(0, -300));
-      await tester.pumpAndSettle();
+      // While dragging, bar hides
+      final gesture = await tester.startGesture(tester.getCenter(find.byKey(const Key('tab0_list'))));
+      await gesture.moveBy(const Offset(0, -40));
+      await tester.pump();
+      await gesture.moveBy(const Offset(0, -60));
+      await tester.pump();
 
       final hiddenContainer = tester.widget<AnimatedContainer>(
         find.ancestor(of: find.byType(BottomNavigationBar), matching: find.byType(AnimatedContainer)).first,
       );
       expect(hiddenContainer.constraints?.maxHeight, equals(0.0));
+      await gesture.up();
 
       // Swipe left to switch to Courses
       await tester.fling(find.byKey(const Key('tab0_list')), const Offset(-400, 0), 1000);

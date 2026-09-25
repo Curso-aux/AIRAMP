@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../../core/theme/app_theme.dart';
@@ -19,15 +20,21 @@ class TeacherDashboardScreen extends ConsumerStatefulWidget {
   ConsumerState<TeacherDashboardScreen> createState() => _TeacherDashboardScreenState();
 }
 
-class _TeacherDashboardScreenState extends ConsumerState<TeacherDashboardScreen> {
+class _TeacherDashboardScreenState extends ConsumerState<TeacherDashboardScreen>
+    with SingleTickerProviderStateMixin {
   String _activeSectionFilter = 'All Handled Sections';
   bool _isAnalyticsExpanded = false; // Analytics hidden by default; tap to expand
   String _analyticsSectionFilter = 'All Handled Sections';
   String _analyticsStudentFilter = 'All';
+  late AnimationController _refreshSpinController;
 
   @override
   void initState() {
     super.initState();
+    _refreshSpinController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 650),
+    );
     WidgetsBinding.instance.addPostFrameCallback((_) {
       ref.invalidate(teacherHandledSectionsDetailsProvider);
       ref.invalidate(teacherHandledSectionsProvider);
@@ -36,6 +43,12 @@ class _TeacherDashboardScreenState extends ConsumerState<TeacherDashboardScreen>
         studentId: _analyticsStudentFilter,
       );
     });
+  }
+
+  @override
+  void dispose() {
+    _refreshSpinController.dispose();
+    super.dispose();
   }
 
   String _formatDate(String? isoString) {
@@ -364,9 +377,14 @@ class _TeacherDashboardScreenState extends ConsumerState<TeacherDashboardScreen>
                       },
                     ),
                     IconButton(
-                      icon: Icon(Icons.refresh, color: AppTheme.primary),
+                      icon: RotationTransition(
+                        turns: _refreshSpinController,
+                        child: Icon(Icons.refresh, color: AppTheme.primary),
+                      ),
                       tooltip: 'Refresh Dashboard',
                       onPressed: () {
+                        _refreshSpinController.forward(from: 0.0);
+                        HapticFeedback.lightImpact();
                         ref.read(teacherDashboardProvider.notifier).reload(
                           section: _analyticsSectionFilter,
                           studentId: _analyticsStudentFilter,
@@ -847,114 +865,139 @@ class _TeacherDashboardScreenState extends ConsumerState<TeacherDashboardScreen>
       selectedStudentName = match['full_name'] as String? ?? 'Student';
     }
 
-    if (!_isAnalyticsExpanded) {
-      // Collapsed View: Compact banner with quick stats and expand button
-      return Container(
-        decoration: BoxDecoration(
-          color: AppTheme.surface,
-          borderRadius: BorderRadius.circular(16),
-          border: Border.all(color: AppTheme.border),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withValues(alpha: 0.03),
-              blurRadius: 10,
-              offset: const Offset(0, 2),
-            ),
-          ],
-        ),
-        child: InkWell(
-          borderRadius: BorderRadius.circular(16),
-          onTap: () => setState(() => _isAnalyticsExpanded = true),
-          child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-            child: Row(
-              children: [
-                Container(
-                  padding: const EdgeInsets.all(8),
-                  decoration: BoxDecoration(
-                    color: AppTheme.primary.withValues(alpha: 0.12),
-                    borderRadius: BorderRadius.circular(10),
-                  ),
-                  child: Icon(Icons.analytics_outlined, size: 20, color: AppTheme.primary),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Row(
-                        children: [
-                          Flexible(
-                            child: Text(
-                              'Performance & Analytics',
-                              style: TextStyle(
-                                fontSize: 15,
-                                fontWeight: FontWeight.bold,
-                                color: AppTheme.text,
-                              ),
-                              overflow: TextOverflow.ellipsis,
-                            ),
-                          ),
-                          const SizedBox(width: 8),
-                          Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
-                            decoration: BoxDecoration(
-                              color: (passRate >= 75 ? AppTheme.success : AppTheme.warning).withValues(alpha: 0.12),
-                              borderRadius: BorderRadius.circular(12),
-                            ),
-                            child: Text(
-                              '$passRate% Pass Rate',
-                              style: TextStyle(
-                                fontSize: 11,
-                                fontWeight: FontWeight.w600,
-                                color: passRate >= 75 ? AppTheme.success : AppTheme.warning,
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 2),
-                      Text(
-                        hasActiveFilter
-                            ? 'Filtered: ${effectiveStudentId != 'All' ? selectedStudentName : effectiveSection} • Tap to view'
-                            : 'Tap to view metrics, pass rates & section/student filters',
-                        style: TextStyle(fontSize: 11, color: AppTheme.textSecondary),
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                    ],
-                  ),
-                ),
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                  decoration: BoxDecoration(
-                    color: AppTheme.primary.withValues(alpha: 0.08),
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Text(
-                        'Show',
-                        style: TextStyle(
-                          fontSize: 12,
-                          fontWeight: FontWeight.w600,
-                          color: AppTheme.primary,
-                        ),
-                      ),
-                      const SizedBox(width: 2),
-                      Icon(Icons.keyboard_arrow_down, size: 18, color: AppTheme.primary),
-                    ],
-                  ),
-                ),
-              ],
-            ),
+    final collapsedView = Container(
+      key: const ValueKey('analytics_collapsed'),
+      decoration: BoxDecoration(
+        color: AppTheme.surface,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: AppTheme.border),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.03),
+            blurRadius: 10,
+            offset: const Offset(0, 2),
           ),
+        ],
+      ),
+      child: InkWell(
+        borderRadius: BorderRadius.circular(16),
+        onTap: () {
+          HapticFeedback.lightImpact();
+          setState(() => _isAnalyticsExpanded = true);
+        },
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+          child: Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: AppTheme.primary.withValues(alpha: 0.12),
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: Icon(Icons.analytics_outlined, size: 20, color: AppTheme.primary),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Flexible(
+                          child: Text(
+                            'Performance & Analytics',
+                            style: TextStyle(
+                              fontSize: 15,
+                              fontWeight: FontWeight.bold,
+                              color: AppTheme.text,
+                            ),
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+                          decoration: BoxDecoration(
+                            color: (passRate >= 75 ? AppTheme.success : AppTheme.warning).withValues(alpha: 0.12),
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          child: Text(
+                            '$passRate% Pass Rate',
+                            style: TextStyle(
+                              fontSize: 11,
+                              fontWeight: FontWeight.w600,
+                              color: passRate >= 75 ? AppTheme.success : AppTheme.warning,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      hasActiveFilter
+                          ? 'Filtered: ${effectiveStudentId != 'All' ? selectedStudentName : effectiveSection} • Tap to view'
+                          : 'Tap to view metrics, pass rates & section/student filters',
+                      style: TextStyle(fontSize: 11, color: AppTheme.textSecondary),
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ],
+                ),
+              ),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                decoration: BoxDecoration(
+                  color: AppTheme.primary.withValues(alpha: 0.08),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(
+                      'Show',
+                      style: TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
+                        color: AppTheme.primary,
+                      ),
+                    ),
+                    const SizedBox(width: 2),
+                    Icon(Icons.keyboard_arrow_down, size: 18, color: AppTheme.primary),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+
+    if (!_isAnalyticsExpanded) {
+      return AnimatedSize(
+        duration: const Duration(milliseconds: 320),
+        curve: Curves.easeInOutCubic,
+        child: AnimatedSwitcher(
+          duration: const Duration(milliseconds: 260),
+          switchInCurve: Curves.easeOutCubic,
+          switchOutCurve: Curves.easeInCubic,
+          transitionBuilder: (child, animation) {
+            return FadeTransition(
+              opacity: animation,
+              child: SizeTransition(
+                sizeFactor: animation,
+                alignment: Alignment.topCenter,
+                child: child,
+              ),
+            );
+          },
+          child: collapsedView,
         ),
       );
     }
 
     // Expanded View: Filter controls + 4 Metric Cards
-    return Container(
+    final expandedView = Container(
+      key: const ValueKey('analytics_expanded'),
       decoration: BoxDecoration(
         color: AppTheme.surface,
         borderRadius: BorderRadius.circular(16),
@@ -1006,7 +1049,10 @@ class _TeacherDashboardScreenState extends ConsumerState<TeacherDashboardScreen>
                 ),
               ),
               TextButton.icon(
-                onPressed: () => setState(() => _isAnalyticsExpanded = false),
+                onPressed: () {
+                  HapticFeedback.lightImpact();
+                  setState(() => _isAnalyticsExpanded = false);
+                },
                 icon: Icon(Icons.keyboard_arrow_up, size: 18, color: AppTheme.textSecondary),
                 label: Text(
                   'Hide',
@@ -1044,6 +1090,8 @@ class _TeacherDashboardScreenState extends ConsumerState<TeacherDashboardScreen>
                     child: DropdownButton<String>(
                       isExpanded: true,
                       value: effectiveSection,
+                      borderRadius: BorderRadius.circular(12),
+                      elevation: 3,
                       icon: Icon(Icons.keyboard_arrow_down, size: 18, color: AppTheme.textSecondary),
                       style: TextStyle(fontSize: 12, color: AppTheme.text, fontWeight: FontWeight.w500),
                       dropdownColor: AppTheme.surface,
@@ -1095,6 +1143,8 @@ class _TeacherDashboardScreenState extends ConsumerState<TeacherDashboardScreen>
                     child: DropdownButton<String>(
                       isExpanded: true,
                       value: effectiveStudentId,
+                      borderRadius: BorderRadius.circular(12),
+                      elevation: 3,
                       icon: Icon(Icons.keyboard_arrow_down, size: 18, color: AppTheme.textSecondary),
                       style: TextStyle(fontSize: 12, color: AppTheme.text, fontWeight: FontWeight.w500),
                       dropdownColor: AppTheme.surface,
@@ -1298,6 +1348,27 @@ class _TeacherDashboardScreenState extends ConsumerState<TeacherDashboardScreen>
         ],
       ),
     );
+
+    return AnimatedSize(
+      duration: const Duration(milliseconds: 320),
+      curve: Curves.easeInOutCubic,
+      child: AnimatedSwitcher(
+        duration: const Duration(milliseconds: 260),
+        switchInCurve: Curves.easeOutCubic,
+        switchOutCurve: Curves.easeInCubic,
+        transitionBuilder: (child, animation) {
+          return FadeTransition(
+            opacity: animation,
+            child: SizeTransition(
+              sizeFactor: animation,
+              alignment: Alignment.topCenter,
+              child: child,
+            ),
+          );
+        },
+        child: expandedView,
+      ),
+    );
   }
 
   Widget _buildMetricCard({
@@ -1354,38 +1425,11 @@ class _TeacherDashboardScreenState extends ConsumerState<TeacherDashboardScreen>
     required Color color,
     required VoidCallback onTap,
   }) {
-    return InkWell(
+    return _AnimatedActionTile(
+      icon: icon,
+      label: label,
+      color: color,
       onTap: onTap,
-      borderRadius: BorderRadius.circular(12),
-      child: Container(
-        padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 8),
-        decoration: BoxDecoration(
-          color: AppTheme.surface,
-          borderRadius: BorderRadius.circular(12),
-          border: Border.all(color: AppTheme.border),
-        ),
-        child: Column(
-          children: [
-            CircleAvatar(
-              radius: 18,
-              backgroundColor: color.withValues(alpha: 0.12),
-              child: Icon(icon, color: color, size: 18),
-            ),
-            const SizedBox(height: 8),
-            Text(
-              label,
-              textAlign: TextAlign.center,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: TextStyle(
-                fontSize: 11,
-                fontWeight: FontWeight.w600,
-                color: AppTheme.text,
-              ),
-            ),
-          ],
-        ),
-      ),
     );
   }
 
@@ -1958,3 +2002,116 @@ class _TeacherDashboardScreenState extends ConsumerState<TeacherDashboardScreen>
   }
 }
 
+/// A tactile animated action button for Quick Actions Hub with scale bounce physics,
+/// vibrant tinted splash ripple, and haptic feedback.
+class _AnimatedActionTile extends StatefulWidget {
+  final IconData icon;
+  final String label;
+  final Color color;
+  final VoidCallback onTap;
+
+  const _AnimatedActionTile({
+    required this.icon,
+    required this.label,
+    required this.color,
+    required this.onTap,
+  });
+
+  @override
+  State<_AnimatedActionTile> createState() => _AnimatedActionTileState();
+}
+
+class _AnimatedActionTileState extends State<_AnimatedActionTile> with SingleTickerProviderStateMixin {
+  late AnimationController _pressController;
+  late Animation<double> _scaleAnimation;
+
+  @override
+  void initState() {
+    super.initState();
+    _pressController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 90),
+      reverseDuration: const Duration(milliseconds: 180),
+    );
+    _scaleAnimation = Tween<double>(begin: 1.0, end: 0.92).animate(
+      CurvedAnimation(
+        parent: _pressController,
+        curve: Curves.easeOutCubic,
+        reverseCurve: Curves.easeOutBack,
+      ),
+    );
+  }
+
+  @override
+  void dispose() {
+    _pressController.dispose();
+    super.dispose();
+  }
+
+  void _onTapDown(TapDownDetails _) {
+    _pressController.forward();
+    HapticFeedback.lightImpact();
+  }
+
+  void _onTapUp(TapUpDetails _) {
+    _pressController.reverse();
+  }
+
+  void _onTapCancel() {
+    _pressController.reverse();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return ScaleTransition(
+      scale: _scaleAnimation,
+      child: Material(
+        color: AppTheme.surface,
+        borderRadius: BorderRadius.circular(12),
+        elevation: 0,
+        child: InkWell(
+          onTap: () {
+            _pressController.forward().then((_) {
+              if (mounted) _pressController.reverse();
+            });
+            widget.onTap();
+          },
+          onTapDown: _onTapDown,
+          onTapUp: _onTapUp,
+          onTapCancel: _onTapCancel,
+          borderRadius: BorderRadius.circular(12),
+          splashColor: widget.color.withValues(alpha: 0.16),
+          highlightColor: widget.color.withValues(alpha: 0.08),
+          child: Container(
+            padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 8),
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: AppTheme.border),
+            ),
+            child: Column(
+              children: [
+                CircleAvatar(
+                  radius: 18,
+                  backgroundColor: widget.color.withValues(alpha: 0.12),
+                  child: Icon(widget.icon, color: widget.color, size: 18),
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  widget.label,
+                  textAlign: TextAlign.center,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    fontSize: 11,
+                    fontWeight: FontWeight.w600,
+                    color: AppTheme.text,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}

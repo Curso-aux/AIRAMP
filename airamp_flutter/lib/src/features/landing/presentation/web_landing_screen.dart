@@ -1,3 +1,4 @@
+import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -76,7 +77,7 @@ class WebLandingScreen extends ConsumerWidget {
                                 borderRadius: BorderRadius.circular(6),
                               ),
                               child: Text(
-                                'WEB ADMIN',
+                                'PORTAL',
                                 style: TextStyle(
                                   color: AppTheme.primary,
                                   fontSize: 10,
@@ -154,33 +155,7 @@ class WebLandingScreen extends ConsumerWidget {
                       ),
                     )
                   else
-                    Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        TextButton.icon(
-                          onPressed: () => context.go('/login'),
-                          icon: const Icon(Icons.person_outline_rounded, size: 18),
-                          label: const Text('Student / Teacher'),
-                          style: TextButton.styleFrom(
-                            foregroundColor: AppTheme.text,
-                            padding: const EdgeInsets.symmetric(horizontal: 16),
-                          ),
-                        ),
-                        const SizedBox(width: 8),
-                        ElevatedButton.icon(
-                          onPressed: () => context.go('/admin/login'),
-                          icon: const Icon(Icons.shield_outlined, size: 18),
-                          label: const Text('Admin Login'),
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: AppTheme.primary,
-                            foregroundColor: Colors.black,
-                            minimumSize: const Size(0, 42),
-                            padding: const EdgeInsets.symmetric(horizontal: 20),
-                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                          ),
-                        ),
-                      ],
-                    ),
+                    _buildSignInDropdown(context, isDark),
                 ],
               ),
             ),
@@ -255,9 +230,9 @@ class WebLandingScreen extends ConsumerWidget {
                     runSpacing: 12,
                     alignment: WrapAlignment.center,
                     children: [
-                      ElevatedButton.icon(
-                        onPressed: () {
-                          if (user != null) {
+                      if (user != null) ...[
+                        ElevatedButton.icon(
+                          onPressed: () {
                             if (user.role == 'admin' || user.role == 'super_admin') {
                               context.go('/admin/dashboard');
                             } else if (user.role == 'teacher') {
@@ -265,58 +240,74 @@ class WebLandingScreen extends ConsumerWidget {
                             } else {
                               context.go('/student/home');
                             }
-                          } else {
-                            context.go('/admin/login');
-                          }
-                        },
-                        icon: Icon(
-                          user != null
-                              ? (user.role == 'teacher'
-                                  ? Icons.school_rounded
-                                  : (user.role == 'student'
-                                      ? Icons.auto_stories_rounded
-                                      : Icons.dashboard_rounded))
-                              : Icons.admin_panel_settings_rounded,
-                          size: 20,
+                          },
+                          icon: Icon(
+                            user.role == 'teacher'
+                                ? Icons.school_rounded
+                                : (user.role == 'student'
+                                    ? Icons.auto_stories_rounded
+                                    : Icons.dashboard_rounded),
+                            size: 20,
+                          ),
+                          label: Text(
+                            user.role == 'teacher'
+                                ? 'Go to Teacher Portal'
+                                : (user.role == 'student'
+                                    ? 'Go to Student Portal'
+                                    : 'Go to Admin Console'),
+                          ),
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: AppTheme.primary,
+                            foregroundColor: Colors.black,
+                            minimumSize: const Size(0, 50),
+                            padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 14),
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                            textStyle: const TextStyle(fontWeight: FontWeight.w800, fontSize: 16),
+                          ),
                         ),
-                        label: Text(
-                          user != null
-                              ? (user.role == 'teacher'
-                                  ? 'Go to Teacher Portal'
-                                  : (user.role == 'student'
-                                      ? 'Go to Student Portal'
-                                      : 'Go to Admin Console'))
-                              : 'Access Admin Portal',
+                      ] else ...[
+                        ElevatedButton.icon(
+                          onPressed: () => context.go('/login'),
+                          icon: const Icon(Icons.school_rounded, size: 20),
+                          label: const Text('Enter Classroom Portal'),
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: AppTheme.primary,
+                            foregroundColor: Colors.black,
+                            minimumSize: const Size(0, 50),
+                            padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 14),
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                            textStyle: const TextStyle(fontWeight: FontWeight.w800, fontSize: 15),
+                          ),
                         ),
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: AppTheme.primary,
-                          foregroundColor: Colors.black,
-                          minimumSize: const Size(0, 50),
-                          padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 14),
-                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                          textStyle: const TextStyle(fontWeight: FontWeight.w800, fontSize: 16),
-                        ),
-                      ),
-                      OutlinedButton.icon(
-                        onPressed: () {
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            SnackBar(
-                              content: const Text('Teachers and students access coursework via the AIRAMP mobile or Windows app.'),
-                              backgroundColor: AppTheme.surfaceLight,
+                        OutlinedButton.icon(
+                          onPressed: () => context.go('/admin/login'),
+                          icon: const Icon(Icons.shield_outlined, size: 20),
+                          label: const Text('Admin Console'),
+                          style: OutlinedButton.styleFrom(
+                            foregroundColor: AppTheme.text,
+                            side: BorderSide(
+                              color: isDark ? Colors.white.withValues(alpha: 0.25) : Colors.black.withValues(alpha: 0.2),
                             ),
-                          );
-                        },
+                            minimumSize: const Size(0, 50),
+                            padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 14),
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                            textStyle: const TextStyle(fontWeight: FontWeight.w700, fontSize: 15),
+                          ),
+                        ),
+                      ],
+                      OutlinedButton.icon(
+                        onPressed: () => _showAppInfoDialog(context, isDark),
                         icon: const Icon(Icons.devices_rounded, size: 20),
                         label: const Text('App Information'),
                         style: OutlinedButton.styleFrom(
-                          foregroundColor: AppTheme.text,
+                          foregroundColor: AppTheme.textSecondary,
                           side: BorderSide(
-                            color: isDark ? Colors.white.withValues(alpha: 0.25) : Colors.black.withValues(alpha: 0.2),
+                            color: isDark ? Colors.white.withValues(alpha: 0.15) : Colors.black.withValues(alpha: 0.12),
                           ),
                           minimumSize: const Size(0, 50),
-                          padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 14),
+                          padding: const EdgeInsets.symmetric(horizontal: 22, vertical: 14),
                           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                          textStyle: const TextStyle(fontWeight: FontWeight.w700, fontSize: 16),
+                          textStyle: const TextStyle(fontWeight: FontWeight.w600, fontSize: 14),
                         ),
                       ),
                     ],
@@ -381,10 +372,10 @@ class WebLandingScreen extends ConsumerWidget {
                             const SizedBox(width: 20),
                             Expanded(child: _buildRoleCard(
                               context,
-                              title: 'Teacher App',
+                              title: 'Teacher Portal',
                               subtitle: 'Classroom & Scoring Hub',
                               icon: Icons.assignment_ind_rounded,
-                              badge: 'Mobile & Desktop App',
+                              badge: 'Web & Desktop',
                               isFeatured: false,
                               color: AppTheme.accent,
                               items: [
@@ -394,23 +385,16 @@ class WebLandingScreen extends ConsumerWidget {
                                 'Learning outcome pacing and mastery tracking',
                                 'Class announcements broadcast',
                               ],
-                              ctaText: 'Use Mobile / Desktop App',
-                              onCta: () {
-                                ScaffoldMessenger.of(context).showSnackBar(
-                                  SnackBar(
-                                    content: const Text('Teachers: Please launch the AIRAMP application on your mobile device or Windows computer.'),
-                                    backgroundColor: AppTheme.surfaceLight,
-                                  ),
-                                );
-                              },
+                              ctaText: 'Access Teacher Portal',
+                              onCta: () => context.go('/login'),
                             )),
                             const SizedBox(width: 20),
                             Expanded(child: _buildRoleCard(
                               context,
-                              title: 'Student App',
+                              title: 'Student Portal',
                               subtitle: 'Personalized Learning',
                               icon: Icons.school_rounded,
-                              badge: 'Mobile & Desktop App',
+                              badge: 'Web, Mobile & Desktop',
                               isFeatured: false,
                               color: AppTheme.info,
                               items: [
@@ -420,15 +404,8 @@ class WebLandingScreen extends ConsumerWidget {
                                 'Section key enrollment self-service',
                                 'Direct teacher inquiries & study support',
                               ],
-                              ctaText: 'Use Mobile / Desktop App',
-                              onCta: () {
-                                ScaffoldMessenger.of(context).showSnackBar(
-                                  SnackBar(
-                                    content: const Text('Students: Please launch the AIRAMP application on your mobile device or Windows computer.'),
-                                    backgroundColor: AppTheme.surfaceLight,
-                                  ),
-                                );
-                              },
+                              ctaText: 'Access Student Portal',
+                              onCta: () => context.go('/login'),
                             )),
                           ],
                         );
@@ -457,10 +434,10 @@ class WebLandingScreen extends ConsumerWidget {
                             const SizedBox(height: 20),
                             _buildRoleCard(
                               context,
-                              title: 'Teacher App',
+                              title: 'Teacher Portal',
                               subtitle: 'Classroom & Scoring Hub',
                               icon: Icons.assignment_ind_rounded,
-                              badge: 'Mobile & Desktop App',
+                              badge: 'Web & Desktop',
                               isFeatured: false,
                               color: AppTheme.accent,
                               items: [
@@ -470,23 +447,16 @@ class WebLandingScreen extends ConsumerWidget {
                                 'Learning outcome pacing and mastery tracking',
                                 'Class announcements broadcast',
                               ],
-                              ctaText: 'Use Mobile / Desktop App',
-                              onCta: () {
-                                ScaffoldMessenger.of(context).showSnackBar(
-                                  SnackBar(
-                                    content: const Text('Teachers: Please launch the AIRAMP application on your mobile device or Windows computer.'),
-                                    backgroundColor: AppTheme.surfaceLight,
-                                  ),
-                                );
-                              },
+                              ctaText: 'Access Teacher Portal',
+                              onCta: () => context.go('/login'),
                             ),
                             const SizedBox(height: 20),
                             _buildRoleCard(
                               context,
-                              title: 'Student App',
+                              title: 'Student Portal',
                               subtitle: 'Personalized Learning',
                               icon: Icons.school_rounded,
-                              badge: 'Mobile & Desktop App',
+                              badge: 'Web, Mobile & Desktop',
                               isFeatured: false,
                               color: AppTheme.info,
                               items: [
@@ -496,15 +466,8 @@ class WebLandingScreen extends ConsumerWidget {
                                 'Section key enrollment self-service',
                                 'Direct teacher inquiries & study support',
                               ],
-                              ctaText: 'Use Mobile / Desktop App',
-                              onCta: () {
-                                ScaffoldMessenger.of(context).showSnackBar(
-                                  SnackBar(
-                                    content: const Text('Students: Please launch the AIRAMP application on your mobile device or Windows computer.'),
-                                    backgroundColor: AppTheme.surfaceLight,
-                                  ),
-                                );
-                              },
+                              ctaText: 'Access Student Portal',
+                              onCta: () => context.go('/login'),
                             ),
                           ],
                         );
@@ -526,7 +489,7 @@ class WebLandingScreen extends ConsumerWidget {
                 color: AppTheme.surfaceLight,
                 borderRadius: BorderRadius.circular(16),
                 border: Border.all(
-                  color: AppTheme.warning.withValues(alpha: 0.3),
+                  color: AppTheme.primary.withValues(alpha: 0.25),
                 ),
               ),
               child: Row(
@@ -535,10 +498,10 @@ class WebLandingScreen extends ConsumerWidget {
                   Container(
                     padding: const EdgeInsets.all(10),
                     decoration: BoxDecoration(
-                      color: AppTheme.warning.withValues(alpha: 0.15),
+                      color: AppTheme.primary.withValues(alpha: 0.15),
                       shape: BoxShape.circle,
                     ),
-                    child: Icon(Icons.shield_outlined, color: AppTheme.warning, size: 28),
+                    child: Icon(Icons.devices_rounded, color: AppTheme.primary, size: 28),
                   ),
                   const SizedBox(width: 18),
                   Expanded(
@@ -546,7 +509,7 @@ class WebLandingScreen extends ConsumerWidget {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         const Text(
-                          'Web Access Restriction Notice',
+                          'Institutional & Multi-Device Access Guidelines',
                           style: TextStyle(
                             fontSize: 16,
                             fontWeight: FontWeight.w800,
@@ -554,7 +517,7 @@ class WebLandingScreen extends ConsumerWidget {
                         ),
                         const SizedBox(height: 6),
                         Text(
-                          'This web portal is strictly restricted to School Administrators (Admin & Super Admin accounts). Teachers and students cannot sign in to the web console and must use the dedicated AIRAMP mobile or desktop application to ensure reliable offline lesson caching and data synchronization.',
+                          'AIRAMP supports seamless multi-device accessibility. Administrators manage institutional curriculum, section keys, and master schedules via the Web Console. Teachers and students can sign in directly through the web portal or use dedicated Windows and mobile applications for offline lesson caching and continuous synchronization.',
                           style: TextStyle(
                             color: AppTheme.textSecondary,
                             fontSize: 13,
@@ -752,6 +715,344 @@ class WebLandingScreen extends ConsumerWidget {
           ),
         ],
       ),
+    );
+  }
+
+  Widget _buildSignInDropdown(BuildContext context, bool isDark) {
+    final screenWidth = MediaQuery.sizeOf(context).width;
+
+    return PopupMenuButton<String>(
+      tooltip: 'Select Access Portal',
+      offset: const Offset(0, 48),
+      elevation: 16,
+      constraints: BoxConstraints(
+        minWidth: math.min(340.0, screenWidth - 32),
+        maxWidth: math.min(380.0, screenWidth - 24),
+      ),
+      color: isDark ? const Color(0xFF161F2E) : Colors.white,
+      surfaceTintColor: Colors.transparent,
+      shadowColor: Colors.black.withValues(alpha: 0.35),
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(16),
+        side: BorderSide(
+          color: isDark ? Colors.white.withValues(alpha: 0.12) : Colors.black.withValues(alpha: 0.08),
+          width: 1.2,
+        ),
+      ),
+      onSelected: (portal) {
+        if (portal == 'admin') {
+          context.go('/admin/login');
+        } else {
+          context.go('/login');
+        }
+      },
+      itemBuilder: (context) => [
+        PopupMenuItem<String>(
+          enabled: false,
+          height: 36,
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+          child: Row(
+            children: [
+              Icon(
+                Icons.lock_person_outlined,
+                size: 14,
+                color: isDark ? Colors.white54 : Colors.black45,
+              ),
+              const SizedBox(width: 8),
+              Text(
+                'SELECT ACCESS PORTAL',
+                style: TextStyle(
+                  fontSize: 10,
+                  fontWeight: FontWeight.w800,
+                  letterSpacing: 1.0,
+                  color: isDark ? Colors.white54 : Colors.black45,
+                ),
+              ),
+            ],
+          ),
+        ),
+        const PopupMenuDivider(height: 1),
+        PopupMenuItem<String>(
+          value: 'student',
+          height: 68,
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
+          child: _buildPortalItem(
+            icon: Icons.school_rounded,
+            iconColor: const Color(0xFF38BDF8),
+            iconBg: const Color(0xFF38BDF8).withValues(alpha: 0.15),
+            title: 'Student Portal',
+            badgeText: 'LEARNER',
+            badgeColor: const Color(0xFF38BDF8),
+            subtitle: 'Review modules, quizzes & progress',
+            isDark: isDark,
+          ),
+        ),
+        PopupMenuItem<String>(
+          value: 'teacher',
+          height: 68,
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
+          child: _buildPortalItem(
+            icon: Icons.assignment_ind_rounded,
+            iconColor: const Color(0xFFA855F7),
+            iconBg: const Color(0xFFA855F7).withValues(alpha: 0.15),
+            title: 'Teacher Portal',
+            badgeText: 'FACULTY',
+            badgeColor: const Color(0xFFA855F7),
+            subtitle: 'Classrooms, scorebooks & consultations',
+            isDark: isDark,
+          ),
+        ),
+        const PopupMenuDivider(height: 1),
+        PopupMenuItem<String>(
+          value: 'admin',
+          height: 68,
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
+          child: _buildPortalItem(
+            icon: Icons.admin_panel_settings_rounded,
+            iconColor: AppTheme.primary,
+            iconBg: AppTheme.primary.withValues(alpha: 0.15),
+            title: 'Admin Web Console',
+            badgeText: 'INSTITUTION',
+            badgeColor: AppTheme.primary,
+            subtitle: 'Curriculum, schedules & school metrics',
+            isDark: isDark,
+          ),
+        ),
+      ],
+      child: Container(
+        height: 42,
+        padding: const EdgeInsets.symmetric(horizontal: 16),
+        decoration: BoxDecoration(
+          color: AppTheme.primary,
+          borderRadius: BorderRadius.circular(10),
+          boxShadow: [
+            BoxShadow(
+              color: AppTheme.primary.withValues(alpha: 0.3),
+              blurRadius: 8,
+              offset: const Offset(0, 2),
+            ),
+          ],
+        ),
+        child: const Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(Icons.login_rounded, size: 18, color: Colors.black),
+            SizedBox(width: 8),
+            Text(
+              'Sign In',
+              style: TextStyle(
+                color: Colors.black,
+                fontWeight: FontWeight.w800,
+                fontSize: 14,
+                letterSpacing: 0.3,
+              ),
+            ),
+            SizedBox(width: 4),
+            Icon(Icons.keyboard_arrow_down_rounded, size: 18, color: Colors.black),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildPortalItem({
+    required IconData icon,
+    required Color iconColor,
+    required Color iconBg,
+    required String title,
+    required String badgeText,
+    required Color badgeColor,
+    required String subtitle,
+    required bool isDark,
+  }) {
+    return Row(
+      children: [
+        Container(
+          width: 40,
+          height: 40,
+          decoration: BoxDecoration(
+            color: iconBg,
+            borderRadius: BorderRadius.circular(10),
+          ),
+          child: Icon(icon, color: iconColor, size: 20),
+        ),
+        const SizedBox(width: 12),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Row(
+                children: [
+                  Flexible(
+                    child: Text(
+                      title,
+                      style: TextStyle(
+                        color: isDark ? Colors.white : const Color(0xFF0F172A),
+                        fontWeight: FontWeight.w700,
+                        fontSize: 13.5,
+                      ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+                  const SizedBox(width: 6),
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                    decoration: BoxDecoration(
+                      color: badgeColor.withValues(alpha: 0.15),
+                      borderRadius: BorderRadius.circular(4),
+                    ),
+                    child: Text(
+                      badgeText,
+                      style: TextStyle(
+                        color: badgeColor,
+                        fontSize: 8.5,
+                        fontWeight: FontWeight.w800,
+                        letterSpacing: 0.5,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 3),
+              Text(
+                subtitle,
+                style: TextStyle(
+                  color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B),
+                  fontSize: 11,
+                  fontWeight: FontWeight.w400,
+                ),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(width: 6),
+        Icon(
+          Icons.chevron_right_rounded,
+          size: 18,
+          color: isDark ? Colors.white38 : Colors.black38,
+        ),
+      ],
+    );
+  }
+
+  void _showAppInfoDialog(BuildContext context, bool isDark) {
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: isDark ? const Color(0xFF1E293B) : Colors.white,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        title: Row(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                color: AppTheme.primary.withValues(alpha: 0.15),
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: Icon(Icons.devices_rounded, color: AppTheme.primary, size: 24),
+            ),
+            const SizedBox(width: 12),
+            const Text(
+              'AIRAMP Ecosystem Access',
+              style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800),
+            ),
+          ],
+        ),
+        content: SizedBox(
+          width: 520,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              _buildAppPlatformRow(
+                icon: Icons.language_rounded,
+                iconColor: AppTheme.primary,
+                title: 'Web Console & Portals',
+                description: 'Full institutional management for Administrators, with direct web access for Teachers and Students.',
+                isDark: isDark,
+              ),
+              const SizedBox(height: 16),
+              _buildAppPlatformRow(
+                icon: Icons.desktop_windows_rounded,
+                iconColor: const Color(0xFF38BDF8),
+                title: 'Windows Desktop Application',
+                description: 'Offline-ready assessment execution, auto-sync, and teacher grading tools for school PC laboratories.',
+                isDark: isDark,
+              ),
+              const SizedBox(height: 16),
+              _buildAppPlatformRow(
+                icon: Icons.android_rounded,
+                iconColor: const Color(0xFF10B981),
+                title: 'Android Mobile Application',
+                description: 'Portable learning outcome reviews, instant quiz submission, and direct teacher consultations for students on the go.',
+                isDark: isDark,
+              ),
+            ],
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            style: TextButton.styleFrom(
+              foregroundColor: AppTheme.primary,
+              textStyle: const TextStyle(fontWeight: FontWeight.bold),
+            ),
+            child: const Text('Close'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildAppPlatformRow({
+    required IconData icon,
+    required Color iconColor,
+    required String title,
+    required String description,
+    required bool isDark,
+  }) {
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Container(
+          width: 40,
+          height: 40,
+          decoration: BoxDecoration(
+            color: iconColor.withValues(alpha: 0.15),
+            borderRadius: BorderRadius.circular(10),
+          ),
+          child: Icon(icon, color: iconColor, size: 20),
+        ),
+        const SizedBox(width: 14),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                title,
+                style: TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.w700,
+                  color: isDark ? Colors.white : const Color(0xFF0F172A),
+                ),
+              ),
+              const SizedBox(height: 3),
+              Text(
+                description,
+                style: TextStyle(
+                  fontSize: 12,
+                  color: AppTheme.textSecondary,
+                  height: 1.4,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ],
     );
   }
 }

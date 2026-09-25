@@ -263,9 +263,40 @@ void main() {
 
       expect(find.text('AIRAMP Role Ecosystem'), findsOneWidget);
       expect(find.text('Admin Web Console'), findsOneWidget);
-      expect(find.text('Teacher App'), findsOneWidget);
-      expect(find.text('Student App'), findsOneWidget);
-      expect(find.text('Web Access Restriction Notice'), findsOneWidget);
+      expect(find.text('Teacher Portal'), findsOneWidget);
+      expect(find.text('Student Portal'), findsOneWidget);
+      expect(find.text('Institutional & Multi-Device Access Guidelines'), findsOneWidget);
+      expect(find.text('Sign In'), findsOneWidget);
+    });
+
+    testWidgets('WebLandingScreen Sign In dropdown opens cleanly without RenderFlex overflow', (tester) async {
+      tester.view.physicalSize = const Size(1280, 900);
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(() {
+        tester.view.resetPhysicalSize();
+        tester.view.resetDevicePixelRatio();
+      });
+
+      await tester.pumpWidget(
+        ProviderScope(
+          child: MaterialApp(
+            theme: AppTheme.darkTheme,
+            home: const Scaffold(body: WebLandingScreen()),
+          ),
+        ),
+      );
+      await tester.pump(const Duration(milliseconds: 100));
+
+      // Tap Sign In to open dropdown
+      await tester.tap(find.text('Sign In'));
+      await tester.pumpAndSettle();
+
+      // Verify menu header and all portal items & badges appear
+      expect(find.text('SELECT ACCESS PORTAL'), findsOneWidget);
+      expect(find.text('LEARNER'), findsOneWidget);
+      expect(find.text('FACULTY'), findsOneWidget);
+      expect(find.text('INSTITUTION'), findsOneWidget);
+      expect(tester.takeException(), isNull);
     });
 
     testWidgets('AdminWebLoginScreen renders administrative console sign-in form', (tester) async {

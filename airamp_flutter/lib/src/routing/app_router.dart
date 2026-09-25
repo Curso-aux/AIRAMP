@@ -26,6 +26,7 @@ import '../features/admin/presentation/web/admin_web_students_screen.dart';
 import '../features/admin/presentation/web/admin_web_teachers_screen.dart';
 import '../features/admin/presentation/web/admin_web_keys_screen.dart';
 import '../features/admin/presentation/web/admin_web_announcements_screen.dart';
+import '../features/admin/presentation/web/admin_web_schedule_screen.dart';
 import '../features/student/presentation/student_scaffold.dart';
 import '../features/teacher/presentation/teacher_scaffold.dart';
 import '../features/teacher/presentation/teacher_dashboard_screen.dart';
@@ -298,6 +299,14 @@ final routerProvider = Provider<GoRouter>((ref) {
               GoRoute(
                 path: '/admin/sections',
                 builder: (context, state) => const SectionsMgmtScreen(),
+              ),
+            ],
+          ),
+          StatefulShellBranch(
+            routes: [
+              GoRoute(
+                path: '/admin/schedules',
+                builder: (context, state) => const AdminWebScheduleScreen(),
               ),
             ],
           ),

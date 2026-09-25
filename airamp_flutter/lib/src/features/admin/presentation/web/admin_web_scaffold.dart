@@ -73,6 +73,12 @@ class _AdminWebScaffoldState extends ConsumerState<AdminWebScaffold> {
       activeIcon: Icons.groups,
       route: '/admin/sections',
     ),
+    AdminNavItem(
+      label: 'Class Schedules',
+      icon: Icons.calendar_month_outlined,
+      activeIcon: Icons.calendar_month,
+      route: '/admin/schedules',
+    ),
   ];
 
   void _onSelectTab(int index) {

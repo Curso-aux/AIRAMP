@@ -110,6 +110,7 @@ class _AdminCommandPaletteState extends ConsumerState<AdminCommandPalette> {
       (5, 'Announcements', 'Broadcast alerts and school bulletins', Icons.campaign),
       (6, 'Quiz Scores & Results', 'Student performance and attempts', Icons.assignment_turned_in),
       (7, 'Class Sections', 'Room assignments and section arrangements', Icons.groups),
+      (8, 'Class Schedules', 'Master timetable and teacher class assignments', Icons.calendar_month),
     ];
 
     for (final p in pages) {

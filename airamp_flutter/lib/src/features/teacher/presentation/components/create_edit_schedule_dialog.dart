@@ -1,23 +1,30 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../core/theme/app_theme.dart';
-import '../../data/teacher_repository.dart';
+import '../../../../core/database/database_helper.dart';
+import '../../../admin/data/admin_repository.dart';
 import '../../data/teacher_schedule_repository.dart';
 
 class CreateEditScheduleDialog extends ConsumerStatefulWidget {
   final Map<String, dynamic>? initialSchedule;
   final String? defaultDay;
+  final String? preselectedTeacherId;
+  final String? preselectedTeacherName;
 
   const CreateEditScheduleDialog({
     super.key,
     this.initialSchedule,
     this.defaultDay,
+    this.preselectedTeacherId,
+    this.preselectedTeacherName,
   });
 
   static Future<bool?> show(
     BuildContext context, {
     Map<String, dynamic>? initialSchedule,
     String? defaultDay,
+    String? preselectedTeacherId,
+    String? preselectedTeacherName,
   }) {
     return showDialog<bool>(
       context: context,
@@ -25,6 +32,8 @@ class CreateEditScheduleDialog extends ConsumerStatefulWidget {
       builder: (ctx) => CreateEditScheduleDialog(
         initialSchedule: initialSchedule,
         defaultDay: defaultDay,
+        preselectedTeacherId: preselectedTeacherId,
+        preselectedTeacherName: preselectedTeacherName,
       ),
     );
   }
@@ -36,6 +45,8 @@ class CreateEditScheduleDialog extends ConsumerStatefulWidget {
 class _CreateEditScheduleDialogState extends ConsumerState<CreateEditScheduleDialog> {
   final _formKey = GlobalKey<FormState>();
 
+  String? _selectedTeacherId;
+  String? _selectedTeacherName;
   int? _selectedSubjectId;
   String? _selectedSubjectName;
   String? _selectedSection;
@@ -71,6 +82,8 @@ class _CreateEditScheduleDialogState extends ConsumerState<CreateEditScheduleDia
     super.initState();
     final init = widget.initialSchedule;
     if (init != null) {
+      _selectedTeacherId = init['teacher_id'] as String?;
+      _selectedTeacherName = init['teacher_name'] as String?;
       _selectedSubjectId = init['subject_id'] as int?;
       _selectedSubjectName = init['subject_name'] as String?;
       _selectedSection = init['section_name'] as String?;
@@ -80,9 +93,18 @@ class _CreateEditScheduleDialogState extends ConsumerState<CreateEditScheduleDia
 
       _startTime = _parseTime(init['start_time'] as String?) ?? const TimeOfDay(hour: 8, minute: 0);
       _endTime = _parseTime(init['end_time'] as String?) ?? const TimeOfDay(hour: 9, minute: 30);
-    } else if (widget.defaultDay != null && _daysOfWeek.contains(widget.defaultDay)) {
-      _selectedDay = widget.defaultDay!;
+    } else {
+      _selectedTeacherId = widget.preselectedTeacherId;
+      _selectedTeacherName = widget.preselectedTeacherName;
+      if (widget.defaultDay != null && _daysOfWeek.contains(widget.defaultDay)) {
+        _selectedDay = widget.defaultDay!;
+      }
     }
+
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      ref.read(adminTeachersProvider.notifier).loadTeachers();
+      ref.read(subjectsProvider.notifier).reload();
+    });
   }
 
   @override
@@ -122,7 +144,6 @@ class _CreateEditScheduleDialogState extends ConsumerState<CreateEditScheduleDia
     if (picked != null) {
       setState(() {
         _startTime = picked;
-        // Default auto-adjust end time to +1.5h if end is before start
         final startMinutes = picked.hour * 60 + picked.minute;
         final endMinutes = _endTime.hour * 60 + _endTime.minute;
         if (endMinutes <= startMinutes) {
@@ -151,14 +172,15 @@ class _CreateEditScheduleDialogState extends ConsumerState<CreateEditScheduleDia
 
   Future<void> _validateConflict() async {
     if (_selectedSection == null) return;
-    final check = await ref.read(teacherSchedulesProvider.notifier).checkConflict(
-          dayOfWeek: _selectedDay,
-          startTime: _formatTime(_startTime),
-          endTime: _formatTime(_endTime),
-          sectionName: _selectedSection,
-          room: _roomController.text.trim().isNotEmpty ? _roomController.text.trim() : null,
-          excludeScheduleId: widget.initialSchedule?['id'] as String?,
-        );
+    final check = await DatabaseHelper().checkScheduleConflict(
+      dayOfWeek: _selectedDay,
+      startTime: _formatTime(_startTime),
+      endTime: _formatTime(_endTime),
+      teacherId: _selectedTeacherId,
+      sectionName: _selectedSection,
+      room: _roomController.text.trim().isNotEmpty ? _roomController.text.trim() : null,
+      excludeScheduleId: widget.initialSchedule?['id'] as String?,
+    );
 
     if (mounted) {
       setState(() {
@@ -173,15 +195,21 @@ class _CreateEditScheduleDialogState extends ConsumerState<CreateEditScheduleDia
 
   Future<void> _save() async {
     if (!_formKey.currentState!.validate()) return;
-    if (_selectedSubjectId == null || _selectedSubjectName == null) {
+    if (_selectedTeacherId == null || _selectedTeacherName == null) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Please select an assigned subject')),
+        const SnackBar(content: Text('Please select an instructor/teacher to assign')),
       );
       return;
     }
-    if (_selectedSection == null) {
+    if (_selectedSubjectId == null || _selectedSubjectName == null) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Please select a class section')),
+        const SnackBar(content: Text('Please select a subject for this class')),
+      );
+      return;
+    }
+    if (_selectedSection == null || _selectedSection!.trim().isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Please select or specify a class section')),
       );
       return;
     }
@@ -202,85 +230,142 @@ class _CreateEditScheduleDialogState extends ConsumerState<CreateEditScheduleDia
       final endTimeStr = _formatTime(_endTime);
       final roomStr = _roomController.text.trim();
 
-      Map<String, dynamic> result;
-      if (widget.initialSchedule != null) {
-        result = await ref.read(teacherSchedulesProvider.notifier).updateSchedule(
-              id: widget.initialSchedule!['id'] as String,
-              subjectId: _selectedSubjectId!,
-              subjectName: _selectedSubjectName!,
-              sectionName: _selectedSection!,
-              dayOfWeek: _selectedDay,
-              startTime: startTimeStr,
-              endTime: endTimeStr,
-              room: roomStr.isNotEmpty ? roomStr : null,
-              colorCode: _selectedColor,
-            );
-      } else {
-        result = await ref.read(teacherSchedulesProvider.notifier).addSchedule(
-              subjectId: _selectedSubjectId!,
-              subjectName: _selectedSubjectName!,
-              sectionName: _selectedSection!,
-              dayOfWeek: _selectedDay,
-              startTime: startTimeStr,
-              endTime: endTimeStr,
-              room: roomStr.isNotEmpty ? roomStr : null,
-              colorCode: _selectedColor,
-            );
-      }
+      // Final Conflict Check
+      final conflict = await DatabaseHelper().checkScheduleConflict(
+        dayOfWeek: _selectedDay,
+        startTime: startTimeStr,
+        endTime: endTimeStr,
+        teacherId: _selectedTeacherId,
+        sectionName: _selectedSection,
+        room: roomStr.isNotEmpty ? roomStr : null,
+        excludeScheduleId: widget.initialSchedule?['id'] as String?,
+      );
 
-      if (!mounted) return;
-
-      if (result['hasConflict'] == true) {
+      if (conflict['hasConflict'] == true) {
         setState(() {
           _isSaving = false;
-          _conflictError = result['reason'] as String? ?? 'Time conflict detected!';
+          _conflictError = conflict['reason'] as String? ?? 'Schedule conflict detected!';
         });
         return;
       }
 
+      if (widget.initialSchedule != null) {
+        await DatabaseHelper().updateClassSchedule(
+          widget.initialSchedule!['id'] as String,
+          {
+            'teacher_id': _selectedTeacherId!,
+            'teacher_name': _selectedTeacherName!,
+            'subject_id': _selectedSubjectId!,
+            'subject_name': _selectedSubjectName!,
+            'section_name': _selectedSection!,
+            'day_of_week': _selectedDay,
+            'start_time': startTimeStr,
+            'end_time': endTimeStr,
+            'room': roomStr.isNotEmpty ? roomStr : null,
+            'color_code': _selectedColor,
+          },
+        );
+      } else {
+        await DatabaseHelper().createClassSchedule({
+          'teacher_id': _selectedTeacherId!,
+          'teacher_name': _selectedTeacherName!,
+          'subject_id': _selectedSubjectId!,
+          'subject_name': _selectedSubjectName!,
+          'section_name': _selectedSection!,
+          'day_of_week': _selectedDay,
+          'start_time': startTimeStr,
+          'end_time': endTimeStr,
+          'room': roomStr.isNotEmpty ? roomStr : null,
+          'color_code': _selectedColor,
+        });
+      }
+
+      // Invalidate riverpod providers
+      ref.invalidate(allClassSchedulesProvider);
+      ref.invalidate(todayTeacherSchedulesProvider);
+      ref.invalidate(teacherSchedulesProvider);
+      ref.invalidate(scheduledSectionsProvider);
+      ref.invalidate(sectionSchedulesProvider);
+
+      if (!mounted) return;
       Navigator.of(context).pop(true);
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(
             widget.initialSchedule != null
                 ? 'Class schedule updated successfully'
-                : 'Class schedule created successfully',
+                : 'Schedule assigned to $_selectedTeacherName successfully',
           ),
           backgroundColor: AppTheme.success,
         ),
       );
     } catch (e) {
-      if (!mounted) return;
-      setState(() => _isSaving = false);
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Failed to save schedule: $e'), backgroundColor: AppTheme.error),
-      );
+      if (mounted) {
+        setState(() {
+          _isSaving = false;
+          _conflictError = 'Failed to save schedule: $e';
+        });
+      }
     }
   }
 
   @override
   Widget build(BuildContext context) {
-    final subjects = ref.watch(teacherSubjectsProvider);
-    final sectionsAsync = ref.watch(teacherHandledSectionsProvider);
-    final sections = sectionsAsync.value ?? [];
+    final teachers = ref.watch(adminTeachersProvider);
+    final allSubjects = ref.watch(subjectsProvider);
+    final allSections = ref.watch(sectionsProvider);
 
     final isEdit = widget.initialSchedule != null;
 
-    // Default subject if single
-    if (_selectedSubjectId == null && subjects.isNotEmpty) {
-      _selectedSubjectId = subjects.first['id'] as int?;
-      _selectedSubjectName = subjects.first['name'] as String?;
+    // Auto-select initial teacher if needed
+    if (_selectedTeacherId == null && teachers.isNotEmpty) {
+      _selectedTeacherId = teachers.first['id'] as String?;
+      _selectedTeacherName = teachers.first['full_name'] as String?;
     }
-    // Default section if single
-    if (_selectedSection == null && sections.isNotEmpty) {
-      _selectedSection = sections.first;
+
+    // Determine subjects to offer: if teacher selected, optionally prioritize their assigned subjects
+    final teacherMatch = teachers.firstWhere(
+      (t) => t['id'] == _selectedTeacherId,
+      orElse: () => {},
+    );
+    final teacherAssignedSubjects = (teacherMatch['assigned_subjects'] as List? ?? []);
+
+    final List<Map<String, dynamic>> availableSubjects = allSubjects;
+
+    // Default subject if not set
+    if (_selectedSubjectId == null && availableSubjects.isNotEmpty) {
+      if (teacherAssignedSubjects.isNotEmpty) {
+        final firstAssigned = teacherAssignedSubjects.first as Map;
+        _selectedSubjectId = firstAssigned['id'] as int?;
+        _selectedSubjectName = firstAssigned['name'] as String?;
+      } else {
+        _selectedSubjectId = availableSubjects.first['id'] as int?;
+        _selectedSubjectName = availableSubjects.first['name'] as String?;
+      }
+    }
+
+    // Section options: combine handled sections of teacher with school sections
+    final Set<String> sectionOptions = {};
+    for (final sec in teacherMatch['handled_sections'] as List? ?? []) {
+      sectionOptions.add(sec.toString());
+    }
+    for (final sec in allSections) {
+      final name = sec['name'] as String?;
+      if (name != null && name.isNotEmpty) sectionOptions.add(name);
+    }
+    if (sectionOptions.isEmpty) {
+      sectionOptions.addAll(['STEM 12-A', 'STEM 12-B', 'ABM 12-A', 'HUMSS 12-A']);
+    }
+
+    if (_selectedSection == null && sectionOptions.isNotEmpty) {
+      _selectedSection = sectionOptions.first;
     }
 
     return Dialog(
       backgroundColor: AppTheme.surface,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
       child: ConstrainedBox(
-        constraints: const BoxConstraints(maxWidth: 580, maxHeight: 720),
+        constraints: const BoxConstraints(maxWidth: 580, maxHeight: 780),
         child: Padding(
           padding: const EdgeInsets.all(24.0),
           child: Form(
@@ -309,7 +394,7 @@ class _CreateEditScheduleDialogState extends ConsumerState<CreateEditScheduleDia
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Text(
-                            isEdit ? 'Edit Class Schedule' : 'Schedule New Class',
+                            isEdit ? 'Edit Class Schedule' : 'Assign Class Schedule',
                             style: TextStyle(
                               fontSize: 18,
                               fontWeight: FontWeight.bold,
@@ -317,7 +402,7 @@ class _CreateEditScheduleDialogState extends ConsumerState<CreateEditScheduleDia
                             ),
                           ),
                           Text(
-                            'Assign subject, handled section, time window & room',
+                            'Assign faculty instructor, subject, section, time slot & room',
                             style: TextStyle(fontSize: 12, color: AppTheme.textSecondary),
                           ),
                         ],
@@ -376,9 +461,71 @@ class _CreateEditScheduleDialogState extends ConsumerState<CreateEditScheduleDia
                             ),
                           ),
 
+                        // Faculty / Teacher Selection Dropdown
+                        Text(
+                          'Assign to Faculty / Teacher *',
+                          style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: AppTheme.text),
+                        ),
+                        const SizedBox(height: 6),
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 14),
+                          decoration: BoxDecoration(
+                            color: AppTheme.background,
+                            borderRadius: BorderRadius.circular(12),
+                            border: Border.all(color: AppTheme.border),
+                          ),
+                          child: DropdownButtonHideUnderline(
+                            child: DropdownButton<String>(
+                              isExpanded: true,
+                              value: _selectedTeacherId,
+                              hint: Text('Select Instructor', style: TextStyle(color: AppTheme.textMuted)),
+                              dropdownColor: AppTheme.surface,
+                              items: teachers.map((t) {
+                                final tid = t['id'] as String;
+                                final tname = t['full_name'] as String? ?? 'Teacher';
+                                return DropdownMenuItem<String>(
+                                  value: tid,
+                                  child: Row(
+                                    children: [
+                                      CircleAvatar(
+                                        radius: 12,
+                                        backgroundColor: AppTheme.primary.withValues(alpha: 0.15),
+                                        child: Text(
+                                          tname.isNotEmpty ? tname[0].toUpperCase() : 'T',
+                                          style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: AppTheme.primary),
+                                        ),
+                                      ),
+                                      const SizedBox(width: 10),
+                                      Expanded(
+                                        child: Text(
+                                          tname,
+                                          style: TextStyle(color: AppTheme.text, fontSize: 13, fontWeight: FontWeight.w600),
+                                          overflow: TextOverflow.ellipsis,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                );
+                              }).toList(),
+                              onChanged: (val) {
+                                if (val != null) {
+                                  final match = teachers.firstWhere((t) => t['id'] == val, orElse: () => {});
+                                  setState(() {
+                                    _selectedTeacherId = val;
+                                    _selectedTeacherName = match['full_name'] as String?;
+                                    _conflictError = null;
+                                  });
+                                  _validateConflict();
+                                }
+                              },
+                            ),
+                          ),
+                        ),
+                        const SizedBox(height: 16),
+
                         // Subject Selection Dropdown
                         Text(
-                          'Assigned Subject *',
+                          'Class Subject *',
                           style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: AppTheme.text),
                         ),
                         const SizedBox(height: 6),
@@ -395,18 +542,22 @@ class _CreateEditScheduleDialogState extends ConsumerState<CreateEditScheduleDia
                               value: _selectedSubjectId,
                               hint: Text('Select Subject', style: TextStyle(color: AppTheme.textMuted)),
                               dropdownColor: AppTheme.surface,
-                              items: subjects.map((sub) {
+                              items: availableSubjects.map((sub) {
+                                final id = sub['id'] as int;
+                                final name = sub['name'] as String? ?? 'Subject';
+                                final code = sub['subject_code'] as String? ?? '';
                                 return DropdownMenuItem<int>(
-                                  value: sub['id'] as int,
+                                  value: id,
                                   child: Text(
-                                    sub['name'] as String? ?? 'Subject',
-                                    style: TextStyle(color: AppTheme.text, fontSize: 14),
+                                    code.isNotEmpty ? '$code - $name' : name,
+                                    style: TextStyle(color: AppTheme.text, fontSize: 13),
+                                    overflow: TextOverflow.ellipsis,
                                   ),
                                 );
                               }).toList(),
                               onChanged: (val) {
                                 if (val != null) {
-                                  final match = subjects.firstWhere((s) => s['id'] == val);
+                                  final match = availableSubjects.firstWhere((s) => s['id'] == val);
                                   setState(() {
                                     _selectedSubjectId = val;
                                     _selectedSubjectName = match['name'] as String?;
@@ -437,12 +588,12 @@ class _CreateEditScheduleDialogState extends ConsumerState<CreateEditScheduleDia
                               value: _selectedSection,
                               hint: Text('Select Section', style: TextStyle(color: AppTheme.textMuted)),
                               dropdownColor: AppTheme.surface,
-                              items: sections.map((sec) {
+                              items: sectionOptions.map((sec) {
                                 return DropdownMenuItem<String>(
                                   value: sec,
                                   child: Text(
                                     sec,
-                                    style: TextStyle(color: AppTheme.text, fontSize: 14),
+                                    style: TextStyle(color: AppTheme.text, fontSize: 13, fontWeight: FontWeight.w600),
                                   ),
                                 );
                               }).toList(),
@@ -522,7 +673,11 @@ class _CreateEditScheduleDialogState extends ConsumerState<CreateEditScheduleDia
                                           const SizedBox(width: 8),
                                           Text(
                                             _formatDisplayTime(_startTime),
-                                            style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: AppTheme.text),
+                                            style: TextStyle(
+                                              fontWeight: FontWeight.bold,
+                                              fontSize: 13,
+                                              color: AppTheme.text,
+                                            ),
                                           ),
                                         ],
                                       ),
@@ -531,7 +686,7 @@ class _CreateEditScheduleDialogState extends ConsumerState<CreateEditScheduleDia
                                 ],
                               ),
                             ),
-                            const SizedBox(width: 14),
+                            const SizedBox(width: 12),
                             Expanded(
                               child: Column(
                                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -553,11 +708,15 @@ class _CreateEditScheduleDialogState extends ConsumerState<CreateEditScheduleDia
                                       ),
                                       child: Row(
                                         children: [
-                                          Icon(Icons.access_time_filled, size: 18, color: AppTheme.textSecondary),
+                                          Icon(Icons.access_time_filled, size: 18, color: AppTheme.primary),
                                           const SizedBox(width: 8),
                                           Text(
                                             _formatDisplayTime(_endTime),
-                                            style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: AppTheme.text),
+                                            style: TextStyle(
+                                              fontWeight: FontWeight.bold,
+                                              fontSize: 13,
+                                              color: AppTheme.text,
+                                            ),
                                           ),
                                         ],
                                       ),
@@ -570,88 +729,74 @@ class _CreateEditScheduleDialogState extends ConsumerState<CreateEditScheduleDia
                         ),
                         const SizedBox(height: 16),
 
-                        // Room / Venue Field
+                        // Room / Classroom
                         Text(
-                          'Classroom / Laboratory / Venue',
+                          'Classroom / Laboratory (Optional)',
                           style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: AppTheme.text),
                         ),
                         const SizedBox(height: 6),
                         TextFormField(
                           controller: _roomController,
-                          style: TextStyle(color: AppTheme.text, fontSize: 14),
                           decoration: InputDecoration(
-                            hintText: 'e.g. Room 302, Science Lab, AVR',
-                            hintStyle: TextStyle(color: AppTheme.textMuted, fontSize: 13),
-                            prefixIcon: Icon(Icons.meeting_room_outlined, color: AppTheme.textSecondary, size: 20),
-                            filled: true,
-                            fillColor: AppTheme.background,
+                            hintText: 'e.g. Room 302, Science Lab 1, Audi 2',
+                            prefixIcon: Icon(Icons.room_outlined, size: 18, color: AppTheme.textMuted),
+                            border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
                             contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-                            border: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(12),
-                              borderSide: BorderSide(color: AppTheme.border),
-                            ),
-                            enabledBorder: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(12),
-                              borderSide: BorderSide(color: AppTheme.border),
-                            ),
                           ),
-                          onChanged: (_) {
-                            _conflictError = null;
-                            _validateConflict();
-                          },
+                          onChanged: (_) => _validateConflict(),
                         ),
                         const SizedBox(height: 16),
 
-                        // Card Color Accent Picker
+                        // Color Preset
                         Text(
-                          'Timetable Card Accent Color',
+                          'Card Color Accent',
                           style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: AppTheme.text),
                         ),
                         const SizedBox(height: 8),
-                        Row(
+                        Wrap(
+                          spacing: 10,
+                          runSpacing: 10,
                           children: _colorPresets.map((preset) {
                             final hex = preset['hex'] as String;
                             final color = preset['color'] as Color;
                             final isSel = _selectedColor == hex;
 
-                            return Padding(
-                              padding: const EdgeInsets.only(right: 12),
-                              child: InkWell(
-                                onTap: () => setState(() => _selectedColor = hex),
-                                borderRadius: BorderRadius.circular(20),
-                                child: Container(
-                                  width: 32,
-                                  height: 32,
-                                  decoration: BoxDecoration(
-                                    color: color,
-                                    shape: BoxShape.circle,
-                                    border: isSel
-                                        ? Border.all(color: Colors.white, width: 3)
-                                        : Border.all(color: Colors.transparent),
-                                    boxShadow: isSel
-                                        ? [
-                                            BoxShadow(
-                                              color: color.withValues(alpha: 0.5),
-                                              blurRadius: 8,
-                                              spreadRadius: 2,
-                                            ),
-                                          ]
-                                        : null,
+                            return InkWell(
+                              onTap: () => setState(() => _selectedColor = hex),
+                              borderRadius: BorderRadius.circular(20),
+                              child: Container(
+                                width: 36,
+                                height: 36,
+                                decoration: BoxDecoration(
+                                  color: color,
+                                  shape: BoxShape.circle,
+                                  border: Border.all(
+                                    color: isSel ? Colors.white : Colors.transparent,
+                                    width: 2.5,
                                   ),
-                                  child: isSel
-                                      ? const Center(
-                                          child: Icon(Icons.check, size: 16, color: Colors.white),
-                                        )
+                                  boxShadow: isSel
+                                      ? [
+                                          BoxShadow(
+                                            color: color.withValues(alpha: 0.5),
+                                            blurRadius: 8,
+                                            spreadRadius: 2,
+                                          )
+                                        ]
                                       : null,
                                 ),
+                                child: isSel
+                                    ? const Icon(Icons.check, color: Colors.white, size: 18)
+                                    : null,
                               ),
                             );
                           }).toList(),
                         ),
+                        const SizedBox(height: 12),
                       ],
                     ),
                   ),
                 ),
+
                 const SizedBox(height: 16),
 
                 // Dialog Action Buttons
@@ -668,17 +813,17 @@ class _CreateEditScheduleDialogState extends ConsumerState<CreateEditScheduleDia
                       style: ElevatedButton.styleFrom(
                         backgroundColor: AppTheme.primary,
                         foregroundColor: Colors.white,
-                        padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                        padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 14),
                         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                       ),
                       child: _isSaving
                           ? const SizedBox(
                               width: 18,
                               height: 18,
-                              child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2),
+                              child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
                             )
                           : Text(
-                              isEdit ? 'Save Changes' : 'Create Schedule',
+                              isEdit ? 'Update Schedule' : 'Assign Schedule',
                               style: const TextStyle(fontWeight: FontWeight.bold),
                             ),
                     ),

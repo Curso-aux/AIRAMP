@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 import 'package:flutter/services.dart';
@@ -7,8 +8,8 @@ import '../theme/app_theme.dart';
 import '../theme/theme_provider.dart';
 
 /// A premium, adaptive scaffold supporting:
-/// 1. Smooth auto-hiding of the bottom navigation bar on downward scroll
-/// 2. Instant smooth reveal on upward scroll or when reaching the top
+/// 1. Smooth auto-hiding of the bottom navigation bar while actively scrolling
+/// 2. Smooth reveal of the bottom navigation bar as soon as scrolling stops
 /// 3. Horizontal swipe gestures to switch between navigation tabs
 /// 4. Hardware-accelerated overflow-free slide animation
 class SwipeableNavScaffold extends ConsumerStatefulWidget {
@@ -35,12 +36,38 @@ class SwipeableNavScaffold extends ConsumerStatefulWidget {
 
 class _SwipeableNavScaffoldState extends ConsumerState<SwipeableNavScaffold> {
   bool _isBarVisible = true;
+  Timer? _scrollStopTimer;
   static const double _baseBarHeight = 58.0;
 
-  void _goBranch(int index) {
-    if (!_isBarVisible) {
+  @override
+  void dispose() {
+    _scrollStopTimer?.cancel();
+    super.dispose();
+  }
+
+  void _showBar() {
+    _scrollStopTimer?.cancel();
+    _scrollStopTimer = null;
+    if (!_isBarVisible && mounted) {
       setState(() => _isBarVisible = true);
     }
+  }
+
+  void _hideBar() {
+    if (_isBarVisible && mounted) {
+      setState(() => _isBarVisible = false);
+    }
+  }
+
+  void _scheduleShowOnStop() {
+    _scrollStopTimer?.cancel();
+    _scrollStopTimer = Timer(const Duration(milliseconds: 320), () {
+      _showBar();
+    });
+  }
+
+  void _goBranch(int index) {
+    _showBar();
     if (index != widget.navigationShell.currentIndex) {
       HapticFeedback.selectionClick();
     }
@@ -78,27 +105,34 @@ class _SwipeableNavScaffoldState extends ConsumerState<SwipeableNavScaffold> {
     if (notification.metrics.axis == Axis.vertical) {
       // If user is near top of scrollview, always reveal the bar
       if (notification.metrics.pixels <= 15) {
-        if (!_isBarVisible) {
-          setState(() => _isBarVisible = true);
-        }
+        _showBar();
         return false;
       }
 
-      if (notification is UserScrollNotification) {
-        if (notification.direction == ScrollDirection.reverse && _isBarVisible) {
-          // Scrolling down -> hide bottom bar
-          setState(() => _isBarVisible = false);
-        } else if (notification.direction == ScrollDirection.forward && !_isBarVisible) {
-          // Scrolling up -> reveal bottom bar
-          setState(() => _isBarVisible = true);
-        }
+      if (notification is ScrollStartNotification) {
+        // User started scrolling
+        _scrollStopTimer?.cancel();
       } else if (notification is ScrollUpdateNotification) {
-        final dy = notification.scrollDelta ?? 0;
-        if (dy > 12 && _isBarVisible) {
-          setState(() => _isBarVisible = false);
-        } else if (dy < -12 && !_isBarVisible) {
-          setState(() => _isBarVisible = true);
+        final dy = (notification.scrollDelta ?? 0).abs();
+        if (dy > 1.0) {
+          // Actively scrolling: hide bottom bar
+          _hideBar();
+          // Reset stop debounce timer: reveal when movement pauses
+          _scheduleShowOnStop();
         }
+      } else if (notification is UserScrollNotification) {
+        if (notification.direction == ScrollDirection.idle) {
+          // Touch released / scrolling idle
+          _scheduleShowOnStop();
+        } else {
+          // Actively moving up or down
+          _hideBar();
+          _scheduleShowOnStop();
+        }
+      } else if (notification is ScrollEndNotification) {
+        // Drag or momentum fling has completely finished
+        _scrollStopTimer?.cancel();
+        _showBar();
       }
     }
     return false; // Allow other listeners to receive notification
