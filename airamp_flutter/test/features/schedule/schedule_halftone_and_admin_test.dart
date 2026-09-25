@@ -7,6 +7,7 @@ import 'package:airamp_flutter/src/features/teacher/presentation/teacher_schedul
 import 'package:airamp_flutter/src/features/teacher/presentation/components/halftone_pattern.dart';
 import 'package:airamp_flutter/src/features/teacher/data/teacher_repository.dart';
 import 'package:airamp_flutter/src/features/teacher/data/teacher_schedule_repository.dart';
+import 'package:airamp_flutter/src/features/teacher/presentation/components/create_edit_schedule_dialog.dart';
 import 'package:airamp_flutter/src/features/admin/presentation/web/admin_web_schedule_screen.dart';
 import 'package:airamp_flutter/src/features/admin/data/admin_repository.dart';
 import 'package:airamp_flutter/src/features/auth/application/auth_provider.dart';
@@ -38,12 +39,26 @@ class _FakeAdminTeachersNotifier extends AdminTeachersNotifier {
   Future<void> loadTeachers() async {}
 }
 
+class _FakeSubjectsNotifier extends SubjectsNotifier {
+  final List<Map<String, dynamic>> subjects;
+  _FakeSubjectsNotifier(this.subjects);
+
+  @override
+  List<Map<String, dynamic>> build() => subjects;
+
+  @override
+  Future<void> reload() async {}
+}
+
 class _FakeSectionsNotifier extends SectionsNotifier {
   final List<Map<String, dynamic>> sections;
   _FakeSectionsNotifier(this.sections);
 
   @override
   List<Map<String, dynamic>> build() => sections;
+
+  @override
+  Future<void> reload() async {}
 }
 
 void main() {
@@ -196,6 +211,125 @@ void main() {
 
       // Admin has the action menu (Icons.more_vert) to edit/delete
       expect(find.byIcon(Icons.more_vert), findsNWidgets(2));
+    });
+
+    testWidgets('5. CreateEditScheduleDialog handles custom/unseeded section names like STEM 12-A without DropdownButton crash', (tester) async {
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [
+            authProvider.overrideWith(() => MockAuthNotifier(User(
+              id: 'admin_1',
+              email: 'admin@school.edu',
+              fullName: 'Aira Admin',
+              role: 'admin',
+            ))),
+            adminTeachersProvider.overrideWith(() => _FakeAdminTeachersNotifier([
+              {'id': 'teacher_1', 'full_name': 'Mr. Santos', 'email': 'santos@school.edu'}
+            ])),
+            subjectsProvider.overrideWith(() => _FakeSubjectsNotifier([
+              {'id': 101, 'name': 'General Mathematics', 'subject_code': 'MATH12'}
+            ])),
+            sectionsProvider.overrideWith(() => _FakeSectionsNotifier([
+              {'id': 99, 'name': 'Grade 10 - Emerald'}
+            ])),
+          ],
+          child: MaterialApp(
+            home: Scaffold(
+              body: CreateEditScheduleDialog(
+                initialSchedule: {
+                  'id': 'sched_test',
+                  'subject_id': 101,
+                  'subject_name': 'General Mathematics',
+                  'section_name': 'STEM 12-A',
+                  'teacher_id': 'teacher_1',
+                  'teacher_name': 'Mr. Santos',
+                  'day_of_week': 'Monday',
+                  'start_time': '08:00',
+                  'end_time': '09:30',
+                  'room': 'Room 302',
+                  'color_code': '#0D9488',
+                },
+              ),
+            ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      // Verify dialog renders successfully without crash
+      expect(find.text('Edit Class Schedule'), findsOneWidget);
+      expect(find.text('STEM 12-A'), findsWidgets);
+      expect(find.textContaining('General Mathematics'), findsWidgets);
+      expect(find.text('Mr. Santos'), findsWidgets);
+    });
+
+    testWidgets('6. CreateEditScheduleDialog custom section toggle allows typing arbitrary section names', (tester) async {
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [
+            authProvider.overrideWith(() => MockAuthNotifier(User(
+              id: 'admin_1',
+              email: 'admin@school.edu',
+              fullName: 'Aira Admin',
+              role: 'admin',
+            ))),
+            adminTeachersProvider.overrideWith(() => _FakeAdminTeachersNotifier([
+              {'id': 'teacher_1', 'full_name': 'Mr. Santos'}
+            ])),
+            subjectsProvider.overrideWith(() => _FakeSubjectsNotifier([
+              {'id': 101, 'name': 'General Mathematics'}
+            ])),
+            sectionsProvider.overrideWith(() => _FakeSectionsNotifier([])),
+          ],
+          child: const MaterialApp(
+            home: Scaffold(
+              body: CreateEditScheduleDialog(),
+            ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.text('Type custom section'), findsOneWidget);
+      await tester.tap(find.text('Type custom section'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Choose from list'), findsOneWidget);
+      expect(find.byType(TextFormField), findsWidgets);
+    });
+
+    testWidgets('7. Teacher role is locked to own account in CreateEditScheduleDialog', (tester) async {
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [
+            authProvider.overrideWith(() => MockAuthNotifier(User(
+              id: 'teacher_1',
+              email: 'teacher@school.edu',
+              fullName: 'Sir John Reyes',
+              role: 'teacher',
+            ))),
+            adminTeachersProvider.overrideWith(() => _FakeAdminTeachersNotifier([
+              {'id': 'teacher_1', 'full_name': 'Sir John Reyes'},
+              {'id': 'teacher_2', 'full_name': 'Maam Garcia'},
+            ])),
+            subjectsProvider.overrideWith(() => _FakeSubjectsNotifier([
+              {'id': 101, 'name': 'General Mathematics'}
+            ])),
+            sectionsProvider.overrideWith(() => _FakeSectionsNotifier([])),
+          ],
+          child: const MaterialApp(
+            home: Scaffold(
+              body: CreateEditScheduleDialog(),
+            ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      // Dropdown for teacher should be disabled (onChanged == null)
+      final dropdowns = tester.widgetList<DropdownButton<String>>(find.byType(DropdownButton<String>));
+      final teacherDropdown = dropdowns.firstWhere((d) => d.value == 'teacher_1');
+      expect(teacherDropdown.onChanged, isNull);
     });
   });
 }

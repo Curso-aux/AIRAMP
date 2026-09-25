@@ -3,6 +3,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../../core/database/database_helper.dart';
 import '../../../admin/data/admin_repository.dart';
+import '../../../auth/application/auth_provider.dart';
+import '../../data/teacher_repository.dart';
 import '../../data/teacher_schedule_repository.dart';
 
 class CreateEditScheduleDialog extends ConsumerStatefulWidget {
@@ -50,6 +52,8 @@ class _CreateEditScheduleDialogState extends ConsumerState<CreateEditScheduleDia
   int? _selectedSubjectId;
   String? _selectedSubjectName;
   String? _selectedSection;
+  bool _isCustomSection = false;
+  final _customSectionController = TextEditingController();
   String _selectedDay = 'Monday';
   TimeOfDay _startTime = const TimeOfDay(hour: 8, minute: 0);
   TimeOfDay _endTime = const TimeOfDay(hour: 9, minute: 30);
@@ -86,7 +90,8 @@ class _CreateEditScheduleDialogState extends ConsumerState<CreateEditScheduleDia
       _selectedTeacherName = init['teacher_name'] as String?;
       _selectedSubjectId = init['subject_id'] as int?;
       _selectedSubjectName = init['subject_name'] as String?;
-      _selectedSection = init['section_name'] as String?;
+      _selectedSection = (init['section_name'] as String?)?.trim();
+      _customSectionController.text = _selectedSection ?? '';
       _selectedDay = (init['day_of_week'] as String?) ?? 'Monday';
       _roomController.text = (init['room'] as String?) ?? '';
       _selectedColor = (init['color_code'] as String?) ?? '#0D9488';
@@ -104,12 +109,14 @@ class _CreateEditScheduleDialogState extends ConsumerState<CreateEditScheduleDia
     WidgetsBinding.instance.addPostFrameCallback((_) {
       ref.read(adminTeachersProvider.notifier).loadTeachers();
       ref.read(subjectsProvider.notifier).reload();
+      ref.read(sectionsProvider.notifier).reload();
     });
   }
 
   @override
   void dispose() {
     _roomController.dispose();
+    _customSectionController.dispose();
     super.dispose();
   }
 
@@ -207,12 +214,16 @@ class _CreateEditScheduleDialogState extends ConsumerState<CreateEditScheduleDia
       );
       return;
     }
-    if (_selectedSection == null || _selectedSection!.trim().isEmpty) {
+    final sectionToSave = _isCustomSection
+        ? _customSectionController.text.trim()
+        : (_selectedSection?.trim() ?? '');
+    if (sectionToSave.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Please select or specify a class section')),
       );
       return;
     }
+    _selectedSection = sectionToSave;
 
     final startMinutes = _startTime.hour * 60 + _startTime.minute;
     final endMinutes = _endTime.hour * 60 + _endTime.minute;
@@ -286,6 +297,19 @@ class _CreateEditScheduleDialogState extends ConsumerState<CreateEditScheduleDia
       ref.invalidate(teacherSchedulesProvider);
       ref.invalidate(scheduledSectionsProvider);
       ref.invalidate(sectionSchedulesProvider);
+      ref.invalidate(teacherHandledSectionsProvider);
+      ref.invalidate(availableSectionsProvider);
+      ref.invalidate(adminTeachersProvider);
+      ref.invalidate(sectionsProvider);
+      if (_selectedSection != null && _selectedSection!.trim().isNotEmpty) {
+        ref.invalidate(sectionSchedulesProvider(_selectedSection!.trim()));
+      }
+      if (widget.initialSchedule != null) {
+        final oldSec = (widget.initialSchedule!['section_name'] as String?)?.trim();
+        if (oldSec != null && oldSec.isNotEmpty) {
+          ref.invalidate(sectionSchedulesProvider(oldSec));
+        }
+      }
 
       if (!mounted) return;
       Navigator.of(context).pop(true);
@@ -311,55 +335,97 @@ class _CreateEditScheduleDialogState extends ConsumerState<CreateEditScheduleDia
 
   @override
   Widget build(BuildContext context) {
+    final currentUser = ref.watch(authProvider);
+    final isAdmin = currentUser?.role == 'admin' || currentUser?.role == 'super_admin';
+    final isTeacher = currentUser?.role == 'teacher';
+
     final teachers = ref.watch(adminTeachersProvider);
     final allSubjects = ref.watch(subjectsProvider);
     final allSections = ref.watch(sectionsProvider);
 
     final isEdit = widget.initialSchedule != null;
 
-    // Auto-select initial teacher if needed
-    if (_selectedTeacherId == null && teachers.isNotEmpty) {
-      _selectedTeacherId = teachers.first['id'] as String?;
-      _selectedTeacherName = teachers.first['full_name'] as String?;
+    // If teacher role, lock to their account
+    if (isTeacher && currentUser != null) {
+      _selectedTeacherId = currentUser.id;
+      _selectedTeacherName = currentUser.fullName;
     }
 
+    // Build safe list of teachers
+    final List<Map<String, dynamic>> safeTeachers = List.from(teachers);
+    if (_selectedTeacherId != null && !safeTeachers.any((t) => t['id'] == _selectedTeacherId)) {
+      safeTeachers.insert(0, {
+        'id': _selectedTeacherId!,
+        'full_name': _selectedTeacherName ?? 'Instructor ($_selectedTeacherId)',
+      });
+    }
+    if (_selectedTeacherId == null && safeTeachers.isNotEmpty) {
+      _selectedTeacherId = safeTeachers.first['id'] as String?;
+      _selectedTeacherName = safeTeachers.first['full_name'] as String?;
+    }
+    final effectiveTeacherId = (_selectedTeacherId != null && safeTeachers.any((t) => t['id'] == _selectedTeacherId))
+        ? _selectedTeacherId
+        : (safeTeachers.isNotEmpty ? safeTeachers.first['id'] as String? : null);
+
     // Determine subjects to offer: if teacher selected, optionally prioritize their assigned subjects
-    final teacherMatch = teachers.firstWhere(
-      (t) => t['id'] == _selectedTeacherId,
+    final teacherMatch = safeTeachers.firstWhere(
+      (t) => t['id'] == effectiveTeacherId,
       orElse: () => {},
     );
     final teacherAssignedSubjects = (teacherMatch['assigned_subjects'] as List? ?? []);
 
-    final List<Map<String, dynamic>> availableSubjects = allSubjects;
-
-    // Default subject if not set
-    if (_selectedSubjectId == null && availableSubjects.isNotEmpty) {
+    final List<Map<String, dynamic>> safeSubjects = List.from(allSubjects);
+    if (_selectedSubjectId != null && !safeSubjects.any((s) => s['id'] == _selectedSubjectId)) {
+      safeSubjects.insert(0, {
+        'id': _selectedSubjectId!,
+        'name': _selectedSubjectName ?? 'Subject ($_selectedSubjectId)',
+        'subject_code': '',
+      });
+    }
+    if (_selectedSubjectId == null && safeSubjects.isNotEmpty) {
       if (teacherAssignedSubjects.isNotEmpty) {
         final firstAssigned = teacherAssignedSubjects.first as Map;
         _selectedSubjectId = firstAssigned['id'] as int?;
         _selectedSubjectName = firstAssigned['name'] as String?;
       } else {
-        _selectedSubjectId = availableSubjects.first['id'] as int?;
-        _selectedSubjectName = availableSubjects.first['name'] as String?;
+        _selectedSubjectId = safeSubjects.first['id'] as int?;
+        _selectedSubjectName = safeSubjects.first['name'] as String?;
       }
     }
+    final effectiveSubjectId = (_selectedSubjectId != null && safeSubjects.any((s) => s['id'] == _selectedSubjectId))
+        ? _selectedSubjectId
+        : (safeSubjects.isNotEmpty ? safeSubjects.first['id'] as int? : null);
 
-    // Section options: combine handled sections of teacher with school sections
+    // Section options: combine initial section, handled sections of teacher, and school sections
     final Set<String> sectionOptions = {};
+    if (_selectedSection != null && _selectedSection!.trim().isNotEmpty) {
+      sectionOptions.add(_selectedSection!.trim());
+    }
+    if (widget.initialSchedule != null) {
+      final initSec = (widget.initialSchedule!['section_name'] as String?)?.trim();
+      if (initSec != null && initSec.isNotEmpty) {
+        sectionOptions.add(initSec);
+      }
+    }
     for (final sec in teacherMatch['handled_sections'] as List? ?? []) {
-      sectionOptions.add(sec.toString());
+      final s = sec.toString().trim();
+      if (s.isNotEmpty) sectionOptions.add(s);
     }
     for (final sec in allSections) {
-      final name = sec['name'] as String?;
+      final name = (sec['name'] as String?)?.trim();
       if (name != null && name.isNotEmpty) sectionOptions.add(name);
     }
     if (sectionOptions.isEmpty) {
-      sectionOptions.addAll(['STEM 12-A', 'STEM 12-B', 'ABM 12-A', 'HUMSS 12-A']);
+      sectionOptions.addAll(['STEM 12-A', 'STEM 12-B', 'ABM 12-A', 'HUMSS 12-A', 'Grade 10 - Emerald']);
     }
 
-    if (_selectedSection == null && sectionOptions.isNotEmpty) {
-      _selectedSection = sectionOptions.first;
+    if (_selectedSection == null || (!_isCustomSection && !sectionOptions.contains(_selectedSection))) {
+      _selectedSection = sectionOptions.isNotEmpty ? sectionOptions.first : null;
     }
+
+    final effectiveSelectedSection = (_selectedSection != null && sectionOptions.contains(_selectedSection))
+        ? _selectedSection
+        : (sectionOptions.isNotEmpty ? sectionOptions.first : null);
 
     return Dialog(
       backgroundColor: AppTheme.surface,
@@ -402,7 +468,9 @@ class _CreateEditScheduleDialogState extends ConsumerState<CreateEditScheduleDia
                             ),
                           ),
                           Text(
-                            'Assign faculty instructor, subject, section, time slot & room',
+                            isAdmin
+                                ? 'Assign faculty instructor, subject, section, time slot & room'
+                                : 'Configure your class schedule, time slot & classroom',
                             style: TextStyle(fontSize: 12, color: AppTheme.textSecondary),
                           ),
                         ],
@@ -463,24 +531,24 @@ class _CreateEditScheduleDialogState extends ConsumerState<CreateEditScheduleDia
 
                         // Faculty / Teacher Selection Dropdown
                         Text(
-                          'Assign to Faculty / Teacher *',
+                          'Assigned Faculty / Instructor *',
                           style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: AppTheme.text),
                         ),
                         const SizedBox(height: 6),
                         Container(
                           padding: const EdgeInsets.symmetric(horizontal: 14),
                           decoration: BoxDecoration(
-                            color: AppTheme.background,
+                            color: isTeacher ? AppTheme.surface : AppTheme.background,
                             borderRadius: BorderRadius.circular(12),
                             border: Border.all(color: AppTheme.border),
                           ),
                           child: DropdownButtonHideUnderline(
                             child: DropdownButton<String>(
                               isExpanded: true,
-                              value: _selectedTeacherId,
+                              value: effectiveTeacherId,
                               hint: Text('Select Instructor', style: TextStyle(color: AppTheme.textMuted)),
                               dropdownColor: AppTheme.surface,
-                              items: teachers.map((t) {
+                              items: safeTeachers.map((t) {
                                 final tid = t['id'] as String;
                                 final tname = t['full_name'] as String? ?? 'Teacher';
                                 return DropdownMenuItem<String>(
@@ -507,17 +575,19 @@ class _CreateEditScheduleDialogState extends ConsumerState<CreateEditScheduleDia
                                   ),
                                 );
                               }).toList(),
-                              onChanged: (val) {
-                                if (val != null) {
-                                  final match = teachers.firstWhere((t) => t['id'] == val, orElse: () => {});
-                                  setState(() {
-                                    _selectedTeacherId = val;
-                                    _selectedTeacherName = match['full_name'] as String?;
-                                    _conflictError = null;
-                                  });
-                                  _validateConflict();
-                                }
-                              },
+                              onChanged: isTeacher
+                                  ? null
+                                  : (val) {
+                                      if (val != null) {
+                                        final match = safeTeachers.firstWhere((t) => t['id'] == val, orElse: () => {});
+                                        setState(() {
+                                          _selectedTeacherId = val;
+                                          _selectedTeacherName = match['full_name'] as String?;
+                                          _conflictError = null;
+                                        });
+                                        _validateConflict();
+                                      }
+                                    },
                             ),
                           ),
                         ),
@@ -539,10 +609,10 @@ class _CreateEditScheduleDialogState extends ConsumerState<CreateEditScheduleDia
                           child: DropdownButtonHideUnderline(
                             child: DropdownButton<int>(
                               isExpanded: true,
-                              value: _selectedSubjectId,
+                              value: effectiveSubjectId,
                               hint: Text('Select Subject', style: TextStyle(color: AppTheme.textMuted)),
                               dropdownColor: AppTheme.surface,
-                              items: availableSubjects.map((sub) {
+                              items: safeSubjects.map((sub) {
                                 final id = sub['id'] as int;
                                 final name = sub['name'] as String? ?? 'Subject';
                                 final code = sub['subject_code'] as String? ?? '';
@@ -557,7 +627,7 @@ class _CreateEditScheduleDialogState extends ConsumerState<CreateEditScheduleDia
                               }).toList(),
                               onChanged: (val) {
                                 if (val != null) {
-                                  final match = availableSubjects.firstWhere((s) => s['id'] == val);
+                                  final match = safeSubjects.firstWhere((s) => s['id'] == val, orElse: () => {});
                                   setState(() {
                                     _selectedSubjectId = val;
                                     _selectedSubjectName = match['name'] as String?;
@@ -569,44 +639,95 @@ class _CreateEditScheduleDialogState extends ConsumerState<CreateEditScheduleDia
                         ),
                         const SizedBox(height: 16),
 
-                        // Section Selection Dropdown
-                        Text(
-                          'Class Section *',
-                          style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: AppTheme.text),
+                        // Section Selection Dropdown with Custom Input Toggle
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            Text(
+                              'Class Section *',
+                              style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: AppTheme.text),
+                            ),
+                            TextButton.icon(
+                              style: TextButton.styleFrom(
+                                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                minimumSize: Size.zero,
+                                tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                              ),
+                              onPressed: () {
+                                setState(() {
+                                  _isCustomSection = !_isCustomSection;
+                                  if (_isCustomSection) {
+                                    _customSectionController.text = _selectedSection ?? '';
+                                  } else {
+                                    if (_customSectionController.text.trim().isNotEmpty) {
+                                      _selectedSection = _customSectionController.text.trim();
+                                    }
+                                  }
+                                });
+                              },
+                              icon: Icon(_isCustomSection ? Icons.list_rounded : Icons.edit_note_rounded, size: 14, color: AppTheme.primary),
+                              label: Text(
+                                _isCustomSection ? 'Choose from list' : 'Type custom section',
+                                style: TextStyle(fontSize: 11, color: AppTheme.primary, fontWeight: FontWeight.w600),
+                              ),
+                            ),
+                          ],
                         ),
                         const SizedBox(height: 6),
-                        Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 14),
-                          decoration: BoxDecoration(
-                            color: AppTheme.background,
-                            borderRadius: BorderRadius.circular(12),
-                            border: Border.all(color: AppTheme.border),
-                          ),
-                          child: DropdownButtonHideUnderline(
-                            child: DropdownButton<String>(
-                              isExpanded: true,
-                              value: _selectedSection,
-                              hint: Text('Select Section', style: TextStyle(color: AppTheme.textMuted)),
-                              dropdownColor: AppTheme.surface,
-                              items: sectionOptions.map((sec) {
-                                return DropdownMenuItem<String>(
-                                  value: sec,
-                                  child: Text(
-                                    sec,
-                                    style: TextStyle(color: AppTheme.text, fontSize: 13, fontWeight: FontWeight.w600),
-                                  ),
-                                );
-                              }).toList(),
-                              onChanged: (val) {
-                                setState(() {
-                                  _selectedSection = val;
-                                  _conflictError = null;
-                                });
-                                _validateConflict();
-                              },
+                        if (_isCustomSection)
+                          TextFormField(
+                            controller: _customSectionController,
+                            decoration: InputDecoration(
+                              hintText: 'e.g. Grade 12 - STEM A',
+                              prefixIcon: const Icon(Icons.class_outlined, size: 18),
+                              border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                              filled: true,
+                              fillColor: AppTheme.background,
+                              contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                            ),
+                            style: TextStyle(color: AppTheme.text, fontSize: 13, fontWeight: FontWeight.w600),
+                            onChanged: (val) {
+                              _selectedSection = val.trim();
+                              _validateConflict();
+                            },
+                            validator: (val) {
+                              if (val == null || val.trim().isEmpty) return 'Section name cannot be empty';
+                              return null;
+                            },
+                          )
+                        else
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 14),
+                            decoration: BoxDecoration(
+                              color: AppTheme.background,
+                              borderRadius: BorderRadius.circular(12),
+                              border: Border.all(color: AppTheme.border),
+                            ),
+                            child: DropdownButtonHideUnderline(
+                              child: DropdownButton<String>(
+                                isExpanded: true,
+                                value: effectiveSelectedSection,
+                                hint: Text('Select Section', style: TextStyle(color: AppTheme.textMuted)),
+                                dropdownColor: AppTheme.surface,
+                                items: sectionOptions.map((sec) {
+                                  return DropdownMenuItem<String>(
+                                    value: sec,
+                                    child: Text(
+                                      sec,
+                                      style: TextStyle(color: AppTheme.text, fontSize: 13, fontWeight: FontWeight.w600),
+                                    ),
+                                  );
+                                }).toList(),
+                                onChanged: (val) {
+                                  setState(() {
+                                    _selectedSection = val;
+                                    _conflictError = null;
+                                  });
+                                  _validateConflict();
+                                },
+                              ),
                             ),
                           ),
-                        ),
                         const SizedBox(height: 16),
 
                         // Day of Week

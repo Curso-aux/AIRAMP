@@ -1,10 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../../../core/components/calendar/actual_calendar_view.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/theme/theme_provider.dart';
 import '../data/teacher_repository.dart';
 import '../data/teacher_schedule_repository.dart';
 import 'components/halftone_pattern.dart';
+
+enum ScheduleViewMode { grid, calendar, agenda }
 
 class TeacherScheduleScreen extends ConsumerStatefulWidget {
   const TeacherScheduleScreen({super.key});
@@ -16,7 +19,7 @@ class TeacherScheduleScreen extends ConsumerStatefulWidget {
 class _TeacherScheduleScreenState extends ConsumerState<TeacherScheduleScreen> {
   String _selectedDay = 'All Days';
   String _selectedSection = 'All Handled Sections';
-  bool _isGridView = true;
+  ScheduleViewMode _viewMode = ScheduleViewMode.grid;
 
   static const List<String> _days = [
     'All Days',
@@ -81,12 +84,16 @@ class _TeacherScheduleScreenState extends ConsumerState<TeacherScheduleScreen> {
   @override
   Widget build(BuildContext context) {
     ref.watch(themeProvider);
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    AppTheme.setDark(isDark);
     final schedules = ref.watch(teacherSchedulesProvider);
     final sectionsAsync = ref.watch(teacherHandledSectionsProvider);
     final sections = sectionsAsync.value ?? [];
 
     final filtered = schedules.where((s) {
-      if (_selectedDay != 'All Days' && s['day_of_week'] != _selectedDay) {
+      if (_viewMode != ScheduleViewMode.calendar &&
+          _selectedDay != 'All Days' &&
+          s['day_of_week'] != _selectedDay) {
         return false;
       }
       if (_selectedSection != 'All Handled Sections' &&
@@ -129,7 +136,9 @@ class _TeacherScheduleScreenState extends ConsumerState<TeacherScheduleScreen> {
                                 borderRadius: BorderRadius.circular(6),
                               ),
                               child: Text(
-                                'WEEKLY TIMETABLE',
+                                _viewMode == ScheduleViewMode.calendar
+                                    ? 'MONTHLY CALENDAR'
+                                    : 'WEEKLY TIMETABLE',
                                 style: TextStyle(
                                   color: AppTheme.primary,
                                   fontSize: 10,
@@ -141,13 +150,15 @@ class _TeacherScheduleScreenState extends ConsumerState<TeacherScheduleScreen> {
                             Container(
                               padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                               decoration: BoxDecoration(
-                                color: Colors.teal.withValues(alpha: 0.12),
+                                color: isDark
+                                    ? Colors.tealAccent.withValues(alpha: 0.15)
+                                    : Colors.teal.withValues(alpha: 0.12),
                                 borderRadius: BorderRadius.circular(6),
                               ),
                               child: Text(
                                 '${filtered.length} Scheduled',
-                                style: const TextStyle(
-                                  color: Colors.teal,
+                                style: TextStyle(
+                                  color: isDark ? Colors.tealAccent : Colors.teal,
                                   fontSize: 10,
                                   fontWeight: FontWeight.bold,
                                 ),
@@ -156,13 +167,15 @@ class _TeacherScheduleScreenState extends ConsumerState<TeacherScheduleScreen> {
                             Container(
                               padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                               decoration: BoxDecoration(
-                                color: Colors.purple.withValues(alpha: 0.12),
+                                color: isDark
+                                    ? const Color(0xFFA855F7).withValues(alpha: 0.15)
+                                    : Colors.purple.withValues(alpha: 0.12),
                                 borderRadius: BorderRadius.circular(6),
                               ),
-                              child: const Text(
+                              child: Text(
                                 'Admin Assigned',
                                 style: TextStyle(
-                                  color: Colors.purple,
+                                  color: isDark ? const Color(0xFFA855F7) : Colors.purple,
                                   fontSize: 10,
                                   fontWeight: FontWeight.bold,
                                 ),
@@ -172,7 +185,9 @@ class _TeacherScheduleScreenState extends ConsumerState<TeacherScheduleScreen> {
                         ),
                         const SizedBox(height: 8),
                         Text(
-                          'Class Schedule & Timetable',
+                          _viewMode == ScheduleViewMode.calendar
+                              ? 'Interactive Calendar'
+                              : 'Class Schedule & Timetable',
                           style: TextStyle(
                             fontSize: isMobile ? 20 : 24,
                             fontWeight: FontWeight.bold,
@@ -181,7 +196,9 @@ class _TeacherScheduleScreenState extends ConsumerState<TeacherScheduleScreen> {
                         ),
                         const SizedBox(height: 2),
                         Text(
-                          'View your assigned weekly class hours, section schedules, and classroom allocations',
+                          _viewMode == ScheduleViewMode.calendar
+                              ? 'Browse class schedule by calendar days, view daily hours, and check active classes'
+                              : 'View your assigned weekly class hours, section schedules, and classroom allocations',
                           style: TextStyle(fontSize: 12, color: AppTheme.textSecondary),
                         ),
                       ],
@@ -201,18 +218,27 @@ class _TeacherScheduleScreenState extends ConsumerState<TeacherScheduleScreen> {
                             tooltip: 'Weekly Timetable Grid',
                             icon: Icon(
                               Icons.grid_view_rounded,
-                              color: _isGridView ? AppTheme.primary : AppTheme.textMuted,
+                              color: _viewMode == ScheduleViewMode.grid ? AppTheme.primary : AppTheme.textMuted,
                             ),
-                            onPressed: () => setState(() => _isGridView = true),
+                            onPressed: () => setState(() => _viewMode = ScheduleViewMode.grid),
+                          ),
+                          IconButton(
+                            iconSize: 18,
+                            tooltip: 'Monthly Calendar Mode',
+                            icon: Icon(
+                              Icons.calendar_month_rounded,
+                              color: _viewMode == ScheduleViewMode.calendar ? AppTheme.primary : AppTheme.textMuted,
+                            ),
+                            onPressed: () => setState(() => _viewMode = ScheduleViewMode.calendar),
                           ),
                           IconButton(
                             iconSize: 18,
                             tooltip: 'Agenda Timeline List',
                             icon: Icon(
                               Icons.view_agenda_outlined,
-                              color: !_isGridView ? AppTheme.primary : AppTheme.textMuted,
+                              color: _viewMode == ScheduleViewMode.agenda ? AppTheme.primary : AppTheme.textMuted,
                             ),
-                            onPressed: () => setState(() => _isGridView = false),
+                            onPressed: () => setState(() => _viewMode = ScheduleViewMode.agenda),
                           ),
                         ],
                       ),
@@ -251,29 +277,32 @@ class _TeacherScheduleScreenState extends ConsumerState<TeacherScheduleScreen> {
                   runSpacing: 10,
                   crossAxisAlignment: WrapCrossAlignment.center,
                   children: [
-                    // Day Selector Chips
-                    ..._days.map((day) {
-                      final isSel = _selectedDay == day;
-                      return ChoiceChip(
-                        label: Text(day),
-                        selected: isSel,
-                        selectedColor: AppTheme.primary,
-                        labelStyle: TextStyle(
-                          color: isSel ? Colors.white : AppTheme.text,
-                          fontSize: 12,
-                          fontWeight: isSel ? FontWeight.bold : FontWeight.w500,
-                        ),
-                        backgroundColor: AppTheme.surface,
-                        side: BorderSide(
-                          color: isSel ? AppTheme.primary : AppTheme.border,
-                        ),
-                        onSelected: (selected) {
-                          if (selected) {
-                            setState(() => _selectedDay = day);
-                          }
-                        },
-                      );
-                    }),
+                    if (_viewMode != ScheduleViewMode.calendar)
+                      // Day Selector Chips
+                      ..._days.map((day) {
+                        final isSel = _selectedDay == day;
+                        return ChoiceChip(
+                          label: Text(day),
+                          selected: isSel,
+                          selectedColor: AppTheme.primary,
+                          labelStyle: TextStyle(
+                            color: isSel
+                                ? (isDark ? const Color(0xFF0A1420) : Colors.white)
+                                : AppTheme.text,
+                            fontSize: 12,
+                            fontWeight: isSel ? FontWeight.bold : FontWeight.w500,
+                          ),
+                          backgroundColor: AppTheme.surface,
+                          side: BorderSide(
+                            color: isSel ? AppTheme.primary : AppTheme.border,
+                          ),
+                          onSelected: (selected) {
+                            if (selected) {
+                              setState(() => _selectedDay = day);
+                            }
+                          },
+                        );
+                      }),
 
                     // Section Dropdown
                     Container(
@@ -312,7 +341,12 @@ class _TeacherScheduleScreenState extends ConsumerState<TeacherScheduleScreen> {
                 // Schedules Display Area
                 if (filtered.isEmpty)
                   _buildEmptyState()
-                else if (_isGridView)
+                else if (_viewMode == ScheduleViewMode.calendar)
+                  ActualCalendarView(
+                    schedules: filtered,
+                    isTeacher: true,
+                  )
+                else if (_viewMode == ScheduleViewMode.grid)
                   _buildTimetableGrid(filtered)
                 else
                   _buildAgendaList(filtered),
@@ -482,6 +516,7 @@ class _TeacherScheduleScreenState extends ConsumerState<TeacherScheduleScreen> {
     final endTime = _formatDisplayTime(sched['end_time'] as String?);
     final color = _parseColor(sched['color_code'] as String?, AppTheme.primary);
     final isOngoing = _isClassOngoing(sched);
+    final isDark = AppTheme.isDark;
 
     return ClipRRect(
       borderRadius: BorderRadius.circular(14),
@@ -490,12 +525,12 @@ class _TeacherScheduleScreenState extends ConsumerState<TeacherScheduleScreen> {
           color: AppTheme.surface,
           borderRadius: BorderRadius.circular(14),
           border: Border.all(
-            color: isOngoing ? color : color.withValues(alpha: 0.25),
+            color: isOngoing ? color : color.withValues(alpha: isDark ? 0.35 : 0.25),
             width: isOngoing ? 1.5 : 1,
           ),
           boxShadow: [
             BoxShadow(
-              color: color.withValues(alpha: 0.04),
+              color: color.withValues(alpha: isDark ? 0.08 : 0.04),
               blurRadius: 8,
               offset: const Offset(0, 3),
             ),
@@ -507,7 +542,7 @@ class _TeacherScheduleScreenState extends ConsumerState<TeacherScheduleScreen> {
             HalftoneCardDecoration(
               color: color,
               width: 140,
-              baseOpacity: 0.28,
+              baseOpacity: isDark ? 0.18 : 0.28,
             ),
             Padding(
               padding: const EdgeInsets.all(14),
@@ -521,14 +556,14 @@ class _TeacherScheduleScreenState extends ConsumerState<TeacherScheduleScreen> {
                       Container(
                         padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                         decoration: BoxDecoration(
-                          color: color.withValues(alpha: 0.12),
+                          color: color.withValues(alpha: isDark ? 0.22 : 0.12),
                           borderRadius: BorderRadius.circular(6),
-                          border: Border.all(color: color.withValues(alpha: 0.25)),
+                          border: Border.all(color: color.withValues(alpha: isDark ? 0.4 : 0.25)),
                         ),
                         child: Text(
                           section,
                           style: TextStyle(
-                            color: color,
+                            color: isDark ? Color.lerp(color, Colors.white, 0.25) : color,
                             fontSize: 11,
                             fontWeight: FontWeight.bold,
                           ),
@@ -636,6 +671,7 @@ class _TeacherScheduleScreenState extends ConsumerState<TeacherScheduleScreen> {
   }
 
   Widget _buildAgendaList(List<Map<String, dynamic>> schedules) {
+    final isDark = AppTheme.isDark;
     return Column(
       children: schedules.map((sched) {
         final subject = sched['subject_name'] as String? ?? 'Subject';
@@ -655,7 +691,7 @@ class _TeacherScheduleScreenState extends ConsumerState<TeacherScheduleScreen> {
               color: AppTheme.surface,
               borderRadius: BorderRadius.circular(14),
               border: Border.all(
-                color: isOngoing ? color : color.withValues(alpha: 0.25),
+                color: isOngoing ? color : color.withValues(alpha: isDark ? 0.35 : 0.25),
                 width: isOngoing ? 1.5 : 1,
               ),
             ),
@@ -665,7 +701,7 @@ class _TeacherScheduleScreenState extends ConsumerState<TeacherScheduleScreen> {
                 HalftoneCardDecoration(
                   color: color,
                   width: 90,
-                  baseOpacity: 0.18,
+                  baseOpacity: isDark ? 0.12 : 0.18,
                 ),
                 Padding(
                   padding: const EdgeInsets.all(16),

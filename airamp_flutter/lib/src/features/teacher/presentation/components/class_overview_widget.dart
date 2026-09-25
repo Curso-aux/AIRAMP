@@ -5,6 +5,7 @@ import '../../../../core/theme/app_theme.dart';
 import '../../../../core/theme/theme_provider.dart';
 import '../../data/teacher_repository.dart';
 import '../../data/teacher_schedule_repository.dart';
+import 'halftone_pattern.dart';
 
 class ClassOverviewWidget extends ConsumerStatefulWidget {
   const ClassOverviewWidget({super.key});
@@ -591,9 +592,38 @@ class TodayScheduleBanner extends ConsumerWidget {
     }
   }
 
+  bool _isClassOngoing(Map<String, dynamic> sched) {
+    final schedDay = sched['day_of_week'] as String?;
+    if (schedDay != getCurrentDayOfWeek()) return false;
+
+    final now = TimeOfDay.now();
+    final nowMinutes = now.hour * 60 + now.minute;
+
+    final startParts = (sched['start_time'] as String? ?? '').split(':');
+    final endParts = (sched['end_time'] as String? ?? '').split(':');
+    if (startParts.length < 2 || endParts.length < 2) return false;
+
+    final startMinutes = int.parse(startParts[0]) * 60 + int.parse(startParts[1]);
+    final endMinutes = int.parse(endParts[0]) * 60 + int.parse(endParts[1]);
+
+    return nowMinutes >= startMinutes && nowMinutes < endMinutes;
+  }
+
+  Color _parseColor(String? hexString, Color fallback) {
+    if (hexString == null || hexString.isEmpty) return fallback;
+    try {
+      final hex = hexString.replaceAll('#', '');
+      return Color(int.parse('FF$hex', radix: 16));
+    } catch (_) {
+      return fallback;
+    }
+  }
+
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     ref.watch(themeProvider);
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    AppTheme.setDark(isDark);
 
     final todayAsync = ref.watch(todayTeacherSchedulesProvider);
     final todayName = getCurrentDayOfWeek();
@@ -607,22 +637,14 @@ class TodayScheduleBanner extends ConsumerWidget {
             margin: const EdgeInsets.only(bottom: 20),
             padding: const EdgeInsets.all(16),
             decoration: BoxDecoration(
-              gradient: const LinearGradient(
-                colors: [
-                  Color(0xFF0F2027),
-                  Color(0xFF203A43),
-                  Color(0xFF2C5364),
-                ],
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
-              ),
+              color: AppTheme.surface,
               borderRadius: BorderRadius.circular(16),
-              border: Border.all(color: AppTheme.primary.withValues(alpha: 0.35)),
+              border: Border.all(color: AppTheme.border),
               boxShadow: [
                 BoxShadow(
-                  color: Colors.black.withValues(alpha: 0.18),
+                  color: Colors.black.withValues(alpha: isDark ? 0.2 : 0.04),
                   blurRadius: 10,
-                  offset: const Offset(0, 3),
+                  offset: const Offset(0, 2),
                 ),
               ],
             ),
@@ -631,7 +653,7 @@ class TodayScheduleBanner extends ConsumerWidget {
                 Container(
                   padding: const EdgeInsets.all(10),
                   decoration: BoxDecoration(
-                    color: AppTheme.primary.withValues(alpha: 0.2),
+                    color: AppTheme.primary.withValues(alpha: 0.12),
                     borderRadius: BorderRadius.circular(10),
                   ),
                   child: Icon(Icons.free_cancellation_outlined, color: AppTheme.primary, size: 22),
@@ -643,12 +665,19 @@ class TodayScheduleBanner extends ConsumerWidget {
                     children: [
                       Text(
                         'No Classes Scheduled for Today ($todayName)',
-                        style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: Colors.white),
+                        style: TextStyle(
+                          fontWeight: FontWeight.bold,
+                          fontSize: 13,
+                          color: AppTheme.text,
+                        ),
                       ),
                       const SizedBox(height: 2),
-                      const Text(
-                        'You have no assigned class hours for today. Click below to view the full timetable.',
-                        style: TextStyle(fontSize: 12, color: Colors.white70),
+                      Text(
+                        'You have no assigned class hours for today. Tap below to view the full timetable.',
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: AppTheme.textSecondary,
+                        ),
                       ),
                     ],
                   ),
@@ -667,22 +696,14 @@ class TodayScheduleBanner extends ConsumerWidget {
           margin: const EdgeInsets.only(bottom: 20),
           padding: const EdgeInsets.all(16),
           decoration: BoxDecoration(
-            gradient: const LinearGradient(
-              colors: [
-                Color(0xFF0F2027),
-                Color(0xFF203A43),
-                Color(0xFF2C5364),
-              ],
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
-            ),
+            color: AppTheme.surface,
             borderRadius: BorderRadius.circular(16),
-            border: Border.all(color: AppTheme.primary.withValues(alpha: 0.35)),
+            border: Border.all(color: AppTheme.border),
             boxShadow: [
               BoxShadow(
-                color: Colors.black.withValues(alpha: 0.2),
+                color: Colors.black.withValues(alpha: isDark ? 0.2 : 0.04),
                 blurRadius: 10,
-                offset: const Offset(0, 3),
+                offset: const Offset(0, 2),
               ),
             ],
           ),
@@ -694,7 +715,7 @@ class TodayScheduleBanner extends ConsumerWidget {
                   Container(
                     padding: const EdgeInsets.all(6),
                     decoration: BoxDecoration(
-                      color: AppTheme.primary.withValues(alpha: 0.2),
+                      color: AppTheme.primary.withValues(alpha: 0.12),
                       borderRadius: BorderRadius.circular(8),
                     ),
                     child: Icon(Icons.calendar_today_rounded, size: 16, color: AppTheme.primary),
@@ -703,10 +724,10 @@ class TodayScheduleBanner extends ConsumerWidget {
                   Expanded(
                     child: Text(
                       "Today's Class Schedule ($todayName)",
-                      style: const TextStyle(
+                      style: TextStyle(
                         fontWeight: FontWeight.bold,
                         fontSize: 14,
-                        color: Colors.white,
+                        color: AppTheme.text,
                       ),
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
@@ -741,62 +762,246 @@ class TodayScheduleBanner extends ConsumerWidget {
                 ],
               ),
               const SizedBox(height: 12),
-              SingleChildScrollView(
-                scrollDirection: Axis.horizontal,
-                child: Row(
-                  children: schedules.map((sched) {
-                    final subject = sched['subject_name'] as String? ?? 'Subject';
-                    final section = sched['section_name'] as String? ?? 'Section';
-                    final room = sched['room'] as String? ?? 'Classroom';
-                    final start = _formatDisplayTime(sched['start_time'] as String?);
-                    final end = _formatDisplayTime(sched['end_time'] as String?);
+              Column(
+                children: schedules.map((sched) {
+                  final subject = sched['subject_name'] as String? ?? 'Subject';
+                  final section = sched['section_name'] as String? ?? 'Section';
+                  final day = sched['day_of_week'] as String? ?? todayName;
+                  final room = sched['room'] as String?;
+                  final start = _formatDisplayTime(sched['start_time'] as String?);
+                  final end = _formatDisplayTime(sched['end_time'] as String?);
+                  final isOngoing = _isClassOngoing(sched);
+                  final color = _parseColor(sched['color_code'] as String?, AppTheme.primary);
 
-                    return Container(
-                      margin: const EdgeInsets.only(right: 12),
-                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-                      decoration: BoxDecoration(
-                        color: const Color(0xFF0C1926).withValues(alpha: 0.85),
-                        borderRadius: BorderRadius.circular(12),
-                        border: Border.all(color: Colors.white.withValues(alpha: 0.12)),
-                      ),
-                      child: Row(
-                        children: [
-                          Container(
-                            width: 3,
-                            height: 38,
+                  return Padding(
+                    padding: const EdgeInsets.only(bottom: 10),
+                    child: ClipRRect(
+                      borderRadius: BorderRadius.circular(14),
+                      child: Material(
+                        color: Colors.transparent,
+                        child: InkWell(
+                          onTap: () => context.go('/teacher/schedule'),
+                          borderRadius: BorderRadius.circular(14),
+                          child: Container(
                             decoration: BoxDecoration(
-                              color: AppTheme.primary,
-                              borderRadius: BorderRadius.circular(2),
+                              color: AppTheme.surface,
+                              borderRadius: BorderRadius.circular(14),
+                              border: Border.all(
+                                color: isOngoing
+                                    ? color
+                                    : color.withValues(alpha: isDark ? 0.35 : 0.25),
+                                width: isOngoing ? 1.5 : 1,
+                              ),
+                              boxShadow: [
+                                BoxShadow(
+                                  color: color.withValues(alpha: isDark ? 0.08 : 0.04),
+                                  blurRadius: 8,
+                                  offset: const Offset(0, 2),
+                                ),
+                              ],
+                            ),
+                            child: Stack(
+                              children: [
+                                // Halftone Dot Matrix Accent on Right
+                                HalftoneCardDecoration(
+                                  color: color,
+                                  width: 110,
+                                  baseOpacity: isDark ? 0.14 : 0.20,
+                                ),
+                                Padding(
+                                  padding: const EdgeInsets.all(14),
+                                  child: Row(
+                                    children: [
+                                      // Time & Day Block
+                                      Container(
+                                        width: 82,
+                                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 8),
+                                        decoration: BoxDecoration(
+                                          color: isDark ? AppTheme.background : const Color(0xFFF1F5F9),
+                                          borderRadius: BorderRadius.circular(10),
+                                          border: Border.all(
+                                            color: isDark ? AppTheme.border : const Color(0xFFE2E8F0).withValues(alpha: 0.7),
+                                          ),
+                                        ),
+                                        child: Column(
+                                          crossAxisAlignment: CrossAxisAlignment.start,
+                                          mainAxisSize: MainAxisSize.min,
+                                          children: [
+                                            Text(
+                                              day,
+                                              style: TextStyle(
+                                                fontSize: 11,
+                                                fontWeight: FontWeight.bold,
+                                                color: day == getCurrentDayOfWeek()
+                                                    ? AppTheme.primary
+                                                    : (isDark ? AppTheme.textSecondary : const Color(0xFF334155)),
+                                              ),
+                                              maxLines: 1,
+                                              overflow: TextOverflow.ellipsis,
+                                            ),
+                                            const SizedBox(height: 3),
+                                            Text(
+                                              start,
+                                              style: TextStyle(
+                                                fontSize: 11.5,
+                                                fontWeight: FontWeight.bold,
+                                                color: AppTheme.text,
+                                              ),
+                                              maxLines: 1,
+                                              overflow: TextOverflow.ellipsis,
+                                            ),
+                                            Text(
+                                              'to $end',
+                                              style: TextStyle(
+                                                fontSize: 9,
+                                                color: AppTheme.textSecondary,
+                                                fontWeight: FontWeight.w500,
+                                              ),
+                                              maxLines: 1,
+                                              overflow: TextOverflow.ellipsis,
+                                            ),
+                                          ],
+                                        ),
+                                      ),
+                                      const SizedBox(width: 12),
+
+                                      // Subject & Info
+                                      Expanded(
+                                        child: Column(
+                                          crossAxisAlignment: CrossAxisAlignment.start,
+                                          mainAxisSize: MainAxisSize.min,
+                                          children: [
+                                            Row(
+                                              children: [
+                                                Expanded(
+                                                  child: Text(
+                                                    subject,
+                                                    style: TextStyle(
+                                                      fontSize: 13.5,
+                                                      fontWeight: FontWeight.bold,
+                                                      color: AppTheme.text,
+                                                    ),
+                                                    maxLines: 1,
+                                                    overflow: TextOverflow.ellipsis,
+                                                  ),
+                                                ),
+                                                if (isOngoing) ...[
+                                                  const SizedBox(width: 4),
+                                                  Container(
+                                                    padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1.5),
+                                                    decoration: BoxDecoration(
+                                                      color: AppTheme.success.withValues(alpha: 0.15),
+                                                      borderRadius: BorderRadius.circular(4),
+                                                    ),
+                                                    child: Row(
+                                                      mainAxisSize: MainAxisSize.min,
+                                                      children: [
+                                                        Container(
+                                                          width: 5,
+                                                          height: 5,
+                                                          decoration: BoxDecoration(
+                                                            color: AppTheme.success,
+                                                            shape: BoxShape.circle,
+                                                          ),
+                                                        ),
+                                                        const SizedBox(width: 3),
+                                                        Text(
+                                                          'LIVE',
+                                                          style: TextStyle(
+                                                            fontSize: 8.5,
+                                                            fontWeight: FontWeight.bold,
+                                                            color: AppTheme.success,
+                                                          ),
+                                                        ),
+                                                      ],
+                                                    ),
+                                                  ),
+                                                ],
+                                              ],
+                                            ),
+                                            const SizedBox(height: 5),
+                                            Row(
+                                              children: [
+                                                Flexible(
+                                                  child: Container(
+                                                    padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+                                                    decoration: BoxDecoration(
+                                                      color: color.withValues(alpha: isDark ? 0.20 : 0.12),
+                                                      borderRadius: BorderRadius.circular(6),
+                                                      border: Border.all(color: color.withValues(alpha: isDark ? 0.35 : 0.22)),
+                                                    ),
+                                                    child: Text(
+                                                      section,
+                                                      style: TextStyle(
+                                                        fontSize: 11,
+                                                        fontWeight: FontWeight.bold,
+                                                        color: isDark ? Color.lerp(color, Colors.white, 0.25) : color,
+                                                      ),
+                                                      maxLines: 1,
+                                                      overflow: TextOverflow.ellipsis,
+                                                    ),
+                                                  ),
+                                                ),
+                                                if (room != null && room.isNotEmpty) ...[
+                                                  const SizedBox(width: 6),
+                                                  Icon(Icons.meeting_room_outlined, size: 13, color: AppTheme.textSecondary),
+                                                  const SizedBox(width: 3),
+                                                  Flexible(
+                                                    child: Text(
+                                                      room,
+                                                      style: TextStyle(
+                                                        fontSize: 11,
+                                                        color: AppTheme.textSecondary,
+                                                        fontWeight: FontWeight.w500,
+                                                      ),
+                                                      maxLines: 1,
+                                                      overflow: TextOverflow.ellipsis,
+                                                    ),
+                                                  ),
+                                                ],
+                                              ],
+                                            ),
+                                          ],
+                                        ),
+                                      ),
+
+                                      const SizedBox(width: 8),
+
+                                      // Admin Assigned Tag
+                                      Container(
+                                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3.5),
+                                        decoration: BoxDecoration(
+                                          color: isDark ? AppTheme.background : const Color(0xFFF8FAFC),
+                                          borderRadius: BorderRadius.circular(6),
+                                          border: Border.all(color: isDark ? AppTheme.border : const Color(0xFFE2E8F0)),
+                                        ),
+                                        child: Row(
+                                          mainAxisSize: MainAxisSize.min,
+                                          children: [
+                                            Icon(Icons.lock_clock_outlined, size: 11, color: AppTheme.textMuted),
+                                            const SizedBox(width: 3),
+                                            Text(
+                                              'Assigned',
+                                              style: TextStyle(
+                                                fontSize: 10,
+                                                color: AppTheme.textMuted,
+                                                fontWeight: FontWeight.w500,
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ],
                             ),
                           ),
-                          const SizedBox(width: 12),
-                          Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                subject,
-                                style: const TextStyle(
-                                  fontSize: 13.5,
-                                  fontWeight: FontWeight.bold,
-                                  color: Colors.white,
-                                ),
-                              ),
-                              const SizedBox(height: 3),
-                              Text(
-                                '$section • $start - $end • $room',
-                                style: TextStyle(
-                                  fontSize: 11,
-                                  color: Colors.white.withValues(alpha: 0.78),
-                                  fontWeight: FontWeight.w500,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ],
+                        ),
                       ),
-                    );
-                  }).toList(),
-                ),
+                    ),
+                  );
+                }).toList(),
               ),
             ],
           ),

@@ -10,6 +10,7 @@ import 'components/create_quiz_dialog.dart';
 import 'components/post_announcement_dialog.dart';
 import 'components/assignment_roster_dialog.dart';
 import 'components/class_overview_widget.dart';
+import 'components/teacher_assistive_touch.dart';
 import '../../../core/database/database_helper.dart';
 import '../../submissions/data/submissions_repository.dart';
 
@@ -259,7 +260,9 @@ class _TeacherDashboardScreenState extends ConsumerState<TeacherDashboardScreen>
     return Scaffold(
       backgroundColor: AppTheme.background,
       body: SafeArea(
-        child: RefreshIndicator(
+        child: Stack(
+          children: [
+            RefreshIndicator(
           onRefresh: () async {
             await Future.wait([
               ref.read(teacherDashboardProvider.notifier).reload(
@@ -399,6 +402,41 @@ class _TeacherDashboardScreenState extends ConsumerState<TeacherDashboardScreen>
                         }
                       },
                     ),
+                    const SizedBox(width: 2),
+                    InkWell(
+                      onTap: () {
+                        HapticFeedback.lightImpact();
+                        context.push('/teacher/profile');
+                      },
+                      borderRadius: BorderRadius.circular(20),
+                      child: Container(
+                        padding: const EdgeInsets.all(2),
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          border: Border.all(
+                            color: AppTheme.primary.withValues(alpha: 0.5),
+                            width: 1.5,
+                          ),
+                        ),
+                        child: CircleAvatar(
+                          radius: 15,
+                          backgroundColor: AppTheme.primary.withValues(alpha: 0.15),
+                          backgroundImage: currentUser?.profileImage != null && currentUser!.profileImage!.isNotEmpty
+                              ? NetworkImage(currentUser.profileImage!)
+                              : null,
+                          child: currentUser?.profileImage == null || currentUser!.profileImage!.isEmpty
+                              ? Text(
+                                  teacherName.isNotEmpty ? teacherName[0].toUpperCase() : 'T',
+                                  style: TextStyle(
+                                    color: AppTheme.primary,
+                                    fontWeight: FontWeight.bold,
+                                    fontSize: 12,
+                                  ),
+                                )
+                              : null,
+                        ),
+                      ),
+                    ),
                   ],
                 ),
                 const SizedBox(height: 20),
@@ -419,9 +457,6 @@ class _TeacherDashboardScreenState extends ConsumerState<TeacherDashboardScreen>
 
                 // Today's Class Schedule Banner
                 const TodayScheduleBanner(),
-
-                // Direct Action Hub
-                _buildActionHub(context),
                 const SizedBox(height: 24),
 
                 // Responsive Area: 2 Columns on Desktop, 1 Column on Mobile
@@ -478,86 +513,23 @@ class _TeacherDashboardScreenState extends ConsumerState<TeacherDashboardScreen>
             ),
           ),
         ),
-      ),
-    );
-  }
-
-  Widget _buildActionHub(BuildContext context) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          'Quick Actions Hub',
-          style: TextStyle(
-            fontSize: 16,
-            fontWeight: FontWeight.bold,
-            color: AppTheme.text,
+        TeacherAssistiveTouch(
+          onCurriculum: () => context.go('/teacher/subjects'),
+          onSchedule: () => context.go('/teacher/schedule'),
+          onScores: () => context.go('/teacher/scores'),
+          onStudents: () => context.go('/teacher/students'),
+          onCreateQuiz: () => _showCreateQuizDialog(context),
+          onAnnounce: () => PostAnnouncementDialog.show(
+            context,
+            defaultSection: _activeSectionFilter,
           ),
-        ),
-        const SizedBox(height: 12),
-        Row(
-          children: [
-            Expanded(
-              child: _buildActionTile(
-                icon: Icons.menu_book,
-                label: 'Curriculum & Quizzes',
-                color: AppTheme.primary,
-                onTap: () => context.go('/teacher/subjects'),
-              ),
-            ),
-            const SizedBox(width: 8),
-            Expanded(
-              child: _buildActionTile(
-                icon: Icons.calendar_month,
-                label: 'Class Scheduling',
-                color: Colors.teal,
-                onTap: () => context.go('/teacher/schedule'),
-              ),
-            ),
-            const SizedBox(width: 8),
-            Expanded(
-              child: _buildActionTile(
-                icon: Icons.assignment_turned_in,
-                label: 'Live Scores',
-                color: AppTheme.accent,
-                onTap: () => context.go('/teacher/scores'),
-              ),
-            ),
-            const SizedBox(width: 8),
-            Expanded(
-              child: _buildActionTile(
-                icon: Icons.people_alt,
-                label: 'Student Roster',
-                color: AppTheme.primary.withValues(alpha: 0.7),
-                onTap: () => context.go('/teacher/students'),
-              ),
-            ),
-            const SizedBox(width: 8),
-            Expanded(
-              child: _buildActionTile(
-                icon: Icons.add_circle_outline,
-                label: 'Create Quiz',
-                color: const Color(0xFF0D9488),
-                onTap: () => _showCreateQuizDialog(context),
-              ),
-            ),
-            const SizedBox(width: 8),
-            Expanded(
-              child: _buildActionTile(
-                icon: Icons.campaign_rounded,
-                label: 'Announce',
-                color: const Color(0xFF8B5CF6),
-                onTap: () => PostAnnouncementDialog.show(
-                  context,
-                  defaultSection: _activeSectionFilter,
-                ),
-              ),
-            ),
-          ],
+          onProfile: () => context.push('/teacher/profile'),
         ),
       ],
-    );
-  }
+    ),
+  ),
+);
+}
 
   Widget _buildSubmissionsSection(BuildContext context, List<Map<String, dynamic>> recentAttempts) {
     return Column(
@@ -1419,20 +1391,6 @@ class _TeacherDashboardScreenState extends ConsumerState<TeacherDashboardScreen>
     );
   }
 
-  Widget _buildActionTile({
-    required IconData icon,
-    required String label,
-    required Color color,
-    required VoidCallback onTap,
-  }) {
-    return _AnimatedActionTile(
-      icon: icon,
-      label: label,
-      color: color,
-      onTap: onTap,
-    );
-  }
-
   Widget _buildAnnouncementsSection(
     User? currentUser,
     List<Map<String, dynamic>> announcements,
@@ -1996,120 +1954,6 @@ class _TeacherDashboardScreenState extends ConsumerState<TeacherDashboardScreen>
         builder: (ctx) => CreateQuizDialog(
           initialSubjectId: subjects.first['id'] as int?,
           subjectName: subjects.first['name']?.toString() ?? 'Subject',
-        ),
-      ),
-    );
-  }
-}
-
-/// A tactile animated action button for Quick Actions Hub with scale bounce physics,
-/// vibrant tinted splash ripple, and haptic feedback.
-class _AnimatedActionTile extends StatefulWidget {
-  final IconData icon;
-  final String label;
-  final Color color;
-  final VoidCallback onTap;
-
-  const _AnimatedActionTile({
-    required this.icon,
-    required this.label,
-    required this.color,
-    required this.onTap,
-  });
-
-  @override
-  State<_AnimatedActionTile> createState() => _AnimatedActionTileState();
-}
-
-class _AnimatedActionTileState extends State<_AnimatedActionTile> with SingleTickerProviderStateMixin {
-  late AnimationController _pressController;
-  late Animation<double> _scaleAnimation;
-
-  @override
-  void initState() {
-    super.initState();
-    _pressController = AnimationController(
-      vsync: this,
-      duration: const Duration(milliseconds: 90),
-      reverseDuration: const Duration(milliseconds: 180),
-    );
-    _scaleAnimation = Tween<double>(begin: 1.0, end: 0.92).animate(
-      CurvedAnimation(
-        parent: _pressController,
-        curve: Curves.easeOutCubic,
-        reverseCurve: Curves.easeOutBack,
-      ),
-    );
-  }
-
-  @override
-  void dispose() {
-    _pressController.dispose();
-    super.dispose();
-  }
-
-  void _onTapDown(TapDownDetails _) {
-    _pressController.forward();
-    HapticFeedback.lightImpact();
-  }
-
-  void _onTapUp(TapUpDetails _) {
-    _pressController.reverse();
-  }
-
-  void _onTapCancel() {
-    _pressController.reverse();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return ScaleTransition(
-      scale: _scaleAnimation,
-      child: Material(
-        color: AppTheme.surface,
-        borderRadius: BorderRadius.circular(12),
-        elevation: 0,
-        child: InkWell(
-          onTap: () {
-            _pressController.forward().then((_) {
-              if (mounted) _pressController.reverse();
-            });
-            widget.onTap();
-          },
-          onTapDown: _onTapDown,
-          onTapUp: _onTapUp,
-          onTapCancel: _onTapCancel,
-          borderRadius: BorderRadius.circular(12),
-          splashColor: widget.color.withValues(alpha: 0.16),
-          highlightColor: widget.color.withValues(alpha: 0.08),
-          child: Container(
-            padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 8),
-            decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(12),
-              border: Border.all(color: AppTheme.border),
-            ),
-            child: Column(
-              children: [
-                CircleAvatar(
-                  radius: 18,
-                  backgroundColor: widget.color.withValues(alpha: 0.12),
-                  child: Icon(widget.icon, color: widget.color, size: 18),
-                ),
-                const SizedBox(height: 8),
-                Text(
-                  widget.label,
-                  textAlign: TextAlign.center,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: TextStyle(
-                    fontSize: 11,
-                    fontWeight: FontWeight.w600,
-                    color: AppTheme.text,
-                  ),
-                ),
-              ],
-            ),
-          ),
         ),
       ),
     );

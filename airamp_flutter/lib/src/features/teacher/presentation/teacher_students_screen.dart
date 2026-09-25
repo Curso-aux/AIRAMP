@@ -1,16 +1,23 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/theme/theme_provider.dart';
 import '../../admin/data/admin_repository.dart';
+import '../../admin/presentation/scores_screen.dart';
 import '../../chat/application/chat_provider.dart';
 import '../data/teacher_repository.dart';
 
 class TeacherStudentsScreen extends ConsumerStatefulWidget {
   final String? initialSection;
+  final int initialTab; // 0: Roster, 1: Scores
 
-  const TeacherStudentsScreen({super.key, this.initialSection});
+  const TeacherStudentsScreen({
+    super.key,
+    this.initialSection,
+    this.initialTab = 0,
+  });
 
   @override
   ConsumerState<TeacherStudentsScreen> createState() => _TeacherStudentsScreenState();
@@ -19,10 +26,12 @@ class TeacherStudentsScreen extends ConsumerStatefulWidget {
 class _TeacherStudentsScreenState extends ConsumerState<TeacherStudentsScreen> {
   final _searchController = TextEditingController();
   late String _selectedSection;
+  late int _activeTab;
 
   @override
   void initState() {
     super.initState();
+    _activeTab = widget.initialTab;
     _selectedSection = (widget.initialSection != null && widget.initialSection!.isNotEmpty)
         ? widget.initialSection!
         : 'All Sections';
@@ -41,6 +50,11 @@ class _TeacherStudentsScreenState extends ConsumerState<TeacherStudentsScreen> {
   @override
   void didUpdateWidget(covariant TeacherStudentsScreen oldWidget) {
     super.didUpdateWidget(oldWidget);
+    if (widget.initialTab != oldWidget.initialTab && widget.initialTab != _activeTab) {
+      setState(() {
+        _activeTab = widget.initialTab;
+      });
+    }
     if (widget.initialSection != null &&
         widget.initialSection != oldWidget.initialSection &&
         widget.initialSection != _selectedSection) {
@@ -96,23 +110,70 @@ class _TeacherStudentsScreenState extends ConsumerState<TeacherStudentsScreen> {
     return Scaffold(
       backgroundColor: AppTheme.background,
       body: SafeArea(
-        child: RefreshIndicator(
-          onRefresh: () async {
-            await Future.wait([
-              ref.read(teacherStudentsProvider.notifier).reload(
-                    section: _selectedSection == 'All Sections' ? null : _selectedSection,
-                    query: _searchController.text.trim(),
-                  ),
-              ref.refresh(teacherHandledSectionsDetailsProvider.future),
-              ref.refresh(teacherHandledSectionsProvider.future),
-            ]);
-          },
-          child: Column(
-            children: [
-              // Header & Section Exploration Area
-              Padding(
-                padding: const EdgeInsets.fromLTRB(20, 16, 20, 12),
-                child: Column(
+        child: Column(
+          children: [
+            // Top Segmented Pill Toggle: Class Roster vs Quiz Scores
+            Padding(
+              padding: const EdgeInsets.fromLTRB(20, 10, 20, 4),
+              child: Container(
+                height: 42,
+                padding: const EdgeInsets.all(4),
+                decoration: BoxDecoration(
+                  color: AppTheme.surface,
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: AppTheme.border),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withValues(alpha: 0.04),
+                      blurRadius: 6,
+                      offset: const Offset(0, 2),
+                    ),
+                  ],
+                ),
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: _buildSegmentTab(
+                        label: 'Class Roster',
+                        icon: Icons.people_alt_outlined,
+                        isActive: _activeTab == 0,
+                        onTap: () => setState(() => _activeTab = 0),
+                      ),
+                    ),
+                    const SizedBox(width: 4),
+                    Expanded(
+                      child: _buildSegmentTab(
+                        label: 'Quiz Scores',
+                        icon: Icons.assignment_turned_in_outlined,
+                        isActive: _activeTab == 1,
+                        onTap: () => setState(() => _activeTab = 1),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+
+            // Tab Content
+            Expanded(
+              child: _activeTab == 0
+                  ? RefreshIndicator(
+                      onRefresh: () async {
+                        await Future.wait([
+                          ref.read(teacherStudentsProvider.notifier).reload(
+                                section: _selectedSection == 'All Sections' ? null : _selectedSection,
+                                query: _searchController.text.trim(),
+                              ),
+                          ref.refresh(teacherHandledSectionsDetailsProvider.future),
+                          ref.refresh(teacherHandledSectionsProvider.future),
+                        ]);
+                      },
+                      child: Column(
+                        children: [
+                          // Header & Section Exploration Area
+                          Padding(
+                            padding: const EdgeInsets.fromLTRB(20, 12, 20, 12),
+                            child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     // Header title & count
@@ -505,6 +566,60 @@ class _TeacherStudentsScreenState extends ConsumerState<TeacherStudentsScreen> {
               ),
             ],
           ),
+        )
+      : const ScoresScreen(isEmbedded: true),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildSegmentTab({
+    required String label,
+    required IconData icon,
+    required bool isActive,
+    required VoidCallback onTap,
+  }) {
+    return InkWell(
+      onTap: () {
+        HapticFeedback.lightImpact();
+        onTap();
+      },
+      borderRadius: BorderRadius.circular(9),
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 180),
+        decoration: BoxDecoration(
+          color: isActive ? AppTheme.primary : Colors.transparent,
+          borderRadius: BorderRadius.circular(9),
+          boxShadow: isActive
+              ? [
+                  BoxShadow(
+                    color: AppTheme.primary.withValues(alpha: 0.25),
+                    blurRadius: 6,
+                    offset: const Offset(0, 2),
+                  ),
+                ]
+              : null,
+        ),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(
+              icon,
+              size: 16,
+              color: isActive ? Colors.white : AppTheme.textSecondary,
+            ),
+            const SizedBox(width: 6),
+            Text(
+              label,
+              style: TextStyle(
+                fontSize: 12.5,
+                fontWeight: isActive ? FontWeight.bold : FontWeight.w500,
+                color: isActive ? Colors.white : AppTheme.textSecondary,
+              ),
+            ),
+          ],
         ),
       ),
     );

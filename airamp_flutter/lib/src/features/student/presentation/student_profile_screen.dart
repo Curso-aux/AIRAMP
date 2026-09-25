@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/theme/theme_provider.dart';
 import '../../auth/application/auth_provider.dart';
@@ -183,6 +184,24 @@ class _StudentProfileScreenState extends ConsumerState<StudentProfileScreen> {
 
     return Scaffold(
       backgroundColor: AppTheme.background,
+      appBar: AppBar(
+        backgroundColor: AppTheme.background,
+        elevation: 0,
+        leading: Navigator.canPop(context)
+            ? IconButton(
+                icon: Icon(Icons.arrow_back_ios_new_rounded, color: AppTheme.text, size: 20),
+                onPressed: () => context.pop(),
+              )
+            : IconButton(
+                icon: Icon(Icons.arrow_back_ios_new_rounded, color: AppTheme.text, size: 20),
+                onPressed: () => context.go('/student/home'),
+              ),
+        title: Text(
+          'Student Profile',
+          style: TextStyle(color: AppTheme.text, fontSize: 18, fontWeight: FontWeight.bold),
+        ),
+        centerTitle: true,
+      ),
       body: SafeArea(
         child: SingleChildScrollView(
           padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 0),

@@ -1,12 +1,16 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../../../../core/components/calendar/actual_calendar_view.dart';
 import '../../../../core/database/database_helper.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../../core/theme/theme_provider.dart';
+import '../../../teacher/data/teacher_repository.dart';
 import '../../../teacher/data/teacher_schedule_repository.dart';
 import '../../../teacher/presentation/components/create_edit_schedule_dialog.dart';
 import '../../../teacher/presentation/components/halftone_pattern.dart';
 import '../../data/admin_repository.dart';
+
+enum AdminScheduleViewMode { grid, calendar, agenda }
 
 class AdminWebScheduleScreen extends ConsumerStatefulWidget {
   const AdminWebScheduleScreen({super.key});
@@ -21,7 +25,7 @@ class _AdminWebScheduleScreenState extends ConsumerState<AdminWebScheduleScreen>
   String _selectedTeacher = 'All Faculty';
   String _selectedDay = 'All Days';
   String _selectedSection = 'All Sections';
-  bool _isGridView = true;
+  AdminScheduleViewMode _viewMode = AdminScheduleViewMode.grid;
 
   static const List<String> _days = [
     'All Days',
@@ -129,6 +133,12 @@ class _AdminWebScheduleScreenState extends ConsumerState<AdminWebScheduleScreen>
               ref.invalidate(todayTeacherSchedulesProvider);
               ref.invalidate(teacherSchedulesProvider);
               ref.invalidate(scheduledSectionsProvider);
+              ref.invalidate(sectionSchedulesProvider);
+              ref.invalidate(teacherHandledSectionsProvider);
+              ref.invalidate(availableSectionsProvider);
+              if (section.isNotEmpty) {
+                ref.invalidate(sectionSchedulesProvider(section));
+              }
               if (mounted) {
                 ScaffoldMessenger.of(context).showSnackBar(
                   const SnackBar(content: Text('Class schedule entry removed')),
@@ -159,16 +169,32 @@ class _AdminWebScheduleScreenState extends ConsumerState<AdminWebScheduleScreen>
         loading: () => const Center(child: CircularProgressIndicator()),
         error: (err, _) => Center(child: Text('Error loading schedules: $err')),
         data: (allSchedules) {
+          // Unique sections from database
+          final Set<String> availableSections = {'All Sections'};
+          for (final s in allSchedules) {
+            final name = s['section_name'] as String?;
+            if (name != null && name.isNotEmpty) availableSections.add(name);
+          }
+          for (final sec in sectionsList) {
+            final name = sec['name'] as String?;
+            if (name != null && name.isNotEmpty) availableSections.add(name);
+          }
+
+          // Teacher ID set & Safe fallback values to guarantee DropdownButton invariant
+          final teacherIds = {'All Faculty', ...teachers.map((t) => t['id'] as String)};
+          final effectiveSelectedTeacher = teacherIds.contains(_selectedTeacher) ? _selectedTeacher : 'All Faculty';
+          final effectiveSelectedSection = availableSections.contains(_selectedSection) ? _selectedSection : 'All Sections';
+
           // Filters
           final filtered = allSchedules.where((s) {
-            if (_selectedDay != 'All Days' && s['day_of_week'] != _selectedDay) {
+            if (_viewMode != AdminScheduleViewMode.calendar && _selectedDay != 'All Days' && s['day_of_week'] != _selectedDay) {
               return false;
             }
-            if (_selectedTeacher != 'All Faculty' && s['teacher_id'] != _selectedTeacher) {
+            if (effectiveSelectedTeacher != 'All Faculty' && s['teacher_id'] != effectiveSelectedTeacher) {
               return false;
             }
-            if (_selectedSection != 'All Sections' &&
-                (s['section_name'] as String?)?.toLowerCase().trim() != _selectedSection.toLowerCase().trim()) {
+            if (effectiveSelectedSection != 'All Sections' &&
+                (s['section_name'] as String?)?.toLowerCase().trim() != effectiveSelectedSection.toLowerCase().trim()) {
               return false;
             }
             if (_searchQuery.isNotEmpty) {
@@ -195,17 +221,6 @@ class _AdminWebScheduleScreenState extends ConsumerState<AdminWebScheduleScreen>
               .where((r) => r != null && r.isNotEmpty)
               .toSet()
               .length;
-
-          // Unique sections from database
-          final Set<String> availableSections = {'All Sections'};
-          for (final s in allSchedules) {
-            final name = s['section_name'] as String?;
-            if (name != null && name.isNotEmpty) availableSections.add(name);
-          }
-          for (final sec in sectionsList) {
-            final name = sec['name'] as String?;
-            if (name != null && name.isNotEmpty) availableSections.add(name);
-          }
 
           return RefreshIndicator(
             onRefresh: () async {
@@ -342,7 +357,7 @@ class _AdminWebScheduleScreenState extends ConsumerState<AdminWebScheduleScreen>
                               ),
                               child: DropdownButtonHideUnderline(
                                 child: DropdownButton<String>(
-                                  value: _selectedTeacher,
+                                  value: effectiveSelectedTeacher,
                                   dropdownColor: AppTheme.surface,
                                   style: TextStyle(color: AppTheme.text, fontSize: 13, fontWeight: FontWeight.w600),
                                   items: [
@@ -376,7 +391,7 @@ class _AdminWebScheduleScreenState extends ConsumerState<AdminWebScheduleScreen>
                               ),
                               child: DropdownButtonHideUnderline(
                                 child: DropdownButton<String>(
-                                  value: _selectedSection,
+                                  value: effectiveSelectedSection,
                                   dropdownColor: AppTheme.surface,
                                   style: TextStyle(color: AppTheme.text, fontSize: 13, fontWeight: FontWeight.w600),
                                   items: availableSections.map((sec) {
@@ -407,53 +422,66 @@ class _AdminWebScheduleScreenState extends ConsumerState<AdminWebScheduleScreen>
                                     tooltip: 'Grid View',
                                     icon: Icon(
                                       Icons.grid_view_rounded,
-                                      color: _isGridView ? AppTheme.primary : AppTheme.textMuted,
+                                      color: _viewMode == AdminScheduleViewMode.grid ? AppTheme.primary : AppTheme.textMuted,
                                     ),
-                                    onPressed: () => setState(() => _isGridView = true),
+                                    onPressed: () => setState(() => _viewMode = AdminScheduleViewMode.grid),
+                                  ),
+                                  IconButton(
+                                    iconSize: 18,
+                                    tooltip: 'Calendar Mode',
+                                    icon: Icon(
+                                      Icons.calendar_month_rounded,
+                                      color: _viewMode == AdminScheduleViewMode.calendar ? AppTheme.primary : AppTheme.textMuted,
+                                    ),
+                                    onPressed: () => setState(() => _viewMode = AdminScheduleViewMode.calendar),
                                   ),
                                   IconButton(
                                     iconSize: 18,
                                     tooltip: 'Timeline Agenda',
                                     icon: Icon(
                                       Icons.view_agenda_outlined,
-                                      color: !_isGridView ? AppTheme.primary : AppTheme.textMuted,
+                                      color: _viewMode == AdminScheduleViewMode.agenda ? AppTheme.primary : AppTheme.textMuted,
                                     ),
-                                    onPressed: () => setState(() => _isGridView = false),
+                                    onPressed: () => setState(() => _viewMode = AdminScheduleViewMode.agenda),
                                   ),
                                 ],
                               ),
                             ),
                           ],
                         ),
-                        const SizedBox(height: 12),
+                        if (_viewMode != AdminScheduleViewMode.calendar) ...[
+                          const SizedBox(height: 12),
 
-                        // Row 2: Day of Week Pills
-                        SingleChildScrollView(
-                          scrollDirection: Axis.horizontal,
-                          child: Row(
-                            children: _days.map((day) {
-                              final isSel = _selectedDay == day;
-                              return Padding(
-                                padding: const EdgeInsets.only(right: 8.0),
-                                child: ChoiceChip(
-                                  label: Text(day),
-                                  selected: isSel,
-                                  selectedColor: AppTheme.primary,
-                                  labelStyle: TextStyle(
-                                    color: isSel ? Colors.white : AppTheme.text,
-                                    fontSize: 12,
-                                    fontWeight: isSel ? FontWeight.bold : FontWeight.normal,
+                          // Row 2: Day of Week Pills
+                          SingleChildScrollView(
+                            scrollDirection: Axis.horizontal,
+                            child: Row(
+                              children: _days.map((day) {
+                                final isSel = _selectedDay == day;
+                                return Padding(
+                                  padding: const EdgeInsets.only(right: 8.0),
+                                  child: ChoiceChip(
+                                    label: Text(day),
+                                    selected: isSel,
+                                    selectedColor: AppTheme.primary,
+                                    labelStyle: TextStyle(
+                                      color: isSel
+                                          ? (AppTheme.isDark ? const Color(0xFF0A1420) : Colors.white)
+                                          : AppTheme.text,
+                                      fontSize: 12,
+                                      fontWeight: isSel ? FontWeight.bold : FontWeight.normal,
+                                    ),
+                                    backgroundColor: AppTheme.background,
+                                    side: BorderSide(color: isSel ? AppTheme.primary : AppTheme.border),
+                                    onSelected: (selected) {
+                                      if (selected) setState(() => _selectedDay = day);
+                                    },
                                   ),
-                                  backgroundColor: AppTheme.background,
-                                  side: BorderSide(color: isSel ? AppTheme.primary : AppTheme.border),
-                                  onSelected: (selected) {
-                                    if (selected) setState(() => _selectedDay = day);
-                                  },
-                                ),
-                              );
-                            }).toList(),
+                                );
+                              }).toList(),
+                            ),
                           ),
-                        ),
+                        ],
                       ],
                     ),
                   ),
@@ -493,7 +521,15 @@ class _AdminWebScheduleScreenState extends ConsumerState<AdminWebScheduleScreen>
                         ),
                       ),
                     )
-                  else if (_isGridView)
+                  else if (_viewMode == AdminScheduleViewMode.calendar)
+                    ActualCalendarView(
+                      schedules: filtered,
+                      isAdmin: true,
+                      onEditSchedule: (sched) => CreateEditScheduleDialog.show(context, initialSchedule: sched),
+                      onDeleteSchedule: _confirmDelete,
+                      onAddSchedule: () => CreateEditScheduleDialog.show(context),
+                    )
+                  else if (_viewMode == AdminScheduleViewMode.grid)
                     _buildAdminGrid(filtered)
                   else
                     _buildAdminAgendaList(filtered),

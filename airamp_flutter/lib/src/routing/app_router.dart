@@ -137,15 +137,11 @@ final routerProvider = Provider<GoRouter>((ref) {
               ),
             ],
           ),
-          StatefulShellBranch(
-            routes: [
-              GoRoute(
-                path: '/student/profile',
-                builder: (context, state) => const StudentProfileScreen(),
-              ),
-            ],
-          ),
         ],
+      ),
+      GoRoute(
+        path: '/student/profile',
+        builder: (context, state) => const StudentProfileScreen(),
       ),
       // Teacher Routes with Bottom Navigation
       StatefulShellRoute.indexedStack(
@@ -189,19 +185,20 @@ final routerProvider = Provider<GoRouter>((ref) {
           StatefulShellBranch(
             routes: [
               GoRoute(
-                path: '/teacher/scores',
-                builder: (context, state) => const ScoresScreen(),
-              ),
-            ],
-          ),
-          StatefulShellBranch(
-            routes: [
-              GoRoute(
                 path: '/teacher/students',
                 builder: (context, state) {
                   final initialSection = state.uri.queryParameters['section'];
-                  return TeacherStudentsScreen(initialSection: initialSection);
+                  final tab = state.uri.queryParameters['tab'];
+                  final initialTab = tab == 'scores' ? 1 : 0;
+                  return TeacherStudentsScreen(
+                    initialSection: initialSection,
+                    initialTab: initialTab,
+                  );
                 },
+              ),
+              GoRoute(
+                path: '/teacher/scores',
+                redirect: (context, state) => '/teacher/students?tab=scores',
               ),
             ],
           ),
@@ -213,15 +210,11 @@ final routerProvider = Provider<GoRouter>((ref) {
               ),
             ],
           ),
-          StatefulShellBranch(
-            routes: [
-              GoRoute(
-                path: '/teacher/profile',
-                builder: (context, state) => const TeacherProfileScreen(),
-              ),
-            ],
-          ),
         ],
+      ),
+      GoRoute(
+        path: '/teacher/profile',
+        builder: (context, state) => const TeacherProfileScreen(),
       ),
       // Admin Web Portal Routes with Responsive Sidebar Scaffold
       StatefulShellRoute.indexedStack(

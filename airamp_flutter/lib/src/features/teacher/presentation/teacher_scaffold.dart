@@ -21,10 +21,10 @@ class TeacherScaffold extends StatelessWidget {
     // Mobile / Tablet layout with Swipeable and Auto-hiding Bottom Navigation Bar
     return SwipeableNavScaffold(
       navigationShell: navigationShell,
-      // Chat is index 5: disable tab swipe on Chat so conversation dismissibles work cleanly
-      swipeDisabledIndices: const {5},
-      selectedFontSize: 9,
-      unselectedFontSize: 9,
+      // Chat is index 4: disable tab swipe on Chat so conversation dismissibles work cleanly
+      swipeDisabledIndices: const {4},
+      selectedFontSize: 11,
+      unselectedFontSize: 11,
       items: const [
         BottomNavigationBarItem(
           icon: Icon(Icons.dashboard_outlined),
@@ -42,11 +42,6 @@ class TeacherScaffold extends StatelessWidget {
           label: 'Schedule',
         ),
         BottomNavigationBarItem(
-          icon: Icon(Icons.assignment_turned_in_outlined),
-          activeIcon: Icon(Icons.assignment_turned_in),
-          label: 'Scores',
-        ),
-        BottomNavigationBarItem(
           icon: Icon(Icons.people_alt_outlined),
           activeIcon: Icon(Icons.people_alt),
           label: 'Students',
@@ -55,11 +50,6 @@ class TeacherScaffold extends StatelessWidget {
           icon: Icon(Icons.chat_bubble_outline),
           activeIcon: Icon(Icons.chat_bubble),
           label: 'Chat',
-        ),
-        BottomNavigationBarItem(
-          icon: Icon(Icons.person_outline),
-          activeIcon: Icon(Icons.person),
-          label: 'Profile',
         ),
       ],
     );

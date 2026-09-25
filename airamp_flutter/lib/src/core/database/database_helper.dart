@@ -223,7 +223,7 @@ class DatabaseHelper {
           'id': 'sched_seed_4',
           'school_id': 'sch_main',
           'teacher_id': 'teacher_1',
-          'teacher_name': 'Mr. Santos',
+          'teacher_name': 'Sir John Reyes',
           'subject_id': 2,
           'subject_name': 'Earth & Life Science',
           'section_id': 2,
@@ -233,6 +233,38 @@ class DatabaseHelper {
           'end_time': '14:30',
           'room': 'Science Lab 1',
           'color_code': '#2563EB',
+          'created_at': now,
+        });
+        await db.insert('class_schedules', {
+          'id': 'sched_seed_5',
+          'school_id': 'sch_main',
+          'teacher_id': 'teacher_1',
+          'teacher_name': 'Sir John Reyes',
+          'subject_id': 1,
+          'subject_name': 'CSS NC II - Computer Systems Servicing',
+          'section_id': 1,
+          'section_name': 'Grade 10 - Emerald',
+          'day_of_week': 'Tuesday',
+          'start_time': '08:00',
+          'end_time': '09:30',
+          'room': 'Computer Lab 1',
+          'color_code': '#E11D48',
+          'created_at': now,
+        });
+        await db.insert('class_schedules', {
+          'id': 'sched_seed_6',
+          'school_id': 'sch_main',
+          'teacher_id': 'teacher_1',
+          'teacher_name': 'Sir John Reyes',
+          'subject_id': 1,
+          'subject_name': 'CSS NC II - Computer Systems Servicing',
+          'section_id': 1,
+          'section_name': 'Grade 10 - Emerald',
+          'day_of_week': 'Thursday',
+          'start_time': '08:00',
+          'end_time': '09:30',
+          'room': 'Computer Lab 1',
+          'color_code': '#E11D48',
           'created_at': now,
         });
       }
@@ -3276,6 +3308,47 @@ class DatabaseHelper {
           }
         }
       }
+
+      // Ensure default class schedules for Grade 10 - Emerald exist
+      try {
+        final emSchedCount = Sqflite.firstIntValue(await db.rawQuery(
+          "SELECT COUNT(*) FROM class_schedules WHERE LOWER(section_name) LIKE '%emerald%'"
+        )) ?? 0;
+        if (emSchedCount == 0) {
+          final now = DateTime.now().toIso8601String();
+          final subId = cs101Rows.isNotEmpty ? (cs101Rows.first['id'] as int) : 1;
+          await db.insert('class_schedules', {
+            'id': 'sched_emerald_1',
+            'school_id': 'sch_main',
+            'teacher_id': 'teacher_1',
+            'teacher_name': 'Sir John Reyes',
+            'subject_id': subId,
+            'subject_name': 'CSS NC II - Computer Systems Servicing',
+            'section_name': 'Grade 10 - Emerald',
+            'day_of_week': 'Tuesday',
+            'start_time': '08:00',
+            'end_time': '09:30',
+            'room': 'Computer Lab 1',
+            'color_code': '#E11D48',
+            'created_at': now,
+          });
+          await db.insert('class_schedules', {
+            'id': 'sched_emerald_2',
+            'school_id': 'sch_main',
+            'teacher_id': 'teacher_1',
+            'teacher_name': 'Sir John Reyes',
+            'subject_id': subId,
+            'subject_name': 'CSS NC II - Computer Systems Servicing',
+            'section_name': 'Grade 10 - Emerald',
+            'day_of_week': 'Thursday',
+            'start_time': '08:00',
+            'end_time': '09:30',
+            'room': 'Computer Lab 1',
+            'color_code': '#E11D48',
+            'created_at': now,
+          });
+        }
+      } catch (_) {}
 
       // If teacher_1 has any other subjects without enrollments, enroll authentic students
       final otherTeacherSubjects = await db.query('subjects', where: "teacher_id = 'teacher_1' OR teacher_id LIKE '%reyes%'");

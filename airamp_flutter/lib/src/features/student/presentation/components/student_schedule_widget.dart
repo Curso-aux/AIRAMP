@@ -1,7 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../../../../core/components/calendar/actual_calendar_view.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../teacher/data/teacher_schedule_repository.dart';
+
+enum StudentModalViewMode { grid, calendar, agenda }
 
 /// Helper function to open the student's timetable modal
 void showStudentTimetableModal(
@@ -115,6 +118,8 @@ class StudentScheduleWidget extends ConsumerStatefulWidget {
 }
 
 class _StudentScheduleWidgetState extends ConsumerState<StudentScheduleWidget> {
+  bool _isCalendarMode = false;
+
   String _formatDisplayTime(String? timeStr) {
     if (timeStr == null || !timeStr.contains(':')) return timeStr ?? '';
     try {
@@ -244,78 +249,144 @@ class _StudentScheduleWidgetState extends ConsumerState<StudentScheduleWidget> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        // Section Header with Student's assigned Section badge and Timetable button
+        // Top row: Title and Timetable Grid button
         Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
+            Container(
+              padding: const EdgeInsets.all(7),
+              decoration: BoxDecoration(
+                color: AppTheme.primary.withValues(alpha: 0.15),
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: Icon(Icons.calendar_month_rounded, color: AppTheme.primary, size: 18),
+            ),
+            const SizedBox(width: 10),
             Expanded(
-              child: Row(
-                children: [
-                  Container(
-                    padding: const EdgeInsets.all(7),
-                    decoration: BoxDecoration(
-                      color: AppTheme.primary.withValues(alpha: 0.15),
-                      borderRadius: BorderRadius.circular(10),
-                    ),
-                    child: Icon(Icons.calendar_month_rounded, color: AppTheme.primary, size: 18),
+              child: Text(
+                "Class Schedule",
+                style: TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.bold,
+                  color: AppTheme.text,
+                ),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+              ),
+            ),
+            IconButton(
+              tooltip: 'Open Full Timetable Grid',
+              icon: Icon(Icons.grid_view_rounded, size: 20, color: AppTheme.primary),
+              onPressed: () => _openTimetableModal(context),
+            ),
+          ],
+        ),
+        const SizedBox(height: 8),
+
+        // Subtitle row: Section Info & View Mode Toggle (responsive Wrap)
+        Wrap(
+          alignment: WrapAlignment.spaceBetween,
+          crossAxisAlignment: WrapCrossAlignment.center,
+          spacing: 8,
+          runSpacing: 8,
+          children: [
+            Wrap(
+              crossAxisAlignment: WrapCrossAlignment.center,
+              spacing: 6,
+              runSpacing: 4,
+              children: [
+                Text(
+                  "Section: ",
+                  style: TextStyle(fontSize: 11, color: AppTheme.textMuted),
+                ),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                  decoration: BoxDecoration(
+                    color: AppTheme.primary.withValues(alpha: 0.12),
+                    borderRadius: BorderRadius.circular(4),
                   ),
-                  const SizedBox(width: 10),
-                  Flexible(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          "Class Schedule",
-                          style: TextStyle(
-                            fontSize: 18,
-                            fontWeight: FontWeight.bold,
-                            color: AppTheme.text,
+                  child: Text(
+                    studentSection,
+                    style: TextStyle(
+                      fontSize: 11,
+                      fontWeight: FontWeight.bold,
+                      color: AppTheme.primary,
+                    ),
+                  ),
+                ),
+                Text(' • $today', style: TextStyle(fontSize: 11, color: AppTheme.textMuted)),
+              ],
+            ),
+            // View Mode Toggle (Today vs Calendar)
+            Container(
+              decoration: BoxDecoration(
+                color: AppTheme.surface,
+                borderRadius: BorderRadius.circular(10),
+                border: Border.all(color: AppTheme.border),
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  InkWell(
+                    onTap: () => setState(() => _isCalendarMode = false),
+                    borderRadius: const BorderRadius.horizontal(left: Radius.circular(9)),
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                      decoration: BoxDecoration(
+                        color: !_isCalendarMode ? AppTheme.primary.withValues(alpha: 0.15) : Colors.transparent,
+                        borderRadius: const BorderRadius.horizontal(left: Radius.circular(9)),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(
+                            Icons.view_day_outlined,
+                            size: 13,
+                            color: !_isCalendarMode ? AppTheme.primary : AppTheme.textMuted,
                           ),
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                        Row(
-                          children: [
-                            Text(
-                              "Section: ",
-                              style: TextStyle(fontSize: 11, color: AppTheme.textMuted),
+                          const SizedBox(width: 4),
+                          Text(
+                            'Today',
+                            style: TextStyle(
+                              fontSize: 11,
+                              fontWeight: !_isCalendarMode ? FontWeight.bold : FontWeight.normal,
+                              color: !_isCalendarMode ? AppTheme.primary : AppTheme.textMuted,
                             ),
-                            Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1),
-                              decoration: BoxDecoration(
-                                color: AppTheme.primary.withValues(alpha: 0.12),
-                                borderRadius: BorderRadius.circular(4),
-                              ),
-                              child: Text(
-                                studentSection,
-                                style: TextStyle(
-                                  fontSize: 11,
-                                  fontWeight: FontWeight.bold,
-                                  color: AppTheme.primary,
-                                ),
-                              ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                  InkWell(
+                    onTap: () => setState(() => _isCalendarMode = true),
+                    borderRadius: const BorderRadius.horizontal(right: Radius.circular(9)),
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                      decoration: BoxDecoration(
+                        color: _isCalendarMode ? AppTheme.primary.withValues(alpha: 0.15) : Colors.transparent,
+                        borderRadius: const BorderRadius.horizontal(right: Radius.circular(9)),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(
+                            Icons.calendar_month_rounded,
+                            size: 13,
+                            color: _isCalendarMode ? AppTheme.primary : AppTheme.textMuted,
+                          ),
+                          const SizedBox(width: 4),
+                          Text(
+                            'Calendar',
+                            style: TextStyle(
+                              fontSize: 11,
+                              fontWeight: _isCalendarMode ? FontWeight.bold : FontWeight.normal,
+                              color: _isCalendarMode ? AppTheme.primary : AppTheme.textMuted,
                             ),
-                            Text(' • $today', style: TextStyle(fontSize: 11, color: AppTheme.textMuted)),
-                          ],
-                        ),
-                      ],
+                          ),
+                        ],
+                      ),
                     ),
                   ),
                 ],
-              ),
-            ),
-            const SizedBox(width: 8),
-            // Prominent Full Timetable Button
-            ElevatedButton.icon(
-              onPressed: () => _openTimetableModal(context),
-              icon: const Icon(Icons.grid_view_rounded, size: 14),
-              label: const Text('Timetable Grid', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: AppTheme.primary,
-                foregroundColor: Colors.black,
-                elevation: 0,
-                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
               ),
             ),
           ],
@@ -340,9 +411,11 @@ class _StudentScheduleWidgetState extends ConsumerState<StudentScheduleWidget> {
                   child: CircularProgressIndicator(strokeWidth: 2, color: AppTheme.primary),
                 ),
                 const SizedBox(width: 14),
-                Text(
-                  'Loading your schedule...',
-                  style: TextStyle(fontSize: 13, color: AppTheme.textSecondary),
+                Expanded(
+                  child: Text(
+                    'Loading your schedule...',
+                    style: TextStyle(fontSize: 13, color: AppTheme.textSecondary),
+                  ),
                 ),
               ],
             ),
@@ -373,6 +446,43 @@ class _StudentScheduleWidgetState extends ConsumerState<StudentScheduleWidget> {
             ),
           ),
           data: (allSchedules) {
+            if (_isCalendarMode) {
+              if (allSchedules.isEmpty) {
+                return Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.all(24),
+                  decoration: BoxDecoration(
+                    color: AppTheme.surface,
+                    borderRadius: BorderRadius.circular(16),
+                    border: Border.all(color: AppTheme.border),
+                  ),
+                  child: Center(
+                    child: Column(
+                      children: [
+                        Icon(Icons.calendar_today_outlined, size: 44, color: AppTheme.textMuted),
+                        const SizedBox(height: 10),
+                        Text(
+                          'No Class Schedules Found',
+                          style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: AppTheme.text),
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          'Your teachers have not uploaded class schedules for Section $studentSection yet.',
+                          textAlign: TextAlign.center,
+                          style: TextStyle(fontSize: 12, color: AppTheme.textSecondary),
+                        ),
+                      ],
+                    ),
+                  ),
+                );
+              }
+              return ActualCalendarView(
+                schedules: allSchedules,
+                isStudent: true,
+                emptySubtitle: 'No classes scheduled for Section $studentSection on this day.',
+              );
+            }
+
             // Case 1: No schedules uploaded for this student's section at all
             if (allSchedules.isEmpty) {
               return Container(
@@ -715,7 +825,7 @@ class _WeeklyTimetableDialogState extends ConsumerState<WeeklyTimetableDialog> {
 
   // Active day filter for mobile jump / agenda view
   String _activeDayJump = 'ALL';
-  bool _isMobileAgendaView = false;
+  StudentModalViewMode _modalViewMode = StudentModalViewMode.grid;
 
   @override
   void initState() {
@@ -870,6 +980,81 @@ class _WeeklyTimetableDialogState extends ConsumerState<WeeklyTimetableDialog> {
     );
   }
 
+  Widget _buildModalModeSelector() {
+    return Container(
+      decoration: BoxDecoration(
+        color: AppTheme.background,
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: AppTheme.border),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          _buildModeSelectorButton(
+            mode: StudentModalViewMode.grid,
+            icon: Icons.grid_view_rounded,
+            tooltip: 'Weekly Timetable Matrix',
+            label: 'Grid',
+          ),
+          _buildModeSelectorButton(
+            mode: StudentModalViewMode.calendar,
+            icon: Icons.calendar_month_rounded,
+            tooltip: 'Monthly Calendar Mode',
+            label: 'Calendar',
+          ),
+          _buildModeSelectorButton(
+            mode: StudentModalViewMode.agenda,
+            icon: Icons.view_agenda_outlined,
+            tooltip: 'Agenda Timeline List',
+            label: 'Agenda',
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildModeSelectorButton({
+    required StudentModalViewMode mode,
+    required IconData icon,
+    required String tooltip,
+    required String label,
+  }) {
+    final isSelected = _modalViewMode == mode;
+    return Tooltip(
+      message: tooltip,
+      child: InkWell(
+        onTap: () => setState(() => _modalViewMode = mode),
+        borderRadius: BorderRadius.circular(9),
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+          decoration: BoxDecoration(
+            color: isSelected ? AppTheme.primary.withValues(alpha: 0.15) : Colors.transparent,
+            borderRadius: BorderRadius.circular(9),
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(
+                icon,
+                size: 14,
+                color: isSelected ? AppTheme.primary : AppTheme.textMuted,
+              ),
+              const SizedBox(width: 4),
+              Text(
+                label,
+                style: TextStyle(
+                  fontSize: 11,
+                  fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+                  color: isSelected ? AppTheme.primary : AppTheme.textMuted,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final studentSection = widget.sectionName?.trim();
@@ -893,93 +1078,181 @@ class _WeeklyTimetableDialogState extends ConsumerState<WeeklyTimetableDialog> {
           children: [
             // ── Top Header ──────────────────────────────────────────
             Container(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+              padding: EdgeInsets.symmetric(
+                horizontal: isMobile ? 12 : 16,
+                vertical: isMobile ? 10 : 12,
+              ),
               decoration: BoxDecoration(
                 border: Border(
-                  top: const BorderSide(color: Color(0xFF10B981), width: 3), // Green accent line like screenshot
+                  top: const BorderSide(color: Color(0xFF10B981), width: 3), // Green accent line
                   bottom: BorderSide(color: AppTheme.border, width: 1),
                 ),
               ),
-              child: Row(
-                children: [
-                  Container(
-                    padding: const EdgeInsets.all(6),
-                    decoration: BoxDecoration(
-                      color: AppTheme.primary.withValues(alpha: 0.15),
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                    child: Icon(Icons.grid_on_rounded, color: AppTheme.primary, size: 18),
-                  ),
-                  const SizedBox(width: 10),
-                  Expanded(
-                    child: Column(
+              child: isMobile
+                  ? Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
+                      mainAxisSize: MainAxisSize.min,
                       children: [
-                        Text(
-                          'Class Timetable Schedule',
-                          style: TextStyle(
-                            fontSize: isMobile ? 15 : 18,
-                            fontWeight: FontWeight.bold,
-                            color: AppTheme.text,
-                          ),
-                        ),
+                        // Row 1 on Mobile: Icon, Title & Section, Refresh & Close
                         Row(
                           children: [
-                            Text('Section: ', style: TextStyle(fontSize: 11, color: AppTheme.textMuted)),
                             Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1),
+                              padding: const EdgeInsets.all(6),
                               decoration: BoxDecoration(
                                 color: AppTheme.primary.withValues(alpha: 0.15),
-                                borderRadius: BorderRadius.circular(4),
+                                borderRadius: BorderRadius.circular(8),
                               ),
-                              child: Text(
-                                studentSection != null && studentSection.isNotEmpty ? studentSection : 'No Section',
-                                style: TextStyle(
-                                  fontSize: 11,
-                                  fontWeight: FontWeight.bold,
-                                  color: AppTheme.primary,
-                                ),
+                              child: Icon(Icons.grid_on_rounded, color: AppTheme.primary, size: 18),
+                            ),
+                            const SizedBox(width: 8),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Text(
+                                    'Class Timetable Schedule',
+                                    style: TextStyle(
+                                      fontSize: 14.5,
+                                      fontWeight: FontWeight.bold,
+                                      color: AppTheme.text,
+                                    ),
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
+                                  const SizedBox(height: 2),
+                                  Wrap(
+                                    crossAxisAlignment: WrapCrossAlignment.center,
+                                    spacing: 4,
+                                    runSpacing: 2,
+                                    children: [
+                                      Text('Section: ', style: TextStyle(fontSize: 11, color: AppTheme.textMuted)),
+                                      Container(
+                                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1),
+                                        decoration: BoxDecoration(
+                                          color: AppTheme.primary.withValues(alpha: 0.15),
+                                          borderRadius: BorderRadius.circular(4),
+                                        ),
+                                        child: Text(
+                                          studentSection != null && studentSection.isNotEmpty ? studentSection : 'No Section',
+                                          style: TextStyle(
+                                            fontSize: 11,
+                                            fontWeight: FontWeight.bold,
+                                            color: AppTheme.primary,
+                                          ),
+                                          maxLines: 1,
+                                          overflow: TextOverflow.ellipsis,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ],
                               ),
                             ),
-                            if (!isMobile) ...[
-                              Text(' • Visual Weekly Matrix', style: TextStyle(fontSize: 11, color: AppTheme.textMuted)),
-                            ],
+                            IconButton(
+                              tooltip: 'Refresh Schedule',
+                              icon: Icon(Icons.refresh_rounded, color: AppTheme.primary, size: 20),
+                              visualDensity: VisualDensity.compact,
+                              padding: const EdgeInsets.all(6),
+                              constraints: const BoxConstraints(minWidth: 34, minHeight: 34),
+                              onPressed: () {
+                                if (studentSection != null && studentSection.isNotEmpty) {
+                                  ref.invalidate(sectionSchedulesProvider(studentSection));
+                                }
+                              },
+                            ),
+                            IconButton(
+                              tooltip: 'Close',
+                              icon: Icon(Icons.close, color: AppTheme.textMuted, size: 20),
+                              visualDensity: VisualDensity.compact,
+                              padding: const EdgeInsets.all(6),
+                              constraints: const BoxConstraints(minWidth: 34, minHeight: 34),
+                              onPressed: () => Navigator.of(context).pop(),
+                            ),
                           ],
+                        ),
+                        const SizedBox(height: 8),
+                        // Row 2 on Mobile: Mode Selector Pill
+                        Center(
+                          child: _buildModalModeSelector(),
+                        ),
+                      ],
+                    )
+                  : Row(
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.all(6),
+                          decoration: BoxDecoration(
+                            color: AppTheme.primary.withValues(alpha: 0.15),
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          child: Icon(Icons.grid_on_rounded, color: AppTheme.primary, size: 18),
+                        ),
+                        const SizedBox(width: 10),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                'Class Timetable Schedule',
+                                style: TextStyle(
+                                  fontSize: 18,
+                                  fontWeight: FontWeight.bold,
+                                  color: AppTheme.text,
+                                ),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                              Wrap(
+                                crossAxisAlignment: WrapCrossAlignment.center,
+                                spacing: 4,
+                                children: [
+                                  Text('Section: ', style: TextStyle(fontSize: 11, color: AppTheme.textMuted)),
+                                  Container(
+                                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1),
+                                    decoration: BoxDecoration(
+                                      color: AppTheme.primary.withValues(alpha: 0.15),
+                                      borderRadius: BorderRadius.circular(4),
+                                    ),
+                                    child: Text(
+                                      studentSection != null && studentSection.isNotEmpty ? studentSection : 'No Section',
+                                      style: TextStyle(
+                                        fontSize: 11,
+                                        fontWeight: FontWeight.bold,
+                                        color: AppTheme.primary,
+                                      ),
+                                    ),
+                                  ),
+                                  Text(' • Visual Weekly Matrix', style: TextStyle(fontSize: 11, color: AppTheme.textMuted)),
+                                ],
+                              ),
+                            ],
+                          ),
+                        ),
+                        _buildModalModeSelector(),
+                        const SizedBox(width: 6),
+                        IconButton(
+                          tooltip: 'Refresh Schedule',
+                          icon: Icon(Icons.refresh_rounded, color: AppTheme.primary, size: 20),
+                          visualDensity: VisualDensity.compact,
+                          onPressed: () {
+                            if (studentSection != null && studentSection.isNotEmpty) {
+                              ref.invalidate(sectionSchedulesProvider(studentSection));
+                            }
+                          },
+                        ),
+                        IconButton(
+                          icon: Icon(Icons.close, color: AppTheme.textMuted, size: 20),
+                          visualDensity: VisualDensity.compact,
+                          onPressed: () => Navigator.of(context).pop(),
                         ),
                       ],
                     ),
-                  ),
-                  if (isMobile) ...[
-                    // Mobile Toggle: Grid vs Agenda
-                    IconButton(
-                      tooltip: _isMobileAgendaView ? 'Switch to Full Matrix Grid' : 'Switch to Agenda List',
-                      icon: Icon(
-                        _isMobileAgendaView ? Icons.grid_view_rounded : Icons.view_agenda_outlined,
-                        color: AppTheme.primary,
-                        size: 20,
-                      ),
-                      onPressed: () => setState(() => _isMobileAgendaView = !_isMobileAgendaView),
-                    ),
-                  ],
-                  IconButton(
-                    tooltip: 'Refresh Schedule',
-                    icon: Icon(Icons.refresh_rounded, color: AppTheme.primary, size: 20),
-                    onPressed: () {
-                      if (studentSection != null && studentSection.isNotEmpty) {
-                        ref.invalidate(sectionSchedulesProvider(studentSection));
-                      }
-                    },
-                  ),
-                  IconButton(
-                    icon: Icon(Icons.close, color: AppTheme.textMuted, size: 20),
-                    onPressed: () => Navigator.of(context).pop(),
-                  ),
-                ],
-              ),
             ),
 
-            // ── Quick Day Jump Navigation ───────────────────────────
-            Container(
+            if (_modalViewMode != StudentModalViewMode.calendar) ...[
+              // ── Quick Day Jump Navigation ───────────────────────────
+              Container(
               padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
               decoration: BoxDecoration(
                 color: AppTheme.background.withValues(alpha: 0.5),
@@ -1045,6 +1318,7 @@ class _WeeklyTimetableDialogState extends ConsumerState<WeeklyTimetableDialog> {
                 ),
               ),
             ),
+          ],
 
             // ── Timetable Matrix Content ────────────────────────────
             Expanded(
@@ -1111,7 +1385,18 @@ class _WeeklyTimetableDialogState extends ConsumerState<WeeklyTimetableDialog> {
                             );
                           }
 
-                          if (_isMobileAgendaView) {
+                          if (_modalViewMode == StudentModalViewMode.calendar) {
+                            return SingleChildScrollView(
+                              padding: const EdgeInsets.all(16),
+                              child: ActualCalendarView(
+                                schedules: schedules,
+                                isStudent: true,
+                                onScheduleTap: (c) => _showClassDetailModal(context, c, isDark),
+                              ),
+                            );
+                          }
+
+                          if (_modalViewMode == StudentModalViewMode.agenda) {
                             return _buildMobileAgendaView(schedules, isDark);
                           }
 

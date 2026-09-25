@@ -245,7 +245,9 @@ class _TeacherScheduleModalState extends ConsumerState<TeacherScheduleModal> {
                         selected: isSel,
                         selectedColor: AppTheme.primary,
                         labelStyle: TextStyle(
-                          color: isSel ? Colors.white : AppTheme.text,
+                          color: isSel
+                              ? (AppTheme.isDark ? const Color(0xFF0A1420) : Colors.white)
+                              : AppTheme.text,
                           fontSize: 12,
                           fontWeight: isSel ? FontWeight.bold : FontWeight.normal,
                         ),

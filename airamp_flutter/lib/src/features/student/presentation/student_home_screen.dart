@@ -7,6 +7,7 @@ import '../../auth/application/auth_provider.dart';
 import '../../admin/data/admin_repository.dart';
 import '../../teacher/data/teacher_schedule_repository.dart';
 import '../data/student_repository.dart';
+import 'components/student_assistive_touch.dart';
 import 'components/student_schedule_widget.dart';
 
 class StudentHomeScreen extends ConsumerStatefulWidget {
@@ -217,7 +218,9 @@ class _StudentHomeScreenState extends ConsumerState<StudentHomeScreen> {
     return Scaffold(
       backgroundColor: AppTheme.background,
       body: SafeArea(
-        child: RefreshIndicator(
+        child: Stack(
+          children: [
+            RefreshIndicator(
           onRefresh: () async {
             if (currentUser.section != null && currentUser.section!.isNotEmpty) {
               ref.invalidate(sectionSchedulesProvider(currentUser.section!.trim()));
@@ -298,66 +301,9 @@ class _StudentHomeScreenState extends ConsumerState<StudentHomeScreen> {
                 ),
                 const SizedBox(height: 20),
 
-                // Quick Class Schedule Banner & Shortcut
-                GestureDetector(
-                  onTap: () => showStudentTimetableModal(context, initialSection: currentUser.section),
-                  child: Container(
-                    margin: const EdgeInsets.only(bottom: 20),
-                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                    decoration: BoxDecoration(
-                      gradient: LinearGradient(
-                        colors: [
-                          AppTheme.primary.withValues(alpha: 0.15),
-                          AppTheme.surface,
-                        ],
-                        begin: Alignment.topLeft,
-                        end: Alignment.bottomRight,
-                      ),
-                      borderRadius: BorderRadius.circular(14),
-                      border: Border.all(color: AppTheme.primary.withValues(alpha: 0.3)),
-                    ),
-                    child: Row(
-                      children: [
-                        Container(
-                          padding: const EdgeInsets.all(8),
-                          decoration: BoxDecoration(
-                            color: AppTheme.primary,
-                            borderRadius: BorderRadius.circular(10),
-                          ),
-                          child: const Icon(Icons.calendar_month_rounded, color: Colors.black, size: 20),
-                        ),
-                        const SizedBox(width: 12),
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                'Teacher Class Schedules',
-                                style: TextStyle(
-                                  fontSize: 13,
-                                  fontWeight: FontWeight.bold,
-                                  color: AppTheme.text,
-                                ),
-                              ),
-                              const SizedBox(height: 2),
-                              Text(
-                                (currentUser.section != null && currentUser.section!.isNotEmpty)
-                                    ? 'Section ${currentUser.section} • Tap to view weekly timetable'
-                                    : 'No section assigned • Contact administrator',
-                                style: TextStyle(fontSize: 11, color: AppTheme.textSecondary),
-                              ),
-                            ],
-                          ),
-                        ),
-                        Icon(Icons.arrow_forward_ios_rounded, size: 14, color: AppTheme.primary),
-                      ],
-                    ),
-                  ),
-                ),
-
                 // Student Section Class Schedule
                 StudentScheduleWidget(sectionName: currentUser.section),
-                const SizedBox(height: 12),
+                const SizedBox(height: 16),
 
                 // Assigned Quizzes & Tasks
                 Row(
@@ -532,8 +478,19 @@ class _StudentHomeScreenState extends ConsumerState<StudentHomeScreen> {
             ),
           ),
         ),
-      ),
-    );
+        StudentAssistiveTouch(
+          onCourses: () => context.go('/student/courses'),
+          onSchedule: () => showStudentTimetableModal(context, initialSection: currentUser.section),
+          onQuizzes: () => context.go('/student/quiz-history'),
+          onProgress: () => context.go('/student/progress'),
+          onChat: () => context.go('/student/chat'),
+          onAnnouncements: () => _showNotificationsSheet(studentAnnouncements),
+          onProfile: () => context.go('/student/profile'),
+        ),
+      ],
+    ),
+  ),
+);
   }
 
   Widget _buildStatCard(String title, IconData icon, String value, Color color) {
@@ -803,17 +760,7 @@ class _StudentHomeScreenState extends ConsumerState<StudentHomeScreen> {
                 ),
               ),
               if (dueDate != null && dueDate.isNotEmpty)
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                  decoration: BoxDecoration(
-                    color: AppTheme.error.withValues(alpha: 0.1),
-                    borderRadius: BorderRadius.circular(4),
-                  ),
-                  child: Text(
-                    'Due $dueDate',
-                    style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: AppTheme.error),
-                  ),
-                ),
+                _buildDueDateBadge(dueDate),
             ],
           ),
           const SizedBox(height: 10),
@@ -861,11 +808,74 @@ class _StudentHomeScreenState extends ConsumerState<StudentHomeScreen> {
               label: const Text('Start Quiz', style: TextStyle(fontWeight: FontWeight.bold)),
               style: ElevatedButton.styleFrom(
                 backgroundColor: AppTheme.primary,
-                foregroundColor: Colors.black,
+                foregroundColor: Colors.white,
                 padding: const EdgeInsets.symmetric(vertical: 10),
                 shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
               ),
             ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildDueDateBadge(String rawDate) {
+    DateTime? dt = DateTime.tryParse(rawDate);
+    if (dt == null) {
+      final sanitized = rawDate.replaceAll('T', ' ');
+      dt = DateTime.tryParse(sanitized);
+    }
+
+    String label;
+    Color badgeColor;
+
+    if (dt == null) {
+      label = rawDate.length > 10 ? rawDate.substring(0, 10) : rawDate;
+      badgeColor = AppTheme.error;
+    } else {
+      final now = DateTime.now();
+      final diff = dt.difference(now);
+
+      const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+      final monthStr = months[dt.month - 1];
+      final hour = dt.hour % 12 == 0 ? 12 : dt.hour % 12;
+      final minute = dt.minute.toString().padLeft(2, '0');
+      final period = dt.hour >= 12 ? 'PM' : 'AM';
+      final timeStr = '$hour:$minute $period';
+
+      if (diff.isNegative) {
+        label = 'Overdue ($monthStr ${dt.day})';
+        badgeColor = AppTheme.error;
+      } else if (dt.year == now.year && dt.month == now.month && dt.day == now.day) {
+        label = 'Due Today • $timeStr';
+        badgeColor = AppTheme.warning;
+      } else if (diff.inHours < 48 && dt.day == now.add(const Duration(days: 1)).day) {
+        label = 'Due Tomorrow • $timeStr';
+        badgeColor = AppTheme.warning;
+      } else if (diff.inDays < 7) {
+        label = 'Due in ${diff.inDays}d • $timeStr';
+        badgeColor = AppTheme.primary;
+      } else {
+        label = 'Due $monthStr ${dt.day} • $timeStr';
+        badgeColor = AppTheme.textSecondary;
+      }
+    }
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
+      decoration: BoxDecoration(
+        color: badgeColor.withValues(alpha: 0.12),
+        borderRadius: BorderRadius.circular(6),
+        border: Border.all(color: badgeColor.withValues(alpha: 0.25)),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(Icons.schedule_rounded, size: 11, color: badgeColor),
+          const SizedBox(width: 4),
+          Text(
+            label,
+            style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: badgeColor),
           ),
         ],
       ),

@@ -55,13 +55,7 @@ class _TeacherWebScaffoldState extends ConsumerState<TeacherWebScaffold> {
       route: '/teacher/schedule',
     ),
     TeacherNavItem(
-      label: 'Scores & Evaluation',
-      icon: Icons.assignment_turned_in_outlined,
-      activeIcon: Icons.assignment_turned_in,
-      route: '/teacher/scores',
-    ),
-    TeacherNavItem(
-      label: 'Classroom & Students',
+      label: 'Students & Scores',
       icon: Icons.people_alt_outlined,
       activeIcon: Icons.people_alt,
       route: '/teacher/students',
@@ -71,12 +65,6 @@ class _TeacherWebScaffoldState extends ConsumerState<TeacherWebScaffold> {
       icon: Icons.chat_bubble_outline,
       activeIcon: Icons.chat_bubble,
       route: '/teacher/chat',
-    ),
-    TeacherNavItem(
-      label: 'Profile & Settings',
-      icon: Icons.person_outline,
-      activeIcon: Icons.person,
-      route: '/teacher/profile',
     ),
   ];
 
@@ -452,51 +440,60 @@ class _TeacherWebScaffoldState extends ConsumerState<TeacherWebScaffold> {
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Container(
-                height: 44,
-                padding: const EdgeInsets.symmetric(horizontal: 4),
-                child: Row(
-                  children: [
-                    SizedBox(
-                      width: 48,
-                      child: Center(
-                        child: CircleAvatar(
-                          radius: 18,
-                          backgroundColor: Colors.teal.withValues(alpha: 0.15),
-                          child: Text(
-                            currentUser?.fullName.isNotEmpty == true ? currentUser.fullName[0].toUpperCase() : 'T',
-                            style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.teal),
+              InkWell(
+                onTap: () => context.push('/teacher/profile'),
+                borderRadius: BorderRadius.circular(10),
+                child: Tooltip(
+                  message: 'View & Edit Profile',
+                  child: Container(
+                    height: 44,
+                    padding: const EdgeInsets.symmetric(horizontal: 4),
+                    child: Row(
+                      children: [
+                        SizedBox(
+                          width: 48,
+                          child: Center(
+                            child: CircleAvatar(
+                              radius: 18,
+                              backgroundColor: Colors.teal.withValues(alpha: 0.15),
+                              child: Text(
+                                currentUser?.fullName.isNotEmpty == true ? currentUser.fullName[0].toUpperCase() : 'T',
+                                style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.teal),
+                              ),
+                            ),
                           ),
                         ),
-                      ),
-                    ),
-                    Expanded(
-                      child: Opacity(
-                        opacity: isCollapsed ? 0.0 : 1.0,
-                        child: Padding(
-                          padding: const EdgeInsets.only(left: 8),
-                          child: Column(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                currentUser?.fullName ?? 'Faculty Instructor',
-                                style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: AppTheme.text),
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
+                        Expanded(
+                          child: Opacity(
+                            opacity: isCollapsed ? 0.0 : 1.0,
+                            child: Padding(
+                              padding: const EdgeInsets.only(left: 8),
+                              child: Column(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    currentUser?.fullName ?? 'Faculty Instructor',
+                                    style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: AppTheme.text),
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
+                                  Text(
+                                    currentUser?.email ?? 'teacher@school.edu',
+                                    style: TextStyle(fontSize: 11, color: AppTheme.textMuted),
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
+                                ],
                               ),
-                              Text(
-                                currentUser?.email ?? 'teacher@school.edu',
-                                style: TextStyle(fontSize: 11, color: AppTheme.textMuted),
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                              ),
-                            ],
+                            ),
                           ),
                         ),
-                      ),
+                        if (!isCollapsed)
+                          Icon(Icons.chevron_right, size: 16, color: AppTheme.textMuted),
+                      ],
                     ),
-                  ],
+                  ),
                 ),
               ),
               const SizedBox(height: 10),

@@ -5,7 +5,9 @@ import '../../../core/theme/theme_provider.dart';
 import '../../student/data/student_repository.dart';
 
 class ScoresScreen extends ConsumerStatefulWidget {
-  const ScoresScreen({super.key});
+  final bool isEmbedded;
+
+  const ScoresScreen({super.key, this.isEmbedded = false});
 
   @override
   ConsumerState<ScoresScreen> createState() => _ScoresScreenState();
@@ -82,17 +84,14 @@ class _ScoresScreenState extends ConsumerState<ScoresScreen> {
         ? '${((scores.map((s) => (s['percentage'] as num?)?.toDouble() ?? 0.0).reduce((a, b) => a + b)) / totalAttempts).toStringAsFixed(0)}%'
         : '0%';
 
-    return Scaffold(
-      backgroundColor: AppTheme.background,
-      body: SafeArea(
-        child: RefreshIndicator(
-          onRefresh: () async {
-            await ref.read(teacherScoresProvider.notifier).loadScores();
-          },
-          child: SingleChildScrollView(
-            physics: const AlwaysScrollableScrollPhysics(),
-            padding: const EdgeInsets.all(20),
-            child: Column(
+    final content = RefreshIndicator(
+      onRefresh: () async {
+        await ref.read(teacherScoresProvider.notifier).loadScores();
+      },
+      child: SingleChildScrollView(
+        physics: const AlwaysScrollableScrollPhysics(),
+        padding: const EdgeInsets.all(20),
+        child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 // Header
@@ -334,7 +333,16 @@ class _ScoresScreenState extends ConsumerState<ScoresScreen> {
               ],
             ),
           ),
-        ),
+        );
+
+    if (widget.isEmbedded) {
+      return content;
+    }
+
+    return Scaffold(
+      backgroundColor: AppTheme.background,
+      body: SafeArea(
+        child: content,
       ),
     );
   }
