@@ -2,6 +2,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import '../../../core/components/skeleton_loader.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/theme/theme_provider.dart';
 import '../../../core/database/database_helper.dart';
@@ -388,7 +389,23 @@ class _QuizScreenState extends ConsumerState<QuizScreen> {
           title: Text('Assessment', style: TextStyle(color: AppTheme.text)),
           iconTheme: IconThemeData(color: AppTheme.text),
         ),
-        body: Center(child: CircularProgressIndicator(color: AppTheme.primary)),
+        body: const Padding(
+          padding: EdgeInsets.all(20),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              SkeletonLoader(width: double.infinity, height: 18),
+              SizedBox(height: 16),
+              SkeletonCard(height: 110),
+              SizedBox(height: 14),
+              SkeletonCard(height: 56),
+              SizedBox(height: 8),
+              SkeletonCard(height: 56),
+              SizedBox(height: 8),
+              SkeletonCard(height: 56),
+            ],
+          ),
+        ),
       );
     }
 

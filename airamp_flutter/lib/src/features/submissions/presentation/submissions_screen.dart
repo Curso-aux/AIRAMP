@@ -3,6 +3,8 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:file_picker/file_picker.dart';
+import '../../../core/components/empty_state.dart';
+import '../../../core/components/skeleton_loader.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/theme/theme_provider.dart';
 import '../../auth/application/auth_provider.dart';
@@ -463,23 +465,16 @@ class _SubmissionsScreenState extends ConsumerState<SubmissionsScreen> {
         iconTheme: IconThemeData(color: AppTheme.text),
       ),
       body: assignmentAsync.when(
-        loading: () => Center(child: CircularProgressIndicator(color: AppTheme.primary)),
-        error: (err, stack) => Center(
-          child: Padding(
-            padding: const EdgeInsets.all(24.0),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Icon(Icons.error_outline, color: AppTheme.error, size: 48),
-                const SizedBox(height: 12),
-                Text('Failed to load activity', style: TextStyle(color: AppTheme.text, fontSize: 16)),
-                const SizedBox(height: 8),
-                Text('$err', style: TextStyle(color: AppTheme.textMuted, fontSize: 12), textAlign: TextAlign.center),
-                const SizedBox(height: 16),
-                OutlinedButton(onPressed: () => context.pop(), child: const Text('Go Back')),
-              ],
-            ),
-          ),
+        loading: () => const Padding(
+          padding: EdgeInsets.all(20),
+          child: SkeletonListView(itemCount: 4),
+        ),
+        error: (err, stack) => AppErrorState(
+          error: err,
+          title: 'Failed to Load Activity',
+          onRetry: () => ref.refresh(assignmentDetailProvider(_parsedId)),
+          secondaryActionLabel: 'Go Back',
+          onSecondaryAction: () => context.pop(),
         ),
         data: (assignment) {
           if (assignment == null) {

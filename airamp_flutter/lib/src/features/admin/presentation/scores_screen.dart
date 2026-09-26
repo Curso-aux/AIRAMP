@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/animations/app_transitions.dart';
 import '../../../core/animations/animated_pressable.dart';
+import '../../../core/components/empty_state.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/theme/theme_provider.dart';
 import '../../admin/data/admin_repository.dart';
@@ -29,6 +30,8 @@ class ScoresScreen extends ConsumerStatefulWidget {
 class _ScoresScreenState extends ConsumerState<ScoresScreen> {
   final _searchController = TextEditingController();
   late String _activeSection;
+  static const int _pageSize = 20;
+  int _displayLimit = _pageSize;
 
   void _openSectionFilterBottomSheet(BuildContext context, List<String> sectionOptions) {
     AppModalTransitions.showSmoothBottomSheet(
@@ -38,7 +41,10 @@ class _ScoresScreenState extends ConsumerState<ScoresScreen> {
           sectionOptions: sectionOptions,
           activeSection: _activeSection,
           onSectionSelected: (selectedSection) {
-            setState(() => _activeSection = selectedSection);
+            setState(() {
+              _activeSection = selectedSection;
+              _displayLimit = _pageSize;
+            });
             ref.read(teacherScoresProvider.notifier).loadScores(section: selectedSection);
           },
         );
@@ -69,12 +75,16 @@ class _ScoresScreenState extends ConsumerState<ScoresScreen> {
         widget.initialSection != _activeSection) {
       setState(() {
         _activeSection = widget.initialSection!;
+        _displayLimit = _pageSize;
       });
       ref.read(teacherScoresProvider.notifier).loadScores(section: _activeSection);
     }
   }
 
   void _onSearchChanged() {
+    setState(() {
+      _displayLimit = _pageSize;
+    });
     ref.read(teacherScoresProvider.notifier).loadScores(
           query: _searchController.text.trim(),
         );
@@ -349,44 +359,38 @@ class _ScoresScreenState extends ConsumerState<ScoresScreen> {
 
                 // Scores List or Empty State
                 if (scores.isEmpty)
-                  Center(
-                    child: Padding(
-                      padding: const EdgeInsets.symmetric(vertical: 40),
-                      child: Column(
-                        children: [
-                          Container(
-                            padding: const EdgeInsets.all(20),
-                            decoration: BoxDecoration(
-                              color: Theme.of(context).colorScheme.surface,
-                              shape: BoxShape.circle,
-                            ),
-                            child: Icon(Icons.assignment_turned_in_outlined, size: 48, color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.4)),
-                          ),
-                          const SizedBox(height: 20),
-                          Text(
-                            'No Quiz Scores Found',
-                            style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Theme.of(context).colorScheme.onSurface),
-                          ),
-                          const SizedBox(height: 8),
-                          Padding(
-                            padding: const EdgeInsets.symmetric(horizontal: 40),
-                            child: Text(
-                              _searchController.text.isNotEmpty
-                                  ? 'No quiz scores matching "${_searchController.text}". Try a different search keyword.'
-                                  : 'No quiz attempts have been recorded for the selected filter. Scores will appear here once students complete quizzes.',
-                              textAlign: TextAlign.center,
-                              style: TextStyle(color: AppTheme.textSecondary, height: 1.5),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  )
-                else
+                  _searchController.text.isNotEmpty
+                      ? AppEmptyState.search(
+                          query: _searchController.text,
+                          onClearSearch: () => _searchController.clear(),
+                        )
+                      : (_activeSection != 'All Sections')
+                          ? AppEmptyState(
+                              icon: Icons.filter_alt_off_outlined,
+                              title: 'No Scores in Section $_activeSection',
+                              message: 'No quiz attempts have been recorded for section "$_activeSection" yet. Tap below to view all sections or clear your filter.',
+                              actionLabel: 'View All Sections',
+                              actionIcon: Icons.clear_all_rounded,
+                              onAction: () {
+                                setState(() => _activeSection = 'All Sections');
+                                ref.read(teacherScoresProvider.notifier).loadScores(section: 'All Sections');
+                              },
+                            )
+                          : AppEmptyState(
+                              icon: Icons.assignment_outlined,
+                              title: 'No Quiz Scores Found',
+                              message: 'No quiz attempts have been recorded yet. Scores will appear here automatically once students complete quizzes.',
+                              actionLabel: 'Refresh Scores',
+                              actionIcon: Icons.refresh_rounded,
+                              onAction: () {
+                                ref.read(teacherScoresProvider.notifier).loadScores();
+                              },
+                            )
+                else ...[
                   ListView.separated(
                     shrinkWrap: true,
                     physics: const NeverScrollableScrollPhysics(),
-                    itemCount: scores.length,
+                    itemCount: scores.take(_displayLimit).length,
                     separatorBuilder: (_, _) => const SizedBox(height: 12),
                     itemBuilder: (context, index) {
                       final item = scores[index];
@@ -421,6 +425,49 @@ class _ScoresScreenState extends ConsumerState<ScoresScreen> {
                       );
                     },
                   ),
+                  if (scores.length > _displayLimit) ...[
+                    const SizedBox(height: 16),
+                    Center(
+                      child: AnimatedPressable(
+                        onTap: () {
+                          setState(() {
+                            _displayLimit += _pageSize;
+                          });
+                        },
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 11),
+                          decoration: BoxDecoration(
+                            color: AppTheme.surface,
+                            borderRadius: BorderRadius.circular(12),
+                            border: Border.all(color: AppTheme.border),
+                            boxShadow: [
+                              BoxShadow(
+                                color: Colors.black.withValues(alpha: 0.04),
+                                blurRadius: 8,
+                                offset: const Offset(0, 2),
+                              ),
+                            ],
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(Icons.expand_more_rounded, size: 18, color: AppTheme.primary),
+                              const SizedBox(width: 8),
+                              Text(
+                                'Load More Attempts (${scores.length - _displayLimit} remaining)',
+                                style: TextStyle(
+                                  color: AppTheme.text,
+                                  fontWeight: FontWeight.w600,
+                                  fontSize: 13,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
+                ],
               ],
             ),
           ),
@@ -946,7 +993,7 @@ class _SectionFilterBottomSheetState extends State<_SectionFilterBottomSheet> {
               shrinkWrap: true,
               padding: const EdgeInsets.fromLTRB(16, 10, 16, 20),
               itemCount: filteredSections.length,
-              separatorBuilder: (_, __) => const SizedBox(height: 6),
+              separatorBuilder: (_, _) => const SizedBox(height: 6),
               itemBuilder: (context, index) {
                 final section = filteredSections[index];
                 final isSelected = _selectedSection.toLowerCase() == section.toLowerCase();

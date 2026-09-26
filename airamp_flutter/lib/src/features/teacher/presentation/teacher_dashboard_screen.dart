@@ -12,6 +12,9 @@ import 'components/assignment_roster_dialog.dart';
 import 'components/class_overview_widget.dart';
 import 'components/teacher_assistive_touch.dart';
 import '../../../core/database/database_helper.dart';
+import '../../../core/components/app_toast.dart';
+import '../../../core/components/empty_state.dart';
+import '../../../core/components/skeleton_loader.dart';
 import '../../../core/animations/app_transitions.dart';
 import '../../../core/animations/animated_pressable.dart';
 import '../../submissions/data/submissions_repository.dart';
@@ -94,26 +97,31 @@ class _TeacherDashboardScreenState extends ConsumerState<TeacherDashboardScreen>
                 width: 480,
                 height: 400,
                 child: notifsAsync.when(
-                  loading: () => Center(child: CircularProgressIndicator(color: AppTheme.primary)),
-                  error: (err, _) => Center(
-                    child: Text('Failed to load notifications: $err', style: TextStyle(color: AppTheme.textMuted)),
+                  loading: () => const AppShimmer(
+                    child: Padding(
+                      padding: EdgeInsets.symmetric(vertical: 8),
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          SkeletonListTile(leadingSize: 36, contentPadding: EdgeInsets.symmetric(horizontal: 4, vertical: 6)),
+                          SkeletonListTile(leadingSize: 36, contentPadding: EdgeInsets.symmetric(horizontal: 4, vertical: 6)),
+                          SkeletonListTile(leadingSize: 36, contentPadding: EdgeInsets.symmetric(horizontal: 4, vertical: 6)),
+                        ],
+                      ),
+                    ),
+                  ),
+                  error: (err, _) => AppErrorState(
+                    compact: true,
+                    error: err,
+                    onRetry: () => ref.refresh(userNotificationsProvider(teacherId)),
                   ),
                   data: (notifs) {
                     if (notifs.isEmpty) {
-                      return Center(
-                        child: Column(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Icon(Icons.notifications_none_outlined, size: 48, color: AppTheme.textMuted),
-                            const SizedBox(height: 10),
-                            Text('No notifications yet', style: TextStyle(color: AppTheme.text, fontWeight: FontWeight.bold)),
-                            const SizedBox(height: 4),
-                            Text(
-                              'New student activity submissions will appear here.',
-                              style: TextStyle(color: AppTheme.textMuted, fontSize: 12),
-                            ),
-                          ],
-                        ),
+                      return const AppEmptyState(
+                        compact: true,
+                        icon: Icons.notifications_none_outlined,
+                        title: 'All Caught Up!',
+                        message: 'No new activity notifications right now. New student submissions will appear here.',
                       );
                     }
                     return ListView.separated(
@@ -521,29 +529,19 @@ class _TeacherDashboardScreenState extends ConsumerState<TeacherDashboardScreen>
         if (recentAttempts.isEmpty)
           Container(
             width: double.infinity,
-            padding: const EdgeInsets.all(24),
             decoration: BoxDecoration(
               color: AppTheme.surface,
               borderRadius: BorderRadius.circular(14),
               border: Border.all(color: AppTheme.border),
             ),
-            child: Center(
-              child: Column(
-                children: [
-                  Icon(Icons.quiz_outlined, size: 40, color: AppTheme.textMuted),
-                  const SizedBox(height: 8),
-                  Text(
-                    'No quiz submissions yet',
-                    style: TextStyle(fontWeight: FontWeight.w600, color: AppTheme.text),
-                  ),
-                  const SizedBox(height: 4),
-                  Text(
-                    'When enrolled students complete quizzes in your subjects, their live results will appear here.',
-                    textAlign: TextAlign.center,
-                    style: TextStyle(fontSize: 12, color: AppTheme.textSecondary),
-                  ),
-                ],
-              ),
+            child: AppEmptyState(
+              compact: true,
+              icon: Icons.quiz_outlined,
+              title: 'No Quiz Submissions Yet',
+              message: 'When enrolled students complete quizzes in your subjects, their live results will appear here.',
+              actionLabel: 'View Quiz Scores',
+              actionIcon: Icons.insights_rounded,
+              onAction: () => context.go('/teacher/scores'),
             ),
           )
         else
@@ -1692,9 +1690,7 @@ class _TeacherDashboardScreenState extends ConsumerState<TeacherDashboardScreen>
               Navigator.of(ctx).pop();
               await ref.read(teacherAnnouncementsProvider.notifier).deleteAnnouncement(id);
               if (mounted) {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('Announcement deleted.')),
-                );
+                AppToast.showSuccess(context, 'Announcement deleted.');
               }
             },
             child: const Text('Delete'),
@@ -1905,11 +1901,9 @@ class _TeacherDashboardScreenState extends ConsumerState<TeacherDashboardScreen>
   void _showCreateQuizDialog(BuildContext context) {
     final subjects = ref.watch(teacherSubjectsProvider);
     if (subjects.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('No subjects assigned. Please contact your admin to assign subjects first.'),
-          backgroundColor: Colors.orange,
-        ),
+      AppToast.showWarning(
+        context,
+        'No subjects assigned. Please contact your admin to assign subjects first.',
       );
       return;
     }

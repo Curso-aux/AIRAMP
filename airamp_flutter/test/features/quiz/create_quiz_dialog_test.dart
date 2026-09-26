@@ -146,4 +146,73 @@ void main() {
     expect(find.textContaining('Select All'), findsOneWidget);
     expect(find.textContaining('Publish & Assign'), findsOneWidget);
   });
+
+  testWidgets('Protects unsaved changes when user types title and attempts to close', (tester) async {
+    bool didPop = false;
+    await tester.pumpWidget(
+      ProviderScope(
+        child: MaterialApp(
+          home: Builder(
+            builder: (context) {
+              return ElevatedButton(
+                onPressed: () async {
+                  await Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      fullscreenDialog: true,
+                      builder: (_) => const CreateQuizDialog(subjectId: 1, subjectName: 'Subject 1'),
+                    ),
+                  );
+                  didPop = true;
+                },
+                child: const Text('Open'),
+              );
+            },
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    // Open
+    await tester.tap(find.text('Open'));
+    await tester.pumpAndSettle();
+
+    // Enter draft title
+    final titleField = find.byType(TextField).first;
+    await tester.enterText(titleField, 'Important Midterm Draft');
+    await tester.pumpAndSettle();
+
+    // Tap Close (X)
+    await tester.tap(find.byIcon(Icons.close));
+    await tester.pumpAndSettle();
+
+    // Verify confirmation modal appears
+    expect(find.text('Discard Quiz Draft?'), findsOneWidget);
+    expect(find.text('Keep Editing'), findsOneWidget);
+    expect(find.text('Discard'), findsOneWidget);
+
+    // Tap Keep Editing
+    await tester.tap(find.text('Keep Editing'));
+    await tester.pumpAndSettle();
+
+    // Dialog is still visible, did not pop
+    expect(find.text('Create & Assign Quiz'), findsOneWidget);
+    expect(didPop, isFalse);
+
+    // Now tap Cancel button at the bottom
+    await tester.tap(find.text('Cancel'));
+    await tester.pumpAndSettle();
+
+    // Confirmation appears again
+    expect(find.text('Discard Quiz Draft?'), findsOneWidget);
+
+    // Tap Discard
+    await tester.tap(find.text('Discard'));
+    await tester.pumpAndSettle();
+
+    // Pop succeeded
+    expect(find.text('Create & Assign Quiz'), findsNothing);
+    expect(didPop, isTrue);
+  });
 }

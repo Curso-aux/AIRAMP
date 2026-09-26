@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/components/calendar/actual_calendar_view.dart';
+import '../../../core/components/empty_state.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/theme/theme_provider.dart';
 import '../data/teacher_repository.dart';
@@ -360,31 +361,32 @@ class _TeacherScheduleScreenState extends ConsumerState<TeacherScheduleScreen> {
   }
 
   Widget _buildEmptyState() {
+    final hasActiveFilter = _selectedDay != 'All Days' || _selectedSection != 'All Handled Sections';
     return Container(
       width: double.infinity,
-      padding: const EdgeInsets.all(40),
       decoration: BoxDecoration(
         color: AppTheme.surface,
         borderRadius: BorderRadius.circular(16),
         border: Border.all(color: AppTheme.border),
       ),
-      child: Center(
-        child: Column(
-          children: [
-            Icon(Icons.calendar_today_outlined, size: 48, color: AppTheme.textMuted),
-            const SizedBox(height: 12),
-            Text(
-              'No class schedules found',
-              style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: AppTheme.text),
-            ),
-            const SizedBox(height: 6),
-            Text(
-              'No classes match your active filters. Your schedule is maintained and assigned by school administration.',
-              textAlign: TextAlign.center,
-              style: TextStyle(fontSize: 13, color: AppTheme.textSecondary),
-            ),
-          ],
-        ),
+      child: AppEmptyState(
+        icon: hasActiveFilter ? Icons.filter_alt_off_outlined : Icons.calendar_today_outlined,
+        title: hasActiveFilter ? 'No Matching Schedules Found' : 'No Class Schedules Assigned',
+        message: hasActiveFilter
+            ? 'No classes match your active day or section filters. Tap below to clear filters and show all classes.'
+            : 'Your schedule is maintained and assigned by school administration.',
+        actionLabel: hasActiveFilter ? 'Reset Filters' : 'Refresh Schedule',
+        actionIcon: hasActiveFilter ? Icons.clear_all_rounded : Icons.refresh_rounded,
+        onAction: () {
+          if (hasActiveFilter) {
+            setState(() {
+              _selectedDay = 'All Days';
+              _selectedSection = 'All Handled Sections';
+            });
+          } else {
+            ref.read(teacherSchedulesProvider.notifier).reload();
+          }
+        },
       ),
     );
   }

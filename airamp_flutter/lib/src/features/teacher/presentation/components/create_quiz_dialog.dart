@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../../../../core/animations/app_transitions.dart';
+import '../../../../core/components/app_toast.dart';
 import '../../../../core/database/database_helper.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../../core/theme/theme_provider.dart';
@@ -194,9 +196,7 @@ Answer: B''';
     final d = _optDController.text.trim();
 
     if (qText.isEmpty || a.isEmpty || b.isEmpty || c.isEmpty || d.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Please fill out question text and all 4 options')),
-      );
+      AppToast.showWarning(context, 'Please fill out question text and all 4 options');
       return;
     }
 
@@ -217,34 +217,26 @@ Answer: B''';
       _manualCorrectOption = 'A';
     });
 
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text('Added question #${_parsedQuestions.length}')),
-    );
+    AppToast.showSuccess(context, 'Added question #${_parsedQuestions.length}');
   }
 
   Future<void> _submitQuiz() async {
     final title = _titleController.text.trim();
     if (title.isEmpty) {
       setState(() => _currentStep = 0);
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Please provide a quiz title')),
-      );
+      AppToast.showWarning(context, 'Please provide a quiz title');
       return;
     }
 
     if (_parsedQuestions.isEmpty) {
       setState(() => _currentStep = 1);
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Please add at least one question')),
-      );
+      AppToast.showWarning(context, 'Please add at least one question');
       return;
     }
 
     if (_selectedStudentIds.isEmpty) {
       setState(() => _currentStep = 2);
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Please select at least one student to assign the quiz')),
-      );
+      AppToast.showWarning(context, 'Please select at least one student to assign the quiz');
       return;
     }
 
@@ -254,9 +246,7 @@ Answer: B''';
       final user = ref.read(authProvider);
       if (user == null || user.id.isEmpty) {
         setState(() => _isSubmitting = false);
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('You must be logged in as a teacher to create quizzes.')),
-        );
+        AppToast.showError(context, 'You must be logged in as a teacher to create quizzes.');
         return;
       }
       final teacherId = user.id;
@@ -289,13 +279,8 @@ Answer: B''';
         ref.invalidate(teacherDashboardProvider);
 
         if (mounted) {
+          AppToast.showSuccess(context, 'Quiz "$title" updated successfully!');
           Navigator.pop(context, true);
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              backgroundColor: AppTheme.success,
-              content: Text('Quiz "$title" updated successfully!'),
-            ),
-          );
         }
       } else {
         // Create new quiz
@@ -326,21 +311,14 @@ Answer: B''';
         ref.invalidate(studentQuizAttemptsProvider);
 
         if (mounted) {
+          AppToast.showSuccess(context, 'Quiz "$title" created and assigned to $assignedCount students!');
           Navigator.pop(context, true);
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              backgroundColor: AppTheme.success,
-              content: Text('Quiz "$title" created and assigned to $assignedCount students!'),
-            ),
-          );
         }
       }
     } catch (e) {
       if (mounted) {
         setState(() => _isSubmitting = false);
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(backgroundColor: AppTheme.error, content: Text('Error creating quiz: $e')),
-        );
+        AppToast.showError(context, 'Error creating quiz: $e');
       }
     }
   }
@@ -358,157 +336,193 @@ Answer: B''';
     super.dispose();
   }
 
+  bool get _hasUnsavedChanges {
+    final title = _titleController.text.trim();
+    final desc = _descController.text.trim();
+    final manualQ = _qTextController.text.trim();
+    if (title.isNotEmpty || desc.isNotEmpty || manualQ.isNotEmpty) {
+      return true;
+    }
+    return false;
+  }
+
+  Future<void> _handleCancel() async {
+    if (_isSubmitting) return;
+    if (!_hasUnsavedChanges) {
+      Navigator.of(context).pop();
+      return;
+    }
+    final shouldDiscard = await AppModalTransitions.confirmDiscardChanges(
+      context: context,
+      title: 'Discard Quiz Draft?',
+      message: 'You have unsaved changes to this quiz. Are you sure you want to discard them?',
+    );
+    if (shouldDiscard && mounted) {
+      Navigator.of(context).pop();
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     ref.watch(themeProvider);
 
-    return Scaffold(
-      backgroundColor: AppTheme.background,
-      appBar: AppBar(
-        backgroundColor: AppTheme.surface,
-        elevation: 0,
-        leading: IconButton(
-          icon: const Icon(Icons.close),
-          tooltip: 'Close',
-          onPressed: () => Navigator.pop(context),
+    return PopScope(
+      canPop: !_hasUnsavedChanges,
+      onPopInvokedWithResult: (didPop, result) async {
+        if (didPop) return;
+        final shouldDiscard = await AppModalTransitions.confirmDiscardChanges(
+          context: context,
+          title: 'Discard Quiz Draft?',
+          message: 'You have unsaved changes to this quiz. Are you sure you want to discard them?',
+        );
+        if (shouldDiscard && context.mounted) {
+          Navigator.of(context).pop();
+        }
+      },
+      child: Scaffold(
+        backgroundColor: AppTheme.background,
+        appBar: AppBar(
+          backgroundColor: AppTheme.surface,
+          elevation: 0,
+          leading: IconButton(
+            icon: const Icon(Icons.close),
+            tooltip: 'Close',
+            onPressed: _handleCancel,
+          ),
+          title: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'Create & Assign Quiz',
+                style: TextStyle(fontSize: 17, fontWeight: FontWeight.bold, color: AppTheme.text),
+              ),
+              Text(
+                widget.subjectName,
+                style: TextStyle(fontSize: 12, color: AppTheme.textSecondary),
+              ),
+            ],
+          ),
         ),
-        title: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              'Create & Assign Quiz',
-              style: TextStyle(fontSize: 17, fontWeight: FontWeight.bold, color: AppTheme.text),
-            ),
-            Text(
-              widget.subjectName,
-              style: TextStyle(fontSize: 12, color: AppTheme.textSecondary),
-            ),
-          ],
-        ),
-      ),
-      body: SafeArea(
-        child: Align(
-          alignment: Alignment.topCenter,
-          child: ConstrainedBox(
-            constraints: const BoxConstraints(maxWidth: 800),
-            child: SizedBox(
-              width: double.infinity,
-              child: Column(
-                children: [
-                  // Stepper Indicator
-                  Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                    child: Row(
-                      children: [
-                        _buildStepPill(0, '1. Details'),
-                        const SizedBox(width: 8),
-                        _buildStepPill(1, '2. Questions (${_parsedQuestions.length})'),
-                        const SizedBox(width: 8),
-                        _buildStepPill(2, '3. Assign (${_selectedStudentIds.length})'),
-                      ],
+        body: SafeArea(
+          child: Align(
+            alignment: Alignment.topCenter,
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 800),
+              child: SizedBox(
+                width: double.infinity,
+                child: Column(
+                  children: [
+                    // Stepper Indicator
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                      child: Row(
+                        children: [
+                          _buildStepPill(0, '1. Details'),
+                          const SizedBox(width: 8),
+                          _buildStepPill(1, '2. Questions (${_parsedQuestions.length})'),
+                          const SizedBox(width: 8),
+                          _buildStepPill(2, '3. Assign (${_selectedStudentIds.length})'),
+                        ],
+                      ),
                     ),
-                  ),
-                  Divider(height: 1, color: AppTheme.border),
+                    Divider(height: 1, color: AppTheme.border),
 
-                  // Body content per step
-                  Expanded(
-                    child: Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                      child: _buildCurrentStepView(),
+                    // Body content per step
+                    Expanded(
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                        child: _buildCurrentStepView(),
+                      ),
                     ),
-                  ),
-                ],
+                  ],
+                ),
               ),
             ),
           ),
         ),
-      ),
-      bottomNavigationBar: Container(
-        decoration: BoxDecoration(
-          color: AppTheme.surface,
-          border: Border(top: BorderSide(color: AppTheme.border)),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withValues(alpha: 0.04),
-              offset: const Offset(0, -2),
-              blurRadius: 6,
-            ),
-          ],
-        ),
-        child: SafeArea(
-          top: false,
-          child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                if (_currentStep > 0)
-                  OutlinedButton.icon(
-                    style: OutlinedButton.styleFrom(
-                      foregroundColor: AppTheme.text,
-                      side: BorderSide(color: AppTheme.border),
-                    ),
-                    onPressed: () => setState(() => _currentStep--),
-                    icon: const Icon(Icons.arrow_back, size: 16),
-                    label: const Text('Back'),
-                  )
-                else
-                  TextButton(
-                    onPressed: () => Navigator.pop(context),
-                    child: Text('Cancel', style: TextStyle(color: AppTheme.textSecondary)),
-                  ),
-                Row(
-                  children: [
-                    if (_currentStep < 2)
-                      ElevatedButton.icon(
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: AppTheme.primary,
-                          foregroundColor: Colors.black,
-                          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
-                          minimumSize: const Size(0, 44),
-                        ),
-                        onPressed: () {
-                          if (_currentStep == 0 && _titleController.text.trim().isEmpty) {
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              const SnackBar(content: Text('Please enter a quiz title')),
-                            );
-                            return;
-                          }
-                          if (_currentStep == 1 && _parsedQuestions.isEmpty) {
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              const SnackBar(content: Text('Please add at least one question')),
-                            );
-                            return;
-                          }
-                          setState(() => _currentStep++);
-                        },
-                        icon: const Icon(Icons.arrow_forward, size: 16),
-                        label: const Text('Next Step', style: TextStyle(fontWeight: FontWeight.bold)),
-                      )
-                    else
-                      ElevatedButton.icon(
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: AppTheme.primary,
-                          foregroundColor: Colors.black,
-                          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
-                          minimumSize: const Size(0, 44),
-                        ),
-                        onPressed: _isSubmitting ? null : _submitQuiz,
-                        icon: _isSubmitting
-                            ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2))
-                            : const Icon(Icons.check, size: 18),
-                        label: Text(
-                          _isSubmitting
-                              ? 'Saving...'
-                              : _quizStatus == 'draft'
-                                  ? 'Save Draft (${_selectedStudentIds.length})'
-                                  : 'Publish & Assign (${_selectedStudentIds.length})',
-                          style: const TextStyle(fontWeight: FontWeight.bold),
-                        ),
+        bottomNavigationBar: Container(
+          decoration: BoxDecoration(
+            color: AppTheme.surface,
+            border: Border(top: BorderSide(color: AppTheme.border)),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withValues(alpha: 0.04),
+                offset: const Offset(0, -2),
+                blurRadius: 6,
+              ),
+            ],
+          ),
+          child: SafeArea(
+            top: false,
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  if (_currentStep > 0)
+                    OutlinedButton.icon(
+                      style: OutlinedButton.styleFrom(
+                        foregroundColor: AppTheme.text,
+                        side: BorderSide(color: AppTheme.border),
                       ),
-                  ],
-                ),
-              ],
+                      onPressed: () => setState(() => _currentStep--),
+                      icon: const Icon(Icons.arrow_back, size: 16),
+                      label: const Text('Back'),
+                    )
+                  else
+                    TextButton(
+                      onPressed: _handleCancel,
+                      child: Text('Cancel', style: TextStyle(color: AppTheme.textSecondary)),
+                    ),
+                  Row(
+                    children: [
+                      if (_currentStep < 2)
+                        ElevatedButton.icon(
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: AppTheme.primary,
+                            foregroundColor: Colors.black,
+                            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+                            minimumSize: const Size(0, 44),
+                          ),
+                          onPressed: () {
+                            if (_currentStep == 0 && _titleController.text.trim().isEmpty) {
+                              AppToast.showWarning(context, 'Please enter a quiz title');
+                              return;
+                            }
+                            if (_currentStep == 1 && _parsedQuestions.isEmpty) {
+                              AppToast.showWarning(context, 'Please add at least one question');
+                              return;
+                            }
+                            setState(() => _currentStep++);
+                          },
+                          icon: const Icon(Icons.arrow_forward, size: 16),
+                          label: const Text('Next Step', style: TextStyle(fontWeight: FontWeight.bold)),
+                        )
+                      else
+                        ElevatedButton.icon(
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: AppTheme.primary,
+                            foregroundColor: Colors.black,
+                            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+                            minimumSize: const Size(0, 44),
+                          ),
+                          onPressed: _isSubmitting ? null : _submitQuiz,
+                          icon: _isSubmitting
+                              ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2))
+                              : const Icon(Icons.check, size: 18),
+                          label: Text(
+                            _isSubmitting
+                                ? 'Saving...'
+                                : _quizStatus == 'draft'
+                                    ? 'Save Draft (${_selectedStudentIds.length})'
+                                    : 'Publish & Assign (${_selectedStudentIds.length})',
+                            style: const TextStyle(fontWeight: FontWeight.bold),
+                          ),
+                        ),
+                    ],
+                  ),
+                ],
+              ),
             ),
           ),
         ),

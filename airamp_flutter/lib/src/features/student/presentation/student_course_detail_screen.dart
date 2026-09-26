@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import '../../../core/components/empty_state.dart';
+import '../../../core/components/skeleton_loader.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/theme/theme_provider.dart';
 import '../../../core/database/database_helper.dart';
@@ -109,7 +111,21 @@ class _StudentCourseDetailScreenState
     if (_loading) {
       return Scaffold(
         backgroundColor: AppTheme.background,
-        body: Center(child: CircularProgressIndicator(color: AppTheme.primary)),
+        body: const SafeArea(
+          child: Padding(
+            padding: EdgeInsets.all(20),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                SkeletonLoader(width: 200, height: 26),
+                SizedBox(height: 10),
+                SkeletonLoader(width: 280, height: 16),
+                SizedBox(height: 24),
+                Expanded(child: SkeletonListView(itemCount: 4)),
+              ],
+            ),
+          ),
+        ),
       );
     }
 
@@ -117,24 +133,11 @@ class _StudentCourseDetailScreenState
       return Scaffold(
         backgroundColor: AppTheme.background,
         body: SafeArea(
-          child: Center(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Text(
-                  'Subject not found',
-                  style: TextStyle(color: AppTheme.textMuted, fontSize: 16),
-                ),
-                const SizedBox(height: 16),
-                TextButton(
-                  onPressed: () => context.pop(),
-                  child: Text(
-                    'Back to Courses',
-                    style: TextStyle(color: AppTheme.primary),
-                  ),
-                ),
-              ],
-            ),
+          child: AppErrorState(
+            title: 'Subject Not Found',
+            message: 'This course is unavailable or you may not be enrolled in it.',
+            retryLabel: 'Back to Courses',
+            onRetry: () => context.pop(),
           ),
         ),
       );

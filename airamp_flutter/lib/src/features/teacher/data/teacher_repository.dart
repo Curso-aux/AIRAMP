@@ -1,5 +1,6 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/database/database_helper.dart';
+import '../../../core/utils/cache_manager.dart';
 import '../../admin/data/admin_repository.dart';
 import '../../auth/application/auth_provider.dart';
 
@@ -26,7 +27,7 @@ class TeacherDashboardNotifier extends Notifier<Map<String, dynamic>> {
     return user?.id;
   }
 
-  Future<void> _load({String? section, String? studentId}) async {
+  Future<void> _load({String? section, String? studentId, bool forceRefresh = false}) async {
     if (section != null) _section = section;
     if (studentId != null) _studentId = studentId;
 
@@ -48,10 +49,16 @@ class TeacherDashboardNotifier extends Notifier<Map<String, dynamic>> {
         ? null
         : _studentId;
 
-    final stats = await DatabaseHelper().getTeacherDashboardStats(
-      teacherId,
-      section: sFilter,
-      studentId: stFilter,
+    final cacheKey = 'teacher_dashboard_${teacherId}_${sFilter ?? "all"}_${stFilter ?? "all"}';
+    final stats = await AppCacheManager.instance.getOrFetch(
+      cacheKey,
+      () => DatabaseHelper().getTeacherDashboardStats(
+        teacherId,
+        section: sFilter,
+        studentId: stFilter,
+      ),
+      ttl: const Duration(minutes: 2),
+      forceRefresh: forceRefresh,
     );
     if (!ref.mounted) return;
     state = stats;
@@ -62,9 +69,10 @@ class TeacherDashboardNotifier extends Notifier<Map<String, dynamic>> {
       _section = null;
       _studentId = null;
     }
+    AppCacheManager.instance.invalidatePrefix('teacher_dashboard_');
     ref.invalidate(teacherHandledSectionsProvider);
     ref.invalidate(teacherHandledSectionsDetailsProvider);
-    await _load(section: section, studentId: studentId);
+    await _load(section: section, studentId: studentId, forceRefresh: true);
   }
 }
 
@@ -85,18 +93,27 @@ class TeacherStudentsNotifier extends Notifier<List<Map<String, dynamic>>> {
     return user?.id;
   }
 
-  Future<void> _load({String? section, String? query}) async {
+  Future<void> _load({String? section, String? query, bool forceRefresh = false}) async {
     final teacherId = _getTeacherId();
     if (teacherId == null) {
       if (ref.mounted) state = [];
       return;
     }
-    final results = await DatabaseHelper().getStudentsForTeacher(teacherId, section: section, query: query);
+    final cacheKey = 'teacher_students_${teacherId}_${section ?? "all"}_${query ?? ""}';
+    final results = await AppCacheManager.instance.getOrFetch(
+      cacheKey,
+      () => DatabaseHelper().getStudentsForTeacher(teacherId, section: section, query: query),
+      ttl: const Duration(minutes: 2),
+      forceRefresh: forceRefresh,
+    );
     if (!ref.mounted) return;
     state = results;
   }
 
-  Future<void> reload({String? section, String? query}) async => _load(section: section, query: query);
+  Future<void> reload({String? section, String? query}) async {
+    AppCacheManager.instance.invalidatePrefix('teacher_students_');
+    await _load(section: section, query: query, forceRefresh: true);
+  }
 }
 
 // Teacher Subjects

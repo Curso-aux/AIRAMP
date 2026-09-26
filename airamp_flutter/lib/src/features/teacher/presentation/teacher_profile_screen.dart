@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import '../../../core/components/skeleton_loader.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/theme/theme_provider.dart';
 import '../../auth/application/auth_provider.dart';
@@ -50,7 +51,23 @@ class _TeacherProfileScreenState extends ConsumerState<TeacherProfileScreen> {
     if (currentUser == null) {
       return Scaffold(
         backgroundColor: AppTheme.background,
-        body: Center(child: CircularProgressIndicator(color: AppTheme.primary)),
+        body: const SafeArea(
+          child: Padding(
+            padding: EdgeInsets.symmetric(horizontal: 20, vertical: 24),
+            child: Column(
+              children: [
+                SkeletonLoader.circle(size: 80),
+                SizedBox(height: 16),
+                SkeletonLoader(width: 160, height: 20),
+                SizedBox(height: 8),
+                SkeletonLoader(width: 100, height: 14),
+                SizedBox(height: 24),
+                SkeletonCard(),
+                SkeletonCard(),
+              ],
+            ),
+          ),
+        ),
       );
     }
 

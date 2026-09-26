@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../../../../core/animations/app_transitions.dart';
+import '../../../../core/components/app_toast.dart';
 import '../../../../core/database/database_helper.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../../core/theme/theme_provider.dart';
@@ -111,9 +113,7 @@ class _CreateAssignmentDialogState extends ConsumerState<CreateAssignmentDialog>
   Future<void> _save() async {
     final title = _titleController.text.trim();
     if (title.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Please enter an assignment title.')),
-      );
+      AppToast.showWarning(context, 'Please enter an assignment title.');
       return;
     }
 
@@ -140,21 +140,33 @@ class _CreateAssignmentDialogState extends ConsumerState<CreateAssignmentDialog>
       ref.invalidate(subjectAssignmentsProvider(widget.subjectId));
 
       if (mounted) {
+        AppToast.showSuccess(context, 'Assignment "$title" created successfully!');
         Navigator.pop(context, true);
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Assignment "$title" created successfully!'),
-            backgroundColor: AppTheme.success,
-          ),
-        );
       }
     } catch (e) {
       if (mounted) {
         setState(() => _isSaving = false);
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error creating assignment: $e'), backgroundColor: AppTheme.error),
-        );
+        AppToast.showError(context, 'Error creating assignment: $e');
       }
+    }
+  }
+
+  bool get _hasUnsavedChanges =>
+      _titleController.text.trim().isNotEmpty || _descController.text.trim().isNotEmpty;
+
+  Future<void> _handleCancel() async {
+    if (_isSaving) return;
+    if (!_hasUnsavedChanges) {
+      Navigator.pop(context);
+      return;
+    }
+    final shouldDiscard = await AppModalTransitions.confirmDiscardChanges(
+      context: context,
+      title: 'Discard Assignment Draft?',
+      message: 'You have unsaved changes to this assignment. Are you sure you want to discard them?',
+    );
+    if (shouldDiscard && mounted) {
+      Navigator.pop(context);
     }
   }
 
@@ -162,51 +174,64 @@ class _CreateAssignmentDialogState extends ConsumerState<CreateAssignmentDialog>
   Widget build(BuildContext context) {
     ref.watch(themeProvider);
 
-    return Dialog(
-      backgroundColor: AppTheme.surface,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-      child: Container(
-        width: 500,
-        constraints: BoxConstraints(maxHeight: MediaQuery.of(context).size.height * 0.85),
-        padding: const EdgeInsets.all(24),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // Title Bar
-            Row(
-              children: [
-                Container(
-                  padding: const EdgeInsets.all(8),
-                  decoration: BoxDecoration(
-                    color: AppTheme.primary.withValues(alpha: 0.15),
-                    borderRadius: BorderRadius.circular(10),
+    return PopScope(
+      canPop: !_hasUnsavedChanges,
+      onPopInvokedWithResult: (didPop, result) async {
+        if (didPop) return;
+        final shouldDiscard = await AppModalTransitions.confirmDiscardChanges(
+          context: context,
+          title: 'Discard Assignment Draft?',
+          message: 'You have unsaved changes to this assignment. Are you sure you want to discard them?',
+        );
+        if (shouldDiscard && context.mounted) {
+          Navigator.pop(context);
+        }
+      },
+      child: Dialog(
+        backgroundColor: AppTheme.surface,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        child: Container(
+          width: 500,
+          constraints: BoxConstraints(maxHeight: MediaQuery.of(context).size.height * 0.85),
+          padding: const EdgeInsets.all(24),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // Title Bar
+              Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(8),
+                    decoration: BoxDecoration(
+                      color: AppTheme.primary.withValues(alpha: 0.15),
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: Icon(Icons.assignment_add, color: AppTheme.primary, size: 24),
                   ),
-                  child: Icon(Icons.assignment_add, color: AppTheme.primary, size: 24),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        'Create Assignment',
-                        style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: AppTheme.text),
-                      ),
-                      Text(
-                        widget.subjectName,
-                        style: TextStyle(fontSize: 12, color: AppTheme.textMuted),
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                    ],
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'Create Assignment',
+                          style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: AppTheme.text),
+                        ),
+                        Text(
+                          widget.subjectName,
+                          style: TextStyle(fontSize: 12, color: AppTheme.textMuted),
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ],
+                    ),
                   ),
-                ),
-                IconButton(
-                  icon: Icon(Icons.close, color: AppTheme.textMuted),
-                  onPressed: () => Navigator.pop(context),
-                ),
-              ],
-            ),
+                  IconButton(
+                    icon: Icon(Icons.close, color: AppTheme.textMuted),
+                    onPressed: _handleCancel,
+                  ),
+                ],
+              ),
             const SizedBox(height: 18),
 
             Expanded(
@@ -360,7 +385,7 @@ class _CreateAssignmentDialogState extends ConsumerState<CreateAssignmentDialog>
               mainAxisAlignment: MainAxisAlignment.end,
               children: [
                 OutlinedButton(
-                  onPressed: () => Navigator.pop(context),
+                  onPressed: _handleCancel,
                   style: OutlinedButton.styleFrom(
                     foregroundColor: AppTheme.textMuted,
                     side: BorderSide(color: AppTheme.border),
@@ -386,8 +411,9 @@ class _CreateAssignmentDialogState extends ConsumerState<CreateAssignmentDialog>
           ],
         ),
       ),
-    );
-  }
+    ),
+  );
+}
 
   Widget _buildFormatOption({
     required String value,

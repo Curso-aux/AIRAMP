@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import '../../../core/animations/animated_pressable.dart';
+import '../../../core/components/empty_state.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/theme/theme_provider.dart';
 import '../../admin/data/admin_repository.dart';
@@ -27,6 +29,8 @@ class _TeacherStudentsScreenState extends ConsumerState<TeacherStudentsScreen> {
   final _searchController = TextEditingController();
   late String _selectedSection;
   late int _activeTab;
+  static const int _pageSize = 25;
+  int _displayLimit = _pageSize;
 
   @override
   void initState() {
@@ -69,6 +73,9 @@ class _TeacherStudentsScreenState extends ConsumerState<TeacherStudentsScreen> {
   }
 
   void _onSearchChanged() {
+    setState(() {
+      _displayLimit = _pageSize;
+    });
     ref.read(teacherStudentsProvider.notifier).reload(
           section: _selectedSection == 'All Sections' ? null : _selectedSection,
           query: _searchController.text.trim(),
@@ -78,6 +85,7 @@ class _TeacherStudentsScreenState extends ConsumerState<TeacherStudentsScreen> {
   void _onSelectSection(String section) {
     setState(() {
       _selectedSection = section;
+      _displayLimit = _pageSize;
     });
     ref.read(teacherStudentsProvider.notifier).reload(
           section: section == 'All Sections' ? null : section,
@@ -394,45 +402,85 @@ class _TeacherStudentsScreenState extends ConsumerState<TeacherStudentsScreen> {
               // Student list
               Expanded(
                 child: students.isEmpty
-                    ? Center(
-                        child: Column(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            Icon(Icons.person_off_outlined, size: 48, color: AppTheme.textMuted),
-                            const SizedBox(height: 12),
-                            Text(
-                              _selectedSection == 'All Sections'
-                                  ? 'No students found'
-                                  : 'No students in Section $_selectedSection',
-                              style: TextStyle(fontWeight: FontWeight.w600, color: AppTheme.text),
-                            ),
-                            const SizedBox(height: 4),
-                            Text(
-                              _searchController.text.isNotEmpty
-                                  ? 'No students matched "${_searchController.text}". Try clearing the search.'
-                                  : 'No enrolled students are currently assigned to this class section.',
-                              textAlign: TextAlign.center,
-                              style: TextStyle(fontSize: 12, color: AppTheme.textSecondary),
-                            ),
-                            if (_selectedSection != 'All Sections') ...[
-                              const SizedBox(height: 12),
-                              ElevatedButton(
-                                onPressed: () => _onSelectSection('All Sections'),
-                                style: ElevatedButton.styleFrom(
-                                  backgroundColor: AppTheme.primary,
-                                  foregroundColor: Colors.white,
-                                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                                ),
-                                child: const Text('View All Sections', style: TextStyle(fontSize: 12)),
-                              ),
-                            ],
-                          ],
-                        ),
-                      )
+                    ? _searchController.text.isNotEmpty
+                        ? AppEmptyState.search(
+                            query: _searchController.text,
+                            onClearSearch: () => _searchController.clear(),
+                          )
+                        : _selectedSection != 'All Sections'
+                            ? AppEmptyState(
+                                icon: Icons.group_off_outlined,
+                                title: 'No Students in Section $_selectedSection',
+                                message: 'No enrolled students are currently assigned to section "$_selectedSection". Tap below to view all sections.',
+                                actionLabel: 'View All Sections',
+                                actionIcon: Icons.groups_outlined,
+                                onAction: () => _onSelectSection('All Sections'),
+                              )
+                            : AppEmptyState(
+                                icon: Icons.people_outline,
+                                title: 'No Students Found',
+                                message: 'No students have been assigned to your classes yet. Tap below to reload your student roster.',
+                                actionLabel: 'Reload Roster',
+                                actionIcon: Icons.refresh_rounded,
+                                onAction: () {
+                                  ref.read(teacherStudentsProvider.notifier).reload(
+                                        section: null,
+                                        query: '',
+                                      );
+                                },
+                              )
                     : ListView.builder(
                         padding: const EdgeInsets.fromLTRB(20, 12, 20, 100),
-                        itemCount: students.length,
+                        itemCount: students.length > _displayLimit
+                            ? _displayLimit + 1
+                            : students.length,
                         itemBuilder: (context, index) {
+                          if (index == _displayLimit && students.length > _displayLimit) {
+                            final remaining = students.length - _displayLimit;
+                            return Padding(
+                              padding: const EdgeInsets.only(top: 8, bottom: 20),
+                              child: Center(
+                                child: AnimatedPressable(
+                                  onTap: () {
+                                    setState(() {
+                                      _displayLimit += _pageSize;
+                                    });
+                                  },
+                                  child: Container(
+                                    padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 11),
+                                    decoration: BoxDecoration(
+                                      color: AppTheme.surface,
+                                      borderRadius: BorderRadius.circular(12),
+                                      border: Border.all(color: AppTheme.border),
+                                      boxShadow: [
+                                        BoxShadow(
+                                          color: Colors.black.withValues(alpha: 0.04),
+                                          blurRadius: 8,
+                                          offset: const Offset(0, 2),
+                                        ),
+                                      ],
+                                    ),
+                                    child: Row(
+                                      mainAxisSize: MainAxisSize.min,
+                                      children: [
+                                        Icon(Icons.expand_more_rounded, size: 18, color: AppTheme.primary),
+                                        const SizedBox(width: 8),
+                                        Text(
+                                          'Load More Students ($remaining remaining)',
+                                          style: TextStyle(
+                                            color: AppTheme.text,
+                                            fontWeight: FontWeight.w600,
+                                            fontSize: 13,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            );
+                          }
+
                           final student = students[index];
                           final studentId = student['id'] as String? ?? '';
                           final name = student['full_name']?.toString() ?? 'Student';

@@ -5,6 +5,7 @@ import 'package:flutter/foundation.dart';
 import 'package:path/path.dart';
 import 'package:sqflite/sqflite.dart';
 import 'package:sqflite_common_ffi_web/sqflite_ffi_web.dart';
+import '../utils/cache_manager.dart';
 import '../utils/section_key_helper.dart';
 
 class DatabaseHelper {
@@ -1911,6 +1912,8 @@ class DatabaseHelper {
         conflictAlgorithm: ConflictAlgorithm.replace,
       );
     }
+    AppCacheManager.instance.invalidatePrefix('teacher_scores_');
+    AppCacheManager.instance.invalidatePrefix('teacher_dashboard_');
   }
 
   /// Get comprehensive attempt statistics for a quiz (teacher perspective)

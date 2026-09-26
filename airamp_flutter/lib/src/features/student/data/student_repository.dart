@@ -1,5 +1,6 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/database/database_helper.dart';
+import '../../../core/utils/cache_manager.dart';
 import '../../auth/application/auth_provider.dart';
 import '../../admin/data/admin_repository.dart';
 import '../../teacher/data/teacher_repository.dart';
@@ -389,13 +390,19 @@ class TeacherScoresNotifier extends Notifier<List<Map<String, dynamic>>> {
     return [];
   }
 
-  Future<void> loadScores({String? section, String? query}) async {
+  Future<void> loadScores({String? section, String? query, bool forceRefresh = false}) async {
     if (section != null) _selectedSection = section;
     if (query != null) _searchQuery = query;
 
-    final results = await DatabaseHelper().getAllQuizScores(
-      section: _selectedSection,
-      query: _searchQuery,
+    final cacheKey = 'teacher_scores_${_selectedSection}_$_searchQuery';
+    final results = await AppCacheManager.instance.getOrFetch(
+      cacheKey,
+      () => DatabaseHelper().getAllQuizScores(
+        section: _selectedSection,
+        query: _searchQuery,
+      ),
+      ttl: const Duration(minutes: 2),
+      forceRefresh: forceRefresh,
     );
     if (!ref.mounted) return;
     state = results;

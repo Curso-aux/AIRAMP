@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import '../../../core/components/empty_state.dart';
+import '../../../core/components/skeleton_loader.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/theme/theme_provider.dart';
 import '../../../core/database/database_helper.dart';
@@ -191,24 +193,20 @@ class _MyProgressScreenState extends ConsumerState<MyProgressScreen> {
 
                   // COC / Topic Cards
                   if (_loadingHierarchy)
-                    Padding(
-                      padding: const EdgeInsets.all(32),
-                      child: Center(child: CircularProgressIndicator(color: AppTheme.primary)),
-                    )
+                    const SkeletonListView(itemCount: 3)
                   else if (topics.isEmpty)
                     Container(
                       width: double.infinity,
-                      padding: const EdgeInsets.all(24),
                       decoration: BoxDecoration(
                         color: AppTheme.surface,
                         borderRadius: BorderRadius.circular(12),
                         border: Border.all(color: AppTheme.border),
                       ),
-                      child: Center(
-                        child: Text(
-                          'No topics added for this subject yet.',
-                          style: TextStyle(color: AppTheme.textMuted, fontSize: 13),
-                        ),
+                      child: const AppEmptyState(
+                        compact: true,
+                        icon: Icons.topic_outlined,
+                        title: 'No Topics Available',
+                        message: 'Curriculum topics for this subject will appear once your teacher publishes them.',
                       ),
                     )
                   else

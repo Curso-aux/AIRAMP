@@ -206,5 +206,67 @@ void main() {
       expect(find.text('Post Announcement'), findsOneWidget);
       expect(find.text('Publish Announcement'), findsOneWidget);
     });
+
+    testWidgets('9. PostAnnouncementDialog protects unsaved draft when user types and attempts to cancel', (tester) async {
+      tester.view.physicalSize = const Size(500, 844);
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(() {
+        tester.view.resetPhysicalSize();
+        tester.view.resetDevicePixelRatio();
+      });
+
+      await tester.pumpWidget(
+        ProviderScope(
+          child: MaterialApp(
+            home: Builder(
+              builder: (context) => Scaffold(
+                body: ElevatedButton(
+                  onPressed: () => PostAnnouncementDialog.show(context, defaultSection: 'Emerald'),
+                  child: const Text('Open Dialog'),
+                ),
+              ),
+            ),
+          ),
+        ),
+      );
+
+      await tester.tap(find.text('Open Dialog'));
+      await tester.pumpAndSettle();
+
+      // Enter title
+      final titleField = find.byType(TextFormField).first;
+      await tester.enterText(titleField, 'Bring Calculator Tomorrow');
+      await tester.pumpAndSettle();
+
+      // Tap Cancel
+      await tester.tap(find.text('Cancel'));
+      await tester.pumpAndSettle();
+
+      // Discard confirmation appears
+      expect(find.text('Discard Announcement?'), findsOneWidget);
+      expect(find.text('Keep Editing'), findsOneWidget);
+      expect(find.text('Discard'), findsOneWidget);
+
+      // Tap Keep Editing
+      await tester.tap(find.text('Keep Editing'));
+      await tester.pumpAndSettle();
+
+      // Dialog still present
+      expect(find.text('Post Announcement'), findsOneWidget);
+
+      // Tap Close (X)
+      await tester.tap(find.byIcon(Icons.close));
+      await tester.pumpAndSettle();
+
+      // Discard confirmation appears again
+      expect(find.text('Discard Announcement?'), findsOneWidget);
+
+      // Tap Discard
+      await tester.tap(find.text('Discard'));
+      await tester.pumpAndSettle();
+
+      // Dialog is closed
+      expect(find.text('Post Announcement'), findsNothing);
+    });
   });
 }

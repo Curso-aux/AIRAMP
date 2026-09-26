@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../core/animations/app_transitions.dart';
+import '../../../../core/components/app_toast.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../../core/theme/theme_provider.dart';
 import '../../data/teacher_repository.dart';
@@ -99,21 +100,50 @@ class _PostAnnouncementDialogState extends ConsumerState<PostAnnouncementDialog>
       }
 
       if (mounted) {
+        AppToast.showSuccess(
+          context,
+          _isEditing ? 'Announcement updated successfully' : 'Announcement posted successfully',
+        );
         Navigator.of(context).pop(true);
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Failed to save announcement: $e'),
-            backgroundColor: AppTheme.error,
-          ),
+        AppToast.showError(
+          context,
+          'Failed to save announcement: $e',
         );
       }
     } finally {
       if (mounted) {
         setState(() => _isSubmitting = false);
       }
+    }
+  }
+
+  bool get _hasUnsavedChanges {
+    final title = _titleController.text.trim();
+    final message = _messageController.text.trim();
+    if (_isEditing) {
+      final initialTitle = widget.existing?['title']?.toString().trim() ?? '';
+      final initialMessage = widget.existing?['message']?.toString().trim() ?? '';
+      return title != initialTitle || message != initialMessage;
+    }
+    return title.isNotEmpty || message.isNotEmpty;
+  }
+
+  Future<void> _handleCancel() async {
+    if (_isSubmitting) return;
+    if (!_hasUnsavedChanges) {
+      Navigator.of(context).pop();
+      return;
+    }
+    final shouldDiscard = await AppModalTransitions.confirmDiscardChanges(
+      context: context,
+      title: 'Discard Announcement?',
+      message: 'You have unsaved changes to this announcement draft. Are you sure you want to discard them?',
+    );
+    if (shouldDiscard && mounted) {
+      Navigator.of(context).pop();
     }
   }
 
@@ -134,74 +164,87 @@ class _PostAnnouncementDialogState extends ConsumerState<PostAnnouncementDialog>
       _selectedSection = 'All Handled Sections';
     }
 
-    return Dialog(
-      backgroundColor: Colors.transparent,
-      insetPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 24),
-      child: ConstrainedBox(
-        constraints: const BoxConstraints(maxWidth: 540, maxHeight: 680),
-        child: Container(
-          decoration: BoxDecoration(
-            color: AppTheme.surface,
-            borderRadius: BorderRadius.circular(20),
-            border: Border.all(color: AppTheme.border),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black.withValues(alpha: 0.2),
-                blurRadius: 24,
-                offset: const Offset(0, 10),
-              ),
-            ],
-          ),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              // Header
-              Padding(
-                padding: const EdgeInsets.fromLTRB(20, 18, 12, 14),
-                child: Row(
-                  children: [
-                    Container(
-                      padding: const EdgeInsets.all(9),
-                      decoration: BoxDecoration(
-                        color: AppTheme.primary.withValues(alpha: 0.12),
-                        borderRadius: BorderRadius.circular(10),
-                      ),
-                      child: Icon(
-                        _isEditing ? Icons.edit_note : Icons.campaign_rounded,
-                        color: AppTheme.primary,
-                        size: 22,
-                      ),
-                    ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            _isEditing ? 'Edit Announcement' : 'Post Announcement',
-                            style: TextStyle(
-                              fontSize: 17,
-                              fontWeight: FontWeight.bold,
-                              color: AppTheme.text,
-                            ),
-                          ),
-                          const SizedBox(height: 2),
-                          Text(
-                            'Target to specific section or all handled classes',
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: TextStyle(fontSize: 11, color: AppTheme.textSecondary),
-                          ),
-                        ],
-                      ),
-                    ),
-                    IconButton(
-                      icon: Icon(Icons.close, color: AppTheme.textMuted, size: 20),
-                      onPressed: _isSubmitting ? null : () => Navigator.of(context).pop(),
-                    ),
-                  ],
+    return PopScope(
+      canPop: !_hasUnsavedChanges,
+      onPopInvokedWithResult: (didPop, result) async {
+        if (didPop) return;
+        final shouldDiscard = await AppModalTransitions.confirmDiscardChanges(
+          context: context,
+          title: 'Discard Announcement?',
+          message: 'You have unsaved changes to this announcement draft. Are you sure you want to discard them?',
+        );
+        if (shouldDiscard && context.mounted) {
+          Navigator.of(context).pop();
+        }
+      },
+      child: Dialog(
+        backgroundColor: Colors.transparent,
+        insetPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 24),
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 540, maxHeight: 680),
+          child: Container(
+            decoration: BoxDecoration(
+              color: AppTheme.surface,
+              borderRadius: BorderRadius.circular(20),
+              border: Border.all(color: AppTheme.border),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withValues(alpha: 0.2),
+                  blurRadius: 24,
+                  offset: const Offset(0, 10),
                 ),
-              ),
+              ],
+            ),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                // Header
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(20, 18, 12, 14),
+                  child: Row(
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.all(9),
+                        decoration: BoxDecoration(
+                          color: AppTheme.primary.withValues(alpha: 0.12),
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                        child: Icon(
+                          _isEditing ? Icons.edit_note : Icons.campaign_rounded,
+                          color: AppTheme.primary,
+                          size: 22,
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              _isEditing ? 'Edit Announcement' : 'Post Announcement',
+                              style: TextStyle(
+                                fontSize: 17,
+                                fontWeight: FontWeight.bold,
+                                color: AppTheme.text,
+                              ),
+                            ),
+                            const SizedBox(height: 2),
+                            Text(
+                              'Target to specific section or all handled classes',
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: TextStyle(fontSize: 11, color: AppTheme.textSecondary),
+                            ),
+                          ],
+                        ),
+                      ),
+                      IconButton(
+                        icon: Icon(Icons.close, color: AppTheme.textMuted, size: 20),
+                        onPressed: _isSubmitting ? null : _handleCancel,
+                      ),
+                    ],
+                  ),
+                ),
 
               const Divider(height: 1),
 
@@ -338,7 +381,7 @@ class _PostAnnouncementDialogState extends ConsumerState<PostAnnouncementDialog>
                   children: [
                     Expanded(
                       child: OutlinedButton(
-                        onPressed: _isSubmitting ? null : () => Navigator.of(context).pop(),
+                        onPressed: _isSubmitting ? null : _handleCancel,
                         style: OutlinedButton.styleFrom(
                           foregroundColor: AppTheme.textSecondary,
                           side: BorderSide(color: AppTheme.border),
@@ -389,8 +432,9 @@ class _PostAnnouncementDialogState extends ConsumerState<PostAnnouncementDialog>
           ),
         ),
       ),
-    );
-  }
+    ),
+  );
+}
 
   Widget _buildFieldLabel(String label, {bool isRequired = false}) {
     return Row(

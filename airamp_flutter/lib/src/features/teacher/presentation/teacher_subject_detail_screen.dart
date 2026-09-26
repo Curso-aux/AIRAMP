@@ -1,5 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../../../core/components/app_toast.dart';
+import '../../../core/components/empty_state.dart';
+import '../../../core/components/skeleton_loader.dart';
 import '../../../core/database/database_helper.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/theme/theme_provider.dart';
@@ -77,11 +80,9 @@ class _TeacherSubjectDetailScreenState extends ConsumerState<TeacherSubjectDetai
     );
     if (result == true && mounted) {
       ref.read(subjectDetailProvider.notifier).loadHierarchy(subjectId);
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: const Text('PDF Module imported and practice quizzes generated successfully!'),
-          backgroundColor: AppTheme.success,
-        ),
+      AppToast.showSuccess(
+        context,
+        'PDF Module imported and practice quizzes generated successfully!',
       );
     }
   }
@@ -92,25 +93,32 @@ class _TeacherSubjectDetailScreenState extends ConsumerState<TeacherSubjectDetai
     if (_loading) {
       return Scaffold(
         backgroundColor: AppTheme.background,
-        body: const Center(child: CircularProgressIndicator()),
+        body: const SafeArea(
+          child: Padding(
+            padding: EdgeInsets.all(20),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                SkeletonLoader(width: 180, height: 28),
+                SizedBox(height: 12),
+                SkeletonLoader(width: 260, height: 16),
+                SizedBox(height: 24),
+                Expanded(child: SkeletonListView(itemCount: 4)),
+              ],
+            ),
+          ),
+        ),
       );
     }
     if (_subject == null) {
       return Scaffold(
         backgroundColor: AppTheme.background,
-        body: Center(
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Icon(Icons.error_outline, size: 48, color: AppTheme.textMuted),
-              const SizedBox(height: 16),
-              Text('Subject not found', style: TextStyle(fontSize: 18, color: AppTheme.text)),
-              const SizedBox(height: 8),
-              ElevatedButton(
-                onPressed: () => Navigator.pop(context),
-                child: const Text('Go Back'),
-              ),
-            ],
+        body: SafeArea(
+          child: AppErrorState(
+            title: 'Subject Not Found',
+            message: 'This subject could not be located or may have been deleted.',
+            retryLabel: 'Go Back',
+            onRetry: () => Navigator.pop(context),
           ),
         ),
       );
@@ -527,8 +535,14 @@ class _TeacherSubjectDetailScreenState extends ConsumerState<TeacherSubjectDetai
     final quizzesAsync = ref.watch(subjectQuizzesProvider(subjectId));
 
     return quizzesAsync.when(
-      loading: () => const Center(child: CircularProgressIndicator()),
-      error: (e, _) => Center(child: Text('Error: $e')),
+      loading: () => const Padding(
+        padding: EdgeInsets.all(16),
+        child: SkeletonListView(itemCount: 3),
+      ),
+      error: (e, _) => AppErrorState(
+        error: e,
+        onRetry: () => ref.refresh(subjectQuizzesProvider(subjectId)),
+      ),
       data: (quizzes) {
         if (quizzes.isEmpty) {
           return Center(
@@ -813,17 +827,11 @@ class _TeacherSubjectDetailScreenState extends ConsumerState<TeacherSubjectDetai
           ),
           TextButton(
             onPressed: () async {
-              final messenger = ScaffoldMessenger.of(context);
+              Navigator.pop(ctx);
               await DatabaseHelper().deleteAssignment(assignmentId);
-              if (ctx.mounted) {
-                Navigator.pop(ctx);
-              }
-              if (mounted) {
-                ref.invalidate(subjectAssignmentsProvider(subjectId));
-                messenger.showSnackBar(
-                  const SnackBar(content: Text('Assignment deleted')),
-                );
-              }
+              if (!context.mounted) return;
+              ref.invalidate(subjectAssignmentsProvider(subjectId));
+              AppToast.showSuccess(context, 'Assignment deleted');
             },
             child: Text('Delete', style: TextStyle(color: AppTheme.error)),
           ),
@@ -841,8 +849,14 @@ class _TeacherSubjectDetailScreenState extends ConsumerState<TeacherSubjectDetai
     final assignmentsAsync = ref.watch(subjectAssignmentsProvider(subjectId));
 
     return assignmentsAsync.when(
-      loading: () => Center(child: CircularProgressIndicator(color: AppTheme.primary)),
-      error: (err, stack) => Center(child: Text('Error loading assignments: $err', style: TextStyle(color: AppTheme.error))),
+      loading: () => const Padding(
+        padding: EdgeInsets.all(16),
+        child: SkeletonListView(itemCount: 3),
+      ),
+      error: (err, stack) => AppErrorState(
+        error: err,
+        onRetry: () => ref.refresh(subjectAssignmentsProvider(subjectId)),
+      ),
       data: (assignments) {
         if (assignments.isEmpty) {
           return Center(
