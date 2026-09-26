@@ -8,6 +8,7 @@ import '../../teacher/data/teacher_repository.dart';
 import '../../teacher/presentation/components/create_quiz_dialog.dart';
 import '../../teacher/presentation/components/quiz_roster_dialog.dart';
 import '../../curriculum/presentation/curriculum_content_sheet.dart';
+import '../../curriculum/presentation/components/pdf_module_upload_dialog.dart';
 import '../data/admin_repository.dart';
 
 class SubjectDetailScreen extends ConsumerStatefulWidget {
@@ -453,30 +454,56 @@ class _SubjectDetailScreenState extends ConsumerState<SubjectDetailScreen> {
                   const SizedBox(height: 16),
 
                   // Add Topic / Create Quiz button
+                  // Add Topic / Upload PDF / Create Quiz button
                   if (_selectedTab == 0) ...[
-                    SizedBox(
-                      width: double.infinity,
-                      child: ElevatedButton.icon(
-                        onPressed: () {
-                          _showAddTopicSheet(context, subjectId);
-                        },
-                        icon: const Icon(
-                          Icons.add,
-                          color: Colors.black,
-                          size: 20,
+                    Row(
+                      children: [
+                        Expanded(
+                          child: ElevatedButton.icon(
+                            onPressed: () {
+                              _showAddTopicSheet(context, subjectId);
+                            },
+                            icon: const Icon(
+                              Icons.add,
+                              color: Colors.black,
+                              size: 18,
+                            ),
+                            label: const Text(
+                              'Add Topic',
+                              style: TextStyle(fontWeight: FontWeight.bold),
+                            ),
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: Theme.of(context).colorScheme.primary,
+                              foregroundColor: Colors.black,
+                              padding: const EdgeInsets.symmetric(vertical: 14),
+                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                              textStyle: const TextStyle(fontSize: 14),
+                            ),
+                          ),
                         ),
-                        label: const Text(
-                          'Add Topic',
-                          style: TextStyle(fontWeight: FontWeight.bold),
+                        const SizedBox(width: 10),
+                        Expanded(
+                          child: ElevatedButton.icon(
+                            onPressed: () => _openPdfModuleUploadDialog(subjectId, subjectName),
+                            icon: const Icon(
+                              Icons.picture_as_pdf,
+                              color: Colors.white,
+                              size: 18,
+                            ),
+                            label: const Text(
+                              'Upload PDF Module',
+                              style: TextStyle(fontWeight: FontWeight.bold),
+                            ),
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: const Color(0xFFE11D48),
+                              foregroundColor: Colors.white,
+                              padding: const EdgeInsets.symmetric(vertical: 14),
+                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                              textStyle: const TextStyle(fontSize: 14),
+                            ),
+                          ),
                         ),
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: Theme.of(context).colorScheme.primary,
-                          foregroundColor: Colors.black,
-                          padding: const EdgeInsets.symmetric(vertical: 14),
-                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                          textStyle: const TextStyle(fontSize: 16),
-                        ),
-                      ),
+                      ],
                     ),
                   ] else ...[
                     SizedBox(
@@ -533,22 +560,42 @@ class _SubjectDetailScreenState extends ConsumerState<SubjectDetailScreen> {
   }
 
   Widget _buildTopicsList(List<Map<String, dynamic>> topics, int subjectId) {
+    final subjectName = _subject?['name']?.toString() ?? 'Subject';
+
     if (topics.isEmpty) {
-      return Center(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(
-              Icons.layers_outlined,
-              size: 64,
-              color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.4).withValues(alpha: 0.4),
+      return SingleChildScrollView(
+        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+        child: Center(
+          child: Container(
+            constraints: const BoxConstraints(maxWidth: 680),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                PdfModuleUploadCard(
+                  subjectId: subjectId,
+                  subjectName: subjectName,
+                  isDialog: false,
+                  onCompleted: (result) {
+                    if (result.success && mounted) {
+                      ref.read(subjectDetailProvider.notifier).loadHierarchy(subjectId);
+                    }
+                  },
+                ),
+                const SizedBox(height: 16),
+                Center(
+                  child: TextButton.icon(
+                    onPressed: () => _showAddTopicSheet(context, subjectId),
+                    icon: const Icon(Icons.add, size: 16),
+                    label: const Text('Or create a topic manually without a PDF'),
+                    style: TextButton.styleFrom(
+                      foregroundColor: AppTheme.textSecondary,
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 24),
+              ],
             ),
-            const SizedBox(height: 16),
-            Text(
-              'No topics yet. Add your first topic.',
-              style: TextStyle(color: AppTheme.textMuted, fontSize: 14),
-            ),
-          ],
+          ),
         ),
       );
     }
@@ -558,7 +605,17 @@ class _SubjectDetailScreenState extends ConsumerState<SubjectDetailScreen> {
       itemCount: topics.length,
       itemBuilder: (context, index) {
         final topic = topics[index];
-        return _TopicCard(topic: topic, topicIndex: index + 1, subjectId: subjectId);
+        return _TopicCard(
+          topic: topic,
+          topicIndex: index + 1,
+          subjectId: subjectId,
+          onUploadPdf: () => _openPdfModuleUploadDialog(
+            subjectId,
+            subjectName,
+            topicId: topic['id'] as int?,
+            topicTitle: topic['title']?.toString(),
+          ),
+        );
       },
     );
   }
@@ -810,6 +867,33 @@ class _SubjectDetailScreenState extends ConsumerState<SubjectDetailScreen> {
       builder: (ctx) => _AddTopicSheet(subjectId: subjectId),
     );
   }
+
+  Future<void> _openPdfModuleUploadDialog(
+    int subjectId,
+    String subjectName, {
+    int? topicId,
+    String? topicTitle,
+  }) async {
+    final result = await showDialog<bool>(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx) => PdfModuleUploadDialog(
+        subjectId: subjectId,
+        subjectName: subjectName,
+        initialTopicId: topicId,
+        initialTopicTitle: topicTitle,
+      ),
+    );
+    if (result == true && mounted) {
+      ref.read(subjectDetailProvider.notifier).loadHierarchy(subjectId);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: const Text('PDF Module imported and practice quizzes generated successfully!'),
+          backgroundColor: AppTheme.success,
+        ),
+      );
+    }
+  }
 }
 
 // ========================
@@ -819,8 +903,14 @@ class _TopicCard extends ConsumerStatefulWidget {
   final Map<String, dynamic> topic;
   final int topicIndex;
   final int subjectId;
+  final VoidCallback? onUploadPdf;
 
-  const _TopicCard({required this.topic, required this.topicIndex, required this.subjectId});
+  const _TopicCard({
+    required this.topic,
+    required this.topicIndex,
+    required this.subjectId,
+    this.onUploadPdf,
+  });
 
   @override
   ConsumerState<_TopicCard> createState() => _TopicCardState();
@@ -938,27 +1028,61 @@ class _TopicCardState extends ConsumerState<_TopicCard> {
                 ),
               ),
 
-            // Add LO Button
+            // Add LO & Upload PDF Buttons
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 16),
-              child: OutlinedButton.icon(
-                onPressed: () {
-                  showModalBottomSheet(
-                    context: context,
-                    isScrollControlled: true,
-                    backgroundColor: Colors.transparent,
-                    builder: (ctx) => _AddLOSheet(topicId: widget.topic['id'], subjectId: widget.subjectId),
-                  );
-                },
-                icon: Icon(Icons.add, color: Theme.of(context).colorScheme.primary, size: 18),
-                label: const Text('Add Learning Outcome'),
-                style: OutlinedButton.styleFrom(
-                  foregroundColor: Theme.of(context).colorScheme.primary,
-                  side: BorderSide(color: Theme.of(context).colorScheme.primary.withValues(alpha: 0.3)),
-                  padding: const EdgeInsets.symmetric(vertical: 12),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                  minimumSize: const Size(double.infinity, 40),
-                ),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: OutlinedButton.icon(
+                      onPressed: () {
+                        showModalBottomSheet(
+                          context: context,
+                          isScrollControlled: true,
+                          backgroundColor: Colors.transparent,
+                          builder: (ctx) => _AddLOSheet(topicId: widget.topic['id'], subjectId: widget.subjectId),
+                        );
+                      },
+                      icon: Icon(Icons.add, color: Theme.of(context).colorScheme.primary, size: 18),
+                      label: const Text('Add LO'),
+                      style: OutlinedButton.styleFrom(
+                        foregroundColor: Theme.of(context).colorScheme.primary,
+                        side: BorderSide(color: Theme.of(context).colorScheme.primary.withValues(alpha: 0.3)),
+                        padding: const EdgeInsets.symmetric(vertical: 12),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: OutlinedButton.icon(
+                      onPressed: () {
+                        if (widget.onUploadPdf != null) {
+                          widget.onUploadPdf!();
+                        } else {
+                          showDialog(
+                            context: context,
+                            barrierDismissible: false,
+                            builder: (ctx) => PdfModuleUploadDialog(
+                              subjectId: widget.subjectId,
+                              subjectName: widget.topic['title']?.toString() ?? 'Topic',
+                              initialTopicId: widget.topic['id'] as int?,
+                              initialTopicTitle: widget.topic['title']?.toString(),
+                            ),
+                          );
+                        }
+                      },
+                      icon: const Icon(Icons.picture_as_pdf, color: Color(0xFFE11D48), size: 18),
+                      label: const Text('Upload PDF'),
+                      style: OutlinedButton.styleFrom(
+                        foregroundColor: const Color(0xFFE11D48),
+                        side: BorderSide(color: const Color(0xFFE11D48).withValues(alpha: 0.3)),
+                        padding: const EdgeInsets.symmetric(vertical: 12),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                      ),
+                    ),
+                  ),
+                ],
               ),
             ),
             const SizedBox(height: 16),

@@ -37,6 +37,7 @@ import '../features/teacher/presentation/teacher_subject_detail_screen.dart';
 import '../features/chat/presentation/chat_list_screen.dart';
 import '../features/chat/presentation/chat_room_screen.dart';
 import '../features/quiz/presentation/quiz_screen.dart';
+import '../features/quiz/presentation/module_gizmo_review_screen.dart';
 import '../features/submissions/presentation/submissions_screen.dart';
 
 // Placeholder screens for unresolved domains
@@ -337,6 +338,19 @@ final routerProvider = Provider<GoRouter>((ref) {
         builder: (context, state) {
           final id = state.pathParameters['id']!;
           return QuizScreen(quizId: id);
+        },
+      ),
+      GoRoute(
+        path: '/module-review/:loId',
+        builder: (context, state) {
+          final loId = int.tryParse(state.pathParameters['loId'] ?? '0') ?? 0;
+          final title = state.uri.queryParameters['title'];
+          final subject = state.uri.queryParameters['subject'];
+          return ModuleGizmoReviewScreen(
+            loId: loId,
+            initialModuleTitle: title,
+            initialSubjectName: subject,
+          );
         },
       ),
       GoRoute(

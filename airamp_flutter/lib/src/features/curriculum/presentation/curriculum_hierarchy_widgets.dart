@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../admin/data/admin_repository.dart';
 import 'curriculum_content_sheet.dart';
+import 'components/pdf_module_upload_dialog.dart';
 
 // ─────────────────────────────────────────────────────────────
 // Expandable Topic Card
@@ -184,28 +185,58 @@ class _TopicCardState extends ConsumerState<TopicCard> {
                 ),
               ),
 
-            // Add LO Button
+            // Add LO & Upload PDF Buttons
             if (widget.canEdit)
               Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
-                child: OutlinedButton.icon(
-                  onPressed: () {
-                    showModalBottomSheet(
-                      context: context,
-                      isScrollControlled: true,
-                      backgroundColor: Colors.transparent,
-                      builder: (ctx) => AddLOSheet(topicId: widget.topic['id'], subjectId: widget.subjectId),
-                    );
-                  },
-                  icon: Icon(Icons.add, color: AppTheme.primary, size: 16),
-                  label: const Text('Add Learning Outcome', style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold)),
-                  style: OutlinedButton.styleFrom(
-                    foregroundColor: AppTheme.primary,
-                    side: BorderSide(color: AppTheme.primary.withValues(alpha: 0.4)),
-                    padding: const EdgeInsets.symmetric(vertical: 10),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                    minimumSize: const Size(double.infinity, 38),
-                  ),
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: OutlinedButton.icon(
+                        onPressed: () {
+                          showModalBottomSheet(
+                            context: context,
+                            isScrollControlled: true,
+                            backgroundColor: Colors.transparent,
+                            builder: (ctx) => AddLOSheet(topicId: widget.topic['id'], subjectId: widget.subjectId),
+                          );
+                        },
+                        icon: Icon(Icons.add, color: AppTheme.primary, size: 16),
+                        label: const Text('Add LO', style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold)),
+                        style: OutlinedButton.styleFrom(
+                          foregroundColor: AppTheme.primary,
+                          side: BorderSide(color: AppTheme.primary.withValues(alpha: 0.4)),
+                          padding: const EdgeInsets.symmetric(vertical: 10),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: OutlinedButton.icon(
+                        onPressed: () {
+                          showDialog(
+                            context: context,
+                            barrierDismissible: false,
+                            builder: (ctx) => PdfModuleUploadDialog(
+                              subjectId: widget.subjectId,
+                              subjectName: widget.topic['title']?.toString() ?? 'Topic',
+                              initialTopicId: widget.topic['id'] as int?,
+                              initialTopicTitle: widget.topic['title']?.toString(),
+                            ),
+                          );
+                        },
+                        icon: const Icon(Icons.picture_as_pdf, color: Color(0xFFE11D48), size: 16),
+                        label: const Text('Upload PDF', style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold)),
+                        style: OutlinedButton.styleFrom(
+                          foregroundColor: const Color(0xFFE11D48),
+                          side: BorderSide(color: const Color(0xFFE11D48).withValues(alpha: 0.4)),
+                          padding: const EdgeInsets.symmetric(vertical: 10),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                        ),
+                      ),
+                    ),
+                  ],
                 ),
               ),
             const SizedBox(height: 12),

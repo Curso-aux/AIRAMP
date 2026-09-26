@@ -85,6 +85,7 @@ class SubjectsNotifier extends Notifier<List<Map<String, dynamic>>> {
   Future<int> addSubject(Map<String, dynamic> subject) async {
     final db = await DatabaseHelper().database;
     final id = await db.insert('subjects', subject);
+    await DatabaseHelper().autoEnrollAllStudentsInSubject(id);
     await _loadSubjects();
     return id;
   }

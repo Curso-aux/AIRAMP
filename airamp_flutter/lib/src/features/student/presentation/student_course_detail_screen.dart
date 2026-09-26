@@ -15,10 +15,12 @@ class StudentCourseDetailScreen extends ConsumerStatefulWidget {
   const StudentCourseDetailScreen({super.key, required this.courseId});
 
   @override
-  ConsumerState<StudentCourseDetailScreen> createState() => _StudentCourseDetailScreenState();
+  ConsumerState<StudentCourseDetailScreen> createState() =>
+      _StudentCourseDetailScreenState();
 }
 
-class _StudentCourseDetailScreenState extends ConsumerState<StudentCourseDetailScreen> {
+class _StudentCourseDetailScreenState
+    extends ConsumerState<StudentCourseDetailScreen> {
   Map<String, dynamic>? _subject;
   bool _loading = true;
   List<Map<String, dynamic>> _completedLos = [];
@@ -35,7 +37,9 @@ class _StudentCourseDetailScreenState extends ConsumerState<StudentCourseDetailS
     final id = int.tryParse(widget.courseId);
     if (id == null) return;
 
-    final subject = await ref.read(subjectsProvider.notifier).getSubjectById(id);
+    final subject = await ref
+        .read(subjectsProvider.notifier)
+        .getSubjectById(id);
     await ref.read(subjectDetailProvider.notifier).loadHierarchy(id);
 
     final user = ref.read(authProvider);
@@ -57,8 +61,14 @@ class _StudentCourseDetailScreenState extends ConsumerState<StudentCourseDetailS
       whereArgs: [studentId, id],
     );
 
-    final assignedQuizzes = await DatabaseHelper().getAssignedQuizzesForStudent(studentId, subjectId: id);
-    final assignments = await DatabaseHelper().getAssignmentsForStudent(studentId, subjectId: id);
+    final assignedQuizzes = await DatabaseHelper().getAssignedQuizzesForStudent(
+      studentId,
+      subjectId: id,
+    );
+    final assignments = await DatabaseHelper().getAssignmentsForStudent(
+      studentId,
+      subjectId: id,
+    );
 
     if (mounted) {
       setState(() {
@@ -111,11 +121,17 @@ class _StudentCourseDetailScreenState extends ConsumerState<StudentCourseDetailS
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                Text('Subject not found', style: TextStyle(color: AppTheme.textMuted, fontSize: 16)),
+                Text(
+                  'Subject not found',
+                  style: TextStyle(color: AppTheme.textMuted, fontSize: 16),
+                ),
                 const SizedBox(height: 16),
                 TextButton(
                   onPressed: () => context.pop(),
-                  child: Text('Back to Courses', style: TextStyle(color: AppTheme.primary)),
+                  child: Text(
+                    'Back to Courses',
+                    style: TextStyle(color: AppTheme.primary),
+                  ),
                 ),
               ],
             ),
@@ -142,7 +158,9 @@ class _StudentCourseDetailScreenState extends ConsumerState<StudentCourseDetailS
       }
     }
 
-    final progressPct = totalLos > 0 ? ((completedCount / totalLos) * 100).round() : 0;
+    final progressPct = totalLos > 0
+        ? ((completedCount / totalLos) * 100).round()
+        : 0;
 
     return Scaffold(
       backgroundColor: AppTheme.background,
@@ -162,7 +180,11 @@ class _StudentCourseDetailScreenState extends ConsumerState<StudentCourseDetailS
                     const SizedBox(width: 6),
                     Text(
                       'Back to My Courses',
-                      style: TextStyle(color: AppTheme.primary, fontSize: 14, fontWeight: FontWeight.w600),
+                      style: TextStyle(
+                        color: AppTheme.primary,
+                        fontSize: 14,
+                        fontWeight: FontWeight.w600,
+                      ),
                     ),
                   ],
                 ),
@@ -187,19 +209,29 @@ class _StudentCourseDetailScreenState extends ConsumerState<StudentCourseDetailS
                     Row(
                       children: [
                         Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 8,
+                            vertical: 4,
+                          ),
                           decoration: BoxDecoration(
                             color: Colors.black.withValues(alpha: 0.2),
                             borderRadius: BorderRadius.circular(6),
                           ),
                           child: Text(
                             subjectCode,
-                            style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 12),
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontWeight: FontWeight.bold,
+                              fontSize: 12,
+                            ),
                           ),
                         ),
                         const SizedBox(width: 8),
                         Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 8,
+                            vertical: 4,
+                          ),
                           decoration: BoxDecoration(
                             color: Colors.black.withValues(alpha: 0.2),
                             borderRadius: BorderRadius.circular(6),
@@ -208,14 +240,19 @@ class _StudentCourseDetailScreenState extends ConsumerState<StudentCourseDetailS
                             mainAxisSize: MainAxisSize.min,
                             children: [
                               Icon(
-                                isSequential ? Icons.lock_outline : Icons.lock_open_outlined,
+                                isSequential
+                                    ? Icons.lock_outline
+                                    : Icons.lock_open_outlined,
                                 size: 12,
                                 color: Colors.white,
                               ),
                               const SizedBox(width: 4),
                               Text(
                                 unlockType,
-                                style: const TextStyle(color: Colors.white, fontSize: 11),
+                                style: const TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 11,
+                                ),
                               ),
                             ],
                           ),
@@ -234,13 +271,22 @@ class _StudentCourseDetailScreenState extends ConsumerState<StudentCourseDetailS
                     const SizedBox(height: 8),
                     Text(
                       _subject!['description']?.toString() ?? '',
-                      style: TextStyle(fontSize: 13, color: Colors.black.withValues(alpha: 0.75), height: 1.4),
+                      style: TextStyle(
+                        fontSize: 13,
+                        color: Colors.black.withValues(alpha: 0.75),
+                        height: 1.4,
+                      ),
                     ),
-                    if (_subject!['teacher_name'] != null && _subject!['teacher_name'].toString().isNotEmpty) ...[
+                    if (_subject!['teacher_name'] != null &&
+                        _subject!['teacher_name'].toString().isNotEmpty) ...[
                       const SizedBox(height: 8),
                       Row(
                         children: [
-                          Icon(Icons.person_outline, size: 14, color: Colors.black.withValues(alpha: 0.8)),
+                          Icon(
+                            Icons.person_outline,
+                            size: 14,
+                            color: Colors.black.withValues(alpha: 0.8),
+                          ),
                           const SizedBox(width: 4),
                           Text(
                             'Instructor: ${_subject!['teacher_name']}',
@@ -271,11 +317,19 @@ class _StudentCourseDetailScreenState extends ConsumerState<StudentCourseDetailS
                       children: [
                         Text(
                           '$completedCount of $totalLos Learning Outcomes Completed',
-                          style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: Colors.black87),
+                          style: const TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.w600,
+                            color: Colors.black87,
+                          ),
                         ),
                         Text(
                           '$progressPct%',
-                          style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.black),
+                          style: const TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.bold,
+                            color: Colors.black,
+                          ),
                         ),
                       ],
                     ),
@@ -291,24 +345,41 @@ class _StudentCourseDetailScreenState extends ConsumerState<StudentCourseDetailS
                   children: [
                     Row(
                       children: [
-                        Icon(Icons.quiz_outlined, color: AppTheme.primary, size: 22),
+                        Icon(
+                          Icons.quiz_outlined,
+                          color: AppTheme.primary,
+                          size: 22,
+                        ),
                         const SizedBox(width: 8),
                         Text(
                           'Assigned Quizzes',
-                          style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: AppTheme.text),
+                          style: TextStyle(
+                            fontSize: 20,
+                            fontWeight: FontWeight.bold,
+                            color: AppTheme.text,
+                          ),
                         ),
                       ],
                     ),
                     Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 8,
+                        vertical: 3,
+                      ),
                       decoration: BoxDecoration(
                         color: AppTheme.primary.withValues(alpha: 0.15),
                         borderRadius: BorderRadius.circular(12),
-                        border: Border.all(color: AppTheme.primary.withValues(alpha: 0.3)),
+                        border: Border.all(
+                          color: AppTheme.primary.withValues(alpha: 0.3),
+                        ),
                       ),
                       child: Text(
                         '${_assignedQuizzes.length} Quizzes',
-                        style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: AppTheme.primary),
+                        style: TextStyle(
+                          fontSize: 11,
+                          fontWeight: FontWeight.bold,
+                          color: AppTheme.primary,
+                        ),
                       ),
                     ),
                   ],
@@ -324,8 +395,10 @@ class _StudentCourseDetailScreenState extends ConsumerState<StudentCourseDetailS
                       shrinkWrap: true,
                       physics: const AlwaysScrollableScrollPhysics(),
                       itemCount: _assignedQuizzes.length,
-                      separatorBuilder: (context, index) => const SizedBox(height: 12),
-                      itemBuilder: (context, index) => _buildCourseQuizCard(_assignedQuizzes[index]),
+                      separatorBuilder: (context, index) =>
+                          const SizedBox(height: 12),
+                      itemBuilder: (context, index) =>
+                          _buildCourseQuizCard(_assignedQuizzes[index]),
                     ),
                   )
                 else
@@ -340,24 +413,41 @@ class _StudentCourseDetailScreenState extends ConsumerState<StudentCourseDetailS
                   children: [
                     Row(
                       children: [
-                        Icon(Icons.assignment_outlined, color: AppTheme.primary, size: 22),
+                        Icon(
+                          Icons.assignment_outlined,
+                          color: AppTheme.primary,
+                          size: 22,
+                        ),
                         const SizedBox(width: 8),
                         Text(
                           'Assignments & Projects',
-                          style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: AppTheme.text),
+                          style: TextStyle(
+                            fontSize: 20,
+                            fontWeight: FontWeight.bold,
+                            color: AppTheme.text,
+                          ),
                         ),
                       ],
                     ),
                     Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 8,
+                        vertical: 3,
+                      ),
                       decoration: BoxDecoration(
                         color: AppTheme.primary.withValues(alpha: 0.15),
                         borderRadius: BorderRadius.circular(12),
-                        border: Border.all(color: AppTheme.primary.withValues(alpha: 0.3)),
+                        border: Border.all(
+                          color: AppTheme.primary.withValues(alpha: 0.3),
+                        ),
                       ),
                       child: Text(
                         '${_assignments.length} Tasks',
-                        style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: AppTheme.primary),
+                        style: TextStyle(
+                          fontSize: 11,
+                          fontWeight: FontWeight.bold,
+                          color: AppTheme.primary,
+                        ),
                       ),
                     ),
                   ],
@@ -367,14 +457,25 @@ class _StudentCourseDetailScreenState extends ConsumerState<StudentCourseDetailS
                 const SizedBox(height: 24),
               ],
 
+              // Gizmo Flashcard & Practice Studio Banner
+              if (topics.isNotEmpty) _buildGizmoPracticeHeroBanner(topics),
+
               // Curriculum Header
               Row(
                 children: [
-                  Icon(Icons.layers_outlined, color: AppTheme.primary, size: 22),
+                  Icon(
+                    Icons.layers_outlined,
+                    color: AppTheme.primary,
+                    size: 22,
+                  ),
                   const SizedBox(width: 8),
                   Text(
                     'Course Curriculum',
-                    style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: AppTheme.text),
+                    style: TextStyle(
+                      fontSize: 20,
+                      fontWeight: FontWeight.bold,
+                      color: AppTheme.text,
+                    ),
                   ),
                 ],
               ),
@@ -392,9 +493,16 @@ class _StudentCourseDetailScreenState extends ConsumerState<StudentCourseDetailS
                   child: Center(
                     child: Column(
                       children: [
-                        Icon(Icons.menu_book_outlined, size: 48, color: AppTheme.textMuted),
+                        Icon(
+                          Icons.menu_book_outlined,
+                          size: 48,
+                          color: AppTheme.textMuted,
+                        ),
                         const SizedBox(height: 12),
-                        Text('No topics published yet by the instructor.', style: TextStyle(color: AppTheme.textMuted)),
+                        Text(
+                          'No topics published yet by the instructor.',
+                          style: TextStyle(color: AppTheme.textMuted),
+                        ),
                       ],
                     ),
                   ),
@@ -408,13 +516,241 @@ class _StudentCourseDetailScreenState extends ConsumerState<StudentCourseDetailS
     );
   }
 
-  List<Widget> _buildTopicsList(List<Map<String, dynamic>> topics, bool isSequential) {
+  Widget _buildGizmoPracticeHeroBanner(List<Map<String, dynamic>> topics) {
+    int? targetLoId;
+    String? targetLoTitle;
+    int totalModulesCount = 0;
+
+    for (final topic in topics) {
+      final los = (topic['learning_outcomes'] as List?)?.cast<Map<String, dynamic>>() ?? [];
+      totalModulesCount += los.length;
+      if (targetLoId == null && los.isNotEmpty) {
+        targetLoId = los.first['id'] as int?;
+        targetLoTitle = los.first['title']?.toString();
+      }
+    }
+
+    if (totalModulesCount == 0) return const SizedBox.shrink();
+
+    final subjectName = _subject?['name']?.toString() ?? 'Course';
+
+    return Container(
+      margin: const EdgeInsets.only(bottom: 24),
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          colors: [
+            const Color(0xFF6366F1).withValues(alpha: 0.22),
+            const Color(0xFF06B6D4).withValues(alpha: 0.15),
+            AppTheme.surface,
+          ],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(
+          color: const Color(0xFF818CF8).withValues(alpha: 0.4),
+          width: 1.5,
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: const Color(0xFF6366F1).withValues(alpha: 0.12),
+            blurRadius: 18,
+            offset: const Offset(0, 6),
+          ),
+        ],
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(20),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Container(
+                  width: 50,
+                  height: 50,
+                  decoration: BoxDecoration(
+                    gradient: const LinearGradient(
+                      colors: [Color(0xFF8B5CF6), Color(0xFF6366F1)],
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                    ),
+                    borderRadius: BorderRadius.circular(14),
+                    boxShadow: [
+                      BoxShadow(
+                        color: const Color(0xFF8B5CF6).withValues(alpha: 0.4),
+                        blurRadius: 10,
+                        offset: const Offset(0, 4),
+                      ),
+                    ],
+                  ),
+                  child: const Center(
+                    child: Icon(
+                      Icons.psychology,
+                      color: Colors.white,
+                      size: 28,
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 14),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFF8B5CF6).withValues(alpha: 0.25),
+                              borderRadius: BorderRadius.circular(6),
+                            ),
+                            child: const Text(
+                              'GIZMO REVIEW STUDIO',
+                              style: TextStyle(
+                                fontSize: 10,
+                                fontWeight: FontWeight.bold,
+                                color: Color(0xFFA78BFA),
+                                letterSpacing: 0.5,
+                              ),
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                            decoration: BoxDecoration(
+                              color: AppTheme.success.withValues(alpha: 0.15),
+                              borderRadius: BorderRadius.circular(4),
+                            ),
+                            child: Row(
+                              children: [
+                                Icon(Icons.auto_awesome, size: 11, color: AppTheme.success),
+                                const SizedBox(width: 3),
+                                Text(
+                                  'AI Scanned',
+                                  style: TextStyle(
+                                    fontSize: 10,
+                                    fontWeight: FontWeight.bold,
+                                    color: AppTheme.success,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 6),
+                      Text(
+                        'Practice Quiz & Flashcards',
+                        style: TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.bold,
+                          color: AppTheme.text,
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        'Review this course with interactive multiple-choice questions & spaced-repetition flashcards automatically generated from your module lessons!',
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: AppTheme.textSecondary,
+                          height: 1.4,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 14),
+            Wrap(
+              spacing: 8,
+              runSpacing: 6,
+              children: [
+                _buildStudioFeatureChip(Icons.quiz_outlined, 'Multiple Choice (A, B, C, D)'),
+                _buildStudioFeatureChip(Icons.check_circle_outline, 'Instant Answer Feedback'),
+                _buildStudioFeatureChip(Icons.style_outlined, '3D Active Recall'),
+              ],
+            ),
+            const SizedBox(height: 16),
+            SizedBox(
+              width: double.infinity,
+              height: 44,
+              child: ElevatedButton.icon(
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xFF6366F1),
+                  foregroundColor: Colors.white,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  elevation: 2,
+                ),
+                icon: const Icon(Icons.play_circle_fill, size: 18),
+                label: Text(
+                  targetLoTitle != null
+                      ? 'Practice First Module: $targetLoTitle'
+                      : 'Start Practice Review',
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                    fontWeight: FontWeight.bold,
+                    fontSize: 13,
+                  ),
+                ),
+                onPressed: () {
+                  if (targetLoId != null) {
+                    final title = Uri.encodeComponent(targetLoTitle ?? 'Module');
+                    final subject = Uri.encodeComponent(subjectName);
+                    context.push('/module-review/$targetLoId?title=$title&subject=$subject');
+                  }
+                },
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildStudioFeatureChip(IconData icon, String label) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+      decoration: BoxDecoration(
+        color: AppTheme.surfaceElevated.withValues(alpha: 0.7),
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: AppTheme.border.withValues(alpha: 0.5)),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, size: 13, color: AppTheme.primary),
+          const SizedBox(width: 5),
+          Text(
+            label,
+            style: TextStyle(
+              fontSize: 11,
+              fontWeight: FontWeight.w600,
+              color: AppTheme.textSecondary,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  List<Widget> _buildTopicsList(
+    List<Map<String, dynamic>> topics,
+    bool isSequential,
+  ) {
     final List<Widget> widgets = [];
     bool previousLoCompleted = true; // For sequential unlocking
 
     for (int tIdx = 0; tIdx < topics.length; tIdx++) {
       final topic = topics[tIdx];
-      final los = (topic['learning_outcomes'] as List?)?.cast<Map<String, dynamic>>() ?? [];
+      final los =
+          (topic['learning_outcomes'] as List?)?.cast<Map<String, dynamic>>() ??
+          [];
 
       widgets.add(
         Padding(
@@ -459,18 +795,87 @@ class _StudentCourseDetailScreenState extends ConsumerState<StudentCourseDetailS
                           children: [
                             Text(
                               topic['title']?.toString() ?? 'Topic',
-                              style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: AppTheme.text),
+                              style: TextStyle(
+                                fontSize: 16,
+                                fontWeight: FontWeight.bold,
+                                color: AppTheme.text,
+                              ),
                             ),
-                            if (topic['description'] != null && topic['description'].toString().isNotEmpty) ...[
+                            if (topic['description'] != null &&
+                                topic['description'].toString().isNotEmpty) ...[
                               const SizedBox(height: 4),
                               Text(
                                 topic['description'].toString(),
-                                style: TextStyle(fontSize: 12, color: AppTheme.textSecondary),
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  color: AppTheme.textSecondary,
+                                ),
                               ),
                             ],
                           ],
                         ),
                       ),
+                      if (los.isNotEmpty) ...[
+                        const SizedBox(width: 8),
+                        Tooltip(
+                          message: 'Review Topic with Flashcards',
+                          child: Material(
+                            color: Colors.transparent,
+                            child: InkWell(
+                              onTap: () {
+                                final firstLoId = los.first['id'] as int;
+                                final title = Uri.encodeComponent(
+                                  topic['title']?.toString() ?? 'Topic',
+                                );
+                                final subjectName = Uri.encodeComponent(
+                                  _subject?['name']?.toString() ?? 'Subject',
+                                );
+                                context.push(
+                                  '/module-review/$firstLoId?title=$title&subject=$subjectName',
+                                );
+                              },
+                              borderRadius: BorderRadius.circular(10),
+                              child: Container(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 12,
+                                  vertical: 6,
+                                ),
+                                decoration: BoxDecoration(
+                                  color: AppTheme.primary.withValues(
+                                    alpha: 0.16,
+                                  ),
+                                  borderRadius: BorderRadius.circular(10),
+                                  border: Border.all(
+                                    color: AppTheme.primary.withValues(
+                                      alpha: 0.5,
+                                    ),
+                                    width: 1.2,
+                                  ),
+                                ),
+                                child: Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    Icon(
+                                      Icons.psychology,
+                                      size: 16,
+                                      color: AppTheme.primary,
+                                    ),
+                                    const SizedBox(width: 6),
+                                    Text(
+                                      'Topic Flashcards',
+                                      style: TextStyle(
+                                        fontSize: 11,
+                                        fontWeight: FontWeight.bold,
+                                        color: AppTheme.primary,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ),
+                          ),
+                        ),
+                      ],
                     ],
                   ),
                 ),
@@ -480,7 +885,10 @@ class _StudentCourseDetailScreenState extends ConsumerState<StudentCourseDetailS
                 if (los.isEmpty)
                   Padding(
                     padding: const EdgeInsets.all(16),
-                    child: Text('No learning outcomes in this topic yet.', style: TextStyle(color: AppTheme.textMuted, fontSize: 12)),
+                    child: Text(
+                      'No learning outcomes in this topic yet.',
+                      style: TextStyle(color: AppTheme.textMuted, fontSize: 12),
+                    ),
                   )
                 else
                   ...los.asMap().entries.map((entry) {
@@ -537,7 +945,9 @@ class _StudentCourseDetailScreenState extends ConsumerState<StudentCourseDetailS
           : () {
               ScaffoldMessenger.of(context).showSnackBar(
                 const SnackBar(
-                  content: Text('Complete previous learning outcomes and assessments to unlock this lesson.'),
+                  content: Text(
+                    'Complete previous learning outcomes and assessments to unlock this lesson.',
+                  ),
                   duration: Duration(seconds: 2),
                 ),
               );
@@ -545,95 +955,228 @@ class _StudentCourseDetailScreenState extends ConsumerState<StudentCourseDetailS
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
         decoration: BoxDecoration(
-          border: Border(bottom: BorderSide(color: AppTheme.border.withValues(alpha: 0.5))),
-          color: isUnlocked ? Colors.transparent : AppTheme.background.withValues(alpha: 0.5),
+          border: Border(
+            bottom: BorderSide(color: AppTheme.border.withValues(alpha: 0.5)),
+          ),
+          color: isUnlocked
+              ? Colors.transparent
+              : AppTheme.background.withValues(alpha: 0.5),
         ),
-        child: Row(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Status indicator icon
-            Container(
-              width: 32,
-              height: 32,
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                color: isCompleted
-                    ? AppTheme.success.withValues(alpha: 0.15)
-                    : isUnlocked
+            Row(
+              children: [
+                // Status indicator icon
+                Container(
+                  width: 32,
+                  height: 32,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    color: isCompleted
+                        ? AppTheme.success.withValues(alpha: 0.15)
+                        : isUnlocked
                         ? AppTheme.primary.withValues(alpha: 0.1)
                         : AppTheme.border.withValues(alpha: 0.3),
-              ),
-              child: Icon(
-                isCompleted
-                    ? Icons.check
-                    : isUnlocked
+                  ),
+                  child: Icon(
+                    isCompleted
+                        ? Icons.check
+                        : isUnlocked
                         ? Icons.play_arrow
                         : Icons.lock_outline,
-                size: 16,
-                color: isCompleted
-                    ? AppTheme.success
-                    : isUnlocked
+                    size: 16,
+                    color: isCompleted
+                        ? AppTheme.success
+                        : isUnlocked
                         ? AppTheme.primary
                         : AppTheme.textMuted,
-              ),
-            ),
-            const SizedBox(width: 12),
-
-            // Title & subtext
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    'LO $loIndex: ${lo['title']}',
-                    style: TextStyle(
-                      fontSize: 14,
-                      fontWeight: FontWeight.w600,
-                      color: isUnlocked ? AppTheme.text : AppTheme.textMuted,
-                    ),
                   ),
-                  const SizedBox(height: 4),
-                  Row(
+                ),
+                const SizedBox(width: 12),
+
+                // Title & subtext
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        '$contentCount lessons · $questionCount questions',
-                        style: TextStyle(fontSize: 11, color: AppTheme.textSecondary),
+                        'LO $loIndex: ${lo['title']}',
+                        style: TextStyle(
+                          fontSize: 14,
+                          fontWeight: FontWeight.w600,
+                          color: isUnlocked ? AppTheme.text : AppTheme.textMuted,
+                        ),
                       ),
-                      if (passingScore > 0) ...[
-                        const SizedBox(width: 6),
-                        Text('· Pass: $passingScore%', style: TextStyle(fontSize: 11, color: AppTheme.primary)),
-                      ],
+                      const SizedBox(height: 4),
+                      Row(
+                        children: [
+                          Text(
+                            '$contentCount lessons · $questionCount questions',
+                            style: TextStyle(
+                              fontSize: 11,
+                              color: AppTheme.textSecondary,
+                            ),
+                          ),
+                          if (passingScore > 0) ...[
+                            const SizedBox(width: 6),
+                            Text(
+                              '· Pass: $passingScore%',
+                              style: TextStyle(
+                                fontSize: 11,
+                                color: AppTheme.primary,
+                              ),
+                            ),
+                          ],
+                        ],
+                      ),
                     ],
                   ),
-                ],
-              ),
+                ),
+
+                // Badge / Action
+                if (isCompleted)
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                    decoration: BoxDecoration(
+                      color: AppTheme.success.withValues(alpha: 0.15),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: Text(
+                      score != null ? 'Passed ($score)' : 'Passed',
+                      style: TextStyle(
+                        fontSize: 11,
+                        fontWeight: FontWeight.bold,
+                        color: AppTheme.success,
+                      ),
+                    ),
+                  )
+                else if (isUnlocked)
+                  Icon(Icons.chevron_right, color: AppTheme.textMuted, size: 20)
+                else
+                  Icon(Icons.lock, color: AppTheme.textMuted, size: 16),
+              ],
             ),
 
-            // Badge / Action
-            if (isCompleted)
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                decoration: BoxDecoration(
-                  color: AppTheme.success.withValues(alpha: 0.15),
-                  borderRadius: BorderRadius.circular(8),
+            // Dedicated, Prominent Flashcard & Quiz Action Strip
+            if (isUnlocked) ...[
+              const SizedBox(height: 10),
+              Material(
+                color: Colors.transparent,
+                child: InkWell(
+                  onTap: () {
+                    final loId = lo['id'] as int? ?? 0;
+                    final title = Uri.encodeComponent(
+                      lo['title']?.toString() ?? 'Module',
+                    );
+                    final subjectName = Uri.encodeComponent(
+                      _subject?['name']?.toString() ?? 'Subject',
+                    );
+                    context.push(
+                      '/module-review/$loId?title=$title&subject=$subjectName',
+                    );
+                  },
+                  borderRadius: BorderRadius.circular(10),
+                  child: Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(
+                        colors: [
+                          AppTheme.primary.withValues(alpha: 0.16),
+                          const Color(0xFF6366F1).withValues(alpha: 0.12),
+                        ],
+                      ),
+                      borderRadius: BorderRadius.circular(10),
+                      border: Border.all(
+                        color: AppTheme.primary.withValues(alpha: 0.4),
+                        width: 1.2,
+                      ),
+                    ),
+                    child: Row(
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.all(4),
+                          decoration: BoxDecoration(
+                            color: AppTheme.primary,
+                            borderRadius: BorderRadius.circular(6),
+                          ),
+                          child: const Icon(
+                            Icons.psychology,
+                            size: 16,
+                            color: Colors.black,
+                          ),
+                        ),
+                        const SizedBox(width: 10),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                '🧠 Practice Quiz & Flashcards',
+                                style: TextStyle(
+                                  fontWeight: FontWeight.bold,
+                                  fontSize: 12,
+                                  color: AppTheme.primary,
+                                ),
+                              ),
+                              Text(
+                                'Multiple-choice questions & active recall cards',
+                                style: TextStyle(
+                                  fontSize: 10,
+                                  color: AppTheme.textSecondary,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                          decoration: BoxDecoration(
+                            color: AppTheme.primary.withValues(alpha: 0.2),
+                            borderRadius: BorderRadius.circular(6),
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Text(
+                                'Practice',
+                                style: TextStyle(
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.bold,
+                                  color: AppTheme.primary,
+                                ),
+                              ),
+                              const SizedBox(width: 4),
+                              Icon(
+                                Icons.arrow_forward_ios,
+                                size: 10,
+                                color: AppTheme.primary,
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
                 ),
-                child: Text(
-                  score != null ? 'Passed ($score)' : 'Passed',
-                  style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: AppTheme.success),
-                ),
-              )
-            else if (isUnlocked)
-              Icon(Icons.chevron_right, color: AppTheme.textMuted, size: 20)
-            else
-              Icon(Icons.lock, color: AppTheme.textMuted, size: 16),
+              ),
+            ],
           ],
         ),
       ),
     );
   }
 
-  void _showLoDetailsSheet(Map<String, dynamic> lo, bool isCompleted, int? score) {
-    final contents = (lo['contents'] as List?)?.cast<Map<String, dynamic>>() ?? [];
-    final questions = (lo['questions'] as List?)?.cast<Map<String, dynamic>>() ?? [];
+  void _showLoDetailsSheet(
+    Map<String, dynamic> lo,
+    bool isCompleted,
+    int? score,
+  ) {
+    final contents =
+        (lo['contents'] as List?)?.cast<Map<String, dynamic>>() ?? [];
+    final questions =
+        (lo['questions'] as List?)?.cast<Map<String, dynamic>>() ?? [];
     final loId = lo['id'] as int;
 
     showModalBottomSheet(
@@ -662,7 +1205,10 @@ class _StudentCourseDetailScreenState extends ConsumerState<StudentCourseDetailS
 
               // Header
               Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 20,
+                  vertical: 12,
+                ),
                 child: Row(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
@@ -672,13 +1218,20 @@ class _StudentCourseDetailScreenState extends ConsumerState<StudentCourseDetailS
                         children: [
                           Text(
                             lo['title']?.toString() ?? 'Learning Outcome',
-                            style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: AppTheme.text),
+                            style: TextStyle(
+                              fontSize: 20,
+                              fontWeight: FontWeight.bold,
+                              color: AppTheme.text,
+                            ),
                           ),
                           if (lo['description'] != null) ...[
                             const SizedBox(height: 4),
                             Text(
                               lo['description'].toString(),
-                              style: TextStyle(color: AppTheme.textSecondary, fontSize: 13),
+                              style: TextStyle(
+                                color: AppTheme.textSecondary,
+                                fontSize: 13,
+                              ),
                             ),
                           ],
                         ],
@@ -700,7 +1253,11 @@ class _StudentCourseDetailScreenState extends ConsumerState<StudentCourseDetailS
                   children: [
                     Text(
                       'Study Materials',
-                      style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: AppTheme.text),
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.bold,
+                        color: AppTheme.text,
+                      ),
                     ),
                     const SizedBox(height: 12),
 
@@ -714,7 +1271,10 @@ class _StudentCourseDetailScreenState extends ConsumerState<StudentCourseDetailS
                         ),
                         child: Text(
                           'No reading materials uploaded for this lesson yet.',
-                          style: TextStyle(color: AppTheme.textMuted, fontSize: 13),
+                          style: TextStyle(
+                            color: AppTheme.textMuted,
+                            fontSize: 13,
+                          ),
                         ),
                       )
                     else
@@ -722,7 +1282,9 @@ class _StudentCourseDetailScreenState extends ConsumerState<StudentCourseDetailS
                         final type = c['content_type']?.toString() ?? 'Text';
                         final icon = getIconForType(type);
                         final color = getColorForType(type);
-                        final fileInfo = MaterialFileInfo.tryParse(c['content_data']);
+                        final fileInfo = MaterialFileInfo.tryParse(
+                          c['content_data'],
+                        );
 
                         return Container(
                           margin: const EdgeInsets.only(bottom: 12),
@@ -749,30 +1311,52 @@ class _StudentCourseDetailScreenState extends ConsumerState<StudentCourseDetailS
                                   const SizedBox(width: 10),
                                   Expanded(
                                     child: Column(
-                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.start,
                                       children: [
                                         Text(
                                           c['title']?.toString() ?? 'Material',
-                                          style: TextStyle(fontWeight: FontWeight.bold, color: AppTheme.text, fontSize: 15),
+                                          style: TextStyle(
+                                            fontWeight: FontWeight.bold,
+                                            color: AppTheme.text,
+                                            fontSize: 15,
+                                          ),
                                         ),
                                         if (fileInfo != null)
                                           Row(
                                             children: [
                                               Container(
-                                                padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
+                                                padding:
+                                                    const EdgeInsets.symmetric(
+                                                      horizontal: 5,
+                                                      vertical: 1,
+                                                    ),
                                                 decoration: BoxDecoration(
-                                                  color: color.withValues(alpha: 0.15),
-                                                  borderRadius: BorderRadius.circular(4),
+                                                  color: color.withValues(
+                                                    alpha: 0.15,
+                                                  ),
+                                                  borderRadius:
+                                                      BorderRadius.circular(4),
                                                 ),
                                                 child: Text(
-                                                  fileInfo.fileExtension.toUpperCase(),
-                                                  style: TextStyle(fontSize: 9, fontWeight: FontWeight.bold, color: color),
+                                                  fileInfo.fileExtension
+                                                      .toUpperCase(),
+                                                  style: TextStyle(
+                                                    fontSize: 9,
+                                                    fontWeight: FontWeight.bold,
+                                                    color: color,
+                                                  ),
                                                 ),
                                               ),
                                               const SizedBox(width: 6),
                                               Text(
-                                                formatFileSize(fileInfo.fileSize),
-                                                style: TextStyle(color: AppTheme.textMuted, fontSize: 11),
+                                                formatFileSize(
+                                                  fileInfo.fileSize,
+                                                ),
+                                                style: TextStyle(
+                                                  color: AppTheme.textMuted,
+                                                  fontSize: 11,
+                                                ),
                                               ),
                                             ],
                                           ),
@@ -783,14 +1367,22 @@ class _StudentCourseDetailScreenState extends ConsumerState<StudentCourseDetailS
                               ),
                               const SizedBox(height: 10),
                               if (fileInfo != null) ...[
-                                if (fileInfo.description != null && fileInfo.description!.isNotEmpty)
+                                if (fileInfo.description != null &&
+                                    fileInfo.description!.isNotEmpty)
                                   Text(
                                     fileInfo.description!,
-                                    style: TextStyle(color: AppTheme.textSecondary, fontSize: 13, height: 1.5),
+                                    style: TextStyle(
+                                      color: AppTheme.textSecondary,
+                                      fontSize: 13,
+                                      height: 1.5,
+                                    ),
                                   ),
                                 const SizedBox(height: 6),
                                 Container(
-                                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 10,
+                                    vertical: 6,
+                                  ),
                                   decoration: BoxDecoration(
                                     color: AppTheme.surface,
                                     borderRadius: BorderRadius.circular(6),
@@ -799,12 +1391,20 @@ class _StudentCourseDetailScreenState extends ConsumerState<StudentCourseDetailS
                                   child: Row(
                                     mainAxisSize: MainAxisSize.min,
                                     children: [
-                                      Icon(Icons.attach_file, size: 14, color: AppTheme.primary),
+                                      Icon(
+                                        Icons.attach_file,
+                                        size: 14,
+                                        color: AppTheme.primary,
+                                      ),
                                       const SizedBox(width: 6),
                                       Flexible(
                                         child: Text(
                                           fileInfo.fileName,
-                                          style: TextStyle(fontSize: 12, color: AppTheme.text, fontWeight: FontWeight.w500),
+                                          style: TextStyle(
+                                            fontSize: 12,
+                                            color: AppTheme.text,
+                                            fontWeight: FontWeight.w500,
+                                          ),
                                           maxLines: 1,
                                           overflow: TextOverflow.ellipsis,
                                         ),
@@ -815,7 +1415,11 @@ class _StudentCourseDetailScreenState extends ConsumerState<StudentCourseDetailS
                               ] else
                                 Text(
                                   c['content_data']?.toString() ?? '',
-                                  style: TextStyle(color: AppTheme.textSecondary, fontSize: 13, height: 1.5),
+                                  style: TextStyle(
+                                    color: AppTheme.textSecondary,
+                                    fontSize: 13,
+                                    height: 1.5,
+                                  ),
                                 ),
                             ],
                           ),
@@ -823,9 +1427,135 @@ class _StudentCourseDetailScreenState extends ConsumerState<StudentCourseDetailS
                       }),
 
                     const SizedBox(height: 24),
+                    // ── Gizmo Review Flashcards Banner ──
+                    Row(
+                      children: [
+                        Icon(
+                          Icons.psychology,
+                          color: AppTheme.primary,
+                          size: 20,
+                        ),
+                        const SizedBox(width: 8),
+                        Text(
+                          'Practice & Active Recall',
+                          style: TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.bold,
+                            color: AppTheme.text,
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 12),
+                    Container(
+                      padding: const EdgeInsets.all(16),
+                      decoration: BoxDecoration(
+                        gradient: LinearGradient(
+                          colors: [
+                            AppTheme.primary.withValues(alpha: 0.12),
+                            AppTheme.surfaceElevated,
+                          ],
+                          begin: Alignment.topLeft,
+                          end: Alignment.bottomRight,
+                        ),
+                        borderRadius: BorderRadius.circular(16),
+                        border: Border.all(
+                          color: AppTheme.primary.withValues(alpha: 0.3),
+                        ),
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            children: [
+                              Container(
+                                width: 40,
+                                height: 40,
+                                decoration: BoxDecoration(
+                                  color: AppTheme.primary.withValues(
+                                    alpha: 0.2,
+                                  ),
+                                  shape: BoxShape.circle,
+                                ),
+                                child: Icon(
+                                  Icons.psychology,
+                                  color: AppTheme.primary,
+                                  size: 22,
+                                ),
+                              ),
+                              const SizedBox(width: 12),
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      'Gizmo Review & Practice Quiz',
+                                      style: TextStyle(
+                                        fontWeight: FontWeight.bold,
+                                        color: AppTheme.text,
+                                        fontSize: 14,
+                                      ),
+                                    ),
+                                    const SizedBox(height: 2),
+                                    Text(
+                                      'Smart flashcards & mini-quizzes automatically scanned from this module',
+                                      style: TextStyle(
+                                        fontSize: 11,
+                                        color: AppTheme.textSecondary,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 14),
+                          SizedBox(
+                            width: double.infinity,
+                            height: 46,
+                            child: ElevatedButton.icon(
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: AppTheme.primary,
+                                foregroundColor: Colors.black,
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(12),
+                                ),
+                                elevation: 2,
+                              ),
+                              icon: const Icon(Icons.psychology, size: 20),
+                              label: const Text(
+                                '🧠 Practice Quiz & Flashcards (Choices)',
+                                style: TextStyle(
+                                  fontWeight: FontWeight.bold,
+                                  fontSize: 13,
+                                ),
+                              ),
+                              onPressed: () {
+                                Navigator.pop(ctx);
+                                final title = Uri.encodeComponent(
+                                  lo['title']?.toString() ?? 'Module',
+                                );
+                                final subjectName = Uri.encodeComponent(
+                                  _subject?['name']?.toString() ?? 'Subject',
+                                );
+                                context.push(
+                                  '/module-review/$loId?title=$title&subject=$subjectName',
+                                );
+                              },
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+
+                    const SizedBox(height: 24),
                     Text(
                       'Assessment',
-                      style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: AppTheme.text),
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.bold,
+                        color: AppTheme.text,
+                      ),
                     ),
                     const SizedBox(height: 12),
                     Container(
@@ -837,7 +1567,11 @@ class _StudentCourseDetailScreenState extends ConsumerState<StudentCourseDetailS
                       ),
                       child: Row(
                         children: [
-                          Icon(Icons.quiz_outlined, size: 24, color: AppTheme.primary),
+                          Icon(
+                            Icons.quiz_outlined,
+                            size: 24,
+                            color: AppTheme.primary,
+                          ),
                           const SizedBox(width: 12),
                           Expanded(
                             child: Column(
@@ -845,24 +1579,40 @@ class _StudentCourseDetailScreenState extends ConsumerState<StudentCourseDetailS
                               children: [
                                 Text(
                                   'Multiple Choice Assessment',
-                                  style: TextStyle(fontWeight: FontWeight.bold, color: AppTheme.text),
+                                  style: TextStyle(
+                                    fontWeight: FontWeight.bold,
+                                    color: AppTheme.text,
+                                  ),
                                 ),
                                 const SizedBox(height: 4),
                                 Text(
                                   '${questions.length} questions · Passing: ${lo['passing_score'] ?? 70}%',
-                                  style: TextStyle(fontSize: 12, color: AppTheme.textSecondary),
+                                  style: TextStyle(
+                                    fontSize: 12,
+                                    color: AppTheme.textSecondary,
+                                  ),
                                 ),
                               ],
                             ),
                           ),
                           if (isCompleted)
                             Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 10,
+                                vertical: 4,
+                              ),
                               decoration: BoxDecoration(
                                 color: AppTheme.success.withValues(alpha: 0.15),
                                 borderRadius: BorderRadius.circular(12),
                               ),
-                              child: Text('Passed', style: TextStyle(color: AppTheme.success, fontWeight: FontWeight.bold, fontSize: 12)),
+                              child: Text(
+                                'Passed',
+                                style: TextStyle(
+                                  color: AppTheme.success,
+                                  fontWeight: FontWeight.bold,
+                                  fontSize: 12,
+                                ),
+                              ),
                             ),
                         ],
                       ),
@@ -881,12 +1631,20 @@ class _StudentCourseDetailScreenState extends ConsumerState<StudentCourseDetailS
                     style: ElevatedButton.styleFrom(
                       backgroundColor: AppTheme.primary,
                       foregroundColor: Colors.black,
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
                     ),
-                    icon: Icon(isCompleted ? Icons.refresh : Icons.play_arrow, color: Colors.black),
+                    icon: Icon(
+                      isCompleted ? Icons.refresh : Icons.play_arrow,
+                      color: Colors.black,
+                    ),
                     label: Text(
                       isCompleted ? 'Retake Quiz' : 'Take Quiz',
-                      style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+                      style: const TextStyle(
+                        fontWeight: FontWeight.bold,
+                        fontSize: 16,
+                      ),
                     ),
                     onPressed: () {
                       Navigator.pop(ctx);
@@ -922,7 +1680,9 @@ class _StudentCourseDetailScreenState extends ConsumerState<StudentCourseDetailS
         borderRadius: BorderRadius.circular(16),
         border: Border.all(
           color: isCompleted
-              ? (isPassed ? AppTheme.success.withValues(alpha: 0.4) : AppTheme.error.withValues(alpha: 0.4))
+              ? (isPassed
+                    ? AppTheme.success.withValues(alpha: 0.4)
+                    : AppTheme.error.withValues(alpha: 0.4))
               : AppTheme.warning.withValues(alpha: 0.4),
         ),
       ),
@@ -934,23 +1694,33 @@ class _StudentCourseDetailScreenState extends ConsumerState<StudentCourseDetailS
               Expanded(
                 child: Text(
                   title,
-                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: AppTheme.text),
+                  style: TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.bold,
+                    color: AppTheme.text,
+                  ),
                 ),
               ),
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                 decoration: BoxDecoration(
                   color: isCompleted
-                      ? (isPassed ? AppTheme.success.withValues(alpha: 0.15) : AppTheme.error.withValues(alpha: 0.15))
+                      ? (isPassed
+                            ? AppTheme.success.withValues(alpha: 0.15)
+                            : AppTheme.error.withValues(alpha: 0.15))
                       : AppTheme.warning.withValues(alpha: 0.15),
                   borderRadius: BorderRadius.circular(6),
                 ),
                 child: Text(
-                  isCompleted ? (isPassed ? 'PASSED' : 'RETAKE REQUIRED') : 'PENDING',
+                  isCompleted
+                      ? (isPassed ? 'PASSED' : 'RETAKE REQUIRED')
+                      : 'PENDING',
                   style: TextStyle(
                     fontSize: 11,
                     fontWeight: FontWeight.bold,
-                    color: isCompleted ? (isPassed ? AppTheme.success : AppTheme.error) : AppTheme.warning,
+                    color: isCompleted
+                        ? (isPassed ? AppTheme.success : AppTheme.error)
+                        : AppTheme.warning,
                   ),
                 ),
               ),
@@ -961,7 +1731,10 @@ class _StudentCourseDetailScreenState extends ConsumerState<StudentCourseDetailS
             children: [
               Icon(Icons.help_outline, size: 14, color: AppTheme.textMuted),
               const SizedBox(width: 4),
-              Text('$qCount questions', style: TextStyle(fontSize: 12, color: AppTheme.textSecondary)),
+              Text(
+                '$qCount questions',
+                style: TextStyle(fontSize: 12, color: AppTheme.textSecondary),
+              ),
               const SizedBox(width: 14),
               Icon(Icons.timer_outlined, size: 14, color: AppTheme.textMuted),
               const SizedBox(width: 4),
@@ -993,13 +1766,23 @@ class _StudentCourseDetailScreenState extends ConsumerState<StudentCourseDetailS
                   context.push('/quiz/$quizId').then((_) => _loadData());
                 }
               },
-              icon: Icon(isCompleted ? Icons.replay : Icons.play_arrow, size: 16),
-              label: Text(isCompleted ? 'Retake Quiz' : 'Start Quiz', style: const TextStyle(fontWeight: FontWeight.bold)),
+              icon: Icon(
+                isCompleted ? Icons.replay : Icons.play_arrow,
+                size: 16,
+              ),
+              label: Text(
+                isCompleted ? 'Retake Quiz' : 'Start Quiz',
+                style: const TextStyle(fontWeight: FontWeight.bold),
+              ),
               style: ElevatedButton.styleFrom(
-                backgroundColor: isCompleted ? AppTheme.surface : AppTheme.primary,
+                backgroundColor: isCompleted
+                    ? AppTheme.surface
+                    : AppTheme.primary,
                 foregroundColor: isCompleted ? AppTheme.text : Colors.black,
                 side: isCompleted ? BorderSide(color: AppTheme.border) : null,
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(8),
+                ),
               ),
             ),
           ),
@@ -1023,7 +1806,20 @@ class _StudentCourseDetailScreenState extends ConsumerState<StudentCourseDetailS
     if (dueDateStr != null && dueDateStr.isNotEmpty) {
       try {
         final dt = DateTime.parse(dueDateStr);
-        final months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+        final months = [
+          'Jan',
+          'Feb',
+          'Mar',
+          'Apr',
+          'May',
+          'Jun',
+          'Jul',
+          'Aug',
+          'Sep',
+          'Oct',
+          'Nov',
+          'Dec',
+        ];
         formattedDue = 'Due: ${months[dt.month - 1]} ${dt.day}, ${dt.year}';
         isOverdue = DateTime.now().isAfter(dt);
       } catch (_) {
@@ -1035,7 +1831,8 @@ class _StudentCourseDetailScreenState extends ConsumerState<StudentCourseDetailS
     String statusLabel = 'PENDING';
     if (isGraded) {
       statusColor = AppTheme.success;
-      statusLabel = 'GRADED: ${grade is num ? grade.toStringAsFixed(0) : grade}/$points';
+      statusLabel =
+          'GRADED: ${grade is num ? grade.toStringAsFixed(0) : grade}/$points';
     } else if (isSubmitted) {
       statusColor = AppTheme.primary;
       statusLabel = 'SUBMITTED';
@@ -1060,7 +1857,11 @@ class _StudentCourseDetailScreenState extends ConsumerState<StudentCourseDetailS
               Expanded(
                 child: Text(
                   title,
-                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: AppTheme.text),
+                  style: TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.bold,
+                    color: AppTheme.text,
+                  ),
                 ),
               ),
               Container(
@@ -1086,19 +1887,29 @@ class _StudentCourseDetailScreenState extends ConsumerState<StudentCourseDetailS
               Icon(
                 Icons.calendar_today_outlined,
                 size: 14,
-                color: (isOverdue && !isSubmitted) ? AppTheme.error : AppTheme.textMuted,
+                color: (isOverdue && !isSubmitted)
+                    ? AppTheme.error
+                    : AppTheme.textMuted,
               ),
               const SizedBox(width: 4),
               Text(
                 formattedDue,
                 style: TextStyle(
                   fontSize: 12,
-                  color: (isOverdue && !isSubmitted) ? AppTheme.error : AppTheme.textSecondary,
-                  fontWeight: (isOverdue && !isSubmitted) ? FontWeight.w600 : FontWeight.normal,
+                  color: (isOverdue && !isSubmitted)
+                      ? AppTheme.error
+                      : AppTheme.textSecondary,
+                  fontWeight: (isOverdue && !isSubmitted)
+                      ? FontWeight.w600
+                      : FontWeight.normal,
                 ),
               ),
               const SizedBox(width: 14),
-              Icon(Icons.military_tech_outlined, size: 14, color: AppTheme.textMuted),
+              Icon(
+                Icons.military_tech_outlined,
+                size: 14,
+                color: AppTheme.textMuted,
+              ),
               const SizedBox(width: 4),
               Text(
                 '$points points',
@@ -1115,16 +1926,25 @@ class _StudentCourseDetailScreenState extends ConsumerState<StudentCourseDetailS
                   context.push('/submissions/$id').then((_) => _loadData());
                 }
               },
-              icon: Icon(isSubmitted ? Icons.visibility_outlined : Icons.upload_file_outlined, size: 16),
+              icon: Icon(
+                isSubmitted
+                    ? Icons.visibility_outlined
+                    : Icons.upload_file_outlined,
+                size: 16,
+              ),
               label: Text(
                 isSubmitted ? 'View Submission' : 'Submit Assignment',
                 style: const TextStyle(fontWeight: FontWeight.bold),
               ),
               style: ElevatedButton.styleFrom(
-                backgroundColor: isSubmitted ? AppTheme.surface : AppTheme.primary,
+                backgroundColor: isSubmitted
+                    ? AppTheme.surface
+                    : AppTheme.primary,
                 foregroundColor: isSubmitted ? AppTheme.text : Colors.black,
                 side: isSubmitted ? BorderSide(color: AppTheme.border) : null,
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(8),
+                ),
               ),
             ),
           ),

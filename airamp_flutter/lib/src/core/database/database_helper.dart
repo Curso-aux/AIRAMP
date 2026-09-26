@@ -134,6 +134,25 @@ class DatabaseHelper {
       ''');
     } catch (_) {}
     try {
+      await db.execute('''
+        CREATE TABLE IF NOT EXISTS module_flashcards (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          lo_id INTEGER NOT NULL,
+          topic_id INTEGER,
+          card_type TEXT NOT NULL,
+          front_text TEXT NOT NULL,
+          back_text TEXT NOT NULL,
+          options_json TEXT,
+          correct_option TEXT,
+          explanation TEXT,
+          source_snippet TEXT,
+          is_mastered INTEGER DEFAULT 0,
+          review_count INTEGER DEFAULT 0,
+          created_at TEXT NOT NULL
+        )
+      ''');
+    } catch (_) {}
+    try {
       final existingSchool = await db.query('schools', where: 'id = ?', whereArgs: ['sch_main']);
       if (existingSchool.isEmpty) {
         await db.insert('schools', {
@@ -689,6 +708,26 @@ class DatabaseHelper {
         subject_id INTEGER,
         actor_id TEXT,
         actor_name TEXT
+      )
+    ''');
+
+    // Module Flashcards Table (Gizmo style active recall & practice quizzes)
+    await db.execute('''
+      CREATE TABLE IF NOT EXISTS module_flashcards (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        lo_id INTEGER NOT NULL,
+        topic_id INTEGER,
+        card_type TEXT NOT NULL,
+        front_text TEXT NOT NULL,
+        back_text TEXT NOT NULL,
+        options_json TEXT,
+        correct_option TEXT,
+        explanation TEXT,
+        source_snippet TEXT,
+        is_mastered INTEGER DEFAULT 0,
+        review_count INTEGER DEFAULT 0,
+        created_at TEXT NOT NULL,
+        FOREIGN KEY (lo_id) REFERENCES learning_outcomes (id) ON DELETE CASCADE
       )
     ''');
 
@@ -1369,12 +1408,14 @@ class DatabaseHelper {
 
   Future<List<Map<String, dynamic>>> getEnrolledSubjects(String studentId) async {
     final db = await database;
+
+
     final subjects = await db.rawQuery('''
       SELECT s.*, e.enrolled_at, e.status as enrollment_status
       FROM subjects s
       JOIN enrollments e ON e.subject_id = s.id
       WHERE e.student_id = ?
-      ORDER BY e.enrolled_at DESC
+      ORDER BY s.id ASC
     ''', [studentId]);
 
     final List<Map<String, dynamic>> enriched = [];
@@ -1415,6 +1456,30 @@ class DatabaseHelper {
       });
     }
     return enriched;
+  }
+
+  /// Automatically enrolls all active students into a given subject and links it to existing sections
+  Future<void> autoEnrollAllStudentsInSubject(int subjectId) async {
+    final db = await database;
+    final now = DateTime.now().toIso8601String();
+
+    // 1. Enroll all student users
+    final students = await db.query('users', where: 'role = ?', whereArgs: ['student']);
+    for (final st in students) {
+      final studentId = st['id']?.toString();
+      if (studentId != null && studentId.isNotEmpty) {
+        await db.insert(
+          'enrollments',
+          {
+            'student_id': studentId,
+            'subject_id': subjectId,
+            'enrolled_at': now,
+            'status': 'active',
+          },
+          conflictAlgorithm: ConflictAlgorithm.ignore,
+        );
+      }
+    }
   }
 
   Future<List<Map<String, dynamic>>> getAvailableSubjects(String studentId) async {
@@ -1962,6 +2027,125 @@ class DatabaseHelper {
       'subject_id': subjectId,
       'questions': questions,
     };
+  }
+
+  /// Load comprehensive module data (LO info, Topic info, Subject, Reading Materials, and Questions)
+  Future<Map<String, dynamic>?> getModuleDataForReview(int loId) async {
+    final db = await database;
+    final loRes = await db.query('learning_outcomes', where: 'id = ?', whereArgs: [loId]);
+    if (loRes.isEmpty) return null;
+    final lo = loRes.first;
+
+    final topicRes = await db.query('topics', where: 'id = ?', whereArgs: [lo['topic_id']]);
+    final topic = topicRes.isNotEmpty ? topicRes.first : null;
+    final subjectId = topic != null ? topic['subject_id'] as int : 0;
+
+    final subjectRes = await db.query('subjects', where: 'id = ?', whereArgs: [subjectId]);
+    final subject = subjectRes.isNotEmpty ? subjectRes.first : null;
+
+    final contents = await db.query('contents', where: 'lo_id = ?', whereArgs: [loId], orderBy: 'id ASC');
+    final questions = await db.query('questions', where: 'lo_id = ?', whereArgs: [loId], orderBy: 'id ASC');
+
+    return {
+      ...lo,
+      'topic_id': lo['topic_id'],
+      'topic_title': topic?['title'] ?? 'Module Topic',
+      'subject_id': subjectId,
+      'subject_name': subject?['name'] ?? 'Course Subject',
+      'subject_code': subject?['subject_code'] ?? '',
+      'contents': contents,
+      'questions': questions,
+    };
+  }
+
+  /// Load comprehensive topic data (all LOs, contents, and questions under this topic)
+  Future<Map<String, dynamic>?> getTopicDataForReview(int topicId) async {
+    final db = await database;
+    final topicRes = await db.query('topics', where: 'id = ?', whereArgs: [topicId]);
+    if (topicRes.isEmpty) return null;
+    final topic = topicRes.first;
+
+    final subjectId = topic['subject_id'] as int? ?? 0;
+    final subjectRes = await db.query('subjects', where: 'id = ?', whereArgs: [subjectId]);
+    final subject = subjectRes.isNotEmpty ? subjectRes.first : null;
+
+    final los = await db.query('learning_outcomes', where: 'topic_id = ?', whereArgs: [topicId], orderBy: 'id ASC');
+    List<Map<String, dynamic>> allContents = [];
+    List<Map<String, dynamic>> allQuestions = [];
+
+    for (final lo in los) {
+      final loId = lo['id'] as int;
+      final c = await db.query('contents', where: 'lo_id = ?', whereArgs: [loId], orderBy: 'id ASC');
+      final q = await db.query('questions', where: 'lo_id = ?', whereArgs: [loId], orderBy: 'id ASC');
+      allContents.addAll(c);
+      allQuestions.addAll(q);
+    }
+
+    return {
+      ...topic,
+      'topic_id': topicId,
+      'topic_title': topic['title'] ?? 'Module Topic',
+      'subject_id': subjectId,
+      'subject_name': subject?['name'] ?? 'Course Subject',
+      'subject_code': subject?['subject_code'] ?? '',
+      'learning_outcomes': los,
+      'contents': allContents,
+      'questions': allQuestions,
+    };
+  }
+
+  /// Retrieve cached flashcards for a specific Learning Outcome
+  Future<List<Map<String, dynamic>>> getModuleFlashcards(int loId) async {
+    final db = await database;
+    return await db.query('module_flashcards', where: 'lo_id = ?', whereArgs: [loId], orderBy: 'id ASC');
+  }
+
+  /// Retrieve cached flashcards for an entire Topic
+  Future<List<Map<String, dynamic>>> getTopicFlashcards(int topicId) async {
+    final db = await database;
+    return await db.query('module_flashcards', where: 'topic_id = ?', whereArgs: [topicId], orderBy: 'id ASC');
+  }
+
+  /// Save or refresh generated flashcards for a module
+  Future<void> saveModuleFlashcards(int loId, int? topicId, List<Map<String, dynamic>> cards) async {
+    final db = await database;
+    final batch = db.batch();
+    batch.delete('module_flashcards', where: 'lo_id = ?', whereArgs: [loId]);
+    final now = DateTime.now().toIso8601String();
+    for (final c in cards) {
+      batch.insert('module_flashcards', {
+        'lo_id': loId,
+        'topic_id': topicId,
+        'card_type': c['card_type'] ?? 'concept',
+        'front_text': c['front_text'] ?? '',
+        'back_text': c['back_text'] ?? '',
+        'options_json': c['options_json'] != null
+            ? (c['options_json'] is String ? c['options_json'] : jsonEncode(c['options_json']))
+            : null,
+        'correct_option': c['correct_option'],
+        'explanation': c['explanation'],
+        'source_snippet': c['source_snippet'],
+        'is_mastered': (c['is_mastered'] == true || c['is_mastered'] == 1) ? 1 : 0,
+        'review_count': c['review_count'] ?? 0,
+        'created_at': now,
+      });
+    }
+    await batch.commit(noResult: true);
+  }
+
+  /// Update single flashcard student mastery status
+  Future<void> updateFlashcardMastery(int cardId, bool isMastered) async {
+    final db = await database;
+    await db.rawUpdate(
+      'UPDATE module_flashcards SET is_mastered = ?, review_count = review_count + 1 WHERE id = ?',
+      [isMastered ? 1 : 0, cardId],
+    );
+  }
+
+  /// Reset all mastery flags in a module for fresh practice
+  Future<void> resetModuleFlashcardMastery(int loId) async {
+    final db = await database;
+    await db.update('module_flashcards', {'is_mastered': 0}, where: 'lo_id = ?', whereArgs: [loId]);
   }
 
   /// Load existing quiz data for editing (includes questions, assignments)

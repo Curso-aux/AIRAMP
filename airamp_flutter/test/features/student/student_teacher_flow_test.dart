@@ -57,6 +57,9 @@ void main() {
       conflictAlgorithm: ConflictAlgorithm.replace,
     );
 
+    // Clear previous enrollments if any to ensure clean test state
+    await db.delete('enrollments', where: 'student_id = ?', whereArgs: [testStudentId]);
+
     // 1. Check available subjects
     final available = await helper.getAvailableSubjects(testStudentId);
     expect(available.isNotEmpty, isTrue);
