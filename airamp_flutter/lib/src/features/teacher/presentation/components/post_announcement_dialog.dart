@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../../../../core/animations/app_transitions.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../../core/theme/theme_provider.dart';
 import '../../data/teacher_repository.dart';
@@ -19,7 +20,7 @@ class PostAnnouncementDialog extends ConsumerStatefulWidget {
     Map<String, dynamic>? existing,
     String? defaultSection,
   }) {
-    return showDialog<bool>(
+    return AppModalTransitions.showSmoothDialog<bool>(
       context: context,
       barrierDismissible: false,
       builder: (_) => PostAnnouncementDialog(

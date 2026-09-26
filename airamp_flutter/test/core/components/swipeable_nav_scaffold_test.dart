@@ -219,5 +219,50 @@ void main() {
       );
       expect(restoredContainer.constraints?.maxHeight, greaterThan(50.0));
     });
+
+    testWidgets('8. Scrolling upwards (dragging down) immediately reveals navigation bar', (tester) async {
+      final router = createTestRouter();
+      await tester.pumpWidget(buildTestApp(router: router));
+      await tester.pumpAndSettle();
+
+      // Scroll down to hide bar
+      final gesture = await tester.startGesture(tester.getCenter(find.byKey(const Key('tab0_list'))));
+      await gesture.moveBy(const Offset(0, -60));
+      await tester.pump();
+      await gesture.moveBy(const Offset(0, -60));
+      await tester.pump();
+
+      final hiddenContainer = tester.widget<AnimatedContainer>(
+        find.ancestor(of: find.byType(BottomNavigationBar), matching: find.byType(AnimatedContainer)).first,
+      );
+      expect(hiddenContainer.constraints?.maxHeight, equals(0.0));
+
+      // Now scroll UP (drag down with positive dy)
+      await gesture.moveBy(const Offset(0, 40));
+      await tester.pump();
+
+      final revealedOnScrollUp = tester.widget<AnimatedContainer>(
+        find.ancestor(of: find.byType(BottomNavigationBar), matching: find.byType(AnimatedContainer)).first,
+      );
+      expect(revealedOnScrollUp.constraints?.maxHeight, greaterThan(50.0));
+      await gesture.up();
+    });
+
+    testWidgets('9. Bottom navigation bar stays visible when at the bottom of the scroll view', (tester) async {
+      final router = createTestRouter();
+      await tester.pumpWidget(buildTestApp(router: router));
+      await tester.pumpAndSettle();
+
+      // Scroll all the way to the bottom item
+      await tester.scrollUntilVisible(find.text('Item 59'), 500.0);
+      await tester.pumpAndSettle();
+
+      expect(find.text('Item 59'), findsOneWidget);
+
+      final barContainer = tester.widget<AnimatedContainer>(
+        find.ancestor(of: find.byType(BottomNavigationBar), matching: find.byType(AnimatedContainer)).first,
+      );
+      expect(barContainer.constraints?.maxHeight, greaterThan(50.0));
+    });
   });
 }

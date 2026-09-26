@@ -12,6 +12,8 @@ import 'components/assignment_roster_dialog.dart';
 import 'components/class_overview_widget.dart';
 import 'components/teacher_assistive_touch.dart';
 import '../../../core/database/database_helper.dart';
+import '../../../core/animations/app_transitions.dart';
+import '../../../core/animations/animated_pressable.dart';
 import '../../submissions/data/submissions_repository.dart';
 
 class TeacherDashboardScreen extends ConsumerStatefulWidget {
@@ -21,21 +23,15 @@ class TeacherDashboardScreen extends ConsumerStatefulWidget {
   ConsumerState<TeacherDashboardScreen> createState() => _TeacherDashboardScreenState();
 }
 
-class _TeacherDashboardScreenState extends ConsumerState<TeacherDashboardScreen>
-    with SingleTickerProviderStateMixin {
+class _TeacherDashboardScreenState extends ConsumerState<TeacherDashboardScreen> {
   String _activeSectionFilter = 'All Handled Sections';
   bool _isAnalyticsExpanded = false; // Analytics hidden by default; tap to expand
   String _analyticsSectionFilter = 'All Handled Sections';
   String _analyticsStudentFilter = 'All';
-  late AnimationController _refreshSpinController;
 
   @override
   void initState() {
     super.initState();
-    _refreshSpinController = AnimationController(
-      vsync: this,
-      duration: const Duration(milliseconds: 650),
-    );
     WidgetsBinding.instance.addPostFrameCallback((_) {
       ref.invalidate(teacherHandledSectionsDetailsProvider);
       ref.invalidate(teacherHandledSectionsProvider);
@@ -44,12 +40,6 @@ class _TeacherDashboardScreenState extends ConsumerState<TeacherDashboardScreen>
         studentId: _analyticsStudentFilter,
       );
     });
-  }
-
-  @override
-  void dispose() {
-    _refreshSpinController.dispose();
-    super.dispose();
   }
 
   String _formatDate(String? isoString) {
@@ -64,7 +54,7 @@ class _TeacherDashboardScreenState extends ConsumerState<TeacherDashboardScreen>
   }
 
   void _showNotificationsDialog(BuildContext context, String teacherId) {
-    showDialog(
+    AppModalTransitions.showSmoothDialog(
       context: context,
       builder: (ctx) {
         return Consumer(
@@ -148,7 +138,7 @@ class _TeacherDashboardScreenState extends ConsumerState<TeacherDashboardScreen>
                               Navigator.pop(ctx);
                               final assignment = await DatabaseHelper().getAssignmentById(assignmentId);
                               if (context.mounted && assignment != null) {
-                                showDialog(
+                                AppModalTransitions.showSmoothDialog(
                                   context: context,
                                   builder: (c) => AssignmentRosterDialog(
                                     assignmentId: assignmentId,
@@ -379,35 +369,9 @@ class _TeacherDashboardScreenState extends ConsumerState<TeacherDashboardScreen>
                         );
                       },
                     ),
-                    IconButton(
-                      icon: RotationTransition(
-                        turns: _refreshSpinController,
-                        child: Icon(Icons.refresh, color: AppTheme.primary),
-                      ),
-                      tooltip: 'Refresh Dashboard',
-                      onPressed: () {
-                        _refreshSpinController.forward(from: 0.0);
-                        HapticFeedback.lightImpact();
-                        ref.read(teacherDashboardProvider.notifier).reload(
-                          section: _analyticsSectionFilter,
-                          studentId: _analyticsStudentFilter,
-                        );
-                        ref.read(teacherSubjectsProvider.notifier).reload();
-                        ref.read(teacherAnnouncementsProvider.notifier).reload(sectionFilter: _activeSectionFilter);
-                        ref.invalidate(teacherHandledSectionsProvider);
-                        ref.invalidate(teacherHandledSectionsDetailsProvider);
-                        if (currentUser != null) {
-                          ref.invalidate(unreadNotificationsCountProvider(currentUser.id));
-                          ref.invalidate(userNotificationsProvider(currentUser.id));
-                        }
-                      },
-                    ),
-                    const SizedBox(width: 2),
-                    InkWell(
-                      onTap: () {
-                        HapticFeedback.lightImpact();
-                        context.push('/teacher/profile');
-                      },
+                    const SizedBox(width: 8),
+                    AnimatedPressable(
+                      onTap: () => context.push('/teacher/profile'),
                       borderRadius: BorderRadius.circular(20),
                       child: Container(
                         padding: const EdgeInsets.all(2),
@@ -508,7 +472,8 @@ class _TeacherDashboardScreenState extends ConsumerState<TeacherDashboardScreen>
                       _buildAssignedSubjectsSection(context, subjects),
                     ],
                   ),
-                const SizedBox(height: 20),
+                // Generous bottom clearance to keep last items clear of the bottom navigation bar and assistive touch
+                const SizedBox(height: 100),
               ],
             ),
           ),
@@ -1696,7 +1661,7 @@ class _TeacherDashboardScreenState extends ConsumerState<TeacherDashboardScreen>
   }
 
   void _showDeleteAnnouncementConfirm(int id, String title) {
-    showDialog(
+    AppModalTransitions.showSmoothDialog(
       context: context,
       builder: (ctx) => AlertDialog(
         backgroundColor: AppTheme.surface,

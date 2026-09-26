@@ -109,23 +109,36 @@ class _SwipeableNavScaffoldState extends ConsumerState<SwipeableNavScaffold> {
         return false;
       }
 
+      // If user is near or at the bottom of scrollview, keep or reveal the bar so the bottom content isn't clipped
+      if (notification.metrics.maxScrollExtent > 20 &&
+          notification.metrics.pixels >= notification.metrics.maxScrollExtent - 20) {
+        _showBar();
+        return false;
+      }
+
       if (notification is ScrollStartNotification) {
         // User started scrolling
         _scrollStopTimer?.cancel();
       } else if (notification is ScrollUpdateNotification) {
-        final dy = (notification.scrollDelta ?? 0).abs();
-        if (dy > 1.0) {
-          // Actively scrolling: hide bottom bar
+        final dy = notification.scrollDelta ?? 0;
+        // Directional auto-hide:
+        // Scrolling DOWN (dy > 2.0): hide bar to maximize reading area
+        if (dy > 2.0) {
           _hideBar();
-          // Reset stop debounce timer: reveal when movement pauses
           _scheduleShowOnStop();
+        } else if (dy < -2.0) {
+          // Scrolling UP (dy < -2.0): reveal bar immediately for quick navigation
+          _showBar();
         }
       } else if (notification is UserScrollNotification) {
         if (notification.direction == ScrollDirection.idle) {
           // Touch released / scrolling idle
           _scheduleShowOnStop();
-        } else {
-          // Actively moving up or down
+        } else if (notification.direction == ScrollDirection.forward) {
+          // Dragging downwards to scroll up: reveal bar
+          _showBar();
+        } else if (notification.direction == ScrollDirection.reverse) {
+          // Dragging upwards to scroll down: hide bar
           _hideBar();
           _scheduleShowOnStop();
         }

@@ -430,7 +430,7 @@ class _TeacherStudentsScreenState extends ConsumerState<TeacherStudentsScreen> {
                         ),
                       )
                     : ListView.builder(
-                        padding: const EdgeInsets.fromLTRB(20, 12, 20, 20),
+                        padding: const EdgeInsets.fromLTRB(20, 12, 20, 100),
                         itemCount: students.length,
                         itemBuilder: (context, index) {
                           final student = students[index];
@@ -567,7 +567,11 @@ class _TeacherStudentsScreenState extends ConsumerState<TeacherStudentsScreen> {
             ],
           ),
         )
-      : const ScoresScreen(isEmbedded: true),
+      : ScoresScreen(
+          isEmbedded: true,
+          initialSection: _selectedSection == 'All Sections' ? null : _selectedSection,
+          sections: combinedSections,
+        ),
             ),
           ],
         ),

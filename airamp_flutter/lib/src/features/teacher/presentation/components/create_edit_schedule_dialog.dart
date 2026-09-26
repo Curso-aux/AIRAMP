@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../../../../core/animations/app_transitions.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../../core/database/database_helper.dart';
 import '../../../admin/data/admin_repository.dart';
@@ -28,7 +29,7 @@ class CreateEditScheduleDialog extends ConsumerStatefulWidget {
     String? preselectedTeacherId,
     String? preselectedTeacherName,
   }) {
-    return showDialog<bool>(
+    return AppModalTransitions.showSmoothDialog<bool>(
       context: context,
       barrierDismissible: false,
       builder: (ctx) => CreateEditScheduleDialog(

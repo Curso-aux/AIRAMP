@@ -72,7 +72,7 @@ void main() {
       final allStudents = await helper.getStudentsForTeacher('teacher_1', section: 'All Sections');
 
       expect(allStudents.length, greaterThanOrEqualTo(1));
-      final sectionsFound = allStudents.map((s) => s['section'] as String).toSet();
+      final sectionsFound = allStudents.map((s) => s['section']?.toString() ?? '').toSet();
       expect(sectionsFound.any((s) => s.contains('Emerald')), isTrue);
     });
 

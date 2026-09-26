@@ -350,6 +350,7 @@ class _TeacherScheduleScreenState extends ConsumerState<TeacherScheduleScreen> {
                   _buildTimetableGrid(filtered)
                 else
                   _buildAgendaList(filtered),
+                const SizedBox(height: 100),
               ],
             ),
           ),

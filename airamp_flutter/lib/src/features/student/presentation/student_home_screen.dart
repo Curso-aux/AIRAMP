@@ -473,7 +473,8 @@ class _StudentHomeScreenState extends ConsumerState<StudentHomeScreen> {
                       ],
                     ),
                   ),
-                const SizedBox(height: 40),
+                // Generous bottom clearance to keep last items clear of the bottom navigation bar and assistive touch
+                const SizedBox(height: 100),
               ],
             ),
           ),

@@ -210,6 +210,7 @@ class AdminDashboardScreen extends ConsumerWidget {
                   ),
                 ),
               ),
+              const SizedBox(height: 100),
             ],
           ),
         ),

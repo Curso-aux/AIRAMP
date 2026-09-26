@@ -2283,7 +2283,11 @@ class DatabaseHelper {
 
     var list = results;
     if (section != null && section.isNotEmpty && section != 'All Sections') {
-      list = list.where((r) => r['student_section'] == section).toList();
+      final secLower = section.trim().toLowerCase();
+      list = list.where((r) {
+        final studentSec = (r['student_section'] as String?)?.trim().toLowerCase() ?? '';
+        return studentSec == secLower || studentSec.contains(secLower) || secLower.contains(studentSec);
+      }).toList();
     }
     if (query != null && query.trim().isNotEmpty) {
       final q = query.toLowerCase().trim();

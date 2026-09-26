@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../animations/app_transitions.dart';
 
 class AppTheme {
   // Current active mode flag
@@ -213,15 +214,66 @@ class AppTheme {
         labelMedium: TextStyle(color: darkTextSecondary),
         labelSmall: TextStyle(color: darkTextSecondary),
       ),
+      pageTransitionsTheme: const PageTransitionsTheme(
+        builders: {
+          TargetPlatform.android: SmoothPageTransitionsBuilder(),
+          TargetPlatform.iOS: SmoothPageTransitionsBuilder(),
+          TargetPlatform.windows: SmoothPageTransitionsBuilder(),
+          TargetPlatform.macOS: SmoothPageTransitionsBuilder(),
+          TargetPlatform.linux: SmoothPageTransitionsBuilder(),
+          TargetPlatform.fuchsia: SmoothPageTransitionsBuilder(),
+        },
+      ),
+      dialogTheme: DialogThemeData(
+        backgroundColor: darkSurface,
+        elevation: 16,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(22),
+        ),
+      ),
+      bottomSheetTheme: const BottomSheetThemeData(
+        backgroundColor: darkSurface,
+        modalBackgroundColor: darkSurface,
+        elevation: 16,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+        ),
+        showDragHandle: false,
+      ),
       elevatedButtonTheme: ElevatedButtonThemeData(
         style: ElevatedButton.styleFrom(
           backgroundColor: darkPrimary,
           foregroundColor: Colors.black,
+          animationDuration: const Duration(milliseconds: 200),
+          splashFactory: InkSparkle.splashFactory,
           textStyle: const TextStyle(fontWeight: FontWeight.w800, fontSize: 16),
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(14),
           ),
           minimumSize: const Size(0, 54),
+        ),
+      ),
+      outlinedButtonTheme: OutlinedButtonThemeData(
+        style: OutlinedButton.styleFrom(
+          foregroundColor: darkText,
+          animationDuration: const Duration(milliseconds: 200),
+          side: const BorderSide(color: darkBorder),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(14),
+          ),
+        ),
+      ),
+      textButtonTheme: TextButtonThemeData(
+        style: TextButton.styleFrom(
+          animationDuration: const Duration(milliseconds: 180),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(12),
+          ),
+        ),
+      ),
+      iconButtonTheme: IconButtonThemeData(
+        style: IconButton.styleFrom(
+          animationDuration: const Duration(milliseconds: 180),
         ),
       ),
       inputDecorationTheme: InputDecorationTheme(
@@ -256,12 +308,6 @@ class AppTheme {
         unselectedItemColor: darkTextMuted,
         elevation: 0,
         type: BottomNavigationBarType.fixed,
-      ),
-      outlinedButtonTheme: OutlinedButtonThemeData(
-        style: OutlinedButton.styleFrom(
-          foregroundColor: darkText,
-          side: const BorderSide(color: darkBorder),
-        ),
       ),
     );
   }
@@ -300,15 +346,66 @@ class AppTheme {
         labelMedium: TextStyle(color: lightTextSecondary),
         labelSmall: TextStyle(color: lightTextSecondary),
       ),
+      pageTransitionsTheme: const PageTransitionsTheme(
+        builders: {
+          TargetPlatform.android: SmoothPageTransitionsBuilder(),
+          TargetPlatform.iOS: SmoothPageTransitionsBuilder(),
+          TargetPlatform.windows: SmoothPageTransitionsBuilder(),
+          TargetPlatform.macOS: SmoothPageTransitionsBuilder(),
+          TargetPlatform.linux: SmoothPageTransitionsBuilder(),
+          TargetPlatform.fuchsia: SmoothPageTransitionsBuilder(),
+        },
+      ),
+      dialogTheme: DialogThemeData(
+        backgroundColor: lightSurface,
+        elevation: 16,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(22),
+        ),
+      ),
+      bottomSheetTheme: const BottomSheetThemeData(
+        backgroundColor: lightSurface,
+        modalBackgroundColor: lightSurface,
+        elevation: 16,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+        ),
+        showDragHandle: false,
+      ),
       elevatedButtonTheme: ElevatedButtonThemeData(
         style: ElevatedButton.styleFrom(
           backgroundColor: lightPrimary,
           foregroundColor: Colors.white,
+          animationDuration: const Duration(milliseconds: 200),
+          splashFactory: InkSparkle.splashFactory,
           textStyle: const TextStyle(fontWeight: FontWeight.w800, fontSize: 16),
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(14),
           ),
           minimumSize: const Size(0, 54),
+        ),
+      ),
+      outlinedButtonTheme: OutlinedButtonThemeData(
+        style: OutlinedButton.styleFrom(
+          foregroundColor: lightText,
+          animationDuration: const Duration(milliseconds: 200),
+          side: const BorderSide(color: lightBorder),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(14),
+          ),
+        ),
+      ),
+      textButtonTheme: TextButtonThemeData(
+        style: TextButton.styleFrom(
+          animationDuration: const Duration(milliseconds: 180),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(12),
+          ),
+        ),
+      ),
+      iconButtonTheme: IconButtonThemeData(
+        style: IconButton.styleFrom(
+          animationDuration: const Duration(milliseconds: 180),
         ),
       ),
       inputDecorationTheme: InputDecorationTheme(
@@ -343,12 +440,6 @@ class AppTheme {
         unselectedItemColor: lightTextMuted,
         elevation: 0,
         type: BottomNavigationBarType.fixed,
-      ),
-      outlinedButtonTheme: OutlinedButtonThemeData(
-        style: OutlinedButton.styleFrom(
-          foregroundColor: lightText,
-          side: const BorderSide(color: lightBorder),
-        ),
       ),
     );
   }
