@@ -22,10 +22,12 @@ class TeacherNavItem {
 
 class TeacherWebScaffold extends ConsumerStatefulWidget {
   final StatefulNavigationShell navigationShell;
+  final Widget? floatingOverlay;
 
   const TeacherWebScaffold({
     super.key,
     required this.navigationShell,
+    this.floatingOverlay,
   });
 
   @override
@@ -172,7 +174,12 @@ class _TeacherWebScaffoldState extends ConsumerState<TeacherWebScaffold> {
 
                 // Routed Page Body
                 Expanded(
-                  child: widget.navigationShell,
+                  child: Stack(
+                    children: [
+                      widget.navigationShell,
+                      if (widget.floatingOverlay != null) widget.floatingOverlay!,
+                    ],
+                  ),
                 ),
               ],
             ),

@@ -19,6 +19,7 @@ class SwipeableNavScaffold extends ConsumerStatefulWidget {
   final double selectedFontSize;
   final double unselectedFontSize;
   final Color? backgroundColor;
+  final Widget? floatingOverlay;
 
   const SwipeableNavScaffold({
     super.key,
@@ -28,6 +29,7 @@ class SwipeableNavScaffold extends ConsumerStatefulWidget {
     this.selectedFontSize = 10,
     this.unselectedFontSize = 10,
     this.backgroundColor,
+    this.floatingOverlay,
   });
 
   @override
@@ -159,13 +161,18 @@ class _SwipeableNavScaffoldState extends ConsumerState<SwipeableNavScaffold> {
 
     return Scaffold(
       backgroundColor: widget.backgroundColor ?? AppTheme.background,
-      body: NotificationListener<ScrollNotification>(
-        onNotification: _handleScrollNotification,
-        child: GestureDetector(
-          behavior: HitTestBehavior.translucent,
-          onHorizontalDragEnd: _handleHorizontalSwipe,
-          child: widget.navigationShell,
-        ),
+      body: Stack(
+        children: [
+          NotificationListener<ScrollNotification>(
+            onNotification: _handleScrollNotification,
+            child: GestureDetector(
+              behavior: HitTestBehavior.translucent,
+              onHorizontalDragEnd: _handleHorizontalSwipe,
+              child: widget.navigationShell,
+            ),
+          ),
+          if (widget.floatingOverlay != null) widget.floatingOverlay!,
+        ],
       ),
       bottomNavigationBar: AnimatedContainer(
         duration: const Duration(milliseconds: 250),

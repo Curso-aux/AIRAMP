@@ -461,57 +461,10 @@ class _StudentCourseDetailScreenState
               ],
 
               // Gizmo Flashcard & Practice Studio Banner
-              if (topics.isNotEmpty) _buildGizmoPracticeHeroBanner(topics),
-
-              // Curriculum Header
-              Row(
-                children: [
-                  Icon(
-                    Icons.layers_outlined,
-                    color: AppTheme.primary,
-                    size: 22,
-                  ),
-                  const SizedBox(width: 8),
-                  Text(
-                    'Course Curriculum',
-                    style: TextStyle(
-                      fontSize: 20,
-                      fontWeight: FontWeight.bold,
-                      color: AppTheme.text,
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 12),
-
-              if (topics.isEmpty)
-                Container(
-                  width: double.infinity,
-                  padding: const EdgeInsets.all(32),
-                  decoration: BoxDecoration(
-                    color: AppTheme.surface,
-                    borderRadius: BorderRadius.circular(16),
-                    border: Border.all(color: AppTheme.border),
-                  ),
-                  child: Center(
-                    child: Column(
-                      children: [
-                        Icon(
-                          Icons.menu_book_outlined,
-                          size: 48,
-                          color: AppTheme.textMuted,
-                        ),
-                        const SizedBox(height: 12),
-                        Text(
-                          'No topics published yet by the instructor.',
-                          style: TextStyle(color: AppTheme.textMuted),
-                        ),
-                      ],
-                    ),
-                  ),
-                )
-              else
-                ..._buildTopicsList(topics, isSequential),
+              if (topics.isNotEmpty) ...[
+                _buildGizmoPracticeHeroBanner(topics),
+                const SizedBox(height: 24),
+              ],
             ],
           ),
         ),
@@ -742,6 +695,7 @@ class _StudentCourseDetailScreenState
     );
   }
 
+  // ignore: unused_element
   List<Widget> _buildTopicsList(
     List<Map<String, dynamic>> topics,
     bool isSequential,
@@ -818,67 +772,6 @@ class _StudentCourseDetailScreenState
                           ],
                         ),
                       ),
-                      if (los.isNotEmpty) ...[
-                        const SizedBox(width: 8),
-                        Tooltip(
-                          message: 'Review Topic with Flashcards',
-                          child: Material(
-                            color: Colors.transparent,
-                            child: InkWell(
-                              onTap: () {
-                                final firstLoId = los.first['id'] as int;
-                                final title = Uri.encodeComponent(
-                                  topic['title']?.toString() ?? 'Topic',
-                                );
-                                final subjectName = Uri.encodeComponent(
-                                  _subject?['name']?.toString() ?? 'Subject',
-                                );
-                                context.push(
-                                  '/module-review/$firstLoId?title=$title&subject=$subjectName',
-                                );
-                              },
-                              borderRadius: BorderRadius.circular(10),
-                              child: Container(
-                                padding: const EdgeInsets.symmetric(
-                                  horizontal: 12,
-                                  vertical: 6,
-                                ),
-                                decoration: BoxDecoration(
-                                  color: AppTheme.primary.withValues(
-                                    alpha: 0.16,
-                                  ),
-                                  borderRadius: BorderRadius.circular(10),
-                                  border: Border.all(
-                                    color: AppTheme.primary.withValues(
-                                      alpha: 0.5,
-                                    ),
-                                    width: 1.2,
-                                  ),
-                                ),
-                                child: Row(
-                                  mainAxisSize: MainAxisSize.min,
-                                  children: [
-                                    Icon(
-                                      Icons.psychology,
-                                      size: 16,
-                                      color: AppTheme.primary,
-                                    ),
-                                    const SizedBox(width: 6),
-                                    Text(
-                                      'Topic Flashcards',
-                                      style: TextStyle(
-                                        fontSize: 11,
-                                        fontWeight: FontWeight.bold,
-                                        color: AppTheme.primary,
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              ),
-                            ),
-                          ),
-                        ),
-                      ],
                     ],
                   ),
                 ),
@@ -1060,111 +953,6 @@ class _StudentCourseDetailScreenState
                   Icon(Icons.lock, color: AppTheme.textMuted, size: 16),
               ],
             ),
-
-            // Dedicated, Prominent Flashcard & Quiz Action Strip
-            if (isUnlocked) ...[
-              const SizedBox(height: 10),
-              Material(
-                color: Colors.transparent,
-                child: InkWell(
-                  onTap: () {
-                    final loId = lo['id'] as int? ?? 0;
-                    final title = Uri.encodeComponent(
-                      lo['title']?.toString() ?? 'Module',
-                    );
-                    final subjectName = Uri.encodeComponent(
-                      _subject?['name']?.toString() ?? 'Subject',
-                    );
-                    context.push(
-                      '/module-review/$loId?title=$title&subject=$subjectName',
-                    );
-                  },
-                  borderRadius: BorderRadius.circular(10),
-                  child: Container(
-                    width: double.infinity,
-                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                    decoration: BoxDecoration(
-                      gradient: LinearGradient(
-                        colors: [
-                          AppTheme.primary.withValues(alpha: 0.16),
-                          const Color(0xFF6366F1).withValues(alpha: 0.12),
-                        ],
-                      ),
-                      borderRadius: BorderRadius.circular(10),
-                      border: Border.all(
-                        color: AppTheme.primary.withValues(alpha: 0.4),
-                        width: 1.2,
-                      ),
-                    ),
-                    child: Row(
-                      children: [
-                        Container(
-                          padding: const EdgeInsets.all(4),
-                          decoration: BoxDecoration(
-                            color: AppTheme.primary,
-                            borderRadius: BorderRadius.circular(6),
-                          ),
-                          child: const Icon(
-                            Icons.psychology,
-                            size: 16,
-                            color: Colors.black,
-                          ),
-                        ),
-                        const SizedBox(width: 10),
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                '🧠 Practice Quiz & Flashcards',
-                                style: TextStyle(
-                                  fontWeight: FontWeight.bold,
-                                  fontSize: 12,
-                                  color: AppTheme.primary,
-                                ),
-                              ),
-                              Text(
-                                'Multiple-choice questions & active recall cards',
-                                style: TextStyle(
-                                  fontSize: 10,
-                                  color: AppTheme.textSecondary,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                        Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                          decoration: BoxDecoration(
-                            color: AppTheme.primary.withValues(alpha: 0.2),
-                            borderRadius: BorderRadius.circular(6),
-                          ),
-                          child: Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              Text(
-                                'Practice',
-                                style: TextStyle(
-                                  fontSize: 11,
-                                  fontWeight: FontWeight.bold,
-                                  color: AppTheme.primary,
-                                ),
-                              ),
-                              const SizedBox(width: 4),
-                              Icon(
-                                Icons.arrow_forward_ios,
-                                size: 10,
-                                color: AppTheme.primary,
-                              ),
-                            ],
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-              ),
-            ],
           ],
         ),
       ),

@@ -6,17 +6,14 @@ import '../../../core/theme/app_theme.dart';
 import '../../../core/theme/theme_provider.dart';
 import '../../auth/application/auth_provider.dart';
 import '../data/teacher_repository.dart';
-import 'components/create_quiz_dialog.dart';
 import 'components/post_announcement_dialog.dart';
 import 'components/assignment_roster_dialog.dart';
 import 'components/class_overview_widget.dart';
-import 'components/teacher_assistive_touch.dart';
 import '../../../core/database/database_helper.dart';
 import '../../../core/components/app_toast.dart';
 import '../../../core/components/empty_state.dart';
 import '../../../core/components/skeleton_loader.dart';
 import '../../../core/animations/app_transitions.dart';
-import '../../../core/animations/animated_pressable.dart';
 import '../../submissions/data/submissions_repository.dart';
 
 class TeacherDashboardScreen extends ConsumerStatefulWidget {
@@ -378,37 +375,7 @@ class _TeacherDashboardScreenState extends ConsumerState<TeacherDashboardScreen>
                       },
                     ),
                     const SizedBox(width: 8),
-                    AnimatedPressable(
-                      onTap: () => context.push('/teacher/profile'),
-                      borderRadius: BorderRadius.circular(20),
-                      child: Container(
-                        padding: const EdgeInsets.all(2),
-                        decoration: BoxDecoration(
-                          shape: BoxShape.circle,
-                          border: Border.all(
-                            color: AppTheme.primary.withValues(alpha: 0.5),
-                            width: 1.5,
-                          ),
-                        ),
-                        child: CircleAvatar(
-                          radius: 15,
-                          backgroundColor: AppTheme.primary.withValues(alpha: 0.15),
-                          backgroundImage: currentUser?.profileImage != null && currentUser!.profileImage!.isNotEmpty
-                              ? NetworkImage(currentUser.profileImage!)
-                              : null,
-                          child: currentUser?.profileImage == null || currentUser!.profileImage!.isEmpty
-                              ? Text(
-                                  teacherName.isNotEmpty ? teacherName[0].toUpperCase() : 'T',
-                                  style: TextStyle(
-                                    color: AppTheme.primary,
-                                    fontWeight: FontWeight.bold,
-                                    fontSize: 12,
-                                  ),
-                                )
-                              : null,
-                        ),
-                      ),
-                    ),
+                    _buildProfileAvatarButton(context, currentUser, teacherName),
                   ],
                 ),
                 const SizedBox(height: 20),
@@ -480,23 +447,10 @@ class _TeacherDashboardScreenState extends ConsumerState<TeacherDashboardScreen>
                       _buildAssignedSubjectsSection(context, subjects),
                     ],
                   ),
-                // Generous bottom clearance to keep last items clear of the bottom navigation bar and assistive touch
                 const SizedBox(height: 100),
               ],
             ),
           ),
-        ),
-        TeacherAssistiveTouch(
-          onCurriculum: () => context.go('/teacher/subjects'),
-          onSchedule: () => context.go('/teacher/schedule'),
-          onScores: () => context.go('/teacher/scores'),
-          onStudents: () => context.go('/teacher/students'),
-          onCreateQuiz: () => _showCreateQuizDialog(context),
-          onAnnounce: () => PostAnnouncementDialog.show(
-            context,
-            defaultSection: _activeSectionFilter,
-          ),
-          onProfile: () => context.push('/teacher/profile'),
         ),
       ],
     ),
@@ -1898,23 +1852,183 @@ class _TeacherDashboardScreenState extends ConsumerState<TeacherDashboardScreen>
     );
   }
 
-  void _showCreateQuizDialog(BuildContext context) {
-    final subjects = ref.watch(teacherSubjectsProvider);
-    if (subjects.isEmpty) {
-      AppToast.showWarning(
-        context,
-        'No subjects assigned. Please contact your admin to assign subjects first.',
-      );
-      return;
-    }
-    Navigator.of(context, rootNavigator: true).push<bool>(
-      MaterialPageRoute(
-        fullscreenDialog: true,
-        builder: (ctx) => CreateQuizDialog(
-          initialSubjectId: subjects.first['id'] as int?,
-          subjectName: subjects.first['name']?.toString() ?? 'Subject',
+  Widget _buildProfileAvatarButton(
+    BuildContext context,
+    dynamic currentUser,
+    String teacherName,
+  ) {
+    return _TeacherHeaderAvatarButton(
+      currentUser: currentUser,
+      teacherName: teacherName,
+      onTap: () => context.push('/teacher/profile'),
+    );
+  }
+}
+
+/// A modern, tactile, interactive faculty profile avatar button for the teacher dashboard header.
+///
+/// Features:
+/// - Outer interactive accent ring line with subtle depth and glow.
+/// - Clean separation gap to prevent obstructing the user's avatar/initial.
+/// - Side clickable indicator badge (subtle chevron indicator) signaling interaction without blocking the center.
+/// - Haptic press and hover scaling feedback.
+class _TeacherHeaderAvatarButton extends StatefulWidget {
+  final dynamic currentUser;
+  final String teacherName;
+  final VoidCallback onTap;
+
+  const _TeacherHeaderAvatarButton({
+    required this.currentUser,
+    required this.teacherName,
+    required this.onTap,
+  });
+
+  @override
+  State<_TeacherHeaderAvatarButton> createState() =>
+      _TeacherHeaderAvatarButtonState();
+}
+
+class _TeacherHeaderAvatarButtonState
+    extends State<_TeacherHeaderAvatarButton> {
+  bool _isPressed = false;
+  bool _isHovered = false;
+
+  @override
+  Widget build(BuildContext context) {
+    final hasImage = widget.currentUser?.profileImage != null &&
+        (widget.currentUser!.profileImage as String).isNotEmpty;
+    final initial = widget.teacherName.isNotEmpty
+        ? widget.teacherName[0].toUpperCase()
+        : 'T';
+
+    return Tooltip(
+      message: 'Faculty Profile & Settings',
+      child: MouseRegion(
+        onEnter: (_) => setState(() => _isHovered = true),
+        onExit: (_) => setState(() => _isHovered = false),
+        cursor: SystemMouseCursors.click,
+        child: GestureDetector(
+          onTapDown: (_) => setState(() => _isPressed = true),
+          onTapUp: (_) => setState(() => _isPressed = false),
+          onTapCancel: () => setState(() => _isPressed = false),
+          onTap: () {
+            HapticFeedback.lightImpact();
+            widget.onTap();
+          },
+          child: AnimatedScale(
+            scale: _isPressed ? 0.92 : (_isHovered ? 1.05 : 1.0),
+            duration: const Duration(milliseconds: 140),
+            curve: Curves.easeOutCubic,
+            child: Stack(
+              clipBehavior: Clip.none,
+              alignment: Alignment.center,
+              children: [
+                // Outer interactive accent ring line with glow
+                Container(
+                  width: 44,
+                  height: 44,
+                  padding: const EdgeInsets.all(2.0),
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    gradient: LinearGradient(
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                      colors: [
+                        AppTheme.primary,
+                        AppTheme.primary.withValues(alpha: 0.45),
+                        AppTheme.primaryDark,
+                      ],
+                    ),
+                    boxShadow: [
+                      BoxShadow(
+                        color: AppTheme.primary.withValues(alpha: _isHovered ? 0.45 : 0.25),
+                        blurRadius: _isHovered ? 10 : 6,
+                        offset: const Offset(0, 2),
+                      ),
+                    ],
+                  ),
+                  child: Container(
+                    padding: const EdgeInsets.all(1.5),
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      color: AppTheme.background,
+                    ),
+                    child: ClipOval(
+                      child: hasImage
+                          ? Image.network(
+                              widget.currentUser!.profileImage!,
+                              fit: BoxFit.cover,
+                              errorBuilder: (context, error, stackTrace) =>
+                                  _buildFallbackInitial(initial),
+                            )
+                          : _buildFallbackInitial(initial),
+                    ),
+                  ),
+                ),
+
+                // Sleek clickable line indicator on the side / bottom-right
+                Positioned(
+                  right: -2,
+                  bottom: -1,
+                  child: Container(
+                    width: 16,
+                    height: 16,
+                    decoration: BoxDecoration(
+                      color: AppTheme.primary,
+                      shape: BoxShape.circle,
+                      border: Border.all(
+                        color: AppTheme.background,
+                        width: 1.8,
+                      ),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withValues(alpha: 0.18),
+                          blurRadius: 3,
+                          offset: const Offset(0, 1),
+                        ),
+                      ],
+                    ),
+                    child: const Center(
+                      child: Icon(
+                        Icons.chevron_right_rounded,
+                        size: 11,
+                        color: Colors.black,
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildFallbackInitial(String initial) {
+    return Container(
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [
+            AppTheme.primary,
+            AppTheme.primaryDark,
+          ],
+        ),
+      ),
+      child: Center(
+        child: Text(
+          initial,
+          style: const TextStyle(
+            fontSize: 16,
+            fontWeight: FontWeight.w800,
+            color: Colors.black,
+            letterSpacing: -0.5,
+          ),
         ),
       ),
     );
   }
 }
+

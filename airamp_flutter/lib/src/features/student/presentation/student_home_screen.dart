@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../../core/theme/app_theme.dart';
@@ -7,7 +8,6 @@ import '../../auth/application/auth_provider.dart';
 import '../../admin/data/admin_repository.dart';
 import '../../teacher/data/teacher_schedule_repository.dart';
 import '../data/student_repository.dart';
-import 'components/student_assistive_touch.dart';
 import 'components/student_schedule_widget.dart';
 
 class StudentHomeScreen extends ConsumerStatefulWidget {
@@ -269,20 +269,8 @@ class _StudentHomeScreenState extends ConsumerState<StudentHomeScreen> {
                         _buildScheduleHeaderButton(context, currentUser.section),
                         const SizedBox(width: 8),
                         _buildBellButton(studentAnnouncements),
-                        const SizedBox(width: 12),
-                        GestureDetector(
-                          onTap: () {
-                            context.go('/student/profile');
-                          },
-                          child: CircleAvatar(
-                            radius: 22,
-                            backgroundColor: AppTheme.primary,
-                            child: Text(
-                              currentUser.fullName.isNotEmpty ? currentUser.fullName[0].toUpperCase() : '?',
-                              style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.black),
-                            ),
-                          ),
-                        ),
+                        const SizedBox(width: 8),
+                        _buildProfileAvatarButton(context, currentUser),
                       ],
                     ),
                   ],
@@ -479,15 +467,6 @@ class _StudentHomeScreenState extends ConsumerState<StudentHomeScreen> {
             ),
           ),
         ),
-        StudentAssistiveTouch(
-          onCourses: () => context.go('/student/courses'),
-          onSchedule: () => showStudentTimetableModal(context, initialSection: currentUser.section),
-          onQuizzes: () => context.go('/student/quiz-history'),
-          onProgress: () => context.go('/student/progress'),
-          onChat: () => context.go('/student/chat'),
-          onAnnouncements: () => _showNotificationsSheet(studentAnnouncements),
-          onProfile: () => context.go('/student/profile'),
-        ),
       ],
     ),
   ),
@@ -573,6 +552,13 @@ class _StudentHomeScreenState extends ConsumerState<StudentHomeScreen> {
           ],
         ),
       ),
+    );
+  }
+
+  Widget _buildProfileAvatarButton(BuildContext context, User currentUser) {
+    return _StudentHeaderAvatarButton(
+      currentUser: currentUser,
+      onTap: () => context.go('/student/profile'),
     );
   }
 
@@ -883,4 +869,170 @@ class _StudentHomeScreenState extends ConsumerState<StudentHomeScreen> {
     );
   }
 }
+
+/// A modern, tactile, interactive student profile avatar button for the dashboard header.
+///
+/// Features:
+/// - Outer interactive accent ring line with subtle depth and glow.
+/// - Clean separation gap to prevent obstructing the user's avatar/initial.
+/// - Side clickable indicator badge (subtle chevron indicator) signaling interaction without blocking the center.
+/// - Haptic press and hover scaling feedback.
+class _StudentHeaderAvatarButton extends StatefulWidget {
+  final User currentUser;
+  final VoidCallback onTap;
+
+  const _StudentHeaderAvatarButton({
+    required this.currentUser,
+    required this.onTap,
+  });
+
+  @override
+  State<_StudentHeaderAvatarButton> createState() =>
+      _StudentHeaderAvatarButtonState();
+}
+
+class _StudentHeaderAvatarButtonState
+    extends State<_StudentHeaderAvatarButton> {
+  bool _isPressed = false;
+  bool _isHovered = false;
+
+  @override
+  Widget build(BuildContext context) {
+    final hasImage = widget.currentUser.profileImage != null &&
+        widget.currentUser.profileImage!.isNotEmpty;
+    final initial = widget.currentUser.fullName.isNotEmpty
+        ? widget.currentUser.fullName[0].toUpperCase()
+        : '?';
+
+    return Tooltip(
+      message: 'My Profile & Account Settings',
+      child: MouseRegion(
+        onEnter: (_) => setState(() => _isHovered = true),
+        onExit: (_) => setState(() => _isHovered = false),
+        cursor: SystemMouseCursors.click,
+        child: GestureDetector(
+          onTapDown: (_) => setState(() => _isPressed = true),
+          onTapUp: (_) => setState(() => _isPressed = false),
+          onTapCancel: () => setState(() => _isPressed = false),
+          onTap: () {
+            HapticFeedback.lightImpact();
+            widget.onTap();
+          },
+          child: AnimatedScale(
+            scale: _isPressed ? 0.92 : (_isHovered ? 1.05 : 1.0),
+            duration: const Duration(milliseconds: 140),
+            curve: Curves.easeOutCubic,
+            child: Stack(
+              clipBehavior: Clip.none,
+              alignment: Alignment.center,
+              children: [
+                // Outer interactive accent ring line with glow
+                Container(
+                  width: 44,
+                  height: 44,
+                  padding: const EdgeInsets.all(2.0),
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    gradient: LinearGradient(
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                      colors: [
+                        AppTheme.primary,
+                        AppTheme.primary.withValues(alpha: 0.45),
+                        AppTheme.primaryDark,
+                      ],
+                    ),
+                    boxShadow: [
+                      BoxShadow(
+                        color: AppTheme.primary.withValues(alpha: _isHovered ? 0.45 : 0.25),
+                        blurRadius: _isHovered ? 10 : 6,
+                        offset: const Offset(0, 2),
+                      ),
+                    ],
+                  ),
+                  child: Container(
+                    padding: const EdgeInsets.all(1.5),
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      color: AppTheme.background,
+                    ),
+                    child: ClipOval(
+                      child: hasImage
+                          ? Image.network(
+                              widget.currentUser.profileImage!,
+                              fit: BoxFit.cover,
+                              errorBuilder: (context, error, stackTrace) =>
+                                  _buildFallbackInitial(initial),
+                            )
+                          : _buildFallbackInitial(initial),
+                    ),
+                  ),
+                ),
+
+                // Sleek clickable line indicator on the side / bottom-right
+                Positioned(
+                  right: -2,
+                  bottom: -1,
+                  child: Container(
+                    width: 16,
+                    height: 16,
+                    decoration: BoxDecoration(
+                      color: AppTheme.primary,
+                      shape: BoxShape.circle,
+                      border: Border.all(
+                        color: AppTheme.background,
+                        width: 1.8,
+                      ),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withValues(alpha: 0.18),
+                          blurRadius: 3,
+                          offset: const Offset(0, 1),
+                        ),
+                      ],
+                    ),
+                    child: const Center(
+                      child: Icon(
+                        Icons.chevron_right_rounded,
+                        size: 11,
+                        color: Colors.black,
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildFallbackInitial(String initial) {
+    return Container(
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [
+            AppTheme.primary,
+            AppTheme.primaryDark,
+          ],
+        ),
+      ),
+      child: Center(
+        child: Text(
+          initial,
+          style: const TextStyle(
+            fontSize: 16,
+            fontWeight: FontWeight.w800,
+            color: Colors.black,
+            letterSpacing: -0.5,
+          ),
+        ),
+      ),
+    );
+  }
+}
+
 

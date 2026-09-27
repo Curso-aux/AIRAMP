@@ -39,19 +39,25 @@ class TeacherAssistiveTouch extends ConsumerStatefulWidget {
 }
 
 class _TeacherAssistiveTouchState extends ConsumerState<TeacherAssistiveTouch>
-    with SingleTickerProviderStateMixin {
-  static const double _buttonSize = 52.0;
-  static const double _edgePadding = 12.0;
+    with TickerProviderStateMixin {
+  static const double _buttonWidth = 64.0;
+  static const double _buttonHeight = 88.0;
+  static const double _edgePadding = 8.0;
 
   Offset _position = Offset.zero;
   bool _isInitialized = false;
   bool _isDragging = false;
+  bool _isInteracting = false;
   bool _isIdle = false;
   bool _isMenuOpen = false;
+  double _dragVelocityX = 0.0;
 
   Timer? _idleTimer;
   late AnimationController _snapController;
   Animation<Offset>? _snapAnimation;
+
+  late AnimationController _floatController;
+  late Animation<double> _floatAnimation;
 
   Offset _dragStartPos = Offset.zero;
   DateTime _dragStartTime = DateTime.now();
@@ -69,12 +75,22 @@ class _TeacherAssistiveTouchState extends ConsumerState<TeacherAssistiveTouch>
           });
         }
       });
+
+    _floatController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 2200),
+    )..repeat(reverse: true);
+
+    _floatAnimation = Tween<double>(begin: -3.0, end: 3.0).animate(
+      CurvedAnimation(parent: _floatController, curve: Curves.easeInOutSine),
+    );
   }
 
   @override
   void dispose() {
     _idleTimer?.cancel();
     _snapController.dispose();
+    _floatController.dispose();
     super.dispose();
   }
 
@@ -99,31 +115,39 @@ class _TeacherAssistiveTouchState extends ConsumerState<TeacherAssistiveTouch>
     if (_snapController.isAnimating) {
       _snapController.stop();
     }
-    _dragStartPos = _position;
-    _dragStartTime = DateTime.now();
+    setState(() => _isInteracting = true);
   }
 
   void _onPanStart(DragStartDetails details) {
     _wakeUp();
-    setState(() => _isDragging = true);
-    HapticFeedback.selectionClick();
+    _dragStartPos = _position;
+    _dragStartTime = DateTime.now();
+    setState(() {
+      _isDragging = true;
+      _isInteracting = true;
+    });
+    HapticFeedback.lightImpact();
   }
 
   void _onPanUpdate(DragUpdateDetails details) {
+    _wakeUp();
     final mediaQuery = MediaQuery.of(context);
     final screenWidth = mediaQuery.size.width;
-    final screenHeight = mediaQuery.size.height - mediaQuery.padding.top - mediaQuery.padding.bottom;
+    final screenHeight = mediaQuery.size.height;
+    final topPadding = mediaQuery.padding.top + 10.0;
+    final bottomPadding = mediaQuery.padding.bottom + 80.0;
 
-    final minY = 12.0;
-    final maxY = (screenHeight - _buttonSize - 16.0).clamp(minY, double.infinity);
     final minX = _edgePadding;
-    final maxX = (screenWidth - _buttonSize - _edgePadding).clamp(minX, double.infinity);
-
-    final newX = (_position.dx + details.delta.dx).clamp(minX, maxX);
-    final newY = (_position.dy + details.delta.dy).clamp(minY, maxY);
+    final maxX = screenWidth - _buttonWidth - _edgePadding;
+    final minY = topPadding;
+    final maxY = screenHeight - _buttonHeight - bottomPadding;
 
     setState(() {
-      _position = Offset(newX, newY);
+      _dragVelocityX = details.delta.dx;
+      _position = Offset(
+        (_position.dx + details.delta.dx).clamp(minX, maxX),
+        (_position.dy + details.delta.dy).clamp(minY, maxY),
+      );
     });
   }
 
@@ -131,59 +155,77 @@ class _TeacherAssistiveTouchState extends ConsumerState<TeacherAssistiveTouch>
     setState(() => _isDragging = false);
 
     final dragDistance = (_position - _dragStartPos).distance;
-    final dragDuration = DateTime.now().difference(_dragStartTime).inMilliseconds;
+    final dragDuration = DateTime.now().difference(_dragStartTime);
 
-    // Detect tap vs drag
-    if (dragDistance < 6.0 && dragDuration < 300) {
+    // If it was just a tap without drag, trigger menu open
+    if (dragDistance < 6.0 && dragDuration.inMilliseconds < 250) {
       _openMenu();
       return;
     }
 
     _snapToNearestEdge(details.velocity.pixelsPerSecond);
+    _startIdleTimer();
+
+    Future.delayed(const Duration(milliseconds: 450), () {
+      if (mounted && !_isDragging && !_isMenuOpen) {
+        setState(() {
+          _isInteracting = false;
+          _dragVelocityX = 0.0;
+        });
+      }
+    });
   }
 
   void _snapToNearestEdge(Offset velocity) {
     final mediaQuery = MediaQuery.of(context);
     final screenWidth = mediaQuery.size.width;
-    final screenHeight = mediaQuery.size.height - mediaQuery.padding.top - mediaQuery.padding.bottom;
+    final screenHeight = mediaQuery.size.height;
+    final topPadding = mediaQuery.padding.top + 10.0;
+    final bottomPadding = mediaQuery.padding.bottom + 80.0;
 
-    final minY = 12.0;
-    final maxY = (screenHeight - _buttonSize - 16.0).clamp(minY, double.infinity);
     final minX = _edgePadding;
-    final maxX = (screenWidth - _buttonSize - _edgePadding).clamp(minX, double.infinity);
+    final maxX = screenWidth - _buttonWidth - _edgePadding;
+    final minY = topPadding;
+    final maxY = screenHeight - _buttonHeight - bottomPadding;
 
-    final centerX = _position.dx + (_buttonSize / 2);
-    final snapLeft = velocity.dx < -300 || (velocity.dx.abs() <= 300 && centerX < screenWidth / 2);
+    final centerX = screenWidth / 2;
+    double targetX;
 
-    final targetX = snapLeft ? minX : maxX;
-    final targetY = _position.dy.clamp(minY, maxY);
+    // Use horizontal velocity bias if fast enough, otherwise geometric proximity
+    if (velocity.dx.abs() > 400) {
+      targetX = velocity.dx > 0 ? maxX : minX;
+    } else {
+      targetX = (_position.dx + _buttonWidth / 2 < centerX) ? minX : maxX;
+    }
+
+    // Apply vertical momentum slightly
+    final targetY = (_position.dy + velocity.dy * 0.1).clamp(minY, maxY);
 
     _snapAnimation = Tween<Offset>(
       begin: _position,
       end: Offset(targetX, targetY),
-    ).animate(
-      CurvedAnimation(
-        parent: _snapController,
-        curve: Curves.easeOutBack,
-      ),
-    );
+    ).animate(CurvedAnimation(
+      parent: _snapController,
+      curve: Curves.easeOutCubic,
+    ));
 
-    _snapController.forward(from: 0.0).then((_) {
-      _startIdleTimer();
-    });
+    _snapController.forward(from: 0.0);
   }
 
   void _openMenu() {
     _wakeUp();
-    setState(() => _isMenuOpen = true);
     HapticFeedback.mediumImpact();
+    setState(() {
+      _isMenuOpen = true;
+      _isInteracting = true;
+    });
 
     showGeneralDialog(
       context: context,
       barrierDismissible: true,
       barrierLabel: 'Quick Actions Hub',
       barrierColor: Colors.transparent,
-      transitionDuration: const Duration(milliseconds: 220),
+      transitionDuration: const Duration(milliseconds: 240),
       pageBuilder: (dialogContext, anim1, anim2) {
         return _QuickActionsMenuDialog(
           onCurriculum: () {
@@ -232,7 +274,10 @@ class _TeacherAssistiveTouchState extends ConsumerState<TeacherAssistiveTouch>
       },
     ).then((_) {
       if (mounted) {
-        setState(() => _isMenuOpen = false);
+        setState(() {
+          _isMenuOpen = false;
+          _isInteracting = false;
+        });
         _startIdleTimer();
       }
     });
@@ -243,31 +288,34 @@ class _TeacherAssistiveTouchState extends ConsumerState<TeacherAssistiveTouch>
     ref.watch(themeProvider);
     final mediaQuery = MediaQuery.of(context);
     final screenWidth = mediaQuery.size.width;
-    final screenHeight = mediaQuery.size.height - mediaQuery.padding.top - mediaQuery.padding.bottom;
+    final screenHeight = mediaQuery.size.height;
 
+    // Default position at bottom-right edge if uninitialized
     if (!_isInitialized) {
-      final initX = screenWidth - _buttonSize - _edgePadding;
+      final initX = (screenWidth - _buttonWidth - _edgePadding).clamp(
+        _edgePadding,
+        double.infinity,
+      );
       final initY = (screenHeight * 0.62).clamp(
         12.0,
-        (screenHeight - _buttonSize - 16.0).clamp(12.0, double.infinity),
+        (screenHeight - _buttonHeight - 16.0).clamp(12.0, double.infinity),
       );
       _position = Offset(initX, initY);
       _isInitialized = true;
       _startIdleTimer();
     } else {
       final minX = _edgePadding;
-      final maxX = (screenWidth - _buttonSize - _edgePadding).clamp(minX, double.infinity);
+      final maxX = (screenWidth - _buttonWidth - _edgePadding).clamp(minX, double.infinity);
       final minY = 12.0;
-      final maxY = (screenHeight - _buttonSize - 16.0).clamp(minY, double.infinity);
+      final maxY = (screenHeight - _buttonHeight - 16.0).clamp(minY, double.infinity);
 
       if (_position.dx > maxX || _position.dy > maxY) {
         _position = Offset(_position.dx.clamp(minX, maxX), _position.dy.clamp(minY, maxY));
       }
     }
 
-    final opacity = _isDragging
-        ? 1.0
-        : (_isIdle ? 0.65 : 0.95);
+    final isActivelyInteracting = _isDragging || _isInteracting || _isMenuOpen;
+    final opacity = isActivelyInteracting ? 1.0 : (_isIdle ? 0.70 : 0.95);
 
     return Positioned(
       left: _position.dx,
@@ -277,51 +325,99 @@ class _TeacherAssistiveTouchState extends ConsumerState<TeacherAssistiveTouch>
         onPanStart: _onPanStart,
         onPanUpdate: _onPanUpdate,
         onPanEnd: _onPanEnd,
+        onTapDown: (_) {
+          _wakeUp();
+          setState(() => _isInteracting = true);
+        },
+        onTapUp: (_) {
+          Future.delayed(const Duration(milliseconds: 350), () {
+            if (mounted && !_isDragging && !_isMenuOpen) {
+              setState(() => _isInteracting = false);
+            }
+          });
+        },
+        onTapCancel: () {
+          if (mounted && !_isDragging && !_isMenuOpen) {
+            setState(() => _isInteracting = false);
+          }
+        },
         onTap: _openMenu,
         behavior: HitTestBehavior.opaque,
         child: AnimatedOpacity(
           opacity: opacity,
           duration: const Duration(milliseconds: 220),
-          child: Container(
-            width: _buttonSize,
-            height: _buttonSize,
-            decoration: BoxDecoration(
-              shape: BoxShape.circle,
-              gradient: LinearGradient(
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
-                colors: [
-                  AppTheme.primary,
-                  AppTheme.primaryDark,
-                ],
-              ),
-              border: Border.all(
-                color: Colors.white.withValues(alpha: 0.35),
-                width: 1.5,
-              ),
-              boxShadow: [
-                BoxShadow(
-                  color: AppTheme.primary.withValues(alpha: 0.35),
-                  blurRadius: 14,
-                  offset: const Offset(0, 4),
+          child: AnimatedBuilder(
+            animation: _floatAnimation,
+            builder: (context, child) {
+              final floatY = isActivelyInteracting ? 0.0 : _floatAnimation.value;
+              final tiltAngle = _isDragging ? (_dragVelocityX * 0.003).clamp(-0.15, 0.15) : 0.0;
+
+              return Transform.translate(
+                offset: Offset(0, floatY),
+                child: Transform.rotate(
+                  angle: tiltAngle,
+                  child: AnimatedScale(
+                    scale: isActivelyInteracting ? 1.08 : 1.0,
+                    duration: const Duration(milliseconds: 180),
+                    curve: Curves.easeOutBack,
+                    child: SizedBox(
+                      width: _buttonWidth,
+                      height: _buttonHeight,
+                      child: Stack(
+                        alignment: Alignment.bottomCenter,
+                        children: [
+                          // Soft floating character shadow underneath baseline
+                          Positioned(
+                            bottom: 2,
+                            child: AnimatedContainer(
+                              duration: const Duration(milliseconds: 180),
+                              width: isActivelyInteracting ? 46 : 38,
+                              height: 6,
+                              decoration: BoxDecoration(
+                                color: Colors.black.withValues(alpha: isActivelyInteracting ? 0.28 : 0.15),
+                                borderRadius: BorderRadius.circular(10),
+                                boxShadow: [
+                                  BoxShadow(
+                                    color: Colors.black.withValues(alpha: isActivelyInteracting ? 0.25 : 0.12),
+                                    blurRadius: isActivelyInteracting ? 8 : 5,
+                                    offset: const Offset(0, 1),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
+                          // Exact shape avatar (seamless transition between idle and active)
+                          AnimatedSwitcher(
+                            duration: const Duration(milliseconds: 220),
+                            switchInCurve: Curves.easeOutCubic,
+                            switchOutCurve: Curves.easeInCubic,
+                            transitionBuilder: (child, animation) {
+                              return FadeTransition(
+                                opacity: animation,
+                                child: ScaleTransition(
+                                  scale: Tween<double>(begin: 0.94, end: 1.0).animate(animation),
+                                  child: child,
+                                ),
+                              );
+                            },
+                            child: Image.asset(
+                              isActivelyInteracting
+                                  ? 'assets/images/aira_avatar_active.png'
+                                  : 'assets/images/aira_avatar_idle.png',
+                              key: ValueKey<bool>(isActivelyInteracting),
+                              width: _buttonWidth,
+                              height: _buttonHeight,
+                              fit: BoxFit.contain,
+                              filterQuality: FilterQuality.medium,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
                 ),
-                BoxShadow(
-                  color: Colors.black.withValues(alpha: 0.15),
-                  blurRadius: 6,
-                  offset: const Offset(0, 2),
-                ),
-              ],
-            ),
-            child: Material(
-              color: Colors.transparent,
-              child: Center(
-                child: Icon(
-                  _isDragging ? Icons.pan_tool_rounded : Icons.touch_app_rounded,
-                  color: Colors.white,
-                  size: 26,
-                ),
-              ),
-            ),
+              );
+            },
           ),
         ),
       ),
@@ -450,7 +546,9 @@ class _QuickActionsMenuDialog extends ConsumerWidget {
                               child: Row(
                                 children: [
                                   Container(
-                                    padding: const EdgeInsets.all(8),
+                                    width: 38,
+                                    height: 38,
+                                    padding: const EdgeInsets.all(3),
                                     decoration: BoxDecoration(
                                       color: AppTheme.primary.withValues(alpha: 0.14),
                                       borderRadius: BorderRadius.circular(12),
@@ -459,10 +557,9 @@ class _QuickActionsMenuDialog extends ConsumerWidget {
                                         width: 1.2,
                                       ),
                                     ),
-                                    child: Icon(
-                                      Icons.touch_app_rounded,
-                                      color: AppTheme.primary,
-                                      size: 20,
+                                    child: Image.asset(
+                                      'assets/images/aira_avatar_active.png',
+                                      fit: BoxFit.contain,
                                     ),
                                   ),
                                   const SizedBox(width: 12),
