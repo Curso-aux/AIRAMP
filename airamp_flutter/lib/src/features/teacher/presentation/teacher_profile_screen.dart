@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import '../../../core/components/otp_verification_dialog.dart';
 import '../../../core/components/skeleton_loader.dart';
+import '../../../core/services/otp_service.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/theme/theme_provider.dart';
 import '../../auth/application/auth_provider.dart';
@@ -344,14 +346,93 @@ class _TeacherProfileScreenState extends ConsumerState<TeacherProfileScreen> {
   Future<void> _handleChangePassword() async {
     final newPass = _newPasswordController.text;
     final confirmPass = _confirmPasswordController.text;
-    if (newPass.isEmpty || newPass.length < 6) { _showAlert('Error', 'Password must be at least 6 characters.'); return; }
-    if (newPass != confirmPass) { _showAlert('Error', 'Passwords do not match.'); return; }
-    await ref.read(authProvider.notifier).updateProfile(password: newPass);
-    setState(() => _showPasswordForm = false);
-    _newPasswordController.clear();
-    _confirmPasswordController.clear();
+    if (newPass.isEmpty || newPass.length < 6) {
+      _showAlert('Error', 'Password must be at least 6 characters.');
+      return;
+    }
+    if (newPass != confirmPass) {
+      _showAlert('Error', 'Passwords do not match.');
+      return;
+    }
+
+    final user = ref.read(authProvider);
+    if (user == null || user.email.isEmpty) {
+      _showAlert('Error', 'Teacher account or email could not be determined.');
+      return;
+    }
+
+    // Show sending progress indicator
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: AppTheme.surface,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+        content: Padding(
+          padding: const EdgeInsets.symmetric(vertical: 16),
+          child: Row(
+            children: [
+              CircularProgressIndicator(color: AppTheme.primary),
+              const SizedBox(width: 20),
+              Expanded(
+                child: Text(
+                  'Sending verification code to your email...',
+                  style: TextStyle(color: AppTheme.text, fontSize: 14),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+
+    final otpResult = await OtpService().requestOtpDirect(
+      userId: user.id,
+      email: user.email,
+      fullName: user.fullName,
+      role: user.role,
+    );
+
     if (!mounted) return;
-    _showAlert('Success', 'Password changed successfully!');
+    Navigator.of(context, rootNavigator: true).pop(); // dismiss loading dialog
+
+    if (!otpResult.success) {
+      _showAlert('Failed to Send Code', otpResult.message);
+      return;
+    }
+
+    // Prompt teacher for OTP verification
+    final verified = await OtpVerificationDialog.show(
+      context: context,
+      email: user.email,
+      userId: user.id,
+      fullName: user.fullName,
+      role: user.role,
+      onVerify: (otpCode) async {
+        return await OtpService().verifyOtp(
+          identifier: user.id,
+          enteredCode: otpCode,
+        );
+      },
+      onResend: () async {
+        final res = await OtpService().requestOtpDirect(
+          userId: user.id,
+          email: user.email,
+          fullName: user.fullName,
+          role: user.role,
+        );
+        return res.success;
+      },
+    );
+
+    if (verified == true) {
+      await ref.read(authProvider.notifier).updateProfile(password: newPass);
+      if (!mounted) return;
+      setState(() => _showPasswordForm = false);
+      _newPasswordController.clear();
+      _confirmPasswordController.clear();
+      _showAlert('Success', 'Password changed successfully!');
+    }
   }
 
   void _handleLogout() {

@@ -3,6 +3,7 @@ import 'package:dio/dio.dart';
 import 'package:flutter/foundation.dart';
 import '../../../core/database/database_helper.dart';
 import '../../../core/database/firestore_service.dart';
+import '../../../core/services/otp_service.dart';
 import '../../../core/api/api_client.dart';
 
 class AuthSession {
@@ -374,6 +375,82 @@ class AuthRepository {
       } on DioException {
         // Fall through; local SQLite is already updated
       }
+    }
+  }
+
+  /// Resets a user's password using a verified OTP code.
+  /// Updates password as salted SHA-256 in both local SQLite and Cloud Firestore.
+  Future<void> resetPasswordWithOtp({
+    required String identifier,
+    required String otpCode,
+    required String newPassword,
+  }) async {
+    final cleanIdentifier = identifier.trim();
+    final cleanPass = newPassword.trim();
+    if (cleanPass.length < 6) {
+      throw Exception('Password must be at least 6 characters.');
+    }
+
+    final isValid = await OtpService().verifyOtp(
+      identifier: cleanIdentifier,
+      enteredCode: otpCode,
+    );
+    if (!isValid) {
+      throw Exception('Invalid or expired OTP verification code.');
+    }
+
+    // Locate the user
+    Map<String, dynamic>? user = await FirestoreService().findUserByIdentifier(cleanIdentifier);
+    String? resolvedUserId = user?['id']?.toString();
+
+    final db = await DatabaseHelper().database;
+    if (resolvedUserId == null) {
+      final idLower = cleanIdentifier.toLowerCase();
+      final rows = await db.rawQuery(
+        '''SELECT * FROM users
+           WHERE LOWER(id) = ?
+              OR LOWER(email) = ?
+              OR LOWER(COALESCE(username, '')) = ?
+           LIMIT 1''',
+        [idLower, idLower, idLower],
+      );
+      if (rows.isNotEmpty) {
+        resolvedUserId = rows.first['id'] as String?;
+      }
+    }
+
+    if (resolvedUserId == null) {
+      throw Exception('Account could not be identified for password update.');
+    }
+
+    // Salt and hash the new password
+    final salt = DatabaseHelper.generateSalt();
+    final hashedPassword = DatabaseHelper.hashPassword(cleanPass, salt);
+
+    // Update SQLite
+    try {
+      await db.update(
+        'users',
+        {
+          'password': hashedPassword,
+          'password_salt': salt,
+        },
+        where: 'id = ?',
+        whereArgs: [resolvedUserId],
+      );
+    } catch (e) {
+      debugPrint('[AuthRepository] Local DB reset update error: $e');
+    }
+
+    // Update Cloud Firestore
+    try {
+      await FirestoreService().saveUser({
+        'id': resolvedUserId,
+        'password': hashedPassword,
+        'password_salt': salt,
+      });
+    } catch (e) {
+      debugPrint('[AuthRepository] Firestore reset update error: $e');
     }
   }
 

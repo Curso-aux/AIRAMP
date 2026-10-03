@@ -353,4 +353,77 @@ class FirestoreService {
       debugPrint('[FirestoreService] Error syncing cloud users to local SQLite: $e');
     }
   }
+
+  /// Generic helper to save or merge a document in any collection
+  Future<void> saveDocument(String collection, String docId, Map<String, dynamic> data) async {
+    final cleanDocId = docId.trim();
+    if (cleanDocId.isEmpty) return;
+
+    if (isAvailable) {
+      try {
+        await firestore.collection(collection).doc(cleanDocId).set(data, SetOptions(merge: true));
+        return;
+      } catch (e) {
+        debugPrint('[FirestoreService] SDK saveDocument error: $e');
+      }
+    }
+
+    try {
+      final dio = Dio();
+      final url = 'https://firestore.googleapis.com/v1/projects/$projectId/databases/(default)/documents/$collection/$cleanDocId?key=$apiKey';
+      final fields = <String, dynamic>{};
+      for (final entry in data.entries) {
+        final val = entry.value;
+        if (val == null) {
+          fields[entry.key] = {'nullValue': null};
+        } else if (val is bool) {
+          fields[entry.key] = {'booleanValue': val};
+        } else if (val is int) {
+          fields[entry.key] = {'integerValue': val.toString()};
+        } else if (val is double) {
+          fields[entry.key] = {'doubleValue': val};
+        } else {
+          fields[entry.key] = {'stringValue': val.toString()};
+        }
+      }
+      await dio.patch(url, data: {'fields': fields});
+    } catch (e) {
+      debugPrint('[FirestoreService] REST saveDocument error: $e');
+    }
+  }
+
+  /// Generic helper to fetch a document from any collection
+  Future<Map<String, dynamic>?> getDocument(String collection, String docId) async {
+    final cleanDocId = docId.trim();
+    if (cleanDocId.isEmpty) return null;
+
+    if (isAvailable) {
+      try {
+        final snap = await firestore.collection(collection).doc(cleanDocId).get();
+        if (snap.exists && snap.data() != null) {
+          final res = snap.data()!;
+          res['id'] = snap.id;
+          return res;
+        }
+      } catch (e) {
+        debugPrint('[FirestoreService] SDK getDocument error: $e');
+      }
+    }
+
+    try {
+      final dio = Dio(BaseOptions(connectTimeout: const Duration(seconds: 4), receiveTimeout: const Duration(seconds: 4)));
+      final url = 'https://firestore.googleapis.com/v1/projects/$projectId/databases/(default)/documents/$collection/$cleanDocId?key=$apiKey';
+      final resp = await dio.get(url);
+      if (resp.statusCode == 200 && resp.data is Map && resp.data['fields'] is Map) {
+        final parsed = _parseFirestoreFields(resp.data['fields'] as Map<String, dynamic>);
+        if (parsed.isNotEmpty) {
+          parsed['id'] = cleanDocId;
+          return parsed;
+        }
+      }
+    } catch (_) {}
+
+    return null;
+  }
 }
+

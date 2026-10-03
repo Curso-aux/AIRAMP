@@ -124,6 +124,134 @@ AIRA School Administration
 </html>
 ''';
 
+    return await _deliverEmail(
+      toEmail: toEmail,
+      subject: subject,
+      textContent: textContent,
+      htmlContent: htmlContent,
+      userId: userId,
+      username: username,
+      role: role,
+      mailType: 'account_credentials',
+      successMessage: 'Credentials email sent to $toEmail via Gmail SMTP',
+    );
+  }
+
+  /// Sends a one-time password (OTP) verification email for password reset or change.
+  Future<EmailResult> sendPasswordResetOtp({
+    required String toEmail,
+    required String fullName,
+    required String userId,
+    required String otpCode,
+    required String role,
+  }) async {
+    final roleTitle = role.toLowerCase() == 'teacher' ? 'Faculty / Teacher' : 'Student';
+    final subject = 'AIRA Security Code: $otpCode - Password Reset Verification';
+
+    final textContent = '''
+Hello $fullName,
+
+You recently requested to change or reset your password for your AIRA $roleTitle account.
+
+Your One-Time Password (OTP) verification code is:
+$otpCode
+
+This code is valid for 10 minutes. Please enter this code into the AIRA application to proceed.
+
+Account Information:
+- User / Student ID: $userId
+- Account Role: $roleTitle
+- Associated Email: $toEmail
+
+If you did not initiate this request, your account remains secure and you may safely ignore this email.
+
+Best regards,
+AIRA Security & Administration
+''';
+
+    final htmlContent = '''
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <style>
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; background-color: #f8fafc; color: #1e293b; margin: 0; padding: 24px; }
+    .container { max-width: 560px; margin: 0 auto; background: #ffffff; border-radius: 16px; overflow: hidden; box-shadow: 0 4px 14px rgba(0,0,0,0.06); border: 1px solid #e2e8f0; }
+    .header { background: linear-gradient(135deg, #0d9488 0%, #0284c7 100%); padding: 28px 24px; text-align: center; color: #ffffff; }
+    .header h1 { margin: 0; font-size: 22px; font-weight: 700; letter-spacing: -0.5px; }
+    .header p { margin: 6px 0 0; font-size: 13px; opacity: 0.9; }
+    .content { padding: 32px 28px; }
+    .greeting { font-size: 16px; font-weight: 600; margin-bottom: 12px; color: #0f172a; }
+    .otp-card { background-color: #f8fafc; border-radius: 12px; padding: 24px; margin: 24px 0; border: 2px dashed #0d9488; text-align: center; }
+    .otp-code { font-family: 'Courier New', Courier, monospace; font-size: 36px; font-weight: 800; letter-spacing: 8px; color: #0d9488; display: inline-block; padding: 4px 12px; }
+    .otp-expiry { font-size: 12px; color: #64748b; margin-top: 10px; font-weight: 500; }
+    .info-box { background-color: #f1f5f9; border-radius: 10px; padding: 14px 18px; margin: 18px 0; font-size: 13px; color: #334155; }
+    .info-row { display: flex; justify-content: space-between; padding: 4px 0; }
+    .warning { font-size: 12px; color: #b45309; background-color: #fffbeb; border: 1px solid #fde68a; border-radius: 8px; padding: 12px; margin-top: 20px; line-height: 1.4; }
+    .footer { text-align: center; padding: 20px; font-size: 12px; color: #94a3b8; border-top: 1px solid #f1f5f9; background-color: #fafafa; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="header">
+      <h1>AIRA Security Verification</h1>
+      <p>One-Time Password (OTP) for Password Change</p>
+    </div>
+    <div class="content">
+      <div class="greeting">Hello, $fullName!</div>
+      <p style="font-size: 14px; line-height: 1.5; color: #475569;">
+        A request has been made to change or reset the password for your <strong>$roleTitle</strong> account. Enter the verification code below in the app to complete this request:
+      </p>
+      
+      <div class="otp-card">
+        <div class="otp-code">$otpCode</div>
+        <div class="otp-expiry">&#9201; Valid for 10 minutes &bull; Single-use only</div>
+      </div>
+
+      <div class="info-box">
+        <div class="info-row"><span><strong>Account ID:</strong></span> <code>$userId</code></div>
+        <div class="info-row"><span><strong>Role:</strong></span> $roleTitle</div>
+        <div class="info-row"><span><strong>Email:</strong></span> $toEmail</div>
+      </div>
+
+      <div class="warning">
+        <strong>Important Security Notice:</strong> Never share this verification code with anyone. AIRA staff or administrators will never ask for your code. If you did not make this request, you can safely ignore this email; your existing password remains unchanged.
+      </div>
+    </div>
+    <div class="footer">
+      Sent automatically by AIRA Platform &bull; Evangelista Christian School<br>
+      Security & Authentication Service
+    </div>
+  </div>
+</body>
+</html>
+''';
+
+    return await _deliverEmail(
+      toEmail: toEmail,
+      subject: subject,
+      textContent: textContent,
+      htmlContent: htmlContent,
+      userId: userId,
+      role: role,
+      mailType: 'password_reset_otp',
+      successMessage: 'Security OTP verification email sent to $toEmail via Gmail SMTP',
+    );
+  }
+
+  /// Core cross-platform email delivery pipeline supporting Native SMTP,
+  /// Local/Emulator HTTP Bridge, and Cloud Firestore Logging.
+  Future<EmailResult> _deliverEmail({
+    required String toEmail,
+    required String subject,
+    required String textContent,
+    required String htmlContent,
+    required String userId,
+    String? username,
+    required String role,
+    required String mailType,
+    required String successMessage,
+  }) async {
     bool sent = false;
     String channel = 'none';
 
@@ -139,7 +267,7 @@ AIRA School Administration
         if (nativeOk) {
           sent = true;
           channel = 'smtp_native';
-          debugPrint('[EmailService] Credentials email sent directly via Gmail SMTP to $toEmail');
+          debugPrint('[EmailService] Email ($mailType) sent directly via Gmail SMTP to $toEmail');
         }
       } catch (e) {
         debugPrint('[EmailService] Native SMTP delivery note: $e');
@@ -153,14 +281,13 @@ AIRA School Administration
         receiveTimeout: const Duration(seconds: 15),
       ));
 
-      // In web or desktop, 127.0.0.1:8088 is localhost; on Android emulator, 10.0.2.2:8088 bridges to host
       final bridgeCandidates = kIsWeb
           ? [EmailConfig.localBridgeUrl, 'http://localhost:8088/send-email']
           : [EmailConfig.emulatorBridgeUrl, EmailConfig.localBridgeUrl];
 
       for (final endpoint in bridgeCandidates) {
         try {
-          debugPrint('[EmailService] Attempting delivery via SMTP bridge: $endpoint');
+          debugPrint('[EmailService] Attempting delivery ($mailType) via SMTP bridge: $endpoint');
           final response = await dio.post(
             endpoint,
             data: {
@@ -176,7 +303,7 @@ AIRA School Administration
           if (response.statusCode == 200) {
             sent = true;
             channel = 'smtp_bridge';
-            debugPrint('[EmailService] Credentials email delivered via SMTP bridge to $toEmail');
+            debugPrint('[EmailService] Email ($mailType) delivered via SMTP bridge to $toEmail');
             break;
           }
         } catch (bridgeErr) {
@@ -191,16 +318,19 @@ AIRA School Administration
       final docId = 'mail_${DateTime.now().millisecondsSinceEpoch}';
       final dio = Dio();
       final url = 'https://firestore.googleapis.com/v1/projects/${FirestoreService.projectId}/databases/(default)/documents/mail/$docId?key=${FirestoreService.apiKey}';
-      
+
       final fields = <String, dynamic>{
         'to': {'stringValue': toEmail},
         'subject': {'stringValue': subject},
         'user_id': {'stringValue': userId},
-        'username': {'stringValue': username},
         'role': {'stringValue': role},
+        'mail_type': {'stringValue': mailType},
         'created_at': {'stringValue': DateTime.now().toIso8601String()},
         'status': {'stringValue': sent ? 'sent_via_$channel' : 'queued_for_delivery'},
       };
+      if (username != null && username.isNotEmpty) {
+        fields['username'] = {'stringValue': username};
+      }
       await dio.patch(url, data: {'fields': fields});
       cloudQueued = true;
     } catch (e) {
@@ -210,13 +340,13 @@ AIRA School Administration
     if (sent) {
       return EmailResult(
         success: true,
-        message: 'Credentials email sent to $toEmail via Gmail SMTP',
+        message: successMessage,
         channel: channel,
       );
     } else if (cloudQueued) {
       return EmailResult(
         success: true,
-        message: 'Credentials recorded & queued in Cloud Database for $toEmail',
+        message: 'Notification recorded & queued in Cloud Database for $toEmail',
         channel: 'firestore_trigger',
       );
     } else {
@@ -228,4 +358,5 @@ AIRA School Administration
     }
   }
 }
+
 

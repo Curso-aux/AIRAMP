@@ -262,6 +262,20 @@ class AuthNotifier extends Notifier<User?> {
     }
   }
 
+  /// Resets password for a user using verified OTP (for forgot password)
+  Future<void> resetPasswordWithOtp({
+    required String identifier,
+    required String otpCode,
+    required String newPassword,
+  }) async {
+    final repository = ref.read(authRepositoryProvider);
+    await repository.resetPasswordWithOtp(
+      identifier: identifier,
+      otpCode: otpCode,
+      newPassword: newPassword,
+    );
+  }
+
   /// Update the current student's section and grade upon key enrollment
   void updateUserSection({required String section, required String grade}) {
     if (state == null) return;
