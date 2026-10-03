@@ -33,7 +33,7 @@ class _AdminWebLoginScreenState extends ConsumerState<AdminWebLoginScreen> {
     final password = _passwordController.text;
 
     if (identifier.isEmpty || password.isEmpty) {
-      setState(() => _error = 'Please enter your administrator email and password.');
+      setState(() => _error = 'Please enter your ID, email or username, and password.');
       return;
     }
 
@@ -42,17 +42,14 @@ class _AdminWebLoginScreenState extends ConsumerState<AdminWebLoginScreen> {
       final user = ref.read(authProvider);
 
       if (user != null) {
-        // Strict Authorization: Administrators and Teachers allowed on Web!
+        // Role-based navigation for all user types on Web
         if (user.role == 'admin' || user.role == 'super_admin') {
           if (mounted) context.go('/admin/dashboard');
         } else if (user.role == 'teacher') {
           if (mounted) context.go('/teacher/dashboard');
         } else {
-          // Immediately revoke session on web for student roles
-          await ref.read(authProvider.notifier).logout();
-          setState(() {
-            _error = 'Access Restricted: You are signed in with a Student account. The Web Portal is exclusively reserved for School Administrators and Faculty Members. Students must open the AIRAMP app on a mobile device or classroom tablet.';
-          });
+          // Students and learners
+          if (mounted) context.go('/student/home');
         }
       }
     } catch (e) {
@@ -117,7 +114,7 @@ class _AdminWebLoginScreenState extends ConsumerState<AdminWebLoginScreen> {
                 mainAxisSize: MainAxisSize.min,
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  // Admin Shield Icon
+                  // Portal Icon
                   Center(
                     child: Container(
                       width: 64,
@@ -128,7 +125,7 @@ class _AdminWebLoginScreenState extends ConsumerState<AdminWebLoginScreen> {
                         border: Border.all(color: AppTheme.primary.withValues(alpha: 0.3)),
                       ),
                       child: Icon(
-                        Icons.shield_rounded,
+                        Icons.school_rounded,
                         color: AppTheme.primary,
                         size: 32,
                       ),
@@ -149,7 +146,7 @@ class _AdminWebLoginScreenState extends ConsumerState<AdminWebLoginScreen> {
                   ),
                   const SizedBox(height: 6),
                   Text(
-                    'Institutional Governance & Faculty Portal',
+                    'Unified Learning & Management Portal',
                     textAlign: TextAlign.center,
                     style: TextStyle(
                       color: AppTheme.textSecondary,
@@ -168,13 +165,13 @@ class _AdminWebLoginScreenState extends ConsumerState<AdminWebLoginScreen> {
                       border: Border.all(color: AppTheme.primary.withValues(alpha: 0.2)),
                     ),
                     child: Row(
-                      crossAxisAlignment: CrossAxisAlignment.start,
+                      crossAxisAlignment: CrossAxisAlignment.center,
                       children: [
                         Icon(Icons.info_outline_rounded, color: AppTheme.primary, size: 18),
                         const SizedBox(width: 10),
                         Expanded(
                           child: Text(
-                            'Authorized School Administrators and Faculty Members. Students must sign in via the AIRAMP mobile app.',
+                            'Welcome! Students, Faculty, and Administrators can sign in below to access their portal.',
                             style: TextStyle(
                               color: AppTheme.text,
                               fontSize: 12,
@@ -220,7 +217,7 @@ class _AdminWebLoginScreenState extends ConsumerState<AdminWebLoginScreen> {
 
                   // Email or Username Input
                   Text(
-                    'Administrator Email / Username',
+                    'Student ID, Email or Username',
                     style: TextStyle(
                       fontSize: 13,
                       fontWeight: FontWeight.w700,
@@ -233,7 +230,7 @@ class _AdminWebLoginScreenState extends ConsumerState<AdminWebLoginScreen> {
                     keyboardType: TextInputType.text,
                     autofocus: true,
                     decoration: InputDecoration(
-                      hintText: 'e.g. Aira Admin, aira@admin, or admin@aira.edu',
+                      hintText: 'e.g. 001-0001, username, or name@aira.edu',
                       prefixIcon: const Icon(Icons.person_outline_rounded, size: 20),
                       filled: true,
                       fillColor: isDark ? Colors.black.withValues(alpha: 0.25) : Colors.black.withValues(alpha: 0.03),
@@ -249,20 +246,36 @@ class _AdminWebLoginScreenState extends ConsumerState<AdminWebLoginScreen> {
                   const SizedBox(height: 18),
 
                   // Password Input
-                  Text(
-                    'Password',
-                    style: TextStyle(
-                      fontSize: 13,
-                      fontWeight: FontWeight.w700,
-                      color: AppTheme.text,
-                    ),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Text(
+                        'Password',
+                        style: TextStyle(
+                          fontSize: 13,
+                          fontWeight: FontWeight.w700,
+                          color: AppTheme.text,
+                        ),
+                      ),
+                      GestureDetector(
+                        onTap: () => context.push('/forgot-password'),
+                        child: Text(
+                          'Forgot password?',
+                          style: TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.w600,
+                            color: AppTheme.primary,
+                          ),
+                        ),
+                      ),
+                    ],
                   ),
                   const SizedBox(height: 8),
                   TextField(
                     controller: _passwordController,
                     obscureText: !_showPassword,
                     decoration: InputDecoration(
-                      hintText: 'Enter administrator password',
+                      hintText: 'Enter your password',
                       prefixIcon: const Icon(Icons.lock_outline_rounded, size: 20),
                       suffixIcon: IconButton(
                         icon: Icon(
@@ -293,8 +306,8 @@ class _AdminWebLoginScreenState extends ConsumerState<AdminWebLoginScreen> {
                             height: 18,
                             child: CircularProgressIndicator(strokeWidth: 2, color: Colors.black),
                           )
-                        : const Icon(Icons.arrow_forward_rounded, size: 18),
-                    label: Text(isLoading ? 'Signing In...' : 'Sign In to Web Admin'),
+                        : const Icon(Icons.login_rounded, size: 18),
+                    label: Text(isLoading ? 'Signing In...' : 'Sign In'),
                     style: ElevatedButton.styleFrom(
                       backgroundColor: AppTheme.primary,
                       foregroundColor: Colors.black,

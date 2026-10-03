@@ -166,11 +166,7 @@ class AuthNotifier extends Notifier<User?> {
       return;
     }
 
-    // On Web (kIsWeb): Web portal is available for Administrators, Super Administrators, and Teachers (Faculty).
-    if (kIsWeb && (session.role != 'admin' && session.role != 'super_admin' && session.role != 'teacher')) {
-      await repository.logout();
-      return;
-    }
+    // On Web (kIsWeb): Web portal is accessible to Students, Teachers, and Administrators.
 
     // Restore complete user profile from local database
     final db = await DatabaseHelper().database;

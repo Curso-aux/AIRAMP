@@ -78,7 +78,7 @@ final routerProvider = Provider<GoRouter>((ref) {
       ),
       GoRoute(
         path: '/login',
-        builder: (context, state) => const LoginScreen(),
+        builder: (context, state) => kIsWeb ? const AdminWebLoginScreen() : const LoginScreen(),
       ),
       GoRoute(
         path: '/signup',
@@ -392,7 +392,7 @@ final routerProvider = Provider<GoRouter>((ref) {
 
       // 2. On Web, visiting generic /login routes to appropriate portal or admin login
       if (kIsWeb && matched == '/login') {
-        if (!isAuth) return '/admin/login';
+        if (!isAuth) return null;
         if (authState.role == 'admin' || authState.role == 'super_admin') {
           return '/admin/dashboard';
         } else if (authState.role == 'teacher') {
