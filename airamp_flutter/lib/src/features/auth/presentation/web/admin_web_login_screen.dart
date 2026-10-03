@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import '../../../../core/components/otp_verification_dialog.dart';
+import '../../../../core/services/otp_service.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../../core/theme/theme_provider.dart';
 import '../../../landing/presentation/components/halftone_background.dart';
@@ -144,11 +146,89 @@ class _AdminWebLoginScreenState extends ConsumerState<AdminWebLoginScreen> {
 
     try {
       await ref.read(authProvider.notifier).login(identifier, password);
+      if (!mounted) return;
       final user = ref.read(authProvider);
 
       if (user != null) {
         // Automatic routing based on verified account role
         if (user.role == 'admin' || user.role == 'super_admin') {
+          // Require 2FA OTP verification if admin has a registered email
+          if (user.email.isNotEmpty && user.email.contains('@')) {
+            showDialog(
+              context: context,
+              barrierDismissible: false,
+              builder: (ctx) => AlertDialog(
+                backgroundColor: AppTheme.surface,
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                content: Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 16),
+                  child: Row(
+                    children: [
+                      CircularProgressIndicator(color: AppTheme.primary),
+                      const SizedBox(width: 20),
+                      Expanded(
+                        child: Text(
+                          'Sending administrator 2FA code to ${OtpService.maskEmail(user.email)}...',
+                          style: TextStyle(color: AppTheme.text, fontSize: 14),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            );
+
+            final otpResult = await OtpService().requestEmailVerificationOtp(
+              targetEmail: user.email,
+              fullName: user.fullName,
+              userId: user.id,
+              role: user.role,
+              purpose: 'Administrator 2FA Sign-In',
+            );
+
+            if (!mounted) return;
+            Navigator.of(context, rootNavigator: true).pop();
+
+            if (!otpResult.success) {
+              setState(() => _error = otpResult.message);
+              await ref.read(authProvider.notifier).logout();
+              return;
+            }
+
+            final verified = await OtpVerificationDialog.show(
+              context: context,
+              email: user.email,
+              userId: user.id,
+              fullName: user.fullName,
+              role: user.role,
+              onVerify: (code) async {
+                return await OtpService().verifyOtp(
+                  identifier: user.id,
+                  enteredCode: code,
+                );
+              },
+              onResend: () async {
+                final res = await OtpService().requestEmailVerificationOtp(
+                  targetEmail: user.email,
+                  fullName: user.fullName,
+                  userId: user.id,
+                  role: user.role,
+                  purpose: 'Administrator 2FA Sign-In',
+                );
+                return res.success;
+              },
+            );
+
+            if (!mounted) return;
+            if (verified != true) {
+              await ref.read(authProvider.notifier).logout();
+              if (mounted) {
+                setState(() => _error = '2FA verification was cancelled or unverified.');
+              }
+              return;
+            }
+          }
+
           if (mounted) context.go('/admin/dashboard');
         } else if (user.role == 'teacher') {
           if (mounted) context.go('/teacher/dashboard');

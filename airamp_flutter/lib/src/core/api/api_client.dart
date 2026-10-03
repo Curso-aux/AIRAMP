@@ -1,5 +1,6 @@
 import 'package:dio/dio.dart';
 import 'package:airamp_flutter/src/core/api/auth_headers.dart';
+import 'rate_limit_interceptor.dart';
 
 class ApiClient {
   static const String _functionsUrl = String.fromEnvironment(
@@ -16,7 +17,7 @@ class ApiClient {
         'Content-Type': 'application/json',
       },
     ),
-  );
+  )..interceptors.add(RateLimitInterceptor());
 
   static String? _session;
   static String? _userId;

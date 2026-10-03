@@ -1,5 +1,6 @@
 import 'package:dio/dio.dart';
 import 'package:flutter/foundation.dart';
+import '../api/rate_limit_interceptor.dart';
 import '../config/email_config.dart';
 import '../database/firestore_service.dart';
 import 'email/email_sender.dart';
@@ -239,6 +240,108 @@ AIRA Security & Administration
     );
   }
 
+  /// Sends an OTP verification email for specific security operations
+  /// (e.g. Email Address Update, Student Account Registration, Administrator 2FA).
+  Future<EmailResult> sendVerificationOtp({
+    required String toEmail,
+    required String fullName,
+    required String otpCode,
+    required String purpose,
+    String? userId,
+    String role = 'student',
+  }) async {
+    final roleTitle = role.toLowerCase() == 'teacher'
+        ? 'Faculty / Teacher'
+        : (role.toLowerCase() == 'admin' || role.toLowerCase() == 'super_admin' ? 'Administrator' : 'Student');
+    final subject = 'AIRA Verification Code: $otpCode - $purpose';
+
+    final textContent = '''
+Hello $fullName,
+
+Your 6-digit verification code for $purpose on the AIRA platform is:
+$otpCode
+
+This code is valid for 10 minutes. Please enter this code into the AIRA application to proceed.
+${userId != null ? '- Account ID: $userId\n' : ''}- Target Email: $toEmail
+- Verification Purpose: $purpose
+
+If you did not initiate this request, please disregard this email.
+
+Best regards,
+AIRA Security & Identity Management
+''';
+
+    final htmlContent = '''
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <style>
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; background-color: #f8fafc; color: #1e293b; margin: 0; padding: 24px; }
+    .container { max-width: 560px; margin: 0 auto; background: #ffffff; border-radius: 16px; overflow: hidden; box-shadow: 0 4px 14px rgba(0,0,0,0.06); border: 1px solid #e2e8f0; }
+    .header { background: linear-gradient(135deg, #0d9488 0%, #0284c7 100%); padding: 28px 24px; text-align: center; color: #ffffff; }
+    .header h1 { margin: 0; font-size: 22px; font-weight: 700; letter-spacing: -0.5px; }
+    .header p { margin: 6px 0 0; font-size: 13px; opacity: 0.9; }
+    .content { padding: 32px 28px; }
+    .greeting { font-size: 16px; font-weight: 600; margin-bottom: 12px; color: #0f172a; }
+    .otp-card { background-color: #f8fafc; border-radius: 12px; padding: 24px; margin: 24px 0; border: 2px dashed #0d9488; text-align: center; }
+    .otp-code { font-family: 'Courier New', Courier, monospace; font-size: 36px; font-weight: 800; letter-spacing: 8px; color: #0d9488; display: inline-block; padding: 4px 12px; }
+    .otp-expiry { font-size: 12px; color: #64748b; margin-top: 10px; font-weight: 500; }
+    .info-box { background-color: #f1f5f9; border-radius: 10px; padding: 14px 18px; margin: 18px 0; font-size: 13px; color: #334155; }
+    .info-row { display: flex; justify-content: space-between; padding: 4px 0; }
+    .warning { font-size: 12px; color: #b45309; background-color: #fffbeb; border: 1px solid #fde68a; border-radius: 8px; padding: 12px; margin-top: 20px; line-height: 1.4; }
+    .footer { text-align: center; padding: 20px; font-size: 12px; color: #94a3b8; border-top: 1px solid #f1f5f9; background-color: #fafafa; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="header">
+      <h1>AIRA Identity Verification</h1>
+      <p>$purpose</p>
+    </div>
+    <div class="content">
+      <div class="greeting">Hello, $fullName!</div>
+      <p style="font-size: 14px; line-height: 1.5; color: #475569;">
+        Please use the following single-use verification code to complete your <strong>$purpose</strong>:
+      </p>
+      
+      <div class="otp-card">
+        <div class="otp-code">$otpCode</div>
+        <div class="otp-expiry">&#9201; Valid for 10 minutes &bull; Single-use only</div>
+      </div>
+
+      <div class="info-box">
+        <div class="info-row"><span><strong>Action:</strong></span> $purpose</div>
+        ${userId != null ? '<div class="info-row"><span><strong>Account ID:</strong></span> <code>$userId</code></div>' : ''}
+        <div class="info-row"><span><strong>Account Role:</strong></span> $roleTitle</div>
+        <div class="info-row"><span><strong>Recipient:</strong></span> $toEmail</div>
+      </div>
+
+      <div class="warning">
+        <strong>Security Notice:</strong> Never share this verification code with anyone. AIRA staff or administrators will never ask for your code. If you did not initiate this request, please ignore this email.
+      </div>
+    </div>
+    <div class="footer">
+      Sent automatically by AIRA Platform &bull; Evangelista Christian School<br>
+      Security & Authentication Service
+    </div>
+  </div>
+</body>
+</html>
+''';
+
+    return await _deliverEmail(
+      toEmail: toEmail,
+      subject: subject,
+      textContent: textContent,
+      htmlContent: htmlContent,
+      userId: userId ?? toEmail,
+      role: role,
+      mailType: 'action_verification_otp',
+      successMessage: 'Verification code sent to $toEmail via Gmail SMTP',
+    );
+  }
+
   /// Core cross-platform email delivery pipeline supporting Native SMTP,
   /// Local/Emulator HTTP Bridge, and Cloud Firestore Logging.
   Future<EmailResult> _deliverEmail({
@@ -279,7 +382,7 @@ AIRA Security & Administration
       final dio = Dio(BaseOptions(
         connectTimeout: const Duration(seconds: 12),
         receiveTimeout: const Duration(seconds: 15),
-      ));
+      ))..interceptors.add(RateLimitInterceptor());
 
       final bridgeCandidates = kIsWeb
           ? [EmailConfig.localBridgeUrl, 'http://localhost:8088/send-email']
@@ -316,7 +419,10 @@ AIRA Security & Administration
     bool cloudQueued = false;
     try {
       final docId = 'mail_${DateTime.now().millisecondsSinceEpoch}';
-      final dio = Dio();
+      final dio = Dio(BaseOptions(
+        connectTimeout: const Duration(seconds: 8),
+        receiveTimeout: const Duration(seconds: 8),
+      ))..interceptors.add(RateLimitInterceptor());
       final url = 'https://firestore.googleapis.com/v1/projects/${FirestoreService.projectId}/databases/(default)/documents/mail/$docId?key=${FirestoreService.apiKey}';
 
       final fields = <String, dynamic>{

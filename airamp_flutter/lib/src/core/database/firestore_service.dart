@@ -4,6 +4,7 @@ import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/foundation.dart';
 import 'package:sqflite/sqflite.dart';
 import '../../../firebase_options.dart';
+import '../api/rate_limit_interceptor.dart';
 import 'database_helper.dart';
 
 /// Centralized service connecting AIRA with Cloud Firestore.
@@ -13,6 +14,13 @@ class FirestoreService {
   static final FirestoreService _instance = FirestoreService._internal();
   factory FirestoreService() => _instance;
   FirestoreService._internal();
+
+  static final Dio _dio = Dio(
+    BaseOptions(
+      connectTimeout: const Duration(seconds: 8),
+      receiveTimeout: const Duration(seconds: 8),
+    ),
+  )..interceptors.add(RateLimitInterceptor());
 
   static const String _envApiKey = String.fromEnvironment('FIREBASE_API_KEY');
   static const String _envProjectId = String.fromEnvironment('FIREBASE_PROJECT_ID');
@@ -87,7 +95,7 @@ class FirestoreService {
   /// REST fallback query to find user by field value
   Future<Map<String, dynamic>?> _queryRest(String field, String value) async {
     try {
-      final dio = Dio(BaseOptions(connectTimeout: const Duration(seconds: 4), receiveTimeout: const Duration(seconds: 4)));
+      final dio = _dio;
       final url = 'https://firestore.googleapis.com/v1/projects/$projectId/databases/(default)/documents:runQuery?key=$apiKey';
       final response = await dio.post(
         url,
@@ -132,7 +140,7 @@ class FirestoreService {
   /// REST fallback to fetch all users from Cloud Firestore
   Future<List<Map<String, dynamic>>> _fetchAllRest() async {
     try {
-      final dio = Dio(BaseOptions(connectTimeout: const Duration(seconds: 6), receiveTimeout: const Duration(seconds: 6)));
+      final dio = _dio;
       final url = 'https://firestore.googleapis.com/v1/projects/$projectId/databases/(default)/documents/users?key=$apiKey&pageSize=100';
       final response = await dio.get(url);
       final list = <Map<String, dynamic>>[];
@@ -183,7 +191,7 @@ class FirestoreService {
 
     // 2. REST API Fallback
     try {
-      final dio = Dio();
+      final dio = _dio;
       final url = 'https://firestore.googleapis.com/v1/projects/$projectId/databases/(default)/documents/users/$id?key=$apiKey';
       final fields = <String, dynamic>{};
       for (final entry in dataToSave.entries) {
@@ -254,7 +262,7 @@ class FirestoreService {
     // 2. High-reliability REST query fallback
     // Try direct document fetch by ID
     try {
-      final dio = Dio(BaseOptions(connectTimeout: const Duration(seconds: 4), receiveTimeout: const Duration(seconds: 4)));
+      final dio = _dio;
       final docUrl = 'https://firestore.googleapis.com/v1/projects/$projectId/databases/(default)/documents/users/$rawTrimmed?key=$apiKey';
       final docResp = await dio.get(docUrl);
       if (docResp.statusCode == 200 && docResp.data is Map && docResp.data['fields'] is Map) {
@@ -407,7 +415,7 @@ class FirestoreService {
     }
 
     try {
-      final dio = Dio();
+      final dio = _dio;
       final url = 'https://firestore.googleapis.com/v1/projects/$projectId/databases/(default)/documents/$collection/$cleanDocId?key=$apiKey';
       final fields = <String, dynamic>{};
       for (final entry in data.entries) {
@@ -449,7 +457,7 @@ class FirestoreService {
     }
 
     try {
-      final dio = Dio(BaseOptions(connectTimeout: const Duration(seconds: 4), receiveTimeout: const Duration(seconds: 4)));
+      final dio = _dio;
       final url = 'https://firestore.googleapis.com/v1/projects/$projectId/databases/(default)/documents/$collection/$cleanDocId?key=$apiKey';
       final resp = await dio.get(url);
       if (resp.statusCode == 200 && resp.data is Map && resp.data['fields'] is Map) {

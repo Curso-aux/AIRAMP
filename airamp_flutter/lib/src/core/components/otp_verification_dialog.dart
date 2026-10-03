@@ -97,15 +97,25 @@ class _OtpVerificationDialogState extends State<OtpVerificationDialog> {
       _errorMessage = null;
     });
 
+    final lockoutMsg = OtpService().getLockoutMessage(widget.userId);
+    if (lockoutMsg != null) {
+      setState(() {
+        _isVerifying = false;
+        _errorMessage = lockoutMsg;
+      });
+      return;
+    }
+
     try {
       final success = await widget.onVerify(code);
       if (!mounted) return;
       if (success) {
         Navigator.of(context).pop(true);
       } else {
+        final postLockout = OtpService().getLockoutMessage(widget.userId);
         setState(() {
           _isVerifying = false;
-          _errorMessage = 'Invalid or expired verification code. Please check your email or request a new code.';
+          _errorMessage = postLockout ?? 'Invalid or expired verification code. Please check your email or request a new code.';
         });
       }
     } catch (e) {

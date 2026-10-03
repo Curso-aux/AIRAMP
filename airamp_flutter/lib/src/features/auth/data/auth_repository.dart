@@ -391,11 +391,20 @@ class AuthRepository {
       throw Exception('Password must be at least 6 characters.');
     }
 
+    final lockoutMsg = OtpService().getLockoutMessage(cleanIdentifier);
+    if (lockoutMsg != null) {
+      throw Exception(lockoutMsg);
+    }
+
     final isValid = await OtpService().verifyOtp(
       identifier: cleanIdentifier,
       enteredCode: otpCode,
     );
     if (!isValid) {
+      final postLockout = OtpService().getLockoutMessage(cleanIdentifier);
+      if (postLockout != null) {
+        throw Exception(postLockout);
+      }
       throw Exception('Invalid or expired OTP verification code.');
     }
 

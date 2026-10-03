@@ -40,6 +40,20 @@ DEFAULT_PASSWORD = os.environ.get("SMTP_APP_PASSWORD", "")
 SMTP_HOST = os.environ.get("SMTP_HOST", "smtp.gmail.com")
 SMTP_PORT = int(os.environ.get("SMTP_PORT", 587))
 
+# ─────────────────────────────────────────────────────────────
+# Rate Limiting Engine: protects SMTP from abuse & quota exhaustion
+# ─────────────────────────────────────────────────────────────
+import time
+from collections import defaultdict
+
+IP_MAX_PER_MINUTE = 15
+RECIPIENT_MAX_PER_3MIN = 3
+RECIPIENT_COOLDOWN_SECONDS = 45
+
+_ip_history = defaultdict(list)
+_recipient_history = defaultdict(list)
+_recipient_last_dispatch = {}
+
 class SmtpBridgeHandler(BaseHTTPRequestHandler):
     def _send_cors_headers(self):
         self.send_header("Access-Control-Allow-Origin", "*")
@@ -61,6 +75,11 @@ class SmtpBridgeHandler(BaseHTTPRequestHandler):
             "status": "online",
             "service": "AIRA Local SMTP Bridge",
             "sender": DEFAULT_SENDER,
+            "rate_limits": {
+                "ip_max_per_minute": IP_MAX_PER_MINUTE,
+                "recipient_max_per_3min": RECIPIENT_MAX_PER_3MIN,
+                "recipient_cooldown_seconds": RECIPIENT_COOLDOWN_SECONDS
+            },
             "timestamp": datetime.now().isoformat()
         }
         self.wfile.write(json.dumps(response).encode("utf-8"))
@@ -72,6 +91,27 @@ class SmtpBridgeHandler(BaseHTTPRequestHandler):
             self.send_header("Content-Type", "application/json")
             self.end_headers()
             self.wfile.write(json.dumps({"error": "Endpoint not found"}).encode("utf-8"))
+            return
+
+        client_ip = self.client_address[0]
+        now = time.time()
+
+        # 1. IP-level Rate Limit Check (15 req/min)
+        _ip_history[client_ip] = [t for t in _ip_history[client_ip] if now - t < 60]
+        if len(_ip_history[client_ip]) >= IP_MAX_PER_MINUTE:
+            oldest = _ip_history[client_ip][0]
+            retry_after = max(1, int(60 - (now - oldest)))
+            print(f"[{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}] [RATE-LIMIT] IP {client_ip} exceeded {IP_MAX_PER_MINUTE} req/min.")
+            self.send_response(429)
+            self._send_cors_headers()
+            self.send_header("Content-Type", "application/json")
+            self.send_header("Retry-After", str(retry_after))
+            self.end_headers()
+            self.wfile.write(json.dumps({
+                "success": False,
+                "error": f"Rate limit exceeded: Too many requests from this IP. Please wait {retry_after}s.",
+                "retry_after": retry_after
+            }).encode("utf-8"))
             return
 
         content_length = int(self.headers.get("Content-Length", 0))
@@ -101,6 +141,48 @@ class SmtpBridgeHandler(BaseHTTPRequestHandler):
             self.end_headers()
             self.wfile.write(json.dumps({"error": "Missing 'to' recipient email"}).encode("utf-8"))
             return
+
+        clean_recipient = to_email.lower().strip()
+
+        # 2. Recipient Cooldown Check (minimum 45s between emails to same target)
+        last_sent = _recipient_last_dispatch.get(clean_recipient)
+        if last_sent and (now - last_sent < RECIPIENT_COOLDOWN_SECONDS):
+            cooldown_wait = max(1, int(RECIPIENT_COOLDOWN_SECONDS - (now - last_sent)))
+            print(f"[{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}] [RATE-LIMIT] Recipient {clean_recipient} in cooldown ({cooldown_wait}s remaining).")
+            self.send_response(429)
+            self._send_cors_headers()
+            self.send_header("Content-Type", "application/json")
+            self.send_header("Retry-After", str(cooldown_wait))
+            self.end_headers()
+            self.wfile.write(json.dumps({
+                "success": False,
+                "error": f"Please wait {cooldown_wait}s before requesting another email to this address.",
+                "retry_after": cooldown_wait
+            }).encode("utf-8"))
+            return
+
+        # 3. Recipient Rolling Window Check (max 3 emails per 3 minutes)
+        _recipient_history[clean_recipient] = [t for t in _recipient_history[clean_recipient] if now - t < 180]
+        if len(_recipient_history[clean_recipient]) >= RECIPIENT_MAX_PER_3MIN:
+            oldest = _recipient_history[clean_recipient][0]
+            retry_after = max(1, int(180 - (now - oldest)))
+            print(f"[{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}] [RATE-LIMIT] Recipient {clean_recipient} reached limit ({RECIPIENT_MAX_PER_3MIN} per 3m).")
+            self.send_response(429)
+            self._send_cors_headers()
+            self.send_header("Content-Type", "application/json")
+            self.send_header("Retry-After", str(retry_after))
+            self.end_headers()
+            self.wfile.write(json.dumps({
+                "success": False,
+                "error": f"Recipient rate limit reached (max {RECIPIENT_MAX_PER_3MIN} per 3 mins). Please wait {retry_after}s.",
+                "retry_after": retry_after
+            }).encode("utf-8"))
+            return
+
+        # Record permitted request
+        _ip_history[client_ip].append(now)
+        _recipient_history[clean_recipient].append(now)
+        _recipient_last_dispatch[clean_recipient] = now
 
         timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
         print(f"[{timestamp}] Incoming email dispatch request to: {to_email}")

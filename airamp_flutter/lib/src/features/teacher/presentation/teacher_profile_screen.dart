@@ -337,10 +337,91 @@ class _TeacherProfileScreenState extends ConsumerState<TeacherProfileScreen> {
       _showAlert('Error', 'All fields are required.');
       return;
     }
+
+    final user = ref.read(authProvider);
+    if (user == null) return;
+
+    final isEmailChanged = email.toLowerCase() != user.email.toLowerCase();
+
+    if (isEmailChanged) {
+      // Require OTP verification for new email address
+      showDialog(
+        context: context,
+        barrierDismissible: false,
+        builder: (ctx) => AlertDialog(
+          backgroundColor: AppTheme.surface,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+          content: Padding(
+            padding: const EdgeInsets.symmetric(vertical: 16),
+            child: Row(
+              children: [
+                CircularProgressIndicator(color: AppTheme.primary),
+                const SizedBox(width: 20),
+                Expanded(
+                  child: Text(
+                    'Sending verification code to $email...',
+                    style: TextStyle(color: AppTheme.text, fontSize: 14),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      );
+
+      final otpResult = await OtpService().requestEmailVerificationOtp(
+        targetEmail: email,
+        fullName: fullName,
+        userId: user.id,
+        role: user.role,
+        purpose: 'Faculty Email Update',
+      );
+
+      if (!mounted) return;
+      Navigator.of(context, rootNavigator: true).pop();
+
+      if (!otpResult.success) {
+        _showAlert('Verification Failed', otpResult.message);
+        return;
+      }
+
+      final verified = await OtpVerificationDialog.show(
+        context: context,
+        email: email,
+        userId: user.id,
+        fullName: fullName,
+        role: user.role,
+        onVerify: (code) async {
+          return await OtpService().verifyOtp(
+            identifier: email,
+            enteredCode: code,
+          );
+        },
+        onResend: () async {
+          final res = await OtpService().requestEmailVerificationOtp(
+            targetEmail: email,
+            fullName: fullName,
+            userId: user.id,
+            role: user.role,
+            purpose: 'Faculty Email Update',
+          );
+          return res.success;
+        },
+      );
+
+      if (verified != true) {
+        _emailController.text = user.email;
+        return;
+      }
+    }
+
     await ref.read(authProvider.notifier).updateProfile(fullName: fullName, username: username, email: email);
     setState(() => _isEditing = false);
     if (!mounted) return;
-    _showAlert('Success', 'Profile updated successfully!');
+    _showAlert(
+      'Success',
+      isEmailChanged ? 'Email verified and profile updated successfully!' : 'Profile updated successfully!',
+    );
   }
 
   Future<void> _handleChangePassword() async {

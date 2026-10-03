@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import '../../../core/components/otp_verification_dialog.dart';
 import '../../../core/database/database_helper.dart';
+import '../../../core/services/otp_service.dart';
 import '../../../core/theme/app_theme.dart';
 import '../application/auth_provider.dart';
 
@@ -65,25 +67,94 @@ class _SignupScreenState extends ConsumerState<SignupScreen> {
   Future<void> _handleRegister({bool skipKey = false}) async {
     setState(() => _error = '');
 
-    if (_fullNameController.text.trim().isEmpty ||
-        _emailController.text.trim().isEmpty ||
-        _passwordController.text.isEmpty) {
+    final fullName = _fullNameController.text.trim();
+    final email = _emailController.text.trim();
+    final password = _passwordController.text;
+
+    if (fullName.isEmpty || email.isEmpty || password.isEmpty) {
       setState(() => _error = 'Please fill in all required fields.');
       return;
     }
 
-    if (_passwordController.text != _confirmPasswordController.text) {
+    if (password != _confirmPasswordController.text) {
       setState(() => _error = 'Passwords do not match.');
       return;
     }
 
     final key = skipKey ? null : _sectionKeyController.text.trim();
 
+    // 1. Require 6-digit email OTP verification before creating student account
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: AppTheme.surface,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+        content: Padding(
+          padding: const EdgeInsets.symmetric(vertical: 16),
+          child: Row(
+            children: [
+              CircularProgressIndicator(color: AppTheme.primary),
+              const SizedBox(width: 20),
+              Expanded(
+                child: Text(
+                  'Sending verification code to $email...',
+                  style: TextStyle(color: AppTheme.text, fontSize: 14),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+
+    final otpResult = await OtpService().requestEmailVerificationOtp(
+      targetEmail: email,
+      fullName: fullName,
+      role: 'student',
+      purpose: 'Student Account Registration',
+    );
+
+    if (!mounted) return;
+    Navigator.of(context, rootNavigator: true).pop();
+
+    if (!otpResult.success) {
+      setState(() => _error = otpResult.message);
+      return;
+    }
+
+    final verified = await OtpVerificationDialog.show(
+      context: context,
+      email: email,
+      userId: email,
+      fullName: fullName,
+      role: 'student',
+      onVerify: (code) async {
+        return await OtpService().verifyOtp(
+          identifier: email,
+          enteredCode: code,
+        );
+      },
+      onResend: () async {
+        final res = await OtpService().requestEmailVerificationOtp(
+          targetEmail: email,
+          fullName: fullName,
+          role: 'student',
+          purpose: 'Student Account Registration',
+        );
+        return res.success;
+      },
+    );
+
+    if (verified != true) {
+      return;
+    }
+
     try {
       await ref.read(authProvider.notifier).register(
-            fullName: _fullNameController.text.trim(),
-            email: _emailController.text.trim(),
-            password: _passwordController.text,
+            fullName: fullName,
+            email: email,
+            password: password,
             role: 'student',
             username: _usernameController.text.trim().isNotEmpty
                 ? _usernameController.text.trim()
