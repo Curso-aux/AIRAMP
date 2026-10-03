@@ -2,6 +2,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:dio/dio.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/foundation.dart';
+import 'package:sqflite/sqflite.dart';
 import 'database_helper.dart';
 
 /// Centralized service connecting AIRA with Cloud Firestore.
@@ -322,30 +323,40 @@ class FirestoreService {
       final db = await DatabaseHelper().database;
 
       for (final data in cloudUsers) {
-        final userId = data['id']?.toString();
-        if (userId == null || userId.isEmpty) continue;
+        try {
+          final userId = data['id']?.toString();
+          if (userId == null || userId.isEmpty) continue;
+          final email = (data['email']?.toString() ?? '').toLowerCase().trim();
 
-        final existing = await db.query('users', where: 'id = ?', whereArgs: [userId]);
-        final dbRow = {
-          'id': userId,
-          'email': data['email'] ?? '',
-          'username': data['username'] ?? '',
-          'password': data['password'] ?? '',
-          'password_salt': data['password_salt'],
-          'role': data['role'] ?? 'student',
-          'full_name': data['full_name'] ?? '',
-          'section': data['section'],
-          'grade': data['grade'],
-          'student_type': data['student_type'] ?? 'regular',
-          'special_notes': data['special_notes'],
-          'school_id': data['school_id'] ?? 'sch_main',
-          'created_at': data['created_at'] ?? DateTime.now().toIso8601String(),
-        };
+          List<Map<String, dynamic>> existing = await db.query('users', where: 'id = ?', whereArgs: [userId]);
+          if (existing.isEmpty && email.isNotEmpty) {
+            existing = await db.query('users', where: 'LOWER(email) = ?', whereArgs: [email]);
+          }
 
-        if (existing.isEmpty) {
-          await db.insert('users', dbRow);
-        } else {
-          await db.update('users', dbRow, where: 'id = ?', whereArgs: [userId]);
+          final dbRow = {
+            'id': existing.isNotEmpty ? existing.first['id'] : userId,
+            'email': data['email'] ?? '',
+            'username': data['username'] ?? '',
+            'password': data['password'] ?? '',
+            'password_salt': data['password_salt'],
+            'role': data['role'] ?? 'student',
+            'full_name': data['full_name'] ?? '',
+            'section': data['section'],
+            'grade': data['grade'],
+            'student_type': data['student_type'] ?? 'regular',
+            'special_notes': data['special_notes'],
+            'school_id': data['school_id'] ?? 'sch_main',
+            'created_at': data['created_at'] ?? DateTime.now().toIso8601String(),
+          };
+
+          if (existing.isEmpty) {
+            await db.insert('users', dbRow, conflictAlgorithm: ConflictAlgorithm.replace);
+          } else {
+            final targetId = existing.first['id'];
+            await db.update('users', dbRow, where: 'id = ?', whereArgs: [targetId]);
+          }
+        } catch (e) {
+          debugPrint('[FirestoreService] Note syncing user ${data['id']}: $e');
         }
       }
       debugPrint('[FirestoreService] Synced ${cloudUsers.length} Cloud Firestore users to local SQLite cache');

@@ -213,7 +213,7 @@ class WebLandingScreen extends ConsumerWidget {
                   ConstrainedBox(
                     constraints: const BoxConstraints(maxWidth: 780),
                     child: Text(
-                      'AIRAMP separates institutional oversight from classroom execution: school administrators manage curriculum and students on the Web Console, while teachers and students experience interactive, offline-ready modular review on their mobile and desktop apps.',
+                      'AIRAMP connects institutional governance with interactive classroom learning: school administrators manage curriculum and cohorts, while teachers and students engage in modular reviews and assessments across web, mobile, and desktop.',
                       textAlign: TextAlign.center,
                       style: TextStyle(
                         color: AppTheme.textSecondary,
@@ -267,7 +267,7 @@ class WebLandingScreen extends ConsumerWidget {
                         ),
                       ] else ...[
                         ElevatedButton.icon(
-                          onPressed: () => context.go('/login'),
+                          onPressed: () => context.go('/student/login'),
                           icon: const Icon(Icons.school_rounded, size: 20),
                           label: const Text('Enter Classroom Portal'),
                           style: ElevatedButton.styleFrom(
@@ -386,7 +386,7 @@ class WebLandingScreen extends ConsumerWidget {
                                 'Class announcements broadcast',
                               ],
                               ctaText: 'Access Teacher Portal',
-                              onCta: () => context.go('/login'),
+                              onCta: () => context.go('/teacher/login'),
                             )),
                             const SizedBox(width: 20),
                             Expanded(child: _buildRoleCard(
@@ -405,7 +405,7 @@ class WebLandingScreen extends ConsumerWidget {
                                 'Direct teacher inquiries & study support',
                               ],
                               ctaText: 'Access Student Portal',
-                              onCta: () => context.go('/login'),
+                              onCta: () => context.go('/student/login'),
                             )),
                           ],
                         );
@@ -448,7 +448,7 @@ class WebLandingScreen extends ConsumerWidget {
                                 'Class announcements broadcast',
                               ],
                               ctaText: 'Access Teacher Portal',
-                              onCta: () => context.go('/login'),
+                              onCta: () => context.go('/teacher/login'),
                             ),
                             const SizedBox(height: 20),
                             _buildRoleCard(
@@ -467,7 +467,7 @@ class WebLandingScreen extends ConsumerWidget {
                                 'Direct teacher inquiries & study support',
                               ],
                               ctaText: 'Access Student Portal',
-                              onCta: () => context.go('/login'),
+                              onCta: () => context.go('/student/login'),
                             ),
                           ],
                         );
@@ -742,8 +742,10 @@ class WebLandingScreen extends ConsumerWidget {
       onSelected: (portal) {
         if (portal == 'admin') {
           context.go('/admin/login');
+        } else if (portal == 'teacher') {
+          context.go('/teacher/login');
         } else {
-          context.go('/login');
+          context.go('/student/login');
         }
       },
       itemBuilder: (context) => [

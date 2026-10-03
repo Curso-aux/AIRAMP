@@ -311,15 +311,15 @@ void main() {
         ProviderScope(
           child: MaterialApp(
             theme: AppTheme.darkTheme,
-            home: const AdminWebLoginScreen(),
+            home: const AdminWebLoginScreen(initialRole: 'admin'),
           ),
         ),
       );
       await tester.pump(const Duration(milliseconds: 100));
 
-      expect(find.text('AIRA Web Portal'), findsOneWidget);
-      expect(find.text('Sign In to Web Admin'), findsOneWidget);
-      expect(find.text('Return to AIRA Home Page'), findsOneWidget);
+      expect(find.text('Admin Web Console'), findsOneWidget);
+      expect(find.text('Sign In to Admin Console'), findsOneWidget);
+      expect(find.byIcon(Icons.arrow_back_rounded), findsOneWidget);
     });
   });
 

@@ -74,11 +74,22 @@ final routerProvider = Provider<GoRouter>((ref) {
       ),
       GoRoute(
         path: '/admin/login',
-        builder: (context, state) => const AdminWebLoginScreen(),
+        builder: (context, state) => const AdminWebLoginScreen(initialRole: 'admin'),
+      ),
+      GoRoute(
+        path: '/teacher/login',
+        builder: (context, state) => const AdminWebLoginScreen(initialRole: 'teacher'),
+      ),
+      GoRoute(
+        path: '/student/login',
+        builder: (context, state) => const AdminWebLoginScreen(initialRole: 'student'),
       ),
       GoRoute(
         path: '/login',
-        builder: (context, state) => kIsWeb ? const AdminWebLoginScreen() : const LoginScreen(),
+        builder: (context, state) {
+          final role = state.uri.queryParameters['role'] ?? 'student';
+          return kIsWeb ? AdminWebLoginScreen(initialRole: role) : const LoginScreen();
+        },
       ),
       GoRoute(
         path: '/signup',
@@ -367,6 +378,8 @@ final routerProvider = Provider<GoRouter>((ref) {
       final isPublicRoute = matched == '/' ||
           matched == '/login' ||
           matched == '/admin/login' ||
+          matched == '/teacher/login' ||
+          matched == '/student/login' ||
           matched == '/signup' ||
           matched == '/admin-signup' ||
           matched == '/forgot-password';
@@ -390,8 +403,8 @@ final routerProvider = Provider<GoRouter>((ref) {
         return kIsWeb ? '/' : '/login';
       }
 
-      // 2. On Web, visiting generic /login routes to appropriate portal or admin login
-      if (kIsWeb && matched == '/login') {
+      // 2. On Web, visiting generic login routes to appropriate portal
+      if (kIsWeb && (matched == '/login' || matched == '/student/login' || matched == '/teacher/login')) {
         if (!isAuth) return null;
         if (authState.role == 'admin' || authState.role == 'super_admin') {
           return '/admin/dashboard';
@@ -419,6 +432,8 @@ final routerProvider = Provider<GoRouter>((ref) {
 
         final isLoginRoute = matched == '/login' ||
             matched == '/admin/login' ||
+            matched == '/teacher/login' ||
+            matched == '/student/login' ||
             matched == '/signup' ||
             matched == '/admin-signup' ||
             matched == '/forgot-password';

@@ -4,31 +4,50 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:airamp_flutter/src/features/auth/presentation/web/admin_web_login_screen.dart';
 
 void main() {
-  testWidgets('Web Portal Login Screen renders universal UI for students, faculty & admins', (tester) async {
+  testWidgets('Web Portal Login Screen renders role-specific UI based on initialRole', (tester) async {
+    // 1. Student Portal View
     await tester.pumpWidget(
       const ProviderScope(
         child: MaterialApp(
-          home: AdminWebLoginScreen(),
+          home: AdminWebLoginScreen(initialRole: 'student'),
         ),
       ),
     );
-
     await tester.pumpAndSettle();
 
-    // Verify Title and Subtitle
-    expect(find.text('AIRA Web Portal'), findsOneWidget);
-    expect(find.text('Unified Learning & Management Portal'), findsOneWidget);
+    expect(find.text('Student Portal'), findsOneWidget);
+    expect(find.text('LEARNER ACCESS'), findsOneWidget);
+    expect(find.text('Student ID, Username or Email'), findsOneWidget);
+    expect(find.text('Sign In to Student Portal'), findsOneWidget);
 
-    // Verify inclusive welcome notice
-    expect(find.textContaining('Students, Faculty, and Administrators'), findsOneWidget);
+    // 2. Teacher Portal View
+    await tester.pumpWidget(
+      const ProviderScope(
+        child: MaterialApp(
+          home: AdminWebLoginScreen(initialRole: 'teacher'),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
 
-    // Verify field labels and hints
-    expect(find.text('Student ID, Email or Username'), findsOneWidget);
-    expect(find.text('Password'), findsOneWidget);
-    expect(find.text('Forgot password?'), findsOneWidget);
+    expect(find.text('Teacher Portal'), findsOneWidget);
+    expect(find.text('FACULTY ACCESS'), findsOneWidget);
+    expect(find.text('Faculty Email or Username'), findsOneWidget);
+    expect(find.text('Sign In to Teacher Portal'), findsOneWidget);
 
-    // Verify button text
-    expect(find.text('Sign In'), findsOneWidget);
-    expect(find.text('Sign In to Web Admin'), findsNothing);
+    // 3. Admin Console View
+    await tester.pumpWidget(
+      const ProviderScope(
+        child: MaterialApp(
+          home: AdminWebLoginScreen(initialRole: 'admin'),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('Admin Web Console'), findsOneWidget);
+    expect(find.text('INSTITUTION ACCESS'), findsOneWidget);
+    expect(find.text('Administrator Email or Username'), findsOneWidget);
+    expect(find.text('Sign In to Admin Console'), findsOneWidget);
   });
 }
