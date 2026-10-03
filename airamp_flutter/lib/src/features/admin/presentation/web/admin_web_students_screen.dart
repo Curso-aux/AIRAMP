@@ -216,12 +216,8 @@ class _AdminWebStudentsScreenState extends ConsumerState<AdminWebStudentsScreen>
       }
     }
 
-    final List<String> displayedGrades = [];
-    for (final g in _defaultGrades) {
-      if (presentGrades.contains(g) || g == 'Grade 10' || g == 'Grade 11' || g == 'Grade 12') {
-        displayedGrades.add(g);
-      }
-    }
+    // Always include all standard Philippine curriculum year levels (Grade 7 - Grade 12)
+    final List<String> displayedGrades = List<String>.from(_defaultGrades);
     for (final g in presentGrades) {
       if (!displayedGrades.contains(g)) {
         displayedGrades.add(g);
@@ -615,17 +611,29 @@ class _AdminWebStudentsScreenState extends ConsumerState<AdminWebStudentsScreen>
                       SingleChildScrollView(
                         scrollDirection: Axis.horizontal,
                         child: Row(
-                          children: ['All', 'Irregular', 'Transferee', 'SPED', 'Unassigned'].map((cat) {
+                          children: [
+                            {'id': 'All', 'name': 'All Special', 'count': specialStudents.length},
+                            {'id': 'Irregular', 'name': 'Irregular', 'count': specialStudents.where((s) => (s['student_type'] as String? ?? '').toLowerCase().contains('irregular')).length},
+                            {'id': 'Transferee', 'name': 'Transferee', 'count': specialStudents.where((s) => (s['student_type'] as String? ?? '').toLowerCase().contains('transferee')).length},
+                            {'id': 'SPED', 'name': 'SPED', 'count': specialStudents.where((s) => (s['student_type'] as String? ?? '').toLowerCase().contains('sped')).length},
+                            {'id': 'Unassigned', 'name': 'Unassigned', 'count': specialStudents.where((s) {
+                              final sec = (s['section'] as String? ?? '').toLowerCase();
+                              return sec == 'unassigned' || sec.isEmpty;
+                            }).length},
+                          ].map((item) {
+                            final cat = item['id'] as String;
+                            final name = item['name'] as String;
+                            final count = item['count'] as int;
                             final isSel = _specialSubFilter == cat;
                             return Padding(
                               padding: const EdgeInsets.only(right: 8),
                               child: FilterChip(
-                                label: Text(cat == 'All' ? 'All Special ($specialStudents.length)' : cat),
+                                label: Text('$name ($count)'),
                                 selected: isSel,
                                 selectedColor: Colors.amber.shade700,
                                 labelStyle: TextStyle(
                                   fontSize: 12,
-                                  fontWeight: isSel ? FontWeight.bold : FontWeight.normal,
+                                  fontWeight: isSel ? FontWeight.bold : FontWeight.w600,
                                   color: isSel ? Colors.black : AppTheme.textSecondary,
                                 ),
                                 backgroundColor: AppTheme.background,
@@ -852,7 +860,7 @@ class _AdminWebStudentsScreenState extends ConsumerState<AdminWebStudentsScreen>
         child: SingleChildScrollView(
           scrollDirection: Axis.horizontal,
           child: ConstrainedBox(
-            constraints: const BoxConstraints(minWidth: 1020),
+            constraints: const BoxConstraints(minWidth: 1080),
             child: DataTable(
               headingRowColor: WidgetStateProperty.all(AppTheme.background),
               dataRowMinHeight: 64,
@@ -866,7 +874,7 @@ class _AdminWebStudentsScreenState extends ConsumerState<AdminWebStudentsScreen>
                 DataColumn(label: Text('CLASSIFICATION', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold))),
                 DataColumn(label: Text('ENROLLED', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold))),
                 DataColumn(label: Text('QUIZ AVG', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold))),
-                DataColumn(label: Text('ARRANGE SECTION', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold))),
+                DataColumn(label: Text('ACTIONS', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold))),
               ],
               rows: students.map((s) {
                 final studentId = s['id'] as String? ?? '';
@@ -1001,7 +1009,7 @@ class _AdminWebStudentsScreenState extends ConsumerState<AdminWebStudentsScreen>
                       ),
                     ),
 
-                    // Actions: Manage Courses & Arrange Section
+                    // Actions: Manage Courses, Arrange Section & Delete
                     DataCell(
                       Row(
                         mainAxisSize: MainAxisSize.min,
@@ -1034,6 +1042,23 @@ class _AdminWebStudentsScreenState extends ConsumerState<AdminWebStudentsScreen>
                               shape: RoundedRectangleBorder(
                                 borderRadius: BorderRadius.circular(8),
                                 side: BorderSide(color: AppTheme.primary.withValues(alpha: 0.4)),
+                              ),
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          Tooltip(
+                            message: 'Delete student permanently',
+                            child: InkWell(
+                              onTap: () => _confirmDeleteStudent(context, s),
+                              borderRadius: BorderRadius.circular(8),
+                              child: Container(
+                                padding: const EdgeInsets.all(8),
+                                decoration: BoxDecoration(
+                                  color: Colors.red.withValues(alpha: 0.1),
+                                  borderRadius: BorderRadius.circular(8),
+                                  border: Border.all(color: Colors.red.withValues(alpha: 0.3)),
+                                ),
+                                child: const Icon(Icons.delete_outline_rounded, size: 16, color: Colors.red),
                               ),
                             ),
                           ),
@@ -1165,6 +1190,19 @@ class _AdminWebStudentsScreenState extends ConsumerState<AdminWebStudentsScreen>
                         foregroundColor: AppTheme.primary,
                         side: BorderSide(color: AppTheme.primary),
                         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  IconButton(
+                    onPressed: () => _confirmDeleteStudent(context, s),
+                    tooltip: 'Delete Student',
+                    icon: const Icon(Icons.delete_outline_rounded, color: Colors.red),
+                    style: IconButton.styleFrom(
+                      backgroundColor: Colors.red.withValues(alpha: 0.1),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(10),
+                        side: BorderSide(color: Colors.red.withValues(alpha: 0.3)),
                       ),
                     ),
                   ),
@@ -1581,6 +1619,208 @@ class _AdminWebStudentsScreenState extends ConsumerState<AdminWebStudentsScreen>
           );
         },
       ),
+    );
+  }
+
+  void _confirmDeleteStudent(BuildContext context, Map<String, dynamic> student) {
+    final studentId = student['id'] as String? ?? '';
+    final studentName = student['full_name'] as String? ?? 'Student';
+    final studentEmail = student['email'] as String? ?? '';
+    final studentGrade = student['grade'] as String? ?? 'Unset';
+    final studentSection = student['section'] as String? ?? 'Unassigned';
+
+    showDialog(
+      context: context,
+      builder: (dialogCtx) {
+        bool isDeleting = false;
+        return StatefulBuilder(
+          builder: (context, setDialogState) {
+            return AlertDialog(
+              backgroundColor: AppTheme.surface,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+              title: Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(8),
+                    decoration: BoxDecoration(
+                      color: Colors.red.withValues(alpha: 0.12),
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: const Icon(Icons.warning_amber_rounded, color: Colors.red, size: 24),
+                  ),
+                  const SizedBox(width: 12),
+                  Text(
+                    'Delete Student Record',
+                    style: TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.bold,
+                      color: AppTheme.text,
+                    ),
+                  ),
+                ],
+              ),
+              content: ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 440),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Are you sure you want to permanently delete this student account?',
+                      style: TextStyle(
+                        fontSize: 14,
+                        color: AppTheme.textSecondary,
+                        height: 1.4,
+                      ),
+                    ),
+                    const SizedBox(height: 14),
+                    Container(
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: AppTheme.background,
+                        borderRadius: BorderRadius.circular(10),
+                        border: Border.all(color: AppTheme.border),
+                      ),
+                      child: Column(
+                        children: [
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              Text('Student Name:', style: TextStyle(fontSize: 12, color: AppTheme.textMuted)),
+                              Flexible(
+                                child: Text(
+                                  studentName,
+                                  textAlign: TextAlign.right,
+                                  style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.bold, color: AppTheme.text),
+                                ),
+                              ),
+                            ],
+                          ),
+                          const Divider(height: 14),
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              Text('Student ID / LRN:', style: TextStyle(fontSize: 12, color: AppTheme.textMuted)),
+                              Text(
+                                studentId,
+                                style: const TextStyle(fontSize: 12, fontFamily: 'monospace', fontWeight: FontWeight.w600),
+                              ),
+                            ],
+                          ),
+                          if (studentEmail.isNotEmpty) ...[
+                            const Divider(height: 14),
+                            Row(
+                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                              children: [
+                                Text('Email:', style: TextStyle(fontSize: 12, color: AppTheme.textMuted)),
+                                Flexible(
+                                  child: Text(
+                                    studentEmail,
+                                    textAlign: TextAlign.right,
+                                    style: TextStyle(fontSize: 12, color: AppTheme.textSecondary),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ],
+                          const Divider(height: 14),
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              Text('Classroom:', style: TextStyle(fontSize: 12, color: AppTheme.textMuted)),
+                              Text(
+                                '$studentGrade • $studentSection',
+                                style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: AppTheme.primary),
+                              ),
+                            ],
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 14),
+                    Container(
+                      padding: const EdgeInsets.all(10),
+                      decoration: BoxDecoration(
+                        color: Colors.red.withValues(alpha: 0.08),
+                        borderRadius: BorderRadius.circular(8),
+                        border: Border.all(color: Colors.red.withValues(alpha: 0.25)),
+                      ),
+                      child: Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const Icon(Icons.info_outline, size: 16, color: Colors.red),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: Text(
+                              'Warning: This action permanently deletes the student account from local and cloud databases. All subject enrollments, quiz scores, and submission records will be removed. This cannot be undone.',
+                              style: TextStyle(fontSize: 11.5, color: Colors.red.shade700, height: 1.35),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              actions: [
+                TextButton(
+                  onPressed: isDeleting ? null : () => Navigator.of(dialogCtx).pop(),
+                  child: Text('Cancel', style: TextStyle(color: AppTheme.textSecondary)),
+                ),
+                ElevatedButton.icon(
+                  onPressed: isDeleting
+                      ? null
+                      : () async {
+                          setDialogState(() => isDeleting = true);
+                          try {
+                            await ref.read(adminStudentsProvider.notifier).deleteStudent(studentId);
+                            if (context.mounted) {
+                              Navigator.of(dialogCtx).pop();
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                SnackBar(
+                                  content: Row(
+                                    children: [
+                                      const Icon(Icons.delete_sweep_rounded, color: Colors.white),
+                                      const SizedBox(width: 10),
+                                      Expanded(
+                                        child: Text('Student "$studentName" ($studentId) was permanently deleted.'),
+                                      ),
+                                    ],
+                                  ),
+                                  backgroundColor: Colors.red.shade700,
+                                  behavior: SnackBarBehavior.floating,
+                                ),
+                              );
+                            }
+                          } catch (e) {
+                            setDialogState(() => isDeleting = false);
+                            if (context.mounted) {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                SnackBar(content: Text('Failed to delete student: $e'), backgroundColor: Colors.red),
+                              );
+                            }
+                          }
+                        },
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.red,
+                    foregroundColor: Colors.white,
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                    minimumSize: const Size(0, 40),
+                  ),
+                  icon: isDeleting
+                      ? const SizedBox(
+                          width: 16,
+                          height: 16,
+                          child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                        )
+                      : const Icon(Icons.delete_forever, size: 18),
+                  label: Text(isDeleting ? 'Deleting...' : 'Delete Student'),
+                ),
+              ],
+            );
+          },
+        );
+      },
     );
   }
 

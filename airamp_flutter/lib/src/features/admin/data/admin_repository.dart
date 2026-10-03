@@ -602,6 +602,13 @@ class AdminStudentsNotifier extends Notifier<List<Map<String, dynamic>>> {
     ref.read(adminAnalyticsProvider.notifier).loadAnalytics();
   }
 
+  Future<void> deleteStudent(String studentId) async {
+    await DatabaseHelper().deleteStudent(studentId);
+    await loadStudents();
+    ref.read(adminAnalyticsProvider.notifier).loadAnalytics();
+    ref.read(sectionsProvider.notifier).reload();
+  }
+
   Future<Map<String, dynamic>> bulkImportUsers(List<Map<String, dynamic>> rows) async {
     final result = await DatabaseHelper().bulkImportUsers(rows);
     await loadStudents();

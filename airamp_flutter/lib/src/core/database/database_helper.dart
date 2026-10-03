@@ -2569,6 +2569,39 @@ class DatabaseHelper {
     await db.update('users', updateData, where: 'id = ?', whereArgs: [studentId]);
   }
 
+  /// Permanently removes a student, unenrolls from all subjects,
+  /// clears quiz and progress records, and deletes from Cloud Firestore.
+  Future<void> deleteStudent(String studentId) async {
+    final db = await database;
+    // 1. Delete course enrollments
+    await db.delete('enrollments', where: 'student_id = ?', whereArgs: [studentId]);
+    // 2. Delete learning outcome progress
+    await db.delete('student_progress', where: 'student_id = ?', whereArgs: [studentId]);
+    // 3. Delete quiz attempts and assignments
+    try {
+      await db.delete('quiz_attempts', where: 'student_id = ?', whereArgs: [studentId]);
+    } catch (_) {}
+    try {
+      await db.delete('quiz_assignments', where: 'student_id = ?', whereArgs: [studentId]);
+    } catch (_) {}
+    // 4. Delete assignment submissions
+    try {
+      await db.delete('submissions', where: 'student_id = ?', whereArgs: [studentId]);
+    } catch (_) {}
+    // 5. Delete notifications
+    try {
+      await db.delete('notifications', where: 'user_id = ?', whereArgs: [studentId]);
+    } catch (_) {}
+    // 6. Delete user record
+    await db.delete('users', where: 'id = ?', whereArgs: [studentId]);
+    // 7. Delete from Cloud Firestore
+    try {
+      await FirestoreService().deleteUser(studentId);
+    } catch (e) {
+      debugPrint('[DatabaseHelper] Error deleting student $studentId from Firestore: $e');
+    }
+  }
+
   /// Bulk import students and faculty members with atomic validation,
   /// password salting, section mapping, and automated course enrollment.
   Future<Map<String, dynamic>> bulkImportUsers(List<Map<String, dynamic>> usersToImport) async {
@@ -4085,6 +4118,12 @@ class DatabaseHelper {
     );
     // Delete the teacher account
     await db.delete('users', where: 'id = ?', whereArgs: [teacherId]);
+    // Delete from Cloud Firestore
+    try {
+      await FirestoreService().deleteUser(teacherId);
+    } catch (e) {
+      debugPrint('[DatabaseHelper] Error deleting teacher $teacherId from Firestore: $e');
+    }
   }
 
   Future<List<Map<String, dynamic>>> getSubjectsForTeacher(String teacherId) async {

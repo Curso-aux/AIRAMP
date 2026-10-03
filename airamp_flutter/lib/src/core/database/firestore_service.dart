@@ -471,5 +471,34 @@ class FirestoreService {
 
     return null;
   }
+
+  /// Generic helper to delete a document from any collection in Cloud Firestore
+  Future<void> deleteDocument(String collection, String docId) async {
+    final cleanDocId = docId.trim();
+    if (cleanDocId.isEmpty) return;
+
+    if (isAvailable) {
+      try {
+        await firestore.collection(collection).doc(cleanDocId).delete();
+        return;
+      } catch (e) {
+        debugPrint('[FirestoreService] SDK deleteDocument error: $e');
+      }
+    }
+
+    try {
+      final dio = _dio;
+      final url = 'https://firestore.googleapis.com/v1/projects/$projectId/databases/(default)/documents/$collection/$cleanDocId?key=$apiKey';
+      await dio.delete(url);
+      debugPrint('[FirestoreService] Successfully deleted document $collection/$cleanDocId via REST');
+    } catch (e) {
+      debugPrint('[FirestoreService] REST deleteDocument error: $e');
+    }
+  }
+
+  /// Deletes a user document from Cloud Firestore
+  Future<void> deleteUser(String userId) async {
+    await deleteDocument('users', userId);
+  }
 }
 
