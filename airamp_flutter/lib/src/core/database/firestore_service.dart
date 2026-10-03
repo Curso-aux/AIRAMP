@@ -3,6 +3,7 @@ import 'package:dio/dio.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/foundation.dart';
 import 'package:sqflite/sqflite.dart';
+import '../../../firebase_options.dart';
 import 'database_helper.dart';
 
 /// Centralized service connecting AIRA with Cloud Firestore.
@@ -13,8 +14,34 @@ class FirestoreService {
   factory FirestoreService() => _instance;
   FirestoreService._internal();
 
-  static const String apiKey = 'AIzaSyC5W7a4lOwSrdS27n8G3mfDmqgTbxfBFhs';
-  static const String projectId = 'aira-app-database';
+  static const String _envApiKey = String.fromEnvironment('FIREBASE_API_KEY');
+  static const String _envProjectId = String.fromEnvironment('FIREBASE_PROJECT_ID');
+
+  static String get apiKey {
+    if (_envApiKey.isNotEmpty) return _envApiKey;
+    try {
+      if (Firebase.apps.isNotEmpty) {
+        return Firebase.app().options.apiKey;
+      }
+    } catch (_) {}
+    try {
+      return DefaultFirebaseOptions.currentPlatform.apiKey;
+    } catch (_) {}
+    return '';
+  }
+
+  static String get projectId {
+    if (_envProjectId.isNotEmpty) return _envProjectId;
+    try {
+      if (Firebase.apps.isNotEmpty) {
+        return Firebase.app().options.projectId;
+      }
+    } catch (_) {}
+    try {
+      return DefaultFirebaseOptions.currentPlatform.projectId;
+    } catch (_) {}
+    return 'aira-app-database';
+  }
 
   FirebaseFirestore? _firestore;
 
