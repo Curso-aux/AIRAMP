@@ -1,0 +1,21 @@
+# Environment files and credentials
+.env
+.env.*
+!.env.example
+secrets/
+*.key
+*.pem
+*.jks
+*.keystore
+
+# Operating System files
+.DS_Store
+Thumbs.db
+
+# IDE and Editor files
+.idea/
+.vscode/
+*.iml
+
+# Firebase cache
+.firebase/

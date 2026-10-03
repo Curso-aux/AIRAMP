@@ -8,16 +8,37 @@ directly through Gmail SMTP using SSL/TLS.
 import sys
 import json
 import smtplib
+import os
 from http.server import HTTPServer, BaseHTTPRequestHandler
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
 from datetime import datetime
 
-PORT = 8088
-DEFAULT_SENDER = "evangelistachristian88@gmail.com"
-DEFAULT_PASSWORD = "xzvgjnxxdqtxmqag"
-SMTP_HOST = "smtp.gmail.com"
-SMTP_PORT = 587
+# Load environment configuration from .env if present
+def _load_env_file():
+    candidates = [
+        os.path.join(os.path.dirname(__file__), ".env"),
+        os.path.join(os.path.dirname(__file__), "airamp_flutter", ".env"),
+    ]
+    for path in candidates:
+        if os.path.exists(path):
+            try:
+                with open(path, "r", encoding="utf-8") as f:
+                    for line in f:
+                        line = line.strip()
+                        if line and not line.startswith("#") and "=" in line:
+                            k, v = line.split("=", 1)
+                            os.environ.setdefault(k.strip(), v.strip().strip('"').strip("'"))
+            except Exception:
+                pass
+
+_load_env_file()
+
+PORT = int(os.environ.get("PORT", 8088))
+DEFAULT_SENDER = os.environ.get("SMTP_SENDER_EMAIL", "evangelistachristian88@gmail.com")
+DEFAULT_PASSWORD = os.environ.get("SMTP_APP_PASSWORD", "")
+SMTP_HOST = os.environ.get("SMTP_HOST", "smtp.gmail.com")
+SMTP_PORT = int(os.environ.get("SMTP_PORT", 587))
 
 class SmtpBridgeHandler(BaseHTTPRequestHandler):
     def _send_cors_headers(self):

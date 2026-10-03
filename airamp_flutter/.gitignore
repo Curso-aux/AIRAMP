@@ -1,3 +1,10 @@
+# Environment and secrets
+.env
+.env.*
+!.env.example
+*.keystore
+*.jks
+
 # Miscellaneous
 *.class
 *.log
