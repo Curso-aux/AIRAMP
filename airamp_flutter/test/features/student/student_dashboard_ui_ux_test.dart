@@ -37,7 +37,7 @@ void main() {
       'teacher_name': 'Sir John Reyes',
       'question_count': 3,
       'time_limit_minutes': 60,
-      'due_date': '2026-09-29T17:13:10.383563',
+      'due_date': DateTime.now().add(const Duration(days: 3)).toIso8601String(),
       'status': 'pending',
     },
     {
@@ -119,7 +119,7 @@ void main() {
         ),
       ),
     );
-    await tester.pumpAndSettle();
+    await tester.pump(const Duration(milliseconds: 300));
 
     // Verify exactly 5 bottom navigation items: Dashboard, Courses, Progress, Quizzes, Chat
     final navBar = tester.widget<BottomNavigationBar>(find.byType(BottomNavigationBar));

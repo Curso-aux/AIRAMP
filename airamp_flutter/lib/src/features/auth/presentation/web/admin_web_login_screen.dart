@@ -65,9 +65,9 @@ class _AdminWebLoginScreenState extends ConsumerState<AdminWebLoginScreen> {
       icon: Icons.school_rounded,
       accentColor: Color(0xFF0284C7), // Sky / Cyan blue
       badgeBg: Color(0xFFE0F2FE),
-      noticeText: 'Sign in with your Student ID (e.g. 001-0001), username, or registered student email.',
-      identifierLabel: 'Student ID, Username or Email',
-      identifierHint: 'e.g. 001-0001, khev, or student@aira.edu',
+      noticeText: 'Sign in with your Student ID (e.g. 001-0001) or username.',
+      identifierLabel: 'Student ID or Username',
+      identifierHint: 'e.g. 001-0001 or khev',
       buttonText: 'Sign In to Student Portal',
     ),
     'teacher': _RolePortalConfig(

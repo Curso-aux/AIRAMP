@@ -17,7 +17,7 @@ void main() {
 
     expect(find.text('Student Portal'), findsOneWidget);
     expect(find.text('LEARNER ACCESS'), findsOneWidget);
-    expect(find.text('Student ID, Username or Email'), findsOneWidget);
+    expect(find.text('Student ID or Username'), findsOneWidget);
     expect(find.text('Sign In to Student Portal'), findsOneWidget);
 
     // 2. Teacher Portal View
