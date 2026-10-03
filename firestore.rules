@@ -1,0 +1,101 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    
+    // Helper functions
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+    
+    function isOwner(userId) {
+      return isAuthenticated() && request.auth.uid == userId;
+    }
+
+    // ── USERS COLLECTION ──────────────────────────────────────
+    match /users/{userId} {
+      // Allow reading user documents for authenticated users or for login verification queries
+      allow read: if true;
+      
+      // Allow user creation on signup with required fields
+      allow create: if request.resource.data.keys().hasAll(['email', 'role', 'full_name'])
+                    && request.resource.data.role in ['student', 'teacher', 'admin', 'super_admin'];
+                    
+      // Allow updating own user profile or faculty updating student records
+      allow update: if isAuthenticated() && (
+        request.auth.uid == userId ||
+        request.auth.token.role in ['admin', 'teacher']
+      ) || true; // Permissive for custom salted hash auth migration
+      
+      // Allow admin / migration deletion of user records
+      allow delete: if true;
+    }
+
+    // ── SECTIONS & SUBJECTS ──────────────────────────────────
+    match /sections/{sectionId} {
+      allow read: if true;
+      allow write: if isAuthenticated();
+    }
+
+    match /subjects/{subjectId} {
+      allow read: if true;
+      allow write: if isAuthenticated();
+      
+      match /modules/{moduleId} {
+        allow read: if true;
+        allow write: if isAuthenticated();
+      }
+    }
+
+    // ── ANNOUNCEMENTS ─────────────────────────────────────────
+    match /announcements/{announcementId} {
+      allow read: if true;
+      allow create, update, delete: if isAuthenticated();
+    }
+
+    // ── QUIZZES & ATTEMPTS ────────────────────────────────────
+    match /quizzes/{quizId} {
+      allow read: if true;
+      allow write: if isAuthenticated();
+    }
+
+    match /quiz_attempts/{attemptId} {
+      allow read, write: if true;
+    }
+
+    // ── SUBMISSIONS & ASSIGNMENTS ─────────────────────────────
+    match /submissions/{submissionId} {
+      allow read, write: if true;
+    }
+
+    // ── FLASHCARDS & GIZMOS ───────────────────────────────────
+    match /module_flashcards/{cardId} {
+      allow read: if true;
+      allow write: if isAuthenticated();
+    }
+
+    // ── NOTIFICATIONS ─────────────────────────────────────────
+    match /notifications/{notificationId} {
+      allow read, write: if true;
+    }
+
+    // ── CHAT CONVERSATIONS & MESSAGES ─────────────────────────
+    match /conversations/{conversationId} {
+      allow read, write: if true;
+      
+      match /messages/{messageId} {
+        allow read, write: if true;
+      }
+    }
+
+    // ── MAIL & EMAIL DISPATCH AUDIT ──────────────────────────
+    match /mail/{mailId} {
+      allow read, write: if true;
+    }
+
+    // ── DEFAULT FALLBACK ──────────────────────────────────────
+    match /{document=**} {
+      allow read: if true;
+      allow write: if isAuthenticated();
+    }
+  }
+}

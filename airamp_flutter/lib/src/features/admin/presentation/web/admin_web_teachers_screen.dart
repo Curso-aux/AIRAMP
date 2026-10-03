@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../../core/theme/theme_provider.dart';
+import '../../../../core/database/database_helper.dart';
 import '../../data/admin_repository.dart';
 import 'components/teacher_bulk_import_modal.dart';
 import 'components/teacher_schedule_modal.dart';
@@ -589,13 +590,18 @@ class _AdminWebTeachersScreenState extends ConsumerState<AdminWebTeachersScreen>
   }
 
   // ── Add New Faculty Dialog ─────────────────────────────────
-  void _openAddTeacherDialog(BuildContext context, List<Map<String, dynamic>> availableSubjects) {
+  Future<void> _openAddTeacherDialog(BuildContext context, List<Map<String, dynamic>> availableSubjects) async {
+    final nextId = await DatabaseHelper().generateNextTeacherId();
+    final teacherIdCtrl = TextEditingController(text: nextId);
     final nameCtrl = TextEditingController();
     final emailCtrl = TextEditingController();
     final usernameCtrl = TextEditingController();
     final passwordCtrl = TextEditingController(text: 'Teacher@123');
     final selectedSubjectIds = <int>{};
     final formKey = GlobalKey<FormState>();
+    bool obscurePassword = true;
+
+    if (!context.mounted) return;
 
     showDialog(
       context: context,
@@ -630,6 +636,20 @@ class _AdminWebTeachersScreenState extends ConsumerState<AdminWebTeachersScreen>
                       children: [
                         Text('Instructor Details', style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: AppTheme.textSecondary)),
                         const SizedBox(height: 12),
+                        TextFormField(
+                          controller: teacherIdCtrl,
+                          style: TextStyle(color: AppTheme.text, fontSize: 14),
+                          decoration: InputDecoration(
+                            labelText: 'Faculty ID (e.g. 002-0001)',
+                            labelStyle: TextStyle(color: AppTheme.textSecondary, fontSize: 13),
+                            prefixIcon: Icon(Icons.badge_outlined, size: 20, color: AppTheme.textMuted),
+                            filled: true,
+                            fillColor: AppTheme.background,
+                            border: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: BorderSide(color: AppTheme.border)),
+                          ),
+                          validator: (v) => v == null || v.trim().isEmpty ? 'Please enter teacher ID' : null,
+                        ),
+                        const SizedBox(height: 14),
                         TextFormField(
                           controller: nameCtrl,
                           style: TextStyle(color: AppTheme.text, fontSize: 14),
@@ -682,12 +702,20 @@ class _AdminWebTeachersScreenState extends ConsumerState<AdminWebTeachersScreen>
                             Expanded(
                               child: TextFormField(
                                 controller: passwordCtrl,
-                                obscureText: true,
+                                obscureText: obscurePassword,
                                 style: TextStyle(color: AppTheme.text, fontSize: 14),
                                 decoration: InputDecoration(
                                   labelText: 'Initial Password',
                                   labelStyle: TextStyle(color: AppTheme.textSecondary, fontSize: 13),
                                   prefixIcon: Icon(Icons.lock_outline, size: 20, color: AppTheme.textMuted),
+                                  suffixIcon: IconButton(
+                                    icon: Icon(
+                                      obscurePassword ? Icons.visibility_off_outlined : Icons.visibility_outlined,
+                                      size: 18,
+                                      color: AppTheme.textMuted,
+                                    ),
+                                    onPressed: () => setDialogState(() => obscurePassword = !obscurePassword),
+                                  ),
                                   filled: true,
                                   fillColor: AppTheme.background,
                                   border: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: BorderSide(color: AppTheme.border)),
@@ -747,6 +775,27 @@ class _AdminWebTeachersScreenState extends ConsumerState<AdminWebTeachersScreen>
                               },
                             ),
                           ),
+                        const SizedBox(height: 16),
+                        Container(
+                          padding: const EdgeInsets.all(12),
+                          decoration: BoxDecoration(
+                            color: AppTheme.primary.withValues(alpha: 0.08),
+                            borderRadius: BorderRadius.circular(10),
+                            border: Border.all(color: AppTheme.primary.withValues(alpha: 0.25)),
+                          ),
+                          child: Row(
+                            children: [
+                              Icon(Icons.mark_email_read_outlined, size: 20, color: AppTheme.primary),
+                              const SizedBox(width: 10),
+                              Expanded(
+                                child: Text(
+                                  'SMTP Email Delivery: Teacher ID, username, and password will be sent automatically to the faculty email via Gmail SMTP.',
+                                  style: TextStyle(fontSize: 12, color: AppTheme.text, height: 1.3),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
                       ],
                     ),
                   ),
@@ -762,6 +811,7 @@ class _AdminWebTeachersScreenState extends ConsumerState<AdminWebTeachersScreen>
                     if (!formKey.currentState!.validate()) return;
                     try {
                       await ref.read(adminTeachersProvider.notifier).addTeacher(
+                            id: teacherIdCtrl.text.trim().isNotEmpty ? teacherIdCtrl.text.trim() : null,
                             fullName: nameCtrl.text.trim(),
                             email: emailCtrl.text.trim(),
                             password: passwordCtrl.text.trim(),
@@ -772,8 +822,17 @@ class _AdminWebTeachersScreenState extends ConsumerState<AdminWebTeachersScreen>
                         Navigator.of(dialogCtx).pop();
                         ScaffoldMessenger.of(context).showSnackBar(
                           SnackBar(
-                            content: Text('Faculty "${nameCtrl.text.trim()}" onboarded successfully!'),
-                            backgroundColor: Colors.green,
+                            content: Row(
+                              children: [
+                                const Icon(Icons.mark_email_read_rounded, color: Colors.white),
+                                const SizedBox(width: 10),
+                                Expanded(
+                                  child: Text('Faculty "${nameCtrl.text.trim()}" onboarded! Credentials sent to ${emailCtrl.text.trim()} via Gmail SMTP & synced to Cloud Database!'),
+                                ),
+                              ],
+                            ),
+                            backgroundColor: Colors.green.shade700,
+                            behavior: SnackBarBehavior.floating,
                           ),
                         );
                       }

@@ -1,6 +1,8 @@
 import 'dart:math';
 import 'package:dio/dio.dart';
+import 'package:flutter/foundation.dart';
 import '../../../core/database/database_helper.dart';
+import '../../../core/database/firestore_service.dart';
 import '../../../core/api/api_client.dart';
 
 class AuthSession {
@@ -26,27 +28,61 @@ class AuthRepository {
       await db.execute('ALTER TABLE users ADD COLUMN password_salt TEXT');
     } catch (_) {}
 
-    // Find candidate accounts by email, username, full name, or name prefix
+    // Find candidate accounts by ID (e.g. 001-0001), email, username, full name, or prefix
     List<Map<String, Object?>> candidateRows = [];
     try {
       candidateRows = await db.rawQuery(
         '''SELECT * FROM users
-           WHERE LOWER(email) = ? 
+           WHERE LOWER(id) = ?
+              OR LOWER(email) = ? 
               OR LOWER(COALESCE(username, '')) = ?
               OR LOWER(full_name) = ?
               OR LOWER(REPLACE(REPLACE(COALESCE(username, ''), '.', ' '), '_', ' ')) = ?
               OR LOWER(full_name) LIKE ?
               OR LOWER(COALESCE(username, '')) LIKE ?''',
-        [identifierLower, identifierLower, identifierLower, identifierLower, '$identifierLower%', '$identifierLower%'],
+        [identifierLower, identifierLower, identifierLower, identifierLower, identifierLower, '$identifierLower%', '$identifierLower%'],
       );
     } catch (_) {
       candidateRows = await db.rawQuery(
         '''SELECT * FROM users
-           WHERE LOWER(email) = ? 
+           WHERE LOWER(id) = ?
+              OR LOWER(email) = ? 
               OR LOWER(full_name) = ?
               OR LOWER(full_name) LIKE ?''',
-        [identifierLower, identifierLower, '$identifierLower%'],
+        [identifierLower, identifierLower, identifierLower, '$identifierLower%'],
       );
+    }
+
+    // 2. Query Cloud Firestore to ensure fresh cloud credentials take precedence
+    Map<String, dynamic>? cloudUser;
+    try {
+      cloudUser = await FirestoreService().findUserByIdentifier(identifier);
+    } catch (e) {
+      debugPrint('[AuthRepository] Cloud lookup note: $e');
+    }
+
+    if (cloudUser != null) {
+      final cloudId = cloudUser['id']?.toString() ?? 'usr_${DateTime.now().millisecondsSinceEpoch}';
+      final cloudDbRow = <String, Object?>{
+        'id': cloudId,
+        'email': cloudUser['email'] ?? '',
+        'username': cloudUser['username'] ?? '',
+        'password': cloudUser['password'] ?? '',
+        'password_salt': cloudUser['password_salt'],
+        'role': cloudUser['role'] ?? 'student',
+        'full_name': cloudUser['full_name'] ?? '',
+        'section': cloudUser['section'],
+        'grade': cloudUser['grade'],
+        'student_type': cloudUser['student_type'] ?? 'regular',
+        'special_notes': cloudUser['special_notes'],
+        'school_id': cloudUser['school_id'] ?? 'sch_main',
+        'created_at': cloudUser['created_at'] ?? DateTime.now().toIso8601String(),
+      };
+      // Place cloud user first so latest cloud password/salt is verified first
+      candidateRows = [
+        cloudDbRow,
+        ...candidateRows.where((r) => r['id'] != cloudId),
+      ];
     }
 
     if (candidateRows.isEmpty) {
@@ -100,6 +136,21 @@ class AuthRepository {
     final user = sorted.first;
     final userId = user['id'] as String;
     final role = user['role'] as String;
+
+    // Ensure local SQLite cache is updated with the verified user
+    try {
+      final existing = await db.query('users', where: 'id = ?', whereArgs: [userId]);
+      if (existing.isEmpty) {
+        await db.insert('users', user);
+      } else {
+        await db.update('users', user, where: 'id = ?', whereArgs: [userId]);
+      }
+    } catch (_) {}
+
+    // Synchronize authenticated user with Cloud Firestore
+    try {
+      FirestoreService().saveUser(user);
+    } catch (_) {}
 
     String token = _localToken(userId);
 
@@ -162,6 +213,11 @@ class AuthRepository {
     );
 
     if (existingEmail.isNotEmpty) {
+      throw Exception('An account with this email already exists.');
+    }
+
+    final cloudExists = await FirestoreService().isEmailRegistered(email);
+    if (cloudExists) {
       throw Exception('An account with this email already exists.');
     }
 
@@ -231,6 +287,11 @@ class AuthRepository {
 
     await db.insert('users', userData);
 
+    // Save to Cloud Firestore so the user can log in on any device or browser
+    try {
+      await FirestoreService().saveUser(userData);
+    } catch (_) {}
+
     if (role == 'student' && sectionCode != null && sectionCode.trim().isNotEmpty) {
       // First attempt section-key enrollment (binds section + subjects atomically)
       final enrolled = await DatabaseHelper().enrollStudentBySectionKey(id, sectionCode.trim());
@@ -295,6 +356,9 @@ class AuthRepository {
     if (updates.isNotEmpty) {
       try {
         await db.update('users', updates, where: 'id = ?', whereArgs: [userId]);
+      } catch (_) {}
+      try {
+        await FirestoreService().saveUser({'id': userId, ...updates});
       } catch (_) {}
     }
 

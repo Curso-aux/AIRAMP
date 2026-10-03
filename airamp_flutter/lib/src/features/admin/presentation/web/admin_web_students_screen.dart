@@ -205,6 +205,7 @@ class _AdminWebStudentsScreenState extends ConsumerState<AdminWebStudentsScreen>
     final allStudents = ref.watch(adminStudentsProvider);
     final availableSectionsAsync = ref.watch(availableSectionsProvider);
     final availableSections = availableSectionsAsync.value ?? ['STEM A', 'STEM B', 'STEM C', 'Emerald', 'Ruby'];
+    final subjects = ref.watch(subjectsProvider);
 
     // Compute all dynamic grade levels present
     final Set<String> presentGrades = {};
@@ -358,6 +359,18 @@ class _AdminWebStudentsScreenState extends ConsumerState<AdminWebStudentsScreen>
                         label: const Text('Import CSV', style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold)),
                         style: ElevatedButton.styleFrom(
                           backgroundColor: AppTheme.primary,
+                          foregroundColor: Colors.white,
+                          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                          elevation: 0,
+                        ),
+                      ),
+                      ElevatedButton.icon(
+                        onPressed: () => _openAddStudentDialog(context, availableSections, subjects),
+                        icon: const Icon(Icons.person_add_alt_1_rounded, size: 16),
+                        label: const Text('Add New Student', style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold)),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Colors.teal.shade700,
                           foregroundColor: Colors.white,
                           padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
                           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
@@ -792,6 +805,18 @@ class _AdminWebStudentsScreenState extends ConsumerState<AdminWebStudentsScreen>
                             ? 'You can tag any student as a Special Student to manage their individualized curriculum.'
                             : 'No students are currently enrolled in this specific grade and classroom.',
                         style: TextStyle(fontSize: 13, color: AppTheme.textSecondary),
+                      ),
+                      const SizedBox(height: 16),
+                      ElevatedButton.icon(
+                        onPressed: () => _openAddStudentDialog(context, availableSections, subjects),
+                        icon: const Icon(Icons.person_add_alt_1_rounded, size: 16),
+                        label: const Text('Add Student to This Classroom'),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Colors.teal.shade700,
+                          foregroundColor: Colors.white,
+                          padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 12),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                        ),
                       ),
                     ],
                   ),
@@ -1556,6 +1581,457 @@ class _AdminWebStudentsScreenState extends ConsumerState<AdminWebStudentsScreen>
           );
         },
       ),
+    );
+  }
+
+  // ── Add New Student Dialog ──────────────────────────────────
+  Future<void> _openAddStudentDialog(
+    BuildContext context,
+    List<String> availableSections,
+    List<Map<String, dynamic>> availableSubjects,
+  ) async {
+    final formKey = GlobalKey<FormState>();
+    final nextId = await DatabaseHelper().generateNextStudentId();
+    final studentIdCtrl = TextEditingController(text: nextId);
+    final nameCtrl = TextEditingController();
+    final emailCtrl = TextEditingController();
+    final usernameCtrl = TextEditingController();
+    final passwordCtrl = TextEditingController(text: 'Student@123');
+    final customSectionCtrl = TextEditingController();
+    final notesCtrl = TextEditingController();
+
+    if (!context.mounted) return;
+
+    // Default grade & section based on currently active filter
+    String selectedGrade = _selectedGrade != 'All' ? _selectedGrade : 'Grade 10';
+
+    // Build clean list of section options
+    final sectionOptions = <String>{};
+    for (final s in availableSections) {
+      if (s.isNotEmpty && s != 'All') sectionOptions.add(s);
+    }
+    sectionOptions.add('Diamond');
+    sectionOptions.add('Emerald');
+    sectionOptions.add('Ruby');
+    sectionOptions.add('Sapphire');
+    sectionOptions.add('STEM A');
+    sectionOptions.add('STEM B');
+    sectionOptions.add('Unassigned');
+
+    String selectedSection = (_selectedSection != 'All' && _selectedSection.isNotEmpty)
+        ? _selectedSection
+        : (sectionOptions.contains('Diamond') ? 'Diamond' : sectionOptions.first);
+
+    String selectedType = 'regular';
+    final selectedSubjectIds = <int>{};
+    bool obscurePassword = true;
+    bool isSubmitting = false;
+
+    showDialog(
+      context: context,
+      builder: (dialogCtx) {
+        return StatefulBuilder(
+          builder: (context, setDialogState) {
+            return AlertDialog(
+              backgroundColor: AppTheme.surface,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+              title: Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(8),
+                    decoration: BoxDecoration(
+                      color: Colors.teal.withValues(alpha: 0.12),
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: const Icon(Icons.person_add_alt_1_rounded, color: Colors.teal, size: 22),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'Onboard New Student',
+                          style: TextStyle(color: AppTheme.text, fontSize: 18, fontWeight: FontWeight.bold),
+                        ),
+                        Text(
+                          'Creates student account & syncs immediately to Cloud Database',
+                          style: TextStyle(color: AppTheme.textSecondary, fontSize: 12),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+              content: SizedBox(
+                width: 560,
+                child: Form(
+                  key: formKey,
+                  child: SingleChildScrollView(
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text('Student Information', style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: AppTheme.textSecondary)),
+                        const SizedBox(height: 12),
+                        TextFormField(
+                          controller: studentIdCtrl,
+                          style: TextStyle(color: AppTheme.text, fontSize: 14),
+                          decoration: InputDecoration(
+                            labelText: 'Student ID (e.g. 001-0001)',
+                            labelStyle: TextStyle(color: AppTheme.textSecondary, fontSize: 13),
+                            prefixIcon: Icon(Icons.badge_outlined, size: 20, color: AppTheme.textMuted),
+                            filled: true,
+                            fillColor: AppTheme.background,
+                            border: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: BorderSide(color: AppTheme.border)),
+                          ),
+                          validator: (v) => v == null || v.trim().isEmpty ? 'Please enter student ID' : null,
+                        ),
+                        const SizedBox(height: 14),
+                        TextFormField(
+                          controller: nameCtrl,
+                          style: TextStyle(color: AppTheme.text, fontSize: 14),
+                          decoration: InputDecoration(
+                            labelText: 'Full Name (e.g. Maria Clara Santos)',
+                            labelStyle: TextStyle(color: AppTheme.textSecondary, fontSize: 13),
+                            prefixIcon: Icon(Icons.person_outline, size: 20, color: AppTheme.textMuted),
+                            filled: true,
+                            fillColor: AppTheme.background,
+                            border: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: BorderSide(color: AppTheme.border)),
+                          ),
+                          validator: (v) => v == null || v.trim().isEmpty ? 'Please enter student full name' : null,
+                        ),
+                        const SizedBox(height: 14),
+                        TextFormField(
+                          controller: emailCtrl,
+                          style: TextStyle(color: AppTheme.text, fontSize: 14),
+                          decoration: InputDecoration(
+                            labelText: 'School Email (e.g. maria.santos@school.edu)',
+                            labelStyle: TextStyle(color: AppTheme.textSecondary, fontSize: 13),
+                            prefixIcon: Icon(Icons.email_outlined, size: 20, color: AppTheme.textMuted),
+                            filled: true,
+                            fillColor: AppTheme.background,
+                            border: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: BorderSide(color: AppTheme.border)),
+                          ),
+                          validator: (v) {
+                            if (v == null || v.trim().isEmpty) return 'Please enter email';
+                            if (!v.contains('@') || !v.contains('.')) return 'Please enter a valid email address';
+                            return null;
+                          },
+                        ),
+                        const SizedBox(height: 14),
+                        Row(
+                          children: [
+                            Expanded(
+                              child: TextFormField(
+                                controller: usernameCtrl,
+                                style: TextStyle(color: AppTheme.text, fontSize: 14),
+                                decoration: InputDecoration(
+                                  labelText: 'Username (Optional)',
+                                  labelStyle: TextStyle(color: AppTheme.textSecondary, fontSize: 13),
+                                  prefixIcon: Icon(Icons.alternate_email, size: 20, color: AppTheme.textMuted),
+                                  filled: true,
+                                  fillColor: AppTheme.background,
+                                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: BorderSide(color: AppTheme.border)),
+                                ),
+                              ),
+                            ),
+                            const SizedBox(width: 12),
+                            Expanded(
+                              child: TextFormField(
+                                controller: passwordCtrl,
+                                obscureText: obscurePassword,
+                                style: TextStyle(color: AppTheme.text, fontSize: 14),
+                                decoration: InputDecoration(
+                                  labelText: 'Initial Password',
+                                  labelStyle: TextStyle(color: AppTheme.textSecondary, fontSize: 13),
+                                  prefixIcon: Icon(Icons.lock_outline, size: 20, color: AppTheme.textMuted),
+                                  suffixIcon: IconButton(
+                                    icon: Icon(
+                                      obscurePassword ? Icons.visibility_off_outlined : Icons.visibility_outlined,
+                                      size: 18,
+                                      color: AppTheme.textMuted,
+                                    ),
+                                    onPressed: () => setDialogState(() => obscurePassword = !obscurePassword),
+                                  ),
+                                  filled: true,
+                                  fillColor: AppTheme.background,
+                                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: BorderSide(color: AppTheme.border)),
+                                ),
+                                validator: (v) => v == null || v.length < 6 ? 'Minimum 6 characters' : null,
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 20),
+
+                        Text('Academic Placement & Classroom', style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: AppTheme.textSecondary)),
+                        const SizedBox(height: 12),
+                        Row(
+                          children: [
+                            Expanded(
+                              child: DropdownButtonFormField<String>(
+                                initialValue: selectedGrade,
+                                dropdownColor: AppTheme.surface,
+                                style: TextStyle(color: AppTheme.text, fontSize: 13),
+                                decoration: InputDecoration(
+                                  labelText: 'Grade Level',
+                                  labelStyle: TextStyle(color: AppTheme.textSecondary, fontSize: 13),
+                                  prefixIcon: Icon(Icons.school_outlined, size: 20, color: AppTheme.textMuted),
+                                  filled: true,
+                                  fillColor: AppTheme.background,
+                                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: BorderSide(color: AppTheme.border)),
+                                ),
+                                items: const [
+                                  DropdownMenuItem(value: 'Grade 7', child: Text('Grade 7')),
+                                  DropdownMenuItem(value: 'Grade 8', child: Text('Grade 8')),
+                                  DropdownMenuItem(value: 'Grade 9', child: Text('Grade 9')),
+                                  DropdownMenuItem(value: 'Grade 10', child: Text('Grade 10')),
+                                  DropdownMenuItem(value: 'Grade 11', child: Text('Grade 11')),
+                                  DropdownMenuItem(value: 'Grade 12', child: Text('Grade 12')),
+                                ],
+                                onChanged: (val) {
+                                  if (val != null) setDialogState(() => selectedGrade = val);
+                                },
+                              ),
+                            ),
+                            const SizedBox(width: 12),
+                            Expanded(
+                              child: DropdownButtonFormField<String>(
+                                initialValue: sectionOptions.contains(selectedSection) ? selectedSection : null,
+                                dropdownColor: AppTheme.surface,
+                                style: TextStyle(color: AppTheme.text, fontSize: 13),
+                                decoration: InputDecoration(
+                                  labelText: 'Classroom / Section',
+                                  labelStyle: TextStyle(color: AppTheme.textSecondary, fontSize: 13),
+                                  prefixIcon: Icon(Icons.meeting_room_outlined, size: 20, color: AppTheme.textMuted),
+                                  filled: true,
+                                  fillColor: AppTheme.background,
+                                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: BorderSide(color: AppTheme.border)),
+                                ),
+                                items: [
+                                  ...sectionOptions.map((sec) => DropdownMenuItem(value: sec, child: Text(sec))),
+                                  const DropdownMenuItem(value: '__custom__', child: Text('+ Custom Section...')),
+                                ],
+                                onChanged: (val) {
+                                  if (val != null) setDialogState(() => selectedSection = val);
+                                },
+                              ),
+                            ),
+                          ],
+                        ),
+                        if (selectedSection == '__custom__') ...[
+                          const SizedBox(height: 12),
+                          TextFormField(
+                            controller: customSectionCtrl,
+                            style: TextStyle(color: AppTheme.text, fontSize: 14),
+                            decoration: InputDecoration(
+                              labelText: 'New Section Name (e.g. Diamond-A)',
+                              labelStyle: TextStyle(color: AppTheme.textSecondary, fontSize: 13),
+                              prefixIcon: Icon(Icons.add_box_outlined, size: 20, color: AppTheme.textMuted),
+                              filled: true,
+                              fillColor: AppTheme.background,
+                              border: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: BorderSide(color: AppTheme.border)),
+                            ),
+                            validator: (v) => selectedSection == '__custom__' && (v == null || v.trim().isEmpty)
+                                ? 'Please enter the section name'
+                                : null,
+                          ),
+                        ],
+                        const SizedBox(height: 14),
+
+                        DropdownButtonFormField<String>(
+                          initialValue: selectedType,
+                          dropdownColor: AppTheme.surface,
+                          style: TextStyle(color: AppTheme.text, fontSize: 13),
+                          decoration: InputDecoration(
+                            labelText: 'Student Classification',
+                            labelStyle: TextStyle(color: AppTheme.textSecondary, fontSize: 13),
+                            prefixIcon: Icon(Icons.badge_outlined, size: 20, color: AppTheme.textMuted),
+                            filled: true,
+                            fillColor: AppTheme.background,
+                            border: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: BorderSide(color: AppTheme.border)),
+                          ),
+                          items: const [
+                            DropdownMenuItem(value: 'regular', child: Text('Regular Student (Standard Curriculum)')),
+                            DropdownMenuItem(value: 'irregular', child: Text('Irregular / Cross-Enrollee')),
+                            DropdownMenuItem(value: 'transferee', child: Text('Transferee Student')),
+                            DropdownMenuItem(value: 'sped', child: Text('SPED / Accommodated Student')),
+                          ],
+                          onChanged: (val) {
+                            if (val != null) setDialogState(() => selectedType = val);
+                          },
+                        ),
+                        const SizedBox(height: 14),
+
+                        TextFormField(
+                          controller: notesCtrl,
+                          maxLines: 2,
+                          style: TextStyle(color: AppTheme.text, fontSize: 13),
+                          decoration: InputDecoration(
+                            labelText: 'Special Notes / Learning Accommodations (Optional)',
+                            labelStyle: TextStyle(color: AppTheme.textSecondary, fontSize: 13),
+                            hintText: 'e.g. Needs front row seating, transfer student from St. Jude...',
+                            hintStyle: TextStyle(color: AppTheme.textMuted, fontSize: 12),
+                            prefixIcon: Icon(Icons.note_alt_outlined, size: 20, color: AppTheme.textMuted),
+                            filled: true,
+                            fillColor: AppTheme.background,
+                            border: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: BorderSide(color: AppTheme.border)),
+                          ),
+                        ),
+                        const SizedBox(height: 20),
+
+                        Text('Initial Course Enrollments (Optional)', style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: AppTheme.textSecondary)),
+                        const SizedBox(height: 4),
+                        Text('Courses will also auto-enroll based on section assignment.', style: TextStyle(fontSize: 11, color: AppTheme.textMuted)),
+                        const SizedBox(height: 8),
+                        if (availableSubjects.isEmpty)
+                          Text('No curriculum subjects configured yet.', style: TextStyle(fontSize: 12, color: AppTheme.textMuted))
+                        else
+                          Container(
+                            constraints: const BoxConstraints(maxHeight: 160),
+                            decoration: BoxDecoration(
+                              color: AppTheme.background,
+                              borderRadius: BorderRadius.circular(10),
+                              border: Border.all(color: AppTheme.border),
+                            ),
+                            child: ListView.separated(
+                              shrinkWrap: true,
+                              itemCount: availableSubjects.length,
+                              separatorBuilder: (_, _) => Divider(height: 1, color: AppTheme.border),
+                              itemBuilder: (ctx, i) {
+                                final sub = availableSubjects[i];
+                                final id = sub['id'] as int;
+                                final name = sub['name'] as String? ?? 'Subject';
+                                final code = sub['subject_code'] as String? ?? '';
+                                final teacher = sub['teacher_name'] as String?;
+                                final isSelected = selectedSubjectIds.contains(id);
+
+                                return CheckboxListTile(
+                                  value: isSelected,
+                                  onChanged: (val) {
+                                    setDialogState(() {
+                                      if (val == true) {
+                                        selectedSubjectIds.add(id);
+                                      } else {
+                                        selectedSubjectIds.remove(id);
+                                      }
+                                    });
+                                  },
+                                  title: Text(
+                                    code.isNotEmpty ? '$code — $name' : name,
+                                    style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: AppTheme.text),
+                                  ),
+                                  subtitle: teacher != null && teacher.isNotEmpty
+                                      ? Text('Teacher: $teacher', style: TextStyle(fontSize: 11, color: AppTheme.textMuted))
+                                      : null,
+                                  activeColor: Colors.teal,
+                                  dense: true,
+                                );
+                              },
+                            ),
+                          ),
+                        const SizedBox(height: 16),
+                        Container(
+                          padding: const EdgeInsets.all(12),
+                          decoration: BoxDecoration(
+                            color: Colors.teal.withValues(alpha: 0.08),
+                            borderRadius: BorderRadius.circular(10),
+                            border: Border.all(color: Colors.teal.withValues(alpha: 0.25)),
+                          ),
+                          child: Row(
+                            children: [
+                              const Icon(Icons.mark_email_read_outlined, size: 20, color: Colors.teal),
+                              const SizedBox(width: 10),
+                              Expanded(
+                                child: Text(
+                                  'SMTP Email Delivery: Student ID, username, and password will be sent automatically to the student\'s email via Gmail SMTP.',
+                                  style: TextStyle(fontSize: 12, color: AppTheme.text, height: 1.3),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+              actions: [
+                TextButton(
+                  onPressed: isSubmitting ? null : () => Navigator.of(dialogCtx).pop(),
+                  child: Text('Cancel', style: TextStyle(color: AppTheme.textSecondary)),
+                ),
+                ElevatedButton(
+                  onPressed: isSubmitting
+                      ? null
+                      : () async {
+                          if (!formKey.currentState!.validate()) return;
+                          setDialogState(() => isSubmitting = true);
+
+                          final finalSection = selectedSection == '__custom__'
+                              ? (customSectionCtrl.text.trim().isNotEmpty ? customSectionCtrl.text.trim() : 'Unassigned')
+                              : selectedSection;
+
+                          try {
+                            await ref.read(adminStudentsProvider.notifier).addStudent(
+                                  id: studentIdCtrl.text.trim().isNotEmpty ? studentIdCtrl.text.trim() : null,
+                                  fullName: nameCtrl.text.trim(),
+                                  email: emailCtrl.text.trim(),
+                                  password: passwordCtrl.text.trim(),
+                                  username: usernameCtrl.text.trim().isNotEmpty ? usernameCtrl.text.trim() : null,
+                                  grade: selectedGrade,
+                                  section: finalSection,
+                                  studentType: selectedType,
+                                  specialNotes: notesCtrl.text.trim().isNotEmpty ? notesCtrl.text.trim() : null,
+                                  enrollSubjectIds: selectedSubjectIds.isNotEmpty ? selectedSubjectIds.toList() : null,
+                                );
+                            if (context.mounted) {
+                              Navigator.of(dialogCtx).pop();
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                SnackBar(
+                                  content: Row(
+                                    children: [
+                                      const Icon(Icons.mark_email_read_rounded, color: Colors.white),
+                                      const SizedBox(width: 10),
+                                      Expanded(
+                                        child: Text('Student "${nameCtrl.text.trim()}" onboarded! Credentials sent to ${emailCtrl.text.trim()} via Gmail SMTP & synced to Cloud Database!'),
+                                      ),
+                                    ],
+                                  ),
+                                  backgroundColor: Colors.green.shade700,
+                                  behavior: SnackBarBehavior.floating,
+                                ),
+                              );
+                            }
+                          } catch (e) {
+                            setDialogState(() => isSubmitting = false);
+                            if (context.mounted) {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                SnackBar(content: Text('Error: $e'), backgroundColor: Colors.red),
+                              );
+                            }
+                          }
+                        },
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.teal.shade700,
+                    foregroundColor: Colors.white,
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                    minimumSize: const Size(0, 40),
+                  ),
+                  child: isSubmitting
+                      ? const SizedBox(
+                          width: 18,
+                          height: 18,
+                          child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                        )
+                      : const Text('Add Student'),
+                ),
+              ],
+            );
+          },
+        );
+      },
     );
   }
 }

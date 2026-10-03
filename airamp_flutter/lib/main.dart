@@ -1,12 +1,26 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:firebase_core/firebase_core.dart';
+import 'firebase_options.dart';
 import 'src/routing/app_router.dart';
 import 'src/core/theme/app_theme.dart';
 import 'src/core/theme/theme_provider.dart';
+import 'src/core/database/firestore_service.dart';
 import 'src/features/auth/application/auth_provider.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+
+  // Initialize Firebase Cloud Infrastructure
+  try {
+    await Firebase.initializeApp(
+      options: DefaultFirebaseOptions.currentPlatform,
+    );
+    debugPrint('[Firebase] Initialized successfully for platform');
+  } catch (e) {
+    debugPrint('[Firebase] Initialization note: $e');
+  }
+
   FlutterError.onError = (FlutterErrorDetails details) {
     FlutterError.presentError(details);
     debugPrint('FLUTTER_ERROR_START');
@@ -52,6 +66,12 @@ class _AirampAppState extends ConsumerState<AirampApp> {
     if (mounted) {
       setState(() => _bootstrapped = true);
     }
+    // Background cloud user sync
+    try {
+      FirestoreService().syncCloudUsersToLocal().then((_) {
+        FirestoreService().syncLocalUsersToCloud();
+      });
+    } catch (_) {}
   }
 
   @override

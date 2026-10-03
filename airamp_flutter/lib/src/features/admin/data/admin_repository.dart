@@ -554,6 +554,36 @@ class AdminStudentsNotifier extends Notifier<List<Map<String, dynamic>>> {
     state = results;
   }
 
+  Future<String> addStudent({
+    String? id,
+    required String fullName,
+    required String email,
+    required String password,
+    String? username,
+    String? grade,
+    String? section,
+    String studentType = 'regular',
+    String? specialNotes,
+    List<int>? enrollSubjectIds,
+  }) async {
+    final sid = await DatabaseHelper().createStudent(
+      id: id,
+      fullName: fullName,
+      email: email,
+      password: password,
+      username: username,
+      grade: grade,
+      section: section,
+      studentType: studentType,
+      specialNotes: specialNotes,
+      enrollSubjectIds: enrollSubjectIds,
+    );
+    await loadStudents();
+    ref.read(adminAnalyticsProvider.notifier).loadAnalytics();
+    ref.read(sectionsProvider.notifier).reload();
+    return sid;
+  }
+
   Future<void> reassignSection(String studentId, String newSection, {String? newGrade}) async {
     await DatabaseHelper().updateStudentSection(studentId, newSection, grade: newGrade);
     await loadStudents();
@@ -677,6 +707,7 @@ class AdminTeachersNotifier extends Notifier<List<Map<String, dynamic>>> {
   }
 
   Future<String> addTeacher({
+    String? id,
     required String fullName,
     required String email,
     required String password,
@@ -684,6 +715,7 @@ class AdminTeachersNotifier extends Notifier<List<Map<String, dynamic>>> {
     List<int>? assignSubjectIds,
   }) async {
     final tid = await DatabaseHelper().createTeacher(
+      id: id,
       fullName: fullName,
       email: email,
       password: password,

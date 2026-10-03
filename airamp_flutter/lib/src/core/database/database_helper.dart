@@ -7,6 +7,8 @@ import 'package:sqflite/sqflite.dart';
 import 'package:sqflite_common_ffi_web/sqflite_ffi_web.dart';
 import '../utils/cache_manager.dart';
 import '../utils/section_key_helper.dart';
+import 'firestore_service.dart';
+import '../services/email_service.dart';
 
 class DatabaseHelper {
   static final DatabaseHelper _instance = DatabaseHelper._internal();
@@ -75,6 +77,9 @@ class DatabaseHelper {
     } catch (_) {}
     try {
       await db.execute("ALTER TABLE users ADD COLUMN special_notes TEXT");
+    } catch (_) {}
+    try {
+      await db.execute("ALTER TABLE users ADD COLUMN category TEXT");
     } catch (_) {}
     try {
       await db.execute('ALTER TABLE sections ADD COLUMN enrollment_key TEXT');
@@ -338,6 +343,7 @@ class DatabaseHelper {
         password TEXT NOT NULL,
         password_salt TEXT,
         role TEXT NOT NULL,
+        category TEXT,
         full_name TEXT NOT NULL,
         section TEXT,
         grade TEXT,
@@ -2647,6 +2653,7 @@ class DatabaseHelper {
       final hashedPassword = hashPassword(defaultPass, salt);
       final username = email.split('@').first;
 
+      final category = (role == 'teacher') ? 'teacher' : (role == 'student' ? 'student' : role);
       final userRecord = <String, dynamic>{
         'id': userId,
         'email': email,
@@ -2654,19 +2661,31 @@ class DatabaseHelper {
         'password': hashedPassword,
         'password_salt': salt,
         'role': role,
+        'category': category,
         'full_name': fullName,
         'section': resolvedSection.isNotEmpty ? resolvedSection : null,
         'grade': resolvedGrade.isNotEmpty ? resolvedGrade : null,
         'student_type': studentType.isNotEmpty ? studentType : 'regular',
         'special_notes': specialNotes.isNotEmpty ? specialNotes : null,
+        'school_id': 'sch_main',
         'created_at': now.toIso8601String(),
       };
 
       try {
-        await db.insert('users', userRecord);
+        try {
+          await db.insert('users', userRecord);
+        } catch (_) {
+          final fallback = Map<String, dynamic>.from(userRecord)..remove('category');
+          await db.insert('users', fallback);
+        }
         existingEmails.add(email); // Prevent duplicates within same import batch
         insertedUsers.add(userRecord);
         successCount++;
+
+        // Synchronize imported user to Cloud Firestore
+        try {
+          FirestoreService().saveUser(userRecord);
+        } catch (_) {}
 
         // Auto-enroll if student with assigned section
         if (role == 'student' && resolvedSection.isNotEmpty) {
@@ -2748,6 +2767,7 @@ class DatabaseHelper {
         'password': hashedPassword,
         'password_salt': salt,
         'role': 'teacher',
+        'category': 'teacher',
         'full_name': fullName,
         'section': rawSections.isNotEmpty ? rawSections : null,
         'special_notes': [
@@ -2759,7 +2779,12 @@ class DatabaseHelper {
       };
 
       try {
-        await db.insert('users', teacherRecord);
+        try {
+          await db.insert('users', teacherRecord);
+        } catch (_) {
+          final fallback = Map<String, dynamic>.from(teacherRecord)..remove('category');
+          await db.insert('users', fallback);
+        }
         existingEmails.add(email);
 
         insertedTeachers.add({
@@ -2769,6 +2794,11 @@ class DatabaseHelper {
           'specialty': specialty,
         });
         successCount++;
+
+        // Synchronize imported teacher to Cloud Firestore
+        try {
+          FirestoreService().saveUser(teacherRecord);
+        } catch (_) {}
       } catch (e) {
         errors.add({'row': i + 1, 'email': email, 'reason': 'Database error: $e'});
       }
@@ -3722,7 +3752,88 @@ class DatabaseHelper {
     return enriched;
   }
 
+  /// Generates the next sequential Student ID using the 001-XXXX pattern (e.g. 001-0001, 001-0002)
+  Future<String> generateNextStudentId() async {
+    int maxSequence = 0;
+    try {
+      final db = await database;
+      final localRows = await db.rawQuery(
+        "SELECT id FROM users WHERE id LIKE '001-%'",
+      );
+      for (final row in localRows) {
+        final idStr = row['id']?.toString() ?? '';
+        final parts = idStr.split('-');
+        if (parts.length == 2) {
+          final num = int.tryParse(parts[1]);
+          if (num != null && num > maxSequence) {
+            maxSequence = num;
+          }
+        }
+      }
+    } catch (_) {}
+
+    try {
+      final cloudUsers = await FirestoreService().fetchAllUsers();
+      for (final user in cloudUsers) {
+        final idStr = user['id']?.toString() ?? '';
+        if (idStr.startsWith('001-')) {
+          final parts = idStr.split('-');
+          if (parts.length == 2) {
+            final num = int.tryParse(parts[1]);
+            if (num != null && num > maxSequence) {
+              maxSequence = num;
+            }
+          }
+        }
+      }
+    } catch (_) {}
+
+    final nextNumber = (maxSequence + 1).toString().padLeft(4, '0');
+    return '001-$nextNumber';
+  }
+
+  /// Generates the next sequential Teacher ID using the 002-XXXX pattern (e.g. 002-0001, 002-0002)
+  Future<String> generateNextTeacherId() async {
+    int maxSequence = 0;
+    try {
+      final db = await database;
+      final localRows = await db.rawQuery(
+        "SELECT id FROM users WHERE id LIKE '002-%'",
+      );
+      for (final row in localRows) {
+        final idStr = row['id']?.toString() ?? '';
+        final parts = idStr.split('-');
+        if (parts.length == 2) {
+          final num = int.tryParse(parts[1]);
+          if (num != null && num > maxSequence) {
+            maxSequence = num;
+          }
+        }
+      }
+    } catch (_) {}
+
+    try {
+      final cloudUsers = await FirestoreService().fetchAllUsers();
+      for (final user in cloudUsers) {
+        final idStr = user['id']?.toString() ?? '';
+        if (idStr.startsWith('002-')) {
+          final parts = idStr.split('-');
+          if (parts.length == 2) {
+            final num = int.tryParse(parts[1]);
+            if (num != null && num > maxSequence) {
+              maxSequence = num;
+            }
+          }
+        }
+      }
+    } catch (_) {}
+
+    final nextNumber = (maxSequence + 1).toString().padLeft(4, '0');
+    return '002-$nextNumber';
+  }
+
   Future<String> createTeacher({
+    String? id,
     required String fullName,
     required String email,
     required String password,
@@ -3732,29 +3843,193 @@ class DatabaseHelper {
     final db = await database;
     final salt = generateSalt();
     final hashedPassword = hashPassword(password, salt);
-    final teacherId = 'teacher_${DateTime.now().millisecondsSinceEpoch}';
+    final teacherId = (id != null && id.trim().isNotEmpty)
+        ? id.trim()
+        : await generateNextTeacherId();
     final resolvedUsername = (username != null && username.trim().isNotEmpty)
         ? username.trim()
         : (email.contains('@') ? email.split('@').first : fullName.trim().toLowerCase().replaceAll(' ', '.'));
 
-    await db.insert('users', {
+    final teacherData = {
       'id': teacherId,
       'email': email.trim(),
       'username': resolvedUsername,
       'password': hashedPassword,
       'password_salt': salt,
       'role': 'teacher',
+      'category': 'teacher',
       'full_name': fullName.trim(),
+      'school_id': 'sch_main',
       'created_at': DateTime.now().toIso8601String(),
-    });
+    };
 
-    if (assignSubjectIds != null && assignSubjectIds.isNotEmpty) {
-      for (final subId in assignSubjectIds) {
-        await assignTeacherToSubject(subId, teacherId, fullName.trim());
+    final cleanEmail = email.trim().toLowerCase();
+    final existingUsers = await db.query(
+      'users',
+      where: 'LOWER(email) = ?',
+      whereArgs: [cleanEmail],
+      limit: 1,
+    );
+
+    String finalTeacherId = teacherId;
+
+    if (existingUsers.isNotEmpty) {
+      final existingUser = existingUsers.first;
+      finalTeacherId = existingUser['id'] as String;
+
+      final updateData = Map<String, dynamic>.from(teacherData);
+      updateData['id'] = finalTeacherId;
+
+      try {
+        await db.update('users', updateData, where: 'id = ?', whereArgs: [finalTeacherId]);
+      } catch (_) {
+        final fallback = Map<String, dynamic>.from(updateData)..remove('category');
+        await db.update('users', fallback, where: 'id = ?', whereArgs: [finalTeacherId]);
+      }
+      teacherData['id'] = finalTeacherId;
+    } else {
+      try {
+        await db.insert('users', teacherData, conflictAlgorithm: ConflictAlgorithm.replace);
+      } catch (_) {
+        final fallbackData = Map<String, dynamic>.from(teacherData)..remove('category');
+        await db.insert('users', fallbackData, conflictAlgorithm: ConflictAlgorithm.replace);
       }
     }
 
-    return teacherId;
+    if (assignSubjectIds != null && assignSubjectIds.isNotEmpty) {
+      for (final subId in assignSubjectIds) {
+        await assignTeacherToSubject(subId, finalTeacherId, fullName.trim());
+      }
+    }
+
+    try {
+      await FirestoreService().saveUser(teacherData);
+    } catch (e) {
+      debugPrint('[DatabaseHelper] Error syncing teacher to Firestore: $e');
+    }
+
+    try {
+      await EmailService().sendAccountCredentials(
+        toEmail: email.trim(),
+        fullName: fullName.trim(),
+        userId: finalTeacherId,
+        username: resolvedUsername,
+        plainPassword: password,
+        role: 'teacher',
+      );
+    } catch (e) {
+      debugPrint('[DatabaseHelper] Error dispatching teacher credentials email: $e');
+    }
+
+    return finalTeacherId;
+  }
+
+  Future<String> createStudent({
+    String? id,
+    required String fullName,
+    required String email,
+    required String password,
+    String? username,
+    String? grade,
+    String? section,
+    String studentType = 'regular',
+    String? specialNotes,
+    List<int>? enrollSubjectIds,
+  }) async {
+    final db = await database;
+    final salt = generateSalt();
+    final hashedPassword = hashPassword(password, salt);
+    final studentId = (id != null && id.trim().isNotEmpty)
+        ? id.trim()
+        : await generateNextStudentId();
+    final resolvedUsername = (username != null && username.trim().isNotEmpty)
+        ? username.trim()
+        : (email.contains('@') ? email.split('@').first : fullName.trim().toLowerCase().replaceAll(' ', '.'));
+
+    final studentData = {
+      'id': studentId,
+      'email': email.trim(),
+      'username': resolvedUsername,
+      'password': hashedPassword,
+      'password_salt': salt,
+      'role': 'student',
+      'category': 'student',
+      'full_name': fullName.trim(),
+      'grade': grade,
+      'section': section,
+      'student_type': studentType,
+      'special_notes': specialNotes,
+      'school_id': 'sch_main',
+      'created_at': DateTime.now().toIso8601String(),
+    };
+
+    final cleanEmail = email.trim().toLowerCase();
+    final existingUsers = await db.query(
+      'users',
+      where: 'LOWER(email) = ?',
+      whereArgs: [cleanEmail],
+      limit: 1,
+    );
+
+    String finalStudentId = studentId;
+
+    if (existingUsers.isNotEmpty) {
+      final existingUser = existingUsers.first;
+      finalStudentId = existingUser['id'] as String;
+
+      final updateData = Map<String, dynamic>.from(studentData);
+      updateData['id'] = finalStudentId;
+
+      try {
+        await db.update('users', updateData, where: 'id = ?', whereArgs: [finalStudentId]);
+      } catch (_) {
+        final fallback = Map<String, dynamic>.from(updateData)..remove('category');
+        await db.update('users', fallback, where: 'id = ?', whereArgs: [finalStudentId]);
+      }
+      studentData['id'] = finalStudentId;
+    } else {
+      try {
+        await db.insert('users', studentData, conflictAlgorithm: ConflictAlgorithm.replace);
+      } catch (_) {
+        final fallbackData = Map<String, dynamic>.from(studentData)..remove('category');
+        await db.insert('users', fallbackData, conflictAlgorithm: ConflictAlgorithm.replace);
+      }
+    }
+
+    if (section != null && section.isNotEmpty) {
+      try {
+        await autoEnrollStudentBySection(finalStudentId, section, grade ?? '');
+      } catch (_) {}
+    }
+    if (enrollSubjectIds != null && enrollSubjectIds.isNotEmpty) {
+      try {
+        await setStudentEnrollments(finalStudentId, enrollSubjectIds);
+      } catch (_) {}
+    }
+
+    try {
+      await FirestoreService().saveUser(studentData);
+    } catch (e) {
+      debugPrint('[DatabaseHelper] Error syncing student to Firestore: $e');
+    }
+
+    try {
+      await EmailService().sendAccountCredentials(
+        toEmail: email.trim(),
+        fullName: fullName.trim(),
+        userId: finalStudentId,
+        username: resolvedUsername,
+        plainPassword: password,
+        role: 'student',
+        grade: grade,
+        section: section,
+        specialNotes: specialNotes,
+      );
+    } catch (e) {
+      debugPrint('[DatabaseHelper] Error dispatching student credentials email: $e');
+    }
+
+    return finalStudentId;
   }
 
   Future<void> updateTeacher(
