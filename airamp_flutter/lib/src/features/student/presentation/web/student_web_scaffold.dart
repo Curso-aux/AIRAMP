@@ -196,7 +196,7 @@ class _StudentWebScaffoldState extends ConsumerState<StudentWebScaffold> {
     required bool isDesktop,
     required double screenWidth,
     required bool isDark,
-    required dynamic currentUser,
+    required User? currentUser,
   }) {
     final section = currentUser?.section?.toString() ?? '';
 
@@ -347,7 +347,7 @@ class _StudentWebScaffoldState extends ConsumerState<StudentWebScaffold> {
 
   Widget _buildSidebarContent({
     required bool isCollapsed,
-    required dynamic currentUser,
+    required User? currentUser,
     required bool isDark,
   }) {
     final activeIndex = widget.navigationShell.currentIndex;
@@ -502,7 +502,7 @@ class _StudentWebScaffoldState extends ConsumerState<StudentWebScaffold> {
                               radius: 18,
                               backgroundColor: _studentAccent.withValues(alpha: 0.15),
                               child: Text(
-                                currentUser?.fullName.isNotEmpty == true ? currentUser.fullName[0].toUpperCase() : 'S',
+                                currentUser?.fullName.isNotEmpty == true ? currentUser!.fullName[0].toUpperCase() : 'S',
                                 style: const TextStyle(fontWeight: FontWeight.bold, color: _studentAccent),
                               ),
                             ),
@@ -524,9 +524,11 @@ class _StudentWebScaffoldState extends ConsumerState<StudentWebScaffold> {
                                     overflow: TextOverflow.ellipsis,
                                   ),
                                   Text(
-                                    currentUser?.studentId != null && currentUser!.studentId!.isNotEmpty
-                                        ? 'ID: ${currentUser.studentId}'
-                                        : (currentUser?.username ?? 'Student'),
+                                    currentUser != null && currentUser.username.isNotEmpty
+                                        ? '@${currentUser.username}'
+                                        : (currentUser != null && currentUser.id.isNotEmpty
+                                            ? 'ID: ${currentUser.id}'
+                                            : 'Student'),
                                     style: TextStyle(fontSize: 11, color: AppTheme.textMuted),
                                     maxLines: 1,
                                     overflow: TextOverflow.ellipsis,
