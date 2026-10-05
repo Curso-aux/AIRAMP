@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import '../../../../core/animations/app_page_transitions.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../../core/theme/theme_provider.dart';
 import '../../../auth/application/auth_provider.dart';
@@ -179,7 +180,10 @@ class _StudentWebScaffoldState extends ConsumerState<StudentWebScaffold> {
                 Expanded(
                   child: Stack(
                     children: [
-                      widget.navigationShell,
+                      AppBranchTransition(
+                        currentIndex: widget.navigationShell.currentIndex,
+                        child: widget.navigationShell,
+                      ),
                       if (widget.floatingOverlay != null) widget.floatingOverlay!,
                     ],
                   ),

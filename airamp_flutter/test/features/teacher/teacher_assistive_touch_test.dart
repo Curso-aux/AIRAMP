@@ -78,5 +78,6 @@ void main() {
     await tester.tap(find.text('Create Quiz'));
     await tester.pumpAndSettle();
     expect(createQuizTapped, isTrue);
+    expect(announceTapped, isFalse);
   });
 }

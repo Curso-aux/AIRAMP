@@ -29,21 +29,23 @@ class SmoothPageTransitionsBuilder extends PageTransitionsBuilder {
       reverseCurve: Curves.easeInCubic,
     );
 
-    return SlideTransition(
-      position: Tween<Offset>(
-        begin: const Offset(0.06, 0.0),
-        end: Offset.zero,
-      ).animate(primaryCurve),
-      child: FadeTransition(
-        opacity: Tween<double>(begin: 0.0, end: 1.0).animate(primaryCurve),
-        child: SlideTransition(
-          position: Tween<Offset>(
-            begin: Offset.zero,
-            end: const Offset(-0.03, 0.0),
-          ).animate(secondaryCurve),
-          child: FadeTransition(
-            opacity: Tween<double>(begin: 1.0, end: 0.88).animate(secondaryCurve),
-            child: child,
+    return RepaintBoundary(
+      child: SlideTransition(
+        position: Tween<Offset>(
+          begin: const Offset(0.06, 0.0),
+          end: Offset.zero,
+        ).animate(primaryCurve),
+        child: FadeTransition(
+          opacity: Tween<double>(begin: 0.0, end: 1.0).animate(primaryCurve),
+          child: SlideTransition(
+            position: Tween<Offset>(
+              begin: Offset.zero,
+              end: const Offset(-0.03, 0.0),
+            ).animate(secondaryCurve),
+            child: FadeTransition(
+              opacity: Tween<double>(begin: 1.0, end: 0.88).animate(secondaryCurve),
+              child: child,
+            ),
           ),
         ),
       ),

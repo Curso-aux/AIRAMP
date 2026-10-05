@@ -143,25 +143,6 @@ class _ActualCalendarViewState extends State<ActualCalendarView> {
     }
   }
 
-  String _calculateDuration(String? start, String? end) {
-    if (start == null || end == null || !start.contains(':') || !end.contains(':')) return '';
-    try {
-      final sParts = start.split(':');
-      final eParts = end.split(':');
-      final sMin = int.parse(sParts[0]) * 60 + int.parse(sParts[1]);
-      final eMin = int.parse(eParts[0]) * 60 + int.parse(eParts[1]);
-      final diff = eMin - sMin;
-      if (diff <= 0) return '';
-      final hours = diff ~/ 60;
-      final mins = diff % 60;
-      if (hours > 0 && mins > 0) return '${hours}h ${mins}m';
-      if (hours > 0) return '${hours}h';
-      return '${mins}m';
-    } catch (_) {
-      return '';
-    }
-  }
-
   Color _getSubjectColor(String subjectName, String? hexColor, bool isDark) {
     if (hexColor != null && hexColor.isNotEmpty) {
       try {
@@ -962,31 +943,6 @@ class _ActualCalendarViewState extends State<ActualCalendarView> {
             ),
           ],
         ),
-      ),
-    );
-  }
-
-  Widget _buildMetaChip(IconData icon, String text, Color accentColor, bool isDark) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-      decoration: BoxDecoration(
-        color: accentColor.withValues(alpha: 0.12),
-        borderRadius: BorderRadius.circular(6),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(icon, size: 12, color: accentColor),
-          const SizedBox(width: 4),
-          Text(
-            text,
-            style: TextStyle(
-              fontSize: 11,
-              fontWeight: FontWeight.w600,
-              color: isDark ? Colors.white : AppTheme.text,
-            ),
-          ),
-        ],
       ),
     );
   }

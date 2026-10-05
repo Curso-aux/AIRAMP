@@ -4,6 +4,7 @@ import 'package:flutter/rendering.dart';
 import 'package:flutter/services.dart';
 import 'package:go_router/go_router.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../animations/app_page_transitions.dart';
 import '../theme/app_theme.dart';
 import '../theme/theme_provider.dart';
 
@@ -168,7 +169,10 @@ class _SwipeableNavScaffoldState extends ConsumerState<SwipeableNavScaffold> {
             child: GestureDetector(
               behavior: HitTestBehavior.translucent,
               onHorizontalDragEnd: _handleHorizontalSwipe,
-              child: widget.navigationShell,
+              child: AppBranchTransition(
+                currentIndex: widget.navigationShell.currentIndex,
+                child: widget.navigationShell,
+              ),
             ),
           ),
           if (widget.floatingOverlay != null) widget.floatingOverlay!,

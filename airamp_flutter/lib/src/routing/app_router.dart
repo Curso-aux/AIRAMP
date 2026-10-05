@@ -2,6 +2,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../core/animations/app_page_transitions.dart';
 import '../features/landing/presentation/web_landing_screen.dart';
 import '../features/auth/presentation/web/admin_web_login_screen.dart';
 import '../features/auth/presentation/login_screen.dart';
@@ -54,54 +55,92 @@ class PlaceholderScreen extends StatelessWidget {
   }
 }
 
-final routerProvider = Provider<GoRouter>((ref) {
-  final authState = ref.watch(authProvider);
+/// A stable notifier bridge that notifies GoRouter on auth state changes
+/// without re-instantiating the GoRouter instance itself.
+class RouterAuthNotifier extends ChangeNotifier {
+  final Ref _ref;
+  RouterAuthNotifier(this._ref) {
+    _ref.listen<User?>(authProvider, (_, _) {
+      notifyListeners();
+    });
+  }
+}
 
-  final initialLoc = (authState != null && (authState.role == 'admin' || authState.role == 'super_admin'))
+final routerProvider = Provider<GoRouter>((ref) {
+  final authNotifier = RouterAuthNotifier(ref);
+  ref.onDispose(authNotifier.dispose);
+
+  final initialAuth = ref.read(authProvider);
+  final initialLoc = (initialAuth != null && (initialAuth.role == 'admin' || initialAuth.role == 'super_admin'))
       ? '/admin/dashboard'
-      : (authState != null && authState.role == 'teacher'
+      : (initialAuth != null && initialAuth.role == 'teacher'
           ? '/teacher/dashboard'
-          : (authState != null
+          : (initialAuth != null
               ? '/student/home'
               : (kIsWeb ? '/' : '/login')));
 
   return GoRouter(
     initialLocation: initialLoc,
+    refreshListenable: authNotifier,
     routes: [
       GoRoute(
         path: '/',
-        builder: (context, state) => kIsWeb ? const WebLandingScreen() : const LoginScreen(),
+        pageBuilder: (context, state) => AppPageTransitions.fadeThrough(
+          key: state.pageKey,
+          child: kIsWeb ? const WebLandingScreen() : const LoginScreen(),
+        ),
       ),
       GoRoute(
         path: '/admin/login',
-        builder: (context, state) => const AdminWebLoginScreen(initialRole: 'admin'),
+        pageBuilder: (context, state) => AppPageTransitions.fadeThrough(
+          key: state.pageKey,
+          child: const AdminWebLoginScreen(initialRole: 'admin'),
+        ),
       ),
       GoRoute(
         path: '/teacher/login',
-        builder: (context, state) => const AdminWebLoginScreen(initialRole: 'teacher'),
+        pageBuilder: (context, state) => AppPageTransitions.fadeThrough(
+          key: state.pageKey,
+          child: const AdminWebLoginScreen(initialRole: 'teacher'),
+        ),
       ),
       GoRoute(
         path: '/student/login',
-        builder: (context, state) => const AdminWebLoginScreen(initialRole: 'student'),
+        pageBuilder: (context, state) => AppPageTransitions.fadeThrough(
+          key: state.pageKey,
+          child: const AdminWebLoginScreen(initialRole: 'student'),
+        ),
       ),
       GoRoute(
         path: '/login',
-        builder: (context, state) {
+        pageBuilder: (context, state) {
           final role = state.uri.queryParameters['role'] ?? 'student';
-          return kIsWeb ? AdminWebLoginScreen(initialRole: role) : const LoginScreen();
+          return AppPageTransitions.fadeThrough(
+            key: state.pageKey,
+            child: kIsWeb ? AdminWebLoginScreen(initialRole: role) : const LoginScreen(),
+          );
         },
       ),
       GoRoute(
         path: '/signup',
-        builder: (context, state) => const SignupScreen(),
+        pageBuilder: (context, state) => AppPageTransitions.page(
+          key: state.pageKey,
+          child: const SignupScreen(),
+        ),
       ),
       GoRoute(
         path: '/admin-signup',
-        builder: (context, state) => const AdminSignupScreen(),
+        pageBuilder: (context, state) => AppPageTransitions.page(
+          key: state.pageKey,
+          child: const AdminSignupScreen(),
+        ),
       ),
       GoRoute(
         path: '/forgot-password',
-        builder: (context, state) => const ForgotPasswordScreen(),
+        pageBuilder: (context, state) => AppPageTransitions.page(
+          key: state.pageKey,
+          child: const ForgotPasswordScreen(),
+        ),
       ),
       // Student Routes with Bottom Navigation
       StatefulShellRoute.indexedStack(
@@ -113,7 +152,10 @@ final routerProvider = Provider<GoRouter>((ref) {
             routes: [
               GoRoute(
                 path: '/student/home',
-                builder: (context, state) => const StudentHomeScreen(),
+                pageBuilder: (context, state) => AppPageTransitions.page(
+                  key: state.pageKey,
+                  child: const StudentHomeScreen(),
+                ),
               ),
             ],
           ),
@@ -121,7 +163,10 @@ final routerProvider = Provider<GoRouter>((ref) {
             routes: [
               GoRoute(
                 path: '/student/courses',
-                builder: (context, state) => const MyCoursesScreen(),
+                pageBuilder: (context, state) => AppPageTransitions.page(
+                  key: state.pageKey,
+                  child: const MyCoursesScreen(),
+                ),
               ),
             ],
           ),
@@ -129,7 +174,10 @@ final routerProvider = Provider<GoRouter>((ref) {
             routes: [
               GoRoute(
                 path: '/student/progress',
-                builder: (context, state) => const MyProgressScreen(),
+                pageBuilder: (context, state) => AppPageTransitions.page(
+                  key: state.pageKey,
+                  child: const MyProgressScreen(),
+                ),
               ),
             ],
           ),
@@ -137,7 +185,10 @@ final routerProvider = Provider<GoRouter>((ref) {
             routes: [
               GoRoute(
                 path: '/student/quiz-history',
-                builder: (context, state) => const QuizHistoryScreen(),
+                pageBuilder: (context, state) => AppPageTransitions.page(
+                  key: state.pageKey,
+                  child: const QuizHistoryScreen(),
+                ),
               ),
             ],
           ),
@@ -145,7 +196,10 @@ final routerProvider = Provider<GoRouter>((ref) {
             routes: [
               GoRoute(
                 path: '/student/chat',
-                builder: (context, state) => const ChatListScreen(),
+                pageBuilder: (context, state) => AppPageTransitions.page(
+                  key: state.pageKey,
+                  child: const ChatListScreen(),
+                ),
               ),
             ],
           ),
@@ -153,7 +207,10 @@ final routerProvider = Provider<GoRouter>((ref) {
       ),
       GoRoute(
         path: '/student/profile',
-        builder: (context, state) => const StudentProfileScreen(),
+        pageBuilder: (context, state) => AppPageTransitions.page(
+          key: state.pageKey,
+          child: const StudentProfileScreen(),
+        ),
       ),
       // Teacher Routes with Bottom Navigation
       StatefulShellRoute.indexedStack(
@@ -165,7 +222,10 @@ final routerProvider = Provider<GoRouter>((ref) {
             routes: [
               GoRoute(
                 path: '/teacher/dashboard',
-                builder: (context, state) => const TeacherDashboardScreen(),
+                pageBuilder: (context, state) => AppPageTransitions.page(
+                  key: state.pageKey,
+                  child: const TeacherDashboardScreen(),
+                ),
               ),
             ],
           ),
@@ -173,13 +233,19 @@ final routerProvider = Provider<GoRouter>((ref) {
             routes: [
               GoRoute(
                 path: '/teacher/subjects',
-                builder: (context, state) => const SubjectsMgmtScreen(),
+                pageBuilder: (context, state) => AppPageTransitions.page(
+                  key: state.pageKey,
+                  child: const SubjectsMgmtScreen(),
+                ),
                 routes: [
                   GoRoute(
                     path: ':id',
-                    builder: (context, state) {
+                    pageBuilder: (context, state) {
                       final id = state.pathParameters['id']!;
-                      return TeacherSubjectDetailScreen(subjectId: id);
+                      return AppPageTransitions.page(
+                        key: state.pageKey,
+                        child: TeacherSubjectDetailScreen(subjectId: id),
+                      );
                     },
                   ),
                 ],
@@ -190,7 +256,10 @@ final routerProvider = Provider<GoRouter>((ref) {
             routes: [
               GoRoute(
                 path: '/teacher/schedule',
-                builder: (context, state) => const TeacherScheduleScreen(),
+                pageBuilder: (context, state) => AppPageTransitions.page(
+                  key: state.pageKey,
+                  child: const TeacherScheduleScreen(),
+                ),
               ),
             ],
           ),
@@ -198,13 +267,16 @@ final routerProvider = Provider<GoRouter>((ref) {
             routes: [
               GoRoute(
                 path: '/teacher/students',
-                builder: (context, state) {
+                pageBuilder: (context, state) {
                   final initialSection = state.uri.queryParameters['section'];
                   final tab = state.uri.queryParameters['tab'];
                   final initialTab = tab == 'scores' ? 1 : 0;
-                  return TeacherStudentsScreen(
-                    initialSection: initialSection,
-                    initialTab: initialTab,
+                  return AppPageTransitions.page(
+                    key: state.pageKey,
+                    child: TeacherStudentsScreen(
+                      initialSection: initialSection,
+                      initialTab: initialTab,
+                    ),
                   );
                 },
               ),
@@ -218,7 +290,10 @@ final routerProvider = Provider<GoRouter>((ref) {
             routes: [
               GoRoute(
                 path: '/teacher/chat',
-                builder: (context, state) => const ChatListScreen(),
+                pageBuilder: (context, state) => AppPageTransitions.page(
+                  key: state.pageKey,
+                  child: const ChatListScreen(),
+                ),
               ),
             ],
           ),
@@ -226,7 +301,10 @@ final routerProvider = Provider<GoRouter>((ref) {
       ),
       GoRoute(
         path: '/teacher/profile',
-        builder: (context, state) => const TeacherProfileScreen(),
+        pageBuilder: (context, state) => AppPageTransitions.page(
+          key: state.pageKey,
+          child: const TeacherProfileScreen(),
+        ),
       ),
       // Admin Web Portal Routes with Responsive Sidebar Scaffold
       StatefulShellRoute.indexedStack(
@@ -238,7 +316,10 @@ final routerProvider = Provider<GoRouter>((ref) {
             routes: [
               GoRoute(
                 path: '/admin/dashboard',
-                builder: (context, state) => const AdminWebAnalyticsView(),
+                pageBuilder: (context, state) => AppPageTransitions.page(
+                  key: state.pageKey,
+                  child: const AdminWebAnalyticsView(),
+                ),
               ),
             ],
           ),
@@ -246,7 +327,10 @@ final routerProvider = Provider<GoRouter>((ref) {
             routes: [
               GoRoute(
                 path: '/admin/students',
-                builder: (context, state) => const AdminWebStudentsScreen(),
+                pageBuilder: (context, state) => AppPageTransitions.page(
+                  key: state.pageKey,
+                  child: const AdminWebStudentsScreen(),
+                ),
               ),
             ],
           ),
@@ -254,7 +338,10 @@ final routerProvider = Provider<GoRouter>((ref) {
             routes: [
               GoRoute(
                 path: '/admin/teachers',
-                builder: (context, state) => const AdminWebTeachersScreen(),
+                pageBuilder: (context, state) => AppPageTransitions.page(
+                  key: state.pageKey,
+                  child: const AdminWebTeachersScreen(),
+                ),
               ),
             ],
           ),
@@ -262,13 +349,19 @@ final routerProvider = Provider<GoRouter>((ref) {
             routes: [
               GoRoute(
                 path: '/admin/subjects',
-                builder: (context, state) => const SubjectsMgmtScreen(),
+                pageBuilder: (context, state) => AppPageTransitions.page(
+                  key: state.pageKey,
+                  child: const SubjectsMgmtScreen(),
+                ),
                 routes: [
                   GoRoute(
                     path: ':id',
-                    builder: (context, state) {
+                    pageBuilder: (context, state) {
                       final id = state.pathParameters['id']!;
-                      return SubjectDetailScreen(subjectId: id);
+                      return AppPageTransitions.page(
+                        key: state.pageKey,
+                        child: SubjectDetailScreen(subjectId: id),
+                      );
                     },
                   ),
                 ],
@@ -279,7 +372,10 @@ final routerProvider = Provider<GoRouter>((ref) {
             routes: [
               GoRoute(
                 path: '/admin/keys',
-                builder: (context, state) => const AdminWebKeysScreen(),
+                pageBuilder: (context, state) => AppPageTransitions.page(
+                  key: state.pageKey,
+                  child: const AdminWebKeysScreen(),
+                ),
               ),
             ],
           ),
@@ -287,7 +383,10 @@ final routerProvider = Provider<GoRouter>((ref) {
             routes: [
               GoRoute(
                 path: '/admin/announcements',
-                builder: (context, state) => const AdminWebAnnouncementsScreen(),
+                pageBuilder: (context, state) => AppPageTransitions.page(
+                  key: state.pageKey,
+                  child: const AdminWebAnnouncementsScreen(),
+                ),
               ),
             ],
           ),
@@ -295,7 +394,10 @@ final routerProvider = Provider<GoRouter>((ref) {
             routes: [
               GoRoute(
                 path: '/admin/scores',
-                builder: (context, state) => const ScoresScreen(),
+                pageBuilder: (context, state) => AppPageTransitions.page(
+                  key: state.pageKey,
+                  child: const ScoresScreen(),
+                ),
               ),
             ],
           ),
@@ -303,7 +405,10 @@ final routerProvider = Provider<GoRouter>((ref) {
             routes: [
               GoRoute(
                 path: '/admin/sections',
-                builder: (context, state) => const SectionsMgmtScreen(),
+                pageBuilder: (context, state) => AppPageTransitions.page(
+                  key: state.pageKey,
+                  child: const SectionsMgmtScreen(),
+                ),
               ),
             ],
           ),
@@ -311,7 +416,10 @@ final routerProvider = Provider<GoRouter>((ref) {
             routes: [
               GoRoute(
                 path: '/admin/schedules',
-                builder: (context, state) => const AdminWebScheduleScreen(),
+                pageBuilder: (context, state) => AppPageTransitions.page(
+                  key: state.pageKey,
+                  child: const AdminWebScheduleScreen(),
+                ),
               ),
             ],
           ),
@@ -319,60 +427,85 @@ final routerProvider = Provider<GoRouter>((ref) {
       ),
       GoRoute(
         path: '/admin/reg-links',
-        builder: (context, state) => const AdminWebKeysScreen(),
+        pageBuilder: (context, state) => AppPageTransitions.page(
+          key: state.pageKey,
+          child: const AdminWebKeysScreen(),
+        ),
       ),
       GoRoute(
         path: '/admin/admin-management',
-        builder: (context, state) => const AdminManagementScreen(),
+        pageBuilder: (context, state) => AppPageTransitions.page(
+          key: state.pageKey,
+          child: const AdminManagementScreen(),
+        ),
       ),
-      // Shared Routes
+      // Shared Routes & Activity Screens
       GoRoute(
         path: '/chat',
-        builder: (context, state) => const ChatListScreen(),
+        pageBuilder: (context, state) => AppPageTransitions.page(
+          key: state.pageKey,
+          child: const ChatListScreen(),
+        ),
       ),
       GoRoute(
         path: '/chat/:id',
-        builder: (context, state) {
+        pageBuilder: (context, state) {
           final id = state.pathParameters['id']!;
-          return ChatRoomScreen(conversationId: id);
+          return AppPageTransitions.page(
+            key: state.pageKey,
+            child: ChatRoomScreen(conversationId: id),
+          );
         },
       ),
       GoRoute(
         path: '/student/course/:id',
-        builder: (context, state) {
+        pageBuilder: (context, state) {
           final id = state.pathParameters['id']!;
-          return StudentCourseDetailScreen(courseId: id);
+          return AppPageTransitions.page(
+            key: state.pageKey,
+            child: StudentCourseDetailScreen(courseId: id),
+          );
         },
       ),
       GoRoute(
         path: '/quiz/:id',
-        builder: (context, state) {
+        pageBuilder: (context, state) {
           final id = state.pathParameters['id']!;
-          return QuizScreen(quizId: id);
+          return AppPageTransitions.activityModal(
+            key: state.pageKey,
+            child: QuizScreen(quizId: id),
+          );
         },
       ),
       GoRoute(
         path: '/module-review/:loId',
-        builder: (context, state) {
+        pageBuilder: (context, state) {
           final loId = int.tryParse(state.pathParameters['loId'] ?? '0') ?? 0;
           final title = state.uri.queryParameters['title'];
           final subject = state.uri.queryParameters['subject'];
-          return ModuleGizmoReviewScreen(
-            loId: loId,
-            initialModuleTitle: title,
-            initialSubjectName: subject,
+          return AppPageTransitions.activityModal(
+            key: state.pageKey,
+            child: ModuleGizmoReviewScreen(
+              loId: loId,
+              initialModuleTitle: title,
+              initialSubjectName: subject,
+            ),
           );
         },
       ),
       GoRoute(
         path: '/submissions/:id',
-        builder: (context, state) {
+        pageBuilder: (context, state) {
           final id = state.pathParameters['id']!;
-          return SubmissionsScreen(assignmentId: id);
+          return AppPageTransitions.activityModal(
+            key: state.pageKey,
+            child: SubmissionsScreen(assignmentId: id),
+          );
         },
       ),
     ],
     redirect: (context, state) {
+      final authState = ref.read(authProvider);
       final isAuth = authState != null;
       final matched = state.matchedLocation;
       final isPublicRoute = matched == '/' ||

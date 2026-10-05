@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import '../../../../core/animations/app_page_transitions.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../../core/theme/theme_provider.dart';
 import '../../../auth/application/auth_provider.dart';
@@ -223,7 +224,10 @@ class _AdminWebScaffoldState extends ConsumerState<AdminWebScaffold> {
                       _buildTopBar(context, isDark, currentUser, isDesktop, constraints.maxWidth),
                       // Main View Content
                       Expanded(
-                        child: widget.navigationShell,
+                        child: AppBranchTransition(
+                          currentIndex: widget.navigationShell.currentIndex,
+                          child: widget.navigationShell,
+                        ),
                       ),
                     ],
                   ),
@@ -584,229 +588,245 @@ class _AdminWebScaffoldState extends ConsumerState<AdminWebScaffold> {
           ),
         ),
 
-        // Navigation Items - SingleChildScrollView + Column for zero sliver overhead
+        // Navigation Items + Bottom Section — all in one scrollable area
+        // so the bottom user card / sign-out never gets clipped on short viewports
         Expanded(
-          child: SingleChildScrollView(
-            padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 10),
-            child: Column(
-              children: List.generate(_navItems.length, (index) {
-                final item = _navItems[index];
-                final isSelected = activeIndex == index;
+          child: LayoutBuilder(
+            builder: (context, constraints) {
+              return SingleChildScrollView(
+                child: ConstrainedBox(
+                  constraints: BoxConstraints(minHeight: constraints.maxHeight),
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      // ── Navigation Items ──
+                      Padding(
+                        padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 10),
+                        child: Column(
+                          children: List.generate(_navItems.length, (index) {
+                            final item = _navItems[index];
+                            final isSelected = activeIndex == index;
 
-                final navItemWidget = InkWell(
-                  onTap: () {
-                    if (isDrawer) Navigator.pop(context);
-                    _onSelectTab(index);
-                  },
-                  borderRadius: BorderRadius.circular(12),
-                  child: Container(
-                    height: 46,
-                    decoration: BoxDecoration(
-                      color: isSelected ? AppTheme.primary.withValues(alpha: 0.15) : Colors.transparent,
-                      borderRadius: BorderRadius.circular(12),
-                      border: isSelected
-                          ? Border.all(color: AppTheme.primary.withValues(alpha: 0.4))
-                          : Border.all(color: Colors.transparent),
-                    ),
-                    child: Row(
-                      children: [
-                        // Fixed Leading Icon Box (56px width): With 10px list margin, icon center is at 10 + 28 = 38px
-                        SizedBox(
-                          width: 56,
-                          child: Center(
-                            child: Icon(
-                              isSelected ? item.activeIcon : item.icon,
-                              color: isSelected ? AppTheme.primary : AppTheme.textSecondary,
-                              size: 22,
-                            ),
-                          ),
-                        ),
-                        // Label & Selection Indicator Dot
-                        Expanded(
-                          child: Opacity(
-                            opacity: isCollapsed ? 0.0 : 1.0,
-                            child: Row(
-                              children: [
-                                Expanded(
-                                  child: Text(
-                                    item.label,
-                                    style: TextStyle(
-                                      fontSize: 13,
-                                      fontWeight: isSelected ? FontWeight.bold : FontWeight.w500,
-                                      color: isSelected ? AppTheme.text : AppTheme.textSecondary,
-                                    ),
-                                    maxLines: 1,
-                                    overflow: TextOverflow.ellipsis,
-                                  ),
+                            final navItemWidget = InkWell(
+                              onTap: () {
+                                if (isDrawer) Navigator.pop(context);
+                                _onSelectTab(index);
+                              },
+                              borderRadius: BorderRadius.circular(12),
+                              child: Container(
+                                height: 46,
+                                decoration: BoxDecoration(
+                                  color: isSelected ? AppTheme.primary.withValues(alpha: 0.15) : Colors.transparent,
+                                  borderRadius: BorderRadius.circular(12),
+                                  border: isSelected
+                                      ? Border.all(color: AppTheme.primary.withValues(alpha: 0.4))
+                                      : Border.all(color: Colors.transparent),
                                 ),
-                                if (isSelected)
-                                  Container(
-                                    width: 6,
-                                    height: 6,
-                                    margin: const EdgeInsets.only(right: 14),
-                                    decoration: BoxDecoration(
-                                      color: AppTheme.primary,
-                                      shape: BoxShape.circle,
+                                child: Row(
+                                  children: [
+                                    // Fixed Leading Icon Box (56px width): With 10px list margin, icon center is at 10 + 28 = 38px
+                                    SizedBox(
+                                      width: 56,
+                                      child: Center(
+                                        child: Icon(
+                                          isSelected ? item.activeIcon : item.icon,
+                                          color: isSelected ? AppTheme.primary : AppTheme.textSecondary,
+                                          size: 22,
+                                        ),
+                                      ),
+                                    ),
+                                    // Label & Selection Indicator Dot
+                                    Expanded(
+                                      child: Opacity(
+                                        opacity: isCollapsed ? 0.0 : 1.0,
+                                        child: Row(
+                                          children: [
+                                            Expanded(
+                                              child: Text(
+                                                item.label,
+                                                style: TextStyle(
+                                                  fontSize: 13,
+                                                  fontWeight: isSelected ? FontWeight.bold : FontWeight.w500,
+                                                  color: isSelected ? AppTheme.text : AppTheme.textSecondary,
+                                                ),
+                                                maxLines: 1,
+                                                overflow: TextOverflow.ellipsis,
+                                              ),
+                                            ),
+                                            if (isSelected)
+                                              Container(
+                                                width: 6,
+                                                height: 6,
+                                                margin: const EdgeInsets.only(right: 14),
+                                                decoration: BoxDecoration(
+                                                  color: AppTheme.primary,
+                                                  shape: BoxShape.circle,
+                                                ),
+                                              ),
+                                          ],
+                                        ),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            );
+
+                            return Padding(
+                              padding: const EdgeInsets.only(bottom: 6),
+                              child: isCollapsed
+                                  ? Tooltip(
+                                      message: item.label,
+                                      preferBelow: false,
+                                      waitDuration: const Duration(milliseconds: 250),
+                                      child: navItemWidget,
+                                    )
+                                  : navItemWidget,
+                            );
+                          }),
+                        ),
+                      ),
+
+                      // ── Bottom User Card & Sign Out ──
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 14),
+                        decoration: BoxDecoration(
+                          color: AppTheme.surface,
+                          border: Border(top: BorderSide(color: AppTheme.border, width: 1)),
+                        ),
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            // Super Admin Console Access for Super Admins
+                            if (currentUser?.role == 'super_admin') ...[
+                              InkWell(
+                                onTap: () => context.go('/admin/admin-management'),
+                                borderRadius: BorderRadius.circular(10),
+                                child: Container(
+                                  height: 40,
+                                  margin: const EdgeInsets.only(bottom: 10),
+                                  decoration: BoxDecoration(
+                                    gradient: LinearGradient(
+                                      colors: [Colors.purple.shade700, Colors.deepPurple.shade900],
+                                      begin: Alignment.topLeft,
+                                      end: Alignment.bottomRight,
+                                    ),
+                                    borderRadius: BorderRadius.circular(10),
+                                  ),
+                                  child: isCollapsed
+                                      ? const Tooltip(
+                                          message: 'Super Admin Console',
+                                          preferBelow: false,
+                                          waitDuration: Duration(milliseconds: 250),
+                                          child: Center(
+                                            child: Icon(Icons.admin_panel_settings, size: 18, color: Colors.white),
+                                          ),
+                                        )
+                                      : const Row(
+                                          mainAxisAlignment: MainAxisAlignment.center,
+                                          children: [
+                                            Icon(Icons.admin_panel_settings, size: 16, color: Colors.white),
+                                            SizedBox(width: 8),
+                                            Text(
+                                              'Super Admin Console',
+                                              style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.white),
+                                            ),
+                                          ],
+                                        ),
+                                ),
+                              ),
+                            ],
+
+                            // User Profile Section
+                            Container(
+                              height: 44,
+                              padding: const EdgeInsets.symmetric(horizontal: 4),
+                              child: Row(
+                                children: [
+                                  SizedBox(
+                                    width: 48,
+                                    child: Center(
+                                      child: CircleAvatar(
+                                        radius: 18,
+                                        backgroundColor: AppTheme.primarySoft,
+                                        child: Text(
+                                          currentUser?.fullName.isNotEmpty == true ? currentUser.fullName[0].toUpperCase() : 'A',
+                                          style: TextStyle(fontWeight: FontWeight.bold, color: AppTheme.primary),
+                                        ),
+                                      ),
                                     ),
                                   ),
-                              ],
+                                  Expanded(
+                                    child: Opacity(
+                                      opacity: isCollapsed ? 0.0 : 1.0,
+                                      child: Padding(
+                                        padding: const EdgeInsets.only(left: 8),
+                                        child: Column(
+                                          mainAxisAlignment: MainAxisAlignment.center,
+                                          crossAxisAlignment: CrossAxisAlignment.start,
+                                          children: [
+                                            Text(
+                                              currentUser?.fullName ?? 'Administrator',
+                                              style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: AppTheme.text),
+                                              maxLines: 1,
+                                              overflow: TextOverflow.ellipsis,
+                                            ),
+                                            Text(
+                                              currentUser?.email ?? 'admin@airamp.edu',
+                                              style: TextStyle(fontSize: 11, color: AppTheme.textMuted),
+                                              maxLines: 1,
+                                              overflow: TextOverflow.ellipsis,
+                                            ),
+                                          ],
+                                        ),
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ),
                             ),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                );
+                            const SizedBox(height: 10),
 
-                return Padding(
-                  padding: const EdgeInsets.only(bottom: 6),
-                  child: isCollapsed
-                      ? Tooltip(
-                          message: item.label,
-                          preferBelow: false,
-                          waitDuration: const Duration(milliseconds: 250),
-                          child: navItemWidget,
-                        )
-                      : navItemWidget,
-                );
-              }),
-            ),
-          ),
-        ),
-
-        // Bottom User Card & Sign Out
-        Container(
-          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 14),
-          decoration: BoxDecoration(
-            color: AppTheme.surface,
-            border: Border(top: BorderSide(color: AppTheme.border, width: 1)),
-          ),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              // Super Admin Console Access for Super Admins
-              if (currentUser?.role == 'super_admin') ...[
-                InkWell(
-                  onTap: () => context.go('/admin/admin-management'),
-                  borderRadius: BorderRadius.circular(10),
-                  child: Container(
-                    height: 40,
-                    margin: const EdgeInsets.only(bottom: 10),
-                    decoration: BoxDecoration(
-                      gradient: LinearGradient(
-                        colors: [Colors.purple.shade700, Colors.deepPurple.shade900],
-                        begin: Alignment.topLeft,
-                        end: Alignment.bottomRight,
-                      ),
-                      borderRadius: BorderRadius.circular(10),
-                    ),
-                    child: isCollapsed
-                        ? const Tooltip(
-                            message: 'Super Admin Console',
-                            preferBelow: false,
-                            waitDuration: Duration(milliseconds: 250),
-                            child: Center(
-                              child: Icon(Icons.admin_panel_settings, size: 18, color: Colors.white),
-                            ),
-                          )
-                        : const Row(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: [
-                              Icon(Icons.admin_panel_settings, size: 16, color: Colors.white),
-                              SizedBox(width: 8),
-                              Text(
-                                'Super Admin Console',
-                                style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.white),
+                            // Logout Action
+                            InkWell(
+                              onTap: () => _confirmLogout(context),
+                              borderRadius: BorderRadius.circular(10),
+                              child: Container(
+                                height: 40,
+                                decoration: BoxDecoration(
+                                  color: AppTheme.error.withValues(alpha: 0.1),
+                                  borderRadius: BorderRadius.circular(10),
+                                ),
+                                child: isCollapsed
+                                    ? Tooltip(
+                                        message: 'Sign Out',
+                                        preferBelow: false,
+                                        waitDuration: const Duration(milliseconds: 250),
+                                        child: Center(
+                                          child: Icon(Icons.logout, size: 18, color: AppTheme.error),
+                                        ),
+                                      )
+                                    : Row(
+                                        mainAxisAlignment: MainAxisAlignment.center,
+                                        children: [
+                                          Icon(Icons.logout, size: 16, color: AppTheme.error),
+                                          const SizedBox(width: 8),
+                                          Text(
+                                            'Sign Out',
+                                            style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: AppTheme.error),
+                                          ),
+                                        ],
+                                      ),
                               ),
-                            ],
-                          ),
-                  ),
-                ),
-              ],
-
-              // User Profile Section
-              Container(
-                height: 44,
-                padding: const EdgeInsets.symmetric(horizontal: 4),
-                child: Row(
-                  children: [
-                    SizedBox(
-                      width: 48,
-                      child: Center(
-                        child: CircleAvatar(
-                          radius: 18,
-                          backgroundColor: AppTheme.primarySoft,
-                          child: Text(
-                            currentUser?.fullName.isNotEmpty == true ? currentUser.fullName[0].toUpperCase() : 'A',
-                            style: TextStyle(fontWeight: FontWeight.bold, color: AppTheme.primary),
-                          ),
-                        ),
-                      ),
-                    ),
-                    Expanded(
-                      child: Opacity(
-                        opacity: isCollapsed ? 0.0 : 1.0,
-                        child: Padding(
-                          padding: const EdgeInsets.only(left: 8),
-                          child: Column(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                currentUser?.fullName ?? 'Administrator',
-                                style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: AppTheme.text),
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                              ),
-                              Text(
-                                currentUser?.email ?? 'admin@airamp.edu',
-                                style: TextStyle(fontSize: 11, color: AppTheme.textMuted),
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                              ),
-                            ],
-                          ),
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              const SizedBox(height: 10),
-
-              // Logout Action
-              InkWell(
-                onTap: () => _confirmLogout(context),
-                borderRadius: BorderRadius.circular(10),
-                child: Container(
-                  height: 40,
-                  decoration: BoxDecoration(
-                    color: AppTheme.error.withValues(alpha: 0.1),
-                    borderRadius: BorderRadius.circular(10),
-                  ),
-                  child: isCollapsed
-                      ? Tooltip(
-                          message: 'Sign Out',
-                          preferBelow: false,
-                          waitDuration: const Duration(milliseconds: 250),
-                          child: Center(
-                            child: Icon(Icons.logout, size: 18, color: AppTheme.error),
-                          ),
-                        )
-                      : Row(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            Icon(Icons.logout, size: 16, color: AppTheme.error),
-                            const SizedBox(width: 8),
-                            Text(
-                              'Sign Out',
-                              style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: AppTheme.error),
                             ),
                           ],
                         ),
+                      ),
+                    ],
+                  ),
                 ),
-              ),
-            ],
+              );
+            },
           ),
         ),
       ],
