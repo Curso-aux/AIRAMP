@@ -178,19 +178,43 @@ class _SectionsMgmtScreenState extends ConsumerState<SectionsMgmtScreen> {
                         onConfirm: () async {
                           final sectionId = section['id'];
                           final nav = Navigator.of(context);
+                          final messenger = ScaffoldMessenger.of(context);
                           if (sectionId is int) {
                             final rawKey = editKeyController.text.trim().toUpperCase();
                             final key = rawKey.isNotEmpty ? rawKey : (section['enrollment_key'] ?? 'SEC-${section['id']}');
-                            await ref.read(sectionsProvider.notifier).updateSection(
-                              sectionId,
-                              {
-                                'name': editNameController.text.trim(),
-                                'description': editDescController.text.trim(),
-                                'grade': editSelectedGrade.isNotEmpty ? editSelectedGrade : (section['grade'] ?? 'Grade 11'),
-                                'room': editRoomController.text.trim(),
-                                'enrollment_key': key,
-                              },
-                            );
+                            try {
+                              await ref.read(sectionsProvider.notifier).updateSection(
+                                sectionId,
+                                {
+                                  'name': editNameController.text.trim(),
+                                  'description': editDescController.text.trim(),
+                                  'grade': editSelectedGrade.isNotEmpty ? editSelectedGrade : (section['grade'] ?? 'Grade 11'),
+                                  'room': editRoomController.text.trim(),
+                                  'enrollment_key': key,
+                                },
+                              );
+                              if (mounted) {
+                                messenger.showSnackBar(
+                                  SnackBar(
+                                    content: const Text('Section updated successfully.'),
+                                    backgroundColor: AppTheme.success,
+                                  ),
+                                );
+                              }
+                            } catch (e) {
+                              if (mounted) {
+                                final errStr = e.toString();
+                                final displayMsg = errStr.contains('UNIQUE constraint') || errStr.contains('already exists')
+                                    ? 'A section with this enrollment key or name already exists.'
+                                    : 'Failed to update section: ${errStr.replaceFirst("Exception: ", "")}';
+                                messenger.showSnackBar(
+                                  SnackBar(
+                                    content: Text(displayMsg),
+                                    backgroundColor: AppTheme.error,
+                                  ),
+                                );
+                              }
+                            }
                           }
                           nav.pop();
                         },
@@ -504,25 +528,40 @@ class _SectionsMgmtScreenState extends ConsumerState<SectionsMgmtScreen> {
                       final messenger = ScaffoldMessenger.of(context);
                       final router = GoRouter.maybeOf(context);
                       Navigator.pop(dialogCtx);
-                      await ref.read(sectionsProvider.notifier).addSection({
-                        'name': name,
-                        'description': addDescController.text.trim(),
-                        'grade': addSelectedGrade.isNotEmpty ? addSelectedGrade : 'Grade 10',
-                        'room': addRoomController.text.trim(),
-                        'enrollment_key': enrollmentKey,
-                        'student_count': 0,
-                        'created_at': DateTime.now().toIso8601String(),
-                      });
-                      if (mounted) {
-                        messenger.showSnackBar(
-                          SnackBar(
-                            content: Text('Created section "$name" with Key: $enrollmentKey'),
-                            backgroundColor: AppTheme.success,
-                          ),
-                        );
-                        try {
-                          router?.go('/admin/keys');
-                        } catch (_) {}
+                      try {
+                        await ref.read(sectionsProvider.notifier).addSection({
+                          'name': name,
+                          'description': addDescController.text.trim(),
+                          'grade': addSelectedGrade.isNotEmpty ? addSelectedGrade : 'Grade 10',
+                          'room': addRoomController.text.trim(),
+                          'enrollment_key': enrollmentKey,
+                          'student_count': 0,
+                          'created_at': DateTime.now().toIso8601String(),
+                        });
+                        if (mounted) {
+                          messenger.showSnackBar(
+                            SnackBar(
+                              content: Text('Created section "$name" with Key: $enrollmentKey'),
+                              backgroundColor: AppTheme.success,
+                            ),
+                          );
+                          try {
+                            router?.go('/admin/keys');
+                          } catch (_) {}
+                        }
+                      } catch (e) {
+                        if (mounted) {
+                          final errStr = e.toString();
+                          final displayMsg = errStr.contains('UNIQUE constraint') || errStr.contains('already exists')
+                              ? 'A section with this enrollment key or name already exists. Please choose a different key.'
+                              : 'Failed to create section: ${errStr.replaceFirst("Exception: ", "")}';
+                          messenger.showSnackBar(
+                            SnackBar(
+                              content: Text(displayMsg),
+                              backgroundColor: AppTheme.error,
+                            ),
+                          );
+                        }
                       }
                     }
                   },
@@ -847,8 +886,28 @@ class _SectionsMgmtScreenState extends ConsumerState<SectionsMgmtScreen> {
                           content: 'Are you sure you want to delete "${section['name']}"?',
                           onConfirm: () async {
                             final sectionId = section['id'];
+                            final messenger = ScaffoldMessenger.of(context);
                             if (sectionId is int) {
-                              await ref.read(sectionsProvider.notifier).deleteSection(sectionId);
+                              try {
+                                await ref.read(sectionsProvider.notifier).deleteSection(sectionId);
+                                if (mounted) {
+                                  messenger.showSnackBar(
+                                    SnackBar(
+                                      content: Text('Section "${section['name']}" was deleted.'),
+                                      backgroundColor: AppTheme.success,
+                                    ),
+                                  );
+                                }
+                              } catch (e) {
+                                if (mounted) {
+                                  messenger.showSnackBar(
+                                    SnackBar(
+                                      content: Text('Failed to delete section: ${e.toString().replaceFirst("Exception: ", "")}'),
+                                      backgroundColor: AppTheme.error,
+                                    ),
+                                  );
+                                }
+                              }
                             }
                           },
                         );
@@ -876,8 +935,28 @@ class _SectionsMgmtScreenState extends ConsumerState<SectionsMgmtScreen> {
                             content: 'Are you sure you want to delete "${section['name']}"?',
                             onConfirm: () async {
                               final sectionId = section['id'];
+                              final messenger = ScaffoldMessenger.of(context);
                               if (sectionId is int) {
-                                await ref.read(sectionsProvider.notifier).deleteSection(sectionId);
+                                try {
+                                  await ref.read(sectionsProvider.notifier).deleteSection(sectionId);
+                                  if (mounted) {
+                                    messenger.showSnackBar(
+                                      SnackBar(
+                                        content: Text('Section "${section['name']}" was deleted.'),
+                                        backgroundColor: AppTheme.success,
+                                      ),
+                                    );
+                                  }
+                                } catch (e) {
+                                  if (mounted) {
+                                    messenger.showSnackBar(
+                                      SnackBar(
+                                        content: Text('Failed to delete section: ${e.toString().replaceFirst("Exception: ", "")}'),
+                                        backgroundColor: AppTheme.error,
+                                      ),
+                                    );
+                                  }
+                                }
                               }
                             },
                           );

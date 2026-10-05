@@ -85,7 +85,9 @@ class _AdminWebKeysScreenState extends ConsumerState<AdminWebKeysScreen> {
                     onPressed: () {
                       try {
                         GoRouter.maybeOf(context)?.go('/admin/sections');
-                      } catch (_) {}
+                      } catch (e) {
+                        debugPrint('[AdminWebKeys] Navigation error: $e');
+                      }
                     },
                     icon: const Icon(Icons.groups_outlined, size: 18),
                     label: const Text('Manage Class Sections'),
@@ -187,7 +189,9 @@ class _AdminWebKeysScreenState extends ConsumerState<AdminWebKeysScreen> {
                         onPressed: () {
                           try {
                             GoRouter.maybeOf(context)?.go('/admin/sections');
-                          } catch (_) {}
+                          } catch (e) {
+                            debugPrint('[AdminWebKeys] Navigation error: $e');
+                          }
                         },
                         icon: const Icon(Icons.add, size: 18),
                         label: const Text('Add Class Section'),
@@ -358,7 +362,9 @@ class _AdminWebKeysScreenState extends ConsumerState<AdminWebKeysScreen> {
                   onPressed: () {
                     try {
                       GoRouter.maybeOf(context)?.go('/admin/sections');
-                    } catch (_) {}
+                    } catch (e) {
+                      debugPrint('[AdminWebKeys] Navigation error: $e');
+                    }
                   },
                   icon: const Icon(Icons.add, size: 15),
                   label: Text(
@@ -411,7 +417,9 @@ class _AdminWebKeysScreenState extends ConsumerState<AdminWebKeysScreen> {
             onPressed: () {
               try {
                 GoRouter.maybeOf(context)?.go('/admin/sections');
-              } catch (_) {}
+              } catch (e) {
+                debugPrint('[AdminWebKeys] Navigation error: $e');
+              }
             },
             icon: const Icon(Icons.add, size: 16),
             label: Text('Create $grade Section'),

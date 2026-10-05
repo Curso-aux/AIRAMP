@@ -240,27 +240,38 @@ class QuizRosterDialog extends ConsumerWidget {
             style: ElevatedButton.styleFrom(backgroundColor: AppTheme.accent, foregroundColor: Colors.black),
             onPressed: () async {
               Navigator.pop(ctx);
-              await DatabaseHelper().resetStudentQuizAttempt(
-                quizId: quizId,
-                studentId: studentId,
-              );
-              // Invalidate all affected providers across teacher, student, and admin views
-              ref.invalidate(quizRosterProvider(quizId));
-              ref.invalidate(subjectQuizzesProvider);
-              ref.invalidate(teacherDashboardProvider);
-              ref.invalidate(teacherScoresProvider);
-              ref.invalidate(adminAnalyticsProvider);
-              ref.invalidate(studentQuizAssignmentsProvider);
-              ref.invalidate(studentQuizAttemptsProvider);
-              ref.invalidate(studentProgressProvider);
-              ref.invalidate(studentCoursesProvider);
-              if (context.mounted) {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(
-                    backgroundColor: AppTheme.success,
-                    content: Text('$studentName can now retake the quiz.'),
-                  ),
+              try {
+                await DatabaseHelper().resetStudentQuizAttempt(
+                  quizId: quizId,
+                  studentId: studentId,
                 );
+                // Invalidate all affected providers across teacher, student, and admin views
+                ref.invalidate(quizRosterProvider(quizId));
+                ref.invalidate(subjectQuizzesProvider);
+                ref.invalidate(teacherDashboardProvider);
+                ref.invalidate(teacherScoresProvider);
+                ref.invalidate(adminAnalyticsProvider);
+                ref.invalidate(studentQuizAssignmentsProvider);
+                ref.invalidate(studentQuizAttemptsProvider);
+                ref.invalidate(studentProgressProvider);
+                ref.invalidate(studentCoursesProvider);
+                if (context.mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      backgroundColor: AppTheme.success,
+                      content: Text('$studentName can now retake the quiz.'),
+                    ),
+                  );
+                }
+              } catch (e) {
+                if (context.mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      backgroundColor: AppTheme.error,
+                      content: Text('Failed to reset quiz: ${e.toString().replaceFirst("Exception: ", "")}'),
+                    ),
+                  );
+                }
               }
             },
             child: const Text('Reset'),

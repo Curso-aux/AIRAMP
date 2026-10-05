@@ -779,13 +779,20 @@ class _TeacherSubjectDetailScreenState extends ConsumerState<TeacherSubjectDetai
           ),
           TextButton(
             onPressed: () async {
-              await DatabaseHelper().deleteQuiz(quizId);
-              if (ctx.mounted) {
-                Navigator.pop(ctx);
-              }
-              if (mounted) {
-                ref.invalidate(subjectQuizzesProvider(subjectId));
-                ref.invalidate(teacherDashboardProvider);
+              try {
+                await DatabaseHelper().deleteQuiz(quizId);
+                if (ctx.mounted) {
+                  Navigator.pop(ctx);
+                }
+                if (mounted && context.mounted) {
+                  ref.invalidate(subjectQuizzesProvider(subjectId));
+                  ref.invalidate(teacherDashboardProvider);
+                  AppToast.showSuccess(context, 'Quiz "$title" deleted successfully');
+                }
+              } catch (e) {
+                if (mounted && context.mounted) {
+                  AppToast.showError(context, 'Failed to delete quiz: ${e.toString().replaceFirst("Exception: ", "")}');
+                }
               }
             },
             child: Text('Delete', style: TextStyle(color: AppTheme.error)),
@@ -828,10 +835,16 @@ class _TeacherSubjectDetailScreenState extends ConsumerState<TeacherSubjectDetai
           TextButton(
             onPressed: () async {
               Navigator.pop(ctx);
-              await DatabaseHelper().deleteAssignment(assignmentId);
-              if (!context.mounted) return;
-              ref.invalidate(subjectAssignmentsProvider(subjectId));
-              AppToast.showSuccess(context, 'Assignment deleted');
+              try {
+                await DatabaseHelper().deleteAssignment(assignmentId);
+                if (!context.mounted) return;
+                ref.invalidate(subjectAssignmentsProvider(subjectId));
+                AppToast.showSuccess(context, 'Assignment deleted');
+              } catch (e) {
+                if (context.mounted) {
+                  AppToast.showError(context, 'Failed to delete assignment: ${e.toString().replaceFirst("Exception: ", "")}');
+                }
+              }
             },
             child: Text('Delete', style: TextStyle(color: AppTheme.error)),
           ),

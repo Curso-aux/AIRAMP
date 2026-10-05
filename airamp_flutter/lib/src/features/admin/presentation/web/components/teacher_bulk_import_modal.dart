@@ -182,10 +182,12 @@ class _TeacherBulkImportModalState extends ConsumerState<TeacherBulkImportModal>
         insertedTeachers: insertedTeachers,
       );
     } catch (e) {
-      setState(() => _isProcessing = false);
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Import failed: $e'), backgroundColor: AppTheme.error),
-      );
+      if (mounted) {
+        setState(() => _isProcessing = false);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Import failed: ${e.toString().replaceFirst("Exception: ", "")}'), backgroundColor: AppTheme.error),
+        );
+      }
     }
   }
 

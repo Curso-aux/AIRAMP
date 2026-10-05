@@ -54,7 +54,9 @@ class _AdminSignupScreenState extends ConsumerState<AdminSignupScreen> {
         context.go('/teacher/dashboard');
       }
     } catch (e) {
-      setState(() => _error = e.toString().replaceFirst('Exception: ', ''));
+      if (mounted) {
+        setState(() => _error = e.toString().replaceFirst('Exception: ', ''));
+      }
     }
   }
 

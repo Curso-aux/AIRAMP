@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../data/chat_repository.dart';
 import '../domain/chat_models.dart';
@@ -110,7 +111,9 @@ class ChatNotifier extends Notifier<ChatState> {
 
       if (_disposed) return;
       state = state.copyWith(messages: messagesMap, conversations: updatedConvos);
-    } catch (_) {}
+    } catch (e) {
+      debugPrint('[ChatNotifier] Error refreshing conversation messages: $e');
+    }
   }
 
   /// Mark messages in conversation as read and update unread count
@@ -152,7 +155,9 @@ class ChatNotifier extends Notifier<ChatState> {
         if (_disposed) return;
         state = state.copyWith(messages: messagesMap, conversations: updatedConvos);
       }
-    } catch (_) {}
+    } catch (e) {
+      debugPrint('[ChatNotifier] Error marking conversation as read: $e');
+    }
   }
 
   /// Load conversations and messages from local SQLite database.
@@ -475,7 +480,9 @@ class ChatNotifier extends Notifier<ChatState> {
 
       if (_disposed) return;
       state = state.copyWith(availableUsers: filtered);
-    } catch (_) {}
+    } catch (e) {
+      debugPrint('[ChatNotifier] Error filtering available users: $e');
+    }
   }
 
   /// Retrieves or creates a 1-on-1 direct conversation with the target user.

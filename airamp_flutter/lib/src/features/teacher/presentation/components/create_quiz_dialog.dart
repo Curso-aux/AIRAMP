@@ -336,8 +336,11 @@ Answer: B''';
       }
     } catch (e) {
       if (mounted) {
+        AppToast.showError(context, 'Error saving quiz: ${e.toString().replaceFirst("Exception: ", "")}');
+      }
+    } finally {
+      if (mounted) {
         setState(() => _isSubmitting = false);
-        AppToast.showError(context, 'Error creating quiz: $e');
       }
     }
   }

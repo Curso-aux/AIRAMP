@@ -212,34 +212,45 @@ class _AssignmentRosterDialogState extends ConsumerState<AssignmentRosterDialog>
 
                     final messenger = ScaffoldMessenger.of(context);
 
-                    await DatabaseHelper().gradeSubmission(
-                      submissionId: subId,
-                      grade: score,
-                      feedback: feedbackController.text.trim().isNotEmpty ? feedbackController.text.trim() : null,
-                      gradedBy: teacherName,
-                    );
-
-                    ref.invalidate(studentSubmissionProvider((
-                      assignmentId: widget.assignmentId,
-                      studentId: student['student_id'].toString(),
-                    )));
-                    ref.invalidate(activityRosterProvider(widget.assignmentId));
-                    ref.invalidate(assignmentSubmissionsProvider(widget.assignmentId));
-
-                    SessionDraftService.instance.clearForm(formId);
-
-                    if (ctx.mounted) {
-                      disposer.dispose();
-                      Navigator.pop(ctx);
-                    }
-                    if (mounted) {
-                      await _loadRoster();
-                      messenger.showSnackBar(
-                        SnackBar(
-                          content: const Text('Grade & feedback recorded! Student notified.'),
-                          backgroundColor: AppTheme.success,
-                        ),
+                    try {
+                      await DatabaseHelper().gradeSubmission(
+                        submissionId: subId,
+                        grade: score,
+                        feedback: feedbackController.text.trim().isNotEmpty ? feedbackController.text.trim() : null,
+                        gradedBy: teacherName,
                       );
+
+                      ref.invalidate(studentSubmissionProvider((
+                        assignmentId: widget.assignmentId,
+                        studentId: student['student_id'].toString(),
+                      )));
+                      ref.invalidate(activityRosterProvider(widget.assignmentId));
+                      ref.invalidate(assignmentSubmissionsProvider(widget.assignmentId));
+
+                      SessionDraftService.instance.clearForm(formId);
+
+                      if (ctx.mounted) {
+                        disposer.dispose();
+                        Navigator.pop(ctx);
+                      }
+                      if (mounted) {
+                        await _loadRoster();
+                        messenger.showSnackBar(
+                          SnackBar(
+                            content: const Text('Grade & feedback recorded! Student notified.'),
+                            backgroundColor: AppTheme.success,
+                          ),
+                        );
+                      }
+                    } catch (e) {
+                      if (mounted) {
+                        messenger.showSnackBar(
+                          SnackBar(
+                            content: Text('Failed to save grade: ${e.toString().replaceFirst("Exception: ", "")}'),
+                            backgroundColor: AppTheme.error,
+                          ),
+                        );
+                      }
                     }
                   },
                   style: ElevatedButton.styleFrom(

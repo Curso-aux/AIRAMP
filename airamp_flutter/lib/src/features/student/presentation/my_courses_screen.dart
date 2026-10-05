@@ -130,23 +130,37 @@ class _MyCoursesScreenState extends ConsumerState<MyCoursesScreen> {
                         if (key.isEmpty) return;
 
                         setDialogState(() => isVerifyingModal = true);
-                        final verified = await ref.read(studentCoursesProvider.notifier).verifyKey(key);
-                        setDialogState(() => isVerifyingModal = false);
+                        try {
+                          final verified = await ref.read(studentCoursesProvider.notifier).verifyKey(key);
 
-                        if (dialogCtx.mounted) {
-                          Navigator.pop(dialogCtx);
-                        }
+                          if (dialogCtx.mounted) {
+                            Navigator.pop(dialogCtx);
+                          }
 
-                        if (verified != null) {
-                          _showVerificationPreviewSheet(verified, key);
-                        } else {
+                          if (verified != null) {
+                            _showVerificationPreviewSheet(verified, key);
+                          } else {
+                            if (mounted) {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                SnackBar(
+                                  content: Text('Invalid Section Key "$key". Please check with your administrator.'),
+                                  backgroundColor: AppTheme.error,
+                                ),
+                              );
+                            }
+                          }
+                        } catch (e) {
                           if (mounted) {
                             ScaffoldMessenger.of(context).showSnackBar(
                               SnackBar(
-                                content: Text('Invalid Section Key "$key". Please check with your administrator.'),
+                                content: Text('Error verifying key: ${e.toString().replaceFirst("Exception: ", "")}'),
                                 backgroundColor: AppTheme.error,
                               ),
                             );
+                          }
+                        } finally {
+                          if (dialogCtx.mounted) {
+                            setDialogState(() => isVerifyingModal = false);
                           }
                         }
                       },
@@ -454,21 +468,32 @@ class _MyCoursesScreenState extends ConsumerState<MyCoursesScreen> {
                         onPressed: () async {
                           Navigator.pop(sheetCtx);
                           final messenger = ScaffoldMessenger.of(context);
-                          final success = await ref.read(studentCoursesProvider.notifier).enrollBySectionKey(key);
-                          if (success && mounted) {
-                            messenger.showSnackBar(
-                              SnackBar(
-                                content: Text('Enrolled in $sectionName successfully! All ${subjects.length} subjects loaded.'),
-                                backgroundColor: AppTheme.success,
-                              ),
-                            );
-                          } else if (mounted) {
-                            messenger.showSnackBar(
-                              SnackBar(
-                                content: const Text('Enrollment failed. Please try again.'),
-                                backgroundColor: AppTheme.error,
-                              ),
-                            );
+                          try {
+                            final success = await ref.read(studentCoursesProvider.notifier).enrollBySectionKey(key);
+                            if (success && mounted) {
+                              messenger.showSnackBar(
+                                SnackBar(
+                                  content: Text('Enrolled in $sectionName successfully! All ${subjects.length} subjects loaded.'),
+                                  backgroundColor: AppTheme.success,
+                                ),
+                              );
+                            } else if (mounted) {
+                              messenger.showSnackBar(
+                                SnackBar(
+                                  content: const Text('Enrollment failed. Please try again.'),
+                                  backgroundColor: AppTheme.error,
+                                ),
+                              );
+                            }
+                          } catch (e) {
+                            if (mounted) {
+                              messenger.showSnackBar(
+                                SnackBar(
+                                  content: Text('Enrollment error: ${e.toString().replaceFirst("Exception: ", "")}'),
+                                  backgroundColor: AppTheme.error,
+                                ),
+                              );
+                            }
                           }
                         },
                         icon: const Icon(Icons.check, size: 18),
@@ -998,19 +1023,33 @@ class _MyCoursesScreenState extends ConsumerState<MyCoursesScreen> {
                         if (key.isEmpty) return;
 
                         setState(() => _isVerifying = true);
-                        final verified = await ref.read(studentCoursesProvider.notifier).verifyKey(key);
-                        setState(() => _isVerifying = false);
+                        try {
+                          final verified = await ref.read(studentCoursesProvider.notifier).verifyKey(key);
 
-                        if (verified != null) {
-                          _showVerificationPreviewSheet(verified, key);
-                        } else {
+                          if (verified != null) {
+                            _showVerificationPreviewSheet(verified, key);
+                          } else {
+                            if (mounted) {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                SnackBar(
+                                  content: Text('Invalid Key "$key". Please check with your school administrator.'),
+                                  backgroundColor: AppTheme.error,
+                                ),
+                              );
+                            }
+                          }
+                        } catch (e) {
                           if (mounted) {
                             ScaffoldMessenger.of(context).showSnackBar(
                               SnackBar(
-                                content: Text('Invalid Key "$key". Please check with your school administrator.'),
+                                content: Text('Error verifying key: ${e.toString().replaceFirst("Exception: ", "")}'),
                                 backgroundColor: AppTheme.error,
                               ),
                             );
+                          }
+                        } finally {
+                          if (mounted) {
+                            setState(() => _isVerifying = false);
                           }
                         }
                       },

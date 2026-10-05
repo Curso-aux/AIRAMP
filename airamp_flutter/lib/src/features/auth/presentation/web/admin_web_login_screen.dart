@@ -237,6 +237,7 @@ class _AdminWebLoginScreenState extends ConsumerState<AdminWebLoginScreen> {
         }
       }
     } catch (e) {
+      if (!mounted) return;
       setState(() {
         _error = e.toString().replaceFirst('Exception: ', '');
       });

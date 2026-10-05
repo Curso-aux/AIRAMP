@@ -238,81 +238,101 @@ class _PdfModuleUploadCardState extends ConsumerState<PdfModuleUploadCard> {
       _parseResult = null;
     });
 
-    final parser = PdfModuleParserService();
-    PdfModuleParseResult result;
+    try {
+      final parser = PdfModuleParserService();
+      PdfModuleParseResult result;
 
-    if (widget.subjectId == null) {
-      // ── Create Subject from PDF Module Mode ──
-      result = await parser.createSubjectAndImportPdf(
-        pdfBytes: _pickedFileBytes!,
-        fileName: _pickedFileName ?? 'module.pdf',
-        customSubjectName: _subjectNameController.text.trim().isNotEmpty
-            ? _subjectNameController.text.trim()
-            : null,
-        semester: _selectedSemester,
-        uploadType: _uploadType,
-        term: _selectedTerm,
-        onProgress: (status, prog) {
-          if (mounted) {
-            setState(() {
-              _statusMessage = status;
-              _progress = prog;
-            });
+      if (widget.subjectId == null) {
+        // ── Create Subject from PDF Module Mode ──
+        result = await parser.createSubjectAndImportPdf(
+          pdfBytes: _pickedFileBytes!,
+          fileName: _pickedFileName ?? 'module.pdf',
+          customSubjectName: _subjectNameController.text.trim().isNotEmpty
+              ? _subjectNameController.text.trim()
+              : null,
+          semester: _selectedSemester,
+          uploadType: _uploadType,
+          term: _selectedTerm,
+          onProgress: (status, prog) {
+            if (mounted) {
+              setState(() {
+                _statusMessage = status;
+                _progress = prog;
+              });
+            }
+          },
+        );
+
+        if (result.success && mounted) {
+          ref.read(subjectsProvider.notifier).reload();
+          if (result.createdSubjectId != null) {
+            ref.read(subjectDetailProvider.notifier).loadHierarchy(result.createdSubjectId!);
           }
-        },
-      );
+        }
+      } else {
+        // ── Import into Existing Subject Mode ──
+        result = await parser.parseAndImportPdf(
+          pdfBytes: _pickedFileBytes!,
+          fileName: _pickedFileName ?? 'module.pdf',
+          subjectId: widget.subjectId!,
+          uploadType: _uploadType,
+          term: _selectedTerm,
+          targetTopicId: _selectedTopicId,
+          customTopicTitle: _customTopicController.text.trim().isNotEmpty
+              ? _customTopicController.text.trim()
+              : null,
+          onProgress: (status, prog) {
+            if (mounted) {
+              setState(() {
+                _statusMessage = status;
+                _progress = prog;
+              });
+            }
+          },
+        );
 
-      if (result.success && mounted) {
-        ref.read(subjectsProvider.notifier).reload();
-        if (result.createdSubjectId != null) {
-          ref.read(subjectDetailProvider.notifier).loadHierarchy(result.createdSubjectId!);
+        if (result.success && mounted) {
+          ref.read(subjectDetailProvider.notifier).loadHierarchy(widget.subjectId!);
         }
       }
-    } else {
-      // ── Import into Existing Subject Mode ──
-      result = await parser.parseAndImportPdf(
-        pdfBytes: _pickedFileBytes!,
-        fileName: _pickedFileName ?? 'module.pdf',
-        subjectId: widget.subjectId!,
-        uploadType: _uploadType,
-        term: _selectedTerm,
-        targetTopicId: _selectedTopicId,
-        customTopicTitle: _customTopicController.text.trim().isNotEmpty
-            ? _customTopicController.text.trim()
-            : null,
-        onProgress: (status, prog) {
-          if (mounted) {
-            setState(() {
-              _statusMessage = status;
-              _progress = prog;
-            });
+
+      if (mounted) {
+        setState(() {
+          _parseResult = result;
+        });
+
+        if (!result.success) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(result.errorMessage ?? 'Error processing PDF module'),
+              backgroundColor: AppTheme.error,
+            ),
+          );
+        } else {
+          SessionDraftService.instance.clearForm(_formId);
+          if (widget.onCompleted != null) {
+            widget.onCompleted!(result);
           }
-        },
-      );
-
-      if (result.success && mounted) {
-        ref.read(subjectDetailProvider.notifier).loadHierarchy(widget.subjectId!);
+        }
       }
-    }
-
-    if (mounted) {
-      setState(() {
-        _isProcessing = false;
-        _parseResult = result;
-      });
-
-      if (!result.success) {
+    } catch (e) {
+      if (mounted) {
+        final errText = 'Failed to process PDF: ${e.toString().replaceFirst("Exception: ", "")}';
+        setState(() {
+          _statusMessage = errText;
+        });
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text(result.errorMessage ?? 'Error processing PDF module'),
+            content: Text(errText),
             backgroundColor: AppTheme.error,
           ),
         );
-      } else {
-        SessionDraftService.instance.clearForm(_formId);
-        if (widget.onCompleted != null) {
-          widget.onCompleted!(result);
-        }
+      }
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isProcessing = false;
+        });
       }
     }
   }

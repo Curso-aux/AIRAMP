@@ -150,7 +150,9 @@ class AuthNotifier extends Notifier<User?> {
           whereArgs: [session.session],
         );
       }
-    } catch (_) {}
+    } catch (e) {
+      debugPrint('[AuthProvider] Failed to persist role switch in session: $e');
+    }
   }
 
   /// Restore user from persisted session on app start.

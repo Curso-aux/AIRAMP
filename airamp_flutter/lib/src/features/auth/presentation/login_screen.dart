@@ -93,6 +93,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
         }
       }
     } catch (e) {
+      if (!mounted) return;
       setState(() {
         _error = e.toString().replaceFirst('Exception: ', '');
       });

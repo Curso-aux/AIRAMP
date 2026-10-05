@@ -155,8 +155,11 @@ class _CreateAssignmentDialogState extends ConsumerState<CreateAssignmentDialog>
       }
     } catch (e) {
       if (mounted) {
+        AppToast.showError(context, 'Error creating assignment: ${e.toString().replaceFirst("Exception: ", "")}');
+      }
+    } finally {
+      if (mounted) {
         setState(() => _isSaving = false);
-        AppToast.showError(context, 'Error creating assignment: $e');
       }
     }
   }

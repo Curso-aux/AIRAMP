@@ -49,13 +49,29 @@ class _TeacherScheduleModalState extends ConsumerState<TeacherScheduleModal> {
 
   Future<void> _loadSchedules() async {
     setState(() => _isLoading = true);
-    final teacherId = widget.teacher['id'] as String;
-    final results = await DatabaseHelper().getClassSchedules(teacherId: teacherId);
-    if (mounted) {
-      setState(() {
-        _schedules = results;
-        _isLoading = false;
-      });
+    try {
+      final teacherId = widget.teacher['id'] as String;
+      final results = await DatabaseHelper().getClassSchedules(teacherId: teacherId);
+      if (mounted) {
+        setState(() {
+          _schedules = results;
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Failed to load faculty schedules: ${e.toString().replaceFirst("Exception: ", "")}'),
+            backgroundColor: AppTheme.error,
+          ),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+        });
+      }
     }
   }
 

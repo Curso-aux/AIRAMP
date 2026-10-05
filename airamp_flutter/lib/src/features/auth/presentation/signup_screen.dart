@@ -175,7 +175,9 @@ class _SignupScreenState extends ConsumerState<SignupScreen> {
         context.go('/student/home');
       }
     } catch (e) {
-      setState(() => _error = e.toString().replaceFirst('Exception: ', ''));
+      if (mounted) {
+        setState(() => _error = e.toString().replaceFirst('Exception: ', ''));
+      }
     }
   }
 

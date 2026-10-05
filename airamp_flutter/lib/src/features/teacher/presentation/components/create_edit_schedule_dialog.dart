@@ -327,8 +327,13 @@ class _CreateEditScheduleDialogState extends ConsumerState<CreateEditScheduleDia
     } catch (e) {
       if (mounted) {
         setState(() {
+          _conflictError = 'Failed to save schedule: ${e.toString().replaceFirst("Exception: ", "")}';
+        });
+      }
+    } finally {
+      if (mounted) {
+        setState(() {
           _isSaving = false;
-          _conflictError = 'Failed to save schedule: $e';
         });
       }
     }
