@@ -170,32 +170,25 @@ class OtpService {
     _activeOtps[userId.toLowerCase().trim()] = record;
     _activeOtps[cleanEmail.toLowerCase()] = record;
 
-    // 7. Backup to Cloud Firestore for cross-client reliability
-    try {
-      await FirestoreService().saveDocument('password_otps', userId.trim(), {
-        'otp': otpCode,
-        'email': cleanEmail,
-        'user_id': userId,
-        'role': role,
-        'created_at': now.toIso8601String(),
-        'expires_at': expiresAt.toIso8601String(),
-        'used': false,
-        'attempts': 0,
-      });
-      final emailSafeKey = cleanEmail.replaceAll('.', '_').replaceAll('@', '_at_');
-      await FirestoreService().saveDocument('password_otps', emailSafeKey, {
-        'otp': otpCode,
-        'email': cleanEmail,
-        'user_id': userId,
-        'role': role,
-        'created_at': now.toIso8601String(),
-        'expires_at': expiresAt.toIso8601String(),
-        'used': false,
-        'attempts': 0,
-      });
-    } catch (e) {
+    // 7. Backup to Cloud Firestore in parallel without blocking email dispatch
+    final emailSafeKey = cleanEmail.replaceAll('.', '_').replaceAll('@', '_at_');
+    final otpBackupData = {
+      'otp': otpCode,
+      'email': cleanEmail,
+      'user_id': userId,
+      'role': role,
+      'created_at': now.toIso8601String(),
+      'expires_at': expiresAt.toIso8601String(),
+      'used': false,
+      'attempts': 0,
+    };
+    Future.wait([
+      FirestoreService().saveDocument('password_otps', userId.trim(), otpBackupData),
+      FirestoreService().saveDocument('password_otps', emailSafeKey, otpBackupData),
+    ]).catchError((e) {
       debugPrint('[OtpService] Firestore OTP backup note: $e');
-    }
+      return <void>[];
+    });
 
     // 8. Send via EmailService (Gmail SMTP)
     final sendResult = await EmailService().sendPasswordResetOtp(
@@ -395,36 +388,29 @@ class OtpService {
     _activeOtps[rateKey] = record;
     _activeOtps[normEmail] = record;
 
-    // 7. Backup to Cloud Firestore
-    try {
-      final emailSafeKey = normEmail.replaceAll('.', '_').replaceAll('@', '_at_');
-      await FirestoreService().saveDocument('security_otps', emailSafeKey, {
-        'otp': otpCode,
-        'email': cleanEmail,
-        'identifier': rateKey,
-        'purpose': purpose,
-        'role': role,
-        'created_at': now.toIso8601String(),
-        'expires_at': expiresAt.toIso8601String(),
-        'used': false,
-        'attempts': 0,
-      });
-      if (userId != null) {
-        await FirestoreService().saveDocument('security_otps', userId.trim(), {
-          'otp': otpCode,
-          'email': cleanEmail,
-          'identifier': rateKey,
-          'purpose': purpose,
-          'role': role,
-          'created_at': now.toIso8601String(),
-          'expires_at': expiresAt.toIso8601String(),
-          'used': false,
-          'attempts': 0,
-        });
-      }
-    } catch (e) {
-      debugPrint('[OtpService] Security OTP backup note: $e');
+    // 7. Backup to Cloud Firestore in parallel without blocking email dispatch
+    final emailSafeKey = normEmail.replaceAll('.', '_').replaceAll('@', '_at_');
+    final secBackupData = {
+      'otp': otpCode,
+      'email': cleanEmail,
+      'identifier': rateKey,
+      'purpose': purpose,
+      'role': role,
+      'created_at': now.toIso8601String(),
+      'expires_at': expiresAt.toIso8601String(),
+      'used': false,
+      'attempts': 0,
+    };
+    final backupTasks = [
+      FirestoreService().saveDocument('security_otps', emailSafeKey, secBackupData),
+    ];
+    if (userId != null && userId.trim().isNotEmpty) {
+      backupTasks.add(FirestoreService().saveDocument('security_otps', userId.trim(), secBackupData));
     }
+    Future.wait(backupTasks).catchError((e) {
+      debugPrint('[OtpService] Security OTP backup note: $e');
+      return <void>[];
+    });
 
     // 8. Deliver email
     final sendResult = await EmailService().sendVerificationOtp(
@@ -514,10 +500,13 @@ class OtpService {
     // 3. Cloud Firestore fallback check
     try {
       final emailSafeKey = key.replaceAll('.', '_').replaceAll('@', '_at_');
-      final doc = await FirestoreService().getDocument('security_otps', key) ??
-          await FirestoreService().getDocument('security_otps', emailSafeKey) ??
-          await FirestoreService().getDocument('password_otps', key) ??
-          await FirestoreService().getDocument('password_otps', emailSafeKey);
+      final docs = await Future.wait([
+        FirestoreService().getDocument('security_otps', key),
+        FirestoreService().getDocument('security_otps', emailSafeKey),
+        FirestoreService().getDocument('password_otps', key),
+        FirestoreService().getDocument('password_otps', emailSafeKey),
+      ]);
+      final doc = docs.firstWhere((d) => d != null, orElse: () => null);
 
       if (doc != null) {
         final storedOtp = doc['otp']?.toString();
@@ -534,10 +523,12 @@ class OtpService {
           }
 
           // Mark used
-          await FirestoreService().saveDocument('security_otps', key, {'used': true});
-          await FirestoreService().saveDocument('security_otps', emailSafeKey, {'used': true});
-          await FirestoreService().saveDocument('password_otps', key, {'used': true});
-          await FirestoreService().saveDocument('password_otps', emailSafeKey, {'used': true});
+          Future.wait([
+            FirestoreService().saveDocument('security_otps', key, {'used': true}),
+            FirestoreService().saveDocument('security_otps', emailSafeKey, {'used': true}),
+            FirestoreService().saveDocument('password_otps', key, {'used': true}),
+            FirestoreService().saveDocument('password_otps', emailSafeKey, {'used': true}),
+          ]).catchError((_) => <void>[]);
 
           _limiter.reset('otp_verify_$key');
           _limiter.reset('otp_verify_$emailSafeKey');

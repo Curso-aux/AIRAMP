@@ -4,6 +4,7 @@ import '../../../../core/animations/app_transitions.dart';
 import '../../../../core/components/app_toast.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../../core/theme/theme_provider.dart';
+import '../../../../core/services/session_draft_service.dart';
 import '../../data/teacher_repository.dart';
 
 class PostAnnouncementDialog extends ConsumerStatefulWidget {
@@ -43,6 +44,8 @@ class _PostAnnouncementDialogState extends ConsumerState<PostAnnouncementDialog>
   late String _selectedAudience;
   late String _selectedSection;
   bool _isSubmitting = false;
+  final SessionDraftDisposer _draftDisposer = SessionDraftDisposer();
+  static const String _formId = 'teacher_post_announcement';
 
   bool get _isEditing => widget.existing != null;
 
@@ -52,6 +55,11 @@ class _PostAnnouncementDialogState extends ConsumerState<PostAnnouncementDialog>
     final ext = widget.existing;
     _titleController = TextEditingController(text: ext?['title']?.toString() ?? '');
     _messageController = TextEditingController(text: ext?['message']?.toString() ?? '');
+
+    if (!_isEditing) {
+      _draftDisposer.add(_titleController.bindSessionDraft(formId: _formId, fieldKey: 'title'));
+      _draftDisposer.add(_messageController.bindSessionDraft(formId: _formId, fieldKey: 'message'));
+    }
 
     final extPriority = ext?['priority']?.toString().toLowerCase();
     _selectedPriority = (extPriority == 'high' || extPriority == 'medium' || extPriority == 'normal')
@@ -69,6 +77,7 @@ class _PostAnnouncementDialogState extends ConsumerState<PostAnnouncementDialog>
 
   @override
   void dispose() {
+    _draftDisposer.dispose();
     _titleController.dispose();
     _messageController.dispose();
     super.dispose();
@@ -97,6 +106,10 @@ class _PostAnnouncementDialogState extends ConsumerState<PostAnnouncementDialog>
               targetSection: _selectedSection,
               targetAudience: _selectedAudience,
             );
+      }
+
+      if (!_isEditing) {
+        SessionDraftService.instance.clearForm(_formId);
       }
 
       if (mounted) {
@@ -143,6 +156,9 @@ class _PostAnnouncementDialogState extends ConsumerState<PostAnnouncementDialog>
       message: 'You have unsaved changes to this announcement draft. Are you sure you want to discard them?',
     );
     if (shouldDiscard && mounted) {
+      if (!_isEditing) {
+        SessionDraftService.instance.clearForm(_formId);
+      }
       Navigator.of(context).pop();
     }
   }
@@ -174,6 +190,9 @@ class _PostAnnouncementDialogState extends ConsumerState<PostAnnouncementDialog>
           message: 'You have unsaved changes to this announcement draft. Are you sure you want to discard them?',
         );
         if (shouldDiscard && context.mounted) {
+          if (!_isEditing) {
+            SessionDraftService.instance.clearForm(_formId);
+          }
           Navigator.of(context).pop();
         }
       },
@@ -262,6 +281,7 @@ class _PostAnnouncementDialogState extends ConsumerState<PostAnnouncementDialog>
                         const SizedBox(height: 6),
                         TextFormField(
                           controller: _titleController,
+                          maxLength: 80,
                           style: TextStyle(color: AppTheme.text, fontSize: 14),
                           decoration: _inputDecoration(
                             hintText: 'e.g., Midterm Project Guidelines & Deadlines',
@@ -353,6 +373,7 @@ class _PostAnnouncementDialogState extends ConsumerState<PostAnnouncementDialog>
                         const SizedBox(height: 6),
                         TextFormField(
                           controller: _messageController,
+                          maxLength: 2000,
                           maxLines: 4,
                           minLines: 3,
                           style: TextStyle(color: AppTheme.text, fontSize: 14),

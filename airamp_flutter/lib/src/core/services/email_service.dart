@@ -380,13 +380,30 @@ AIRA Security & Identity Management
     // 2. HTTP SMTP Bridge Delivery (For Web & fallback on emulator/desktop)
     if (!sent) {
       final dio = Dio(BaseOptions(
-        connectTimeout: const Duration(seconds: 12),
-        receiveTimeout: const Duration(seconds: 15),
+        connectTimeout: const Duration(seconds: 3),
+        receiveTimeout: const Duration(seconds: 5),
       ))..interceptors.add(RateLimitInterceptor());
 
-      final bridgeCandidates = kIsWeb
-          ? [EmailConfig.localBridgeUrl, 'http://localhost:8088/send-email']
-          : [EmailConfig.emulatorBridgeUrl, EmailConfig.localBridgeUrl];
+      final List<String> bridgeCandidates = [];
+      if (EmailConfig.cloudBridgeUrl.isNotEmpty) {
+        bridgeCandidates.add(EmailConfig.cloudBridgeUrl);
+      }
+
+      if (kIsWeb) {
+        // In web browser, only attempt localhost bridge if running in a local environment
+        final isLocalWeb = Uri.base.host == 'localhost' || Uri.base.host == '127.0.0.1' || Uri.base.host.isEmpty;
+        if (isLocalWeb) {
+          bridgeCandidates.addAll([
+            EmailConfig.localBridgeUrl,
+            'http://localhost:8088/send-email',
+          ]);
+        }
+      } else {
+        bridgeCandidates.addAll([
+          EmailConfig.emulatorBridgeUrl,
+          EmailConfig.localBridgeUrl,
+        ]);
+      }
 
       for (final endpoint in bridgeCandidates) {
         try {
@@ -416,12 +433,11 @@ AIRA Security & Identity Management
     }
 
     // 3. Always log to Cloud Firestore `mail` collection for auditing & persistence
-    bool cloudQueued = false;
     try {
       final docId = 'mail_${DateTime.now().millisecondsSinceEpoch}';
       final dio = Dio(BaseOptions(
-        connectTimeout: const Duration(seconds: 8),
-        receiveTimeout: const Duration(seconds: 8),
+        connectTimeout: const Duration(seconds: 4),
+        receiveTimeout: const Duration(seconds: 4),
       ))..interceptors.add(RateLimitInterceptor());
       final url = 'https://firestore.googleapis.com/v1/projects/${FirestoreService.projectId}/databases/(default)/documents/mail/$docId?key=${FirestoreService.apiKey}';
 
@@ -432,13 +448,12 @@ AIRA Security & Identity Management
         'role': {'stringValue': role},
         'mail_type': {'stringValue': mailType},
         'created_at': {'stringValue': DateTime.now().toIso8601String()},
-        'status': {'stringValue': sent ? 'sent_via_$channel' : 'queued_for_delivery'},
+        'status': {'stringValue': sent ? 'sent_via_$channel' : 'delivery_failed'},
       };
       if (username != null && username.isNotEmpty) {
         fields['username'] = {'stringValue': username};
       }
       await dio.patch(url, data: {'fields': fields});
-      cloudQueued = true;
     } catch (e) {
       debugPrint('[EmailService] Cloud mail audit note: $e');
     }
@@ -449,16 +464,10 @@ AIRA Security & Identity Management
         message: successMessage,
         channel: channel,
       );
-    } else if (cloudQueued) {
-      return EmailResult(
-        success: true,
-        message: 'Notification recorded & queued in Cloud Database for $toEmail',
-        channel: 'firestore_trigger',
-      );
     } else {
       return EmailResult(
         success: false,
-        message: 'Could not deliver email to $toEmail',
+        message: 'Could not deliver email to $toEmail. Please check your network connection and SMTP service.',
         channel: 'failed',
       );
     }

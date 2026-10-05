@@ -75,29 +75,38 @@ class _SectionsMgmtScreenState extends ConsumerState<SectionsMgmtScreen> {
                   children: [
                     TextField(
                       controller: editNameController,
+                      maxLength: 40,
+                      buildCounter: (context, {required currentLength, required isFocused, maxLength}) => null,
                       style: TextStyle(color: AppTheme.text),
                       decoration: const InputDecoration(
                         labelText: 'Section Name',
                         hintText: 'Section Name (e.g., Grade 12 - ICT A)',
+                        counterText: '',
                       ),
                     ),
                     const SizedBox(height: 12),
                     TextField(
                       controller: editRoomController,
+                      maxLength: 30,
+                      buildCounter: (context, {required currentLength, required isFocused, maxLength}) => null,
                       style: TextStyle(color: AppTheme.text),
                       decoration: const InputDecoration(
                         labelText: 'Room / Building',
                         hintText: 'Room (e.g., Room 304 - Science Bldg)',
+                        counterText: '',
                         prefixIcon: Icon(Icons.meeting_room_outlined, size: 20),
                       ),
                     ),
                     const SizedBox(height: 12),
                     TextField(
                       controller: editKeyController,
+                      maxLength: 15,
+                      buildCounter: (context, {required currentLength, required isFocused, maxLength}) => null,
                       style: TextStyle(color: AppTheme.text),
                       textCapitalization: TextCapitalization.characters,
                       decoration: InputDecoration(
                         labelText: 'Enrollment Key (for Students)',
+                        counterText: '',
                         hintText: 'e.g., SEC-EMR10',
                         prefixIcon: const Icon(Icons.vpn_key_outlined, size: 20),
                         suffixIcon: IconButton(
@@ -115,6 +124,7 @@ class _SectionsMgmtScreenState extends ConsumerState<SectionsMgmtScreen> {
                     const SizedBox(height: 12),
                     TextField(
                       controller: editDescController,
+                      maxLength: 500,
                       style: TextStyle(color: AppTheme.text),
                       decoration: const InputDecoration(
                         labelText: 'Description (optional)',
@@ -250,9 +260,12 @@ class _SectionsMgmtScreenState extends ConsumerState<SectionsMgmtScreen> {
                       children: [
                         TextFormField(
                           controller: addNameController,
+                          maxLength: 40,
+                          buildCounter: (context, {required currentLength, required isFocused, maxLength}) => null,
                           style: TextStyle(color: AppTheme.text),
                           decoration: const InputDecoration(
                             labelText: 'Section Name',
+                            counterText: '',
                             hintText: 'e.g., Grade 10 - Sapphire',
                             prefixIcon: Icon(Icons.badge_outlined, size: 20),
                           ),
@@ -277,9 +290,12 @@ class _SectionsMgmtScreenState extends ConsumerState<SectionsMgmtScreen> {
                         const SizedBox(height: 14),
                         TextFormField(
                           controller: addRoomController,
+                          maxLength: 30,
+                          buildCounter: (context, {required currentLength, required isFocused, maxLength}) => null,
                           style: TextStyle(color: AppTheme.text),
                           decoration: const InputDecoration(
                             labelText: 'Room / Building',
+                            counterText: '',
                             hintText: 'e.g., Room 304 - Science Bldg',
                             prefixIcon: Icon(Icons.meeting_room_outlined, size: 20),
                           ),
@@ -406,10 +422,13 @@ class _SectionsMgmtScreenState extends ConsumerState<SectionsMgmtScreen> {
                         else
                           TextFormField(
                             controller: addKeyController,
+                            maxLength: 15,
+                            buildCounter: (context, {required currentLength, required isFocused, maxLength}) => null,
                             style: TextStyle(color: AppTheme.text),
                             textCapitalization: TextCapitalization.characters,
                             decoration: const InputDecoration(
                               labelText: 'Custom Key Override',
+                              counterText: '',
                               hintText: 'e.g., SEC-CUSTOM10',
                               prefixIcon: Icon(Icons.edit_outlined, size: 18),
                             ),
@@ -417,6 +436,7 @@ class _SectionsMgmtScreenState extends ConsumerState<SectionsMgmtScreen> {
                         const SizedBox(height: 14),
                         TextFormField(
                           controller: addDescController,
+                          maxLength: 500,
                           style: TextStyle(color: AppTheme.text),
                           decoration: const InputDecoration(
                             labelText: 'Description (optional)',

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../../core/theme/theme_provider.dart';
+import '../../../../core/services/session_draft_service.dart';
 import '../../data/admin_repository.dart';
 
 class AdminWebAnnouncementsScreen extends ConsumerStatefulWidget {
@@ -218,6 +219,14 @@ class _AdminWebAnnouncementsScreenState extends ConsumerState<AdminWebAnnounceme
     final id = existing?['id'] as int? ?? 0;
     final titleController = TextEditingController(text: existing?['title'] as String? ?? '');
     final messageController = TextEditingController(text: existing?['message'] as String? ?? '');
+    final disposer = SessionDraftDisposer();
+    const formId = 'admin_announcement_draft';
+
+    if (!isEditing) {
+      disposer.add(titleController.bindSessionDraft(formId: formId, fieldKey: 'title'));
+      disposer.add(messageController.bindSessionDraft(formId: formId, fieldKey: 'message'));
+    }
+
     String selectedPriority = (existing?['priority'] as String? ?? 'medium').toLowerCase();
     if (!['high', 'medium', 'normal'].contains(selectedPriority)) {
       selectedPriority = 'medium';
@@ -258,9 +267,12 @@ class _AdminWebAnnouncementsScreenState extends ConsumerState<AdminWebAnnounceme
                   const SizedBox(height: 6),
                   TextField(
                     controller: titleController,
+                    maxLength: 80,
+                    buildCounter: (context, {required currentLength, required isFocused, maxLength}) => null,
                     style: TextStyle(color: AppTheme.text),
                     decoration: InputDecoration(
                       hintText: 'e.g. Schedule of 1st Semester Final Exams',
+                      counterText: '',
                       filled: true,
                       fillColor: AppTheme.background,
                       isDense: true,
@@ -339,10 +351,13 @@ class _AdminWebAnnouncementsScreenState extends ConsumerState<AdminWebAnnounceme
                   const SizedBox(height: 6),
                   TextField(
                     controller: messageController,
+                    maxLength: 2000,
+                    buildCounter: (context, {required currentLength, required isFocused, maxLength}) => null,
                     maxLines: 4,
                     style: TextStyle(color: AppTheme.text),
                     decoration: InputDecoration(
                       hintText: 'Enter the complete announcement message...',
+                      counterText: '',
                       filled: true,
                       fillColor: AppTheme.background,
                       border: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: BorderSide(color: AppTheme.border)),
@@ -365,6 +380,7 @@ class _AdminWebAnnouncementsScreenState extends ConsumerState<AdminWebAnnounceme
 
                   final messenger = ScaffoldMessenger.of(context);
                   Navigator.pop(dialogCtx);
+                  disposer.dispose();
                   if (isEditing) {
                     await ref.read(announcementsProvider.notifier).updateAnnouncement(id, {
                       'title': title,
@@ -380,6 +396,7 @@ class _AdminWebAnnouncementsScreenState extends ConsumerState<AdminWebAnnounceme
                       'target_audience': selectedAudience,
                       'created_at': DateTime.now().toIso8601String(),
                     });
+                    SessionDraftService.instance.clearForm(formId);
                   }
                   ref.read(adminAnalyticsProvider.notifier).loadAnalytics();
                   if (mounted) {

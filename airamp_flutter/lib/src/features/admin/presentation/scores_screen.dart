@@ -256,9 +256,12 @@ class _ScoresScreenState extends ConsumerState<ScoresScreen> {
                 // Search Bar
                 TextField(
                   controller: _searchController,
+                  maxLength: 60,
+                  buildCounter: (context, {required currentLength, required isFocused, maxLength}) => null,
                   style: TextStyle(color: AppTheme.text),
                   decoration: InputDecoration(
                     hintText: 'Search student, subject, or quiz...',
+                    counterText: '',
                     prefixIcon: Icon(Icons.search, color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.4)),
                     suffixIcon: _searchController.text.isNotEmpty
                         ? IconButton(
@@ -959,9 +962,12 @@ class _SectionFilterBottomSheetState extends State<_SectionFilterBottomSheet> {
               padding: const EdgeInsets.fromLTRB(18, 12, 18, 6),
               child: TextField(
                 controller: _searchController,
+                maxLength: 40,
+                buildCounter: (context, {required currentLength, required isFocused, maxLength}) => null,
                 style: TextStyle(fontSize: 13, color: AppTheme.text),
                 decoration: InputDecoration(
                   hintText: 'Search section name...',
+                  counterText: '',
                   hintStyle: TextStyle(fontSize: 12.5, color: AppTheme.textMuted),
                   prefixIcon: Icon(Icons.search, size: 18, color: AppTheme.textMuted),
                   suffixIcon: _searchQuery.isNotEmpty

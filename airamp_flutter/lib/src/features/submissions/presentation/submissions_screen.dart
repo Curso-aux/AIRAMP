@@ -7,6 +7,7 @@ import '../../../core/components/empty_state.dart';
 import '../../../core/components/skeleton_loader.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/theme/theme_provider.dart';
+import '../../../core/services/session_draft_service.dart';
 import '../../auth/application/auth_provider.dart';
 import '../data/submissions_repository.dart';
 
@@ -35,9 +36,32 @@ class _SubmissionsScreenState extends ConsumerState<SubmissionsScreen> {
 
   bool _isSubmitting = false;
   bool _isEditingExisting = false;
+  final SessionDraftDisposer _draftDisposer = SessionDraftDisposer();
+
+  @override
+  void initState() {
+    super.initState();
+    final formId = 'submission_${widget.assignmentId}';
+    _draftDisposer.add(_textResponseController.bindSessionDraft(
+      formId: formId,
+      fieldKey: 'text',
+      onDraftRestored: () => setState(() {}),
+    ));
+    _draftDisposer.add(_linkController.bindSessionDraft(
+      formId: formId,
+      fieldKey: 'link',
+      onDraftRestored: () => setState(() {}),
+    ));
+    _draftDisposer.add(_notesController.bindSessionDraft(
+      formId: formId,
+      fieldKey: 'notes',
+      onDraftRestored: () => setState(() {}),
+    ));
+  }
 
   @override
   void dispose() {
+    _draftDisposer.dispose();
     _textResponseController.dispose();
     _linkController.dispose();
     _notesController.dispose();
@@ -419,6 +443,8 @@ class _SubmissionsScreenState extends ConsumerState<SubmissionsScreen> {
       ref.invalidate(activityRosterProvider(_parsedId));
       ref.invalidate(assignmentSubmissionsProvider(_parsedId));
 
+      SessionDraftService.instance.clearForm('submission_${widget.assignmentId}');
+
       if (mounted) {
         setState(() {
           _isSubmitting = false;
@@ -729,10 +755,13 @@ class _SubmissionsScreenState extends ConsumerState<SubmissionsScreen> {
           const SizedBox(height: 8),
           TextField(
             controller: _linkController,
+            maxLength: 250,
+            buildCounter: (context, {required currentLength, required isFocused, maxLength}) => null,
             style: TextStyle(color: AppTheme.text),
             decoration: InputDecoration(
               prefixIcon: Icon(Icons.link, color: AppTheme.primary),
               hintText: 'e.g. https://github.com/username/project or Google Drive',
+              counterText: '',
               hintStyle: TextStyle(color: AppTheme.textMuted, fontSize: 13),
               filled: true,
               fillColor: AppTheme.background,
@@ -769,6 +798,7 @@ class _SubmissionsScreenState extends ConsumerState<SubmissionsScreen> {
           const SizedBox(height: 8),
           TextField(
             controller: _textResponseController,
+            maxLength: 5000,
             onChanged: (_) => setState(() {}),
             style: TextStyle(color: AppTheme.text, height: 1.4),
             minLines: 4,
@@ -993,6 +1023,7 @@ class _SubmissionsScreenState extends ConsumerState<SubmissionsScreen> {
           const SizedBox(height: 8),
           TextField(
             controller: _notesController,
+            maxLength: 500,
             style: TextStyle(color: AppTheme.text),
             maxLines: 2,
             decoration: InputDecoration(

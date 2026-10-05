@@ -337,8 +337,11 @@ class _AdminWebScheduleScreenState extends ConsumerState<AdminWebScheduleScreen>
                               width: 260,
                               child: TextField(
                                 controller: _searchController,
+                                maxLength: 60,
+                                buildCounter: (context, {required currentLength, required isFocused, maxLength}) => null,
                                 decoration: InputDecoration(
                                   hintText: 'Search subject, faculty, room...',
+                                  counterText: '',
                                   prefixIcon: const Icon(Icons.search, size: 20),
                                   border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
                                   contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),

@@ -1,0 +1,10 @@
+{
+  "version": "1.0.0",
+  "build_number": 1,
+  "app_name": "AIRA Platform",
+  "package_name": "com.aira.airamp",
+  "release_notes": "Official release with Gmail SMTP verification, cloud synchronization, and performance optimizations.",
+  "apk_url": "https://aira-app-database.web.app/downloads/aira-latest.apk",
+  "pwa_url": "https://aira-app-database.web.app",
+  "updated_at": "2026-10-05T15:20:00Z"
+}

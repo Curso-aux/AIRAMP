@@ -219,78 +219,103 @@ class FirestoreService {
   Future<Map<String, dynamic>?> findUserByIdentifier(String identifier) async {
     final idLower = identifier.toLowerCase().trim();
     final rawTrimmed = identifier.trim();
+    if (rawTrimmed.isEmpty) return null;
+
+    try {
+      return await _findUserInternal(idLower, rawTrimmed)
+          .timeout(const Duration(seconds: 4), onTimeout: () => null);
+    } catch (e) {
+      debugPrint('[FirestoreService] findUserByIdentifier note: $e');
+      return null;
+    }
+  }
+
+  Future<Map<String, dynamic>?> _findUserInternal(String idLower, String rawTrimmed) async {
+    final isEmail = rawTrimmed.contains('@');
 
     // 1. Try SDK if available
     if (isAvailable) {
       try {
-        // Direct document ID lookup (e.g. 001-0001, 002-0001)
-        final byDoc = await usersCollection.doc(rawTrimmed).get();
-        if (byDoc.exists && byDoc.data() != null) {
-          final data = byDoc.data()!;
-          if (!data.containsKey('id')) data['id'] = byDoc.id;
-          return data;
+        if (isEmail) {
+          // Parallel search targeted to email fields
+          final results = await Future.wait([
+            usersCollection.where('email_lower', isEqualTo: idLower).limit(1).get().catchError((_) => null as dynamic),
+            usersCollection.where('email', isEqualTo: rawTrimmed).limit(1).get().catchError((_) => null as dynamic),
+            usersCollection.doc(idLower).get().catchError((_) => null as dynamic),
+          ]);
+          for (final snap in results) {
+            if (snap is QuerySnapshot<Map<String, dynamic>> && snap.docs.isNotEmpty) {
+              final d = snap.docs.first.data();
+              if (!d.containsKey('id')) d['id'] = snap.docs.first.id;
+              return d;
+            } else if (snap is DocumentSnapshot<Map<String, dynamic>> && snap.exists && snap.data() != null) {
+              final d = snap.data()!;
+              if (!d.containsKey('id')) d['id'] = snap.id;
+              return d;
+            }
+          }
+        } else {
+          // Parallel search targeted to user ID and username
+          final results = await Future.wait([
+            usersCollection.doc(rawTrimmed).get().catchError((_) => null as dynamic),
+            usersCollection.where('id', isEqualTo: rawTrimmed).limit(1).get().catchError((_) => null as dynamic),
+            usersCollection.where('username_lower', isEqualTo: idLower).limit(1).get().catchError((_) => null as dynamic),
+            usersCollection.where('username', isEqualTo: rawTrimmed).limit(1).get().catchError((_) => null as dynamic),
+          ]);
+          for (final snap in results) {
+            if (snap is DocumentSnapshot<Map<String, dynamic>> && snap.exists && snap.data() != null) {
+              final d = snap.data()!;
+              if (!d.containsKey('id')) d['id'] = snap.id;
+              return d;
+            } else if (snap is QuerySnapshot<Map<String, dynamic>> && snap.docs.isNotEmpty) {
+              final d = snap.docs.first.data();
+              if (!d.containsKey('id')) d['id'] = snap.docs.first.id;
+              return d;
+            }
+          }
         }
-
-        // Search by id field
-        final byId = await usersCollection.where('id', isEqualTo: rawTrimmed).limit(1).get();
-        if (byId.docs.isNotEmpty) return byId.docs.first.data();
-
-        // Search by email_lower
-        final byEmail = await usersCollection.where('email_lower', isEqualTo: idLower).limit(1).get();
-        if (byEmail.docs.isNotEmpty) return byEmail.docs.first.data();
-
-        // Search by username_lower
-        final byUserLower = await usersCollection.where('username_lower', isEqualTo: idLower).limit(1).get();
-        if (byUserLower.docs.isNotEmpty) return byUserLower.docs.first.data();
-
-        // Search by email
-        final byEmailRaw = await usersCollection.where('email', isEqualTo: rawTrimmed).limit(1).get();
-        if (byEmailRaw.docs.isNotEmpty) return byEmailRaw.docs.first.data();
-
-        // Search by username
-        final byUserRaw = await usersCollection.where('username', isEqualTo: rawTrimmed).limit(1).get();
-        if (byUserRaw.docs.isNotEmpty) return byUserRaw.docs.first.data();
-
-        // Search by full_name
-        final byFullName = await usersCollection.where('full_name', isEqualTo: rawTrimmed).limit(1).get();
-        if (byFullName.docs.isNotEmpty) return byFullName.docs.first.data();
       } catch (e) {
         debugPrint('[FirestoreService] SDK search note: $e');
       }
     }
 
     // 2. High-reliability REST query fallback
-    // Try direct document fetch by ID
     try {
-      final dio = _dio;
-      final docUrl = 'https://firestore.googleapis.com/v1/projects/$projectId/databases/(default)/documents/users/$rawTrimmed?key=$apiKey';
-      final docResp = await dio.get(docUrl);
-      if (docResp.statusCode == 200 && docResp.data is Map && docResp.data['fields'] is Map) {
-        final parsed = _parseFirestoreFields(docResp.data['fields'] as Map<String, dynamic>);
-        if (parsed.isNotEmpty) {
-          if (!parsed.containsKey('id')) parsed['id'] = rawTrimmed;
-          return parsed;
+      if (isEmail) {
+        final results = await Future.wait([
+          _queryRest('email_lower', idLower),
+          _queryRest('email', rawTrimmed),
+        ]);
+        for (final r in results) {
+          if (r != null && r.isNotEmpty) return r;
+        }
+      } else {
+        // Direct document fetch by ID
+        try {
+          final dio = _dio;
+          final docUrl = 'https://firestore.googleapis.com/v1/projects/$projectId/databases/(default)/documents/users/$rawTrimmed?key=$apiKey';
+          final docResp = await dio.get(docUrl);
+          if (docResp.statusCode == 200 && docResp.data is Map && docResp.data['fields'] is Map) {
+            final parsed = _parseFirestoreFields(docResp.data['fields'] as Map<String, dynamic>);
+            if (parsed.isNotEmpty) {
+              if (!parsed.containsKey('id')) parsed['id'] = rawTrimmed;
+              return parsed;
+            }
+          }
+        } catch (_) {}
+
+        final results = await Future.wait([
+          _queryRest('id', rawTrimmed),
+          _queryRest('username_lower', idLower),
+          _queryRest('username', rawTrimmed),
+        ]);
+        for (final r in results) {
+          if (r != null && r.isNotEmpty) return r;
         }
       }
     } catch (_) {}
 
-    Map<String, dynamic>? match = await _queryRest('id', rawTrimmed);
-    if (match != null) return match;
-
-    match = await _queryRest('email_lower', idLower);
-    if (match != null) return match;
-
-    match = await _queryRest('username_lower', idLower);
-    if (match != null) return match;
-
-    match = await _queryRest('email', rawTrimmed);
-    if (match != null) return match;
-
-    match = await _queryRest('username', rawTrimmed);
-    if (match != null) return match;
-
-    match = await _queryRest('full_name', rawTrimmed);
-    return match;
+    return null;
   }
 
   /// Fetches all users from Cloud Firestore (via SDK or REST fallback)
@@ -407,7 +432,8 @@ class FirestoreService {
 
     if (isAvailable) {
       try {
-        await firestore.collection(collection).doc(cleanDocId).set(data, SetOptions(merge: true));
+        await firestore.collection(collection).doc(cleanDocId).set(data, SetOptions(merge: true))
+            .timeout(const Duration(seconds: 3));
         return;
       } catch (e) {
         debugPrint('[FirestoreService] SDK saveDocument error: $e');
@@ -445,7 +471,8 @@ class FirestoreService {
 
     if (isAvailable) {
       try {
-        final snap = await firestore.collection(collection).doc(cleanDocId).get();
+        final snap = await firestore.collection(collection).doc(cleanDocId).get()
+            .timeout(const Duration(seconds: 3));
         if (snap.exists && snap.data() != null) {
           final res = snap.data()!;
           res['id'] = snap.id;

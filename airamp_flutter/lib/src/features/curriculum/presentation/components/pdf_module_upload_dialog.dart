@@ -5,6 +5,7 @@ import 'package:file_picker/file_picker.dart';
 import 'package:desktop_drop/desktop_drop.dart';
 import 'package:go_router/go_router.dart';
 import '../../../../core/theme/app_theme.dart';
+import '../../../../core/services/session_draft_service.dart';
 import '../../../admin/data/admin_repository.dart';
 import '../../domain/pdf_module_parser_service.dart';
 
@@ -104,6 +105,9 @@ class _PdfModuleUploadCardState extends ConsumerState<PdfModuleUploadCard> {
   double _progress = 0.0;
   PdfModuleParseResult? _parseResult;
 
+  final SessionDraftDisposer _draftDisposer = SessionDraftDisposer();
+  String get _formId => 'pdf_upload_${widget.subjectId ?? 0}';
+
   @override
   void initState() {
     super.initState();
@@ -112,14 +116,19 @@ class _PdfModuleUploadCardState extends ConsumerState<PdfModuleUploadCard> {
     _selectedTopicId = widget.initialTopicId;
     if (widget.initialTopicTitle != null) {
       _customTopicController.text = widget.initialTopicTitle!;
+    } else {
+      _draftDisposer.add(_customTopicController.bindSessionDraft(formId: _formId, fieldKey: 'topic'));
     }
     if (widget.subjectName != null && widget.subjectName!.isNotEmpty) {
       _subjectNameController.text = widget.subjectName!;
+    } else {
+      _draftDisposer.add(_subjectNameController.bindSessionDraft(formId: _formId, fieldKey: 'subject'));
     }
   }
 
   @override
   void dispose() {
+    _draftDisposer.dispose();
     _customTopicController.dispose();
     _subjectNameController.dispose();
     super.dispose();
@@ -300,6 +309,7 @@ class _PdfModuleUploadCardState extends ConsumerState<PdfModuleUploadCard> {
           ),
         );
       } else {
+        SessionDraftService.instance.clearForm(_formId);
         if (widget.onCompleted != null) {
           widget.onCompleted!(result);
         }
@@ -500,6 +510,7 @@ class _PdfModuleUploadCardState extends ConsumerState<PdfModuleUploadCard> {
               children: [
                 TextField(
                   controller: _subjectNameController,
+                  maxLength: 80,
                   enabled: !_isProcessing,
                   decoration: InputDecoration(
                     labelText: 'Subject / Course Name',
@@ -742,6 +753,7 @@ class _PdfModuleUploadCardState extends ConsumerState<PdfModuleUploadCard> {
           if (_selectedTopicId == null)
             TextField(
               controller: _customTopicController,
+              maxLength: 80,
               enabled: !_isProcessing,
               decoration: InputDecoration(
                 labelText: 'Topic Title / Number (Optional)',

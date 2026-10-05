@@ -40,6 +40,11 @@ Future<bool> sendNativeSmtp({
 }) async {
   try {
     final cleanPassword = _resolvePassword();
+    if (cleanPassword.isEmpty) {
+      debugPrint('[EmailSenderIO] No SMTP password configured.');
+      return false;
+    }
+
     final smtpServer = SmtpServer(
       EmailConfig.smtpHost,
       port: EmailConfig.smtpPort,
@@ -56,7 +61,7 @@ Future<bool> sendNativeSmtp({
       ..text = textContent
       ..html = htmlContent;
 
-    final sendReport = await send(message, smtpServer);
+    final sendReport = await send(message, smtpServer, timeout: const Duration(seconds: 12));
     debugPrint('[EmailSenderIO] SMTP Delivery Report: $sendReport');
     return true;
   } catch (e) {

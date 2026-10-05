@@ -97,9 +97,12 @@ class _RegLinksScreenState extends ConsumerState<RegLinksScreen> {
                         const SizedBox(height: 8),
                         TextField(
                           controller: _expirationController,
+                          maxLength: 20,
+                          buildCounter: (context, {required currentLength, required isFocused, maxLength}) => null,
                           style: TextStyle(color: AppTheme.text),
                           decoration: InputDecoration(
                             hintText: 'YYYY-MM-DD (optional)',
+                            counterText: '',
                             prefixIcon: Icon(
                               Icons.calendar_today,
                               color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.4),
@@ -140,10 +143,13 @@ class _RegLinksScreenState extends ConsumerState<RegLinksScreen> {
                         const SizedBox(height: 8),
                         TextField(
                           controller: _maxUsesController,
+                          maxLength: 4,
+                          buildCounter: (context, {required currentLength, required isFocused, maxLength}) => null,
                           style: TextStyle(color: AppTheme.text),
                           keyboardType: TextInputType.number,
                           textAlign: TextAlign.center,
                           decoration: InputDecoration(
+                            counterText: '',
                             filled: true,
                             fillColor: Theme.of(context).colorScheme.surface,
                             border: OutlineInputBorder(

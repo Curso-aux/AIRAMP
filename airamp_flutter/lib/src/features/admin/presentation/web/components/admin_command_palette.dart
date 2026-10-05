@@ -384,6 +384,8 @@ class _AdminCommandPaletteState extends ConsumerState<AdminCommandPalette> {
           Expanded(
             child: TextField(
               controller: _searchController,
+              maxLength: 60,
+              buildCounter: (context, {required currentLength, required isFocused, maxLength}) => null,
               autofocus: true,
               style: TextStyle(
                 fontSize: 16,
@@ -393,6 +395,7 @@ class _AdminCommandPaletteState extends ConsumerState<AdminCommandPalette> {
               decoration: InputDecoration(
                 hintText: 'Search pages, students, teachers, sections, or actions...',
                 hintStyle: TextStyle(fontSize: 14, color: AppTheme.textMuted),
+                counterText: '',
                 border: InputBorder.none,
                 isDense: true,
                 contentPadding: EdgeInsets.zero,

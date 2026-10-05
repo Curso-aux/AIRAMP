@@ -1,9 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:flutter/foundation.dart';
 import '../../../core/components/otp_verification_dialog.dart';
 import '../../../core/components/skeleton_loader.dart';
 import '../../../core/services/otp_service.dart';
+import '../../../core/services/app_update_service.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/theme/theme_provider.dart';
 import '../../auth/application/auth_provider.dart';
@@ -394,6 +396,10 @@ class _StudentProfileScreenState extends ConsumerState<StudentProfileScreen> {
               _buildChangePasswordCard(),
               const SizedBox(height: 16),
 
+              // ── App Updates & Version Card ──
+              _buildAppUpdatesCard(),
+              const SizedBox(height: 16),
+
               // ── Sign Out Button ──
               _buildSignOutButton(),
               const SizedBox(height: 40),
@@ -699,7 +705,13 @@ class _StudentProfileScreenState extends ConsumerState<StudentProfileScreen> {
     required bool isEditing,
     required bool showBorder,
     TextInputType keyboardType = TextInputType.text,
+    int? maxLength,
   }) {
+    final int effectiveLimit = maxLength ?? (
+      label.toLowerCase().contains('phone') ? 15 :
+      label.toLowerCase().contains('user') ? 30 :
+      label.toLowerCase().contains('email') ? 50 : 50
+    );
     return Container(
       padding: const EdgeInsets.symmetric(vertical: 10),
       decoration: BoxDecoration(
@@ -731,10 +743,13 @@ class _StudentProfileScreenState extends ConsumerState<StudentProfileScreen> {
                 if (isEditing)
                   TextField(
                     controller: controller,
+                    maxLength: effectiveLimit,
+                    buildCounter: (context, {required currentLength, required isFocused, maxLength}) => null,
                     keyboardType: keyboardType,
                     style: TextStyle(
                         color: AppTheme.text, fontSize: 15),
                     decoration: InputDecoration(
+                      counterText: '',
                       isDense: true,
                       contentPadding: const EdgeInsets.symmetric(
                           horizontal: 10, vertical: 6),
@@ -818,11 +833,14 @@ class _StudentProfileScreenState extends ConsumerState<StudentProfileScreen> {
                   // New Password
                   TextField(
                     controller: _newPasswordController,
+                    maxLength: 16,
+                    buildCounter: (context, {required currentLength, required isFocused, maxLength}) => null,
                     obscureText: true,
                     style:
                         TextStyle(color: AppTheme.text, fontSize: 14),
                     decoration: InputDecoration(
                       hintText: 'New Password',
+                      counterText: '',
                       hintStyle:
                           TextStyle(color: AppTheme.textMuted),
                       filled: true,
@@ -851,11 +869,14 @@ class _StudentProfileScreenState extends ConsumerState<StudentProfileScreen> {
                   // Confirm Password
                   TextField(
                     controller: _confirmPasswordController,
+                    maxLength: 16,
+                    buildCounter: (context, {required currentLength, required isFocused, maxLength}) => null,
                     obscureText: true,
                     style:
                         TextStyle(color: AppTheme.text, fontSize: 14),
                     decoration: InputDecoration(
                       hintText: 'Confirm Password',
+                      counterText: '',
                       hintStyle:
                           TextStyle(color: AppTheme.textMuted),
                       filled: true,
@@ -905,6 +926,90 @@ class _StudentProfileScreenState extends ConsumerState<StudentProfileScreen> {
               ),
             ),
           ],
+        ],
+      ),
+    );
+  }
+
+  // ═══════════════════════════════════════════════════════════
+  //  APP UPDATES & VERSION CARD
+  // ═══════════════════════════════════════════════════════════
+  Widget _buildAppUpdatesCard() {
+    return _sectionCard(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(Icons.system_update_rounded, color: AppTheme.primary, size: 20),
+              const SizedBox(width: 8),
+              Text(
+                'Version & Updates',
+                style: TextStyle(
+                  color: AppTheme.text,
+                  fontSize: 16,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+              const Spacer(),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                decoration: BoxDecoration(
+                  color: AppTheme.primary.withValues(alpha: 0.15),
+                  borderRadius: BorderRadius.circular(6),
+                ),
+                child: Text(
+                  'v${AppUpdateService.currentVersion}',
+                  style: TextStyle(
+                    color: AppTheme.primary,
+                    fontSize: 12,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 10),
+          Text(
+            kIsWeb
+                ? 'Hosted on Firebase with automatic PWA synchronization across web, iOS, and Android.'
+                : 'Native Android application synchronized with Firebase Cloud infrastructure.',
+            style: TextStyle(color: AppTheme.textSecondary, fontSize: 12),
+          ),
+          const SizedBox(height: 14),
+          Row(
+            children: [
+              Expanded(
+                child: OutlinedButton.icon(
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: AppTheme.primary,
+                    side: BorderSide(color: AppTheme.primary.withValues(alpha: 0.5)),
+                    padding: const EdgeInsets.symmetric(vertical: 10),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                  ),
+                  onPressed: () => AppUpdateService().promptUpdateIfAvailable(context, showNoUpdateMessage: true),
+                  icon: const Icon(Icons.sync_rounded, size: 16),
+                  label: const Text('Check for Updates', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600)),
+                ),
+              ),
+              if (kIsWeb) ...[
+                const SizedBox(width: 10),
+                Expanded(
+                  child: ElevatedButton.icon(
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: AppTheme.primary,
+                      foregroundColor: Colors.white,
+                      padding: const EdgeInsets.symmetric(vertical: 10),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                    ),
+                    onPressed: () => AppUpdateService.showInstallPwaInstructions(context),
+                    icon: const Icon(Icons.phone_iphone_rounded, size: 16),
+                    label: const Text('Install App', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600)),
+                  ),
+                ),
+              ],
+            ],
+          ),
         ],
       ),
     );

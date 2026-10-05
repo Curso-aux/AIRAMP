@@ -1580,13 +1580,24 @@ class _BaseBottomSheet extends StatelessWidget {
   }
 }
 
-Widget _buildTextField(TextEditingController controller, String hint, {int maxLines = 1}) {
+Widget _buildTextField(TextEditingController controller, String hint, {int maxLines = 1, int? maxLength}) {
+  final int effectiveLimit = maxLength ?? (
+    hint.toLowerCase().contains('score') ? 4 :
+    hint.toLowerCase().contains('yyyy') ? 20 :
+    hint.toLowerCase().contains('timezone') ? 40 :
+    hint.toLowerCase().contains('option') ? 120 :
+    hint.toLowerCase().contains('question') ? 500 :
+    maxLines > 1 ? 1000 : 80
+  );
   return TextField(
     controller: controller,
+    maxLength: effectiveLimit,
+    buildCounter: maxLines == 1 ? (context, {required currentLength, required isFocused, maxLength}) => null : null,
     style: TextStyle(color: AppTheme.text),
     maxLines: maxLines,
     decoration: InputDecoration(
       hintText: hint,
+      counterText: maxLines == 1 ? '' : null,
       hintStyle: TextStyle(color: AppTheme.textMuted),
       filled: true,
       fillColor: AppTheme.background,

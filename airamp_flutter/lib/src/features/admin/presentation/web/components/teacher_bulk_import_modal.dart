@@ -485,12 +485,15 @@ class _TeacherBulkImportModalState extends ConsumerState<TeacherBulkImportModal>
                         Expanded(
                           child: TextField(
                             controller: _pasteController,
+                            maxLength: 25000,
+                            buildCounter: (context, {required currentLength, required isFocused, maxLength}) => null,
                             maxLines: null,
                             expands: true,
                             style: const TextStyle(fontFamily: 'monospace', fontSize: 13),
                             decoration: InputDecoration(
                               hintText: 'Paste CSV rows here...\n\nExample:\nfull_name,email,handled_sections,specialty,notes\nMr. Arthur Santos,arthur.santos@school.edu,"STEM 12-A, STEM 12-B",General Mathematics,Lead Instructor\nMs. Elena Rivera,elena.rivera@school.edu,STEM 12-A,Earth & Life Science,Coordinator',
                               hintStyle: TextStyle(color: AppTheme.textMuted, fontFamily: 'monospace', fontSize: 12),
+                              counterText: '',
                               filled: true,
                               fillColor: AppTheme.background,
                               border: OutlineInputBorder(

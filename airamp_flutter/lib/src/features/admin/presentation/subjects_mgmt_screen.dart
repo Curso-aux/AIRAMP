@@ -1164,13 +1164,20 @@ class _CreateSubjectSheetState extends ConsumerState<_CreateSubjectSheet> {
     );
   }
 
-  Widget _buildTextField(TextEditingController controller, String hint, {int maxLines = 1}) {
+  Widget _buildTextField(TextEditingController controller, String hint, {int maxLines = 1, int? maxLength}) {
+    final int effectiveLimit = maxLength ?? (
+      hint.toLowerCase().contains('code') ? 20 :
+      maxLines > 1 ? 500 : 80
+    );
     return TextField(
       controller: controller,
+      maxLength: effectiveLimit,
+      buildCounter: maxLines == 1 ? (context, {required currentLength, required isFocused, maxLength}) => null : null,
       style: TextStyle(color: AppTheme.text),
       maxLines: maxLines,
       decoration: InputDecoration(
         hintText: hint,
+        counterText: maxLines == 1 ? '' : null,
         filled: true,
         fillColor: Theme.of(context).colorScheme.surface,
         border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
@@ -1424,13 +1431,20 @@ class _EditSubjectSheetState extends ConsumerState<_EditSubjectSheet> {
     );
   }
 
-  Widget _buildTextField(TextEditingController controller, String hint, {int maxLines = 1}) {
+  Widget _buildTextField(TextEditingController controller, String hint, {int maxLines = 1, int? maxLength}) {
+    final int effectiveLimit = maxLength ?? (
+      hint.toLowerCase().contains('code') ? 20 :
+      maxLines > 1 ? 500 : 80
+    );
     return TextField(
       controller: controller,
+      maxLength: effectiveLimit,
+      buildCounter: maxLines == 1 ? (context, {required currentLength, required isFocused, maxLength}) => null : null,
       style: TextStyle(color: AppTheme.text),
       maxLines: maxLines,
       decoration: InputDecoration(
         hintText: hint,
+        counterText: maxLines == 1 ? '' : null,
         filled: true,
         fillColor: Theme.of(context).colorScheme.surface,
         border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),

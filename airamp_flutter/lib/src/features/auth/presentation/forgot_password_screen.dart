@@ -332,10 +332,13 @@ class _ForgotPasswordScreenState extends ConsumerState<ForgotPasswordScreen> {
                     const SizedBox(height: 6),
                     TextField(
                       controller: _identifierController,
+                      maxLength: 50,
+                      buildCounter: (context, {required currentLength, required isFocused, maxLength}) => null,
                       style: TextStyle(color: AppTheme.text, fontSize: 15),
                       decoration: InputDecoration(
                         hintText: 'e.g. 001-0001 or name@gmail.com',
                         hintStyle: TextStyle(color: AppTheme.textMuted),
+                        counterText: '',
                         prefixIcon: Icon(Icons.person_search_outlined, color: AppTheme.textMuted),
                         filled: true,
                         fillColor: AppTheme.surface,
@@ -490,10 +493,13 @@ class _ForgotPasswordScreenState extends ConsumerState<ForgotPasswordScreen> {
                     const SizedBox(height: 6),
                     TextField(
                       controller: _newPasswordController,
+                      maxLength: 16,
+                      buildCounter: (context, {required currentLength, required isFocused, maxLength}) => null,
                       obscureText: _obscureNewPass,
                       style: TextStyle(color: AppTheme.text, fontSize: 15),
                       decoration: InputDecoration(
                         hintText: 'Minimum 6 characters',
+                        counterText: '',
                         hintStyle: TextStyle(color: AppTheme.textMuted),
                         prefixIcon: Icon(Icons.lock_outline, color: AppTheme.textMuted),
                         suffixIcon: IconButton(
@@ -529,10 +535,13 @@ class _ForgotPasswordScreenState extends ConsumerState<ForgotPasswordScreen> {
                     const SizedBox(height: 6),
                     TextField(
                       controller: _confirmPasswordController,
+                      maxLength: 16,
+                      buildCounter: (context, {required currentLength, required isFocused, maxLength}) => null,
                       obscureText: _obscureConfirmPass,
                       style: TextStyle(color: AppTheme.text, fontSize: 15),
                       decoration: InputDecoration(
                         hintText: 'Repeat new password',
+                        counterText: '',
                         hintStyle: TextStyle(color: AppTheme.textMuted),
                         prefixIcon: Icon(Icons.lock_reset_outlined, color: AppTheme.textMuted),
                         suffixIcon: IconButton(

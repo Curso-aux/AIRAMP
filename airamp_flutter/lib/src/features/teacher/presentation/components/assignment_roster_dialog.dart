@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../core/database/database_helper.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../../core/theme/theme_provider.dart';
+import '../../../../core/services/session_draft_service.dart';
 import '../../../auth/application/auth_provider.dart';
 import '../../../submissions/data/submissions_repository.dart';
 
@@ -112,6 +113,10 @@ class _AssignmentRosterDialogState extends ConsumerState<AssignmentRosterDialog>
 
     final gradeController = TextEditingController(text: currentGrade);
     final feedbackController = TextEditingController(text: currentFeedback);
+    final formId = 'teacher_grading_${widget.assignmentId}_${student['student_id']}';
+    final disposer = SessionDraftDisposer();
+    disposer.add(gradeController.bindSessionDraft(formId: formId, fieldKey: 'grade'));
+    disposer.add(feedbackController.bindSessionDraft(formId: formId, fieldKey: 'feedback'));
 
     showDialog(
       context: context,
@@ -146,10 +151,13 @@ class _AssignmentRosterDialogState extends ConsumerState<AssignmentRosterDialog>
                     const SizedBox(height: 6),
                     TextField(
                       controller: gradeController,
+                      maxLength: 4,
+                      buildCounter: (context, {required currentLength, required isFocused, maxLength}) => null,
                       keyboardType: const TextInputType.numberWithOptions(decimal: true),
                       style: TextStyle(color: AppTheme.text),
                       decoration: InputDecoration(
                         hintText: 'e.g. 95',
+                        counterText: '',
                         hintStyle: TextStyle(color: AppTheme.textMuted),
                         filled: true,
                         fillColor: AppTheme.background,
@@ -167,6 +175,7 @@ class _AssignmentRosterDialogState extends ConsumerState<AssignmentRosterDialog>
                     const SizedBox(height: 6),
                     TextField(
                       controller: feedbackController,
+                      maxLength: 500,
                       maxLines: 3,
                       style: TextStyle(color: AppTheme.text),
                       decoration: InputDecoration(
@@ -217,7 +226,10 @@ class _AssignmentRosterDialogState extends ConsumerState<AssignmentRosterDialog>
                     ref.invalidate(activityRosterProvider(widget.assignmentId));
                     ref.invalidate(assignmentSubmissionsProvider(widget.assignmentId));
 
+                    SessionDraftService.instance.clearForm(formId);
+
                     if (ctx.mounted) {
+                      disposer.dispose();
                       Navigator.pop(ctx);
                     }
                     if (mounted) {
@@ -415,10 +427,13 @@ class _AssignmentRosterDialogState extends ConsumerState<AssignmentRosterDialog>
             // Search Bar & Filter Tabs
             TextField(
               controller: _searchController,
+              maxLength: 60,
+              buildCounter: (context, {required currentLength, required isFocused, maxLength}) => null,
               onChanged: (val) => setState(() => _searchQuery = val.trim()),
               style: TextStyle(color: AppTheme.text, fontSize: 13),
               decoration: InputDecoration(
                 hintText: 'Search student name, section, or email...',
+                counterText: '',
                 hintStyle: TextStyle(color: AppTheme.textMuted, fontSize: 12),
                 prefixIcon: Icon(Icons.search, size: 18, color: AppTheme.primary),
                 suffixIcon: _searchQuery.isNotEmpty

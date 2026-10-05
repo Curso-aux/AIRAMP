@@ -384,12 +384,15 @@ class _BulkImportModalState extends ConsumerState<BulkImportModal> with SingleTi
       ),
       child: TextField(
         controller: _pasteController,
+        maxLength: 25000,
+        buildCounter: (context, {required currentLength, required isFocused, maxLength}) => null,
         maxLines: null,
         expands: true,
         style: TextStyle(fontFamily: 'monospace', fontSize: 12, color: AppTheme.text),
         decoration: InputDecoration(
           hintText: 'Paste comma-separated rows with header (e.g. full_name,email,role,grade,section)...',
           hintStyle: TextStyle(color: AppTheme.textMuted, fontSize: 12),
+          counterText: '',
           border: InputBorder.none,
           contentPadding: const EdgeInsets.all(12),
           suffixIcon: _pasteController.text.isNotEmpty

@@ -2,8 +2,11 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import 'package:flutter/foundation.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/components/app_logo.dart';
+import '../../../core/services/app_update_service.dart';
+import '../../../core/services/session_draft_service.dart';
 import '../application/auth_provider.dart';
 
 class LoginScreen extends ConsumerStatefulWidget {
@@ -22,10 +25,17 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
 
   late AnimationController _buttonScaleController;
   late Animation<double> _buttonScaleAnimation;
+  final SessionDraftDisposer _draftDisposer = SessionDraftDisposer();
+  static const String _formId = 'auth_login';
 
   @override
   void initState() {
     super.initState();
+    _draftDisposer.add(_identifierController.bindSessionDraft(
+      formId: _formId,
+      fieldKey: 'identifier',
+      onDraftRestored: () => setState(() {}),
+    ));
     _buttonScaleController = AnimationController(
       vsync: this,
       duration: const Duration(milliseconds: 100),
@@ -37,6 +47,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
 
   @override
   void dispose() {
+    _draftDisposer.dispose();
     _identifierController.dispose();
     _passwordController.dispose();
     _buttonScaleController.dispose();
@@ -70,6 +81,8 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
           });
           return;
         }
+
+        SessionDraftService.instance.clearForm(_formId);
 
         if (user.role == 'teacher') {
           if (mounted) context.go('/teacher/dashboard');
@@ -179,6 +192,8 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
                       // Email/Username Input
                       TextField(
                         controller: _identifierController,
+                        maxLength: 50,
+                        buildCounter: (context, {required currentLength, required isFocused, maxLength}) => null,
                         style: TextStyle(
                           color: Theme.of(context).colorScheme.onSurface,
                           fontSize: 15,
@@ -188,6 +203,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
                         enableSuggestions: true,
                         decoration: InputDecoration(
                           hintText: 'Email or Username',
+                          counterText: '',
                           prefixIcon: Icon(
                             Icons.alternate_email,
                             color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.4),
@@ -200,6 +216,8 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
                       // Password Input
                       TextField(
                         controller: _passwordController,
+                        maxLength: 16,
+                        buildCounter: (context, {required currentLength, required isFocused, maxLength}) => null,
                         obscureText: !_showPassword,
                         style: TextStyle(
                           color: Theme.of(context).colorScheme.onSurface,
@@ -207,6 +225,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
                         ),
                         decoration: InputDecoration(
                           hintText: 'Password',
+                          counterText: '',
                           prefixIcon: Icon(
                             Icons.lock_outline,
                             color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.4),
@@ -320,6 +339,30 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
                           ),
                         ],
                       ),
+
+                      if (kIsWeb) ...[
+                        const SizedBox(height: 20),
+                        Divider(color: AppTheme.border.withValues(alpha: 0.5)),
+                        const SizedBox(height: 12),
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            TextButton.icon(
+                              onPressed: () => AppUpdateService.showInstallPwaInstructions(context),
+                              icon: Icon(Icons.install_mobile_rounded, size: 16, color: AppTheme.primary),
+                              label: Text('Install on iOS / Android', style: TextStyle(color: AppTheme.primary, fontSize: 12, fontWeight: FontWeight.w600)),
+                            ),
+                            const SizedBox(width: 4),
+                            Text('•', style: TextStyle(color: AppTheme.textMuted)),
+                            const SizedBox(width: 4),
+                            TextButton.icon(
+                              onPressed: () => AppUpdateService().downloadLatestApk(),
+                              icon: Icon(Icons.download_rounded, size: 16, color: AppTheme.textMuted),
+                              label: Text('Download APK', style: TextStyle(color: AppTheme.textMuted, fontSize: 12)),
+                            ),
+                          ],
+                        ),
+                      ],
                     ],
                   ),
                 ),

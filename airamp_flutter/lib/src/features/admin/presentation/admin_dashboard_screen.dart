@@ -335,6 +335,7 @@ class _PostAnnouncementSheetState extends State<_PostAnnouncementSheet> {
             // Title Field
             TextField(
               controller: _titleController,
+              maxLength: 80,
               style: TextStyle(color: AppTheme.text),
               decoration: const InputDecoration(hintText: 'Title'),
             ),
@@ -343,6 +344,7 @@ class _PostAnnouncementSheetState extends State<_PostAnnouncementSheet> {
             // Message Field
             TextField(
               controller: _messageController,
+              maxLength: 1000,
               style: TextStyle(color: AppTheme.text),
               decoration: const InputDecoration(hintText: 'Message...'),
               maxLines: 4,

@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:desktop_drop/desktop_drop.dart';
 import '../../../core/theme/app_theme.dart';
+import '../../../core/services/session_draft_service.dart';
 import '../../admin/data/admin_repository.dart';
 
 /// Icon lookup based on content type
@@ -147,6 +148,17 @@ class _AddContentSheetState extends ConsumerState<AddContentSheet> {
   final _titleController = TextEditingController();
   final _contentController = TextEditingController();
   final _notesController = TextEditingController();
+  final SessionDraftDisposer _draftDisposer = SessionDraftDisposer();
+
+  String get _formId => 'curriculum_add_content_${widget.loId}';
+
+  @override
+  void initState() {
+    super.initState();
+    _draftDisposer.add(_titleController.bindSessionDraft(formId: _formId, fieldKey: 'title'));
+    _draftDisposer.add(_contentController.bindSessionDraft(formId: _formId, fieldKey: 'content'));
+    _draftDisposer.add(_notesController.bindSessionDraft(formId: _formId, fieldKey: 'notes'));
+  }
   String _selectedType = 'Text';
 
   // File state
@@ -168,6 +180,7 @@ class _AddContentSheetState extends ConsumerState<AddContentSheet> {
 
   @override
   void dispose() {
+    _draftDisposer.dispose();
     _titleController.dispose();
     _contentController.dispose();
     _notesController.dispose();
@@ -303,6 +316,8 @@ class _AddContentSheetState extends ConsumerState<AddContentSheet> {
       'content_type': _selectedType,
       'content_data': contentData,
     });
+
+    SessionDraftService.instance.clearForm(_formId);
 
     Navigator.pop(context);
     ScaffoldMessenger.of(context).showSnackBar(
@@ -971,13 +986,22 @@ Widget _buildTextField({
   required String hintText,
   int maxLines = 1,
   Widget? prefixIcon,
+  int? maxLength,
 }) {
+  final int effectiveLimit = maxLength ?? (
+    (hintText.toLowerCase().contains('url') || hintText.toLowerCase().contains('youtube') || hintText.toLowerCase().contains('http'))
+        ? 250
+        : (maxLines > 1 ? 2000 : 80)
+  );
   return TextField(
     controller: controller,
+    maxLength: effectiveLimit,
+    buildCounter: maxLines == 1 ? (context, {required currentLength, required isFocused, maxLength}) => null : null,
     maxLines: maxLines,
     style: TextStyle(color: AppTheme.text, fontSize: 13),
     decoration: InputDecoration(
       hintText: hintText,
+      counterText: maxLines == 1 ? '' : null,
       hintStyle: TextStyle(color: AppTheme.textMuted, fontSize: 13),
       prefixIcon: prefixIcon,
       filled: true,

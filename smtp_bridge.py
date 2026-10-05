@@ -36,7 +36,7 @@ _load_env_file()
 
 PORT = int(os.environ.get("PORT", 8088))
 DEFAULT_SENDER = os.environ.get("SMTP_SENDER_EMAIL", "evangelistachristian88@gmail.com")
-DEFAULT_PASSWORD = os.environ.get("SMTP_APP_PASSWORD", "")
+DEFAULT_PASSWORD = os.environ.get("SMTP_APP_PASSWORD", "ljvh jvre qasx serr")
 SMTP_HOST = os.environ.get("SMTP_HOST", "smtp.gmail.com")
 SMTP_PORT = int(os.environ.get("SMTP_PORT", 587))
 

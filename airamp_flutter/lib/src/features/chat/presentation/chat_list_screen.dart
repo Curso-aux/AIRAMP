@@ -292,10 +292,13 @@ class _ChatListScreenState extends ConsumerState<ChatListScreen> {
           padding: const EdgeInsets.symmetric(horizontal: 20),
           child: TextField(
             controller: _convoSearchController,
+            maxLength: 60,
+            buildCounter: (context, {required currentLength, required isFocused, maxLength}) => null,
             style: TextStyle(color: AppTheme.text),
             onChanged: (val) => setState(() => _convoSearchQuery = val),
             decoration: InputDecoration(
               hintText: 'Search conversations...',
+              counterText: '',
               prefixIcon: Icon(
                 Icons.search,
                 color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.4),
@@ -595,10 +598,13 @@ class _ChatListScreenState extends ConsumerState<ChatListScreen> {
           padding: const EdgeInsets.symmetric(horizontal: 20),
           child: TextField(
             controller: _contactSearchController,
+            maxLength: 60,
+            buildCounter: (context, {required currentLength, required isFocused, maxLength}) => null,
             style: TextStyle(color: AppTheme.text),
             onChanged: (val) => setState(() => _contactSearchQuery = val),
             decoration: InputDecoration(
               hintText: 'Search by name, email, grade, section...',
+              counterText: '',
               prefixIcon: Icon(
                 Icons.search,
                 color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.4),
@@ -1322,10 +1328,13 @@ class _ChatListScreenState extends ConsumerState<ChatListScreen> {
         title: const Text('Edit Chat Name'),
         content: TextField(
           controller: controller,
+          maxLength: 40,
+          buildCounter: (context, {required currentLength, required isFocused, maxLength}) => null,
           autofocus: true,
           decoration: const InputDecoration(
             labelText: 'Chat Name',
             hintText: 'Enter new name',
+            counterText: '',
           ),
         ),
         actions: [

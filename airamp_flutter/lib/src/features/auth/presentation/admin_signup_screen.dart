@@ -138,13 +138,17 @@ class _AdminSignupScreenState extends ConsumerState<AdminSignupScreen> {
     );
   }
 
-  Widget _buildTextField(String hint, IconData icon, {bool isPassword = false, TextEditingController? controller}) {
+  Widget _buildTextField(String hint, IconData icon, {bool isPassword = false, TextEditingController? controller, int? maxLength}) {
+    final int effectiveLimit = maxLength ?? (isPassword ? 16 : (hint.toLowerCase().contains('user') ? 30 : (hint.toLowerCase().contains('code') ? 15 : 50)));
     return TextField(
       controller: controller,
+      maxLength: effectiveLimit,
+      buildCounter: (context, {required currentLength, required isFocused, maxLength}) => null,
       obscureText: isPassword,
       style: TextStyle(color: AppTheme.text),
       decoration: InputDecoration(
         hintText: hint,
+        counterText: '',
         prefixIcon: Icon(icon, color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.4)),
       ),
     );

@@ -193,12 +193,15 @@ class _NewConversationModalState extends ConsumerState<NewConversationModal>
                   Expanded(
                     child: TextField(
                       controller: _searchController,
+                      maxLength: 60,
+                      buildCounter: (context, {required currentLength, required isFocused, maxLength}) => null,
                       autofocus: false,
                       style: TextStyle(
                         color: AppTheme.text,
                         fontSize: 15,
                       ),
                       decoration: InputDecoration(
+                        counterText: '',
                         hintText: _activeTab == 'users'
                             ? 'Search by name, email, grade, section...'
                             : 'Search contacts...',

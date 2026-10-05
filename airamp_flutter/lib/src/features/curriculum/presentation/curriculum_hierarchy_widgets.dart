@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/theme/app_theme.dart';
+import '../../../core/services/session_draft_service.dart';
 import '../../admin/data/admin_repository.dart';
 import 'curriculum_content_sheet.dart';
 import 'components/pdf_module_upload_dialog.dart';
@@ -718,9 +719,20 @@ class AddTopicSheet extends ConsumerStatefulWidget {
 class _AddTopicSheetState extends ConsumerState<AddTopicSheet> {
   final _titleController = TextEditingController();
   final _descController = TextEditingController();
+  final SessionDraftDisposer _draftDisposer = SessionDraftDisposer();
+
+  String get _formId => 'curriculum_add_topic_${widget.subjectId}';
+
+  @override
+  void initState() {
+    super.initState();
+    _draftDisposer.add(_titleController.bindSessionDraft(formId: _formId, fieldKey: 'title'));
+    _draftDisposer.add(_descController.bindSessionDraft(formId: _formId, fieldKey: 'desc'));
+  }
 
   @override
   void dispose() {
+    _draftDisposer.dispose();
     _titleController.dispose();
     _descController.dispose();
     super.dispose();
@@ -739,6 +751,8 @@ class _AddTopicSheetState extends ConsumerState<AddTopicSheet> {
       'title': title,
       'description': _descController.text.trim(),
     });
+
+    SessionDraftService.instance.clearForm(_formId);
 
     Navigator.pop(context);
     ScaffoldMessenger.of(context).showSnackBar(
@@ -840,9 +854,21 @@ class _AddLOSheetState extends ConsumerState<AddLOSheet> {
   final _titleController = TextEditingController();
   final _descController = TextEditingController();
   final _criteriaController = TextEditingController();
+  final SessionDraftDisposer _draftDisposer = SessionDraftDisposer();
+
+  String get _formId => 'curriculum_add_lo_${widget.topicId}';
+
+  @override
+  void initState() {
+    super.initState();
+    _draftDisposer.add(_titleController.bindSessionDraft(formId: _formId, fieldKey: 'title'));
+    _draftDisposer.add(_descController.bindSessionDraft(formId: _formId, fieldKey: 'desc'));
+    _draftDisposer.add(_criteriaController.bindSessionDraft(formId: _formId, fieldKey: 'criteria'));
+  }
 
   @override
   void dispose() {
+    _draftDisposer.dispose();
     _titleController.dispose();
     _descController.dispose();
     _criteriaController.dispose();
@@ -863,6 +889,8 @@ class _AddLOSheetState extends ConsumerState<AddLOSheet> {
       'description': _descController.text.trim(),
       'performance_criteria': _criteriaController.text.trim(),
     });
+
+    SessionDraftService.instance.clearForm(_formId);
 
     Navigator.pop(context);
     ScaffoldMessenger.of(context).showSnackBar(
@@ -963,13 +991,17 @@ class _EditLOSheetState extends ConsumerState<EditLOSheet> {
 // Modal Bottom Sheet Layout Helper
 // ─────────────────────────────────────────────────────────────
 
-Widget _buildTextField(TextEditingController controller, String hint, {int maxLines = 1}) {
+Widget _buildTextField(TextEditingController controller, String hint, {int maxLines = 1, int? maxLength}) {
+  final int effectiveLimit = maxLength ?? (maxLines > 1 ? 1000 : 80);
   return TextField(
     controller: controller,
+    maxLength: effectiveLimit,
+    buildCounter: maxLines == 1 ? (context, {required currentLength, required isFocused, maxLength}) => null : null,
     maxLines: maxLines,
     style: TextStyle(color: AppTheme.text, fontSize: 13),
     decoration: InputDecoration(
       hintText: hint,
+      counterText: maxLines == 1 ? '' : null,
       hintStyle: TextStyle(color: AppTheme.textMuted, fontSize: 13),
       filled: true,
       fillColor: AppTheme.background,

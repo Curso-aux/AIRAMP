@@ -654,7 +654,13 @@ class _AdminProfileScreenState extends ConsumerState<AdminProfileScreen> {
     required bool isEditing,
     required bool showBorder,
     TextInputType keyboardType = TextInputType.text,
+    int? maxLength,
   }) {
+    final int effectiveLimit = maxLength ?? (
+      label.toLowerCase().contains('phone') ? 15 :
+      label.toLowerCase().contains('user') ? 30 :
+      label.toLowerCase().contains('email') ? 50 : 50
+    );
     return Container(
       padding: const EdgeInsets.symmetric(vertical: 10),
       decoration: BoxDecoration(
@@ -686,10 +692,13 @@ class _AdminProfileScreenState extends ConsumerState<AdminProfileScreen> {
                 if (isEditing)
                   TextField(
                     controller: controller,
+                    maxLength: effectiveLimit,
+                    buildCounter: (context, {required currentLength, required isFocused, maxLength}) => null,
                     keyboardType: keyboardType,
                     style: TextStyle(
                         color: AppTheme.text, fontSize: 15),
                     decoration: InputDecoration(
+                      counterText: '',
                       isDense: true,
                       contentPadding: const EdgeInsets.symmetric(
                           horizontal: 10, vertical: 6),
@@ -773,11 +782,14 @@ class _AdminProfileScreenState extends ConsumerState<AdminProfileScreen> {
                   // New Password
                   TextField(
                     controller: _newPasswordController,
+                    maxLength: 16,
+                    buildCounter: (context, {required currentLength, required isFocused, maxLength}) => null,
                     obscureText: true,
                     style:
                         TextStyle(color: AppTheme.text, fontSize: 14),
                     decoration: InputDecoration(
                       hintText: 'New Password',
+                      counterText: '',
                       hintStyle:
                           TextStyle(color: AppTheme.textMuted),
                       filled: true,
@@ -806,11 +818,14 @@ class _AdminProfileScreenState extends ConsumerState<AdminProfileScreen> {
                   // Confirm Password
                   TextField(
                     controller: _confirmPasswordController,
+                    maxLength: 16,
+                    buildCounter: (context, {required currentLength, required isFocused, maxLength}) => null,
                     obscureText: true,
                     style:
                         TextStyle(color: AppTheme.text, fontSize: 14),
                     decoration: InputDecoration(
                       hintText: 'Confirm Password',
+                      counterText: '',
                       hintStyle:
                           TextStyle(color: AppTheme.textMuted),
                       filled: true,

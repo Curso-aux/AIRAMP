@@ -292,11 +292,14 @@ class _TeacherStudentsScreenState extends ConsumerState<TeacherStudentsScreen> {
                     // Search input
                     TextField(
                       controller: _searchController,
+                      maxLength: 60,
+                      buildCounter: (context, {required currentLength, required isFocused, maxLength}) => null,
                       style: TextStyle(color: AppTheme.text, fontSize: 14),
                       decoration: InputDecoration(
                         hintText: _selectedSection == 'All Sections'
                             ? 'Search students across all sections...'
                             : 'Search students in $_selectedSection...',
+                        counterText: '',
                         hintStyle: TextStyle(color: AppTheme.textMuted, fontSize: 13),
                         prefixIcon: Icon(Icons.search, color: AppTheme.textMuted, size: 20),
                         suffixIcon: _searchController.text.isNotEmpty

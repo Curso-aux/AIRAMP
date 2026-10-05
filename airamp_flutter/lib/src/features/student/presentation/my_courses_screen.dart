@@ -80,10 +80,13 @@ class _MyCoursesScreenState extends ConsumerState<MyCoursesScreen> {
                   const SizedBox(height: 16),
                   TextField(
                     controller: controller,
+                    maxLength: 15,
+                    buildCounter: (context, {required currentLength, required isFocused, maxLength}) => null,
                     textCapitalization: TextCapitalization.characters,
                     style: TextStyle(color: AppTheme.text, fontWeight: FontWeight.bold, letterSpacing: 1),
                     decoration: InputDecoration(
                       labelText: 'Section Key',
+                      counterText: '',
                       hintText: 'e.g., SEC-EMR10',
                       prefixIcon: Icon(Icons.key, color: Theme.of(context).colorScheme.primary, size: 20),
                       suffixIcon: controller.text.isNotEmpty
@@ -974,9 +977,12 @@ class _MyCoursesScreenState extends ConsumerState<MyCoursesScreen> {
               Expanded(
                 child: TextField(
                   controller: _keyController,
+                  maxLength: 15,
+                  buildCounter: (context, {required currentLength, required isFocused, maxLength}) => null,
                   textCapitalization: TextCapitalization.characters,
                   style: TextStyle(color: AppTheme.text, fontWeight: FontWeight.bold, letterSpacing: 1),
                   decoration: InputDecoration(
+                    counterText: '',
                     hintText: 'e.g. SEC-EMR10',
                     contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
                     border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),

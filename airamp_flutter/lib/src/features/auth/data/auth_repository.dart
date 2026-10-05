@@ -54,10 +54,11 @@ class AuthRepository {
       );
     }
 
-    // 2. Query Cloud Firestore to ensure fresh cloud credentials take precedence
+    // 2. Query Cloud Firestore with fast timeout so fresh credentials take precedence without stalling
     Map<String, dynamic>? cloudUser;
     try {
-      cloudUser = await FirestoreService().findUserByIdentifier(identifier);
+      final cloudTimeout = candidateRows.isNotEmpty ? const Duration(seconds: 2) : const Duration(seconds: 4);
+      cloudUser = await FirestoreService().findUserByIdentifier(identifier).timeout(cloudTimeout, onTimeout: () => null);
     } catch (e) {
       debugPrint('[AuthRepository] Cloud lookup note: $e');
     }

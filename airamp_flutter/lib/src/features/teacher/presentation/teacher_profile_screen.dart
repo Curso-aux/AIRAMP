@@ -241,9 +241,9 @@ class _TeacherProfileScreenState extends ConsumerState<TeacherProfileScreen> {
         if (_showPasswordForm) ...[
           const SizedBox(height: 16),
           Padding(padding: EdgeInsets.only(left: 30), child: Column(children: [
-            TextField(controller: _newPasswordController, obscureText: true, style: TextStyle(color: AppTheme.text, fontSize: 14), decoration: InputDecoration(hintText: 'New Password', hintStyle: TextStyle(color: AppTheme.textMuted), filled: true, fillColor: AppTheme.inputBg, border: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: BorderSide(color: AppTheme.border)), enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: BorderSide(color: AppTheme.border)), focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: BorderSide(color: AppTheme.primary)), contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10))),
+            TextField(controller: _newPasswordController, maxLength: 16, buildCounter: (context, {required currentLength, required isFocused, maxLength}) => null, obscureText: true, style: TextStyle(color: AppTheme.text, fontSize: 14), decoration: InputDecoration(hintText: 'New Password', counterText: '', hintStyle: TextStyle(color: AppTheme.textMuted), filled: true, fillColor: AppTheme.inputBg, border: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: BorderSide(color: AppTheme.border)), enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: BorderSide(color: AppTheme.border)), focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: BorderSide(color: AppTheme.primary)), contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10))),
             const SizedBox(height: 10),
-            TextField(controller: _confirmPasswordController, obscureText: true, style: TextStyle(color: AppTheme.text, fontSize: 14), decoration: InputDecoration(hintText: 'Confirm Password', hintStyle: TextStyle(color: AppTheme.textMuted), filled: true, fillColor: AppTheme.inputBg, border: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: BorderSide(color: AppTheme.border)), enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: BorderSide(color: AppTheme.border)), focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: BorderSide(color: AppTheme.primary)), contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10))),
+            TextField(controller: _confirmPasswordController, maxLength: 16, buildCounter: (context, {required currentLength, required isFocused, maxLength}) => null, obscureText: true, style: TextStyle(color: AppTheme.text, fontSize: 14), decoration: InputDecoration(hintText: 'Confirm Password', counterText: '', hintStyle: TextStyle(color: AppTheme.textMuted), filled: true, fillColor: AppTheme.inputBg, border: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: BorderSide(color: AppTheme.border)), enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: BorderSide(color: AppTheme.border)), focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: BorderSide(color: AppTheme.primary)), contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10))),
             const SizedBox(height: 10),
             SizedBox(width: double.infinity, height: 42, child: ElevatedButton(onPressed: _handleChangePassword, style: ElevatedButton.styleFrom(backgroundColor: AppTheme.primary, foregroundColor: Colors.black, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)), textStyle: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600)), child: const Text('Update Password'))),
           ])),
@@ -271,7 +271,12 @@ class _TeacherProfileScreenState extends ConsumerState<TeacherProfileScreen> {
     ));
   }
 
-  Widget _buildFieldRow({required IconData icon, required String label, required String value, required TextEditingController controller, required bool isEditing, required bool showBorder, TextInputType keyboardType = TextInputType.text}) {
+  Widget _buildFieldRow({required IconData icon, required String label, required String value, required TextEditingController controller, required bool isEditing, required bool showBorder, TextInputType keyboardType = TextInputType.text, int? maxLength}) {
+    final int effectiveLimit = maxLength ?? (
+      label.toLowerCase().contains('phone') ? 15 :
+      label.toLowerCase().contains('user') ? 30 :
+      label.toLowerCase().contains('email') ? 50 : 50
+    );
     return Container(
       padding: const EdgeInsets.symmetric(vertical: 10),
       decoration: BoxDecoration(
@@ -294,9 +299,12 @@ class _TeacherProfileScreenState extends ConsumerState<TeacherProfileScreen> {
                 if (isEditing)
                   TextField(
                     controller: controller,
+                    maxLength: effectiveLimit,
+                    buildCounter: (context, {required currentLength, required isFocused, maxLength}) => null,
                     keyboardType: keyboardType,
                     style: TextStyle(color: AppTheme.text, fontSize: 15),
                     decoration: InputDecoration(
+                      counterText: '',
                       isDense: true,
                       contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
                       filled: true,

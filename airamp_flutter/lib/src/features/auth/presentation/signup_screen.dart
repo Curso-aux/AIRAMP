@@ -5,6 +5,7 @@ import '../../../core/components/otp_verification_dialog.dart';
 import '../../../core/database/database_helper.dart';
 import '../../../core/services/otp_service.dart';
 import '../../../core/theme/app_theme.dart';
+import '../../../core/services/session_draft_service.dart';
 import '../application/auth_provider.dart';
 
 class SignupScreen extends ConsumerStatefulWidget {
@@ -24,6 +25,8 @@ class _SignupScreenState extends ConsumerState<SignupScreen> {
   final _passwordController = TextEditingController();
   final _confirmPasswordController = TextEditingController();
   final _sectionKeyController = TextEditingController();
+  final SessionDraftDisposer _draftDisposer = SessionDraftDisposer();
+  static const String _formId = 'auth_signup';
 
   Map<String, dynamic>? _verifiedSectionData;
   bool _isVerifyingKey = false;
@@ -31,6 +34,10 @@ class _SignupScreenState extends ConsumerState<SignupScreen> {
   @override
   void initState() {
     super.initState();
+    _draftDisposer.add(_fullNameController.bindSessionDraft(formId: _formId, fieldKey: 'full_name'));
+    _draftDisposer.add(_usernameController.bindSessionDraft(formId: _formId, fieldKey: 'username'));
+    _draftDisposer.add(_emailController.bindSessionDraft(formId: _formId, fieldKey: 'email'));
+    _draftDisposer.add(_sectionKeyController.bindSessionDraft(formId: _formId, fieldKey: 'section_key'));
     _sectionKeyController.addListener(_onKeyChanged);
   }
 
@@ -54,6 +61,7 @@ class _SignupScreenState extends ConsumerState<SignupScreen> {
 
   @override
   void dispose() {
+    _draftDisposer.dispose();
     _fullNameController.dispose();
     _usernameController.dispose();
     _emailController.dispose();
@@ -163,6 +171,7 @@ class _SignupScreenState extends ConsumerState<SignupScreen> {
           );
       final user = ref.read(authProvider);
       if (user != null && mounted) {
+        SessionDraftService.instance.clearForm(_formId);
         context.go('/student/home');
       }
     } catch (e) {
@@ -320,10 +329,13 @@ class _SignupScreenState extends ConsumerState<SignupScreen> {
                       const SizedBox(height: 12),
                       TextField(
                         controller: _sectionKeyController,
+                        maxLength: 15,
+                        buildCounter: (context, {required currentLength, required isFocused, maxLength}) => null,
                         textCapitalization: TextCapitalization.characters,
                         style: TextStyle(color: AppTheme.text, fontWeight: FontWeight.bold, letterSpacing: 1),
                         decoration: InputDecoration(
                           hintText: 'e.g., SEC-EMR10',
+                          counterText: '',
                           prefixIcon: Icon(Icons.key, color: Theme.of(context).colorScheme.primary, size: 20),
                           suffixIcon: _sectionKeyController.text.isNotEmpty
                               ? IconButton(
@@ -479,13 +491,17 @@ class _SignupScreenState extends ConsumerState<SignupScreen> {
     );
   }
 
-  Widget _buildTextField(String hint, IconData icon, {bool isPassword = false, TextEditingController? controller}) {
+  Widget _buildTextField(String hint, IconData icon, {bool isPassword = false, TextEditingController? controller, int? maxLength}) {
+    final int effectiveLimit = maxLength ?? (isPassword ? 16 : (hint.toLowerCase().contains('user') ? 30 : 50));
     return TextField(
       controller: controller,
+      maxLength: effectiveLimit,
+      buildCounter: (context, {required currentLength, required isFocused, maxLength}) => null,
       obscureText: isPassword,
       style: TextStyle(color: AppTheme.text),
       decoration: InputDecoration(
         hintText: hint,
+        counterText: '',
         prefixIcon: Icon(icon, color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.4)),
       ),
     );

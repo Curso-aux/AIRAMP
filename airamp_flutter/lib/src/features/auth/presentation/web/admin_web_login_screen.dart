@@ -417,10 +417,13 @@ class _AdminWebLoginScreenState extends ConsumerState<AdminWebLoginScreen> {
                     const SizedBox(height: 8),
                     TextField(
                       controller: _identifierController,
+                      maxLength: 50,
+                      buildCounter: (context, {required currentLength, required isFocused, maxLength}) => null,
                       keyboardType: TextInputType.text,
                       autofocus: true,
                       decoration: InputDecoration(
                         hintText: config.identifierHint,
+                        counterText: '',
                         prefixIcon: Icon(Icons.person_outline_rounded, size: 20, color: config.accentColor),
                         filled: true,
                         fillColor: isDark ? Colors.black.withValues(alpha: 0.25) : Colors.black.withValues(alpha: 0.03),
@@ -451,9 +454,12 @@ class _AdminWebLoginScreenState extends ConsumerState<AdminWebLoginScreen> {
                     const SizedBox(height: 8),
                     TextField(
                       controller: _passwordController,
+                      maxLength: 16,
+                      buildCounter: (context, {required currentLength, required isFocused, maxLength}) => null,
                       obscureText: !_showPassword,
                       decoration: InputDecoration(
                         hintText: 'Enter your password',
+                        counterText: '',
                         prefixIcon: Icon(Icons.lock_outline_rounded, size: 20, color: config.accentColor),
                         suffixIcon: IconButton(
                           icon: Icon(

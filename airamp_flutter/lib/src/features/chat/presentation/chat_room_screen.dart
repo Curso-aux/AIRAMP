@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/theme/app_theme.dart';
+import '../../../core/services/session_draft_service.dart';
 import '../application/chat_provider.dart';
 import '../domain/chat_models.dart';
 import '../../auth/application/auth_provider.dart';
@@ -16,10 +17,18 @@ class ChatRoomScreen extends ConsumerStatefulWidget {
 
 class _ChatRoomScreenState extends ConsumerState<ChatRoomScreen> {
   final TextEditingController _controller = TextEditingController();
+  final SessionDraftDisposer _draftDisposer = SessionDraftDisposer();
+
+  String get _formId => 'chat_draft_${widget.conversationId}';
 
   @override
   void initState() {
     super.initState();
+    _draftDisposer.add(_controller.bindSessionDraft(
+      formId: _formId,
+      fieldKey: 'msg',
+      onDraftRestored: () => setState(() {}),
+    ));
     // Ensure latest messages are loaded from DB and marked as read
     Future.microtask(() async {
       await ref.read(chatProvider.notifier).reloadMessages(widget.conversationId);
@@ -29,6 +38,7 @@ class _ChatRoomScreenState extends ConsumerState<ChatRoomScreen> {
 
   @override
   void dispose() {
+    _draftDisposer.dispose();
     _controller.dispose();
     super.dispose();
   }
@@ -37,6 +47,7 @@ class _ChatRoomScreenState extends ConsumerState<ChatRoomScreen> {
     final text = _controller.text.trim();
     if (text.isNotEmpty) {
       ref.read(chatProvider.notifier).sendMessage(widget.conversationId, text);
+      SessionDraftService.instance.clearForm(_formId);
       _controller.clear();
     }
   }
@@ -153,9 +164,12 @@ class _ChatRoomScreenState extends ConsumerState<ChatRoomScreen> {
                 Expanded(
                   child: TextField(
                     controller: _controller,
+                    maxLength: 1000,
+                    buildCounter: (context, {required currentLength, required isFocused, maxLength}) => null,
                     style: TextStyle(color: AppTheme.text),
                     decoration: InputDecoration(
                       hintText: 'Type a message...',
+                      counterText: '',
                       hintStyle: TextStyle(color: AppTheme.textMuted),
                       filled: true,
                       fillColor: AppTheme.background,
@@ -249,6 +263,7 @@ class _ChatRoomScreenState extends ConsumerState<ChatRoomScreen> {
         title: const Text('Edit Message'),
         content: TextField(
           controller: controller,
+          maxLength: 1000,
           autofocus: true,
           maxLines: null,
           decoration: const InputDecoration(hintText: 'Edit your message'),

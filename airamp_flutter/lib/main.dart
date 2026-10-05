@@ -6,6 +6,8 @@ import 'src/routing/app_router.dart';
 import 'src/core/theme/app_theme.dart';
 import 'src/core/theme/theme_provider.dart';
 import 'src/core/database/firestore_service.dart';
+import 'src/core/services/app_update_service.dart';
+import 'src/core/services/session_draft_service.dart';
 import 'src/features/auth/application/auth_provider.dart';
 
 void main() async {
@@ -59,6 +61,7 @@ class _AirampAppState extends ConsumerState<AirampApp> {
       await Future.wait([
         ref.read(authProvider.notifier).bootstrap(),
         ref.read(themeProvider.notifier).loadSavedTheme(),
+        SessionDraftService.instance.init(),
       ]);
     } catch (e) {
       debugPrint('Error during app bootstrap: $e');
@@ -72,6 +75,17 @@ class _AirampAppState extends ConsumerState<AirampApp> {
         FirestoreService().syncLocalUsersToCloud();
       });
     } catch (_) {}
+
+    // Non-blocking update check against Firebase Hosting
+    Future.delayed(const Duration(seconds: 4), () {
+      if (mounted) {
+        AppUpdateService().checkForUpdate().then((info) {
+          if (info.hasUpdate && mounted) {
+            AppUpdateService().showUpdateDialog(context, info);
+          }
+        });
+      }
+    });
   }
 
   @override

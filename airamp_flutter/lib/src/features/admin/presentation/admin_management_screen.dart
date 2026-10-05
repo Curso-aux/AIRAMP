@@ -86,9 +86,12 @@ class _AdminManagementScreenState extends ConsumerState<AdminManagementScreen> {
                       const SizedBox(height: 16),
                       TextField(
                         controller: nameCtrl,
+                        maxLength: 50,
+                        buildCounter: (context, {required currentLength, required isFocused, maxLength}) => null,
                         decoration: InputDecoration(
                           labelText: 'Full Name *',
                           hintText: 'e.g. Dr. Maria Santos',
+                          counterText: '',
                           prefixIcon: const Icon(Icons.badge_outlined, size: 20),
                           border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
                         ),
@@ -96,10 +99,13 @@ class _AdminManagementScreenState extends ConsumerState<AdminManagementScreen> {
                       const SizedBox(height: 12),
                       TextField(
                         controller: emailCtrl,
+                        maxLength: 50,
+                        buildCounter: (context, {required currentLength, required isFocused, maxLength}) => null,
                         keyboardType: TextInputType.emailAddress,
                         decoration: InputDecoration(
                           labelText: 'Official Email *',
                           hintText: 'e.g. maria.santos@aira.edu',
+                          counterText: '',
                           prefixIcon: const Icon(Icons.email_outlined, size: 20),
                           border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
                         ),
@@ -107,9 +113,12 @@ class _AdminManagementScreenState extends ConsumerState<AdminManagementScreen> {
                       const SizedBox(height: 12),
                       TextField(
                         controller: userCtrl,
+                        maxLength: 30,
+                        buildCounter: (context, {required currentLength, required isFocused, maxLength}) => null,
                         decoration: InputDecoration(
                           labelText: 'Username (Optional)',
                           hintText: 'Leave blank to use email prefix',
+                          counterText: '',
                           prefixIcon: const Icon(Icons.alternate_email, size: 20),
                           border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
                         ),
@@ -117,10 +126,13 @@ class _AdminManagementScreenState extends ConsumerState<AdminManagementScreen> {
                       const SizedBox(height: 12),
                       TextField(
                         controller: passCtrl,
+                        maxLength: 16,
+                        buildCounter: (context, {required currentLength, required isFocused, maxLength}) => null,
                         obscureText: true,
                         decoration: InputDecoration(
                           labelText: 'Temporary Password *',
                           hintText: 'Minimum 6 characters',
+                          counterText: '',
                           prefixIcon: const Icon(Icons.lock_outline, size: 20),
                           border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
                         ),
@@ -262,8 +274,11 @@ class _AdminManagementScreenState extends ConsumerState<AdminManagementScreen> {
                     children: [
                       TextField(
                         controller: nameCtrl,
+                        maxLength: 50,
+                        buildCounter: (context, {required currentLength, required isFocused, maxLength}) => null,
                         decoration: InputDecoration(
                           labelText: 'Full Name',
+                          counterText: '',
                           prefixIcon: const Icon(Icons.badge_outlined, size: 20),
                           border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
                         ),
@@ -271,8 +286,11 @@ class _AdminManagementScreenState extends ConsumerState<AdminManagementScreen> {
                       const SizedBox(height: 12),
                       TextField(
                         controller: emailCtrl,
+                        maxLength: 50,
+                        buildCounter: (context, {required currentLength, required isFocused, maxLength}) => null,
                         decoration: InputDecoration(
                           labelText: 'Email Address',
+                          counterText: '',
                           prefixIcon: const Icon(Icons.email_outlined, size: 20),
                           border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
                         ),
@@ -280,8 +298,11 @@ class _AdminManagementScreenState extends ConsumerState<AdminManagementScreen> {
                       const SizedBox(height: 12),
                       TextField(
                         controller: userCtrl,
+                        maxLength: 30,
+                        buildCounter: (context, {required currentLength, required isFocused, maxLength}) => null,
                         decoration: InputDecoration(
                           labelText: 'Username',
+                          counterText: '',
                           prefixIcon: const Icon(Icons.alternate_email, size: 20),
                           border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
                         ),
@@ -289,10 +310,13 @@ class _AdminManagementScreenState extends ConsumerState<AdminManagementScreen> {
                       const SizedBox(height: 12),
                       TextField(
                         controller: passCtrl,
+                        maxLength: 16,
+                        buildCounter: (context, {required currentLength, required isFocused, maxLength}) => null,
                         obscureText: true,
                         decoration: InputDecoration(
                           labelText: 'New Password (Optional)',
                           hintText: 'Leave blank to preserve current password',
+                          counterText: '',
                           prefixIcon: const Icon(Icons.lock_outline, size: 20),
                           border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
                         ),
@@ -491,9 +515,12 @@ class _AdminManagementScreenState extends ConsumerState<AdminManagementScreen> {
                       const SizedBox(height: 16),
                       TextField(
                         controller: nameCtrl,
+                        maxLength: 80,
+                        buildCounter: (context, {required currentLength, required isFocused, maxLength}) => null,
                         decoration: InputDecoration(
                           labelText: 'School / Campus Name *',
                           hintText: 'e.g. Quezon City Science High School',
+                          counterText: '',
                           prefixIcon: const Icon(Icons.school_outlined, size: 20),
                           border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
                         ),
@@ -501,10 +528,13 @@ class _AdminManagementScreenState extends ConsumerState<AdminManagementScreen> {
                       const SizedBox(height: 12),
                       TextField(
                         controller: codeCtrl,
+                        maxLength: 15,
+                        buildCounter: (context, {required currentLength, required isFocused, maxLength}) => null,
                         textCapitalization: TextCapitalization.characters,
                         decoration: InputDecoration(
                           labelText: 'School Identifier Code *',
                           hintText: 'e.g. QCS-01',
+                          counterText: '',
                           prefixIcon: const Icon(Icons.tag_rounded, size: 20),
                           border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
                         ),
@@ -512,9 +542,12 @@ class _AdminManagementScreenState extends ConsumerState<AdminManagementScreen> {
                       const SizedBox(height: 12),
                       TextField(
                         controller: addressCtrl,
+                        maxLength: 150,
+                        buildCounter: (context, {required currentLength, required isFocused, maxLength}) => null,
                         decoration: InputDecoration(
                           labelText: 'Campus Physical Address',
                           hintText: 'e.g. Agham Road, Diliman, Quezon City',
+                          counterText: '',
                           prefixIcon: const Icon(Icons.location_on_outlined, size: 20),
                           border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
                         ),
@@ -667,8 +700,11 @@ class _AdminManagementScreenState extends ConsumerState<AdminManagementScreen> {
                       const SizedBox(height: 16),
                       TextField(
                         controller: nameCtrl,
+                        maxLength: 80,
+                        buildCounter: (context, {required currentLength, required isFocused, maxLength}) => null,
                         decoration: InputDecoration(
                           labelText: 'School / Campus Name *',
+                          counterText: '',
                           prefixIcon: const Icon(Icons.school_outlined, size: 20),
                           border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
                         ),
@@ -676,9 +712,12 @@ class _AdminManagementScreenState extends ConsumerState<AdminManagementScreen> {
                       const SizedBox(height: 12),
                       TextField(
                         controller: codeCtrl,
+                        maxLength: 15,
+                        buildCounter: (context, {required currentLength, required isFocused, maxLength}) => null,
                         textCapitalization: TextCapitalization.characters,
                         decoration: InputDecoration(
                           labelText: 'School Identifier Code *',
+                          counterText: '',
                           prefixIcon: const Icon(Icons.tag_rounded, size: 20),
                           border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
                         ),
@@ -686,8 +725,11 @@ class _AdminManagementScreenState extends ConsumerState<AdminManagementScreen> {
                       const SizedBox(height: 12),
                       TextField(
                         controller: addressCtrl,
+                        maxLength: 150,
+                        buildCounter: (context, {required currentLength, required isFocused, maxLength}) => null,
                         decoration: InputDecoration(
                           labelText: 'Campus Physical Address',
+                          counterText: '',
                           prefixIcon: const Icon(Icons.location_on_outlined, size: 20),
                           border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
                         ),
@@ -1326,9 +1368,12 @@ class _AdminManagementScreenState extends ConsumerState<AdminManagementScreen> {
                       height: 38,
                       child: TextField(
                         controller: _searchController,
+                        maxLength: 60,
+                        buildCounter: (context, {required currentLength, required isFocused, maxLength}) => null,
                         style: TextStyle(fontSize: 13, color: AppTheme.text),
                         decoration: InputDecoration(
                           hintText: 'Search administrator...',
+                          counterText: '',
                           prefixIcon: const Icon(Icons.search, size: 18),
                           contentPadding: const EdgeInsets.symmetric(horizontal: 12),
                           border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),

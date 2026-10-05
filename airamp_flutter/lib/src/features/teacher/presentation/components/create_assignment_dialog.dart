@@ -5,6 +5,7 @@ import '../../../../core/components/app_toast.dart';
 import '../../../../core/database/database_helper.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../../core/theme/theme_provider.dart';
+import '../../../../core/services/session_draft_service.dart';
 import '../../../auth/application/auth_provider.dart';
 import '../../../submissions/data/submissions_repository.dart';
 
@@ -29,16 +30,23 @@ class _CreateAssignmentDialogState extends ConsumerState<CreateAssignmentDialog>
   DateTime? _dueDate;
   String _submissionType = 'both'; // 'link', 'file', 'both'
   bool _isSaving = false;
+  final SessionDraftDisposer _draftDisposer = SessionDraftDisposer();
+
+  String get _formId => 'teacher_create_assignment_${widget.subjectId}';
 
   @override
   void initState() {
     super.initState();
+    _draftDisposer.add(_titleController.bindSessionDraft(formId: _formId, fieldKey: 'title'));
+    _draftDisposer.add(_descController.bindSessionDraft(formId: _formId, fieldKey: 'desc'));
+    _draftDisposer.add(_pointsController.bindSessionDraft(formId: _formId, fieldKey: 'points'));
     // Default due date: 7 days from now
     _dueDate = DateTime.now().add(const Duration(days: 7, hours: 4));
   }
 
   @override
   void dispose() {
+    _draftDisposer.dispose();
     _titleController.dispose();
     _descController.dispose();
     _pointsController.dispose();
@@ -139,6 +147,8 @@ class _CreateAssignmentDialogState extends ConsumerState<CreateAssignmentDialog>
       // Invalidate relevant providers
       ref.invalidate(subjectAssignmentsProvider(widget.subjectId));
 
+      SessionDraftService.instance.clearForm(_formId);
+
       if (mounted) {
         AppToast.showSuccess(context, 'Assignment "$title" created successfully!');
         Navigator.pop(context, true);
@@ -166,6 +176,7 @@ class _CreateAssignmentDialogState extends ConsumerState<CreateAssignmentDialog>
       message: 'You have unsaved changes to this assignment. Are you sure you want to discard them?',
     );
     if (shouldDiscard && mounted) {
+      SessionDraftService.instance.clearForm(_formId);
       Navigator.pop(context);
     }
   }
@@ -184,6 +195,7 @@ class _CreateAssignmentDialogState extends ConsumerState<CreateAssignmentDialog>
           message: 'You have unsaved changes to this assignment. Are you sure you want to discard them?',
         );
         if (shouldDiscard && context.mounted) {
+          SessionDraftService.instance.clearForm(_formId);
           Navigator.pop(context);
         }
       },
@@ -244,6 +256,7 @@ class _CreateAssignmentDialogState extends ConsumerState<CreateAssignmentDialog>
                     const SizedBox(height: 6),
                     TextField(
                       controller: _titleController,
+                      maxLength: 80,
                       style: TextStyle(color: AppTheme.text),
                       decoration: InputDecoration(
                         hintText: 'e.g. Unit 1 Project: Mobile Layout Design',
@@ -262,6 +275,7 @@ class _CreateAssignmentDialogState extends ConsumerState<CreateAssignmentDialog>
                     const SizedBox(height: 6),
                     TextField(
                       controller: _descController,
+                      maxLength: 1500,
                       style: TextStyle(color: AppTheme.text),
                       maxLines: 4,
                       decoration: InputDecoration(
@@ -324,9 +338,12 @@ class _CreateAssignmentDialogState extends ConsumerState<CreateAssignmentDialog>
                               const SizedBox(height: 6),
                               TextField(
                                 controller: _pointsController,
+                                maxLength: 4,
+                                buildCounter: (context, {required currentLength, required isFocused, maxLength}) => null,
                                 keyboardType: TextInputType.number,
                                 style: TextStyle(color: AppTheme.text),
                                 decoration: InputDecoration(
+                                  counterText: '',
                                   suffixText: 'pts',
                                   suffixStyle: TextStyle(color: AppTheme.textMuted, fontSize: 12),
                                   filled: true,

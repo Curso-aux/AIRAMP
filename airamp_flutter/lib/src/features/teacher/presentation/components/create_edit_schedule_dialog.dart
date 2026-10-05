@@ -678,8 +678,11 @@ class _CreateEditScheduleDialogState extends ConsumerState<CreateEditScheduleDia
                         if (_isCustomSection)
                           TextFormField(
                             controller: _customSectionController,
+                            maxLength: 40,
+                            buildCounter: (context, {required currentLength, required isFocused, maxLength}) => null,
                             decoration: InputDecoration(
                               hintText: 'e.g. Grade 12 - STEM A',
+                              counterText: '',
                               prefixIcon: const Icon(Icons.class_outlined, size: 18),
                               border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
                               filled: true,
@@ -859,8 +862,11 @@ class _CreateEditScheduleDialogState extends ConsumerState<CreateEditScheduleDia
                         const SizedBox(height: 6),
                         TextFormField(
                           controller: _roomController,
+                          maxLength: 30,
+                          buildCounter: (context, {required currentLength, required isFocused, maxLength}) => null,
                           decoration: InputDecoration(
                             hintText: 'e.g. Room 302, Science Lab 1, Audi 2',
+                            counterText: '',
                             prefixIcon: Icon(Icons.room_outlined, size: 18, color: AppTheme.textMuted),
                             border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
                             contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),

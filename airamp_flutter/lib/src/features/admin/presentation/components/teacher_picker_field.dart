@@ -265,10 +265,13 @@ class _TeacherSearchModalState extends State<_TeacherSearchModal> {
           padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
           child: TextField(
             controller: _searchController,
+            maxLength: 60,
+            buildCounter: (context, {required currentLength, required isFocused, maxLength}) => null,
             autofocus: true,
             onChanged: _onSearchChanged,
             decoration: InputDecoration(
               hintText: 'Search by faculty name, email, or username...',
+              counterText: '',
               hintStyle: TextStyle(fontSize: 13, color: AppTheme.textMuted),
               prefixIcon: Icon(Icons.search, size: 20, color: AppTheme.primary),
               suffixIcon: query.isNotEmpty

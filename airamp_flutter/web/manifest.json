@@ -1,13 +1,15 @@
 {
-    "name": "airamp_flutter",
-    "short_name": "airamp_flutter",
-    "start_url": ".",
+    "name": "AIRA - Learning Platform",
+    "short_name": "AIRA",
+    "start_url": "./",
+    "scope": "./",
     "display": "standalone",
-    "background_color": "#0175C2",
-    "theme_color": "#0175C2",
-    "description": "A new Flutter project.",
-    "orientation": "portrait-primary",
+    "background_color": "#0a0f1d",
+    "theme_color": "#0d9488",
+    "description": "AIRA Advanced Interactive Resource & Learning Platform for Students, Faculty, and Administrators.",
+    "orientation": "any",
     "prefer_related_applications": false,
+    "categories": ["education", "productivity"],
     "icons": [
         {
             "src": "icons/Icon-192.png",

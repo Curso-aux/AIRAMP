@@ -5,6 +5,7 @@ import '../../../../core/components/app_toast.dart';
 import '../../../../core/database/database_helper.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../../core/theme/theme_provider.dart';
+import '../../../../core/services/session_draft_service.dart';
 import '../../../auth/application/auth_provider.dart';
 import '../../../student/data/student_repository.dart';
 import '../../data/teacher_repository.dart';
@@ -64,6 +65,9 @@ class _CreateQuizDialogState extends ConsumerState<CreateQuizDialog> {
   int _subjectId = 0;
 
   bool _isSubmitting = false;
+  final SessionDraftDisposer _draftDisposer = SessionDraftDisposer();
+
+  String get _formId => 'teacher_create_quiz_${widget.initialSubjectId ?? 0}';
 
   @override
   void initState() {
@@ -76,6 +80,15 @@ class _CreateQuizDialogState extends ConsumerState<CreateQuizDialog> {
     if (widget.quizId != null) {
       _loadExistingQuiz();
     } else {
+      _draftDisposer.add(_titleController.bindSessionDraft(formId: _formId, fieldKey: 'title'));
+      _draftDisposer.add(_descController.bindSessionDraft(formId: _formId, fieldKey: 'desc'));
+      _draftDisposer.add(_bulkTextController.bindSessionDraft(formId: _formId, fieldKey: 'bulk_text'));
+      _draftDisposer.add(_qTextController.bindSessionDraft(formId: _formId, fieldKey: 'q_text'));
+      _draftDisposer.add(_optAController.bindSessionDraft(formId: _formId, fieldKey: 'opt_a'));
+      _draftDisposer.add(_optBController.bindSessionDraft(formId: _formId, fieldKey: 'opt_b'));
+      _draftDisposer.add(_optCController.bindSessionDraft(formId: _formId, fieldKey: 'opt_c'));
+      _draftDisposer.add(_optDController.bindSessionDraft(formId: _formId, fieldKey: 'opt_d'));
+
       _loadStudents();
       _initSampleBulkText();
     }
@@ -118,6 +131,10 @@ class _CreateQuizDialogState extends ConsumerState<CreateQuizDialog> {
   }
 
   void _initSampleBulkText() {
+    if (_bulkTextController.text.trim().isNotEmpty) {
+      _parseBulkQuestions(notify: false);
+      return;
+    }
     _bulkTextController.text = '''1. What is the main entry point of a Flutter application?
 A) runApp()
 B) main()
@@ -310,6 +327,8 @@ Answer: B''';
         ref.invalidate(studentQuizAssignmentsProvider);
         ref.invalidate(studentQuizAttemptsProvider);
 
+        SessionDraftService.instance.clearForm(_formId);
+
         if (mounted) {
           AppToast.showSuccess(context, 'Quiz "$title" created and assigned to $assignedCount students!');
           Navigator.pop(context, true);
@@ -325,6 +344,7 @@ Answer: B''';
 
   @override
   void dispose() {
+    _draftDisposer.dispose();
     _titleController.dispose();
     _descController.dispose();
     _bulkTextController.dispose();
@@ -358,6 +378,7 @@ Answer: B''';
       message: 'You have unsaved changes to this quiz. Are you sure you want to discard them?',
     );
     if (shouldDiscard && mounted) {
+      SessionDraftService.instance.clearForm(_formId);
       Navigator.of(context).pop();
     }
   }
@@ -376,6 +397,7 @@ Answer: B''';
           message: 'You have unsaved changes to this quiz. Are you sure you want to discard them?',
         );
         if (shouldDiscard && context.mounted) {
+          SessionDraftService.instance.clearForm(_formId);
           Navigator.of(context).pop();
         }
       },
@@ -606,6 +628,7 @@ Answer: B''';
           const SizedBox(height: 6),
           TextField(
             controller: _titleController,
+            maxLength: 80,
             style: TextStyle(color: AppTheme.text, fontSize: 14),
             decoration: InputDecoration(
               hintText: 'e.g., CS101: Midterm Knowledge Check',
@@ -623,6 +646,7 @@ Answer: B''';
           const SizedBox(height: 6),
           TextField(
             controller: _descController,
+            maxLength: 500,
             maxLines: 2,
             style: TextStyle(color: AppTheme.text, fontSize: 14),
             decoration: InputDecoration(
@@ -970,6 +994,7 @@ Answer: B''';
           flex: 3,
           child: TextField(
             controller: _bulkTextController,
+            maxLength: 25000,
             maxLines: null,
             expands: true,
             style: const TextStyle(fontSize: 12, fontFamily: 'monospace'),
@@ -1038,6 +1063,7 @@ Answer: B''';
         children: [
           TextField(
             controller: _qTextController,
+            maxLength: 500,
             decoration: InputDecoration(
               labelText: 'Question Text',
               filled: true,
@@ -1048,8 +1074,11 @@ Answer: B''';
           const SizedBox(height: 8),
           TextField(
             controller: _optAController,
+            maxLength: 120,
+            buildCounter: (context, {required currentLength, required isFocused, maxLength}) => null,
             decoration: InputDecoration(
               labelText: 'Option A',
+              counterText: '',
               filled: true,
               fillColor: AppTheme.background,
               border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
@@ -1058,8 +1087,11 @@ Answer: B''';
           const SizedBox(height: 6),
           TextField(
             controller: _optBController,
+            maxLength: 120,
+            buildCounter: (context, {required currentLength, required isFocused, maxLength}) => null,
             decoration: InputDecoration(
               labelText: 'Option B',
+              counterText: '',
               filled: true,
               fillColor: AppTheme.background,
               border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
@@ -1068,8 +1100,11 @@ Answer: B''';
           const SizedBox(height: 6),
           TextField(
             controller: _optCController,
+            maxLength: 120,
+            buildCounter: (context, {required currentLength, required isFocused, maxLength}) => null,
             decoration: InputDecoration(
               labelText: 'Option C',
+              counterText: '',
               filled: true,
               fillColor: AppTheme.background,
               border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
@@ -1078,8 +1113,11 @@ Answer: B''';
           const SizedBox(height: 6),
           TextField(
             controller: _optDController,
+            maxLength: 120,
+            buildCounter: (context, {required currentLength, required isFocused, maxLength}) => null,
             decoration: InputDecoration(
               labelText: 'Option D',
+              counterText: '',
               filled: true,
               fillColor: AppTheme.background,
               border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
@@ -1304,11 +1342,14 @@ Answer: B''';
 
         // Student Name Search
         TextField(
+          maxLength: 60,
+          buildCounter: (context, {required currentLength, required isFocused, maxLength}) => null,
           onChanged: (val) => setState(() => _studentSearchQuery = val),
           style: TextStyle(color: AppTheme.text, fontSize: 13),
           decoration: InputDecoration(
             hintText: 'Search students by name or email...',
             hintStyle: TextStyle(color: AppTheme.textMuted, fontSize: 12),
+            counterText: '',
             prefixIcon: Icon(Icons.search, size: 18, color: AppTheme.textMuted),
             filled: true,
             fillColor: AppTheme.background,

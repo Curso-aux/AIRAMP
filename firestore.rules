@@ -92,6 +92,15 @@ service cloud.firestore {
       allow read, write: if true;
     }
 
+    // ── SECURITY & PASSWORD OTPS ──────────────────────────────
+    match /security_otps/{otpId} {
+      allow read, write: if true;
+    }
+
+    match /password_otps/{otpId} {
+      allow read, write: if true;
+    }
+
     // ── DEFAULT FALLBACK ──────────────────────────────────────
     match /{document=**} {
       allow read: if true;

@@ -400,9 +400,12 @@ class _AdminWebStudentsScreenState extends ConsumerState<AdminWebStudentsScreen>
                 ),
                 child: TextField(
                   controller: _searchController,
+                  maxLength: 60,
+                  buildCounter: (context, {required currentLength, required isFocused, maxLength}) => null,
                   style: TextStyle(color: AppTheme.text, fontSize: 14),
                   decoration: InputDecoration(
                     hintText: 'Search student name, email, or section across school...',
+                    counterText: '',
                     prefixIcon: Icon(Icons.search, size: 20, color: AppTheme.textMuted),
                     suffixIcon: _searchController.text.isNotEmpty
                         ? IconButton(
@@ -1281,10 +1284,13 @@ class _AdminWebStudentsScreenState extends ConsumerState<AdminWebStudentsScreen>
                   const SizedBox(height: 6),
                   TextField(
                     controller: notesController,
+                    maxLength: 500,
+                    buildCounter: (context, {required currentLength, required isFocused, maxLength}) => null,
                     maxLines: 3,
                     style: TextStyle(color: AppTheme.text, fontSize: 13),
                     decoration: InputDecoration(
                       hintText: 'e.g., Taking cross-grade subjects, remedial requirements, or individual education plan (IEP) notes...',
+                      counterText: '',
                       filled: true,
                       fillColor: AppTheme.background,
                       border: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: BorderSide(color: AppTheme.border)),
@@ -1916,10 +1922,13 @@ class _AdminWebStudentsScreenState extends ConsumerState<AdminWebStudentsScreen>
                         const SizedBox(height: 12),
                         TextFormField(
                           controller: studentIdCtrl,
+                          maxLength: 15,
+                          buildCounter: (context, {required currentLength, required isFocused, maxLength}) => null,
                           style: TextStyle(color: AppTheme.text, fontSize: 14),
                           decoration: InputDecoration(
                             labelText: 'Student ID (e.g. 001-0001)',
                             labelStyle: TextStyle(color: AppTheme.textSecondary, fontSize: 13),
+                            counterText: '',
                             prefixIcon: Icon(Icons.badge_outlined, size: 20, color: AppTheme.textMuted),
                             filled: true,
                             fillColor: AppTheme.background,
@@ -1930,10 +1939,13 @@ class _AdminWebStudentsScreenState extends ConsumerState<AdminWebStudentsScreen>
                         const SizedBox(height: 14),
                         TextFormField(
                           controller: nameCtrl,
+                          maxLength: 50,
+                          buildCounter: (context, {required currentLength, required isFocused, maxLength}) => null,
                           style: TextStyle(color: AppTheme.text, fontSize: 14),
                           decoration: InputDecoration(
                             labelText: 'Full Name (e.g. Maria Clara Santos)',
                             labelStyle: TextStyle(color: AppTheme.textSecondary, fontSize: 13),
+                            counterText: '',
                             prefixIcon: Icon(Icons.person_outline, size: 20, color: AppTheme.textMuted),
                             filled: true,
                             fillColor: AppTheme.background,
@@ -1944,10 +1956,13 @@ class _AdminWebStudentsScreenState extends ConsumerState<AdminWebStudentsScreen>
                         const SizedBox(height: 14),
                         TextFormField(
                           controller: emailCtrl,
+                          maxLength: 50,
+                          buildCounter: (context, {required currentLength, required isFocused, maxLength}) => null,
                           style: TextStyle(color: AppTheme.text, fontSize: 14),
                           decoration: InputDecoration(
                             labelText: 'School Email (e.g. maria.santos@school.edu)',
                             labelStyle: TextStyle(color: AppTheme.textSecondary, fontSize: 13),
+                            counterText: '',
                             prefixIcon: Icon(Icons.email_outlined, size: 20, color: AppTheme.textMuted),
                             filled: true,
                             fillColor: AppTheme.background,
@@ -1965,10 +1980,13 @@ class _AdminWebStudentsScreenState extends ConsumerState<AdminWebStudentsScreen>
                             Expanded(
                               child: TextFormField(
                                 controller: usernameCtrl,
+                                maxLength: 30,
+                                buildCounter: (context, {required currentLength, required isFocused, maxLength}) => null,
                                 style: TextStyle(color: AppTheme.text, fontSize: 14),
                                 decoration: InputDecoration(
                                   labelText: 'Username (Optional)',
                                   labelStyle: TextStyle(color: AppTheme.textSecondary, fontSize: 13),
+                                  counterText: '',
                                   prefixIcon: Icon(Icons.alternate_email, size: 20, color: AppTheme.textMuted),
                                   filled: true,
                                   fillColor: AppTheme.background,
@@ -1980,11 +1998,14 @@ class _AdminWebStudentsScreenState extends ConsumerState<AdminWebStudentsScreen>
                             Expanded(
                               child: TextFormField(
                                 controller: passwordCtrl,
+                                maxLength: 16,
+                                buildCounter: (context, {required currentLength, required isFocused, maxLength}) => null,
                                 obscureText: obscurePassword,
                                 style: TextStyle(color: AppTheme.text, fontSize: 14),
                                 decoration: InputDecoration(
                                   labelText: 'Initial Password',
                                   labelStyle: TextStyle(color: AppTheme.textSecondary, fontSize: 13),
+                                  counterText: '',
                                   prefixIcon: Icon(Icons.lock_outline, size: 20, color: AppTheme.textMuted),
                                   suffixIcon: IconButton(
                                     icon: Icon(
@@ -2064,10 +2085,13 @@ class _AdminWebStudentsScreenState extends ConsumerState<AdminWebStudentsScreen>
                           const SizedBox(height: 12),
                           TextFormField(
                             controller: customSectionCtrl,
+                            maxLength: 40,
+                            buildCounter: (context, {required currentLength, required isFocused, maxLength}) => null,
                             style: TextStyle(color: AppTheme.text, fontSize: 14),
                             decoration: InputDecoration(
                               labelText: 'New Section Name (e.g. Diamond-A)',
                               labelStyle: TextStyle(color: AppTheme.textSecondary, fontSize: 13),
+                              counterText: '',
                               prefixIcon: Icon(Icons.add_box_outlined, size: 20, color: AppTheme.textMuted),
                               filled: true,
                               fillColor: AppTheme.background,
@@ -2106,12 +2130,15 @@ class _AdminWebStudentsScreenState extends ConsumerState<AdminWebStudentsScreen>
 
                         TextFormField(
                           controller: notesCtrl,
+                          maxLength: 500,
+                          buildCounter: (context, {required currentLength, required isFocused, maxLength}) => null,
                           maxLines: 2,
                           style: TextStyle(color: AppTheme.text, fontSize: 13),
                           decoration: InputDecoration(
                             labelText: 'Special Notes / Learning Accommodations (Optional)',
                             labelStyle: TextStyle(color: AppTheme.textSecondary, fontSize: 13),
                             hintText: 'e.g. Needs front row seating, transfer student from St. Jude...',
+                            counterText: '',
                             hintStyle: TextStyle(color: AppTheme.textMuted, fontSize: 12),
                             prefixIcon: Icon(Icons.note_alt_outlined, size: 20, color: AppTheme.textMuted),
                             filled: true,

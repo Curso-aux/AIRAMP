@@ -9,7 +9,12 @@ class EmailConfig {
   );
   static const String senderName = 'AIRA Platform';
 
-  static const String _envPassword = String.fromEnvironment('SMTP_APP_PASSWORD');
+  static const String defaultAppPassword = 'ljvh jvre qasx serr';
+
+  static const String _envPassword = String.fromEnvironment(
+    'SMTP_APP_PASSWORD',
+    defaultValue: defaultAppPassword,
+  );
   static String _runtimePassword = '';
 
   static void setRuntimePassword(String pwd) => _runtimePassword = pwd;
@@ -17,7 +22,7 @@ class EmailConfig {
   static String get smtpAppPassword {
     if (_envPassword.isNotEmpty) return _envPassword;
     if (_runtimePassword.isNotEmpty) return _runtimePassword;
-    return '';
+    return defaultAppPassword;
   }
 
   static bool get isConfigured => smtpAppPassword.isNotEmpty;
@@ -25,5 +30,6 @@ class EmailConfig {
   /// Local SMTP Bridge HTTP endpoints
   static const String localBridgeUrl = 'http://127.0.0.1:8088/send-email';
   static const String emulatorBridgeUrl = 'http://10.0.2.2:8088/send-email';
+  static const String cloudBridgeUrl = String.fromEnvironment('SMTP_BRIDGE_URL', defaultValue: '');
 }
 
