@@ -38,6 +38,9 @@ class AdminWebAnalyticsView extends ConsumerWidget {
             ?.cast<Map<String, dynamic>>() ??
         [];
 
+    final screenWidth = MediaQuery.sizeOf(context).width;
+    final isMobile = screenWidth < 720;
+
     return Scaffold(
       backgroundColor: AppTheme.background,
       body: RefreshIndicator(
@@ -46,32 +49,35 @@ class AdminWebAnalyticsView extends ConsumerWidget {
         },
         child: SingleChildScrollView(
           physics: const AlwaysScrollableScrollPhysics(),
-          padding: const EdgeInsets.all(24),
+          padding: EdgeInsets.all(isMobile ? 16 : 24),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               // Welcome & Refresh Banner
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          'School Analytics & Operations',
-                          style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold, color: AppTheme.text),
+              LayoutBuilder(
+                builder: (context, headerConstraints) {
+                  final isNarrow = headerConstraints.maxWidth < 650;
+
+                  final titleSection = Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'School Analytics & Operations',
+                        style: TextStyle(
+                          fontSize: isNarrow ? 20 : 24,
+                          fontWeight: FontWeight.bold,
+                          color: AppTheme.text,
                         ),
-                        const SizedBox(height: 4),
-                        Text(
-                          'Live institutional metrics, student enrollments, and academic performance',
-                          style: TextStyle(fontSize: 14, color: AppTheme.textSecondary),
-                        ),
-                      ],
-                    ),
-                  ),
-                  const SizedBox(width: 16),
-                  ElevatedButton.icon(
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        'Live institutional metrics, student enrollments, and academic performance',
+                        style: TextStyle(fontSize: isNarrow ? 12.5 : 14, color: AppTheme.textSecondary),
+                      ),
+                    ],
+                  );
+
+                  final refreshBtn = ElevatedButton.icon(
                     onPressed: () => ref.read(adminAnalyticsProvider.notifier).loadAnalytics(),
                     icon: const Icon(Icons.refresh, size: 16),
                     label: const Text('Refresh Data'),
@@ -83,8 +89,28 @@ class AdminWebAnalyticsView extends ConsumerWidget {
                       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
                       minimumSize: const Size(0, 40),
                     ),
-                  ),
-                ],
+                  );
+
+                  if (isNarrow) {
+                    return Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        titleSection,
+                        const SizedBox(height: 12),
+                        refreshBtn,
+                      ],
+                    );
+                  }
+
+                  return Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Expanded(child: titleSection),
+                      const SizedBox(width: 16),
+                      refreshBtn,
+                    ],
+                  );
+                },
               ),
               const SizedBox(height: 20),
 

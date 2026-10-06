@@ -234,40 +234,63 @@ class _AdminWebScheduleScreenState extends ConsumerState<AdminWebScheduleScreen>
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   // Top Header
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              'Master Timetable & Class Schedules',
-                              style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold, color: AppTheme.text),
+                  LayoutBuilder(
+                    builder: (context, headerConstraints) {
+                      final isNarrow = headerConstraints.maxWidth < 680;
+
+                      final titleSection = Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'Master Timetable & Class Schedules',
+                            style: TextStyle(
+                              fontSize: isNarrow ? 20 : 24,
+                              fontWeight: FontWeight.bold,
+                              color: AppTheme.text,
                             ),
-                            const SizedBox(height: 4),
-                            Text(
-                              'Administer school timetable, faculty teaching hours, class section allocations, and room reservations',
-                              style: TextStyle(fontSize: 14, color: AppTheme.textSecondary),
-                            ),
-                          ],
-                        ),
-                      ),
-                      const SizedBox(width: 16),
-                      ElevatedButton.icon(
+                          ),
+                          const SizedBox(height: 4),
+                          Text(
+                            'Administer school timetable, faculty teaching hours, class section allocations, and room reservations',
+                            style: TextStyle(fontSize: isNarrow ? 12.5 : 14, color: AppTheme.textSecondary),
+                          ),
+                        ],
+                      );
+
+                      final actionBtn = ElevatedButton.icon(
                         onPressed: () => CreateEditScheduleDialog.show(context),
                         icon: const Icon(Icons.add, size: 18),
                         label: const Text('Assign Class Schedule'),
                         style: ElevatedButton.styleFrom(
                           backgroundColor: AppTheme.primary,
                           foregroundColor: Colors.white,
-                          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
+                          padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 12),
                           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
                           elevation: 0,
                           minimumSize: const Size(0, 42),
                         ),
-                      ),
-                    ],
+                      );
+
+                      if (isNarrow) {
+                        return Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            titleSection,
+                            const SizedBox(height: 14),
+                            actionBtn,
+                          ],
+                        );
+                      }
+
+                      return Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Expanded(child: titleSection),
+                          const SizedBox(width: 16),
+                          actionBtn,
+                        ],
+                      );
+                    },
                   ),
                   const SizedBox(height: 20),
 

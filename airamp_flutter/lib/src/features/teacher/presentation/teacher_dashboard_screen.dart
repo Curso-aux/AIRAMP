@@ -90,10 +90,14 @@ class _TeacherDashboardScreenState extends ConsumerState<TeacherDashboardScreen>
                   ),
                 ],
               ),
-              content: SizedBox(
-                width: 480,
-                height: 400,
-                child: notifsAsync.when(
+              content: ConstrainedBox(
+                constraints: BoxConstraints(
+                  maxWidth: 480,
+                  maxHeight: MediaQuery.sizeOf(context).height * 0.6,
+                ),
+                child: SizedBox(
+                  width: double.maxFinite,
+                  child: notifsAsync.when(
                   loading: () => const AppShimmer(
                     child: Padding(
                       padding: EdgeInsets.symmetric(vertical: 8),
@@ -212,6 +216,7 @@ class _TeacherDashboardScreenState extends ConsumerState<TeacherDashboardScreen>
                     );
                   },
                 ),
+              ),
               ),
               actions: [
                 TextButton(

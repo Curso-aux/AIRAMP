@@ -1,4 +1,3 @@
-import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -36,8 +35,8 @@ class StudentScaffold extends ConsumerWidget {
       onProfile: () => context.go('/student/profile'),
     );
 
-    // Responsive Desktop Web layout with Collapsible Sidebar
-    if (kIsWeb || screenWidth >= 900) {
+    // Responsive Desktop Web layout with Collapsible Sidebar (Screens >= 900px)
+    if (screenWidth >= 900) {
       return StudentWebScaffold(
         navigationShell: navigationShell,
         floatingOverlay: assistiveTouch,

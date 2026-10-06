@@ -61,27 +61,30 @@ class _AdminWebKeysScreenState extends ConsumerState<AdminWebKeysScreen> {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               // Header & Section Management Action
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          'Enrollment Keys & Access Codes',
-                          style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold, color: AppTheme.text),
+              LayoutBuilder(
+                builder: (context, headerConstraints) {
+                  final isNarrow = headerConstraints.maxWidth < 650;
+
+                  final titleSection = Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Enrollment Keys & Access Codes',
+                        style: TextStyle(
+                          fontSize: isNarrow ? 20 : 24,
+                          fontWeight: FontWeight.bold,
+                          color: AppTheme.text,
                         ),
-                        const SizedBox(height: 4),
-                        Text(
-                          'Active enrollment keys organized by year level. Keys are automatically generated when creating class sections.',
-                          style: TextStyle(fontSize: 14, color: AppTheme.textSecondary),
-                        ),
-                      ],
-                    ),
-                  ),
-                  const SizedBox(width: 16),
-                  ElevatedButton.icon(
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        'Active enrollment keys organized by year level. Keys are automatically generated when creating class sections.',
+                        style: TextStyle(fontSize: isNarrow ? 12.5 : 14, color: AppTheme.textSecondary),
+                      ),
+                    ],
+                  );
+
+                  final actionBtn = ElevatedButton.icon(
                     onPressed: () {
                       try {
                         GoRouter.maybeOf(context)?.go('/admin/sections');
@@ -98,8 +101,28 @@ class _AdminWebKeysScreenState extends ConsumerState<AdminWebKeysScreen> {
                       padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 12),
                       minimumSize: const Size(0, 40),
                     ),
-                  ),
-                ],
+                  );
+
+                  if (isNarrow) {
+                    return Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        titleSection,
+                        const SizedBox(height: 14),
+                        actionBtn,
+                      ],
+                    );
+                  }
+
+                  return Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Expanded(child: titleSection),
+                      const SizedBox(width: 16),
+                      actionBtn,
+                    ],
+                  );
+                },
               ),
               const SizedBox(height: 24),
 

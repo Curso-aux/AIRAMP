@@ -76,66 +76,94 @@ class _AdminWebTeachersScreenState extends ConsumerState<AdminWebTeachersScreen>
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               // Page Header
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Expanded(
-                    child: Column(
+              LayoutBuilder(
+                builder: (context, headerConstraints) {
+                  final isNarrow = headerConstraints.maxWidth < 800;
+
+                  final titleSection = Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Faculty & Teacher Management',
+                        style: TextStyle(
+                          fontSize: isNarrow ? 20 : 24,
+                          fontWeight: FontWeight.bold,
+                          color: AppTheme.text,
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        'Manage school instructors, course assignments, handled sections, and teaching workloads',
+                        style: TextStyle(fontSize: isNarrow ? 12.5 : 14, color: AppTheme.textSecondary),
+                      ),
+                    ],
+                  );
+
+                  final actionButtons = Wrap(
+                    spacing: 10,
+                    runSpacing: 8,
+                    crossAxisAlignment: WrapCrossAlignment.center,
+                    children: [
+                      OutlinedButton.icon(
+                        onPressed: () => context.go('/admin/schedules'),
+                        icon: const Icon(Icons.calendar_month_outlined, size: 18),
+                        label: const Text('Master Timetable', style: TextStyle(fontWeight: FontWeight.bold)),
+                        style: OutlinedButton.styleFrom(
+                          foregroundColor: Colors.teal,
+                          side: BorderSide(color: Colors.teal.withValues(alpha: 0.5)),
+                          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                          minimumSize: const Size(0, 42),
+                        ),
+                      ),
+                      OutlinedButton.icon(
+                        onPressed: () => TeacherBulkImportModal.show(context),
+                        icon: const Icon(Icons.upload_file_outlined, size: 18),
+                        label: const Text('Bulk Import (CSV)', style: TextStyle(fontWeight: FontWeight.bold)),
+                        style: OutlinedButton.styleFrom(
+                          foregroundColor: AppTheme.primary,
+                          side: BorderSide(color: AppTheme.primary.withValues(alpha: 0.5)),
+                          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                          minimumSize: const Size(0, 42),
+                        ),
+                      ),
+                      ElevatedButton.icon(
+                        onPressed: () => _openAddTeacherDialog(context, subjects),
+                        icon: const Icon(Icons.person_add_alt_1, size: 18),
+                        label: const Text('Add New Faculty'),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: AppTheme.primary,
+                          foregroundColor: Colors.white,
+                          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                          elevation: 0,
+                          minimumSize: const Size(0, 42),
+                        ),
+                      ),
+                    ],
+                  );
+
+                  if (isNarrow) {
+                    return Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text(
-                          'Faculty & Teacher Management',
-                          style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold, color: AppTheme.text),
-                        ),
-                        const SizedBox(height: 4),
-                        Text(
-                          'Manage school instructors, course assignments, handled sections, and teaching workloads',
-                          style: TextStyle(fontSize: 14, color: AppTheme.textSecondary),
-                        ),
+                        titleSection,
+                        const SizedBox(height: 14),
+                        actionButtons,
                       ],
-                    ),
-                  ),
-                  const SizedBox(width: 16),
-                  OutlinedButton.icon(
-                    onPressed: () => context.go('/admin/schedules'),
-                    icon: const Icon(Icons.calendar_month_outlined, size: 18),
-                    label: const Text('Master Timetable', style: TextStyle(fontWeight: FontWeight.bold)),
-                    style: OutlinedButton.styleFrom(
-                      foregroundColor: Colors.teal,
-                      side: BorderSide(color: Colors.teal.withValues(alpha: 0.5)),
-                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                      minimumSize: const Size(0, 42),
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-                  OutlinedButton.icon(
-                    onPressed: () => TeacherBulkImportModal.show(context),
-                    icon: const Icon(Icons.upload_file_outlined, size: 18),
-                    label: const Text('Bulk Import (CSV)', style: TextStyle(fontWeight: FontWeight.bold)),
-                    style: OutlinedButton.styleFrom(
-                      foregroundColor: AppTheme.primary,
-                      side: BorderSide(color: AppTheme.primary.withValues(alpha: 0.5)),
-                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                      minimumSize: const Size(0, 42),
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-                  ElevatedButton.icon(
-                    onPressed: () => _openAddTeacherDialog(context, subjects),
-                    icon: const Icon(Icons.person_add_alt_1, size: 18),
-                    label: const Text('Add New Faculty'),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: AppTheme.primary,
-                      foregroundColor: Colors.white,
-                      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                      elevation: 0,
-                      minimumSize: const Size(0, 42),
-                    ),
-                  ),
-                ],
+                    );
+                  }
+
+                  return Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Expanded(child: titleSection),
+                      const SizedBox(width: 16),
+                      actionButtons,
+                    ],
+                  );
+                },
               ),
               const SizedBox(height: 20),
 

@@ -28,135 +28,149 @@ class WebLandingScreen extends ConsumerWidget {
           child: Column(
           children: [
             // ── Top Navigation Bar ──────────────────────────────
-            Container(
-              padding: EdgeInsets.symmetric(
-                horizontal: isMobile ? 16 : 48,
-                vertical: 18,
-              ),
-              decoration: BoxDecoration(
-                color: theme.colorScheme.surface.withValues(alpha: 0.95),
-                border: Border(
-                  bottom: BorderSide(
-                    color: isDark ? Colors.white.withValues(alpha: 0.08) : Colors.black.withValues(alpha: 0.06),
+            SafeArea(
+              bottom: false,
+              child: Container(
+                padding: EdgeInsets.symmetric(
+                  horizontal: isMobile ? 14 : 48,
+                  vertical: isMobile ? 12 : 18,
+                ),
+                decoration: BoxDecoration(
+                  color: theme.colorScheme.surface.withValues(alpha: 0.95),
+                  border: Border(
+                    bottom: BorderSide(
+                      color: isDark ? Colors.white.withValues(alpha: 0.08) : Colors.black.withValues(alpha: 0.06),
+                    ),
                   ),
                 ),
-              ),
-              child: Row(
-                children: [
-                  // Logo & Brand
-                  Container(
-                    width: 44,
-                    height: 44,
-                    decoration: BoxDecoration(
-                      color: AppTheme.primary.withValues(alpha: 0.15),
-                      borderRadius: BorderRadius.circular(12),
-                      border: Border.all(color: AppTheme.primary.withValues(alpha: 0.3)),
+                child: Row(
+                  children: [
+                    // Logo & Brand
+                    Container(
+                      width: isMobile ? 38 : 44,
+                      height: isMobile ? 38 : 44,
+                      decoration: BoxDecoration(
+                        color: AppTheme.primary.withValues(alpha: 0.15),
+                        borderRadius: BorderRadius.circular(10),
+                        border: Border.all(color: AppTheme.primary.withValues(alpha: 0.3)),
+                      ),
+                      child: Icon(Icons.school_rounded, color: AppTheme.primary, size: isMobile ? 22 : 26),
                     ),
-                    child: Icon(Icons.school_rounded, color: AppTheme.primary, size: 26),
-                  ),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Row(
-                          children: [
-                            Text(
-                              'AIRA',
-                              style: TextStyle(
-                                color: AppTheme.text,
-                                fontWeight: FontWeight.w900,
-                                fontSize: 20,
-                                letterSpacing: 1.2,
-                              ),
-                            ),
-                            const SizedBox(width: 6),
-                            Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                              decoration: BoxDecoration(
-                                color: AppTheme.primary.withValues(alpha: 0.15),
-                                borderRadius: BorderRadius.circular(6),
-                              ),
-                              child: Text(
-                                'PORTAL',
-                                style: TextStyle(
-                                  color: AppTheme.primary,
-                                  fontSize: 10,
-                                  fontWeight: FontWeight.w800,
-                                  letterSpacing: 0.8,
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          FittedBox(
+                            fit: BoxFit.scaleDown,
+                            alignment: Alignment.centerLeft,
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Text(
+                                  'AIRA',
+                                  style: TextStyle(
+                                    color: AppTheme.text,
+                                    fontWeight: FontWeight.w900,
+                                    fontSize: isMobile ? 18 : 20,
+                                    letterSpacing: 1.1,
+                                  ),
                                 ),
+                                const SizedBox(width: 5),
+                                Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
+                                  decoration: BoxDecoration(
+                                    color: AppTheme.primary.withValues(alpha: 0.15),
+                                    borderRadius: BorderRadius.circular(5),
+                                  ),
+                                  child: Text(
+                                    'PORTAL',
+                                    style: TextStyle(
+                                      color: AppTheme.primary,
+                                      fontSize: 9,
+                                      fontWeight: FontWeight.w800,
+                                      letterSpacing: 0.8,
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                          if (size.width >= 460) ...[
+                            Text(
+                              isMobile ? 'Academic Review & Assessment' : 'Academic Integrated Review & Assessment Management Platform',
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: TextStyle(
+                                color: AppTheme.textSecondary,
+                                fontSize: 11,
+                                fontWeight: FontWeight.w500,
                               ),
                             ),
                           ],
-                        ),
-                        Text(
-                          'Academic Integrated Review & Assessment Management Platform',
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: TextStyle(
-                            color: AppTheme.textSecondary,
-                            fontSize: 11,
-                            fontWeight: FontWeight.w500,
-                          ),
-                        ),
-                      ],
+                        ],
+                      ),
                     ),
-                  ),
-                  const SizedBox(width: 16),
+                    const SizedBox(width: 8),
 
-                  // Theme Mode Switcher
-                  IconButton(
-                    tooltip: isDark ? 'Switch to Light Mode' : 'Switch to Dark Mode',
-                    onPressed: () => ref.read(themeProvider.notifier).toggleTheme(),
-                    icon: Icon(
-                      isDark ? Icons.light_mode_rounded : Icons.dark_mode_rounded,
-                      color: AppTheme.primary,
+                    // Theme Mode Switcher
+                    IconButton(
+                      tooltip: isDark ? 'Switch to Light Mode' : 'Switch to Dark Mode',
+                      padding: isMobile ? EdgeInsets.zero : const EdgeInsets.all(8),
+                      constraints: isMobile ? const BoxConstraints(minWidth: 36, minHeight: 36) : null,
+                      onPressed: () => ref.read(themeProvider.notifier).toggleTheme(),
+                      icon: Icon(
+                        isDark ? Icons.light_mode_rounded : Icons.dark_mode_rounded,
+                        color: isDark ? AppTheme.warning : AppTheme.primary,
+                        size: isMobile ? 20 : 24,
+                      ),
                     ),
-                  ),
-                  const SizedBox(width: 12),
+                    const SizedBox(width: 4),
 
-                  // Login / Dashboard CTA
-                  if (user != null && (user.role == 'admin' || user.role == 'super_admin'))
-                    ElevatedButton.icon(
-                      onPressed: () => context.go('/admin/dashboard'),
-                      icon: const Icon(Icons.dashboard_rounded, size: 18),
-                      label: const Text('Admin Console'),
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: AppTheme.primary,
-                        foregroundColor: Colors.black,
-                        minimumSize: const Size(0, 42),
-                        padding: const EdgeInsets.symmetric(horizontal: 20),
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                      ),
-                    )
-                  else if (user != null && user.role == 'teacher')
-                    ElevatedButton.icon(
-                      onPressed: () => context.go('/teacher/dashboard'),
-                      icon: const Icon(Icons.school_rounded, size: 18),
-                      label: const Text('Teacher Portal'),
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: AppTheme.primary,
-                        foregroundColor: Colors.black,
-                        minimumSize: const Size(0, 42),
-                        padding: const EdgeInsets.symmetric(horizontal: 20),
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                      ),
-                    )
-                  else if (user != null)
-                    ElevatedButton.icon(
-                      onPressed: () => context.go('/student/home'),
-                      icon: const Icon(Icons.auto_stories_rounded, size: 18),
-                      label: const Text('Student Portal'),
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: AppTheme.primary,
-                        foregroundColor: Colors.black,
-                        minimumSize: const Size(0, 42),
-                        padding: const EdgeInsets.symmetric(horizontal: 20),
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                      ),
-                    )
-                  else
-                    _buildSignInDropdown(context, isDark),
-                ],
+                    // Login / Dashboard CTA
+                    if (user != null && (user.role == 'admin' || user.role == 'super_admin'))
+                      ElevatedButton.icon(
+                        onPressed: () => context.go('/admin/dashboard'),
+                        icon: const Icon(Icons.dashboard_rounded, size: 16),
+                        label: Text(isMobile ? 'Admin' : 'Admin Console'),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: AppTheme.primary,
+                          foregroundColor: Colors.black,
+                          minimumSize: Size(0, isMobile ? 38 : 42),
+                          padding: EdgeInsets.symmetric(horizontal: isMobile ? 12 : 20),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                        ),
+                      )
+                    else if (user != null && user.role == 'teacher')
+                      ElevatedButton.icon(
+                        onPressed: () => context.go('/teacher/dashboard'),
+                        icon: const Icon(Icons.school_rounded, size: 16),
+                        label: Text(isMobile ? 'Faculty' : 'Teacher Portal'),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: AppTheme.primary,
+                          foregroundColor: Colors.black,
+                          minimumSize: Size(0, isMobile ? 38 : 42),
+                          padding: EdgeInsets.symmetric(horizontal: isMobile ? 12 : 20),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                        ),
+                      )
+                    else if (user != null)
+                      ElevatedButton.icon(
+                        onPressed: () => context.go('/student/home'),
+                        icon: const Icon(Icons.auto_stories_rounded, size: 16),
+                        label: Text(isMobile ? 'Student' : 'Student Portal'),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: AppTheme.primary,
+                          foregroundColor: Colors.black,
+                          minimumSize: Size(0, isMobile ? 38 : 42),
+                          padding: EdgeInsets.symmetric(horizontal: isMobile ? 12 : 20),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                        ),
+                      )
+                    else
+                      _buildSignInDropdown(context, isDark, isMobile: isMobile),
+                  ],
+                ),
               ),
             ),
 
@@ -164,14 +178,14 @@ class WebLandingScreen extends ConsumerWidget {
             Container(
               width: double.infinity,
               padding: EdgeInsets.symmetric(
-                horizontal: isMobile ? 24 : (isTablet ? 48 : 96),
+                horizontal: isMobile ? 16 : (isTablet ? 48 : 96),
                 vertical: isMobile ? 48 : 80,
               ),
               child: Column(
                 children: [
                   // DepEd & Institutional Pill
                   Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                    padding: EdgeInsets.symmetric(horizontal: isMobile ? 12 : 16, vertical: 8),
                     decoration: BoxDecoration(
                       color: AppTheme.primary.withValues(alpha: 0.12),
                       borderRadius: BorderRadius.circular(30),
@@ -182,18 +196,24 @@ class WebLandingScreen extends ConsumerWidget {
                       children: [
                         Icon(Icons.verified_rounded, color: AppTheme.primary, size: 16),
                         const SizedBox(width: 8),
-                        Text(
-                          'Institutional Learning & Assessment Infrastructure',
-                          style: TextStyle(
-                            color: AppTheme.primary,
-                            fontSize: 13,
-                            fontWeight: FontWeight.w700,
+                        Flexible(
+                          child: Text(
+                            isMobile
+                                ? 'Institutional Learning Infrastructure'
+                                : 'Institutional Learning & Assessment Infrastructure',
+                            style: TextStyle(
+                              color: AppTheme.primary,
+                              fontSize: isMobile ? 11.5 : 13,
+                              fontWeight: FontWeight.w700,
+                            ),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
                           ),
                         ),
                       ],
                     ),
                   ),
-                  const SizedBox(height: 28),
+                  const SizedBox(height: 24),
 
                   // Hero Title
                   Text(
@@ -201,7 +221,7 @@ class WebLandingScreen extends ConsumerWidget {
                     textAlign: TextAlign.center,
                     style: TextStyle(
                       color: AppTheme.text,
-                      fontSize: isMobile ? 32 : 50,
+                      fontSize: isMobile ? 28 : 50,
                       fontWeight: FontWeight.w900,
                       height: 1.15,
                       letterSpacing: -0.5,
@@ -584,9 +604,10 @@ class WebLandingScreen extends ConsumerWidget {
     required VoidCallback onCta,
   }) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
+    final isMobile = MediaQuery.sizeOf(context).width < 600;
 
     return Container(
-      padding: const EdgeInsets.all(24),
+      padding: EdgeInsets.all(isMobile ? 16 : 24),
       decoration: BoxDecoration(
         color: AppTheme.surfaceLight,
         borderRadius: BorderRadius.circular(18),
@@ -610,6 +631,7 @@ class WebLandingScreen extends ConsumerWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               Container(
                 width: 44,
@@ -620,19 +642,23 @@ class WebLandingScreen extends ConsumerWidget {
                 ),
                 child: Icon(icon, color: color, size: 24),
               ),
-              const Spacer(),
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                decoration: BoxDecoration(
-                  color: isFeatured ? AppTheme.primary.withValues(alpha: 0.15) : (isDark ? Colors.white.withValues(alpha: 0.08) : Colors.black.withValues(alpha: 0.05)),
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: Text(
-                  badge,
-                  style: TextStyle(
-                    color: isFeatured ? AppTheme.primary : AppTheme.textSecondary,
-                    fontSize: 11,
-                    fontWeight: FontWeight.w700,
+              const SizedBox(width: 8),
+              Flexible(
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                  decoration: BoxDecoration(
+                    color: isFeatured ? AppTheme.primary.withValues(alpha: 0.15) : (isDark ? Colors.white.withValues(alpha: 0.08) : Colors.black.withValues(alpha: 0.05)),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Text(
+                    badge,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      color: isFeatured ? AppTheme.primary : AppTheme.textSecondary,
+                      fontSize: 11,
+                      fontWeight: FontWeight.w700,
+                    ),
                   ),
                 ),
               ),
@@ -718,7 +744,7 @@ class WebLandingScreen extends ConsumerWidget {
     );
   }
 
-  Widget _buildSignInDropdown(BuildContext context, bool isDark) {
+  Widget _buildSignInDropdown(BuildContext context, bool isDark, {bool isMobile = false}) {
     final screenWidth = MediaQuery.sizeOf(context).width;
 
     return PopupMenuButton<String>(
@@ -726,8 +752,8 @@ class WebLandingScreen extends ConsumerWidget {
       offset: const Offset(0, 48),
       elevation: 16,
       constraints: BoxConstraints(
-        minWidth: math.min(340.0, screenWidth - 32),
-        maxWidth: math.min(380.0, screenWidth - 24),
+        minWidth: math.min(300.0, screenWidth - 32),
+        maxWidth: math.min(360.0, screenWidth - 24),
       ),
       color: isDark ? const Color(0xFF161F2E) : Colors.white,
       surfaceTintColor: Colors.transparent,
@@ -822,8 +848,8 @@ class WebLandingScreen extends ConsumerWidget {
         ),
       ],
       child: Container(
-        height: 42,
-        padding: const EdgeInsets.symmetric(horizontal: 16),
+        height: isMobile ? 38 : 42,
+        padding: EdgeInsets.symmetric(horizontal: isMobile ? 12 : 16),
         decoration: BoxDecoration(
           color: AppTheme.primary,
           borderRadius: BorderRadius.circular(10),
@@ -835,22 +861,22 @@ class WebLandingScreen extends ConsumerWidget {
             ),
           ],
         ),
-        child: const Row(
+        child: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(Icons.login_rounded, size: 18, color: Colors.black),
-            SizedBox(width: 8),
+            Icon(Icons.login_rounded, size: isMobile ? 16 : 18, color: Colors.black),
+            const SizedBox(width: 6),
             Text(
               'Sign In',
               style: TextStyle(
                 color: Colors.black,
                 fontWeight: FontWeight.w800,
-                fontSize: 14,
+                fontSize: isMobile ? 13 : 14,
                 letterSpacing: 0.3,
               ),
             ),
-            SizedBox(width: 4),
-            Icon(Icons.keyboard_arrow_down_rounded, size: 18, color: Colors.black),
+            const SizedBox(width: 4),
+            Icon(Icons.keyboard_arrow_down_rounded, size: isMobile ? 16 : 18, color: Colors.black),
           ],
         ),
       ),
@@ -958,42 +984,58 @@ class WebLandingScreen extends ConsumerWidget {
               child: Icon(Icons.devices_rounded, color: AppTheme.primary, size: 24),
             ),
             const SizedBox(width: 12),
-            const Text(
-              'AIRAMP Ecosystem Access',
-              style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800),
+            const Flexible(
+              child: Text(
+                'AIRAMP Ecosystem Access',
+                style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800),
+                overflow: TextOverflow.ellipsis,
+              ),
             ),
           ],
         ),
-        content: SizedBox(
-          width: 520,
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              _buildAppPlatformRow(
-                icon: Icons.language_rounded,
-                iconColor: AppTheme.primary,
-                title: 'Web Console & Portals',
-                description: 'Full institutional management for Administrators, with direct web access for Teachers and Students.',
-                isDark: isDark,
-              ),
-              const SizedBox(height: 16),
-              _buildAppPlatformRow(
-                icon: Icons.desktop_windows_rounded,
-                iconColor: const Color(0xFF38BDF8),
-                title: 'Windows Desktop Application',
-                description: 'Offline-ready assessment execution, auto-sync, and teacher grading tools for school PC laboratories.',
-                isDark: isDark,
-              ),
-              const SizedBox(height: 16),
-              _buildAppPlatformRow(
-                icon: Icons.android_rounded,
-                iconColor: const Color(0xFF10B981),
-                title: 'Android Mobile Application',
-                description: 'Portable learning outcome reviews, instant quiz submission, and direct teacher consultations for students on the go.',
-                isDark: isDark,
-              ),
-            ],
+        content: ConstrainedBox(
+          constraints: BoxConstraints(
+            maxWidth: 520,
+            maxHeight: MediaQuery.sizeOf(context).height * 0.75,
+          ),
+          child: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                _buildAppPlatformRow(
+                  icon: Icons.language_rounded,
+                  iconColor: AppTheme.primary,
+                  title: 'Web Console & Portals (All Devices)',
+                  description: 'Responsive web platform accessible via Google Chrome, Safari, Android, and iOS for Administrators, Teachers, and Students.',
+                  isDark: isDark,
+                ),
+                const SizedBox(height: 16),
+                _buildAppPlatformRow(
+                  icon: Icons.phone_iphone_rounded,
+                  iconColor: const Color(0xFF0EA5E9),
+                  title: 'iOS & Android Mobile Web / PWA',
+                  description: 'Add AIRA to your device Home Screen for an instant, full-screen mobile app feel with offline lesson caching.',
+                  isDark: isDark,
+                ),
+                const SizedBox(height: 16),
+                _buildAppPlatformRow(
+                  icon: Icons.desktop_windows_rounded,
+                  iconColor: const Color(0xFF38BDF8),
+                  title: 'Windows Desktop Application',
+                  description: 'Offline-ready assessment execution, auto-sync, and teacher grading tools for school PC laboratories.',
+                  isDark: isDark,
+                ),
+                const SizedBox(height: 16),
+                _buildAppPlatformRow(
+                  icon: Icons.android_rounded,
+                  iconColor: const Color(0xFF10B981),
+                  title: 'Android Native Application',
+                  description: 'Dedicated Android APK for portable learning outcome reviews and direct teacher consultations.',
+                  isDark: isDark,
+                ),
+              ],
+            ),
           ),
         ),
         actions: [

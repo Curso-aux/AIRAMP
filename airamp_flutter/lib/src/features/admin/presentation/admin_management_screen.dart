@@ -72,8 +72,8 @@ class _AdminManagementScreenState extends ConsumerState<AdminManagementScreen> {
                   ),
                 ],
               ),
-              content: SizedBox(
-                width: 480,
+              content: ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 480),
                 child: SingleChildScrollView(
                   child: Column(
                     mainAxisSize: MainAxisSize.min,
@@ -266,8 +266,8 @@ class _AdminManagementScreenState extends ConsumerState<AdminManagementScreen> {
                 'Edit Administrator',
                 style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18, color: AppTheme.text),
               ),
-              content: SizedBox(
-                width: 480,
+              content: ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 480),
                 child: SingleChildScrollView(
                   child: Column(
                     mainAxisSize: MainAxisSize.min,
@@ -501,8 +501,8 @@ class _AdminManagementScreenState extends ConsumerState<AdminManagementScreen> {
                   ),
                 ],
               ),
-              content: SizedBox(
-                width: 480,
+              content: ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 480),
                 child: SingleChildScrollView(
                   child: Column(
                     mainAxisSize: MainAxisSize.min,
@@ -686,8 +686,8 @@ class _AdminManagementScreenState extends ConsumerState<AdminManagementScreen> {
                   ),
                 ],
               ),
-              content: SizedBox(
-                width: 480,
+              content: ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 480),
                 child: SingleChildScrollView(
                   child: Column(
                     mainAxisSize: MainAxisSize.min,
@@ -901,24 +901,30 @@ class _AdminManagementScreenState extends ConsumerState<AdminManagementScreen> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: [
-            Column(
+        LayoutBuilder(
+          builder: (context, boxConstraints) {
+            final isNarrow = boxConstraints.maxWidth < 650;
+
+            final titleSection = Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
                   'Institutional Campuses & Schools (Multi-Tenant Scoping)',
-                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: AppTheme.text),
+                  style: TextStyle(
+                    fontSize: isNarrow ? 16 : 18,
+                    fontWeight: FontWeight.bold,
+                    color: AppTheme.text,
+                  ),
                 ),
                 const SizedBox(height: 2),
                 Text(
                   'Super Admin provisions independent schools, campus codes, and assigned School Administrators',
-                  style: TextStyle(fontSize: 13, color: AppTheme.textSecondary),
+                  style: TextStyle(fontSize: isNarrow ? 12 : 13, color: AppTheme.textSecondary),
                 ),
               ],
-            ),
-            ElevatedButton.icon(
+            );
+
+            final registerBtn = ElevatedButton.icon(
               onPressed: () => _openAddSchoolDialog(context),
               icon: const Icon(Icons.add_business_rounded, size: 18),
               label: const Text('Register Campus'),
@@ -930,8 +936,28 @@ class _AdminManagementScreenState extends ConsumerState<AdminManagementScreen> {
                 shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
                 textStyle: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
               ),
-            ),
-          ],
+            );
+
+            if (isNarrow) {
+              return Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  titleSection,
+                  const SizedBox(height: 12),
+                  registerBtn,
+                ],
+              );
+            }
+
+            return Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Expanded(child: titleSection),
+                const SizedBox(width: 16),
+                registerBtn,
+              ],
+            );
+          },
         ),
         const SizedBox(height: 14),
 
@@ -1199,12 +1225,15 @@ class _AdminManagementScreenState extends ConsumerState<AdminManagementScreen> {
     final superAdminCount = admins.where((a) => a['role'] == 'super_admin').length;
     final schoolAdminCount = admins.where((a) => a['role'] == 'admin').length;
 
+    final screenWidth = MediaQuery.sizeOf(context).width;
+    final isMobile = screenWidth < 720;
+
     return Scaffold(
       backgroundColor: AppTheme.background,
       appBar: AppBar(
         title: Text(
           'Super Administrator Governance Console',
-          style: TextStyle(color: AppTheme.text, fontWeight: FontWeight.bold, fontSize: 18),
+          style: TextStyle(color: AppTheme.text, fontWeight: FontWeight.bold, fontSize: isMobile ? 15 : 18),
         ),
         backgroundColor: AppTheme.surface,
         elevation: 0,
@@ -1223,7 +1252,7 @@ class _AdminManagementScreenState extends ConsumerState<AdminManagementScreen> {
         ],
       ),
       body: SingleChildScrollView(
-        padding: const EdgeInsets.all(24),
+        padding: EdgeInsets.all(isMobile ? 16 : 24),
         child: Center(
           child: ConstrainedBox(
             constraints: const BoxConstraints(maxWidth: 1100),
@@ -1233,7 +1262,7 @@ class _AdminManagementScreenState extends ConsumerState<AdminManagementScreen> {
                 // Header Banner
                 Container(
                   width: double.infinity,
-                  padding: const EdgeInsets.all(24),
+                  padding: EdgeInsets.all(isMobile ? 18 : 24),
                   decoration: BoxDecoration(
                     gradient: LinearGradient(
                       colors: [AppTheme.primary, const Color(0xFF4A148C)],
@@ -1249,34 +1278,32 @@ class _AdminManagementScreenState extends ConsumerState<AdminManagementScreen> {
                       ),
                     ],
                   ),
-                  child: Row(
-                    children: [
-                      Container(
-                        padding: const EdgeInsets.all(12),
-                        decoration: BoxDecoration(
-                          color: Colors.white.withValues(alpha: 0.18),
-                          borderRadius: BorderRadius.circular(14),
-                        ),
-                        child: const Icon(Icons.admin_panel_settings, color: Colors.white, size: 36),
-                      ),
-                      const SizedBox(width: 18),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            const Text(
-                              'Institutional Governance & Administration',
-                              style: TextStyle(color: Colors.white, fontSize: 22, fontWeight: FontWeight.bold),
+                  child: LayoutBuilder(
+                    builder: (context, bannerConstraints) {
+                      final isNarrowBanner = bannerConstraints.maxWidth < 650;
+                      final headerText = Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'Institutional Governance & Administration',
+                            style: TextStyle(
+                              color: Colors.white,
+                              fontSize: isNarrowBanner ? 18 : 22,
+                              fontWeight: FontWeight.bold,
                             ),
-                            const SizedBox(height: 4),
-                            Text(
-                              'Authenticated as ${currentUser?.fullName ?? "Super Administrator"} • Full System Jurisdiction',
-                              style: const TextStyle(color: Colors.white70, fontSize: 13),
+                          ),
+                          const SizedBox(height: 4),
+                          Text(
+                            'Authenticated as ${currentUser?.fullName ?? "Super Administrator"} • Full System Jurisdiction',
+                            style: TextStyle(
+                              color: Colors.white70,
+                              fontSize: isNarrowBanner ? 12 : 13,
                             ),
-                          ],
-                        ),
-                      ),
-                      ElevatedButton.icon(
+                          ),
+                        ],
+                      );
+
+                      final addAdminBtn = ElevatedButton.icon(
                         onPressed: () => _openAddAdminDialog(context),
                         icon: const Icon(Icons.person_add_alt_1, size: 18),
                         label: const Text('Add Administrator'),
@@ -1288,83 +1315,116 @@ class _AdminManagementScreenState extends ConsumerState<AdminManagementScreen> {
                           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
                           textStyle: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
                         ),
-                      ),
-                    ],
+                      );
+
+                      if (isNarrowBanner) {
+                        return Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Row(
+                              children: [
+                                Container(
+                                  padding: const EdgeInsets.all(10),
+                                  decoration: BoxDecoration(
+                                    color: Colors.white.withValues(alpha: 0.18),
+                                    borderRadius: BorderRadius.circular(12),
+                                  ),
+                                  child: const Icon(Icons.admin_panel_settings, color: Colors.white, size: 28),
+                                ),
+                                const SizedBox(width: 14),
+                                Expanded(child: headerText),
+                              ],
+                            ),
+                            const SizedBox(height: 16),
+                            SizedBox(width: double.infinity, child: addAdminBtn),
+                          ],
+                        );
+                      }
+
+                      return Row(
+                        children: [
+                          Container(
+                            padding: const EdgeInsets.all(12),
+                            decoration: BoxDecoration(
+                              color: Colors.white.withValues(alpha: 0.18),
+                              borderRadius: BorderRadius.circular(14),
+                            ),
+                            child: const Icon(Icons.admin_panel_settings, color: Colors.white, size: 36),
+                          ),
+                          const SizedBox(width: 18),
+                          Expanded(child: headerText),
+                          const SizedBox(width: 16),
+                          addAdminBtn,
+                        ],
+                      );
+                    },
                   ),
                 ),
                 const SizedBox(height: 24),
 
                 // Metrics Overview
-                Row(
-                  children: [
-                    Expanded(
-                      child: _buildStatTile(
-                        'Total Admins',
-                        admins.length.toString(),
-                        Icons.shield,
-                        Colors.purple,
-                      ),
-                    ),
-                    const SizedBox(width: 14),
-                    Expanded(
-                      child: _buildStatTile(
-                        'Campuses / Schools',
-                        schools.length.toString(),
-                        Icons.account_balance_rounded,
-                        Colors.teal,
-                      ),
-                    ),
-                    const SizedBox(width: 14),
-                    Expanded(
-                      child: _buildStatTile(
-                        'School Admins',
-                        schoolAdminCount.toString(),
-                        Icons.manage_accounts,
-                        Colors.blue,
-                      ),
-                    ),
-                    const SizedBox(width: 14),
-                    Expanded(
-                      child: _buildStatTile(
-                        'Super Admins',
-                        superAdminCount.toString(),
-                        Icons.vpn_key,
-                        Colors.amber.shade800,
-                      ),
-                    ),
-                    const SizedBox(width: 14),
-                    Expanded(
-                      child: _buildStatTile(
-                        'Faculty Staff',
-                        teachers.length.toString(),
-                        Icons.badge,
-                        Colors.indigo,
-                      ),
-                    ),
-                  ],
+                LayoutBuilder(
+                  builder: (context, metricsConstraints) {
+                    final width = metricsConstraints.maxWidth;
+                    final items = [
+                      _buildStatTile('Total Admins', admins.length.toString(), Icons.shield, Colors.purple),
+                      _buildStatTile('Campuses / Schools', schools.length.toString(), Icons.account_balance_rounded, Colors.teal),
+                      _buildStatTile('School Admins', schoolAdminCount.toString(), Icons.manage_accounts, Colors.blue),
+                      _buildStatTile('Super Admins', superAdminCount.toString(), Icons.vpn_key, Colors.amber.shade800),
+                      _buildStatTile('Faculty Staff', teachers.length.toString(), Icons.badge, Colors.indigo),
+                    ];
+
+                    if (width >= 900) {
+                      return Row(
+                        children: items.map((tile) {
+                          final isLast = items.last == tile;
+                          return Expanded(
+                            child: Padding(
+                              padding: EdgeInsets.only(right: isLast ? 0 : 14),
+                              child: tile,
+                            ),
+                          );
+                        }).toList(),
+                      );
+                    }
+
+                    // 2 columns on mobile/tablet, 1 column on very narrow
+                    final cardWidth = width < 480 ? width : (width - 14) / 2;
+                    return Wrap(
+                      spacing: 14,
+                      runSpacing: 14,
+                      children: items.map((tile) => SizedBox(width: cardWidth, child: tile)).toList(),
+                    );
+                  },
                 ),
                 const SizedBox(height: 28),
 
                 // Section 1: Administrator Management (Item 5: Super Admin manages Admins)
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Column(
+                LayoutBuilder(
+                  builder: (context, boxConstraints) {
+                    final isNarrow = boxConstraints.maxWidth < 650;
+
+                    final titleSection = Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
                           'Administrator Accounts & Roles',
-                          style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: AppTheme.text),
+                          style: TextStyle(
+                            fontSize: isNarrow ? 16 : 18,
+                            fontWeight: FontWeight.bold,
+                            color: AppTheme.text,
+                          ),
                         ),
                         const SizedBox(height: 2),
                         Text(
                           'Super Admin manages Admins; Admins manage Teachers and Students',
-                          style: TextStyle(fontSize: 13, color: AppTheme.textSecondary),
+                          style: TextStyle(fontSize: isNarrow ? 12 : 13, color: AppTheme.textSecondary),
                         ),
                       ],
-                    ),
-                    SizedBox(
-                      width: 260,
+                    );
+
+                    final searchField = SizedBox(
+                      width: isNarrow ? double.infinity : 260,
                       height: 38,
                       child: TextField(
                         controller: _searchController,
@@ -1379,8 +1439,28 @@ class _AdminManagementScreenState extends ConsumerState<AdminManagementScreen> {
                           border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
                         ),
                       ),
-                    ),
-                  ],
+                    );
+
+                    if (isNarrow) {
+                      return Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          titleSection,
+                          const SizedBox(height: 12),
+                          searchField,
+                        ],
+                      );
+                    }
+
+                    return Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Expanded(child: titleSection),
+                        const SizedBox(width: 16),
+                        searchField,
+                      ],
+                    );
+                  },
                 ),
                 const SizedBox(height: 12),
 

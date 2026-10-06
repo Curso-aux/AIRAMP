@@ -192,10 +192,10 @@ class _BulkImportModalState extends ConsumerState<BulkImportModal> with SingleTi
 
     return Dialog(
       backgroundColor: Colors.transparent,
-      insetPadding: const EdgeInsets.symmetric(horizontal: 24, vertical: 24),
+      insetPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 20),
       child: Container(
-        width: 860,
         constraints: BoxConstraints(
+          maxWidth: 860,
           maxHeight: MediaQuery.of(context).size.height * 0.9,
         ),
         decoration: BoxDecoration(

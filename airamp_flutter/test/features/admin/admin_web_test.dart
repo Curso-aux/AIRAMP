@@ -161,6 +161,8 @@ void main() {
       await tester.pumpWidget(
         ProviderScope(
           overrides: [
+            subjectsProvider.overrideWith(() => _TestSubjectsNotifier()),
+            sectionsProvider.overrideWith(() => _TestSectionsNotifier()),
             availableSectionsProvider.overrideWith((ref) => ['STEM A', 'Emerald', 'Ruby', 'Diamond']),
           ],
           child: MaterialApp(

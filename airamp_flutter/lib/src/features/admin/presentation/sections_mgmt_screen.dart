@@ -698,11 +698,17 @@ class _SectionsMgmtScreenState extends ConsumerState<SectionsMgmtScreen> {
           ElevatedButton.icon(
             onPressed: () => _showAddSectionDialog(initialGrade: grade),
             icon: const Icon(Icons.add, size: 14),
-            label: Text('Add $grade Section', style: const TextStyle(fontSize: 12)),
+            label: Text(
+              MediaQuery.sizeOf(context).width < 600 ? 'Add' : 'Add $grade Section',
+              style: const TextStyle(fontSize: 12),
+            ),
             style: ElevatedButton.styleFrom(
               backgroundColor: Theme.of(context).colorScheme.primary,
               foregroundColor: Colors.white,
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+              padding: EdgeInsets.symmetric(
+                horizontal: MediaQuery.sizeOf(context).width < 600 ? 8 : 12,
+                vertical: 8,
+              ),
               minimumSize: const Size(0, 34),
               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
               elevation: 0,
@@ -797,24 +803,30 @@ class _SectionsMgmtScreenState extends ConsumerState<SectionsMgmtScreen> {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               // Header
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Column(
+              LayoutBuilder(
+                builder: (context, headerConstraints) {
+                  final isNarrow = headerConstraints.maxWidth < 600;
+
+                  final titleSection = Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
                         'Manage Sections',
-                        style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold, color: Theme.of(context).colorScheme.onSurface),
+                        style: TextStyle(
+                          fontSize: isNarrow ? 20 : 24,
+                          fontWeight: FontWeight.bold,
+                          color: Theme.of(context).colorScheme.onSurface,
+                        ),
                       ),
                       const SizedBox(height: 4),
                       Text(
                         '${sections.length} active sections · Separated by grade level',
-                        style: TextStyle(color: AppTheme.textSecondary, fontSize: 14),
+                        style: TextStyle(color: AppTheme.textSecondary, fontSize: isNarrow ? 12.5 : 14),
                       ),
                     ],
-                  ),
-                  ElevatedButton.icon(
+                  );
+
+                  final actionBtn = ElevatedButton.icon(
                     onPressed: () => _showAddSectionDialog(
                       initialGrade: _selectedGradeFilter != 'All' ? _selectedGradeFilter : 'Grade 10',
                     ),
@@ -828,8 +840,28 @@ class _SectionsMgmtScreenState extends ConsumerState<SectionsMgmtScreen> {
                       elevation: 0,
                       minimumSize: const Size(0, 42),
                     ),
-                  ),
-                ],
+                  );
+
+                  if (isNarrow) {
+                    return Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        titleSection,
+                        const SizedBox(height: 12),
+                        actionBtn,
+                      ],
+                    );
+                  }
+
+                  return Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Expanded(child: titleSection),
+                      const SizedBox(width: 16),
+                      actionBtn,
+                    ],
+                  );
+                },
               ),
               const SizedBox(height: 20),
 

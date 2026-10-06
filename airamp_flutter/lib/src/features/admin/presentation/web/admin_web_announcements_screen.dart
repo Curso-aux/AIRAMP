@@ -37,27 +37,30 @@ class _AdminWebAnnouncementsScreenState extends ConsumerState<AdminWebAnnounceme
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             // Header
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        'Announcements & Broadcasts',
-                        style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold, color: AppTheme.text),
+            LayoutBuilder(
+              builder: (context, headerConstraints) {
+                final isNarrow = headerConstraints.maxWidth < 650;
+
+                final titleSection = Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Announcements & Broadcasts',
+                      style: TextStyle(
+                        fontSize: isNarrow ? 20 : 24,
+                        fontWeight: FontWeight.bold,
+                        color: AppTheme.text,
                       ),
-                      const SizedBox(height: 4),
-                      Text(
-                        'Broadcast school updates, examination schedules, and reminders to teachers and students',
-                        style: TextStyle(fontSize: 14, color: AppTheme.textSecondary),
-                      ),
-                    ],
-                  ),
-                ),
-                const SizedBox(width: 16),
-                ElevatedButton.icon(
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      'Broadcast school updates, examination schedules, and reminders to teachers and students',
+                      style: TextStyle(fontSize: isNarrow ? 12.5 : 14, color: AppTheme.textSecondary),
+                    ),
+                  ],
+                );
+
+                final actionBtn = ElevatedButton.icon(
                   onPressed: () => _showAnnouncementDialog(),
                   icon: const Icon(Icons.campaign, size: 18),
                   label: const Text('Post Announcement'),
@@ -68,8 +71,28 @@ class _AdminWebAnnouncementsScreenState extends ConsumerState<AdminWebAnnounceme
                     padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 12),
                     minimumSize: const Size(0, 40),
                   ),
-                ),
-              ],
+                );
+
+                if (isNarrow) {
+                  return Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      titleSection,
+                      const SizedBox(height: 14),
+                      actionBtn,
+                    ],
+                  );
+                }
+
+                return Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Expanded(child: titleSection),
+                    const SizedBox(width: 16),
+                    actionBtn,
+                  ],
+                );
+              },
             ),
             const SizedBox(height: 24),
 

@@ -313,27 +313,30 @@ class _AdminWebStudentsScreenState extends ConsumerState<AdminWebStudentsScreen>
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               // Header
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          'Student Management & Section Arrangement',
-                          style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold, color: AppTheme.text),
+              LayoutBuilder(
+                builder: (context, headerConstraints) {
+                  final isNarrow = headerConstraints.maxWidth < 760;
+
+                  final titleSection = Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Student Management & Section Arrangement',
+                        style: TextStyle(
+                          fontSize: isNarrow ? 20 : 24,
+                          fontWeight: FontWeight.bold,
+                          color: AppTheme.text,
                         ),
-                        const SizedBox(height: 4),
-                        Text(
-                          'Organized by Year Level ➔ Classroom Section ➔ Student, with specialized student tracking',
-                          style: TextStyle(fontSize: 14, color: AppTheme.textSecondary),
-                        ),
-                      ],
-                    ),
-                  ),
-                  const SizedBox(width: 16),
-                  Wrap(
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        'Organized by Year Level ➔ Classroom Section ➔ Student, with specialized student tracking',
+                        style: TextStyle(fontSize: isNarrow ? 12.5 : 14, color: AppTheme.textSecondary),
+                      ),
+                    ],
+                  );
+
+                  final actionButtons = Wrap(
                     spacing: 10,
                     runSpacing: 8,
                     crossAxisAlignment: WrapCrossAlignment.center,
@@ -386,8 +389,28 @@ class _AdminWebStudentsScreenState extends ConsumerState<AdminWebStudentsScreen>
                         ),
                       ),
                     ],
-                  ),
-                ],
+                  );
+
+                  if (isNarrow) {
+                    return Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        titleSection,
+                        const SizedBox(height: 14),
+                        actionButtons,
+                      ],
+                    );
+                  }
+
+                  return Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Expanded(child: titleSection),
+                      const SizedBox(width: 16),
+                      actionButtons,
+                    ],
+                  );
+                },
               ),
               const SizedBox(height: 20),
 

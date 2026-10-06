@@ -30,8 +30,8 @@ class PdfModuleUploadDialog extends StatelessWidget {
       backgroundColor: Colors.transparent,
       insetPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 24),
       child: Container(
-        width: 680,
         constraints: BoxConstraints(
+          maxWidth: 680,
           maxHeight: MediaQuery.of(context).size.height * 0.90,
         ),
         child: PdfModuleUploadCard(

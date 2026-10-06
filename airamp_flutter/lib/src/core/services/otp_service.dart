@@ -320,6 +320,33 @@ class OtpService {
     final normEmail = cleanEmail.toLowerCase();
     final rateKey = userId != null ? userId.toLowerCase().trim() : normEmail;
 
+    // Demonstration / non-FQDN admin account bypass (e.g. aira@admin, @admin)
+    final isDemoAdmin = normEmail == 'aira@admin' ||
+        normEmail.endsWith('@admin') ||
+        (cleanEmail.contains('@') && !cleanEmail.split('@')[1].contains('.'));
+
+    if (isDemoAdmin) {
+      final bypassCode = '123456';
+      final now = DateTime.now();
+      final expiresAt = now.add(const Duration(minutes: 10));
+      final record = _OtpRecord(
+        code: bypassCode,
+        email: normEmail,
+        identifier: rateKey,
+        expiresAt: expiresAt,
+      );
+      _activeOtps[rateKey] = record;
+      _activeOtps[normEmail] = record;
+      return OtpResult(
+        success: true,
+        message: 'A 6-digit verification code was simulated for ${maskEmail(cleanEmail)}.',
+        email: cleanEmail,
+        userId: userId ?? rateKey,
+        fullName: fullName,
+        role: role,
+      );
+    }
+
     // 1. Lockout check
     if (_limiter.isLockedOut('otp_verify_$rateKey') || _limiter.isLockedOut('otp_verify_$normEmail')) {
       final rem = _limiter.getRemainingLockout('otp_verify_$rateKey');

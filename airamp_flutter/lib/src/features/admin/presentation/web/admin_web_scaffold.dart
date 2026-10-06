@@ -25,6 +25,8 @@ class AdminWebScaffold extends ConsumerStatefulWidget {
 class _AdminWebScaffoldState extends ConsumerState<AdminWebScaffold> {
   bool _isSidebarCollapsed = false;
 
+  final GlobalKey<ScaffoldState> _scaffoldKey = GlobalKey<ScaffoldState>();
+
   final List<AdminNavItem> _navItems = const [
     AdminNavItem(
       label: 'Analytics & Overview',
@@ -123,14 +125,25 @@ class _AdminWebScaffoldState extends ConsumerState<AdminWebScaffold> {
             final effectiveCollapsed = isTablet || _isSidebarCollapsed;
 
             if (isMobile) {
+              final currentIdx = widget.navigationShell.currentIndex;
+              final bottomNavIndex = currentIdx < 4 ? currentIdx : 4;
+
               return Scaffold(
+                key: _scaffoldKey,
                 backgroundColor: AppTheme.background,
                 appBar: AppBar(
                   backgroundColor: AppTheme.surface,
                   elevation: 0,
+                  scrolledUnderElevation: 0,
+                  leading: IconButton(
+                    icon: Icon(Icons.menu_rounded, color: AppTheme.text),
+                    tooltip: 'Navigation Menu',
+                    onPressed: () => _scaffoldKey.currentState?.openDrawer(),
+                  ),
                   title: Text(
                     _getPageTitle(),
-                    style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: AppTheme.text),
+                    style: TextStyle(fontSize: 17, fontWeight: FontWeight.bold, color: AppTheme.text),
+                    overflow: TextOverflow.ellipsis,
                   ),
                   actions: [
                     IconButton(
@@ -140,7 +153,7 @@ class _AdminWebScaffoldState extends ConsumerState<AdminWebScaffold> {
                     ),
                     IconButton(
                       tooltip: isDark ? 'Switch to Light Mode' : 'Switch to Dark Mode',
-                      icon: Icon(isDark ? Icons.light_mode : Icons.dark_mode, color: AppTheme.text),
+                      icon: Icon(isDark ? Icons.light_mode : Icons.dark_mode, color: isDark ? AppTheme.warning : AppTheme.primary),
                       onPressed: () => ref.read(themeProvider.notifier).toggleTheme(),
                     ),
                   ],
@@ -154,33 +167,62 @@ class _AdminWebScaffoldState extends ConsumerState<AdminWebScaffold> {
                     isDark: isDark,
                   ),
                 ),
-            body: widget.navigationShell,
-            bottomNavigationBar: Container(
-              decoration: BoxDecoration(
-                color: AppTheme.surface,
-                border: Border(top: BorderSide(color: AppTheme.border, width: 1)),
-              ),
-              child: BottomNavigationBar(
-                backgroundColor: AppTheme.surface,
-                type: BottomNavigationBarType.fixed,
-                selectedItemColor: AppTheme.primary,
-                unselectedItemColor: AppTheme.textMuted,
-                showUnselectedLabels: true,
-                selectedFontSize: 10,
-                unselectedFontSize: 10,
-                currentIndex: widget.navigationShell.currentIndex.clamp(0, 4),
-                onTap: _onSelectTab,
-                items: const [
-                  BottomNavigationBarItem(icon: Icon(Icons.analytics), label: 'Analytics'),
-                  BottomNavigationBarItem(icon: Icon(Icons.people), label: 'Students'),
-                  BottomNavigationBarItem(icon: Icon(Icons.menu_book), label: 'Subjects'),
-                  BottomNavigationBarItem(icon: Icon(Icons.key), label: 'Keys'),
-                  BottomNavigationBarItem(icon: Icon(Icons.campaign), label: 'Notices'),
-                ],
-              ),
-            ),
-          );
-        }
+                body: widget.navigationShell,
+                bottomNavigationBar: Container(
+                  decoration: BoxDecoration(
+                    color: AppTheme.surface,
+                    border: Border(top: BorderSide(color: AppTheme.border, width: 1)),
+                  ),
+                  child: SafeArea(
+                    top: false,
+                    child: BottomNavigationBar(
+                      backgroundColor: AppTheme.surface,
+                      type: BottomNavigationBarType.fixed,
+                      selectedItemColor: AppTheme.primary,
+                      unselectedItemColor: AppTheme.textMuted,
+                      showUnselectedLabels: true,
+                      selectedFontSize: 10,
+                      unselectedFontSize: 10,
+                      currentIndex: bottomNavIndex,
+                      onTap: (tabIndex) {
+                        if (tabIndex == 4) {
+                          _scaffoldKey.currentState?.openDrawer();
+                        } else {
+                          _onSelectTab(tabIndex);
+                        }
+                      },
+                      items: const [
+                        BottomNavigationBarItem(
+                          icon: Icon(Icons.analytics_outlined),
+                          activeIcon: Icon(Icons.analytics),
+                          label: 'Analytics',
+                        ),
+                        BottomNavigationBarItem(
+                          icon: Icon(Icons.people_outline),
+                          activeIcon: Icon(Icons.people),
+                          label: 'Students',
+                        ),
+                        BottomNavigationBarItem(
+                          icon: Icon(Icons.badge_outlined),
+                          activeIcon: Icon(Icons.badge),
+                          label: 'Faculty',
+                        ),
+                        BottomNavigationBarItem(
+                          icon: Icon(Icons.menu_book_outlined),
+                          activeIcon: Icon(Icons.menu_book),
+                          label: 'Subjects',
+                        ),
+                        BottomNavigationBarItem(
+                          icon: Icon(Icons.grid_view_outlined),
+                          activeIcon: Icon(Icons.grid_view_rounded),
+                          label: 'More',
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              );
+            }
 
         return Scaffold(
           backgroundColor: AppTheme.background,
