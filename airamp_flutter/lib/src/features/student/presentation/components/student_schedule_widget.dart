@@ -980,12 +980,16 @@ class _WeeklyTimetableDialogState extends ConsumerState<WeeklyTimetableDialog> {
     );
   }
 
-  Widget _buildModalModeSelector() {
+  Widget _buildModalModeSelector({bool isMobile = false}) {
+    final isDark = AppTheme.isDark;
     return Container(
+      padding: EdgeInsets.all(isMobile ? 2.5 : 3.0),
       decoration: BoxDecoration(
-        color: AppTheme.background,
+        color: isDark ? const Color(0xFF16253B) : const Color(0xFFF1F5F9),
         borderRadius: BorderRadius.circular(10),
-        border: Border.all(color: AppTheme.border),
+        border: Border.all(
+          color: isDark ? Colors.white.withValues(alpha: 0.08) : Colors.black.withValues(alpha: 0.06),
+        ),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
@@ -995,18 +999,21 @@ class _WeeklyTimetableDialogState extends ConsumerState<WeeklyTimetableDialog> {
             icon: Icons.grid_view_rounded,
             tooltip: 'Weekly Timetable Matrix',
             label: 'Grid',
+            isMobile: isMobile,
           ),
           _buildModeSelectorButton(
             mode: StudentModalViewMode.calendar,
             icon: Icons.calendar_month_rounded,
             tooltip: 'Monthly Calendar Mode',
             label: 'Calendar',
+            isMobile: isMobile,
           ),
           _buildModeSelectorButton(
             mode: StudentModalViewMode.agenda,
             icon: Icons.view_agenda_outlined,
             tooltip: 'Agenda Timeline List',
             label: 'Agenda',
+            isMobile: isMobile,
           ),
         ],
       ),
@@ -1018,37 +1025,61 @@ class _WeeklyTimetableDialogState extends ConsumerState<WeeklyTimetableDialog> {
     required IconData icon,
     required String tooltip,
     required String label,
+    bool isMobile = false,
   }) {
     final isSelected = _modalViewMode == mode;
+    final isDark = AppTheme.isDark;
+
     return Tooltip(
       message: tooltip,
-      child: InkWell(
-        onTap: () => setState(() => _modalViewMode = mode),
-        borderRadius: BorderRadius.circular(9),
-        child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-          decoration: BoxDecoration(
-            color: isSelected ? AppTheme.primary.withValues(alpha: 0.15) : Colors.transparent,
-            borderRadius: BorderRadius.circular(9),
-          ),
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Icon(
-                icon,
-                size: 14,
-                color: isSelected ? AppTheme.primary : AppTheme.textMuted,
-              ),
-              const SizedBox(width: 4),
-              Text(
-                label,
-                style: TextStyle(
-                  fontSize: 11,
-                  fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          onTap: () => setState(() => _modalViewMode = mode),
+          borderRadius: BorderRadius.circular(7),
+          child: AnimatedContainer(
+            duration: const Duration(milliseconds: 180),
+            curve: Curves.easeInOut,
+            padding: EdgeInsets.symmetric(
+              horizontal: isMobile ? 8 : 11,
+              vertical: isMobile ? 4.5 : 5.5,
+            ),
+            decoration: BoxDecoration(
+              color: isSelected
+                  ? (isDark ? AppTheme.surfaceLight : Colors.white)
+                  : Colors.transparent,
+              borderRadius: BorderRadius.circular(7),
+              boxShadow: isSelected
+                  ? [
+                      BoxShadow(
+                        color: Colors.black.withValues(alpha: isDark ? 0.25 : 0.06),
+                        blurRadius: 4,
+                        offset: const Offset(0, 1),
+                      ),
+                    ]
+                  : null,
+            ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(
+                  icon,
+                  size: isMobile ? 12 : 13,
                   color: isSelected ? AppTheme.primary : AppTheme.textMuted,
                 ),
-              ),
-            ],
+                SizedBox(width: isMobile ? 3 : 4),
+                Text(
+                  label,
+                  style: TextStyle(
+                    fontSize: isMobile ? 10.5 : 11,
+                    fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
+                    color: isSelected
+                        ? (isDark ? Colors.white : const Color(0xFF1E293B))
+                        : AppTheme.textMuted,
+                  ),
+                ),
+              ],
+            ),
           ),
         ),
       ),
@@ -1064,11 +1095,20 @@ class _WeeklyTimetableDialogState extends ConsumerState<WeeklyTimetableDialog> {
 
     return Dialog(
       backgroundColor: AppTheme.surface,
+      clipBehavior: Clip.antiAlias,
+      elevation: isDark ? 16 : 8,
+      shadowColor: Colors.black.withValues(alpha: isDark ? 0.4 : 0.12),
       insetPadding: EdgeInsets.symmetric(
         horizontal: isMobile ? 8 : 24,
         vertical: isMobile ? 12 : 24,
       ),
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(20),
+        side: BorderSide(
+          color: isDark ? Colors.white.withValues(alpha: 0.08) : Colors.black.withValues(alpha: 0.06),
+          width: 1,
+        ),
+      ),
       child: ConstrainedBox(
         constraints: BoxConstraints(
           maxWidth: 960,
@@ -1083,9 +1123,12 @@ class _WeeklyTimetableDialogState extends ConsumerState<WeeklyTimetableDialog> {
                 vertical: isMobile ? 10 : 12,
               ),
               decoration: BoxDecoration(
+                color: isDark ? AppTheme.surface : Colors.white,
                 border: Border(
-                  top: const BorderSide(color: Color(0xFF10B981), width: 3), // Green accent line
-                  bottom: BorderSide(color: AppTheme.border, width: 1),
+                  bottom: BorderSide(
+                    color: isDark ? Colors.white.withValues(alpha: 0.08) : Colors.black.withValues(alpha: 0.06),
+                    width: 1,
+                  ),
                 ),
               ),
               child: isMobile
@@ -1093,16 +1136,36 @@ class _WeeklyTimetableDialogState extends ConsumerState<WeeklyTimetableDialog> {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       mainAxisSize: MainAxisSize.min,
                       children: [
+                        // Drag handle for mobile
+                        Center(
+                          child: Container(
+                            width: 36,
+                            height: 4,
+                            margin: const EdgeInsets.only(bottom: 10),
+                            decoration: BoxDecoration(
+                              color: isDark
+                                  ? Colors.white.withValues(alpha: 0.2)
+                                  : Colors.black.withValues(alpha: 0.12),
+                              borderRadius: BorderRadius.circular(2),
+                            ),
+                          ),
+                        ),
                         // Row 1 on Mobile: Icon, Title & Section, Refresh & Close
                         Row(
                           children: [
                             Container(
-                              padding: const EdgeInsets.all(6),
+                              width: 34,
+                              height: 34,
                               decoration: BoxDecoration(
-                                color: AppTheme.primary.withValues(alpha: 0.15),
+                                color: AppTheme.primary.withValues(alpha: 0.12),
                                 borderRadius: BorderRadius.circular(8),
+                                border: Border.all(
+                                  color: AppTheme.primary.withValues(alpha: 0.22),
+                                  width: 1,
+                                ),
                               ),
-                              child: Icon(Icons.grid_on_rounded, color: AppTheme.primary, size: 18),
+                              alignment: Alignment.center,
+                              child: Icon(Icons.grid_on_rounded, color: AppTheme.primary, size: 17),
                             ),
                             const SizedBox(width: 8),
                             Expanded(
@@ -1115,6 +1178,7 @@ class _WeeklyTimetableDialogState extends ConsumerState<WeeklyTimetableDialog> {
                                     style: TextStyle(
                                       fontSize: 14.5,
                                       fontWeight: FontWeight.bold,
+                                      letterSpacing: -0.2,
                                       color: AppTheme.text,
                                     ),
                                     maxLines: 1,
@@ -1126,12 +1190,23 @@ class _WeeklyTimetableDialogState extends ConsumerState<WeeklyTimetableDialog> {
                                     spacing: 4,
                                     runSpacing: 2,
                                     children: [
-                                      Text('Section: ', style: TextStyle(fontSize: 11, color: AppTheme.textMuted)),
+                                      Text(
+                                        'Section: ',
+                                        style: TextStyle(
+                                          fontSize: 11,
+                                          fontWeight: FontWeight.w500,
+                                          color: AppTheme.textMuted,
+                                        ),
+                                      ),
                                       Container(
-                                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1),
+                                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1.5),
                                         decoration: BoxDecoration(
-                                          color: AppTheme.primary.withValues(alpha: 0.15),
-                                          borderRadius: BorderRadius.circular(4),
+                                          color: AppTheme.primary.withValues(alpha: 0.12),
+                                          borderRadius: BorderRadius.circular(5),
+                                          border: Border.all(
+                                            color: AppTheme.primary.withValues(alpha: 0.25),
+                                            width: 0.8,
+                                          ),
                                         ),
                                         child: Text(
                                           studentSection != null && studentSection.isNotEmpty ? studentSection : 'No Section',
@@ -1149,46 +1224,73 @@ class _WeeklyTimetableDialogState extends ConsumerState<WeeklyTimetableDialog> {
                                 ],
                               ),
                             ),
-                            IconButton(
-                              tooltip: 'Refresh Schedule',
-                              icon: Icon(Icons.refresh_rounded, color: AppTheme.primary, size: 20),
-                              visualDensity: VisualDensity.compact,
-                              padding: const EdgeInsets.all(6),
-                              constraints: const BoxConstraints(minWidth: 34, minHeight: 34),
-                              onPressed: () {
-                                if (studentSection != null && studentSection.isNotEmpty) {
-                                  ref.invalidate(sectionSchedulesProvider(studentSection));
-                                }
-                              },
+                            Tooltip(
+                              message: 'Refresh Schedule',
+                              child: Material(
+                                color: AppTheme.primary.withValues(alpha: 0.1),
+                                borderRadius: BorderRadius.circular(8),
+                                child: InkWell(
+                                  borderRadius: BorderRadius.circular(8),
+                                  onTap: () {
+                                    if (studentSection != null && studentSection.isNotEmpty) {
+                                      ref.invalidate(sectionSchedulesProvider(studentSection));
+                                    }
+                                  },
+                                  child: Container(
+                                    width: 32,
+                                    height: 32,
+                                    alignment: Alignment.center,
+                                    child: Icon(Icons.refresh_rounded, color: AppTheme.primary, size: 18),
+                                  ),
+                                ),
+                              ),
                             ),
-                            IconButton(
-                              tooltip: 'Close',
-                              icon: Icon(Icons.close, color: AppTheme.textMuted, size: 20),
-                              visualDensity: VisualDensity.compact,
-                              padding: const EdgeInsets.all(6),
-                              constraints: const BoxConstraints(minWidth: 34, minHeight: 34),
-                              onPressed: () => Navigator.of(context).pop(),
+                            const SizedBox(width: 6),
+                            Tooltip(
+                              message: 'Close',
+                              child: Material(
+                                color: isDark
+                                    ? Colors.white.withValues(alpha: 0.06)
+                                    : Colors.black.withValues(alpha: 0.04),
+                                borderRadius: BorderRadius.circular(8),
+                                child: InkWell(
+                                  borderRadius: BorderRadius.circular(8),
+                                  onTap: () => Navigator.of(context).pop(),
+                                  child: Container(
+                                    width: 32,
+                                    height: 32,
+                                    alignment: Alignment.center,
+                                    child: Icon(Icons.close, color: AppTheme.textMuted, size: 18),
+                                  ),
+                                ),
+                              ),
                             ),
                           ],
                         ),
-                        const SizedBox(height: 8),
+                        const SizedBox(height: 10),
                         // Row 2 on Mobile: Mode Selector Pill
                         Center(
-                          child: _buildModalModeSelector(),
+                          child: _buildModalModeSelector(isMobile: isMobile),
                         ),
                       ],
                     )
                   : Row(
                       children: [
                         Container(
-                          padding: const EdgeInsets.all(6),
+                          width: 38,
+                          height: 38,
                           decoration: BoxDecoration(
-                            color: AppTheme.primary.withValues(alpha: 0.15),
-                            borderRadius: BorderRadius.circular(8),
+                            color: AppTheme.primary.withValues(alpha: 0.12),
+                            borderRadius: BorderRadius.circular(10),
+                            border: Border.all(
+                              color: AppTheme.primary.withValues(alpha: 0.22),
+                              width: 1,
+                            ),
                           ),
-                          child: Icon(Icons.grid_on_rounded, color: AppTheme.primary, size: 18),
+                          alignment: Alignment.center,
+                          child: Icon(Icons.grid_on_rounded, color: AppTheme.primary, size: 19),
                         ),
-                        const SizedBox(width: 10),
+                        const SizedBox(width: 12),
                         Expanded(
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
@@ -1198,21 +1300,34 @@ class _WeeklyTimetableDialogState extends ConsumerState<WeeklyTimetableDialog> {
                                 style: TextStyle(
                                   fontSize: 18,
                                   fontWeight: FontWeight.bold,
+                                  letterSpacing: -0.3,
                                   color: AppTheme.text,
                                 ),
                                 maxLines: 1,
                                 overflow: TextOverflow.ellipsis,
                               ),
+                              const SizedBox(height: 3),
                               Wrap(
                                 crossAxisAlignment: WrapCrossAlignment.center,
-                                spacing: 4,
+                                spacing: 5,
                                 children: [
-                                  Text('Section: ', style: TextStyle(fontSize: 11, color: AppTheme.textMuted)),
+                                  Text(
+                                    'Section: ',
+                                    style: TextStyle(
+                                      fontSize: 11.5,
+                                      fontWeight: FontWeight.w500,
+                                      color: AppTheme.textMuted,
+                                    ),
+                                  ),
                                   Container(
-                                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1),
+                                    padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
                                     decoration: BoxDecoration(
-                                      color: AppTheme.primary.withValues(alpha: 0.15),
-                                      borderRadius: BorderRadius.circular(4),
+                                      color: AppTheme.primary.withValues(alpha: 0.12),
+                                      borderRadius: BorderRadius.circular(6),
+                                      border: Border.all(
+                                        color: AppTheme.primary.withValues(alpha: 0.25),
+                                        width: 0.8,
+                                      ),
                                     ),
                                     child: Text(
                                       studentSection != null && studentSection.isNotEmpty ? studentSection : 'No Section',
@@ -1223,28 +1338,57 @@ class _WeeklyTimetableDialogState extends ConsumerState<WeeklyTimetableDialog> {
                                       ),
                                     ),
                                   ),
-                                  Text(' • Visual Weekly Matrix', style: TextStyle(fontSize: 11, color: AppTheme.textMuted)),
+                                  Text(
+                                    ' • Visual Weekly Matrix',
+                                    style: TextStyle(fontSize: 11.5, color: AppTheme.textMuted),
+                                  ),
                                 ],
                               ),
                             ],
                           ),
                         ),
                         _buildModalModeSelector(),
-                        const SizedBox(width: 6),
-                        IconButton(
-                          tooltip: 'Refresh Schedule',
-                          icon: Icon(Icons.refresh_rounded, color: AppTheme.primary, size: 20),
-                          visualDensity: VisualDensity.compact,
-                          onPressed: () {
-                            if (studentSection != null && studentSection.isNotEmpty) {
-                              ref.invalidate(sectionSchedulesProvider(studentSection));
-                            }
-                          },
+                        const SizedBox(width: 10),
+                        Tooltip(
+                          message: 'Refresh Schedule',
+                          child: Material(
+                            color: AppTheme.primary.withValues(alpha: 0.1),
+                            borderRadius: BorderRadius.circular(8),
+                            child: InkWell(
+                              borderRadius: BorderRadius.circular(8),
+                              onTap: () {
+                                if (studentSection != null && studentSection.isNotEmpty) {
+                                  ref.invalidate(sectionSchedulesProvider(studentSection));
+                                }
+                              },
+                              child: Container(
+                                width: 34,
+                                height: 34,
+                                alignment: Alignment.center,
+                                child: Icon(Icons.refresh_rounded, color: AppTheme.primary, size: 19),
+                              ),
+                            ),
+                          ),
                         ),
-                        IconButton(
-                          icon: Icon(Icons.close, color: AppTheme.textMuted, size: 20),
-                          visualDensity: VisualDensity.compact,
-                          onPressed: () => Navigator.of(context).pop(),
+                        const SizedBox(width: 6),
+                        Tooltip(
+                          message: 'Close',
+                          child: Material(
+                            color: isDark
+                                ? Colors.white.withValues(alpha: 0.06)
+                                : Colors.black.withValues(alpha: 0.04),
+                            borderRadius: BorderRadius.circular(8),
+                            child: InkWell(
+                              borderRadius: BorderRadius.circular(8),
+                              onTap: () => Navigator.of(context).pop(),
+                              child: Container(
+                                width: 34,
+                                height: 34,
+                                alignment: Alignment.center,
+                                child: Icon(Icons.close, color: AppTheme.textMuted, size: 19),
+                              ),
+                            ),
+                          ),
                         ),
                       ],
                     ),
@@ -1253,92 +1397,193 @@ class _WeeklyTimetableDialogState extends ConsumerState<WeeklyTimetableDialog> {
             if (_modalViewMode != StudentModalViewMode.calendar) ...[
               // ── Quick Day Jump Navigation ───────────────────────────
               Container(
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-              decoration: BoxDecoration(
-                color: AppTheme.background.withValues(alpha: 0.5),
-                border: Border(bottom: BorderSide(color: AppTheme.border, width: 1)),
-              ),
-              child: SingleChildScrollView(
-                scrollDirection: Axis.horizontal,
-                child: Row(
-                  children: [
-                    Text('Jump to: ', style: TextStyle(fontSize: 11, color: AppTheme.textMuted)),
-                    const SizedBox(width: 6),
-                    ChoiceChip(
-                      label: const Text('ALL (Grid)'),
-                      selected: _activeDayJump == 'ALL',
-                      selectedColor: AppTheme.primary,
-                      labelStyle: TextStyle(
-                        fontSize: 10,
-                        fontWeight: _activeDayJump == 'ALL' ? FontWeight.bold : FontWeight.normal,
-                        color: _activeDayJump == 'ALL' ? Colors.black : AppTheme.text,
-                      ),
-                      padding: const EdgeInsets.symmetric(horizontal: 4),
-                      visualDensity: VisualDensity.compact,
-                      onSelected: (val) {
-                        if (val) {
-                          setState(() => _activeDayJump = 'ALL');
-                          if (_horizontalGridController.hasClients) {
-                            _horizontalGridController.animateTo(0,
-                                duration: const Duration(milliseconds: 300), curve: Curves.easeInOut);
-                          }
-                        }
-                      },
+                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                decoration: BoxDecoration(
+                  color: isDark ? AppTheme.surface.withValues(alpha: 0.6) : const Color(0xFFF8FAFC),
+                  border: Border(
+                    bottom: BorderSide(
+                      color: isDark ? Colors.white.withValues(alpha: 0.06) : Colors.black.withValues(alpha: 0.05),
+                      width: 1,
                     ),
-                    const SizedBox(width: 6),
-                    ...List.generate(_days.length, (idx) {
-                      final day = _days[idx];
-                      final lbl = _dayLabels[idx];
-                      final isSel = _activeDayJump == day;
-
-                      return Padding(
-                        padding: const EdgeInsets.only(right: 6),
-                        child: ChoiceChip(
-                          label: Text(lbl),
-                          selected: isSel,
-                          selectedColor: AppTheme.primary,
-                          labelStyle: TextStyle(
-                            fontSize: 10,
-                            fontWeight: isSel ? FontWeight.bold : FontWeight.normal,
-                            color: isSel ? Colors.black : AppTheme.text,
+                  ),
+                ),
+                child: SingleChildScrollView(
+                  scrollDirection: Axis.horizontal,
+                  child: Row(
+                    children: [
+                      Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(Icons.tune_rounded, size: 13, color: AppTheme.textMuted),
+                          const SizedBox(width: 4),
+                          Text(
+                            'Jump to: ',
+                            style: TextStyle(
+                              fontSize: 11,
+                              fontWeight: FontWeight.w600,
+                              color: AppTheme.textMuted,
+                            ),
                           ),
-                          padding: const EdgeInsets.symmetric(horizontal: 4),
-                          visualDensity: VisualDensity.compact,
-                          onSelected: (val) {
-                            if (val) {
-                              setState(() => _activeDayJump = day);
-                              const colW = 130.0;
-                              _scrollToDayIndex(idx, colW);
-                            }
-                          },
+                        ],
+                      ),
+                      const SizedBox(width: 6),
+                      ChoiceChip(
+                        showCheckmark: false,
+                        label: const Text('ALL (Grid)'),
+                        selected: _activeDayJump == 'ALL',
+                        selectedColor: AppTheme.primary,
+                        backgroundColor: isDark ? AppTheme.surfaceLight : Colors.white,
+                        labelStyle: TextStyle(
+                          fontSize: 10.5,
+                          fontWeight: _activeDayJump == 'ALL' ? FontWeight.w700 : FontWeight.w500,
+                          color: _activeDayJump == 'ALL' ? Colors.black : AppTheme.textSecondary,
                         ),
-                      );
-                    }),
-                  ],
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(8),
+                          side: BorderSide(
+                            color: _activeDayJump == 'ALL'
+                                ? Colors.transparent
+                                : (isDark ? Colors.white.withValues(alpha: 0.08) : Colors.black.withValues(alpha: 0.07)),
+                            width: 1,
+                          ),
+                        ),
+                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                        visualDensity: VisualDensity.compact,
+                        onSelected: (val) {
+                          if (val) {
+                            setState(() => _activeDayJump = 'ALL');
+                            if (_horizontalGridController.hasClients) {
+                              _horizontalGridController.animateTo(0,
+                                  duration: const Duration(milliseconds: 300), curve: Curves.easeInOut);
+                            }
+                          }
+                        },
+                      ),
+                      const SizedBox(width: 6),
+                      ...List.generate(_days.length, (idx) {
+                        final day = _days[idx];
+                        final lbl = _dayLabels[idx];
+                        final isSel = _activeDayJump == day;
+                        final isToday = day == getCurrentDayOfWeek();
+
+                        return Padding(
+                          padding: const EdgeInsets.only(right: 6),
+                          child: ChoiceChip(
+                            showCheckmark: false,
+                            label: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Text(lbl),
+                                if (isToday) ...[
+                                  const SizedBox(width: 4),
+                                  Container(
+                                    width: 4,
+                                    height: 4,
+                                    decoration: BoxDecoration(
+                                      shape: BoxShape.circle,
+                                      color: isSel ? Colors.black : AppTheme.primary,
+                                    ),
+                                  ),
+                                ],
+                              ],
+                            ),
+                            selected: isSel,
+                            selectedColor: AppTheme.primary,
+                            backgroundColor: isDark ? AppTheme.surfaceLight : Colors.white,
+                            labelStyle: TextStyle(
+                              fontSize: 10.5,
+                              fontWeight: isSel ? FontWeight.w700 : FontWeight.w500,
+                              color: isSel ? Colors.black : AppTheme.textSecondary,
+                            ),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(8),
+                              side: BorderSide(
+                                color: isSel
+                                    ? Colors.transparent
+                                    : (isDark ? Colors.white.withValues(alpha: 0.08) : Colors.black.withValues(alpha: 0.07)),
+                                width: 1,
+                              ),
+                            ),
+                            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                            visualDensity: VisualDensity.compact,
+                            onSelected: (val) {
+                              if (val) {
+                                setState(() => _activeDayJump = day);
+                                const colW = 130.0;
+                                _scrollToDayIndex(idx, colW);
+                              }
+                            },
+                          ),
+                        );
+                      }),
+                    ],
+                  ),
                 ),
               ),
-            ),
-          ],
+            ],
 
             // ── Timetable Matrix Content ────────────────────────────
             Expanded(
               child: (studentSection == null || studentSection.isEmpty)
                   ? Center(
-                      child: Column(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          Icon(Icons.school_outlined, size: 48, color: AppTheme.textMuted),
-                          const SizedBox(height: 12),
-                          Text(
-                            'No Section Assigned',
-                            style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: AppTheme.text),
+                      child: SingleChildScrollView(
+                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 24),
+                        child: ConstrainedBox(
+                          constraints: const BoxConstraints(maxWidth: 380),
+                          child: Column(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Container(
+                                width: 72,
+                                height: 72,
+                                decoration: BoxDecoration(
+                                  color: AppTheme.primary.withValues(alpha: 0.08),
+                                  shape: BoxShape.circle,
+                                  border: Border.all(
+                                    color: AppTheme.primary.withValues(alpha: 0.18),
+                                    width: 1.5,
+                                  ),
+                                ),
+                                alignment: Alignment.center,
+                                child: Container(
+                                  width: 48,
+                                  height: 48,
+                                  decoration: BoxDecoration(
+                                    color: AppTheme.primary.withValues(alpha: 0.12),
+                                    shape: BoxShape.circle,
+                                  ),
+                                  alignment: Alignment.center,
+                                  child: Icon(
+                                    Icons.school_outlined,
+                                    size: 24,
+                                    color: AppTheme.primary,
+                                  ),
+                                ),
+                              ),
+                              const SizedBox(height: 16),
+                              Text(
+                                'No Section Assigned',
+                                textAlign: TextAlign.center,
+                                style: TextStyle(
+                                  fontWeight: FontWeight.bold,
+                                  fontSize: 16,
+                                  letterSpacing: -0.2,
+                                  color: AppTheme.text,
+                                ),
+                              ),
+                              const SizedBox(height: 6),
+                              Text(
+                                'You must be enrolled in a section to view your timetable.',
+                                textAlign: TextAlign.center,
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  height: 1.4,
+                                  color: AppTheme.textSecondary,
+                                ),
+                              ),
+                            ],
                           ),
-                          const SizedBox(height: 6),
-                          Text(
-                            'You must be enrolled in a section to view your timetable.',
-                            style: TextStyle(fontSize: 12, color: AppTheme.textSecondary),
-                          ),
-                        ],
+                        ),
                       ),
                     )
                   : ref.watch(sectionSchedulesProvider(studentSection)).when(
@@ -1351,36 +1596,80 @@ class _WeeklyTimetableDialogState extends ConsumerState<WeeklyTimetableDialog> {
                         data: (schedules) {
                           if (schedules.isEmpty) {
                             return Center(
-                              child: Column(
-                                mainAxisAlignment: MainAxisAlignment.center,
-                                children: [
-                                  Icon(Icons.event_busy_rounded, size: 48, color: AppTheme.textMuted),
-                                  const SizedBox(height: 12),
-                                  Text(
-                                    'No Classes Scheduled for Section $studentSection',
-                                    style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15, color: AppTheme.text),
+                              child: SingleChildScrollView(
+                                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 24),
+                                child: ConstrainedBox(
+                                  constraints: const BoxConstraints(maxWidth: 380),
+                                  child: Column(
+                                    mainAxisSize: MainAxisSize.min,
+                                    mainAxisAlignment: MainAxisAlignment.center,
+                                    children: [
+                                      Container(
+                                        width: 72,
+                                        height: 72,
+                                        decoration: BoxDecoration(
+                                          color: AppTheme.primary.withValues(alpha: 0.08),
+                                          shape: BoxShape.circle,
+                                          border: Border.all(
+                                            color: AppTheme.primary.withValues(alpha: 0.18),
+                                            width: 1.5,
+                                          ),
+                                        ),
+                                        alignment: Alignment.center,
+                                        child: Container(
+                                          width: 48,
+                                          height: 48,
+                                          decoration: BoxDecoration(
+                                            color: AppTheme.primary.withValues(alpha: 0.12),
+                                            shape: BoxShape.circle,
+                                          ),
+                                          alignment: Alignment.center,
+                                          child: Icon(
+                                            Icons.event_busy_rounded,
+                                            size: 24,
+                                            color: AppTheme.primary,
+                                          ),
+                                        ),
+                                      ),
+                                      const SizedBox(height: 16),
+                                      Text(
+                                        'No Classes Scheduled for Section $studentSection',
+                                        textAlign: TextAlign.center,
+                                        style: TextStyle(
+                                          fontWeight: FontWeight.bold,
+                                          fontSize: 15,
+                                          letterSpacing: -0.2,
+                                          color: AppTheme.text,
+                                        ),
+                                      ),
+                                      const SizedBox(height: 6),
+                                      Text(
+                                        'Teachers have not uploaded any class schedules for this section yet.',
+                                        textAlign: TextAlign.center,
+                                        style: TextStyle(
+                                          fontSize: 12,
+                                          height: 1.4,
+                                          color: AppTheme.textSecondary,
+                                        ),
+                                      ),
+                                      const SizedBox(height: 18),
+                                      ElevatedButton.icon(
+                                        onPressed: () {
+                                          ref.invalidate(sectionSchedulesProvider(studentSection));
+                                        },
+                                        icon: const Icon(Icons.refresh_rounded, size: 16),
+                                        label: const Text('Refresh Schedule', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12)),
+                                        style: ElevatedButton.styleFrom(
+                                          backgroundColor: AppTheme.primary,
+                                          foregroundColor: Colors.black,
+                                          elevation: 0,
+                                          padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 10),
+                                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                                        ),
+                                      ),
+                                    ],
                                   ),
-                                  const SizedBox(height: 6),
-                                  Text(
-                                    'Teachers have not uploaded any class schedules for this section yet.',
-                                    style: TextStyle(fontSize: 12, color: AppTheme.textSecondary),
-                                  ),
-                                  const SizedBox(height: 16),
-                                  ElevatedButton.icon(
-                                    onPressed: () {
-                                      ref.invalidate(sectionSchedulesProvider(studentSection));
-                                    },
-                                    icon: const Icon(Icons.refresh_rounded, size: 16),
-                                    label: const Text('Refresh Schedule', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12)),
-                                    style: ElevatedButton.styleFrom(
-                                      backgroundColor: AppTheme.primary,
-                                      foregroundColor: Colors.black,
-                                      elevation: 0,
-                                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-                                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                                    ),
-                                  ),
-                                ],
+                                ),
                               ),
                             );
                           }
