@@ -1,7 +1,9 @@
+import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/theme/theme_provider.dart';
 import '../../auth/application/auth_provider.dart';
@@ -18,6 +20,36 @@ class StudentHomeScreen extends ConsumerStatefulWidget {
 }
 
 class _StudentHomeScreenState extends ConsumerState<StudentHomeScreen> {
+  bool _isAnalyticsHidden = false;
+  // 0: Cards, 1: Pie / Donut, 2: Progress Gauge
+  int _analyticsViewIndex = 0;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadAnalyticsPreferences();
+  }
+
+  Future<void> _loadAnalyticsPreferences() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      if (mounted) {
+        setState(() {
+          _isAnalyticsHidden = prefs.getBool('student_analytics_hidden') ?? false;
+          _analyticsViewIndex = prefs.getInt('student_analytics_view_index') ?? 0;
+        });
+      }
+    } catch (_) {}
+  }
+
+  Future<void> _saveAnalyticsPreferences() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setBool('student_analytics_hidden', _isAnalyticsHidden);
+      await prefs.setInt('student_analytics_view_index', _analyticsViewIndex);
+    } catch (_) {}
+  }
+
   void _showNotificationsSheet(List<Map<String, dynamic>> announcements) {
     showModalBottomSheet(
       context: context,
@@ -297,7 +329,7 @@ class _StudentHomeScreenState extends ConsumerState<StudentHomeScreen> {
                             child: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
-                                _buildStatsRow(activeCourses, lessonsDone, pending),
+                                _buildAnalyticsSection(activeCourses, lessonsDone, pending),
                                 const SizedBox(height: 24),
                                 _buildContinueLearningSection(context, activeCourse),
                                 const SizedBox(height: 24),
@@ -324,7 +356,7 @@ class _StudentHomeScreenState extends ConsumerState<StudentHomeScreen> {
                       Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          _buildStatsRow(activeCourses, lessonsDone, pending),
+                          _buildAnalyticsSection(activeCourses, lessonsDone, pending),
                           const SizedBox(height: 20),
                           StudentScheduleWidget(sectionName: currentUser.section),
                           const SizedBox(height: 16),
@@ -348,15 +380,562 @@ class _StudentHomeScreenState extends ConsumerState<StudentHomeScreen> {
 );
   }
 
-  Widget _buildStatsRow(int activeCourses, int lessonsDone, int pending) {
+  Widget _buildAnalyticsSection(int activeCourses, int lessonsDone, int pending) {
+    final totalLessons = lessonsDone + pending;
+    final completionPct = totalLessons > 0 ? ((lessonsDone / totalLessons) * 100).round() : 0;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
+    if (_isAnalyticsHidden) {
+      return _buildCollapsedStrip(activeCourses, lessonsDone, pending, completionPct);
+    }
+
+    return Container(
+      decoration: BoxDecoration(
+        color: AppTheme.surface,
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(
+          color: isDark ? AppTheme.darkBorder : AppTheme.lightBorder,
+          width: 1.1,
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: isDark ? 0.2 : 0.04),
+            blurRadius: 14,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Header Bar with Title, View Toggles & Hide Button
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 12, 12, 12),
+            child: Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(7),
+                  decoration: BoxDecoration(
+                    color: AppTheme.primary.withValues(alpha: 0.12),
+                    borderRadius: BorderRadius.circular(9),
+                  ),
+                  child: Icon(
+                    Icons.insights_rounded,
+                    color: AppTheme.primary,
+                    size: 17,
+                  ),
+                ),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Row(
+                    children: [
+                      Text(
+                        'Learning Overview',
+                        style: TextStyle(
+                          fontSize: 15,
+                          fontWeight: FontWeight.bold,
+                          color: AppTheme.text,
+                        ),
+                      ),
+                      if (totalLessons > 0) ...[
+                        const SizedBox(width: 8),
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+                          decoration: BoxDecoration(
+                            color: AppTheme.success.withValues(alpha: 0.12),
+                            borderRadius: BorderRadius.circular(10),
+                          ),
+                          child: Text(
+                            '$completionPct% Done',
+                            style: TextStyle(
+                              fontSize: 10,
+                              fontWeight: FontWeight.bold,
+                              color: AppTheme.success,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ],
+                  ),
+                ),
+
+                // View Mode Switcher: Cards, Pie / Donut, Progress Gauge
+                Container(
+                  padding: const EdgeInsets.all(2),
+                  decoration: BoxDecoration(
+                    color: isDark ? AppTheme.darkSurfaceLight : const Color(0xFFF1F5F9),
+                    borderRadius: BorderRadius.circular(10),
+                    border: Border.all(color: AppTheme.border.withValues(alpha: 0.5)),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      _buildViewModeButton(0, Icons.grid_view_rounded, 'Cards View'),
+                      _buildViewModeButton(1, Icons.pie_chart_rounded, 'Pie / Donut View'),
+                      _buildViewModeButton(2, Icons.trending_up_rounded, 'Progress Mastery'),
+                    ],
+                  ),
+                ),
+                const SizedBox(width: 6),
+
+                // Collapse / Hide Toggle Button
+                Tooltip(
+                  message: 'Hide Analytics',
+                  child: InkWell(
+                    borderRadius: BorderRadius.circular(8),
+                    onTap: () {
+                      setState(() {
+                        _isAnalyticsHidden = true;
+                      });
+                      _saveAnalyticsPreferences();
+                    },
+                    child: Padding(
+                      padding: const EdgeInsets.all(6),
+                      child: Icon(
+                        Icons.visibility_off_outlined,
+                        size: 18,
+                        color: AppTheme.textMuted,
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          Divider(height: 1, color: AppTheme.border.withValues(alpha: 0.6)),
+          Padding(
+            padding: const EdgeInsets.all(16),
+            child: _buildCurrentAnalyticsView(activeCourses, lessonsDone, pending),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildCollapsedStrip(int activeCourses, int lessonsDone, int pending, int completionPct) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    return InkWell(
+      onTap: () {
+        setState(() {
+          _isAnalyticsHidden = false;
+        });
+        _saveAnalyticsPreferences();
+      },
+      borderRadius: BorderRadius.circular(16),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+        decoration: BoxDecoration(
+          color: isDark ? AppTheme.darkSurfaceLight.withValues(alpha: 0.5) : const Color(0xFFF8FAFC),
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: AppTheme.border.withValues(alpha: 0.6)),
+        ),
+        child: Row(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(5),
+              decoration: BoxDecoration(
+                color: AppTheme.primary.withValues(alpha: 0.12),
+                shape: BoxShape.circle,
+              ),
+              child: Icon(Icons.insights_rounded, size: 14, color: AppTheme.primary),
+            ),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Text(
+                '$activeCourses Courses  •  $lessonsDone Done  •  $pending Pending  ($completionPct% Complete)',
+                style: TextStyle(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w600,
+                  color: AppTheme.textSecondary,
+                ),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+              ),
+            ),
+            const SizedBox(width: 8),
+            Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  'Show',
+                  style: TextStyle(
+                    fontSize: 11,
+                    fontWeight: FontWeight.bold,
+                    color: AppTheme.primary,
+                  ),
+                ),
+                const SizedBox(width: 2),
+                Icon(Icons.keyboard_arrow_down_rounded, size: 16, color: AppTheme.primary),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildViewModeButton(int index, IconData icon, String tooltip) {
+    final isSelected = _analyticsViewIndex == index;
+    final primary = Theme.of(context).colorScheme.primary;
+    return Tooltip(
+      message: tooltip,
+      child: InkWell(
+        borderRadius: BorderRadius.circular(8),
+        onTap: () {
+          setState(() {
+            _analyticsViewIndex = index;
+          });
+          _saveAnalyticsPreferences();
+        },
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 200),
+          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
+          decoration: BoxDecoration(
+            color: isSelected ? primary : Colors.transparent,
+            borderRadius: BorderRadius.circular(8),
+            boxShadow: isSelected
+                ? [
+                    BoxShadow(
+                      color: primary.withValues(alpha: 0.3),
+                      blurRadius: 4,
+                      offset: const Offset(0, 1),
+                    ),
+                  ]
+                : null,
+          ),
+          child: Icon(
+            icon,
+            size: 15,
+            color: isSelected ? Colors.black : AppTheme.textMuted,
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildCurrentAnalyticsView(int activeCourses, int lessonsDone, int pending) {
+    switch (_analyticsViewIndex) {
+      case 1:
+        return _buildPieChartView(activeCourses, lessonsDone, pending);
+      case 2:
+        return _buildProgressGaugeView(activeCourses, lessonsDone, pending);
+      case 0:
+      default:
+        return _buildCardsView(activeCourses, lessonsDone, pending);
+    }
+  }
+
+  Widget _buildCardsView(int activeCourses, int lessonsDone, int pending) {
     return Row(
       children: [
-        Expanded(child: _buildStatCard('Active Courses', Icons.book, activeCourses.toString(), AppTheme.primary)),
+        Expanded(child: _buildStatCard('Active Courses', Icons.book_outlined, activeCourses.toString(), AppTheme.primary)),
         const SizedBox(width: 12),
-        Expanded(child: _buildStatCard('Lessons Done', Icons.check_circle, lessonsDone.toString(), AppTheme.success)),
+        Expanded(child: _buildStatCard('Lessons Done', Icons.check_circle_outline_rounded, lessonsDone.toString(), AppTheme.success)),
         const SizedBox(width: 12),
-        Expanded(child: _buildStatCard('Pending', Icons.schedule, pending.toString(), AppTheme.warning)),
+        Expanded(child: _buildStatCard('Pending', Icons.schedule_rounded, pending.toString(), AppTheme.warning)),
       ],
+    );
+  }
+
+  Widget _buildPieChartView(int activeCourses, int lessonsDone, int pending) {
+    final total = lessonsDone + pending;
+    final completionPct = total > 0 ? ((lessonsDone / total) * 100).round() : 0;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
+    return Row(
+      children: [
+        // Donut Chart Graphic
+        SizedBox(
+          width: 120,
+          height: 120,
+          child: Stack(
+            alignment: Alignment.center,
+            children: [
+              CustomPaint(
+                size: const Size(120, 120),
+                painter: DonutChartPainter(
+                  completed: lessonsDone.toDouble(),
+                  pending: pending.toDouble(),
+                  courses: activeCourses.toDouble(),
+                  isDark: isDark,
+                  completedColor: AppTheme.success,
+                  pendingColor: AppTheme.warning,
+                  coursesColor: AppTheme.primary,
+                  trackColor: isDark ? AppTheme.darkBorder : AppTheme.lightBorder,
+                ),
+              ),
+              Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(
+                    '$completionPct%',
+                    style: TextStyle(
+                      fontSize: 22,
+                      fontWeight: FontWeight.w800,
+                      color: AppTheme.text,
+                      letterSpacing: -0.5,
+                    ),
+                  ),
+                  Text(
+                    total > 0 ? 'COMPLETE' : 'NO DATA',
+                    style: TextStyle(
+                      fontSize: 8.5,
+                      fontWeight: FontWeight.w700,
+                      letterSpacing: 0.7,
+                      color: AppTheme.textMuted,
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(width: 18),
+
+        // Legend Breakdown List
+        Expanded(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              _buildChartLegendItem(
+                label: 'Lessons Done',
+                value: '$lessonsDone',
+                color: AppTheme.success,
+                subtext: total > 0 ? '${((lessonsDone / total) * 100).round()}% of coursework' : 'None yet',
+              ),
+              const SizedBox(height: 8),
+              _buildChartLegendItem(
+                label: 'Pending Lessons',
+                value: '$pending',
+                color: AppTheme.warning,
+                subtext: total > 0 ? '${((pending / total) * 100).round()}% remaining' : 'Up to date',
+              ),
+              const SizedBox(height: 8),
+              _buildChartLegendItem(
+                label: 'Enrolled Courses',
+                value: '$activeCourses',
+                color: AppTheme.primary,
+                subtext: 'Active curriculum',
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildChartLegendItem({
+    required String label,
+    required String value,
+    required Color color,
+    required String subtext,
+  }) {
+    return Row(
+      children: [
+        Container(
+          width: 9,
+          height: 9,
+          decoration: BoxDecoration(
+            color: color,
+            shape: BoxShape.circle,
+            boxShadow: [
+              BoxShadow(
+                color: color.withValues(alpha: 0.35),
+                blurRadius: 3,
+                offset: const Offset(0, 1),
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(width: 8),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Text(
+                    label,
+                    style: TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w600,
+                      color: AppTheme.text,
+                    ),
+                  ),
+                  Text(
+                    value,
+                    style: TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.bold,
+                      color: color,
+                    ),
+                  ),
+                ],
+              ),
+              Text(
+                subtext,
+                style: TextStyle(
+                  fontSize: 10,
+                  color: AppTheme.textMuted,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildProgressGaugeView(int activeCourses, int lessonsDone, int pending) {
+    final total = lessonsDone + pending;
+    final double progressRatio = total > 0 ? (lessonsDone / total).clamp(0.0, 1.0) : 0.0;
+    final int completionPct = (progressRatio * 100).round();
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
+    final String statusText;
+    final Color statusColor;
+    final IconData statusIcon;
+
+    if (total == 0 && activeCourses == 0) {
+      statusText = 'Enroll in a course to begin your learning journey!';
+      statusColor = AppTheme.textMuted;
+      statusIcon = Icons.school_outlined;
+    } else if (total == 0) {
+      statusText = 'Ready to begin your lessons!';
+      statusColor = AppTheme.primary;
+      statusIcon = Icons.flag_outlined;
+    } else if (completionPct == 100) {
+      statusText = 'All caught up! Outstanding work!';
+      statusColor = AppTheme.success;
+      statusIcon = Icons.celebration_rounded;
+    } else if (completionPct >= 50) {
+      statusText = 'Great momentum! Over halfway through.';
+      statusColor = AppTheme.primary;
+      statusIcon = Icons.rocket_launch_rounded;
+    } else {
+      statusText = '$pending pending lessons remaining.';
+      statusColor = AppTheme.warning;
+      statusIcon = Icons.trending_up_rounded;
+    }
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Curriculum Mastery',
+                  style: TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.bold,
+                    color: AppTheme.text,
+                  ),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  '$lessonsDone of $total lessons completed',
+                  style: TextStyle(
+                    fontSize: 11,
+                    color: AppTheme.textSecondary,
+                  ),
+                ),
+              ],
+            ),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 3),
+              decoration: BoxDecoration(
+                color: (completionPct >= 100 ? AppTheme.success : AppTheme.primary).withValues(alpha: 0.12),
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: Text(
+                '$completionPct%',
+                style: TextStyle(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w800,
+                  color: completionPct >= 100 ? AppTheme.success : AppTheme.primary,
+                ),
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 12),
+
+        // Gradient Linear Progress Track
+        ClipRRect(
+          borderRadius: BorderRadius.circular(8),
+          child: Stack(
+            children: [
+              Container(
+                height: 9,
+                width: double.infinity,
+                color: isDark ? AppTheme.darkBorder : AppTheme.lightBorder,
+              ),
+              FractionallySizedBox(
+                widthFactor: progressRatio > 0 ? progressRatio : 0.001,
+                child: Container(
+                  height: 9,
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      colors: [
+                        AppTheme.primary,
+                        AppTheme.success,
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(height: 12),
+
+        // Status Banner & Quick Metrics
+        Row(
+          children: [
+            Icon(statusIcon, size: 14, color: statusColor),
+            const SizedBox(width: 6),
+            Expanded(
+              child: Text(
+                statusText,
+                style: TextStyle(
+                  fontSize: 11,
+                  fontWeight: FontWeight.w500,
+                  color: statusColor,
+                ),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+              ),
+            ),
+            const SizedBox(width: 8),
+            _buildMiniMetricChip('Courses: $activeCourses', AppTheme.primary),
+          ],
+        ),
+      ],
+    );
+  }
+
+  Widget _buildMiniMetricChip(String text, Color color) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.1),
+        borderRadius: BorderRadius.circular(7),
+        border: Border.all(color: color.withValues(alpha: 0.25)),
+      ),
+      child: Text(
+        text,
+        style: TextStyle(
+          fontSize: 10,
+          fontWeight: FontWeight.bold,
+          color: color,
+        ),
+      ),
     );
   }
 
@@ -1105,5 +1684,99 @@ class _StudentHeaderAvatarButtonState
     );
   }
 }
+
+/// Custom painter for rendering a modern, sleek donut chart breakdown
+/// for the student analytics overview.
+class DonutChartPainter extends CustomPainter {
+  final double completed;
+  final double pending;
+  final double courses;
+  final bool isDark;
+  final Color completedColor;
+  final Color pendingColor;
+  final Color coursesColor;
+  final Color trackColor;
+
+  const DonutChartPainter({
+    required this.completed,
+    required this.pending,
+    required this.courses,
+    required this.isDark,
+    required this.completedColor,
+    required this.pendingColor,
+    required this.coursesColor,
+    required this.trackColor,
+  });
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    const strokeWidth = 11.0;
+    final center = Offset(size.width / 2, size.height / 2);
+    final radius = (math.min(size.width, size.height) - strokeWidth) / 2;
+
+    // 1. Background Track Ring
+    final trackPaint = Paint()
+      ..color = trackColor
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = strokeWidth;
+    canvas.drawCircle(center, radius, trackPaint);
+
+    final total = completed + pending;
+    if (total <= 0) return;
+
+    const startAngle = -math.pi / 2;
+    final hasBoth = completed > 0 && pending > 0;
+    final gap = hasBoth ? 0.08 : 0.0;
+
+    final completedSweep = (completed / total) * 2 * math.pi;
+    final pendingSweep = (pending / total) * 2 * math.pi;
+
+    // 2. Completed Lessons Slice (Success)
+    if (completed > 0) {
+      final sweep = (completedSweep - gap).clamp(0.02, 2 * math.pi);
+      final completedPaint = Paint()
+        ..color = completedColor
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = strokeWidth
+        ..strokeCap = StrokeCap.round;
+      canvas.drawArc(
+        Rect.fromCircle(center: center, radius: radius),
+        startAngle + (gap / 2),
+        sweep,
+        false,
+        completedPaint,
+      );
+    }
+
+    // 3. Pending Lessons Slice (Warning)
+    if (pending > 0) {
+      final sweep = (pendingSweep - gap).clamp(0.02, 2 * math.pi);
+      final pendingPaint = Paint()
+        ..color = pendingColor
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = strokeWidth
+        ..strokeCap = StrokeCap.round;
+      canvas.drawArc(
+        Rect.fromCircle(center: center, radius: radius),
+        startAngle + completedSweep + (gap / 2),
+        sweep,
+        false,
+        pendingPaint,
+      );
+    }
+  }
+
+  @override
+  bool shouldRepaint(covariant DonutChartPainter oldDelegate) {
+    return oldDelegate.completed != completed ||
+        oldDelegate.pending != pending ||
+        oldDelegate.courses != courses ||
+        oldDelegate.isDark != isDark ||
+        oldDelegate.completedColor != completedColor ||
+        oldDelegate.pendingColor != pendingColor ||
+        oldDelegate.trackColor != trackColor;
+  }
+}
+
 
 

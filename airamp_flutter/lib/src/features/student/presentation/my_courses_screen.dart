@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import '../../../core/components/app_toast.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/theme/theme_provider.dart';
 import '../../auth/application/auth_provider.dart';
@@ -32,176 +34,349 @@ class _MyCoursesScreenState extends ConsumerState<MyCoursesScreen> {
       context: context,
       builder: (dialogCtx) => StatefulBuilder(
         builder: (ctx, setDialogState) {
-          return AlertDialog(
-            backgroundColor: Theme.of(context).colorScheme.surface,
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-            title: Row(
-              children: [
-                Container(
-                  padding: const EdgeInsets.all(10),
-                  decoration: BoxDecoration(
-                    color: Theme.of(context).colorScheme.primary.withValues(alpha: 0.15),
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: Icon(Icons.vpn_key_rounded, color: Theme.of(context).colorScheme.primary, size: 22),
+          final isDark = Theme.of(context).brightness == Brightness.dark;
+          final primary = Theme.of(context).colorScheme.primary;
+          final surface = Theme.of(context).colorScheme.surface;
+          final onSurface = Theme.of(context).colorScheme.onSurface;
+          final keyText = controller.text.trim();
+          final canSubmit = keyText.isNotEmpty && !isVerifyingModal;
+
+          Future<void> submitKey() async {
+            final key = controller.text.trim();
+            if (key.isEmpty || isVerifyingModal) return;
+
+            setDialogState(() => isVerifyingModal = true);
+            try {
+              final verified = await ref.read(studentCoursesProvider.notifier).verifyKey(key);
+
+              if (dialogCtx.mounted) {
+                Navigator.pop(dialogCtx);
+              }
+
+              if (verified != null) {
+                _showVerificationPreviewSheet(verified, key);
+              } else {
+                if (mounted) {
+                  AppToast.showWarning(
+                    context,
+                    'Invalid Section Key "$key". Please check with your administrator.',
+                  );
+                }
+              }
+            } catch (e) {
+              if (mounted) {
+                AppToast.showError(
+                  context,
+                  'Error verifying key: ${e.toString().replaceFirst("Exception: ", "")}',
+                );
+              }
+            } finally {
+              if (dialogCtx.mounted) {
+                setDialogState(() => isVerifyingModal = false);
+              }
+            }
+          }
+
+          return Dialog(
+            backgroundColor: Colors.transparent,
+            insetPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 24),
+            child: Container(
+              constraints: const BoxConstraints(maxWidth: 420),
+              decoration: BoxDecoration(
+                color: surface,
+                borderRadius: BorderRadius.circular(24),
+                border: Border.all(
+                  color: isDark ? AppTheme.darkBorder : AppTheme.lightBorder,
+                  width: 1.2,
                 ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        'Section Enrollment Key',
-                        style: TextStyle(
-                          fontSize: 18,
-                          fontWeight: FontWeight.bold,
-                          color: Theme.of(context).colorScheme.onSurface,
-                        ),
-                      ),
-                      const SizedBox(height: 2),
-                      Text(
-                        'Provided by your school admin',
-                        style: TextStyle(fontSize: 12, color: AppTheme.textSecondary),
-                      ),
-                    ],
-                  ),
-                ),
-              ],
-            ),
-            content: SingleChildScrollView(
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    'Enter your assigned section key to load your classroom room and fixed subjects.',
-                    style: TextStyle(fontSize: 13, color: AppTheme.textSecondary, height: 1.4),
-                  ),
-                  const SizedBox(height: 16),
-                  TextField(
-                    controller: controller,
-                    maxLength: 15,
-                    buildCounter: (context, {required currentLength, required isFocused, maxLength}) => null,
-                    textCapitalization: TextCapitalization.characters,
-                    style: TextStyle(color: AppTheme.text, fontWeight: FontWeight.bold, letterSpacing: 1),
-                    decoration: InputDecoration(
-                      labelText: 'Section Key',
-                      counterText: '',
-                      hintText: 'e.g., SEC-EMR10',
-                      prefixIcon: Icon(Icons.key, color: Theme.of(context).colorScheme.primary, size: 20),
-                      suffixIcon: controller.text.isNotEmpty
-                          ? IconButton(
-                              icon: const Icon(Icons.clear, size: 18),
-                              onPressed: () => setDialogState(() => controller.clear()),
-                            )
-                          : null,
-                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
-                    ),
-                    onChanged: (_) => setDialogState(() {}),
-                  ),
-                  const SizedBox(height: 14),
-                  Text(
-                    'Quick Sample Keys:',
-                    style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: AppTheme.textMuted),
-                  ),
-                  const SizedBox(height: 6),
-                  Wrap(
-                    spacing: 6,
-                    runSpacing: 6,
-                    children: [
-                      _buildQuickKeyChip('SEC-EMR10', 'Grade 10 Emerald', controller, setDialogState),
-                      _buildQuickKeyChip('SEC-STEM11', 'Grade 11 STEM', controller, setDialogState),
-                      _buildQuickKeyChip('SEC-GOLD12', 'Grade 12 Gold', controller, setDialogState),
-                    ],
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withValues(alpha: isDark ? 0.45 : 0.12),
+                    blurRadius: 32,
+                    offset: const Offset(0, 12),
                   ),
                 ],
               ),
-            ),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.pop(dialogCtx),
-                child: Text('Cancel', style: TextStyle(color: AppTheme.textMuted)),
-              ),
-              ElevatedButton.icon(
-                onPressed: isVerifyingModal
-                    ? null
-                    : () async {
-                        final key = controller.text.trim();
-                        if (key.isEmpty) return;
-
-                        setDialogState(() => isVerifyingModal = true);
-                        try {
-                          final verified = await ref.read(studentCoursesProvider.notifier).verifyKey(key);
-
-                          if (dialogCtx.mounted) {
-                            Navigator.pop(dialogCtx);
-                          }
-
-                          if (verified != null) {
-                            _showVerificationPreviewSheet(verified, key);
-                          } else {
-                            if (mounted) {
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                SnackBar(
-                                  content: Text('Invalid Section Key "$key". Please check with your administrator.'),
-                                  backgroundColor: AppTheme.error,
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(24),
+                child: Padding(
+                  padding: const EdgeInsets.all(22),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                          // Header: Icon badge + Title / Subtitle + Close icon
+                          Row(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Container(
+                                width: 44,
+                                height: 44,
+                                decoration: BoxDecoration(
+                                  color: primary.withValues(alpha: 0.12),
+                                  borderRadius: BorderRadius.circular(14),
+                                  border: Border.all(
+                                    color: primary.withValues(alpha: 0.25),
+                                    width: 1.2,
+                                  ),
                                 ),
-                              );
-                            }
-                          }
-                        } catch (e) {
-                          if (mounted) {
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              SnackBar(
-                                content: Text('Error verifying key: ${e.toString().replaceFirst("Exception: ", "")}'),
-                                backgroundColor: AppTheme.error,
+                                child: Icon(
+                                  Icons.vpn_key_rounded,
+                                  color: primary,
+                                  size: 22,
+                                ),
                               ),
-                            );
-                          }
-                        } finally {
-                          if (dialogCtx.mounted) {
-                            setDialogState(() => isVerifyingModal = false);
-                          }
-                        }
-                      },
-                icon: isVerifyingModal
-                    ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.black))
-                    : const Icon(Icons.check_circle_outline, size: 18),
-                label: const Text('Verify Key'),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: Theme.of(context).colorScheme.primary,
-                  foregroundColor: Colors.black,
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                              const SizedBox(width: 12),
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      'Section Enrollment',
+                                      style: TextStyle(
+                                        fontSize: 18,
+                                        fontWeight: FontWeight.bold,
+                                        color: onSurface,
+                                        letterSpacing: -0.2,
+                                      ),
+                                    ),
+                                    const SizedBox(height: 3),
+                                    Text(
+                                      'Provided by your school administrator',
+                                      style: TextStyle(
+                                        fontSize: 12,
+                                        color: AppTheme.textSecondary,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                              Material(
+                                color: Colors.transparent,
+                                child: InkWell(
+                                  borderRadius: BorderRadius.circular(20),
+                                  onTap: () => Navigator.pop(dialogCtx),
+                                  child: Padding(
+                                    padding: const EdgeInsets.all(4),
+                                    child: Icon(
+                                      Icons.close_rounded,
+                                      size: 20,
+                                      color: AppTheme.textMuted,
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 18),
+
+                          // Informative callout card
+                          Container(
+                            padding: const EdgeInsets.all(12),
+                            decoration: BoxDecoration(
+                              color: primary.withValues(alpha: 0.06),
+                              borderRadius: BorderRadius.circular(14),
+                              border: Border.all(
+                                color: primary.withValues(alpha: 0.15),
+                              ),
+                            ),
+                            child: Row(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Icon(
+                                  Icons.info_outline_rounded,
+                                  size: 18,
+                                  color: primary,
+                                ),
+                                const SizedBox(width: 10),
+                                Expanded(
+                                  child: Text(
+                                    'Enter your assigned section key to load your classroom room and fixed subjects.',
+                                    style: TextStyle(
+                                      fontSize: 12,
+                                      height: 1.4,
+                                      color: onSurface.withValues(alpha: 0.8),
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                          const SizedBox(height: 18),
+
+                          // Field Label
+                          Text(
+                            'SECTION KEY',
+                            style: TextStyle(
+                              fontSize: 11,
+                              fontWeight: FontWeight.w700,
+                              letterSpacing: 0.8,
+                              color: AppTheme.textMuted,
+                            ),
+                          ),
+                          const SizedBox(height: 8),
+
+                          // Text Input Field
+                          TextField(
+                            controller: controller,
+                            maxLength: 20,
+                            buildCounter: (context, {required currentLength, required isFocused, maxLength}) => null,
+                            textCapitalization: TextCapitalization.characters,
+                            style: TextStyle(
+                              color: onSurface,
+                              fontWeight: FontWeight.w700,
+                              fontSize: 16,
+                              letterSpacing: 1.5,
+                            ),
+                            decoration: InputDecoration(
+                              filled: true,
+                              fillColor: isDark
+                                  ? AppTheme.darkInputBg
+                                  : const Color(0xFFF8FAFC),
+                              hintText: 'e.g. SEC-10A',
+                              hintStyle: TextStyle(
+                                color: AppTheme.textMuted.withValues(alpha: 0.6),
+                                fontWeight: FontWeight.normal,
+                                letterSpacing: 0.5,
+                                fontSize: 14,
+                              ),
+                              contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
+                              prefixIcon: Icon(
+                                Icons.key_rounded,
+                                color: keyText.isNotEmpty ? primary : AppTheme.textMuted,
+                                size: 20,
+                              ),
+                              suffixIcon: controller.text.isNotEmpty
+                                  ? IconButton(
+                                      icon: const Icon(Icons.cancel_rounded, size: 18),
+                                      color: AppTheme.textMuted,
+                                      tooltip: 'Clear',
+                                      onPressed: () => setDialogState(() => controller.clear()),
+                                    )
+                                  : IconButton(
+                                      icon: const Icon(Icons.content_paste_rounded, size: 18),
+                                      color: primary,
+                                      tooltip: 'Paste from clipboard',
+                                      onPressed: () async {
+                                        final data = await Clipboard.getData(Clipboard.kTextPlain);
+                                        if (data?.text != null && data!.text!.trim().isNotEmpty) {
+                                          setDialogState(() {
+                                            controller.text = data.text!.trim().toUpperCase();
+                                          });
+                                        }
+                                      },
+                                    ),
+                              border: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(14),
+                                borderSide: BorderSide(
+                                  color: isDark ? AppTheme.darkBorder : AppTheme.lightBorder,
+                                ),
+                              ),
+                              enabledBorder: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(14),
+                                borderSide: BorderSide(
+                                  color: isDark ? AppTheme.darkBorder : AppTheme.lightBorder,
+                                ),
+                              ),
+                              focusedBorder: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(14),
+                                borderSide: BorderSide(color: primary, width: 2),
+                              ),
+                            ),
+                            onChanged: (_) => setDialogState(() {}),
+                            onSubmitted: (_) => submitKey(),
+                          ),
+                          const SizedBox(height: 8),
+
+                          // Helper note
+                          Row(
+                            children: [
+                              Icon(Icons.shield_outlined, size: 12, color: AppTheme.textMuted),
+                              const SizedBox(width: 5),
+                              Expanded(
+                                child: Text(
+                                  'Keys are case-insensitive and unique to each registered class section.',
+                                  style: TextStyle(fontSize: 11, color: AppTheme.textMuted),
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 22),
+
+                          // Action Buttons Row
+                          Row(
+                            children: [
+                              Expanded(
+                                flex: 1,
+                                child: OutlinedButton(
+                                  onPressed: () => Navigator.pop(dialogCtx),
+                                  style: OutlinedButton.styleFrom(
+                                    padding: const EdgeInsets.symmetric(vertical: 14),
+                                    foregroundColor: AppTheme.textSecondary,
+                                    side: BorderSide(
+                                      color: isDark ? AppTheme.darkBorder : AppTheme.lightBorder,
+                                    ),
+                                    shape: RoundedRectangleBorder(
+                                      borderRadius: BorderRadius.circular(12),
+                                    ),
+                                  ),
+                                  child: const Text(
+                                    'Cancel',
+                                    style: TextStyle(fontWeight: FontWeight.w600, fontSize: 14),
+                                  ),
+                                ),
+                              ),
+                              const SizedBox(width: 12),
+                              Expanded(
+                                flex: 2,
+                                child: ElevatedButton(
+                                  onPressed: canSubmit ? submitKey : null,
+                                  style: ElevatedButton.styleFrom(
+                                    backgroundColor: primary,
+                                    foregroundColor: Colors.black,
+                                    disabledBackgroundColor: primary.withValues(alpha: 0.3),
+                                    disabledForegroundColor: Colors.black38,
+                                    elevation: 0,
+                                    padding: const EdgeInsets.symmetric(vertical: 14),
+                                    shape: RoundedRectangleBorder(
+                                      borderRadius: BorderRadius.circular(12),
+                                    ),
+                                  ),
+                                  child: isVerifyingModal
+                                      ? const SizedBox(
+                                          width: 20,
+                                          height: 20,
+                                          child: CircularProgressIndicator(
+                                            strokeWidth: 2.2,
+                                            color: Colors.black,
+                                          ),
+                                        )
+                                      : Row(
+                                          mainAxisAlignment: MainAxisAlignment.center,
+                                          children: const [
+                                            Icon(Icons.check_circle_rounded, size: 18),
+                                            SizedBox(width: 8),
+                                            Text(
+                                              'Verify Key',
+                                              style: TextStyle(
+                                                fontWeight: FontWeight.bold,
+                                                fontSize: 14,
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
                 ),
-              ),
-            ],
-          );
+              );
         },
       ),
-    );
-  }
-
-  Widget _buildQuickKeyChip(
-    String key,
-    String label,
-    TextEditingController controller,
-    StateSetter setDialogState,
-  ) {
-    return ActionChip(
-      avatar: Icon(Icons.copy, size: 12, color: Theme.of(context).colorScheme.primary),
-      label: Text('$key ($label)'),
-      labelStyle: TextStyle(
-        fontSize: 11,
-        fontWeight: FontWeight.w600,
-        color: Theme.of(context).colorScheme.primary,
-      ),
-      backgroundColor: Theme.of(context).colorScheme.primary.withValues(alpha: 0.1),
-      side: BorderSide(color: Theme.of(context).colorScheme.primary.withValues(alpha: 0.25)),
-      onPressed: () {
-        setDialogState(() {
-          controller.text = key;
-        });
-      },
     );
   }
 
@@ -467,31 +642,24 @@ class _MyCoursesScreenState extends ConsumerState<MyCoursesScreen> {
                       child: ElevatedButton.icon(
                         onPressed: () async {
                           Navigator.pop(sheetCtx);
-                          final messenger = ScaffoldMessenger.of(context);
                           try {
                             final success = await ref.read(studentCoursesProvider.notifier).enrollBySectionKey(key);
                             if (success && mounted) {
-                              messenger.showSnackBar(
-                                SnackBar(
-                                  content: Text('Enrolled in $sectionName successfully! All ${subjects.length} subjects loaded.'),
-                                  backgroundColor: AppTheme.success,
-                                ),
+                              AppToast.showSuccess(
+                                context,
+                                'Enrolled in $sectionName successfully! All ${subjects.length} subjects loaded.',
                               );
                             } else if (mounted) {
-                              messenger.showSnackBar(
-                                SnackBar(
-                                  content: const Text('Enrollment failed. Please try again.'),
-                                  backgroundColor: AppTheme.error,
-                                ),
+                              AppToast.showError(
+                                context,
+                                'Enrollment failed. Please try again.',
                               );
                             }
                           } catch (e) {
                             if (mounted) {
-                              messenger.showSnackBar(
-                                SnackBar(
-                                  content: Text('Enrollment error: ${e.toString().replaceFirst("Exception: ", "")}'),
-                                  backgroundColor: AppTheme.error,
-                                ),
+                              AppToast.showError(
+                                context,
+                                'Enrollment error: ${e.toString().replaceFirst("Exception: ", "")}',
                               );
                             }
                           }
@@ -537,11 +705,9 @@ class _MyCoursesScreenState extends ConsumerState<MyCoursesScreen> {
               Navigator.pop(ctx);
               await ref.read(studentCoursesProvider.notifier).leaveSection();
               if (mounted) {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(
-                    content: const Text('You have left the section. Enter a new key to re-enroll.'),
-                    backgroundColor: AppTheme.error,
-                  ),
+                AppToast.showInfo(
+                  context,
+                  'You have left the section. Enter a new key to re-enroll.',
                 );
               }
             },
@@ -1002,13 +1168,14 @@ class _MyCoursesScreenState extends ConsumerState<MyCoursesScreen> {
               Expanded(
                 child: TextField(
                   controller: _keyController,
-                  maxLength: 15,
+                  maxLength: 20,
                   buildCounter: (context, {required currentLength, required isFocused, maxLength}) => null,
                   textCapitalization: TextCapitalization.characters,
                   style: TextStyle(color: AppTheme.text, fontWeight: FontWeight.bold, letterSpacing: 1),
                   decoration: InputDecoration(
                     counterText: '',
-                    hintText: 'e.g. SEC-EMR10',
+                    hintText: 'e.g. SEC-10A',
+                    prefixIcon: Icon(Icons.key_rounded, color: AppTheme.primary, size: 18),
                     contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
                     border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
                   ),
@@ -1030,21 +1197,17 @@ class _MyCoursesScreenState extends ConsumerState<MyCoursesScreen> {
                             _showVerificationPreviewSheet(verified, key);
                           } else {
                             if (mounted) {
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                SnackBar(
-                                  content: Text('Invalid Key "$key". Please check with your school administrator.'),
-                                  backgroundColor: AppTheme.error,
-                                ),
+                              AppToast.showWarning(
+                                context,
+                                'Invalid Key "$key". Please check with your school administrator.',
                               );
                             }
                           }
                         } catch (e) {
                           if (mounted) {
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              SnackBar(
-                                content: Text('Error verifying key: ${e.toString().replaceFirst("Exception: ", "")}'),
-                                backgroundColor: AppTheme.error,
-                              ),
+                            AppToast.showError(
+                              context,
+                              'Error verifying key: ${e.toString().replaceFirst("Exception: ", "")}',
                             );
                           }
                         } finally {
@@ -1065,18 +1228,16 @@ class _MyCoursesScreenState extends ConsumerState<MyCoursesScreen> {
               ),
             ],
           ),
-          const SizedBox(height: 12),
+          const SizedBox(height: 10),
           Row(
             children: [
-              Text('Sample Keys: ', style: TextStyle(fontSize: 11, color: AppTheme.textMuted)),
-              InkWell(
-                onTap: () => setState(() => _keyController.text = 'SEC-EMR10'),
-                child: Text('SEC-EMR10', style: TextStyle(fontSize: 11, color: AppTheme.primary, fontWeight: FontWeight.bold)),
-              ),
-              Text(' · ', style: TextStyle(color: AppTheme.textMuted)),
-              InkWell(
-                onTap: () => setState(() => _keyController.text = 'SEC-STEM11'),
-                child: Text('SEC-STEM11', style: TextStyle(fontSize: 11, color: AppTheme.primary, fontWeight: FontWeight.bold)),
+              Icon(Icons.info_outline_rounded, size: 12, color: AppTheme.textMuted),
+              const SizedBox(width: 6),
+              Expanded(
+                child: Text(
+                  'Obtain your section key from your school adviser or administrator.',
+                  style: TextStyle(fontSize: 11, color: AppTheme.textMuted),
+                ),
               ),
             ],
           ),
@@ -1296,12 +1457,7 @@ class _MyCoursesScreenState extends ConsumerState<MyCoursesScreen> {
             onPressed: () async {
               await ref.read(studentCoursesProvider.notifier).enrollCourse(id);
               if (mounted) {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(
-                    content: Text('Enrolled in $title'),
-                    backgroundColor: AppTheme.success,
-                  ),
-                );
+                AppToast.showSuccess(context, 'Enrolled in $title');
               }
             },
             style: ElevatedButton.styleFrom(
