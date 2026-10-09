@@ -342,6 +342,124 @@ AIRA Security & Identity Management
     );
   }
 
+  /// Sends an official response email from school administration to an inquiry.
+  Future<EmailResult> sendInquiryReply({
+    required String toEmail,
+    required String fullName,
+    required String userId,
+    required String role,
+    required String inquiryQuestion,
+    required String adminReply,
+    required String adminName,
+  }) async {
+    final roleTitle = role.toLowerCase() == 'teacher'
+        ? 'Faculty Member'
+        : (role.toLowerCase() == 'admin' || role.toLowerCase() == 'super_admin'
+            ? 'Administrator'
+            : 'Student');
+    final subject = 'AIRA School Administration - Response to Your Inquiry';
+
+    final textContent = '''
+Hello $fullName,
+
+This is an official response from AIRA School Administration regarding your inquiry.
+
+Account Details:
+- Recipient: $fullName ($userId)
+- Role: $roleTitle
+- Destination Email: $toEmail
+
+Your Inquiry:
+"$inquiryQuestion"
+
+Administrative Response:
+$adminReply
+
+Answered by: $adminName (School Administration)
+Date: ${DateTime.now().toLocal().toString().split('.')[0]}
+
+This response has also been posted to your in-app AIRA notification center. You can access your account and records at:
+https://aira-app-database.web.app
+
+Best regards,
+AIRA School Administration
+Evangelista Christian School & Institutional Assessment Platform
+''';
+
+    final htmlContent = '''
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <style>
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; background-color: #f8fafc; color: #1e293b; margin: 0; padding: 24px; }
+    .container { max-width: 600px; margin: 0 auto; background: #ffffff; border-radius: 16px; overflow: hidden; box-shadow: 0 4px 14px rgba(0,0,0,0.06); border: 1px solid #e2e8f0; }
+    .header { background: linear-gradient(135deg, #0d9488 0%, #0284c7 100%); padding: 28px 24px; text-align: center; color: #ffffff; }
+    .header h1 { margin: 0; font-size: 22px; font-weight: 700; letter-spacing: -0.5px; }
+    .header p { margin: 6px 0 0; font-size: 13px; opacity: 0.9; }
+    .content { padding: 32px 28px; }
+    .greeting { font-size: 16px; font-weight: 600; margin-bottom: 12px; color: #0f172a; }
+    .badge { display: inline-block; background: #ccfbf1; color: #0f766e; padding: 4px 10px; border-radius: 6px; font-size: 12px; font-weight: 700; margin-bottom: 16px; }
+    .question-box { background-color: #f8fafc; border-left: 4px solid #94a3b8; border-radius: 0 8px 8px 0; padding: 14px 16px; margin: 16px 0; font-size: 14px; color: #475569; font-style: italic; }
+    .reply-card { background-color: #f0fdf4; border-radius: 12px; padding: 20px; margin: 20px 0; border: 1px solid #bbf7d0; }
+    .reply-header { font-size: 13px; font-weight: 700; color: #166534; margin-bottom: 8px; }
+    .reply-text { font-size: 15px; color: #14532d; line-height: 1.6; white-space: pre-wrap; font-weight: 500; }
+    .info-footer { font-size: 12px; color: #64748b; margin-top: 18px; border-top: 1px dashed #cbd5e1; padding-top: 12px; }
+    .btn-container { text-align: center; margin: 24px 0 8px; }
+    .btn { display: inline-block; background-color: #0d9488; color: #ffffff !important; font-weight: 600; text-decoration: none; padding: 12px 26px; border-radius: 10px; font-size: 14px; }
+    .footer { text-align: center; padding: 20px; font-size: 12px; color: #94a3b8; border-top: 1px solid #f1f5f9; background-color: #fafafa; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="header">
+      <h1>AIRA School Administration</h1>
+      <p>Official Inquiry Response</p>
+    </div>
+    <div class="content">
+      <div class="greeting">Hello, $fullName!</div>
+      <div class="badge">$roleTitle &bull; ID: $userId</div>
+      <p style="font-size: 14px; line-height: 1.5; color: #334155;">
+        School administration has reviewed your inquiry and submitted the following response:
+      </p>
+      
+      <div style="font-size: 12px; font-weight: 700; color: #64748b; text-transform: uppercase; letter-spacing: 0.5px;">Your Inquiry:</div>
+      <div class="question-box">"$inquiryQuestion"</div>
+
+      <div class="reply-card">
+        <div class="reply-header">&#9989; Administrative Response from $adminName:</div>
+        <div class="reply-text">$adminReply</div>
+      </div>
+
+      <div class="info-footer">
+        &bull; <strong>System Sync:</strong> A copy of this reply has been placed in your in-app AIRA notification inbox.<br>
+        &bull; <strong>Sent to:</strong> $toEmail
+      </div>
+
+      <div class="btn-container">
+        <a href="https://aira-app-database.web.app" class="btn">Open AIRA Portal</a>
+      </div>
+    </div>
+    <div class="footer">
+      Sent automatically by AIRA Academic Management &bull; School Administration
+    </div>
+  </div>
+</body>
+</html>
+''';
+
+    return await _deliverEmail(
+      toEmail: toEmail,
+      subject: subject,
+      textContent: textContent,
+      htmlContent: htmlContent,
+      userId: userId,
+      role: role,
+      mailType: 'inquiry_response',
+      successMessage: 'Inquiry reply sent to $toEmail via Gmail SMTP',
+    );
+  }
+
   /// Core cross-platform email delivery pipeline supporting Native SMTP,
   /// Local/Emulator HTTP Bridge, and Cloud Firestore Logging.
   Future<EmailResult> _deliverEmail({

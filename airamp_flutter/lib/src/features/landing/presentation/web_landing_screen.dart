@@ -7,6 +7,8 @@ import '../../../core/theme/theme_provider.dart';
 import '../../auth/application/auth_provider.dart';
 
 import 'components/halftone_background.dart';
+import 'components/placeholders_and_vanish_input_demo.dart';
+import 'components/cross_platform_ecosystem_cloud.dart';
 
 class WebLandingScreen extends ConsumerWidget {
   const WebLandingScreen({super.key});
@@ -340,6 +342,48 @@ class WebLandingScreen extends ConsumerWidget {
                     },
                   ),
                 ],
+              ),
+            ),
+
+            // ── Interactive School Management Assistant Section ────
+            Container(
+              margin: EdgeInsets.symmetric(
+                horizontal: isMobile ? 20 : (isTablet ? 40 : 80),
+                vertical: 20,
+              ),
+              decoration: BoxDecoration(
+                color: isDark
+                    ? const Color(0xFF0F172A).withValues(alpha: 0.55)
+                    : Colors.white.withValues(alpha: 0.75),
+                borderRadius: BorderRadius.circular(24),
+                border: Border.all(
+                  color: isDark
+                      ? Colors.white.withValues(alpha: 0.1)
+                      : Colors.black.withValues(alpha: 0.08),
+                ),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withValues(alpha: isDark ? 0.35 : 0.06),
+                    blurRadius: 24,
+                    offset: const Offset(0, 8),
+                  ),
+                ],
+              ),
+              child: PlaceholdersAndVanishInputDemo(
+                isDark: isDark,
+                isCompact: isMobile,
+              ),
+            ),
+
+            // ── Cross-Platform Ecosystem Cloud (Animated) ──────────
+            Container(
+              margin: EdgeInsets.symmetric(
+                horizontal: isMobile ? 20 : (isTablet ? 40 : 80),
+                vertical: 16,
+              ),
+              child: CrossPlatformEcosystemCloud(
+                isDark: isDark,
+                isCompact: isMobile,
               ),
             ),
 
@@ -827,67 +871,58 @@ class WebLandingScreen extends ConsumerWidget {
       context: context,
       builder: (ctx) => AlertDialog(
         backgroundColor: isDark ? const Color(0xFF1E293B) : Colors.white,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-        title: Row(
-          children: [
-            Container(
-              padding: const EdgeInsets.all(8),
-              decoration: BoxDecoration(
-                color: AppTheme.primary.withValues(alpha: 0.15),
-                borderRadius: BorderRadius.circular(10),
-              ),
-              child: Icon(Icons.devices_rounded, color: AppTheme.primary, size: 24),
-            ),
-            const SizedBox(width: 12),
-            const Flexible(
-              child: Text(
-                'AIRAMP Ecosystem Access',
-                style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800),
-                overflow: TextOverflow.ellipsis,
-              ),
-            ),
-          ],
-        ),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+        contentPadding: const EdgeInsets.fromLTRB(20, 14, 20, 16),
         content: ConstrainedBox(
           constraints: BoxConstraints(
-            maxWidth: 520,
-            maxHeight: MediaQuery.sizeOf(context).height * 0.75,
+            maxWidth: 680,
+            maxHeight: MediaQuery.sizeOf(context).height * 0.85,
           ),
           child: SingleChildScrollView(
             child: Column(
               mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                _buildAppPlatformRow(
-                  icon: Icons.language_rounded,
-                  iconColor: AppTheme.primary,
-                  title: 'Web Console & Portals (All Devices)',
-                  description: 'Responsive web platform accessible via Google Chrome, Safari, Android, and iOS for Administrators, Teachers, and Students.',
-                  isDark: isDark,
+                // Top Close Action
+                Align(
+                  alignment: Alignment.topRight,
+                  child: IconButton(
+                    icon: Icon(
+                      Icons.close_rounded,
+                      size: 20,
+                      color: isDark ? Colors.white60 : Colors.black54,
+                    ),
+                    tooltip: 'Close',
+                    padding: EdgeInsets.zero,
+                    constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
+                    onPressed: () => Navigator.pop(ctx),
+                  ),
                 ),
-                const SizedBox(height: 16),
-                _buildAppPlatformRow(
-                  icon: Icons.phone_iphone_rounded,
-                  iconColor: isDark ? const Color(0xFF38BDF8) : const Color(0xFF0284C7),
-                  title: 'iOS & Android Mobile Web / PWA',
-                  description: 'Add AIRA to your device Home Screen for an instant, full-screen mobile app feel with offline lesson caching.',
-                  isDark: isDark,
+                const SizedBox(height: 4),
+                // School Management Assistant inside App Information
+                Container(
+                  margin: const EdgeInsets.only(bottom: 24),
+                  decoration: BoxDecoration(
+                    color: isDark
+                        ? const Color(0xFF0F172A).withValues(alpha: 0.6)
+                        : const Color(0xFFF8FAFC),
+                    borderRadius: BorderRadius.circular(20),
+                    border: Border.all(
+                      color: isDark
+                          ? Colors.white.withValues(alpha: 0.08)
+                          : Colors.black.withValues(alpha: 0.06),
+                    ),
+                  ),
+                  child: PlaceholdersAndVanishInputDemo(
+                    isDark: isDark,
+                    isCompact: true,
+                  ),
                 ),
-                const SizedBox(height: 16),
-                _buildAppPlatformRow(
-                  icon: Icons.desktop_windows_rounded,
-                  iconColor: isDark ? const Color(0xFF60A5FA) : const Color(0xFF2563EB),
-                  title: 'Windows Desktop Application',
-                  description: 'Offline-ready assessment execution, auto-sync, and teacher grading tools for school PC laboratories.',
+
+                // ── Animated Cross-Platform Ecosystem Cloud (Modal) ────
+                CrossPlatformEcosystemCloud(
                   isDark: isDark,
-                ),
-                const SizedBox(height: 16),
-                _buildAppPlatformRow(
-                  icon: Icons.android_rounded,
-                  iconColor: isDark ? const Color(0xFF34D399) : const Color(0xFF059669),
-                  title: 'Android Native Application',
-                  description: 'Dedicated Android APK for portable learning outcome reviews and direct teacher consultations.',
-                  isDark: isDark,
+                  isCompact: true,
                 ),
               ],
             ),
@@ -904,54 +939,6 @@ class WebLandingScreen extends ConsumerWidget {
           ),
         ],
       ),
-    );
-  }
-
-  Widget _buildAppPlatformRow({
-    required IconData icon,
-    required Color iconColor,
-    required String title,
-    required String description,
-    required bool isDark,
-  }) {
-    return Row(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Container(
-          width: 40,
-          height: 40,
-          decoration: BoxDecoration(
-            color: iconColor.withValues(alpha: 0.15),
-            borderRadius: BorderRadius.circular(10),
-          ),
-          child: Icon(icon, color: iconColor, size: 20),
-        ),
-        const SizedBox(width: 14),
-        Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                title,
-                style: TextStyle(
-                  fontSize: 14,
-                  fontWeight: FontWeight.w700,
-                  color: isDark ? Colors.white : const Color(0xFF0F172A),
-                ),
-              ),
-              const SizedBox(height: 3),
-              Text(
-                description,
-                style: TextStyle(
-                  fontSize: 12,
-                  color: AppTheme.textSecondary,
-                  height: 1.4,
-                ),
-              ),
-            ],
-          ),
-        ),
-      ],
     );
   }
 }

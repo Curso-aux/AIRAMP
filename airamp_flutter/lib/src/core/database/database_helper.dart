@@ -294,6 +294,23 @@ class DatabaseHelper {
         });
       }
     } catch (_) {}
+    try {
+      await db.execute('''
+        CREATE TABLE IF NOT EXISTS inquiries (
+          id TEXT PRIMARY KEY,
+          user_id TEXT NOT NULL,
+          user_name TEXT NOT NULL,
+          user_email TEXT NOT NULL,
+          user_role TEXT NOT NULL,
+          question TEXT NOT NULL,
+          status TEXT DEFAULT 'pending',
+          reply TEXT,
+          replied_at TEXT,
+          replied_by TEXT,
+          created_at TEXT NOT NULL
+        )
+      ''');
+    } catch (_) {}
     await _seedInitialData(db);
   }
 
@@ -715,6 +732,23 @@ class DatabaseHelper {
         subject_id INTEGER,
         actor_id TEXT,
         actor_name TEXT
+      )
+    ''');
+
+    // Inquiries & Helpdesk Table
+    await db.execute('''
+      CREATE TABLE IF NOT EXISTS inquiries (
+        id TEXT PRIMARY KEY,
+        user_id TEXT NOT NULL,
+        user_name TEXT NOT NULL,
+        user_email TEXT NOT NULL,
+        user_role TEXT NOT NULL,
+        question TEXT NOT NULL,
+        status TEXT DEFAULT 'pending',
+        reply TEXT,
+        replied_at TEXT,
+        replied_by TEXT,
+        created_at TEXT NOT NULL
       )
     ''');
 
@@ -5932,6 +5966,111 @@ class DatabaseHelper {
     }
 
     return {'hasConflict': false, 'conflicts': <Map<String, dynamic>>[]};
+  }
+
+  // ── Inquiries & Helpdesk Management ─────────────────────────
+
+  Future<Map<String, dynamic>?> findUserByIdOrIdentifier(String identifier) async {
+    final db = await database;
+    final trimmed = identifier.trim();
+    if (trimmed.isEmpty) return null;
+
+    final lower = trimmed.toLowerCase();
+    try {
+      final results = await db.rawQuery(
+        '''SELECT id, full_name, email, role, category FROM users
+           WHERE LOWER(id) = ? 
+              OR LOWER(email) = ? 
+              OR LOWER(COALESCE(username, '')) = ?
+           LIMIT 1''',
+        [lower, lower, lower],
+      );
+
+      if (results.isNotEmpty) {
+        final r = Map<String, dynamic>.from(results.first);
+        final name = (r['full_name'] as String?)?.isNotEmpty == true
+            ? r['full_name']
+            : r['id'];
+        return {
+          'id': r['id']?.toString() ?? trimmed,
+          'name': name?.toString() ?? trimmed,
+          'email': r['email']?.toString() ?? '',
+          'role': r['role']?.toString() ?? 'student',
+        };
+      }
+    } catch (_) {}
+
+    return null;
+  }
+
+  Future<String> submitInquiry({
+    required String userId,
+    required String userName,
+    required String userEmail,
+    required String userRole,
+    required String question,
+  }) async {
+    final db = await database;
+    final id = 'INQ-${(DateTime.now().millisecondsSinceEpoch % 100000).toString().padLeft(5, '0')}';
+    final now = DateTime.now().toIso8601String();
+    await db.insert('inquiries', {
+      'id': id,
+      'user_id': userId,
+      'user_name': userName,
+      'user_email': userEmail,
+      'user_role': userRole,
+      'question': question,
+      'status': 'pending',
+      'reply': null,
+      'replied_at': null,
+      'replied_by': null,
+      'created_at': now,
+    });
+    return id;
+  }
+
+  Future<List<Map<String, dynamic>>> getInquiries({String? status}) async {
+    final db = await database;
+    if (status != null && status.isNotEmpty && status != 'all') {
+      return await db.query(
+        'inquiries',
+        where: 'status = ?',
+        whereArgs: [status],
+        orderBy: 'created_at DESC',
+      );
+    }
+    return await db.query(
+      'inquiries',
+      orderBy: 'created_at DESC',
+    );
+  }
+
+  Future<int> getPendingInquiriesCount() async {
+    final db = await database;
+    final res = await db.rawQuery(
+      "SELECT COUNT(*) as count FROM inquiries WHERE status = 'pending'",
+    );
+    return (res.first['count'] as int?) ?? 0;
+  }
+
+  Future<void> replyToInquiry({
+    required String inquiryId,
+    required String reply,
+    required String repliedBy,
+  }) async {
+    final db = await database;
+    final now = DateTime.now().toIso8601String();
+    await db.update(
+      'inquiries',
+      {
+        'status': 'replied',
+        'reply': reply,
+        'replied_at': now,
+        'replied_by': repliedBy,
+      },
+      where: 'id = ?',
+      whereArgs: [inquiryId],
+    );
   }
 }
 

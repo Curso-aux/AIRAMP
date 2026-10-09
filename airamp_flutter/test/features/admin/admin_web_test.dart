@@ -28,6 +28,35 @@ class _MockAdminKeysNotifier extends AdminKeysNotifier {
   Future<void> loadKeys() async {}
 }
 
+class _MockInquiriesNotifier extends InquiriesNotifier {
+  @override
+  List<Map<String, dynamic>> build() => [];
+
+  @override
+  Future<void> loadInquiries({String? status}) async {}
+}
+
+class _MockAnnouncementsNotifier extends AnnouncementsNotifier {
+  @override
+  List<Map<String, dynamic>> build() => [
+    {
+      'id': 1,
+      'title': 'Test Announcement',
+      'message': 'Welcome to the school year',
+      'priority': 'normal',
+      'target_audience': 'all',
+      'created_at': '2026-09-01 08:00:00',
+    }
+  ];
+
+  @override
+  Future<void> addAnnouncement(Map<String, dynamic> announcement) async {}
+  @override
+  Future<void> updateAnnouncement(int id, Map<String, dynamic> announcement) async {}
+  @override
+  Future<void> deleteAnnouncement(int id) async {}
+}
+
 void main() {
   setUpAll(() {
     sqfliteFfiInit();
@@ -217,16 +246,21 @@ void main() {
 
       await tester.pumpWidget(
         ProviderScope(
+          overrides: [
+            announcementsProvider.overrideWith(() => _MockAnnouncementsNotifier()),
+            inquiriesProvider.overrideWith(() => _MockInquiriesNotifier()),
+            pendingInquiriesCountProvider.overrideWith((ref) => Future.value(0)),
+          ],
           child: MaterialApp(
             theme: AppTheme.darkTheme,
             home: const Scaffold(body: AdminWebAnnouncementsScreen()),
           ),
         ),
       );
-      await tester.pump(const Duration(milliseconds: 100));
+      await tester.pump();
       await tester.pump(const Duration(milliseconds: 100));
 
-      expect(find.text('Announcements & Broadcasts'), findsOneWidget);
+      expect(find.text('Announcements & Inquiries Hub'), findsOneWidget);
       expect(find.text('Post Announcement'), findsOneWidget);
 
       // Verify Edit icon appears for announcements

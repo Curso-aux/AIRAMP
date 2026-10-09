@@ -59,7 +59,7 @@ class _AdminWebScaffoldState extends ConsumerState<AdminWebScaffold> {
       route: '/admin/keys',
     ),
     AdminNavItem(
-      label: 'Announcements',
+      label: 'Announcements & Inquiries',
       icon: Icons.campaign_outlined,
       activeIcon: Icons.campaign,
       route: '/admin/announcements',

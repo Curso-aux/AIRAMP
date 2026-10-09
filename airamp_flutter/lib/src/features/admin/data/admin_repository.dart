@@ -6,6 +6,8 @@ import '../../../core/api/api_client.dart';
 import '../../../core/utils/section_key_helper.dart';
 import '../../../core/utils/csv_helper.dart';
 
+import '../../../core/services/email_service.dart';
+
 // --- Announcements ---
 final announcementsProvider = NotifierProvider<AnnouncementsNotifier, List<Map<String, dynamic>>>(() {
   return AnnouncementsNotifier();
@@ -41,6 +43,77 @@ class AnnouncementsNotifier extends Notifier<List<Map<String, dynamic>>> {
     final db = await DatabaseHelper().database;
     await db.delete('announcements', where: 'id = ?', whereArgs: [id]);
     await _loadAnnouncements();
+  }
+}
+
+// --- Inquiries & Helpdesk ---
+final inquiriesProvider = NotifierProvider<InquiriesNotifier, List<Map<String, dynamic>>>(() {
+  return InquiriesNotifier();
+});
+
+final pendingInquiriesCountProvider = FutureProvider<int>((ref) async {
+  ref.watch(inquiriesProvider);
+  return await DatabaseHelper().getPendingInquiriesCount();
+});
+
+class InquiriesNotifier extends Notifier<List<Map<String, dynamic>>> {
+  @override
+  List<Map<String, dynamic>> build() {
+    loadInquiries();
+    return [];
+  }
+
+  Future<void> loadInquiries({String? status}) async {
+    final list = await DatabaseHelper().getInquiries(status: status);
+    if (!ref.mounted) return;
+    state = list;
+  }
+
+  Future<void> reply({
+    required String inquiryId,
+    required String replyText,
+    required String adminName,
+    required String adminId,
+  }) async {
+    final list = await DatabaseHelper().getInquiries();
+    final inq = list.firstWhere((i) => i['id'] == inquiryId, orElse: () => {});
+    if (inq.isEmpty) return;
+
+    // 1. Update status in database
+    await DatabaseHelper().replyToInquiry(
+      inquiryId: inquiryId,
+      reply: replyText,
+      repliedBy: adminName,
+    );
+
+    // 2. Deliver in-app notification to student/teacher system
+    final userId = inq['user_id'] as String? ?? '';
+    if (userId.isNotEmpty) {
+      await DatabaseHelper().createNotification(
+        userId: userId,
+        type: 'admin_inquiry_reply',
+        title: 'School Administration Replied to Your Inquiry',
+        message: 'Question: "${inq['question']}"\n\nAdmin Reply: $replyText',
+        actorId: adminId,
+        actorName: adminName,
+      );
+    }
+
+    // 3. Deliver email via EmailService SMTP
+    final userEmail = inq['user_email'] as String? ?? '';
+    if (userEmail.isNotEmpty) {
+      await EmailService().sendInquiryReply(
+        toEmail: userEmail,
+        fullName: inq['user_name'] as String? ?? 'User',
+        userId: userId,
+        role: inq['user_role'] as String? ?? 'student',
+        inquiryQuestion: inq['question'] as String? ?? '',
+        adminReply: replyText,
+        adminName: adminName,
+      );
+    }
+
+    await loadInquiries();
   }
 }
 
