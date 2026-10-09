@@ -9,119 +9,119 @@ class AppTheme {
     _isDark = value;
   }
 
-  // ── Dark Palette ──────────────────────────────────────────
-  static const Color darkBackground = Color(0xFF0A1420);
-  static const Color darkSurface = Color(0xFF11203A);
-  static const Color darkSurfaceLight = Color(0xFF192D4A);
-  static const Color darkSurfaceElevated = Color(0xFF1E3556);
+  // ── Dark Palette (Ergonomic Slate-Charcoal & Jade) ──────────
+  static const Color darkBackground = Color(0xFF0B111A); // Deep, calm slate-charcoal (low blue-light emission)
+  static const Color darkSurface = Color(0xFF161F2E);    // Warm, soothing card surface (prevents eye strain)
+  static const Color darkSurfaceLight = Color(0xFF222F42); // Elevated layer for chips and button toggles
+  static const Color darkSurfaceElevated = Color(0xFF2C3C52); // Modals, sheets, dialogs
 
-  static const Color darkPrimary = Color(0xFF00C9A7);
-  static const Color darkPrimaryDark = Color(0xFF00A88A);
-  static const Color darkPrimaryLight = Color(0xFF33D4B8);
-  static const Color darkPrimarySoft = Color(0x1F00C9A7); // 0.12 opacity
+  static const Color darkPrimary = Color(0xFF10B981);     // Gentle Emerald / Mint Jade (replaces glaring neon cyan)
+  static const Color darkPrimaryDark = Color(0xFF059669); // Grounded deep emerald
+  static const Color darkPrimaryLight = Color(0xFF34D399); // Soft pastel mint highlight
+  static const Color darkPrimarySoft = Color(0x1F10B981); // 0.12 opacity
 
-  static const Color darkAccent = Color(0xFF5BA4CF);
-  static const Color darkAccentLight = Color(0xFF7DBCE0);
-  static const Color darkAccentSoft = Color(0x1F5BA4CF);
+  static const Color darkAccent = Color(0xFF38BDF8);      // Soft sky blue (readable, non-vibrating)
+  static const Color darkAccentLight = Color(0xFF7DD3FC);
+  static const Color darkAccentSoft = Color(0x1F38BDF8);
 
-  static const Color darkText = Color(0xFFFFFFFF);
-  static const Color darkTextSecondary = Color(0xFF8B9DC3);
-  static const Color darkTextMuted = Color(0xFF5A6B84);
-  static const Color darkTextBright = Color(0xFFE8F0FF);
+  static const Color darkText = Color(0xFFF1F5F9);         // Soft Titanium White (stops glare & halation)
+  static const Color darkTextSecondary = Color(0xFF94A3B8); // Calm Silver-Slate
+  static const Color darkTextMuted = Color(0xFF64748B);     // Muted Slate (clean legibility)
+  static const Color darkTextBright = Color(0xFFF8FAFC);    // High-emphasis titles
 
-  static const Color darkBorder = Color(0xFF1F3450);
-  static const Color darkBorderLight = Color(0xFF2A4368);
-  static const Color darkBorderFocus = Color(0xFF00C9A7);
+  static const Color darkBorder = Color(0xFF26354A);      // Subtle, clean border
+  static const Color darkBorderLight = Color(0xFF33455E);
+  static const Color darkBorderFocus = Color(0xFF10B981);
 
-  static const Color darkError = Color(0xFFFF6B6B);
-  static const Color darkErrorSoft = Color(0x1FFF6B6B);
-  static const Color darkWarning = Color(0xFFFFD93D);
-  static const Color darkWarningSoft = Color(0x1FFFD93D);
-  static const Color darkSuccess = Color(0xFF00C9A7);
-  static const Color darkSuccessSoft = Color(0x1F00C9A7);
-  static const Color darkLocked = Color(0xFF4A5568);
-  static const Color darkLockedSoft = Color(0x264A5568);
+  static const Color darkError = Color(0xFFEF4444);       // Soft Coral Red (replaces harsh neon pink)
+  static const Color darkErrorSoft = Color(0x1FEF4444);
+  static const Color darkWarning = Color(0xFFF59E0B);     // Warm Honey Amber (replaces piercing neon yellow)
+  static const Color darkWarningSoft = Color(0x1FF59E0B);
+  static const Color darkSuccess = Color(0xFF10B981);     // Emerald green
+  static const Color darkSuccessSoft = Color(0x1F10B981);
+  static const Color darkLocked = Color(0xFF4B5563);
+  static const Color darkLockedSoft = Color(0x264B5563);
 
-  static const Color darkInfo = Color(0xFF5BA4CF);
-  static const Color darkInfoSoft = Color(0x1F5BA4CF);
-  static const Color darkDanger = Color(0xFFFF4757);
-  static const Color darkDangerSoft = Color(0x1FFF4757);
+  static const Color darkInfo = Color(0xFF38BDF8);
+  static const Color darkInfoSoft = Color(0x1F38BDF8);
+  static const Color darkDanger = Color(0xFFEF4444);
+  static const Color darkDangerSoft = Color(0x1FEF4444);
 
-  static const Color darkInputBg = Color(0xFF192D4A);
-  static const Color darkInputFocus = Color(0xFF1E3556);
+  static const Color darkInputBg = Color(0xFF1B2638);
+  static const Color darkInputFocus = Color(0xFF222F42);
 
   static const Color darkOverlay = Color(0x8C000000);
-  static const Color darkCardGradientStart = Color(0xFF162A42);
-  static const Color darkCardGradientEnd = Color(0xFF0E1E33);
+  static const Color darkCardGradientStart = Color(0xFF192435);
+  static const Color darkCardGradientEnd = Color(0xFF131B29);
 
-  static const Color darkPdfColor = Color(0xFFFF6B6B);
-  static const Color darkPptColor = Color(0xFFFF8C42);
-  static const Color darkDocColor = Color(0xFF5BA4CF);
+  static const Color darkPdfColor = Color(0xFFF87171);
+  static const Color darkPptColor = Color(0xFFFB923C);
+  static const Color darkDocColor = Color(0xFF38BDF8);
   static const Color darkImageColor = Color(0xFFA78BFA);
-  static const Color darkVideoColor = Color(0xFFFF6B6B);
-  static const Color darkYoutubeColor = Color(0xFFFF0000);
-  static const Color darkTextColor = Color(0xFF00C9A7);
+  static const Color darkVideoColor = Color(0xFFF87171);
+  static const Color darkYoutubeColor = Color(0xFFEF4444);
+  static const Color darkTextColor = Color(0xFF10B981);
 
-  static const Color darkGlowPrimary = Color(0x4000C9A7);
-  static const Color darkGlowAccent = Color(0x335BA4CF);
-  static const Color darkGlowError = Color(0x33FF6B6B);
+  static const Color darkGlowPrimary = Color(0x3310B981);
+  static const Color darkGlowAccent = Color(0x2638BDF8);
+  static const Color darkGlowError = Color(0x26EF4444);
 
-  // ── Light Palette ─────────────────────────────────────────
-  static const Color lightBackground = Color(0xFFF5F7FA);
+  // ── Light Palette (Increased Saturation for High Contrast & Vibrancy) ──
+  static const Color lightBackground = Color(0xFFF8FAFC);
   static const Color lightSurface = Color(0xFFFFFFFF);
-  static const Color lightSurfaceLight = Color(0xFFF0F4F8);
+  static const Color lightSurfaceLight = Color(0xFFF1F5F9);
   static const Color lightSurfaceElevated = Color(0xFFFFFFFF);
 
-  static const Color lightPrimary = Color(0xFF00A88A);
-  static const Color lightPrimaryDark = Color(0xFF008B72);
-  static const Color lightPrimaryLight = Color(0xFF33D4B8);
-  static const Color lightPrimarySoft = Color(0x1A00A88A); // 0.10 opacity
+  static const Color lightPrimary = Color(0xFF0D9488);     // Saturated Institutional Teal
+  static const Color lightPrimaryDark = Color(0xFF0F766E); // Deep saturated teal
+  static const Color lightPrimaryLight = Color(0xFF14B8A6);// Saturated mint highlight
+  static const Color lightPrimarySoft = Color(0x1F0D9488); // 0.12 opacity
 
-  static const Color lightAccent = Color(0xFF4A90D9);
-  static const Color lightAccentLight = Color(0xFF7DBCE0);
-  static const Color lightAccentSoft = Color(0x1A4A90D9);
+  static const Color lightAccent = Color(0xFF2563EB);      // Saturated Royal Blue
+  static const Color lightAccentLight = Color(0xFF3B82F6);
+  static const Color lightAccentSoft = Color(0x1F2563EB);
 
-  static const Color lightText = Color(0xFF1A202C);
-  static const Color lightTextSecondary = Color(0xFF4A5568);
-  static const Color lightTextMuted = Color(0xFF718096);
-  static const Color lightTextBright = Color(0xFF1A202C);
+  static const Color lightText = Color(0xFF0F172A);         // Deep Slate 900 (High contrast)
+  static const Color lightTextSecondary = Color(0xFF334155); // Slate 700
+  static const Color lightTextMuted = Color(0xFF64748B);     // Slate 500
+  static const Color lightTextBright = Color(0xFF0F172A);
 
   static const Color lightBorder = Color(0xFFE2E8F0);
-  static const Color lightBorderLight = Color(0xFFCBD5E0);
-  static const Color lightBorderFocus = Color(0xFF00A88A);
+  static const Color lightBorderLight = Color(0xFFCBD5E1);
+  static const Color lightBorderFocus = Color(0xFF0D9488);
 
-  static const Color lightError = Color(0xFFE53E3E);
-  static const Color lightErrorSoft = Color(0x14E53E3E);
-  static const Color lightWarning = Color(0xFFD69E2E);
-  static const Color lightWarningSoft = Color(0x1AD69E2E);
-  static const Color lightSuccess = Color(0xFF00A88A);
-  static const Color lightSuccessSoft = Color(0x1A00A88A);
-  static const Color lightLocked = Color(0xFFA0AEC0);
-  static const Color lightLockedSoft = Color(0x1FA0AEC0);
+  static const Color lightError = Color(0xFFDC2626);       // Saturated Ruby Red (High contrast)
+  static const Color lightErrorSoft = Color(0x1FDC2626);
+  static const Color lightWarning = Color(0xFFD97706);     // Saturated Golden Amber (Replaces muddy yellow)
+  static const Color lightWarningSoft = Color(0x1FD97706);
+  static const Color lightSuccess = Color(0xFF059669);     // Saturated Emerald Green
+  static const Color lightSuccessSoft = Color(0x1F059669);
+  static const Color lightLocked = Color(0xFF94A3B8);
+  static const Color lightLockedSoft = Color(0x1F94A3B8);
 
-  static const Color lightInfo = Color(0xFF4A90D9);
-  static const Color lightInfoSoft = Color(0x1A4A90D9);
-  static const Color lightDanger = Color(0xFFE53E3E);
-  static const Color lightDangerSoft = Color(0x14E53E3E);
+  static const Color lightInfo = Color(0xFF0284C7);        // Saturated Cerulean / Sky
+  static const Color lightInfoSoft = Color(0x1F0284C7);
+  static const Color lightDanger = Color(0xFFDC2626);
+  static const Color lightDangerSoft = Color(0x1FDC2626);
 
   static const Color lightInputBg = Color(0xFFFFFFFF);
-  static const Color lightInputFocus = Color(0xFFF0F4F8);
+  static const Color lightInputFocus = Color(0xFFF8FAFC);
 
   static const Color lightOverlay = Color(0x73000000);
   static const Color lightCardGradientStart = Color(0xFFFFFFFF);
-  static const Color lightCardGradientEnd = Color(0xFFF0F4F8);
+  static const Color lightCardGradientEnd = Color(0xFFF1F5F9);
 
-  static const Color lightPdfColor = Color(0xFFE53E3E);
-  static const Color lightPptColor = Color(0xFFDD6B20);
-  static const Color lightDocColor = Color(0xFF4A90D9);
-  static const Color lightImageColor = Color(0xFF805AD5);
-  static const Color lightVideoColor = Color(0xFFE53E3E);
+  static const Color lightPdfColor = Color(0xFFDC2626);    // Saturated Crimson
+  static const Color lightPptColor = Color(0xFFEA580C);    // Saturated Flame Orange
+  static const Color lightDocColor = Color(0xFF2563EB);    // Saturated Royal Blue
+  static const Color lightImageColor = Color(0xFF7C3AED);  // Saturated Royal Violet
+  static const Color lightVideoColor = Color(0xFFE11D48);  // Saturated Ruby
   static const Color lightYoutubeColor = Color(0xFFFF0000);
-  static const Color lightTextColor = Color(0xFF00A88A);
+  static const Color lightTextColor = Color(0xFF0D9488);
 
-  static const Color lightGlowPrimary = Color(0x2600A88A);
-  static const Color lightGlowAccent = Color(0x1F4A90D9);
-  static const Color lightGlowError = Color(0x1FE53E3E);
+  static const Color lightGlowPrimary = Color(0x330D9488);
+  static const Color lightGlowAccent = Color(0x262563EB);
+  static const Color lightGlowError = Color(0x26DC2626);
 
   // ── Dynamic Color Getters ─────────────────────────────────
   static Color get background => _isDark ? darkBackground : lightBackground;

@@ -170,13 +170,13 @@ class _TeacherScheduleScreenState extends ConsumerState<TeacherScheduleScreen> {
                               decoration: BoxDecoration(
                                 color: isDark
                                     ? const Color(0xFFA855F7).withValues(alpha: 0.15)
-                                    : Colors.purple.withValues(alpha: 0.12),
+                                    : const Color(0xFF7C3AED).withValues(alpha: 0.12),
                                 borderRadius: BorderRadius.circular(6),
                               ),
                               child: Text(
                                 'Admin Assigned',
                                 style: TextStyle(
-                                  color: isDark ? const Color(0xFFA855F7) : Colors.purple,
+                                  color: isDark ? const Color(0xFFA855F7) : const Color(0xFF7C3AED),
                                   fontSize: 10,
                                   fontWeight: FontWeight.bold,
                                 ),

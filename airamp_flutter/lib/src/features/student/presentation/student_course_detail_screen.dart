@@ -490,13 +490,15 @@ class _StudentCourseDetailScreenState
 
     final subjectName = _subject?['name']?.toString() ?? 'Course';
 
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
     return Container(
       margin: const EdgeInsets.only(bottom: 24),
       decoration: BoxDecoration(
         gradient: LinearGradient(
           colors: [
-            const Color(0xFF6366F1).withValues(alpha: 0.22),
-            const Color(0xFF06B6D4).withValues(alpha: 0.15),
+            (isDark ? const Color(0xFF6366F1) : const Color(0xFF4F46E5)).withValues(alpha: isDark ? 0.22 : 0.12),
+            (isDark ? const Color(0xFF06B6D4) : const Color(0xFF0284C7)).withValues(alpha: isDark ? 0.15 : 0.08),
             AppTheme.surface,
           ],
           begin: Alignment.topLeft,
@@ -504,12 +506,12 @@ class _StudentCourseDetailScreenState
         ),
         borderRadius: BorderRadius.circular(18),
         border: Border.all(
-          color: const Color(0xFF818CF8).withValues(alpha: 0.4),
+          color: (isDark ? const Color(0xFF818CF8) : const Color(0xFF6366F1)).withValues(alpha: isDark ? 0.4 : 0.35),
           width: 1.5,
         ),
         boxShadow: [
           BoxShadow(
-            color: const Color(0xFF6366F1).withValues(alpha: 0.12),
+            color: (isDark ? const Color(0xFF6366F1) : const Color(0xFF4F46E5)).withValues(alpha: isDark ? 0.12 : 0.08),
             blurRadius: 18,
             offset: const Offset(0, 6),
           ),
@@ -559,15 +561,15 @@ class _StudentCourseDetailScreenState
                           Container(
                             padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                             decoration: BoxDecoration(
-                              color: const Color(0xFF8B5CF6).withValues(alpha: 0.25),
+                              color: (isDark ? const Color(0xFF8B5CF6) : const Color(0xFF7C3AED)).withValues(alpha: isDark ? 0.25 : 0.12),
                               borderRadius: BorderRadius.circular(6),
                             ),
-                            child: const Text(
+                            child: Text(
                               'GIZMO REVIEW STUDIO',
                               style: TextStyle(
                                 fontSize: 10,
                                 fontWeight: FontWeight.bold,
-                                color: Color(0xFFA78BFA),
+                                color: isDark ? const Color(0xFFA78BFA) : const Color(0xFF6D28D9),
                                 letterSpacing: 0.5,
                               ),
                             ),
@@ -635,7 +637,7 @@ class _StudentCourseDetailScreenState
               height: 44,
               child: ElevatedButton.icon(
                 style: ElevatedButton.styleFrom(
-                  backgroundColor: const Color(0xFF6366F1),
+                  backgroundColor: isDark ? const Color(0xFF6366F1) : const Color(0xFF4F46E5),
                   foregroundColor: Colors.white,
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(12),

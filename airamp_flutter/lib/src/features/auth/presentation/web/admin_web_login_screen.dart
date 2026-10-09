@@ -43,7 +43,7 @@ class AdminWebLoginScreen extends ConsumerStatefulWidget {
 
   const AdminWebLoginScreen({
     super.key,
-    this.initialRole = 'student',
+    this.initialRole = 'unified',
   });
 
   @override
@@ -58,6 +58,20 @@ class _AdminWebLoginScreenState extends ConsumerState<AdminWebLoginScreen> {
   late String _selectedRole;
 
   static const Map<String, _RolePortalConfig> _portals = {
+    'unified': _RolePortalConfig(
+      key: 'unified',
+      label: 'Institutional',
+      title: 'AIRAMP Institutional Portal',
+      subtitle: 'Unified Access for Students, Faculty & Administrators',
+      badgeText: 'SINGLE SIGN-IN · INSTITUTIONAL ACCESS',
+      icon: Icons.account_balance_rounded,
+      accentColor: Color(0xFF0D9488),
+      badgeBg: Color(0xFFCCFBF1),
+      noticeText: 'Single Sign-In: Enter your Student ID, Faculty Email, or Admin Account. You will be automatically routed to your authorized portal.',
+      identifierLabel: 'Institutional ID, Email, or Username',
+      identifierHint: 'e.g. 001-0001, teacher@aira.edu, or aira@admin',
+      buttonText: 'Sign In to Institutional Portal',
+    ),
     'student': _RolePortalConfig(
       key: 'student',
       label: 'Student',
@@ -123,7 +137,8 @@ class _AdminWebLoginScreenState extends ConsumerState<AdminWebLoginScreen> {
     final lower = role.toLowerCase().trim();
     if (lower == 'teacher' || lower == 'faculty') return 'teacher';
     if (lower == 'admin' || lower == 'administrator' || lower == 'institution') return 'admin';
-    return 'student';
+    if (lower == 'student' || lower == 'learner') return 'student';
+    return 'unified';
   }
 
   @override
@@ -296,8 +311,9 @@ class _AdminWebLoginScreenState extends ConsumerState<AdminWebLoginScreen> {
                   mainAxisSize: MainAxisSize.min,
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
-                    // Responsive Role Switcher
-                    _buildRoleSegmentedBar(isDark),
+                    // Responsive Role Switcher (Shown when testing or deep-linking specific portal roles)
+                    if (_selectedRole != 'unified')
+                      _buildRoleSegmentedBar(isDark),
 
                     // Portal Icon
                     Center(
@@ -540,6 +556,29 @@ class _AdminWebLoginScreenState extends ConsumerState<AdminWebLoginScreen> {
                         elevation: 4,
                         shadowColor: config.accentColor.withValues(alpha: 0.4),
                       ),
+                    ),
+                    const SizedBox(height: 18),
+                    Wrap(
+                      alignment: WrapAlignment.center,
+                      crossAxisAlignment: WrapCrossAlignment.center,
+                      spacing: 6,
+                      runSpacing: 4,
+                      children: [
+                        Icon(
+                          Icons.verified_user_outlined,
+                          size: 14,
+                          color: isDark ? AppTheme.darkTextMuted : AppTheme.lightTextMuted,
+                        ),
+                        Text(
+                          'Unified Authentication · Automatic Role Routing',
+                          textAlign: TextAlign.center,
+                          style: TextStyle(
+                            fontSize: 11.5,
+                            fontWeight: FontWeight.w500,
+                            color: isDark ? AppTheme.darkTextMuted : AppTheme.lightTextMuted,
+                          ),
+                        ),
+                      ],
                     ),
                   ],
                 ),

@@ -2437,22 +2437,50 @@ class DatabaseHelper {
     for (final s in subjects) {
       final subId = s['id'] as int;
       final subEnrollments = enrollments.where((e) => e['subject_id'] == subId).length;
+      final subAttempts = attempts.where((a) => a['subject_id'] == subId).toList();
+      final subPassed = subAttempts.where((a) => a['is_passed'] == 1 || a['is_passed'] == true).length;
+      final subPassRate = subAttempts.isNotEmpty ? ((subPassed / subAttempts.length) * 100).round() : 0;
       subjectEnrollments.add({
         'id': subId,
         'name': s['name'] as String? ?? 'Subject',
         'code': s['subject_code'] as String? ?? 'CS',
+        'teacher_name': s['assigned_teacher_name'] as String? ?? 'Faculty Assigned',
         'enrollments': subEnrollments,
+        'attempts': subAttempts.length,
+        'passed': subPassed,
+        'passRate': subPassRate,
       });
     }
     subjectEnrollments.sort((a, b) => (b['enrollments'] as int).compareTo(a['enrollments'] as int));
 
     // 7. Section Distribution breakdown (matching students)
     final Map<String, int> sectionMap = {};
+    int unassignedCount = 0;
+    int regularCount = 0;
+    int irregularCount = 0;
+    int transfereeCount = 0;
+    int spedCount = 0;
+
     for (final u in users) {
       if (u['role'] == 'student') {
         final sec = (u['section'] as String?)?.trim();
         final label = (sec != null && sec.isNotEmpty) ? sec : 'Unassigned';
         sectionMap[label] = (sectionMap[label] ?? 0) + 1;
+
+        if (label.toLowerCase() == 'unassigned') {
+          unassignedCount++;
+        }
+
+        final type = (u['student_type'] as String? ?? 'regular').toLowerCase();
+        if (type.contains('irregular') || type.contains('cross')) {
+          irregularCount++;
+        } else if (type.contains('sped') || type.contains('accommodat')) {
+          spedCount++;
+        } else if (type.contains('transferee')) {
+          transfereeCount++;
+        } else {
+          regularCount++;
+        }
       }
     }
     final List<Map<String, dynamic>> sectionDistribution = sectionMap.entries
@@ -2482,6 +2510,7 @@ class DatabaseHelper {
     }).take(8).toList();
 
     final bool hasData = totalUsers > 0 || totalAttempts > 0 || totalEnrollments > 0;
+    final String ratio = totalTeachers > 0 ? (totalStudents / totalTeachers).toStringAsFixed(1) : '0';
 
     return {
       'totalUsers': totalUsers,
@@ -2496,6 +2525,15 @@ class DatabaseHelper {
       'passedAttempts': passedAttempts,
       'passRate': passRate,
       'avgScore': avgScore,
+      'studentTeacherRatio': ratio,
+      'unassignedStudents': unassignedCount,
+      'demographics': {
+        'regular': regularCount,
+        'irregular': irregularCount,
+        'transferee': transfereeCount,
+        'sped': spedCount,
+        'unassigned': unassignedCount,
+      },
       'subjectEnrollments': subjectEnrollments,
       'sectionDistribution': sectionDistribution,
       'recentAnnouncements': announcements,

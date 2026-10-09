@@ -32,41 +32,41 @@ void showStudentTimetableModal(
 // ─────────────────────────────────────────────────────────────────────────────
 class TimetableColorPalette {
   static const List<Map<String, Color>> lightPalettes = [
-    // Pastel Blue (like BA-3102 in user image)
+    // Saturated Royal Blue
     {
-      'bg': Color(0xFFE8F0FE),
-      'border': Color(0xFF3B82F6),
+      'bg': Color(0xFFEFF6FF),
+      'border': Color(0xFF2563EB),
       'text': Color(0xFF1E40AF),
     },
-    // Pastel Purple (like IT 3116 in user image)
+    // Saturated Royal Purple
     {
-      'bg': Color(0xFFF3E8FF),
-      'border': Color(0xFF8B5CF6),
+      'bg': Color(0xFFFAF5FF),
+      'border': Color(0xFF7C3AED),
       'text': Color(0xFF581C87),
     },
-    // Pastel Coral / Pink (like CC 3105 in user image)
+    // Saturated Ruby Rose
     {
-      'bg': Color(0xFFFFE4E6),
-      'border': Color(0xFFF43F5E),
+      'bg': Color(0xFFFFF1F2),
+      'border': Color(0xFFE11D48),
       'text': Color(0xFF9F1239),
     },
-    // Pastel Mint / Green (like IT 3114 in user image)
+    // Saturated Emerald Green
     {
-      'bg': Color(0xFFDCFCE7),
-      'border': Color(0xFF10B981),
+      'bg': Color(0xFFECFDF5),
+      'border': Color(0xFF059669),
       'text': Color(0xFF065F46),
     },
-    // Pastel Peach / Orange (like IT 3115 in user image)
+    // Saturated Golden Amber
     {
-      'bg': Color(0xFFFEF3C7),
-      'border': Color(0xFFF59E0B),
+      'bg': Color(0xFFFFFBEB),
+      'border': Color(0xFFD97706),
       'text': Color(0xFF92400E),
     },
-    // Pastel Cyan
+    // Saturated Deep Teal
     {
-      'bg': Color(0xFFCCFBF1),
-      'border': Color(0xFF06B6D4),
-      'text': Color(0xFF155E75),
+      'bg': Color(0xFFF0FDFA),
+      'border': Color(0xFF0D9488),
+      'text': Color(0xFF0F766E),
     },
   ];
 

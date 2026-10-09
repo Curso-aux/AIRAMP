@@ -271,7 +271,7 @@ void main() {
       expect(find.text('Sign In'), findsOneWidget);
     });
 
-    testWidgets('WebLandingScreen Sign In dropdown opens cleanly without RenderFlex overflow', (tester) async {
+    testWidgets('WebLandingScreen renders single sign-in action cleanly', (tester) async {
       tester.view.physicalSize = const Size(1280, 900);
       tester.view.devicePixelRatio = 1.0;
       addTearDown(() {
@@ -289,15 +289,10 @@ void main() {
       );
       await tester.pump(const Duration(milliseconds: 100));
 
-      // Tap Sign In to open dropdown
+      // Verify single sign-in action button appears and taps cleanly
+      expect(find.text('Sign In'), findsOneWidget);
       await tester.tap(find.text('Sign In'));
       await tester.pumpAndSettle();
-
-      // Verify menu header and all portal items & badges appear
-      expect(find.text('SELECT ACCESS PORTAL'), findsOneWidget);
-      expect(find.text('LEARNER'), findsOneWidget);
-      expect(find.text('FACULTY'), findsOneWidget);
-      expect(find.text('INSTITUTION'), findsOneWidget);
       expect(tester.takeException(), isNull);
     });
 

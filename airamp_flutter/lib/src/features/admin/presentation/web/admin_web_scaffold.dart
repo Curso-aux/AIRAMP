@@ -589,12 +589,15 @@ class _AdminWebScaffoldState extends ConsumerState<AdminWebScaffold> {
                 width: 38,
                 height: 38,
                 decoration: BoxDecoration(
-                  gradient: LinearGradient(
-                    colors: [AppTheme.primary, AppTheme.accent],
-                    begin: Alignment.topLeft,
-                    end: Alignment.bottomRight,
-                  ),
-                  borderRadius: BorderRadius.circular(10),
+                  color: AppTheme.primary,
+                  borderRadius: BorderRadius.circular(8),
+                  boxShadow: [
+                    BoxShadow(
+                      color: AppTheme.primary.withValues(alpha: 0.25),
+                      blurRadius: 6,
+                      offset: const Offset(0, 2),
+                    ),
+                  ],
                 ),
                 alignment: Alignment.center,
                 child: const Text(
@@ -748,30 +751,29 @@ class _AdminWebScaffoldState extends ConsumerState<AdminWebScaffold> {
                                   height: 40,
                                   margin: const EdgeInsets.only(bottom: 10),
                                   decoration: BoxDecoration(
-                                    gradient: LinearGradient(
-                                      colors: [Colors.purple.shade700, Colors.deepPurple.shade900],
-                                      begin: Alignment.topLeft,
-                                      end: Alignment.bottomRight,
-                                    ),
+                                    color: isDark ? AppTheme.darkSurfaceLight : const Color(0xFFF1F5F9),
                                     borderRadius: BorderRadius.circular(10),
+                                    border: Border.all(
+                                      color: isDark ? AppTheme.darkBorder : AppTheme.lightBorder,
+                                    ),
                                   ),
                                   child: isCollapsed
-                                      ? const Tooltip(
+                                      ? Tooltip(
                                           message: 'Super Admin Console',
                                           preferBelow: false,
-                                          waitDuration: Duration(milliseconds: 250),
+                                          waitDuration: const Duration(milliseconds: 250),
                                           child: Center(
-                                            child: Icon(Icons.admin_panel_settings, size: 18, color: Colors.white),
+                                            child: Icon(Icons.shield_outlined, size: 18, color: AppTheme.primary),
                                           ),
                                         )
-                                      : const Row(
+                                      : Row(
                                           mainAxisAlignment: MainAxisAlignment.center,
                                           children: [
-                                            Icon(Icons.admin_panel_settings, size: 16, color: Colors.white),
-                                            SizedBox(width: 8),
+                                            Icon(Icons.shield_outlined, size: 16, color: AppTheme.primary),
+                                            const SizedBox(width: 8),
                                             Text(
                                               'Super Admin Console',
-                                              style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.white),
+                                              style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: AppTheme.text),
                                             ),
                                           ],
                                         ),
@@ -836,8 +838,11 @@ class _AdminWebScaffoldState extends ConsumerState<AdminWebScaffold> {
                               child: Container(
                                 height: 40,
                                 decoration: BoxDecoration(
-                                  color: AppTheme.error.withValues(alpha: 0.1),
+                                  color: isDark ? AppTheme.darkSurfaceLight.withValues(alpha: 0.5) : const Color(0xFFF8FAFC),
                                   borderRadius: BorderRadius.circular(10),
+                                  border: Border.all(
+                                    color: isDark ? AppTheme.darkBorder : AppTheme.lightBorder,
+                                  ),
                                 ),
                                 child: isCollapsed
                                     ? Tooltip(
@@ -845,17 +850,17 @@ class _AdminWebScaffoldState extends ConsumerState<AdminWebScaffold> {
                                         preferBelow: false,
                                         waitDuration: const Duration(milliseconds: 250),
                                         child: Center(
-                                          child: Icon(Icons.logout, size: 18, color: AppTheme.error),
+                                          child: Icon(Icons.logout, size: 18, color: AppTheme.textSecondary),
                                         ),
                                       )
                                     : Row(
                                         mainAxisAlignment: MainAxisAlignment.center,
                                         children: [
-                                          Icon(Icons.logout, size: 16, color: AppTheme.error),
+                                          Icon(Icons.logout, size: 16, color: AppTheme.textSecondary),
                                           const SizedBox(width: 8),
                                           Text(
                                             'Sign Out',
-                                            style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: AppTheme.error),
+                                            style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: AppTheme.textSecondary),
                                           ),
                                         ],
                                       ),

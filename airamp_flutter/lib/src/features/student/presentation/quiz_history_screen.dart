@@ -177,7 +177,7 @@ class _QuizHistoryScreenState extends ConsumerState<QuizHistoryScreen> {
                                   Container(
                                     padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                                     decoration: BoxDecoration(
-                                      color: _selectedTab == 0 ? Colors.black : Colors.orange,
+                                      color: _selectedTab == 0 ? Colors.black : AppTheme.warning,
                                       borderRadius: BorderRadius.circular(10),
                                     ),
                                     child: Text(
@@ -353,13 +353,13 @@ class _QuizHistoryScreenState extends ConsumerState<QuizHistoryScreen> {
                       Container(
                         padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                         decoration: BoxDecoration(
-                          color: isCompleted ? AppTheme.success.withValues(alpha: 0.15) : Colors.orange.withValues(alpha: 0.15),
+                          color: isCompleted ? AppTheme.success.withValues(alpha: 0.15) : AppTheme.warning.withValues(alpha: 0.15),
                           borderRadius: BorderRadius.circular(6),
                         ),
                         child: Text(
                           isCompleted ? 'Completed · $pct%' : 'Pending',
                           style: TextStyle(
-                            color: isCompleted ? AppTheme.success : Colors.orange,
+                            color: isCompleted ? AppTheme.success : AppTheme.warning,
                             fontWeight: FontWeight.bold,
                             fontSize: 11,
                           ),
@@ -374,17 +374,17 @@ class _QuizHistoryScreenState extends ConsumerState<QuizHistoryScreen> {
                     Container(
                       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                       decoration: BoxDecoration(
-                        color: Colors.blue.withValues(alpha: 0.1),
+                        color: AppTheme.info.withValues(alpha: 0.12),
                         borderRadius: BorderRadius.circular(8),
-                        border: Border.all(color: Colors.blue.withValues(alpha: 0.3)),
+                        border: Border.all(color: AppTheme.info.withValues(alpha: 0.3)),
                       ),
                       child: Row(
                         children: [
-                          const Icon(Icons.access_time, size: 16, color: Colors.blue),
+                          Icon(Icons.access_time, size: 16, color: AppTheme.info),
                           const SizedBox(width: 8),
                           Text(
                             'Available from ${_formatDate(scheduleStart)}',
-                            style: const TextStyle(color: Colors.blue, fontWeight: FontWeight.w600, fontSize: 12),
+                            style: TextStyle(color: AppTheme.info, fontWeight: FontWeight.w600, fontSize: 12),
                           ),
                         ],
                       ),

@@ -114,7 +114,7 @@ final routerProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: '/login',
         pageBuilder: (context, state) {
-          final role = state.uri.queryParameters['role'] ?? 'student';
+          final role = state.uri.queryParameters['role'] ?? 'unified';
           return AppPageTransitions.fadeThrough(
             key: state.pageKey,
             child: kIsWeb ? AdminWebLoginScreen(initialRole: role) : const LoginScreen(),

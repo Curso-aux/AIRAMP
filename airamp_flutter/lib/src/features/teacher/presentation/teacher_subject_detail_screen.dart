@@ -649,13 +649,13 @@ class _TeacherSubjectDetailScreenState extends ConsumerState<TeacherSubjectDetai
                         Container(
                           padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                           decoration: BoxDecoration(
-                            color: Colors.orange.withValues(alpha: 0.15),
+                            color: AppTheme.warning.withValues(alpha: 0.15),
                             borderRadius: BorderRadius.circular(4),
                           ),
-                          child: const Text('Draft', style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Colors.orange)),
+                          child: Text('Draft', style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: AppTheme.warning)),
                         ),
                       IconButton(
-                        icon: const Icon(Icons.edit_outlined, color: Colors.blue, size: 20),
+                        icon: Icon(Icons.edit_outlined, color: AppTheme.accent, size: 20),
                         tooltip: 'Edit Quiz',
                         onPressed: () async {
                           final edited = await Navigator.of(context, rootNavigator: true).push<bool>(

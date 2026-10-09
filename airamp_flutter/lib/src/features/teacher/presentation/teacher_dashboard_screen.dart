@@ -14,6 +14,8 @@ import '../../../core/components/app_toast.dart';
 import '../../../core/components/empty_state.dart';
 import '../../../core/components/skeleton_loader.dart';
 import '../../../core/animations/app_transitions.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import '../../../core/components/analytics_donut_chart.dart';
 import '../../submissions/data/submissions_repository.dart';
 
 class TeacherDashboardScreen extends ConsumerStatefulWidget {
@@ -25,13 +27,15 @@ class TeacherDashboardScreen extends ConsumerStatefulWidget {
 
 class _TeacherDashboardScreenState extends ConsumerState<TeacherDashboardScreen> {
   String _activeSectionFilter = 'All Handled Sections';
-  bool _isAnalyticsExpanded = false; // Analytics hidden by default; tap to expand
+  bool _isAnalyticsExpanded = false; // Analytics collapsed by default or loaded from preferences
+  int _analyticsViewIndex = 0; // 0: Cards View, 1: Donut Breakdown, 2: Performance Mastery
   String _analyticsSectionFilter = 'All Handled Sections';
   String _analyticsStudentFilter = 'All';
 
   @override
   void initState() {
     super.initState();
+    _loadAnalyticsPreferences();
     WidgetsBinding.instance.addPostFrameCallback((_) {
       ref.invalidate(teacherHandledSectionsDetailsProvider);
       ref.invalidate(teacherHandledSectionsProvider);
@@ -40,6 +44,26 @@ class _TeacherDashboardScreenState extends ConsumerState<TeacherDashboardScreen>
         studentId: _analyticsStudentFilter,
       );
     });
+  }
+
+  Future<void> _loadAnalyticsPreferences() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      if (mounted) {
+        setState(() {
+          _isAnalyticsExpanded = prefs.getBool('teacher_analytics_expanded') ?? false;
+          _analyticsViewIndex = prefs.getInt('teacher_analytics_view_index') ?? 0;
+        });
+      }
+    } catch (_) {}
+  }
+
+  Future<void> _saveAnalyticsPreferences() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setBool('teacher_analytics_expanded', _isAnalyticsExpanded);
+      await prefs.setInt('teacher_analytics_view_index', _analyticsViewIndex);
+    } catch (_) {}
   }
 
   String _formatDate(String? isoString) {
@@ -359,8 +383,8 @@ class _TeacherDashboardScreenState extends ConsumerState<TeacherDashboardScreen>
                                 top: 6,
                                 child: Container(
                                   padding: const EdgeInsets.all(4),
-                                  decoration: const BoxDecoration(
-                                    color: Colors.redAccent,
+                                  decoration: BoxDecoration(
+                                    color: AppTheme.error,
                                     shape: BoxShape.circle,
                                   ),
                                   constraints: const BoxConstraints(minWidth: 16, minHeight: 16),
@@ -728,6 +752,7 @@ class _TeacherDashboardScreenState extends ConsumerState<TeacherDashboardScreen>
     required List<String> handledSections,
     required List<Map<String, dynamic>> allStudents,
   }) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     // Determine effective section and students available for filter
     final sectionOptions = <String>[
       'All Handled Sections',
@@ -778,6 +803,7 @@ class _TeacherDashboardScreenState extends ConsumerState<TeacherDashboardScreen>
         onTap: () {
           HapticFeedback.lightImpact();
           setState(() => _isAnalyticsExpanded = true);
+          _saveAnalyticsPreferences();
         },
         child: Padding(
           padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
@@ -831,7 +857,7 @@ class _TeacherDashboardScreenState extends ConsumerState<TeacherDashboardScreen>
                     Text(
                       hasActiveFilter
                           ? 'Filtered: ${effectiveStudentId != 'All' ? selectedStudentName : effectiveSection} • Tap to view'
-                          : 'Tap to view metrics, pass rates & section/student filters',
+                          : '$totalSubjects Subjects • $totalStudents Students • $passRate% Pass Rate • $avgScore% Avg',
                       style: TextStyle(fontSize: 11, color: AppTheme.textSecondary),
                       overflow: TextOverflow.ellipsis,
                     ),
@@ -908,7 +934,7 @@ class _TeacherDashboardScreenState extends ConsumerState<TeacherDashboardScreen>
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Header: Title, Subtitle, and Hide Toggle
+          // Header: Title, Subtitle, View Mode Switcher, and Hide Toggle
           Row(
             children: [
               Container(
@@ -924,14 +950,38 @@ class _TeacherDashboardScreenState extends ConsumerState<TeacherDashboardScreen>
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(
-                      'Performance & Analytics',
-                      style: TextStyle(
-                        fontSize: 15,
-                        fontWeight: FontWeight.bold,
-                        color: AppTheme.text,
-                      ),
-                      overflow: TextOverflow.ellipsis,
+                    Row(
+                      children: [
+                        Flexible(
+                          child: Text(
+                            'Performance & Analytics',
+                            style: TextStyle(
+                              fontSize: 15,
+                              fontWeight: FontWeight.bold,
+                              color: AppTheme.text,
+                            ),
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                        if (totalAttempts > 0) ...[
+                          const SizedBox(width: 8),
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+                            decoration: BoxDecoration(
+                              color: (passRate >= 75 ? AppTheme.success : AppTheme.warning).withValues(alpha: 0.12),
+                              borderRadius: BorderRadius.circular(10),
+                            ),
+                            child: Text(
+                              '$passRate% Pass Rate',
+                              style: TextStyle(
+                                fontSize: 10,
+                                fontWeight: FontWeight.bold,
+                                color: passRate >= 75 ? AppTheme.success : AppTheme.warning,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ],
                     ),
                     const SizedBox(height: 2),
                     Text(
@@ -942,24 +992,58 @@ class _TeacherDashboardScreenState extends ConsumerState<TeacherDashboardScreen>
                   ],
                 ),
               ),
-              TextButton.icon(
-                onPressed: () {
-                  HapticFeedback.lightImpact();
-                  setState(() => _isAnalyticsExpanded = false);
-                },
-                icon: Icon(Icons.keyboard_arrow_up, size: 18, color: AppTheme.textSecondary),
-                label: Text(
-                  'Hide',
-                  style: TextStyle(
-                    fontSize: 12,
-                    color: AppTheme.textSecondary,
-                    fontWeight: FontWeight.w600,
-                  ),
+              const SizedBox(width: 8),
+
+              // View Mode Switcher: Cards, Donut, Gauge
+              Container(
+                padding: const EdgeInsets.all(2),
+                decoration: BoxDecoration(
+                  color: isDark ? AppTheme.darkSurfaceLight : const Color(0xFFF1F5F9),
+                  borderRadius: BorderRadius.circular(10),
+                  border: Border.all(color: AppTheme.border.withValues(alpha: 0.5)),
                 ),
-                style: TextButton.styleFrom(
-                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                  minimumSize: Size.zero,
-                  tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    _buildAnalyticsViewModeBtn(0, Icons.grid_view_rounded, 'Cards View'),
+                    _buildAnalyticsViewModeBtn(1, Icons.pie_chart_rounded, 'Donut Breakdown'),
+                    _buildAnalyticsViewModeBtn(2, Icons.trending_up_rounded, 'Performance Mastery'),
+                  ],
+                ),
+              ),
+              const SizedBox(width: 6),
+
+              Tooltip(
+                message: 'Hide Analytics',
+                child: InkWell(
+                  borderRadius: BorderRadius.circular(8),
+                  onTap: () {
+                    HapticFeedback.lightImpact();
+                    setState(() => _isAnalyticsExpanded = false);
+                    _saveAnalyticsPreferences();
+                  },
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                    decoration: BoxDecoration(
+                      color: AppTheme.textMuted.withValues(alpha: 0.1),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(Icons.keyboard_arrow_up, size: 16, color: AppTheme.textSecondary),
+                        const SizedBox(width: 4),
+                        Text(
+                          'Hide',
+                          style: TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.w600,
+                            color: AppTheme.textSecondary,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
                 ),
               ),
             ],
@@ -1126,118 +1210,37 @@ class _TeacherDashboardScreenState extends ConsumerState<TeacherDashboardScreen>
             ),
           const SizedBox(height: 14),
 
-          // 4 Metric Cards (Row on Desktop, 2x2 on Mobile)
-          if (isDesktop)
-            Row(
-              children: [
-                Expanded(
-                  child: _buildMetricCard(
-                    title: 'Assigned Subjects',
-                    value: '$totalSubjects',
-                    subtitle: effectiveStudentId != 'All'
-                        ? 'Enrolled subjects'
-                        : 'Active courses',
-                    icon: Icons.menu_book_outlined,
-                    color: AppTheme.primary,
-                  ),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: _buildMetricCard(
-                    title: effectiveStudentId != 'All' ? 'Target Student' : 'Enrolled Students',
-                    value: '$totalStudents',
-                    subtitle: effectiveStudentId != 'All'
-                        ? selectedStudentName
-                        : effectiveSection != 'All Handled Sections'
-                            ? 'In $effectiveSection'
-                            : 'Across your classes',
-                    icon: Icons.people_alt_outlined,
-                    color: const Color(0xFF0D9488),
-                  ),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: _buildMetricCard(
-                    title: effectiveStudentId != 'All' ? 'Student Pass Rate' : 'Class Pass Rate',
-                    value: '$passRate%',
-                    subtitle: totalAttempts == 0
-                        ? 'No attempts yet'
-                        : '$passedAttempts passed ($totalAttempts attempts)',
-                    icon: Icons.verified_outlined,
-                    color: passRate >= 75 ? AppTheme.success : AppTheme.warning,
-                  ),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: _buildMetricCard(
-                    title: effectiveStudentId != 'All' ? 'Student Avg Score' : 'Average Score',
-                    value: '$avgScore%',
-                    subtitle: totalAttempts == 0 ? 'No attempts yet' : 'Overall assessments',
-                    icon: Icons.trending_up,
-                    color: AppTheme.accent,
-                  ),
-                ),
-              ],
+          // View Content based on _analyticsViewIndex (0: Cards, 1: Donut Breakdown, 2: Performance Mastery)
+          if (_analyticsViewIndex == 1)
+            _buildTeacherDonutView(
+              totalSubjects: totalSubjects,
+              totalStudents: totalStudents,
+              totalAttempts: totalAttempts,
+              passedAttempts: passedAttempts,
+              passRate: passRate,
+              avgScore: avgScore,
+            )
+          else if (_analyticsViewIndex == 2)
+            _buildTeacherGaugeView(
+              totalSubjects: totalSubjects,
+              totalStudents: totalStudents,
+              totalAttempts: totalAttempts,
+              passedAttempts: passedAttempts,
+              passRate: passRate,
+              avgScore: avgScore,
             )
           else
-            Column(
-              children: [
-                Row(
-                  children: [
-                    Expanded(
-                      child: _buildMetricCard(
-                        title: 'Assigned Subjects',
-                        value: '$totalSubjects',
-                        subtitle: effectiveStudentId != 'All'
-                            ? 'Enrolled subjects'
-                            : 'Active courses',
-                        icon: Icons.menu_book_outlined,
-                        color: AppTheme.primary,
-                      ),
-                    ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: _buildMetricCard(
-                        title: effectiveStudentId != 'All' ? 'Target Student' : 'Enrolled Students',
-                        value: '$totalStudents',
-                        subtitle: effectiveStudentId != 'All'
-                            ? selectedStudentName
-                            : effectiveSection != 'All Handled Sections'
-                                ? 'In $effectiveSection'
-                                : 'Across your classes',
-                        icon: Icons.people_alt_outlined,
-                        color: const Color(0xFF0D9488),
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 12),
-                Row(
-                  children: [
-                    Expanded(
-                      child: _buildMetricCard(
-                        title: effectiveStudentId != 'All' ? 'Student Pass Rate' : 'Class Pass Rate',
-                        value: '$passRate%',
-                        subtitle: totalAttempts == 0
-                            ? 'No attempts yet'
-                            : '$passedAttempts passed ($totalAttempts attempts)',
-                        icon: Icons.verified_outlined,
-                        color: passRate >= 75 ? AppTheme.success : AppTheme.warning,
-                      ),
-                    ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: _buildMetricCard(
-                        title: effectiveStudentId != 'All' ? 'Student Avg Score' : 'Average Score',
-                        value: '$avgScore%',
-                        subtitle: totalAttempts == 0 ? 'No attempts yet' : 'Overall assessments',
-                        icon: Icons.trending_up,
-                        color: AppTheme.accent,
-                      ),
-                    ),
-                  ],
-                ),
-              ],
+            _buildTeacherCardsView(
+              isDesktop: isDesktop,
+              totalSubjects: totalSubjects,
+              totalStudents: totalStudents,
+              totalAttempts: totalAttempts,
+              passedAttempts: passedAttempts,
+              passRate: passRate,
+              avgScore: avgScore,
+              effectiveStudentId: effectiveStudentId,
+              selectedStudentName: selectedStudentName,
+              effectiveSection: effectiveSection,
             ),
         ],
       ),
@@ -1309,6 +1312,495 @@ class _TeacherDashboardScreenState extends ConsumerState<TeacherDashboardScreen>
             style: TextStyle(fontSize: 11, color: AppTheme.textSecondary),
           ),
         ],
+      ),
+    );
+  }
+
+  Widget _buildAnalyticsViewModeBtn(int index, IconData icon, String tooltip) {
+    final isSelected = _analyticsViewIndex == index;
+    final primary = Theme.of(context).colorScheme.primary;
+    return Tooltip(
+      message: tooltip,
+      child: InkWell(
+        borderRadius: BorderRadius.circular(8),
+        onTap: () {
+          HapticFeedback.lightImpact();
+          setState(() {
+            _analyticsViewIndex = index;
+          });
+          _saveAnalyticsPreferences();
+        },
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 200),
+          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
+          decoration: BoxDecoration(
+            color: isSelected ? primary : Colors.transparent,
+            borderRadius: BorderRadius.circular(8),
+            boxShadow: isSelected
+                ? [
+                    BoxShadow(
+                      color: primary.withValues(alpha: 0.3),
+                      blurRadius: 4,
+                      offset: const Offset(0, 1),
+                    ),
+                  ]
+                : null,
+          ),
+          child: Icon(
+            icon,
+            size: 15,
+            color: isSelected ? Colors.black : AppTheme.textMuted,
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildTeacherCardsView({
+    required bool isDesktop,
+    required int totalSubjects,
+    required int totalStudents,
+    required int totalAttempts,
+    required int passedAttempts,
+    required int passRate,
+    required int avgScore,
+    required String effectiveStudentId,
+    required String selectedStudentName,
+    required String effectiveSection,
+  }) {
+    if (isDesktop) {
+      return Row(
+        children: [
+          Expanded(
+            child: _buildMetricCard(
+              title: 'Assigned Subjects',
+              value: '$totalSubjects',
+              subtitle: effectiveStudentId != 'All' ? 'Enrolled subjects' : 'Active courses',
+              icon: Icons.menu_book_outlined,
+              color: AppTheme.primary,
+            ),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: _buildMetricCard(
+              title: effectiveStudentId != 'All' ? 'Target Student' : 'Enrolled Students',
+              value: '$totalStudents',
+              subtitle: effectiveStudentId != 'All'
+                  ? selectedStudentName
+                  : effectiveSection != 'All Handled Sections'
+                      ? 'In $effectiveSection'
+                      : 'Across your classes',
+              icon: Icons.people_alt_outlined,
+              color: AppTheme.info,
+            ),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: _buildMetricCard(
+              title: effectiveStudentId != 'All' ? 'Student Pass Rate' : 'Class Pass Rate',
+              value: '$passRate%',
+              subtitle: totalAttempts == 0 ? 'No attempts yet' : '$passedAttempts passed ($totalAttempts attempts)',
+              icon: Icons.verified_outlined,
+              color: passRate >= 75 ? AppTheme.success : AppTheme.warning,
+            ),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: _buildMetricCard(
+              title: effectiveStudentId != 'All' ? 'Student Avg Score' : 'Average Score',
+              value: '$avgScore%',
+              subtitle: totalAttempts == 0 ? 'No attempts yet' : 'Overall assessments',
+              icon: Icons.trending_up,
+              color: AppTheme.accent,
+            ),
+          ),
+        ],
+      );
+    }
+
+    return Column(
+      children: [
+        Row(
+          children: [
+            Expanded(
+              child: _buildMetricCard(
+                title: 'Assigned Subjects',
+                value: '$totalSubjects',
+                subtitle: effectiveStudentId != 'All' ? 'Enrolled subjects' : 'Active courses',
+                icon: Icons.menu_book_outlined,
+                color: AppTheme.primary,
+              ),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: _buildMetricCard(
+                title: effectiveStudentId != 'All' ? 'Target Student' : 'Enrolled Students',
+                value: '$totalStudents',
+                subtitle: effectiveStudentId != 'All'
+                    ? selectedStudentName
+                    : effectiveSection != 'All Handled Sections'
+                        ? 'In $effectiveSection'
+                        : 'Across your classes',
+                icon: Icons.people_alt_outlined,
+                color: AppTheme.info,
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 12),
+        Row(
+          children: [
+            Expanded(
+              child: _buildMetricCard(
+                title: effectiveStudentId != 'All' ? 'Student Pass Rate' : 'Class Pass Rate',
+                value: '$passRate%',
+                subtitle: totalAttempts == 0 ? 'No attempts yet' : '$passedAttempts passed ($totalAttempts attempts)',
+                icon: Icons.verified_outlined,
+                color: passRate >= 75 ? AppTheme.success : AppTheme.warning,
+              ),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: _buildMetricCard(
+                title: effectiveStudentId != 'All' ? 'Student Avg Score' : 'Average Score',
+                value: '$avgScore%',
+                subtitle: totalAttempts == 0 ? 'No attempts yet' : 'Overall assessments',
+                icon: Icons.trending_up,
+                color: AppTheme.accent,
+              ),
+            ),
+          ],
+        ),
+      ],
+    );
+  }
+
+  Widget _buildTeacherDonutView({
+    required int totalSubjects,
+    required int totalStudents,
+    required int totalAttempts,
+    required int passedAttempts,
+    required int passRate,
+    required int avgScore,
+  }) {
+    final needsReview = (totalAttempts - passedAttempts).clamp(0, totalAttempts);
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
+    return Row(
+      children: [
+        // Donut Chart Graphic
+        SizedBox(
+          width: 120,
+          height: 120,
+          child: Stack(
+            alignment: Alignment.center,
+            children: [
+              CustomPaint(
+                size: const Size(120, 120),
+                painter: AnalyticsDonutPainter(
+                  valueA: passedAttempts.toDouble(),
+                  valueB: needsReview.toDouble(),
+                  colorA: AppTheme.success,
+                  colorB: AppTheme.warning,
+                  trackColor: isDark ? AppTheme.darkBorder : AppTheme.lightBorder,
+                ),
+              ),
+              Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(
+                    '$passRate%',
+                    style: TextStyle(
+                      fontSize: 22,
+                      fontWeight: FontWeight.w800,
+                      color: AppTheme.text,
+                      letterSpacing: -0.5,
+                    ),
+                  ),
+                  Text(
+                    totalAttempts > 0 ? 'PASS RATE' : 'NO DATA',
+                    style: TextStyle(
+                      fontSize: 8.5,
+                      fontWeight: FontWeight.w700,
+                      letterSpacing: 0.7,
+                      color: AppTheme.textMuted,
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(width: 18),
+
+        // Legend Breakdown List
+        Expanded(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              _buildTeacherChartLegendItem(
+                label: 'Passed Assessments',
+                value: '$passedAttempts',
+                color: AppTheme.success,
+                subtext: totalAttempts > 0 ? '$passRate% passing rate' : 'No attempts',
+              ),
+              const SizedBox(height: 8),
+              _buildTeacherChartLegendItem(
+                label: 'Needs Review',
+                value: '$needsReview',
+                color: AppTheme.warning,
+                subtext: totalAttempts > 0 ? '${100 - passRate}% attention required' : 'Clear',
+              ),
+              const SizedBox(height: 8),
+              _buildTeacherChartLegendItem(
+                label: 'Enrolled Students',
+                value: '$totalStudents',
+                color: AppTheme.primary,
+                subtext: 'Active in class scope',
+              ),
+              const SizedBox(height: 8),
+              _buildTeacherChartLegendItem(
+                label: 'Class Avg Score',
+                value: '$avgScore%',
+                color: AppTheme.accent,
+                subtext: 'Overall assessment mastery',
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildTeacherChartLegendItem({
+    required String label,
+    required String value,
+    required Color color,
+    required String subtext,
+  }) {
+    return Row(
+      children: [
+        Container(
+          width: 9,
+          height: 9,
+          decoration: BoxDecoration(
+            color: color,
+            shape: BoxShape.circle,
+            boxShadow: [
+              BoxShadow(
+                color: color.withValues(alpha: 0.35),
+                blurRadius: 3,
+                offset: const Offset(0, 1),
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(width: 8),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Text(
+                    label,
+                    style: TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w600,
+                      color: AppTheme.text,
+                    ),
+                  ),
+                  Text(
+                    value,
+                    style: TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.bold,
+                      color: color,
+                    ),
+                  ),
+                ],
+              ),
+              Text(
+                subtext,
+                style: TextStyle(
+                  fontSize: 10,
+                  color: AppTheme.textMuted,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildTeacherGaugeView({
+    required int totalSubjects,
+    required int totalStudents,
+    required int totalAttempts,
+    required int passedAttempts,
+    required int passRate,
+    required int avgScore,
+  }) {
+    final double passRatio = (passRate / 100.0).clamp(0.0, 1.0);
+    final double avgRatio = (avgScore / 100.0).clamp(0.0, 1.0);
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
+    final String statusText;
+    final Color statusColor;
+    final IconData statusIcon;
+
+    if (totalAttempts == 0) {
+      statusText = 'No assessments completed yet for this selection.';
+      statusColor = AppTheme.textMuted;
+      statusIcon = Icons.info_outline;
+    } else if (passRate >= 85) {
+      statusText = 'Exceptional class performance! Benchmark exceeded.';
+      statusColor = AppTheme.success;
+      statusIcon = Icons.stars_rounded;
+    } else if (passRate >= 75) {
+      statusText = 'On track! Class meets standard 75% pass benchmark.';
+      statusColor = AppTheme.primary;
+      statusIcon = Icons.verified_rounded;
+    } else {
+      statusText = 'Class pass rate is below target (75%). Review suggested.';
+      statusColor = AppTheme.warning;
+      statusIcon = Icons.warning_amber_rounded;
+    }
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        // 1. Pass Rate Bar
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Text(
+              'Class Pass Rate Benchmark',
+              style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: AppTheme.text),
+            ),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+              decoration: BoxDecoration(
+                color: (passRate >= 75 ? AppTheme.success : AppTheme.warning).withValues(alpha: 0.12),
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: Text(
+                '$passRate%',
+                style: TextStyle(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w800,
+                  color: passRate >= 75 ? AppTheme.success : AppTheme.warning,
+                ),
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 6),
+        ClipRRect(
+          borderRadius: BorderRadius.circular(6),
+          child: Stack(
+            children: [
+              Container(height: 8, width: double.infinity, color: isDark ? AppTheme.darkBorder : AppTheme.lightBorder),
+              FractionallySizedBox(
+                widthFactor: passRatio > 0 ? passRatio : 0.001,
+                child: Container(
+                  height: 8,
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(colors: [AppTheme.primary, AppTheme.success]),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(height: 12),
+
+        // 2. Average Score Bar
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Text(
+              'Average Score Mastery',
+              style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: AppTheme.text),
+            ),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+              decoration: BoxDecoration(
+                color: AppTheme.accent.withValues(alpha: 0.12),
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: Text(
+                '$avgScore%',
+                style: TextStyle(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w800,
+                  color: AppTheme.accent,
+                ),
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 6),
+        ClipRRect(
+          borderRadius: BorderRadius.circular(6),
+          child: Stack(
+            children: [
+              Container(height: 8, width: double.infinity, color: isDark ? AppTheme.darkBorder : AppTheme.lightBorder),
+              FractionallySizedBox(
+                widthFactor: avgRatio > 0 ? avgRatio : 0.001,
+                child: Container(
+                  height: 8,
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(colors: [AppTheme.accent, AppTheme.primary]),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(height: 14),
+
+        // Status Banner & Quick Chips
+        Row(
+          children: [
+            Icon(statusIcon, size: 15, color: statusColor),
+            const SizedBox(width: 6),
+            Expanded(
+              child: Text(
+                statusText,
+                style: TextStyle(fontSize: 11, fontWeight: FontWeight.w500, color: statusColor),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+              ),
+            ),
+            const SizedBox(width: 8),
+            _buildTeacherMiniChip('Attempts: $totalAttempts', AppTheme.primary),
+            const SizedBox(width: 4),
+            _buildTeacherMiniChip('Students: $totalStudents', AppTheme.accent),
+          ],
+        ),
+      ],
+    );
+  }
+
+  Widget _buildTeacherMiniChip(String text, Color color) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.1),
+        borderRadius: BorderRadius.circular(7),
+        border: Border.all(color: color.withValues(alpha: 0.25)),
+      ),
+      child: Text(
+        text,
+        style: TextStyle(
+          fontSize: 10,
+          fontWeight: FontWeight.bold,
+          color: color,
+        ),
       ),
     );
   }
@@ -1824,7 +2316,7 @@ class _TeacherDashboardScreenState extends ConsumerState<TeacherDashboardScreen>
                           ),
                           Row(
                             children: [
-                              Icon(Icons.people_alt_outlined, size: 14, color: const Color(0xFF0D9488)),
+                              Icon(Icons.people_alt_outlined, size: 14, color: AppTheme.primary),
                               const SizedBox(width: 4),
                               Text(
                                 '$studentCount ${studentCount == 1 ? 'Student' : 'Students'}',
