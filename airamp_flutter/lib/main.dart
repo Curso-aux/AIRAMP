@@ -8,6 +8,7 @@ import 'src/core/theme/theme_provider.dart';
 import 'src/core/database/firestore_service.dart';
 import 'src/core/services/app_update_service.dart';
 import 'src/core/services/session_draft_service.dart';
+import 'src/core/services/aira_voice_service.dart';
 import 'src/features/auth/application/auth_provider.dart';
 
 void main() async {
@@ -63,6 +64,7 @@ class _AirampAppState extends ConsumerState<AirampApp> {
         ref.read(themeProvider.notifier).loadSavedTheme(),
         SessionDraftService.instance.init(),
       ]);
+      AiraVoiceService.instance.init();
     } catch (e) {
       debugPrint('Error during app bootstrap: $e');
     }
@@ -72,6 +74,7 @@ class _AirampAppState extends ConsumerState<AirampApp> {
       try {
         precacheImage(const AssetImage('assets/images/aira_logo.png'), context);
         precacheImage(const AssetImage('assets/images/aira_avatar_idle.png'), context);
+        precacheImage(const AssetImage('assets/images/aira_avatar_speaking.png'), context);
       } catch (_) {}
     }
     // Background cloud user sync
