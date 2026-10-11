@@ -8,6 +8,9 @@ import '../../../core/theme/theme_provider.dart';
 import '../../auth/application/auth_provider.dart';
 import '../data/student_repository.dart';
 import '../../esp32_hub/presentation/student_esp32_sync_modal.dart';
+import '../../esp32_hub/domain/esp32_hub_models.dart';
+import '../../esp32_hub/data/saved_materials_service.dart';
+import '../../esp32_hub/presentation/saved_offline_materials_modal.dart';
 
 class MyCoursesScreen extends ConsumerStatefulWidget {
   const MyCoursesScreen({super.key});
@@ -759,21 +762,56 @@ class _MyCoursesScreenState extends ConsumerState<MyCoursesScreen> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 // Screen Title Header
-                Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  crossAxisAlignment: CrossAxisAlignment.center,
                   children: [
-                    Text(
-                      'My Courses',
-                      style: TextStyle(
-                        fontSize: 28,
-                        fontWeight: FontWeight.bold,
-                        color: Theme.of(context).colorScheme.onSurface,
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'My Courses',
+                            style: TextStyle(
+                              fontSize: 28,
+                              fontWeight: FontWeight.bold,
+                              color: Theme.of(context).colorScheme.onSurface,
+                            ),
+                          ),
+                          const SizedBox(height: 4),
+                          Text(
+                            'Class curriculum and room schedule',
+                            style: TextStyle(fontSize: 14, color: AppTheme.textSecondary),
+                          ),
+                        ],
                       ),
                     ),
-                    const SizedBox(height: 4),
-                    Text(
-                      'Class curriculum and room schedule',
-                      style: TextStyle(fontSize: 14, color: AppTheme.textSecondary),
+                    ValueListenableBuilder<List<HubMaterialItem>>(
+                      valueListenable: SavedMaterialsService.instance.savedMaterialsNotifier,
+                      builder: (context, savedList, _) {
+                        return OutlinedButton.icon(
+                          onPressed: () {
+                            SavedOfflineMaterialsModal.show(
+                              context,
+                              studentName: user?.fullName ?? 'Student',
+                              studentSection: user?.section,
+                            );
+                          },
+                          icon: const Icon(Icons.folder_special_rounded, size: 16),
+                          label: Text(
+                            savedList.isNotEmpty ? 'Materials (${savedList.length})' : 'Materials',
+                            style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13),
+                          ),
+                          style: OutlinedButton.styleFrom(
+                            foregroundColor: Theme.of(context).colorScheme.primary,
+                            side: BorderSide(
+                              color: Theme.of(context).colorScheme.primary.withValues(alpha: 0.5),
+                            ),
+                            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                          ),
+                        );
+                      },
                     ),
                   ],
                 ),
@@ -969,79 +1007,127 @@ class _MyCoursesScreenState extends ConsumerState<MyCoursesScreen> {
           ),
         ],
       ),
-      child: Row(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Container(
-            padding: const EdgeInsets.all(12),
-            decoration: BoxDecoration(
-              color: Theme.of(context).colorScheme.primary.withValues(alpha: 0.15),
-              borderRadius: BorderRadius.circular(12),
-            ),
-            child: Icon(Icons.qr_code_scanner, color: Theme.of(context).colorScheme.primary, size: 26),
-          ),
-          const SizedBox(width: 14),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Wrap(
-                  crossAxisAlignment: WrapCrossAlignment.center,
-                  spacing: 8,
-                  runSpacing: 4,
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: Theme.of(context).colorScheme.primary.withValues(alpha: 0.15),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Icon(Icons.qr_code_scanner, color: Theme.of(context).colorScheme.primary, size: 26),
+              ),
+              const SizedBox(width: 14),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(
-                      'Classroom Offline Hub',
-                      style: TextStyle(
-                        fontSize: 15,
-                        fontWeight: FontWeight.bold,
-                        color: Theme.of(context).colorScheme.onSurface,
-                      ),
-                    ),
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                      decoration: BoxDecoration(
-                        color: AppTheme.primarySoft,
-                        borderRadius: BorderRadius.circular(4),
-                      ),
-                      child: Text(
-                        'No Data Needed',
-                        style: TextStyle(
-                          color: Theme.of(context).colorScheme.primary,
-                          fontSize: 10,
-                          fontWeight: FontWeight.bold,
+                    Wrap(
+                      crossAxisAlignment: WrapCrossAlignment.center,
+                      spacing: 8,
+                      runSpacing: 4,
+                      children: [
+                        Text(
+                          'Classroom Offline Hub',
+                          style: TextStyle(
+                            fontSize: 15,
+                            fontWeight: FontWeight.bold,
+                            color: Theme.of(context).colorScheme.onSurface,
+                          ),
                         ),
-                      ),
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                          decoration: BoxDecoration(
+                            color: AppTheme.primarySoft,
+                            borderRadius: BorderRadius.circular(4),
+                          ),
+                          child: Text(
+                            'No Data Needed',
+                            style: TextStyle(
+                              color: Theme.of(context).colorScheme.primary,
+                              fontSize: 10,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      'Scan teacher\'s QR code or read and review saved modules & quizzes completely offline.',
+                      style: TextStyle(fontSize: 12, color: AppTheme.textSecondary),
                     ),
                   ],
                 ),
-                const SizedBox(height: 4),
-                Text(
-                  'Scan your teacher\'s QR code to download modules & quizzes directly to your phone.',
-                  style: TextStyle(fontSize: 12, color: AppTheme.textSecondary),
-                ),
-              ],
-            ),
+              ),
+            ],
           ),
-          const SizedBox(width: 12),
-          ElevatedButton.icon(
-            onPressed: () {
-              StudentEsp32SyncModal.show(
-                context,
-                studentName: currentUser?.fullName ?? 'Student',
-                studentSection: currentUser?.section,
-                onSyncCompleted: () {
-                  ref.read(studentCoursesProvider.notifier).reload();
-                },
+          const SizedBox(height: 14),
+          ValueListenableBuilder<List<HubMaterialItem>>(
+            valueListenable: SavedMaterialsService.instance.savedMaterialsNotifier,
+            builder: (context, savedList, _) {
+              final count = savedList.length;
+              return Row(
+                children: [
+                  Expanded(
+                    child: OutlinedButton.icon(
+                      onPressed: () {
+                        SavedOfflineMaterialsModal.show(
+                          context,
+                          studentName: currentUser?.fullName ?? 'Student',
+                          studentSection: currentUser?.section,
+                        );
+                      },
+                      icon: const Icon(Icons.folder_special_rounded, size: 16),
+                      label: Text(
+                        count > 0 ? 'Saved ($count)' : 'Saved Materials',
+                        style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13),
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                      style: OutlinedButton.styleFrom(
+                        foregroundColor: Theme.of(context).colorScheme.primary,
+                        side: BorderSide(
+                          color: Theme.of(context).colorScheme.primary.withValues(alpha: 0.5),
+                        ),
+                        padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 8),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: ElevatedButton.icon(
+                      onPressed: () {
+                        StudentEsp32SyncModal.show(
+                          context,
+                          studentName: currentUser?.fullName ?? 'Student',
+                          studentSection: currentUser?.section,
+                          onSyncCompleted: () {
+                            ref.read(studentCoursesProvider.notifier).reload();
+                          },
+                        );
+                      },
+                      icon: const Icon(Icons.qr_code_scanner, size: 16),
+                      label: const Text(
+                        'Scan QR',
+                        style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+                      ),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: Theme.of(context).colorScheme.primary,
+                        foregroundColor: Colors.white,
+                        padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 8),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                        elevation: 0,
+                      ),
+                    ),
+                  ),
+                ],
               );
             },
-            icon: const Icon(Icons.qr_code, size: 16),
-            label: const Text('Scan QR'),
-            style: ElevatedButton.styleFrom(
-              backgroundColor: Theme.of(context).colorScheme.primary,
-              foregroundColor: Colors.white,
-              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-            ),
           ),
         ],
       ),

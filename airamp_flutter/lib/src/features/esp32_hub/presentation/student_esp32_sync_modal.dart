@@ -2,7 +2,9 @@ import 'package:flutter/material.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/components/app_toast.dart';
 import '../domain/esp32_hub_models.dart';
+import '../data/saved_materials_service.dart';
 import 'components/qr_viewfinder_widget.dart';
+import 'saved_offline_materials_modal.dart';
 
 /// Modal bottom sheet for students to scan the teacher's ESP32 QR code,
 /// discover classroom learning materials, and save them offline.
@@ -58,7 +60,7 @@ class _StudentEsp32SyncModalState extends State<StudentEsp32SyncModal>
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 2, vsync: this);
+    _tabController = TabController(length: 3, vsync: this);
     _manifest = HubSyncManifest.sample(
       sectionName: widget.studentSection ?? 'Grade 10 - Rizal',
     );
@@ -128,6 +130,9 @@ class _StudentEsp32SyncModalState extends State<StudentEsp32SyncModal>
         _completedDownloads++;
       });
     }
+
+    // Persist downloaded materials to local device storage
+    await SavedMaterialsService.instance.saveMaterials(_itemsToDownload);
 
     if (!mounted) return;
     setState(() {
@@ -201,6 +206,18 @@ class _StudentEsp32SyncModalState extends State<StudentEsp32SyncModal>
                   ),
                 ),
                 IconButton(
+                  tooltip: 'View Saved Offline Materials',
+                  icon: Icon(Icons.folder_special_outlined, color: AppTheme.primary),
+                  onPressed: () {
+                    Navigator.pop(context);
+                    SavedOfflineMaterialsModal.show(
+                      context,
+                      studentName: widget.studentName,
+                      studentSection: widget.studentSection,
+                    );
+                  },
+                ),
+                IconButton(
                   icon: Icon(Icons.close, color: AppTheme.textMuted),
                   onPressed: () => Navigator.pop(context),
                 ),
@@ -237,16 +254,26 @@ class _StudentEsp32SyncModalState extends State<StudentEsp32SyncModal>
   Widget _buildScanView() {
     return Column(
       children: [
-        TabBar(
-          controller: _tabController,
-          labelColor: AppTheme.primary,
-          unselectedLabelColor: AppTheme.textMuted,
-          indicatorColor: AppTheme.primary,
-          indicatorWeight: 3,
-          tabs: const [
-            Tab(icon: Icon(Icons.camera_alt_outlined, size: 20), text: 'Scan Hub QR'),
-            Tab(icon: Icon(Icons.wifi, size: 20), text: 'Manual Connect'),
-          ],
+        ValueListenableBuilder<List<HubMaterialItem>>(
+          valueListenable: SavedMaterialsService.instance.savedMaterialsNotifier,
+          builder: (context, savedList, _) {
+            final count = savedList.length;
+            return TabBar(
+              controller: _tabController,
+              labelColor: AppTheme.primary,
+              unselectedLabelColor: AppTheme.textMuted,
+              indicatorColor: AppTheme.primary,
+              indicatorWeight: 3,
+              tabs: [
+                const Tab(icon: Icon(Icons.camera_alt_outlined, size: 20), text: 'Scan Hub QR'),
+                Tab(
+                  icon: const Icon(Icons.folder_special_rounded, size: 20),
+                  text: count > 0 ? 'Saved ($count)' : 'Saved Files',
+                ),
+                const Tab(icon: Icon(Icons.wifi, size: 20), text: 'Manual Connect'),
+              ],
+            );
+          },
         ),
         Expanded(
           child: TabBarView(
@@ -254,7 +281,7 @@ class _StudentEsp32SyncModalState extends State<StudentEsp32SyncModal>
             children: [
               // Tab 1: QR Viewfinder
               SingleChildScrollView(
-                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 24),
+                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 20),
                 child: Column(
                   children: [
                     QrViewfinderWidget(
@@ -263,17 +290,84 @@ class _StudentEsp32SyncModalState extends State<StudentEsp32SyncModal>
                         _processHubConnection('Simulated QR: ${_manifest.qrPayload}');
                       },
                     ),
-                    const SizedBox(height: 16),
+                    const SizedBox(height: 14),
                     Text(
                       'No Wi-Fi or data required! Your device will communicate directly with the classroom ESP32 station.',
                       textAlign: TextAlign.center,
                       style: TextStyle(fontSize: 12, color: AppTheme.textMuted),
                     ),
+                    const SizedBox(height: 16),
+                    ValueListenableBuilder<List<HubMaterialItem>>(
+                      valueListenable: SavedMaterialsService.instance.savedMaterialsNotifier,
+                      builder: (context, savedList, _) {
+                        return Container(
+                          padding: const EdgeInsets.all(12),
+                          decoration: BoxDecoration(
+                            color: AppTheme.primary.withValues(alpha: 0.08),
+                            borderRadius: BorderRadius.circular(12),
+                            border: Border.all(color: AppTheme.primary.withValues(alpha: 0.25)),
+                          ),
+                          child: Row(
+                            children: [
+                              Container(
+                                padding: const EdgeInsets.all(8),
+                                decoration: BoxDecoration(
+                                  color: AppTheme.primary.withValues(alpha: 0.15),
+                                  borderRadius: BorderRadius.circular(8),
+                                ),
+                                child: Icon(Icons.folder_special_rounded, color: AppTheme.primary, size: 20),
+                              ),
+                              const SizedBox(width: 10),
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      'Saved Materials (${savedList.length})',
+                                      style: TextStyle(
+                                        fontSize: 13,
+                                        fontWeight: FontWeight.bold,
+                                        color: AppTheme.text,
+                                      ),
+                                    ),
+                                    Text(
+                                      'Review offline modules & quizzes',
+                                      style: TextStyle(fontSize: 11, color: AppTheme.textSecondary),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                              ElevatedButton(
+                                onPressed: () {
+                                  _tabController.animateTo(1);
+                                },
+                                style: ElevatedButton.styleFrom(
+                                  backgroundColor: AppTheme.primary,
+                                  foregroundColor: Colors.white,
+                                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                                  minimumSize: const Size(0, 32),
+                                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                                  elevation: 0,
+                                ),
+                                child: const Text('View Files', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
+                              ),
+                            ],
+                          ),
+                        );
+                      },
+                    ),
                   ],
                 ),
               ),
 
-              // Tab 2: Manual Wi-Fi Connect
+              // Tab 2: Saved Learning Materials Embedded View
+              SavedOfflineMaterialsModal(
+                studentName: widget.studentName,
+                studentSection: widget.studentSection,
+                showHeader: false,
+              ),
+
+              // Tab 3: Manual Wi-Fi Connect
               SingleChildScrollView(
                 padding: const EdgeInsets.all(20),
                 child: Column(
@@ -624,21 +718,46 @@ class _StudentEsp32SyncModalState extends State<StudentEsp32SyncModal>
 
           const SizedBox(height: 24),
 
-          SizedBox(
-            width: double.infinity,
-            height: 48,
-            child: ElevatedButton.icon(
-              onPressed: () {
-                Navigator.pop(context);
-              },
-              icon: const Icon(Icons.menu_book),
-              label: const Text('Start Studying Offline'),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: AppTheme.primary,
-                foregroundColor: Colors.white,
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+          Row(
+            children: [
+              Expanded(
+                child: OutlinedButton.icon(
+                  onPressed: () {
+                    Navigator.pop(context);
+                  },
+                  icon: const Icon(Icons.close, size: 16),
+                  label: const Text('Close'),
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: AppTheme.textSecondary,
+                    side: BorderSide(color: AppTheme.border),
+                    padding: const EdgeInsets.symmetric(vertical: 12),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                  ),
+                ),
               ),
-            ),
+              const SizedBox(width: 12),
+              Expanded(
+                flex: 2,
+                child: ElevatedButton.icon(
+                  onPressed: () {
+                    Navigator.pop(context);
+                    SavedOfflineMaterialsModal.show(
+                      context,
+                      studentName: widget.studentName,
+                      studentSection: widget.studentSection,
+                    );
+                  },
+                  icon: const Icon(Icons.folder_special_rounded, size: 18),
+                  label: const Text('View Saved Materials'),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: AppTheme.primary,
+                    foregroundColor: Colors.white,
+                    padding: const EdgeInsets.symmetric(vertical: 12),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                  ),
+                ),
+              ),
+            ],
           ),
         ],
       ),

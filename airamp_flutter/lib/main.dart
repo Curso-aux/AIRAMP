@@ -10,6 +10,7 @@ import 'src/core/services/app_update_service.dart';
 import 'src/core/services/session_draft_service.dart';
 import 'src/core/services/aira_voice_service.dart';
 import 'src/features/auth/application/auth_provider.dart';
+import 'src/features/esp32_hub/data/saved_materials_service.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -63,6 +64,7 @@ class _AirampAppState extends ConsumerState<AirampApp> {
         ref.read(authProvider.notifier).bootstrap(),
         ref.read(themeProvider.notifier).loadSavedTheme(),
         SessionDraftService.instance.init(),
+        SavedMaterialsService.instance.init(),
       ]);
       AiraVoiceService.instance.init();
     } catch (e) {

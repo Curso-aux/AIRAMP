@@ -829,7 +829,7 @@ class WebLandingScreen extends ConsumerWidget {
     );
   }
 
-  void _navigateToLogin(BuildContext context, [String? role]) {
+  void _navigateToLogin(BuildContext context) {
     try {
       context.go('/login');
     } catch (_) {

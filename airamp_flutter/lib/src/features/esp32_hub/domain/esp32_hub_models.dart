@@ -44,6 +44,9 @@ class HubMaterialItem {
   final String? localPath;
   final HubDownloadStatus downloadStatus;
   final double downloadProgress;
+  final String? savedAt;
+  final String? description;
+  final String? content;
 
   const HubMaterialItem({
     required this.id,
@@ -54,6 +57,9 @@ class HubMaterialItem {
     this.localPath,
     this.downloadStatus = HubDownloadStatus.notDownloaded,
     this.downloadProgress = 0.0,
+    this.savedAt,
+    this.description,
+    this.content,
   });
 
   String get formattedSize {
@@ -68,6 +74,9 @@ class HubMaterialItem {
     HubDownloadStatus? downloadStatus,
     double? downloadProgress,
     String? localPath,
+    String? savedAt,
+    String? description,
+    String? content,
   }) {
     return HubMaterialItem(
       id: id,
@@ -78,6 +87,45 @@ class HubMaterialItem {
       localPath: localPath ?? this.localPath,
       downloadStatus: downloadStatus ?? this.downloadStatus,
       downloadProgress: downloadProgress ?? this.downloadProgress,
+      savedAt: savedAt ?? this.savedAt,
+      description: description ?? this.description,
+      content: content ?? this.content,
+    );
+  }
+
+  Map<String, dynamic> toJson() => {
+    'id': id,
+    'title': title,
+    'subjectName': subjectName,
+    'fileType': fileType.name,
+    'sizeBytes': sizeBytes,
+    'localPath': localPath,
+    'downloadStatus': downloadStatus.name,
+    'downloadProgress': downloadProgress,
+    'savedAt': savedAt,
+    'description': description,
+    'content': content,
+  };
+
+  factory HubMaterialItem.fromJson(Map<String, dynamic> json) {
+    return HubMaterialItem(
+      id: json['id'] as String,
+      title: json['title'] as String,
+      subjectName: json['subjectName'] as String? ?? 'General Subject',
+      fileType: HubFileType.values.firstWhere(
+        (e) => e.name == json['fileType'],
+        orElse: () => HubFileType.module,
+      ),
+      sizeBytes: (json['sizeBytes'] as num?)?.toInt() ?? 0,
+      localPath: json['localPath'] as String?,
+      downloadStatus: HubDownloadStatus.values.firstWhere(
+        (e) => e.name == json['downloadStatus'],
+        orElse: () => HubDownloadStatus.downloaded,
+      ),
+      downloadProgress: (json['downloadProgress'] as num?)?.toDouble() ?? 1.0,
+      savedAt: json['savedAt'] as String?,
+      description: json['description'] as String?,
+      content: json['content'] as String?,
     );
   }
 }
@@ -119,8 +167,11 @@ class HubSyncManifest {
           id: 'mat_01',
           title: 'Module 1: Cellular Biology & Mitosis',
           subjectName: 'General Science',
-          fileType: HubFileType.pdf,
+          fileType: HubFileType.module,
           sizeBytes: 1450000,
+          savedAt: 'Synced via Classroom Station',
+          description: 'Detailed study guide covering the stages of mitosis (Prophase, Metaphase, Anaphase, Telophase) and cellular reproduction in living organisms.',
+          content: '## Overview\nCell division is the biological process by which a parent cell divides into two or more daughter cells. In eukaryotic cells, mitosis is the nuclear division cycle.\n\n### Phases of Mitosis:\n1. **Prophase**: Chromatin condenses into visible chromosomes. The nucleolus disappears and the mitotic spindle begins forming.\n2. **Metaphase**: Chromosomes line up along the equatorial metaphase plate attached to spindle fibers.\n3. **Anaphase**: Sister chromatids are pulled apart to opposite poles of the dividing cell.\n4. **Telophase & Cytokinesis**: Nuclear envelope reforms around daughter nuclei, and the cytoplasm divides into two identical diploid cells.\n\n### Key Takeaways:\n- Mitosis results in genetically identical daughter cells.\n- Crucial for tissue repair, biological growth, and organism maintenance.',
         ),
         HubMaterialItem(
           id: 'mat_02',
@@ -128,20 +179,29 @@ class HubSyncManifest {
           subjectName: 'Mathematics',
           fileType: HubFileType.pdf,
           sizeBytes: 980000,
+          savedAt: 'Synced via Classroom Station',
+          description: 'Standard quadratic form y = ax² + bx + c, vertex formula, axis of symmetry, discriminant rules, and projectile trajectory modeling.',
+          content: '## Quadratic Functions\nA quadratic function is a polynomial function of degree 2:\nf(x) = ax² + bx + c\nwhere a, b, and c are real numbers and a ≠ 0.\n\n### Vertex Formula:\nThe vertex coordinates (h, k) are given by:\n- h = -b / (2a)\n- k = f(h)\n\n### Discriminant Analysis:\n- If b² - 4ac > 0: Two distinct real roots.\n- If b² - 4ac = 0: Exactly one real root (tangent to x-axis).\n- If b² - 4ac < 0: No real roots (complex roots).\n\n### Real-World Applications:\n- Basketball projectile paths\n- Architectural arches and suspension bridge cables\n- Satellite dish focal optimization',
         ),
         HubMaterialItem(
           id: 'mat_03',
-          title: 'Quarter 1 Diagnostic Assessment (20 Items)',
+          title: 'Quarter 1 Diagnostic Assessment (5 Items)',
           subjectName: 'General Science',
           fileType: HubFileType.quiz,
           sizeBytes: 320000,
+          savedAt: 'Synced via Classroom Station',
+          description: 'Interactive offline diagnostic practice test with immediate on-device scoring and answer explanations.',
+          content: 'Q1: In which phase of mitosis do chromosomes align in the center of the cell?\nA) Anaphase\nB) Metaphase\nC) Telophase\nD) Prophase\nAnswer: B\nExplanation: During metaphase, spindle fibers pull chromosomes to the equatorial plane of the cell.\n\nQ2: What is the powerhouse of the cell responsible for ATP production?\nA) Nucleus\nB) Ribosome\nC) Mitochondria\nD) Endoplasmic Reticulum\nAnswer: C\nExplanation: Mitochondria generate most of the chemical energy needed by the cell.\n\nQ3: What molecule carries genetic instructions in living organisms?\nA) RNA\nB) Hemoglobin\nC) DNA\nD) Glucose\nAnswer: C\nExplanation: Deoxyribonucleic acid (DNA) contains the hereditary genetic code.\n\nQ4: During which stage do sister chromatids separate?\nA) Anaphase\nB) Metaphase\nC) Prophase\nD) Interphase\nAnswer: A\nExplanation: In anaphase, centromeres split and sister chromatids are pulled to opposite spindle poles.\n\nQ5: Which cellular division process produces sex cells (gametes)?\nA) Mitosis\nB) Binary Fission\nC) Meiosis\nD) Budding\nAnswer: C\nExplanation: Meiosis reduces the chromosome count by half to yield haploid gametes.',
         ),
         HubMaterialItem(
           id: 'mat_04',
           title: 'Reading Comprehension & Critical Analysis',
           subjectName: 'English',
-          fileType: HubFileType.module,
+          fileType: HubFileType.doc,
           sizeBytes: 650000,
+          savedAt: 'Synced via Classroom Station',
+          description: 'Guided textual analysis, thesis identification, context clues, tone recognition, and argumentative synthesis exercises.',
+          content: '## Critical Analysis in Modern Reading\nCritical reading means evaluating an author\'s argument, assessing rhetorical devices, and verifying textual evidence rather than passively absorbing text.\n\n### Four Pillars of Reading Comprehension:\n1. **Identifying the Thesis**: Pinpoint the author\'s primary claim or central insight early in the text.\n2. **Using Context Clues**: Infer definitions of unfamiliar vocabulary using surrounding sentence structures and contrast clues.\n3. **Tone & Perspective**: Discern whether the narrative voice is objective, satirical, persuasive, or informational.\n4. **Synthesizing Evidence**: Connect key facts from the passage to support valid independent conclusions.',
         ),
       ],
     );

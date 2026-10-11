@@ -12,6 +12,9 @@ import '../../teacher/data/teacher_schedule_repository.dart';
 import '../data/student_repository.dart';
 import 'components/student_schedule_widget.dart';
 import '../../esp32_hub/presentation/student_esp32_sync_modal.dart';
+import '../../esp32_hub/domain/esp32_hub_models.dart';
+import '../../esp32_hub/data/saved_materials_service.dart';
+import '../../esp32_hub/presentation/saved_offline_materials_modal.dart';
 
 class StudentHomeScreen extends ConsumerStatefulWidget {
   const StudentHomeScreen({super.key});
@@ -308,6 +311,8 @@ class _StudentHomeScreenState extends ConsumerState<StudentHomeScreen> {
                         ),
                         Row(
                           children: [
+                            _buildOfflineMaterialsHeaderButton(context, currentUser),
+                            const SizedBox(width: 8),
                             _buildScheduleHeaderButton(context, currentUser.section),
                             const SizedBox(width: 8),
                             _buildBellButton(studentAnnouncements),
@@ -403,79 +408,127 @@ class _StudentHomeScreenState extends ConsumerState<StudentHomeScreen> {
           ),
         ],
       ),
-      child: Row(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Container(
-            padding: const EdgeInsets.all(12),
-            decoration: BoxDecoration(
-              color: AppTheme.primary.withValues(alpha: 0.15),
-              borderRadius: BorderRadius.circular(12),
-            ),
-            child: Icon(Icons.qr_code_scanner, color: AppTheme.primary, size: 26),
-          ),
-          const SizedBox(width: 14),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Wrap(
-                  crossAxisAlignment: WrapCrossAlignment.center,
-                  spacing: 8,
-                  runSpacing: 4,
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: AppTheme.primary.withValues(alpha: 0.15),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Icon(Icons.qr_code_scanner, color: AppTheme.primary, size: 26),
+              ),
+              const SizedBox(width: 14),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(
-                      'Classroom Offline Hub',
-                      style: TextStyle(
-                        fontSize: 15,
-                        fontWeight: FontWeight.bold,
-                        color: AppTheme.text,
-                      ),
-                    ),
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                      decoration: BoxDecoration(
-                        color: AppTheme.primarySoft,
-                        borderRadius: BorderRadius.circular(4),
-                      ),
-                      child: Text(
-                        'No Data Needed',
-                        style: TextStyle(
-                          color: AppTheme.primary,
-                          fontSize: 10,
-                          fontWeight: FontWeight.bold,
+                    Wrap(
+                      crossAxisAlignment: WrapCrossAlignment.center,
+                      spacing: 8,
+                      runSpacing: 4,
+                      children: [
+                        Text(
+                          'Classroom Offline Hub',
+                          style: TextStyle(
+                            fontSize: 15,
+                            fontWeight: FontWeight.bold,
+                            color: AppTheme.text,
+                          ),
                         ),
-                      ),
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                          decoration: BoxDecoration(
+                            color: AppTheme.primarySoft,
+                            borderRadius: BorderRadius.circular(4),
+                          ),
+                          child: Text(
+                            'No Data Needed',
+                            style: TextStyle(
+                              color: AppTheme.primary,
+                              fontSize: 10,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      'Scan teacher\'s QR code or read and review saved modules & quizzes completely offline.',
+                      style: TextStyle(fontSize: 12, color: AppTheme.textSecondary),
                     ),
                   ],
                 ),
-                const SizedBox(height: 4),
-                Text(
-                  'Scan your teacher\'s QR code to download modules & quizzes directly to your phone.',
-                  style: TextStyle(fontSize: 12, color: AppTheme.textSecondary),
-                ),
-              ],
-            ),
+              ),
+            ],
           ),
-          const SizedBox(width: 12),
-          ElevatedButton.icon(
-            onPressed: () {
-              StudentEsp32SyncModal.show(
-                context,
-                studentName: currentUser.fullName,
-                studentSection: currentUser.section,
-                onSyncCompleted: () {
-                  ref.read(studentCoursesProvider.notifier).reload();
-                },
+          const SizedBox(height: 14),
+          ValueListenableBuilder<List<HubMaterialItem>>(
+            valueListenable: SavedMaterialsService.instance.savedMaterialsNotifier,
+            builder: (context, savedList, _) {
+              final count = savedList.length;
+              return Row(
+                children: [
+                  Expanded(
+                    child: OutlinedButton.icon(
+                      onPressed: () {
+                        SavedOfflineMaterialsModal.show(
+                          context,
+                          studentName: currentUser.fullName,
+                          studentSection: currentUser.section,
+                        );
+                      },
+                      icon: const Icon(Icons.folder_special_rounded, size: 16),
+                      label: Text(
+                        count > 0 ? 'Saved ($count)' : 'Saved Materials',
+                        style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13),
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                      style: OutlinedButton.styleFrom(
+                        foregroundColor: AppTheme.primary,
+                        side: BorderSide(
+                          color: AppTheme.primary.withValues(alpha: 0.5),
+                        ),
+                        padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 8),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: ElevatedButton.icon(
+                      onPressed: () {
+                        StudentEsp32SyncModal.show(
+                          context,
+                          studentName: currentUser.fullName,
+                          studentSection: currentUser.section,
+                          onSyncCompleted: () {
+                            ref.read(studentCoursesProvider.notifier).reload();
+                          },
+                        );
+                      },
+                      icon: const Icon(Icons.qr_code_scanner, size: 16),
+                      label: const Text(
+                        'Scan QR',
+                        style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+                      ),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: AppTheme.primary,
+                        foregroundColor: Colors.white,
+                        padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 8),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                        elevation: 0,
+                      ),
+                    ),
+                  ),
+                ],
               );
             },
-            icon: const Icon(Icons.qr_code, size: 16),
-            label: const Text('Scan QR'),
-            style: ElevatedButton.styleFrom(
-              backgroundColor: AppTheme.primary,
-              foregroundColor: Colors.white,
-              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-            ),
           ),
         ],
       ),
@@ -1270,6 +1323,57 @@ class _StudentHomeScreenState extends ConsumerState<StudentHomeScreen> {
           ),
         ),
       ),
+    );
+  }
+
+  Widget _buildOfflineMaterialsHeaderButton(BuildContext context, dynamic currentUser) {
+    return ValueListenableBuilder<List<HubMaterialItem>>(
+      valueListenable: SavedMaterialsService.instance.savedMaterialsNotifier,
+      builder: (context, savedList, _) {
+        return Tooltip(
+          message: 'Saved Offline Materials (${savedList.length})',
+          child: GestureDetector(
+            onTap: () {
+              SavedOfflineMaterialsModal.show(
+                context,
+                studentName: currentUser.fullName,
+                studentSection: currentUser.section,
+              );
+            },
+            child: Container(
+              width: 44,
+              height: 44,
+              decoration: BoxDecoration(
+                color: AppTheme.surface,
+                shape: BoxShape.circle,
+                border: Border.all(color: AppTheme.border),
+              ),
+              child: Stack(
+                alignment: Alignment.center,
+                children: [
+                  Icon(Icons.folder_special_outlined, color: AppTheme.primary, size: 21),
+                  if (savedList.isNotEmpty)
+                    Positioned(
+                      top: 4,
+                      right: 4,
+                      child: Container(
+                        padding: const EdgeInsets.all(3.5),
+                        decoration: BoxDecoration(
+                          color: AppTheme.primary,
+                          shape: BoxShape.circle,
+                        ),
+                        child: Text(
+                          '${savedList.length}',
+                          style: const TextStyle(color: Colors.white, fontSize: 8.5, fontWeight: FontWeight.bold),
+                        ),
+                      ),
+                    ),
+                ],
+              ),
+            ),
+          ),
+        );
+      },
     );
   }
 
