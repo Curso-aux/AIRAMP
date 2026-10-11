@@ -92,34 +92,22 @@ final routerProvider = Provider<GoRouter>((ref) {
       ),
       GoRoute(
         path: '/admin/login',
-        pageBuilder: (context, state) => AppPageTransitions.fadeThrough(
-          key: state.pageKey,
-          child: const AdminWebLoginScreen(initialRole: 'admin'),
-        ),
+        redirect: (context, state) => '/login',
       ),
       GoRoute(
         path: '/teacher/login',
-        pageBuilder: (context, state) => AppPageTransitions.fadeThrough(
-          key: state.pageKey,
-          child: const AdminWebLoginScreen(initialRole: 'teacher'),
-        ),
+        redirect: (context, state) => '/login',
       ),
       GoRoute(
         path: '/student/login',
-        pageBuilder: (context, state) => AppPageTransitions.fadeThrough(
-          key: state.pageKey,
-          child: const AdminWebLoginScreen(initialRole: 'student'),
-        ),
+        redirect: (context, state) => '/login',
       ),
       GoRoute(
         path: '/login',
-        pageBuilder: (context, state) {
-          final role = state.uri.queryParameters['role'] ?? 'unified';
-          return AppPageTransitions.fadeThrough(
-            key: state.pageKey,
-            child: kIsWeb ? AdminWebLoginScreen(initialRole: role) : const LoginScreen(),
-          );
-        },
+        pageBuilder: (context, state) => AppPageTransitions.fadeThrough(
+          key: state.pageKey,
+          child: kIsWeb ? const AdminWebLoginScreen() : const LoginScreen(),
+        ),
       ),
       GoRoute(
         path: '/signup',
@@ -531,13 +519,13 @@ final routerProvider = Provider<GoRouter>((ref) {
       // 1. Unauthenticated user trying to access protected route
       if (!isAuth && !isPublicRoute) {
         if (kIsWeb && matched.startsWith('/admin')) {
-          return '/admin/login';
+          return '/login';
         }
         return kIsWeb ? '/' : '/login';
       }
 
       // 2. On Web, visiting generic login routes to appropriate portal
-      if (kIsWeb && (matched == '/login' || matched == '/student/login' || matched == '/teacher/login')) {
+      if (kIsWeb && (matched == '/login' || matched == '/student/login' || matched == '/teacher/login' || matched == '/admin/login')) {
         if (!isAuth) return null;
         if (authState.role == 'admin' || authState.role == 'super_admin') {
           return '/admin/dashboard';

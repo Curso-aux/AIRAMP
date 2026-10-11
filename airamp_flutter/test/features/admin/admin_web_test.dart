@@ -348,8 +348,8 @@ void main() {
       );
       await tester.pump(const Duration(milliseconds: 100));
 
-      expect(find.text('Admin Web Console'), findsOneWidget);
-      expect(find.text('Sign In to Admin Console'), findsOneWidget);
+      expect(find.text('AIRAMP Portal'), findsOneWidget);
+      expect(find.text('Sign In to Portal'), findsOneWidget);
       expect(find.byIcon(Icons.arrow_back_rounded), findsOneWidget);
     });
   });

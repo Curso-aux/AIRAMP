@@ -113,7 +113,7 @@ class _TeacherWebScaffoldState extends ConsumerState<TeacherWebScaffold> {
               Navigator.of(ctx).pop();
               await ref.read(authProvider.notifier).logout();
               if (context.mounted) {
-                context.go('/admin/login');
+                context.go('/login');
               }
             },
             style: ElevatedButton.styleFrom(

@@ -1,21 +1,29 @@
+import 'dart:async';
 import 'dart:io' show Platform;
 import 'dart:math' as math;
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import '../../../../core/theme/app_theme.dart';
 
-/// An authentic, living academic background featuring a stable, stationary
-/// classroom photograph layered with an animated monochrome halftone dot screen
-/// where the halftone dots/pixels visibly ripple, glide, and breathe in real time.
+/// An authentic, living academic background featuring dynamic transitioning
+/// campus and classroom photography layered seamlessly beneath an animated
+/// monochrome halftone dot screen where the dots/pixels visibly ripple, glide,
+/// and breathe in real time.
 class HalftoneBackground extends StatefulWidget {
   final Widget child;
   final double opacity;
+  final List<String>? images;
+  final Duration slideDuration;
+  final Duration transitionDuration;
   static bool enableAnimation = true;
 
   const HalftoneBackground({
     super.key,
     required this.child,
     this.opacity = 0.28,
+    this.images,
+    this.slideDuration = const Duration(seconds: 7),
+    this.transitionDuration = const Duration(milliseconds: 1800),
   });
 
   @override
@@ -23,9 +31,26 @@ class HalftoneBackground extends StatefulWidget {
 }
 
 class _HalftoneBackgroundState extends State<HalftoneBackground>
-    with SingleTickerProviderStateMixin {
-  late final AnimationController _controller;
+    with TickerProviderStateMixin {
+  late final AnimationController _halftoneController;
+  late final AnimationController _crossFadeController;
+  late final AnimationController _zoomController;
   final ValueNotifier<Offset?> _mouseNotifier = ValueNotifier<Offset?>(null);
+
+  Timer? _slideTimer;
+  int _currentImageIndex = 0;
+  int _nextImageIndex = 1;
+  bool _isTransitioning = false;
+
+  static const List<String> _defaultImages = [
+    'assets/images/ph_highschool_classroom_bg.jpg',
+    'assets/images/ph_seniorhigh_science_bg.jpg',
+    'assets/images/ph_highschool_study_bg.jpg',
+    'assets/images/ph_seniorhigh_computer_bg.jpg',
+    'assets/images/classroom_halftone_bg.jpg',
+  ];
+
+  List<String> get _images => widget.images ?? _defaultImages;
 
   // Soft, muted slate-cyan tint for dark mode (avoids harsh blinding white dots)
   static const ColorFilter _darkHalftoneFilter = ColorFilter.matrix([
@@ -38,23 +63,134 @@ class _HalftoneBackgroundState extends State<HalftoneBackground>
   @override
   void initState() {
     super.initState();
-    // Continuous 16-second smooth looping halftone wave animation
-    _controller = AnimationController(
+
+    // 1. Continuous 16-second smooth looping halftone wave animation
+    _halftoneController = AnimationController(
       vsync: this,
       duration: const Duration(seconds: 16),
     );
 
-    final bool isTest = !kIsWeb && Platform.environment.containsKey('FLUTTER_TEST');
+    // 2. Smooth cross-fade controller for transitions between images
+    _crossFadeController = AnimationController(
+      vsync: this,
+      duration: widget.transitionDuration,
+    );
+
+    // 3. Gentle ambient zoom (Ken Burns breath)
+    _zoomController = AnimationController(
+      vsync: this,
+      duration: widget.slideDuration,
+    );
+
+    bool isTest = false;
+    try {
+      isTest = !kIsWeb && Platform.environment.containsKey('FLUTTER_TEST');
+    } catch (_) {}
+
     if (HalftoneBackground.enableAnimation && !isTest) {
-      _controller.repeat();
+      _halftoneController.repeat();
+      _zoomController.forward();
+      _startSlideTimer();
     }
   }
 
   @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    // Pre-cache all background images for stutter-free cross-fades
+    for (final img in _images) {
+      precacheImage(AssetImage(img), context).catchError((_) {});
+    }
+  }
+
+  void _startSlideTimer() {
+    _slideTimer?.cancel();
+    if (_images.length <= 1) return;
+
+    _slideTimer = Timer.periodic(widget.slideDuration, (_) {
+      if (!mounted) return;
+      final images = _images;
+      if (images.length <= 1) return;
+
+      _nextImageIndex = (_currentImageIndex + 1) % images.length;
+      setState(() {
+        _isTransitioning = true;
+      });
+
+      _crossFadeController.forward(from: 0.0).then((_) {
+        if (!mounted) return;
+        setState(() {
+          _currentImageIndex = _nextImageIndex;
+          _isTransitioning = false;
+        });
+        _crossFadeController.reset();
+        _zoomController.forward(from: 0.0);
+      });
+    });
+  }
+
+  @override
   void dispose() {
-    _controller.dispose();
+    _slideTimer?.cancel();
+    _halftoneController.dispose();
+    _crossFadeController.dispose();
+    _zoomController.dispose();
     _mouseNotifier.dispose();
     super.dispose();
+  }
+
+  Widget _buildImage(String assetPath) {
+    final filename = assetPath.split('/').last;
+    return Image.asset(
+      assetPath,
+      fit: BoxFit.cover,
+      alignment: Alignment.center,
+      errorBuilder: (context, error, stackTrace) {
+        return Image.network(
+          filename,
+          fit: BoxFit.cover,
+          alignment: Alignment.center,
+          errorBuilder: (c, e, s) => const SizedBox.shrink(),
+        );
+      },
+    );
+  }
+
+  Widget _buildCrossFadingImages() {
+    final images = _images;
+    if (images.isEmpty) return const SizedBox.shrink();
+
+    final currentImg = images[_currentImageIndex % images.length];
+    final nextImg = images[_nextImageIndex % images.length];
+
+    return AnimatedBuilder(
+      animation: Listenable.merge([_crossFadeController, _zoomController]),
+      builder: (context, _) {
+        final zoomScale = 1.0 + (_zoomController.value * 0.035);
+        final curvedFade = Curves.easeInOutCubic.transform(_crossFadeController.value);
+
+        return Stack(
+          fit: StackFit.expand,
+          children: [
+            // Current base image with gentle slow zoom
+            Transform.scale(
+              scale: zoomScale,
+              child: _buildImage(currentImg),
+            ),
+
+            // Cross-fading next image
+            if (_isTransitioning)
+              Opacity(
+                opacity: curvedFade.clamp(0.0, 1.0),
+                child: Transform.scale(
+                  scale: 1.0 + ((1.0 - curvedFade) * 0.02),
+                  child: _buildImage(nextImg),
+                ),
+              ),
+          ],
+        );
+      },
+    );
   }
 
   @override
@@ -75,7 +211,7 @@ class _HalftoneBackgroundState extends State<HalftoneBackground>
             ),
           ),
 
-          // 2. Stationary classroom photo (anchored, firmly centered)
+          // 2. Dynamic transitioning academic photos with subtle Ken Burns motion
           Positioned.fill(
             child: Opacity(
               opacity: isDark ? 0.18 : widget.opacity,
@@ -83,19 +219,7 @@ class _HalftoneBackgroundState extends State<HalftoneBackground>
                 colorFilter: isDark
                     ? _darkHalftoneFilter
                     : const ColorFilter.mode(Colors.transparent, BlendMode.dst),
-                child: Image.asset(
-                  'assets/images/classroom_halftone_bg.jpg',
-                  fit: BoxFit.cover,
-                  alignment: Alignment.center,
-                  errorBuilder: (context, error, stackTrace) {
-                    return Image.network(
-                      'classroom_halftone_bg.jpg',
-                      fit: BoxFit.cover,
-                      alignment: Alignment.center,
-                      errorBuilder: (c, e, s) => const SizedBox.shrink(),
-                    );
-                  },
-                ),
+                child: _buildCrossFadingImages(),
               ),
             ),
           ),
@@ -103,11 +227,11 @@ class _HalftoneBackgroundState extends State<HalftoneBackground>
           // 3. Animated monochrome halftone screen layer (dots/pixels rippling & gliding)
           Positioned.fill(
             child: AnimatedBuilder(
-              animation: Listenable.merge([_controller, _mouseNotifier]),
+              animation: Listenable.merge([_halftoneController, _mouseNotifier]),
               builder: (context, _) {
                 return CustomPaint(
                   painter: AnimatedHalftoneScreenPainter(
-                    progress: _controller.value,
+                    progress: _halftoneController.value,
                     mousePos: _mouseNotifier.value,
                     isDark: isDark,
                   ),

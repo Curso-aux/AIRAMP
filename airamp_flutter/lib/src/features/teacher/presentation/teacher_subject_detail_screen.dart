@@ -16,6 +16,8 @@ import 'components/quiz_view_dialog.dart';
 import 'components/create_assignment_dialog.dart';
 import 'components/assignment_roster_dialog.dart';
 import '../../submissions/data/submissions_repository.dart';
+import '../../auth/application/auth_provider.dart';
+import '../../esp32_hub/presentation/teacher_esp32_hub_modal.dart';
 
 class TeacherSubjectDetailScreen extends ConsumerStatefulWidget {
   final String subjectId;
@@ -155,6 +157,18 @@ class _TeacherSubjectDetailScreenState extends ConsumerState<TeacherSubjectDetai
               onPressed: _openCreateAssignment,
             )
           else ...[
+            IconButton(
+              icon: Icon(Icons.router, color: AppTheme.primary),
+              tooltip: 'Upload to ESP32 Hub',
+              onPressed: () {
+                final teacherUser = ref.read(authProvider);
+                TeacherEsp32HubModal.show(
+                  context,
+                  teacherName: teacherUser?.fullName ?? 'Faculty Instructor',
+                  initialSection: teacherUser?.section ?? 'Grade 10',
+                );
+              },
+            ),
             IconButton(
               icon: const Icon(Icons.picture_as_pdf, color: Color(0xFFE11D48)),
               tooltip: 'Upload PDF Module (AI Scan)',

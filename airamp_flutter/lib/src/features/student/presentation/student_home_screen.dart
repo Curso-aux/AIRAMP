@@ -11,6 +11,7 @@ import '../../admin/data/admin_repository.dart';
 import '../../teacher/data/teacher_schedule_repository.dart';
 import '../data/student_repository.dart';
 import 'components/student_schedule_widget.dart';
+import '../../esp32_hub/presentation/student_esp32_sync_modal.dart';
 
 class StudentHomeScreen extends ConsumerStatefulWidget {
   const StudentHomeScreen({super.key});
@@ -323,13 +324,15 @@ class _StudentHomeScreenState extends ConsumerState<StudentHomeScreen> {
                       Row(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          // Left Column (flex: 7): Stats, Continue Learning, Class Schedule
+                          // Left Column (flex: 7): Stats, Offline Hub, Continue Learning, Class Schedule
                           Expanded(
                             flex: 7,
                             child: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
                                 _buildAnalyticsSection(activeCourses, lessonsDone, pending),
+                                const SizedBox(height: 16),
+                                _buildEsp32OfflineHubCard(context, currentUser),
                                 const SizedBox(height: 24),
                                 _buildContinueLearningSection(context, activeCourse),
                                 const SizedBox(height: 24),
@@ -357,6 +360,8 @@ class _StudentHomeScreenState extends ConsumerState<StudentHomeScreen> {
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           _buildAnalyticsSection(activeCourses, lessonsDone, pending),
+                          const SizedBox(height: 16),
+                          _buildEsp32OfflineHubCard(context, currentUser),
                           const SizedBox(height: 20),
                           StudentScheduleWidget(sectionName: currentUser.section),
                           const SizedBox(height: 16),
@@ -378,6 +383,103 @@ class _StudentHomeScreenState extends ConsumerState<StudentHomeScreen> {
     ),
   ),
 );
+  }
+
+  Widget _buildEsp32OfflineHubCard(BuildContext context, dynamic currentUser) {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: AppTheme.surface,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(
+          color: AppTheme.primary.withValues(alpha: 0.35),
+          width: 1.2,
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.05),
+            blurRadius: 10,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: Row(
+        children: [
+          Container(
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: AppTheme.primary.withValues(alpha: 0.15),
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: Icon(Icons.qr_code_scanner, color: AppTheme.primary, size: 26),
+          ),
+          const SizedBox(width: 14),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Wrap(
+                  crossAxisAlignment: WrapCrossAlignment.center,
+                  spacing: 8,
+                  runSpacing: 4,
+                  children: [
+                    Text(
+                      'Classroom Offline Hub',
+                      style: TextStyle(
+                        fontSize: 15,
+                        fontWeight: FontWeight.bold,
+                        color: AppTheme.text,
+                      ),
+                    ),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                      decoration: BoxDecoration(
+                        color: AppTheme.primarySoft,
+                        borderRadius: BorderRadius.circular(4),
+                      ),
+                      child: Text(
+                        'No Data Needed',
+                        style: TextStyle(
+                          color: AppTheme.primary,
+                          fontSize: 10,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  'Scan your teacher\'s QR code to download modules & quizzes directly to your phone.',
+                  style: TextStyle(fontSize: 12, color: AppTheme.textSecondary),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(width: 12),
+          ElevatedButton.icon(
+            onPressed: () {
+              StudentEsp32SyncModal.show(
+                context,
+                studentName: currentUser.fullName,
+                studentSection: currentUser.section,
+                onSyncCompleted: () {
+                  ref.read(studentCoursesProvider.notifier).reload();
+                },
+              );
+            },
+            icon: const Icon(Icons.qr_code, size: 16),
+            label: const Text('Scan QR'),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppTheme.primary,
+              foregroundColor: Colors.white,
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+            ),
+          ),
+        ],
+      ),
+    );
   }
 
   Widget _buildAnalyticsSection(int activeCourses, int lessonsDone, int pending) {

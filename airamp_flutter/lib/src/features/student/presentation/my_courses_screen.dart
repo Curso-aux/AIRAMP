@@ -7,6 +7,7 @@ import '../../../core/theme/app_theme.dart';
 import '../../../core/theme/theme_provider.dart';
 import '../../auth/application/auth_provider.dart';
 import '../data/student_repository.dart';
+import '../../esp32_hub/presentation/student_esp32_sync_modal.dart';
 
 class MyCoursesScreen extends ConsumerStatefulWidget {
   const MyCoursesScreen({super.key});
@@ -790,6 +791,8 @@ class _MyCoursesScreenState extends ConsumerState<MyCoursesScreen> {
                 else
                   _buildEnrollWelcomeCard(),
 
+                const SizedBox(height: 16),
+                _buildEsp32OfflineHubCard(context, user),
                 const SizedBox(height: 24),
 
                 // Curriculum Subjects Header
@@ -944,6 +947,103 @@ class _MyCoursesScreenState extends ConsumerState<MyCoursesScreen> {
             ),
           ),
         ),
+      ),
+    );
+  }
+
+  Widget _buildEsp32OfflineHubCard(BuildContext context, dynamic currentUser) {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Theme.of(context).colorScheme.surface,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(
+          color: Theme.of(context).colorScheme.primary.withValues(alpha: 0.35),
+          width: 1.2,
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.05),
+            blurRadius: 10,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: Row(
+        children: [
+          Container(
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: Theme.of(context).colorScheme.primary.withValues(alpha: 0.15),
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: Icon(Icons.qr_code_scanner, color: Theme.of(context).colorScheme.primary, size: 26),
+          ),
+          const SizedBox(width: 14),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Wrap(
+                  crossAxisAlignment: WrapCrossAlignment.center,
+                  spacing: 8,
+                  runSpacing: 4,
+                  children: [
+                    Text(
+                      'Classroom Offline Hub',
+                      style: TextStyle(
+                        fontSize: 15,
+                        fontWeight: FontWeight.bold,
+                        color: Theme.of(context).colorScheme.onSurface,
+                      ),
+                    ),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                      decoration: BoxDecoration(
+                        color: AppTheme.primarySoft,
+                        borderRadius: BorderRadius.circular(4),
+                      ),
+                      child: Text(
+                        'No Data Needed',
+                        style: TextStyle(
+                          color: Theme.of(context).colorScheme.primary,
+                          fontSize: 10,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  'Scan your teacher\'s QR code to download modules & quizzes directly to your phone.',
+                  style: TextStyle(fontSize: 12, color: AppTheme.textSecondary),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(width: 12),
+          ElevatedButton.icon(
+            onPressed: () {
+              StudentEsp32SyncModal.show(
+                context,
+                studentName: currentUser?.fullName ?? 'Student',
+                studentSection: currentUser?.section,
+                onSyncCompleted: () {
+                  ref.read(studentCoursesProvider.notifier).reload();
+                },
+              );
+            },
+            icon: const Icon(Icons.qr_code, size: 16),
+            label: const Text('Scan QR'),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Theme.of(context).colorScheme.primary,
+              foregroundColor: Colors.white,
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+            ),
+          ),
+        ],
       ),
     );
   }

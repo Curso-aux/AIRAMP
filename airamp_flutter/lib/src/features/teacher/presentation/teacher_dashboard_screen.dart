@@ -17,6 +17,7 @@ import '../../../core/animations/app_transitions.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../../../core/components/analytics_donut_chart.dart';
 import '../../submissions/data/submissions_repository.dart';
+import '../../esp32_hub/presentation/teacher_esp32_hub_modal.dart';
 
 class TeacherDashboardScreen extends ConsumerStatefulWidget {
   const TeacherDashboardScreen({super.key});
@@ -425,6 +426,10 @@ class _TeacherDashboardScreenState extends ConsumerState<TeacherDashboardScreen>
 
                 // Today's Class Schedule Banner
                 const TodayScheduleBanner(),
+                const SizedBox(height: 20),
+
+                // ESP32 Offline Learning Hub Management Card
+                _buildEsp32HubCard(context, teacherName, currentUser?.section),
                 const SizedBox(height: 24),
 
                 // Responsive Area: 2 Columns on Desktop, 1 Column on Mobile
@@ -486,6 +491,112 @@ class _TeacherDashboardScreenState extends ConsumerState<TeacherDashboardScreen>
   ),
 );
 }
+
+  Widget _buildEsp32HubCard(BuildContext context, String teacherName, String? defaultSection) {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: AppTheme.surface,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: AppTheme.primary.withValues(alpha: 0.35), width: 1.2),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.05),
+            blurRadius: 10,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: Row(
+        children: [
+          Container(
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: AppTheme.primary.withValues(alpha: 0.15),
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: Icon(Icons.router, color: AppTheme.primary, size: 28),
+          ),
+          const SizedBox(width: 14),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Wrap(
+                  crossAxisAlignment: WrapCrossAlignment.center,
+                  spacing: 8,
+                  runSpacing: 4,
+                  children: [
+                    Text(
+                      'ESP32 Offline Learning Hub',
+                      style: TextStyle(
+                        fontSize: 15,
+                        fontWeight: FontWeight.bold,
+                        color: AppTheme.text,
+                      ),
+                    ),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                      decoration: BoxDecoration(
+                        color: AppTheme.success.withValues(alpha: 0.15),
+                        borderRadius: BorderRadius.circular(4),
+                      ),
+                      child: Text(
+                        'DevKit Ready',
+                        style: TextStyle(
+                          color: AppTheme.success,
+                          fontSize: 10,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                      decoration: BoxDecoration(
+                        color: AppTheme.warning.withValues(alpha: 0.15),
+                        borderRadius: BorderRadius.circular(4),
+                      ),
+                      child: Text(
+                        'MicroSD: Pending',
+                        style: TextStyle(
+                          color: AppTheme.warning,
+                          fontSize: 10,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  'Package & upload modules to your ESP32 station so students can download and study offline without internet.',
+                  style: TextStyle(fontSize: 12, color: AppTheme.textSecondary),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(width: 12),
+          ElevatedButton.icon(
+            onPressed: () {
+              TeacherEsp32HubModal.show(
+                context,
+                teacherName: teacherName,
+                initialSection: defaultSection,
+              );
+            },
+            icon: const Icon(Icons.cloud_upload_outlined, size: 16),
+            label: const Text('Manage Hub'),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppTheme.primary,
+              foregroundColor: Colors.white,
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
 
   Widget _buildSubmissionsSection(BuildContext context, List<Map<String, dynamic>> recentAttempts) {
     return Column(

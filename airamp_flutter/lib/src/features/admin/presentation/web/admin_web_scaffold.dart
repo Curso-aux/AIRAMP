@@ -920,7 +920,7 @@ class _AdminWebScaffoldState extends ConsumerState<AdminWebScaffold> {
               Navigator.of(dialogCtx).pop();
               await ref.read(authProvider.notifier).logout();
               if (context.mounted) {
-                context.go(kIsWeb ? '/admin/login' : '/login');
+                context.go('/login');
               }
             },
             style: ElevatedButton.styleFrom(

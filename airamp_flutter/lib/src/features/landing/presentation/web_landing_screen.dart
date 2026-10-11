@@ -234,7 +234,7 @@ class WebLandingScreen extends ConsumerWidget {
                                 'Broadcast school-wide announcements',
                               ],
                               ctaText: 'Open Admin Console',
-                              onCta: () => _navigateToLogin(context, 'admin'),
+                              onCta: () => _navigateToLogin(context),
                             )),
                             const SizedBox(width: 20),
                             Expanded(child: _buildRoleCard(
@@ -253,7 +253,7 @@ class WebLandingScreen extends ConsumerWidget {
                                 'Class announcements broadcast',
                               ],
                               ctaText: 'Access Teacher Portal',
-                              onCta: () => _navigateToLogin(context, 'teacher'),
+                              onCta: () => _navigateToLogin(context),
                             )),
                             const SizedBox(width: 20),
                             Expanded(child: _buildRoleCard(
@@ -272,7 +272,7 @@ class WebLandingScreen extends ConsumerWidget {
                                 'Direct teacher inquiries & study support',
                               ],
                               ctaText: 'Access Student Portal',
-                              onCta: () => _navigateToLogin(context, 'student'),
+                              onCta: () => _navigateToLogin(context),
                             )),
                           ],
                         );
@@ -296,7 +296,7 @@ class WebLandingScreen extends ConsumerWidget {
                                 'Broadcast school-wide announcements',
                               ],
                               ctaText: 'Open Admin Console',
-                              onCta: () => _navigateToLogin(context, 'admin'),
+                              onCta: () => _navigateToLogin(context),
                             ),
                             const SizedBox(height: 20),
                             _buildRoleCard(
@@ -315,7 +315,7 @@ class WebLandingScreen extends ConsumerWidget {
                                 'Class announcements broadcast',
                               ],
                               ctaText: 'Access Teacher Portal',
-                              onCta: () => _navigateToLogin(context, 'teacher'),
+                              onCta: () => _navigateToLogin(context),
                             ),
                             const SizedBox(height: 20),
                             _buildRoleCard(
@@ -334,7 +334,7 @@ class WebLandingScreen extends ConsumerWidget {
                                 'Direct teacher inquiries & study support',
                               ],
                               ctaText: 'Access Student Portal',
-                              onCta: () => _navigateToLogin(context, 'student'),
+                              onCta: () => _navigateToLogin(context),
                             ),
                           ],
                         );
@@ -831,11 +831,7 @@ class WebLandingScreen extends ConsumerWidget {
 
   void _navigateToLogin(BuildContext context, [String? role]) {
     try {
-      if (role != null) {
-        context.go('/login?role=$role');
-      } else {
-        context.go('/login');
-      }
+      context.go('/login');
     } catch (_) {
       // Graceful fallback for test environments without GoRouter ancestor
     }

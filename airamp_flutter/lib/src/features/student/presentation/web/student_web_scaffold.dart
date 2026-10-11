@@ -116,7 +116,7 @@ class _StudentWebScaffoldState extends ConsumerState<StudentWebScaffold> {
               Navigator.of(ctx).pop();
               await ref.read(authProvider.notifier).logout();
               if (context.mounted) {
-                context.go('/student/login');
+                context.go('/login');
               }
             },
             style: ElevatedButton.styleFrom(

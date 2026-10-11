@@ -105,8 +105,8 @@ void main() {
 
       await tester.pumpAndSettle();
 
-      expect(find.text('Admin Web Console'), findsOneWidget);
-      expect(find.text('Sign In to Admin Console'), findsOneWidget);
+      expect(find.text('AIRAMP Portal'), findsOneWidget);
+      expect(find.text('Sign In to Portal'), findsOneWidget);
       expect(tester.takeException(), isNull);
     });
 
@@ -125,8 +125,8 @@ void main() {
 
       await tester.pumpAndSettle();
 
-      expect(find.text('Admin Web Console'), findsOneWidget);
-      expect(find.text('Sign In to Admin Console'), findsOneWidget);
+      expect(find.text('AIRAMP Portal'), findsOneWidget);
+      expect(find.text('Sign In to Portal'), findsOneWidget);
       expect(tester.takeException(), isNull);
     });
 
