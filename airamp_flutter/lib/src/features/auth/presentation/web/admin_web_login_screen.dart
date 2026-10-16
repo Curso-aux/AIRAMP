@@ -28,6 +28,16 @@ class _AdminWebLoginScreenState extends ConsumerState<AdminWebLoginScreen> {
   final _passwordController = TextEditingController();
   bool _showPassword = false;
   String _error = '';
+  late String _selectedRole;
+
+  @override
+  void initState() {
+    super.initState();
+    _selectedRole = widget.initialRole;
+    if (_selectedRole != 'admin' && _selectedRole != 'teacher' && _selectedRole != 'student') {
+      _selectedRole = 'unified';
+    }
+  }
 
   @override
   void dispose() {
@@ -161,10 +171,19 @@ class _AdminWebLoginScreenState extends ConsumerState<AdminWebLoginScreen> {
     final theme = Theme.of(context);
     final isDark = theme.brightness == Brightness.dark;
     final isLoading = ref.watch(authProvider.notifier).isLoading;
-    final accentColor = isDark ? const Color(0xFF10B981) : const Color(0xFF0D9488);
-    final badgeBg = isDark ? accentColor.withValues(alpha: 0.2) : const Color(0xFFCCFBF1);
+    final accentColor = AppTheme.primary;
+    final badgeBg = accentColor.withValues(alpha: isDark ? 0.2 : 0.12);
     final screenWidth = MediaQuery.sizeOf(context).width;
     final isMobile = screenWidth < 600;
+
+    String identifierHint = 'e.g. 001-0001, teacher@aira.edu, or aira@admin';
+    if (widget.initialRole == 'admin') {
+      identifierHint = 'e.g. aira@admin or admin@school.edu.ph';
+    } else if (widget.initialRole == 'teacher') {
+      identifierHint = 'e.g. teacher@aira.edu or TCH-1001';
+    } else if (widget.initialRole == 'student') {
+      identifierHint = 'e.g. 001-0001 or student@aira.edu';
+    }
 
     return Scaffold(
       backgroundColor: theme.scaffoldBackgroundColor,
@@ -340,7 +359,7 @@ class _AdminWebLoginScreenState extends ConsumerState<AdminWebLoginScreen> {
                             keyboardType: TextInputType.text,
                             autofocus: true,
                             decoration: InputDecoration(
-                              hintText: 'e.g. 001-0001, teacher@aira.edu, or aira@admin',
+                              hintText: identifierHint,
                               counterText: '',
                               prefixIcon: Icon(Icons.person_outline_rounded, size: 20, color: accentColor),
                               filled: true,

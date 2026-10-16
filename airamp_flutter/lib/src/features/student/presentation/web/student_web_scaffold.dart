@@ -7,6 +7,7 @@ import '../../../../core/theme/theme_provider.dart';
 import '../../../auth/application/auth_provider.dart';
 import '../components/student_announcements_sheet.dart';
 import '../components/student_schedule_widget.dart';
+import '../../../../core/components/offline_sync_status_pill.dart';
 
 class StudentNavItem {
   final String label;
@@ -245,6 +246,10 @@ class _StudentWebScaffoldState extends ConsumerState<StudentWebScaffold> {
           ),
 
           const Spacer(),
+
+          // Persistent Offline-Sync Status Indicator
+          const OfflineSyncStatusPill(),
+          const SizedBox(width: 10),
 
           // Section Badge
           if (section.isNotEmpty) ...[

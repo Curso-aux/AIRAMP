@@ -15,15 +15,19 @@ class HalftoneBackground extends StatefulWidget {
   final List<String>? images;
   final Duration slideDuration;
   final Duration transitionDuration;
+  final bool enableBottomFade;
+  final double bottomFadeStart;
   static bool enableAnimation = true;
 
   const HalftoneBackground({
     super.key,
     required this.child,
-    this.opacity = 0.28,
+    this.opacity = 0.32,
     this.images,
     this.slideDuration = const Duration(seconds: 7),
     this.transitionDuration = const Duration(milliseconds: 1800),
+    this.enableBottomFade = false,
+    this.bottomFadeStart = 0.82,
   });
 
   @override
@@ -240,7 +244,7 @@ class _HalftoneBackgroundState extends State<HalftoneBackground>
             ),
           ),
 
-          // 4. Radial backdrop vignette: clears out hero text area for max legibility
+          // 4. Radial backdrop vignette: clears out hero text area for max legibility without washing out the lower scene
           Positioned.fill(
             child: Container(
               decoration: BoxDecoration(
@@ -249,14 +253,14 @@ class _HalftoneBackgroundState extends State<HalftoneBackground>
                   radius: 0.85,
                   colors: isDark
                       ? [
-                          AppTheme.darkBackground.withValues(alpha: 0.65),
-                          AppTheme.darkBackground.withValues(alpha: 0.20),
-                          AppTheme.darkBackground.withValues(alpha: 0.70),
+                          AppTheme.darkBackground.withValues(alpha: 0.40),
+                          AppTheme.darkBackground.withValues(alpha: 0.10),
+                          Colors.transparent,
                         ]
                       : [
-                          AppTheme.lightBackground.withValues(alpha: 0.45),
-                          AppTheme.lightBackground.withValues(alpha: 0.15),
-                          AppTheme.lightBackground.withValues(alpha: 0.40),
+                          AppTheme.lightBackground.withValues(alpha: 0.30),
+                          AppTheme.lightBackground.withValues(alpha: 0.08),
+                          Colors.transparent,
                         ],
                   stops: const [0.0, 0.55, 1.0],
                 ),
@@ -264,29 +268,37 @@ class _HalftoneBackgroundState extends State<HalftoneBackground>
             ),
           ),
 
-          // 5. Smooth top & bottom edge fade so it melts seamlessly into the page
-          Positioned.fill(
-            child: Container(
-              decoration: BoxDecoration(
-                gradient: LinearGradient(
-                  begin: Alignment.topCenter,
-                  end: Alignment.bottomCenter,
-                  colors: isDark
-                      ? [
-                          AppTheme.darkBackground.withValues(alpha: 0.15),
-                          Colors.transparent,
-                          AppTheme.darkBackground.withValues(alpha: 0.60),
-                        ]
-                      : [
-                          AppTheme.lightBackground.withValues(alpha: 0.05),
-                          Colors.transparent,
-                          AppTheme.lightBackground.withValues(alpha: 0.40),
-                        ],
-                  stops: const [0.0, 0.4, 1.0],
+          // 5. Smooth bottom edge fade so it melts seamlessly into the page background
+          if (widget.enableBottomFade)
+            Positioned.fill(
+              child: Container(
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    begin: Alignment.topCenter,
+                    end: Alignment.bottomCenter,
+                    colors: isDark
+                        ? [
+                            Colors.transparent,
+                            Colors.transparent,
+                            AppTheme.darkBackground.withValues(alpha: 0.60),
+                            AppTheme.darkBackground,
+                          ]
+                        : [
+                            Colors.transparent,
+                            Colors.transparent,
+                            const Color(0xFFF8FAFC).withValues(alpha: 0.65),
+                            const Color(0xFFF8FAFC),
+                          ],
+                    stops: [
+                      0.0,
+                      widget.bottomFadeStart,
+                      (widget.bottomFadeStart + 1.0) / 2,
+                      1.0,
+                    ],
+                  ),
                 ),
               ),
             ),
-          ),
 
           // 6. Foreground content (scrollable layout, cards, buttons)
           widget.child,

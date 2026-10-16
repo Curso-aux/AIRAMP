@@ -92,22 +92,25 @@ final routerProvider = Provider<GoRouter>((ref) {
       ),
       GoRoute(
         path: '/admin/login',
-        redirect: (context, state) => '/login',
+        redirect: (context, state) => '/login?role=admin',
       ),
       GoRoute(
         path: '/teacher/login',
-        redirect: (context, state) => '/login',
+        redirect: (context, state) => '/login?role=teacher',
       ),
       GoRoute(
         path: '/student/login',
-        redirect: (context, state) => '/login',
+        redirect: (context, state) => '/login?role=student',
       ),
       GoRoute(
         path: '/login',
-        pageBuilder: (context, state) => AppPageTransitions.fadeThrough(
-          key: state.pageKey,
-          child: kIsWeb ? const AdminWebLoginScreen() : const LoginScreen(),
-        ),
+        pageBuilder: (context, state) {
+          final role = state.uri.queryParameters['role'] ?? 'unified';
+          return AppPageTransitions.fadeThrough(
+            key: state.pageKey,
+            child: kIsWeb ? AdminWebLoginScreen(initialRole: role) : const LoginScreen(),
+          );
+        },
       ),
       GoRoute(
         path: '/signup',

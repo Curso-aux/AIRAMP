@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:qr_flutter/qr_flutter.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../../core/theme/theme_provider.dart';
 import '../../../../core/utils/section_key_helper.dart';
@@ -16,6 +17,8 @@ class AdminWebKeysScreen extends ConsumerStatefulWidget {
 
 class _AdminWebKeysScreenState extends ConsumerState<AdminWebKeysScreen> {
   String _selectedGradeFilter = 'All';
+  String? _recentlyCopiedKey;
+  final Set<String> _lockedKeys = {};
 
   final List<String> _gradeLevels = [
     'All',
@@ -469,7 +472,7 @@ class _AdminWebKeysScreenState extends ConsumerState<AdminWebKeysScreen> {
         columns: const [
           DataColumn(label: Text('ACCESS KEY', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold))),
           DataColumn(label: Text('TARGET SECTION', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold))),
-          DataColumn(label: Text('USAGE / LIMIT', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold))),
+          DataColumn(label: Text('ENROLLMENT CAPACITY', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold))),
           DataColumn(label: Text('EXPIRATION', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold))),
           DataColumn(label: Text('STATUS', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold))),
           DataColumn(label: Text('ACTIONS', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold))),
@@ -480,6 +483,12 @@ class _AdminWebKeysScreenState extends ConsumerState<AdminWebKeysScreen> {
           final maxUses = k['max_uses'] as int? ?? 50;
           final timesUsed = k['used_count'] as int? ?? 0;
           final expiration = k['expiration'] as String? ?? 'Never (Standard)';
+          final isLocked = _lockedKeys.contains(code) || timesUsed >= maxUses;
+          final isJustCopied = _recentlyCopiedKey == code;
+          final pct = maxUses > 0 ? (timesUsed / maxUses).clamp(0.0, 1.0) : 0.0;
+          final capacityColor = pct >= 0.95
+              ? AppTheme.error
+              : (pct >= 0.75 ? AppTheme.warning : AppTheme.primary);
 
           return DataRow(
             cells: [
@@ -493,7 +502,10 @@ class _AdminWebKeysScreenState extends ConsumerState<AdminWebKeysScreen> {
                       decoration: BoxDecoration(
                         color: AppTheme.background,
                         borderRadius: BorderRadius.circular(8),
-                        border: Border.all(color: AppTheme.border),
+                        border: Border.all(
+                          color: isJustCopied ? AppTheme.success : AppTheme.border,
+                          width: isJustCopied ? 1.5 : 1.0,
+                        ),
                       ),
                       child: Text(
                         code,
@@ -501,15 +513,18 @@ class _AdminWebKeysScreenState extends ConsumerState<AdminWebKeysScreen> {
                           fontFamily: 'monospace',
                           fontWeight: FontWeight.bold,
                           fontSize: 14,
-                          color: AppTheme.text,
+                          color: isJustCopied ? AppTheme.success : AppTheme.text,
                         ),
                       ),
                     ),
                     const SizedBox(width: 8),
                     IconButton(
-                      tooltip: 'Copy Access Key',
-                      icon: const Icon(Icons.copy, size: 16),
-                      color: AppTheme.textSecondary,
+                      tooltip: isJustCopied ? 'Copied!' : 'Copy Access Key',
+                      icon: Icon(
+                        isJustCopied ? Icons.check_circle_rounded : Icons.copy_rounded,
+                        size: 17,
+                        color: isJustCopied ? AppTheme.success : AppTheme.textSecondary,
+                      ),
                       onPressed: () => _copyKey(code),
                     ),
                   ],
@@ -531,30 +546,61 @@ class _AdminWebKeysScreenState extends ConsumerState<AdminWebKeysScreen> {
                 ),
               ),
 
-              // Usage Limits Cell
+              // Enrollment Capacity Bar Cell
               DataCell(
-                Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      '$timesUsed / $maxUses uses',
-                      style: TextStyle(fontSize: 12, color: AppTheme.text),
-                    ),
-                    const SizedBox(height: 4),
-                    SizedBox(
-                      width: 100,
-                      child: LinearProgressIndicator(
-                        value: maxUses > 0 ? (timesUsed / maxUses).clamp(0.0, 1.0) : 0.0,
-                        backgroundColor: AppTheme.border,
-                        valueColor: AlwaysStoppedAnimation(
-                          timesUsed >= maxUses ? AppTheme.error : AppTheme.primary,
-                        ),
-                        minHeight: 4,
-                        borderRadius: BorderRadius.circular(2),
+                SizedBox(
+                  width: 170,
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Flexible(
+                            child: Text(
+                              '$timesUsed/$maxUses enrolled',
+                              overflow: TextOverflow.ellipsis,
+                              maxLines: 1,
+                              style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: AppTheme.text),
+                            ),
+                          ),
+                          const SizedBox(width: 4),
+                          Text(
+                            '${(pct * 100).toInt()}%',
+                            style: TextStyle(
+                              fontSize: 10.5,
+                              fontWeight: FontWeight.bold,
+                              color: capacityColor,
+                            ),
+                          ),
+                        ],
                       ),
-                    ),
-                  ],
+                      const SizedBox(height: 5),
+                      ClipRRect(
+                        borderRadius: BorderRadius.circular(4),
+                        child: Stack(
+                          children: [
+                            Container(
+                              height: 6,
+                              width: double.infinity,
+                              color: AppTheme.border,
+                            ),
+                            FractionallySizedBox(
+                              widthFactor: pct,
+                              child: Container(
+                                height: 6,
+                                decoration: BoxDecoration(
+                                  color: capacityColor,
+                                  borderRadius: BorderRadius.circular(4),
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
               ),
 
@@ -566,17 +612,47 @@ class _AdminWebKeysScreenState extends ConsumerState<AdminWebKeysScreen> {
                 ),
               ),
 
-              // Status Cell
+              // Status Badge Cell (Interactive Active/Locked toggle)
               DataCell(
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                  decoration: BoxDecoration(
-                    color: AppTheme.success.withValues(alpha: 0.12),
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: Text(
-                    'ACTIVE',
-                    style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: AppTheme.success),
+                InkWell(
+                  onTap: () {
+                    setState(() {
+                      if (_lockedKeys.contains(code)) {
+                        _lockedKeys.remove(code);
+                      } else {
+                        _lockedKeys.add(code);
+                      }
+                    });
+                  },
+                  borderRadius: BorderRadius.circular(12),
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                    decoration: BoxDecoration(
+                      color: (isLocked ? AppTheme.error : AppTheme.success).withValues(alpha: 0.12),
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(
+                        color: (isLocked ? AppTheme.error : AppTheme.success).withValues(alpha: 0.3),
+                      ),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(
+                          isLocked ? Icons.lock_rounded : Icons.lock_open_rounded,
+                          size: 12,
+                          color: isLocked ? AppTheme.error : AppTheme.success,
+                        ),
+                        const SizedBox(width: 4),
+                        Text(
+                          isLocked ? 'LOCKED' : 'ACTIVE',
+                          style: TextStyle(
+                            fontSize: 10.5,
+                            fontWeight: FontWeight.bold,
+                            color: isLocked ? AppTheme.error : AppTheme.success,
+                          ),
+                        ),
+                      ],
+                    ),
                   ),
                 ),
               ),
@@ -586,12 +662,23 @@ class _AdminWebKeysScreenState extends ConsumerState<AdminWebKeysScreen> {
                 Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
+                    // Classroom Display / QR Modal Button
+                    TextButton.icon(
+                      onPressed: () => _showClassroomQrModal(code, section, timesUsed, maxUses),
+                      icon: const Icon(Icons.qr_code_2_rounded, size: 16),
+                      label: const Text('Classroom QR'),
+                      style: TextButton.styleFrom(
+                        foregroundColor: AppTheme.primary,
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+                      ),
+                    ),
+                    const SizedBox(width: 4),
                     TextButton.icon(
                       onPressed: () => _showShareModal(code, section),
                       icon: const Icon(Icons.share, size: 14),
                       label: const Text('Share'),
                       style: TextButton.styleFrom(
-                        foregroundColor: AppTheme.primary,
+                        foregroundColor: AppTheme.textSecondary,
                         padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
                       ),
                     ),
@@ -638,9 +725,31 @@ class _AdminWebKeysScreenState extends ConsumerState<AdminWebKeysScreen> {
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  Text(
-                    code,
-                    style: TextStyle(fontFamily: 'monospace', fontSize: 16, fontWeight: FontWeight.bold, color: AppTheme.primary),
+                  Row(
+                    children: [
+                      Text(
+                        code,
+                        style: TextStyle(
+                          fontFamily: 'monospace',
+                          fontSize: 16,
+                          fontWeight: FontWeight.bold,
+                          color: _recentlyCopiedKey == code ? AppTheme.success : AppTheme.primary,
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      InkWell(
+                        onTap: () => _copyKey(code),
+                        borderRadius: BorderRadius.circular(6),
+                        child: Padding(
+                          padding: const EdgeInsets.all(4.0),
+                          child: Icon(
+                            _recentlyCopiedKey == code ? Icons.check_circle_rounded : Icons.copy_rounded,
+                            size: 16,
+                            color: _recentlyCopiedKey == code ? AppTheme.success : AppTheme.textSecondary,
+                          ),
+                        ),
+                      ),
+                    ],
                   ),
                   Container(
                     padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
@@ -652,16 +761,60 @@ class _AdminWebKeysScreenState extends ConsumerState<AdminWebKeysScreen> {
                   ),
                 ],
               ),
-              const SizedBox(height: 8),
-              Text('Usage: $used / $max uses', style: TextStyle(fontSize: 12, color: AppTheme.textSecondary)),
+              const SizedBox(height: 10),
+
+              // Mobile Capacity Bar
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Text(
+                    'Capacity: $used / $max enrolled',
+                    style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: AppTheme.textSecondary),
+                  ),
+                  Text(
+                    '${max > 0 ? ((used / max) * 100).toInt() : 0}%',
+                    style: TextStyle(
+                      fontSize: 11,
+                      fontWeight: FontWeight.bold,
+                      color: (used >= max) ? AppTheme.error : AppTheme.primary,
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 5),
+              ClipRRect(
+                borderRadius: BorderRadius.circular(4),
+                child: LinearProgressIndicator(
+                  value: max > 0 ? (used / max).clamp(0.0, 1.0) : 0.0,
+                  backgroundColor: AppTheme.border,
+                  valueColor: AlwaysStoppedAnimation(
+                    (used >= max) ? AppTheme.error : AppTheme.primary,
+                  ),
+                  minHeight: 5,
+                ),
+              ),
               const SizedBox(height: 12),
+
               Row(
                 children: [
+                  Expanded(
+                    child: OutlinedButton.icon(
+                      onPressed: () => _showClassroomQrModal(code, section, used, max),
+                      icon: const Icon(Icons.qr_code_2_rounded, size: 16),
+                      label: const Text('Project QR'),
+                      style: OutlinedButton.styleFrom(
+                        foregroundColor: AppTheme.primary,
+                        side: BorderSide(color: AppTheme.primary.withValues(alpha: 0.4)),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
                   Expanded(
                     child: ElevatedButton.icon(
                       onPressed: () => _showShareModal(code, section),
                       icon: const Icon(Icons.send, size: 14),
-                      label: const Text('Give to Student'),
+                      label: const Text('Share Key'),
                       style: ElevatedButton.styleFrom(
                         backgroundColor: AppTheme.primary,
                         foregroundColor: Colors.white,
@@ -669,12 +822,7 @@ class _AdminWebKeysScreenState extends ConsumerState<AdminWebKeysScreen> {
                       ),
                     ),
                   ),
-                  const SizedBox(width: 8),
-                  IconButton(
-                    icon: const Icon(Icons.copy, size: 18),
-                    color: AppTheme.textSecondary,
-                    onPressed: () => _copyKey(code),
-                  ),
+                  const SizedBox(width: 6),
                   IconButton(
                     icon: const Icon(Icons.delete_outline, size: 18),
                     color: AppTheme.error,
@@ -691,11 +839,249 @@ class _AdminWebKeysScreenState extends ConsumerState<AdminWebKeysScreen> {
 
   void _copyKey(String code) {
     Clipboard.setData(ClipboardData(text: code));
+    setState(() => _recentlyCopiedKey = code);
+    Future.delayed(const Duration(seconds: 2), () {
+      if (mounted && _recentlyCopiedKey == code) {
+        setState(() => _recentlyCopiedKey = null);
+      }
+    });
+
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
-        content: Text('Copied enrollment key "$code" to clipboard!'),
+        content: Row(
+          children: [
+            const Icon(Icons.check_circle_rounded, color: Colors.white, size: 20),
+            const SizedBox(width: 10),
+            Text('Copied enrollment key "$code" to clipboard!'),
+          ],
+        ),
         backgroundColor: AppTheme.success,
+        behavior: SnackBarBehavior.floating,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
         duration: const Duration(seconds: 2),
+      ),
+    );
+  }
+
+  void _showClassroomQrModal(String code, String section, int usedCount, int maxUses) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final pct = maxUses > 0 ? (usedCount / maxUses).clamp(0.0, 1.0) : 0.0;
+
+    showDialog(
+      context: context,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setModalState) {
+          final isJustCopied = _recentlyCopiedKey == code;
+
+          return AlertDialog(
+            backgroundColor: isDark ? AppTheme.darkSurface : Colors.white,
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+            contentPadding: const EdgeInsets.all(24),
+            titlePadding: const EdgeInsets.fromLTRB(24, 20, 24, 0),
+            title: Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: AppTheme.primary.withValues(alpha: isDark ? 0.2 : 0.1),
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: Icon(Icons.present_to_all_rounded, color: AppTheme.primary, size: 22),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Classroom Projection & QR',
+                        style: TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.bold,
+                          color: isDark ? AppTheme.darkText : AppTheme.lightText,
+                        ),
+                      ),
+                      Text(
+                        'Section: $section · High-Visibility Projector Display',
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: isDark ? AppTheme.darkTextSecondary : AppTheme.lightTextSecondary,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+            content: SizedBox(
+              width: 480,
+              child: SingleChildScrollView(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const SizedBox(height: 8),
+
+                    // Scannable QR Code Container with High-Contrast White Surface
+                    Container(
+                      padding: const EdgeInsets.all(16),
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(16),
+                        border: Border.all(color: Colors.black.withValues(alpha: 0.1), width: 1.5),
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.black.withValues(alpha: 0.08),
+                            blurRadius: 12,
+                            offset: const Offset(0, 4),
+                          ),
+                        ],
+                      ),
+                      child: QrImageView(
+                        data: code,
+                        version: QrVersions.auto,
+                        size: 210.0,
+                        backgroundColor: Colors.white,
+                        padding: EdgeInsets.zero,
+                      ),
+                    ),
+                    const SizedBox(height: 18),
+
+                    // Giant Monospace Key Box with One-Click Copy
+                    InkWell(
+                      onTap: () {
+                        _copyKey(code);
+                        setModalState(() {});
+                      },
+                      borderRadius: BorderRadius.circular(12),
+                      child: Container(
+                        width: double.infinity,
+                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                        decoration: BoxDecoration(
+                          color: isDark ? AppTheme.darkSurfaceLight : const Color(0xFFF1F5F9),
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(
+                            color: isJustCopied ? AppTheme.success : AppTheme.primary.withValues(alpha: 0.4),
+                            width: 1.5,
+                          ),
+                        ),
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Text(
+                              code,
+                              style: TextStyle(
+                                fontFamily: 'monospace',
+                                fontSize: 30,
+                                fontWeight: FontWeight.w800,
+                                color: isJustCopied ? AppTheme.success : AppTheme.primary,
+                                letterSpacing: 4.0,
+                              ),
+                            ),
+                            const SizedBox(width: 12),
+                            Icon(
+                              isJustCopied ? Icons.check_circle_rounded : Icons.copy_rounded,
+                              color: isJustCopied ? AppTheme.success : AppTheme.primary,
+                              size: 22,
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+
+                    // Enrollment Capacity Bar inside Modal
+                    Container(
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: isDark ? AppTheme.darkSurfaceLight : const Color(0xFFF8FAFC),
+                        borderRadius: BorderRadius.circular(10),
+                        border: Border.all(color: isDark ? AppTheme.darkBorder : AppTheme.lightBorder),
+                      ),
+                      child: Column(
+                        children: [
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              Text(
+                                'Section Capacity',
+                                style: TextStyle(fontSize: 12, color: isDark ? AppTheme.darkTextSecondary : AppTheme.lightTextSecondary),
+                              ),
+                              Text(
+                                '$usedCount / $maxUses Students (${(pct * 100).toInt()}%)',
+                                style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: AppTheme.primary),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 6),
+                          ClipRRect(
+                            borderRadius: BorderRadius.circular(4),
+                            child: LinearProgressIndicator(
+                              value: pct,
+                              backgroundColor: isDark ? AppTheme.darkBorder : const Color(0xFFE2E8F0),
+                              valueColor: AlwaysStoppedAnimation(AppTheme.primary),
+                              minHeight: 6,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 14),
+
+                    // Student Instructions
+                    Container(
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: AppTheme.primary.withValues(alpha: isDark ? 0.12 : 0.06),
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'Student Instructions for Enrollment:',
+                            style: TextStyle(
+                              fontSize: 12,
+                              fontWeight: FontWeight.bold,
+                              color: AppTheme.primary,
+                            ),
+                          ),
+                          const SizedBox(height: 4),
+                          Text(
+                            '1. Open AIRAMP Web Portal or Mobile PWA\n2. Select "Join Section" or "Enter Enrollment Key"\n3. Point device camera at the QR code above or type "$code"',
+                            style: TextStyle(
+                              fontSize: 11.5,
+                              color: isDark ? AppTheme.darkTextSecondary : AppTheme.lightTextSecondary,
+                              height: 1.4,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(ctx),
+                child: Text('Close Projector View', style: TextStyle(color: isDark ? AppTheme.darkTextSecondary : AppTheme.lightTextSecondary)),
+              ),
+              ElevatedButton.icon(
+                onPressed: () {
+                  _copyKey(code);
+                  setModalState(() {});
+                },
+                icon: Icon(isJustCopied ? Icons.check_rounded : Icons.copy_rounded, size: 16),
+                label: Text(isJustCopied ? 'Key Copied!' : 'Copy Key'),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AppTheme.primary,
+                  foregroundColor: Colors.white,
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                ),
+              ),
+            ],
+          );
+        },
       ),
     );
   }

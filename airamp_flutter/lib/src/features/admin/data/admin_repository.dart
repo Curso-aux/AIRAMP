@@ -468,19 +468,26 @@ class AnalyticsFilter {
   final String timeframe; // 'all', 'today', '7days', '30days', 'this_month'
   final String category; // 'all', 'regular', 'irregular', 'transferee', 'sped', 'unassigned'
 
+  final String academicYear;
+  final String departmentGradeLevel;
+
   const AnalyticsFilter({
     this.subjectId,
     this.subjectName,
     this.section,
     this.timeframe = 'all',
     this.category = 'all',
+    this.academicYear = 'AY 2025-2026',
+    this.departmentGradeLevel = 'All Levels',
   });
 
   bool get hasActiveFilters =>
       subjectId != null ||
       (section != null && section != 'All Sections' && section!.isNotEmpty) ||
       timeframe != 'all' ||
-      category != 'all';
+      category != 'all' ||
+      academicYear != 'AY 2025-2026' ||
+      departmentGradeLevel != 'All Levels';
 
   int get activeFilterCount {
     int count = 0;
@@ -488,6 +495,8 @@ class AnalyticsFilter {
     if (section != null && section != 'All Sections' && section!.isNotEmpty) count++;
     if (timeframe != 'all') count++;
     if (category != 'all') count++;
+    if (academicYear != 'AY 2025-2026') count++;
+    if (departmentGradeLevel != 'All Levels') count++;
     return count;
   }
 
@@ -499,6 +508,8 @@ class AnalyticsFilter {
     bool clearSection = false,
     String? timeframe,
     String? category,
+    String? academicYear,
+    String? departmentGradeLevel,
   }) {
     return AnalyticsFilter(
       subjectId: clearSubject ? null : (subjectId ?? this.subjectId),
@@ -506,6 +517,8 @@ class AnalyticsFilter {
       section: clearSection ? null : (section ?? this.section),
       timeframe: timeframe ?? this.timeframe,
       category: category ?? this.category,
+      academicYear: academicYear ?? this.academicYear,
+      departmentGradeLevel: departmentGradeLevel ?? this.departmentGradeLevel,
     );
   }
 }
@@ -540,6 +553,16 @@ class AnalyticsFilterNotifier extends Notifier<AnalyticsFilter> {
 
   void updateCategory(String cat) {
     final next = state.copyWith(category: cat);
+    setFilter(next);
+  }
+
+  void updateAcademicYear(String year) {
+    final next = state.copyWith(academicYear: year);
+    setFilter(next);
+  }
+
+  void updateDepartmentGradeLevel(String dept) {
+    final next = state.copyWith(departmentGradeLevel: dept);
     setFilter(next);
   }
 

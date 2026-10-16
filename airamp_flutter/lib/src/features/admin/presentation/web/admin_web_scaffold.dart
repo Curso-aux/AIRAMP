@@ -8,6 +8,7 @@ import '../../../../core/theme/theme_provider.dart';
 import '../../../auth/application/auth_provider.dart';
 import '../../data/admin_repository.dart';
 import 'components/admin_command_palette.dart';
+import '../../../../core/components/offline_sync_status_pill.dart';
 
 class AdminWebScaffold extends ConsumerStatefulWidget {
   final StatefulNavigationShell navigationShell;
@@ -145,6 +146,10 @@ class _AdminWebScaffoldState extends ConsumerState<AdminWebScaffold> {
                     overflow: TextOverflow.ellipsis,
                   ),
                   actions: [
+                    const Padding(
+                      padding: EdgeInsets.symmetric(vertical: 10),
+                      child: OfflineSyncStatusPill(compact: true),
+                    ),
                     IconButton(
                       tooltip: 'Search (Ctrl+K)',
                       icon: Icon(Icons.search, color: AppTheme.text),
@@ -308,27 +313,28 @@ class _AdminWebScaffoldState extends ConsumerState<AdminWebScaffold> {
           ),
           const SizedBox(width: 8),
 
-          // Breadcrumb Title (Flexible so it contracts if space is tight, while Spacer pushes right elements)
+          // Breadcrumb Title (scrollable/flexible so it never overflows when space is tight)
           Flexible(
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Text(
-                  'Portal',
-                  style: TextStyle(fontSize: 14, color: AppTheme.textMuted),
-                ),
-                Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 8),
-                  child: Icon(Icons.chevron_right, size: 16, color: AppTheme.textMuted),
-                ),
-                Flexible(
-                  child: Text(
+            child: SingleChildScrollView(
+              scrollDirection: Axis.horizontal,
+              physics: const NeverScrollableScrollPhysics(),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(
+                    'Portal',
+                    style: TextStyle(fontSize: 14, color: AppTheme.textMuted),
+                  ),
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 8),
+                    child: Icon(Icons.chevron_right, size: 16, color: AppTheme.textMuted),
+                  ),
+                  Text(
                     _getPageTitle(),
                     style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: AppTheme.text),
-                    overflow: TextOverflow.ellipsis,
                   ),
-                ),
-              ],
+                ],
+              ),
             ),
           ),
 
@@ -377,6 +383,10 @@ class _AdminWebScaffoldState extends ConsumerState<AdminWebScaffold> {
 
           // Spacer pushes theme toggle and role badge to the absolute far right
           const Spacer(),
+
+          // Persistent Offline-Sync Status Indicator
+          const OfflineSyncStatusPill(),
+          const SizedBox(width: 12),
 
           // Campus Switcher for Super Admin or School Badge for Admin
           _buildCampusSwitcher(currentUser),

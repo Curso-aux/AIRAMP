@@ -6,6 +6,7 @@ import '../../../../core/theme/app_theme.dart';
 import '../../../../core/theme/theme_provider.dart';
 import '../../../auth/application/auth_provider.dart';
 import '../../data/teacher_repository.dart';
+import '../../../../core/components/offline_sync_status_pill.dart';
 
 class TeacherNavItem {
   final String label;
@@ -240,6 +241,10 @@ class _TeacherWebScaffoldState extends ConsumerState<TeacherWebScaffold> {
           ),
 
           const Spacer(),
+
+          // Persistent Offline-Sync Status Indicator
+          const OfflineSyncStatusPill(),
+          const SizedBox(width: 12),
 
           // Section/Class selector quick view
           Consumer(

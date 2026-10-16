@@ -53,6 +53,7 @@ dependencies:
   url_launcher: ^6.3.3
   shared_preferences: ^2.3.0
   flutter_tts: ^4.2.2
+  qr_flutter: ^4.1.0
 
 dev_dependencies:
   flutter_test:

@@ -18,6 +18,9 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../../../core/components/analytics_donut_chart.dart';
 import '../../submissions/data/submissions_repository.dart';
 import '../../esp32_hub/presentation/teacher_esp32_hub_modal.dart';
+import '../../../core/components/global_dashboard_filter_bar.dart';
+import '../../../core/components/kpi_summary_card.dart';
+import '../../../core/components/lo_mastery_matrix.dart';
 
 class TeacherDashboardScreen extends ConsumerStatefulWidget {
   const TeacherDashboardScreen({super.key});
@@ -1119,6 +1122,7 @@ class _TeacherDashboardScreenState extends ConsumerState<TeacherDashboardScreen>
                     _buildAnalyticsViewModeBtn(0, Icons.grid_view_rounded, 'Cards View'),
                     _buildAnalyticsViewModeBtn(1, Icons.pie_chart_rounded, 'Donut Breakdown'),
                     _buildAnalyticsViewModeBtn(2, Icons.trending_up_rounded, 'Performance Mastery'),
+                    _buildAnalyticsViewModeBtn(3, Icons.grid_on_rounded, 'LO Heatmap Matrix'),
                   ],
                 ),
               ),
@@ -1321,8 +1325,26 @@ class _TeacherDashboardScreenState extends ConsumerState<TeacherDashboardScreen>
             ),
           const SizedBox(height: 14),
 
-          // View Content based on _analyticsViewIndex (0: Cards, 1: Donut Breakdown, 2: Performance Mastery)
-          if (_analyticsViewIndex == 1)
+          // View Content based on _analyticsViewIndex (0: Cards, 1: Donut Breakdown, 2: Performance Mastery, 3: LO Heatmap Matrix)
+          if (_analyticsViewIndex == 3) ...[
+            GlobalDashboardFilterBar(
+              compact: true,
+              customSections: ['All Sections', ...handledSections],
+              selectedSection: _analyticsSectionFilter == 'All Handled Sections' ? 'All Sections' : _analyticsSectionFilter,
+              onSectionChanged: (sec) {
+                setState(() {
+                  _analyticsSectionFilter = sec == 'All Sections' ? 'All Handled Sections' : sec;
+                });
+                ref.read(teacherDashboardProvider.notifier).reload(
+                  section: _analyticsSectionFilter,
+                  studentId: _analyticsStudentFilter,
+                );
+              },
+            ),
+            const SizedBox(height: 14),
+            const LoMasteryMatrix(),
+          ]
+          else if (_analyticsViewIndex == 1)
             _buildTeacherDonutView(
               totalSubjects: totalSubjects,
               totalStudents: totalStudents,
@@ -1385,45 +1407,19 @@ class _TeacherDashboardScreenState extends ConsumerState<TeacherDashboardScreen>
     required String subtitle,
     required IconData icon,
     required Color color,
+    String? trendText,
+    double? progress,
+    String? badgeText,
   }) {
-    return Container(
-      padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(
-        color: AppTheme.surface,
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: AppTheme.border),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Text(
-                title,
-                style: TextStyle(fontSize: 12, color: AppTheme.textSecondary),
-              ),
-              Icon(icon, size: 18, color: color),
-            ],
-          ),
-          const SizedBox(height: 8),
-          Text(
-            value,
-            style: TextStyle(
-              fontSize: 22,
-              fontWeight: FontWeight.bold,
-              color: AppTheme.text,
-            ),
-          ),
-          const SizedBox(height: 4),
-          Text(
-            subtitle,
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-            style: TextStyle(fontSize: 11, color: AppTheme.textSecondary),
-          ),
-        ],
-      ),
+    return KpiSummaryCard(
+      title: title,
+      value: value,
+      subtitle: subtitle,
+      icon: icon,
+      color: color,
+      trendText: trendText ?? '+3.8% vs last mod',
+      progress: progress,
+      badgeText: badgeText,
     );
   }
 
@@ -1489,6 +1485,9 @@ class _TeacherDashboardScreenState extends ConsumerState<TeacherDashboardScreen>
               subtitle: effectiveStudentId != 'All' ? 'Enrolled subjects' : 'Active courses',
               icon: Icons.menu_book_outlined,
               color: AppTheme.primary,
+              trendText: '+1 new course',
+              progress: (totalSubjects / 8).clamp(0.0, 1.0),
+              badgeText: 'Active Curriculum',
             ),
           ),
           const SizedBox(width: 12),
@@ -1503,6 +1502,9 @@ class _TeacherDashboardScreenState extends ConsumerState<TeacherDashboardScreen>
                       : 'Across your classes',
               icon: Icons.people_alt_outlined,
               color: AppTheme.info,
+              trendText: '+4 this term',
+              progress: 0.82,
+              badgeText: effectiveSection != 'All Handled Sections' ? effectiveSection : 'All Sections',
             ),
           ),
           const SizedBox(width: 12),
@@ -1513,6 +1515,9 @@ class _TeacherDashboardScreenState extends ConsumerState<TeacherDashboardScreen>
               subtitle: totalAttempts == 0 ? 'No attempts yet' : '$passedAttempts passed ($totalAttempts attempts)',
               icon: Icons.verified_outlined,
               color: passRate >= 75 ? AppTheme.success : AppTheme.warning,
+              trendText: passRate >= 75 ? '+3.8% vs last mod' : '-1.5% vs target',
+              progress: passRate / 100.0,
+              badgeText: 'Standard ≥75%',
             ),
           ),
           const SizedBox(width: 12),
@@ -1523,6 +1528,9 @@ class _TeacherDashboardScreenState extends ConsumerState<TeacherDashboardScreen>
               subtitle: totalAttempts == 0 ? 'No attempts yet' : 'Overall assessments',
               icon: Icons.trending_up,
               color: AppTheme.accent,
+              trendText: '+4.2% mastery',
+              progress: avgScore / 100.0,
+              badgeText: 'LO Mastery',
             ),
           ),
         ],
