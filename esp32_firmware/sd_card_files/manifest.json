@@ -3,6 +3,7 @@
   "hubName": "AIRA Classroom Station #1",
   "sectionName": "Grade 10 - Emerald",
   "teacherName": "Sir John Reyes",
+  "qrPayload": "WIFI:S:AIRAMP-HUB-01;T:WPA;P:aira1234;;AIRAMP:SEC=Grade 10 - Emerald;IP=192.168.4.1",
   "generatedAt": "2026-10-17T08:00:00Z",
   "items": [
     {

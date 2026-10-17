@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:file_picker/file_picker.dart';
@@ -5,7 +6,9 @@ import '../../../core/theme/app_theme.dart';
 import '../../../core/components/app_toast.dart';
 import '../domain/esp32_hub_models.dart';
 import '../data/esp32_client_service.dart';
+import '../data/saved_materials_service.dart';
 import 'components/hub_qr_code_widget.dart';
+import 'saved_offline_materials_modal.dart';
 
 /// Modal dialog for teachers to manage the ESP32 Offline Learning Hub,
 /// pick and upload real curriculum files to the ESP32 MicroSD card, and display the classroom QR code.
@@ -43,9 +46,11 @@ class _TeacherEsp32HubModalState extends State<TeacherEsp32HubModal>
     with SingleTickerProviderStateMixin {
   late TabController _tabController;
   Esp32HubStatus _hubStatus = const Esp32HubStatus();
+  HubSyncManifest? _hubManifest;
   final List<HubMaterialItem> _availableMaterials = [];
   final Set<String> _selectedMaterialIds = {};
 
+  Timer? _hubPollTimer;
   bool _isCheckingHub = false;
   bool _isUploading = false;
   double _uploadProgress = 0.0;
@@ -54,42 +59,242 @@ class _TeacherEsp32HubModalState extends State<TeacherEsp32HubModal>
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 3, vsync: this);
+    _tabController = TabController(length: 2, vsync: this);
     _refreshHubStatus();
+
+    // Auto-detect connection to ESP32 Wi-Fi every 3 seconds so the user
+    // immediately sees live hardware details, MicroSD files, and the matching QR code
+    _hubPollTimer = Timer.periodic(const Duration(seconds: 3), (_) {
+      if (mounted && !_isCheckingHub && !_isUploading) {
+        _refreshHubStatus(silent: true);
+      }
+    });
   }
 
   @override
   void dispose() {
+    _hubPollTimer?.cancel();
     _tabController.dispose();
     super.dispose();
   }
 
   /// Pings the ESP32 to get real hardware state (DevKit and MicroSD card) and loads existing manifest
-  Future<void> _refreshHubStatus() async {
-    setState(() => _isCheckingHub = true);
+  Future<void> _refreshHubStatus({bool silent = false}) async {
+    if (!silent) {
+      setState(() => _isCheckingHub = true);
+    }
 
-    final status = await Esp32ClientService.instance.checkHubStatus('192.168.4.1');
+    try {
+      final wasConnected = _hubStatus.isDevKitConnected;
+      final status = await Esp32ClientService.instance.checkHubStatus('192.168.4.1');
+
+      if (!mounted) return;
+
+      setState(() {
+        _hubStatus = status;
+        if (!silent) _isCheckingHub = false;
+      });
+
+      if (status.isDevKitConnected) {
+        final manifest = await Esp32ClientService.instance.fetchManifest(status.ipAddress);
+        if (!mounted) return;
+        if (manifest != null) {
+          setState(() {
+            _hubManifest = manifest;
+            if (manifest.items.isNotEmpty) {
+              final existingIds = _availableMaterials.map((m) => m.id).toSet();
+              for (final item in manifest.items) {
+                if (!existingIds.contains(item.id)) {
+                  _availableMaterials.add(item);
+                  _selectedMaterialIds.add(item.id);
+                }
+              }
+            }
+          });
+        }
+
+        if (!wasConnected && mounted) {
+          AppToast.showSuccess(
+            context,
+            'Connected to ${_hubStatus.ssid}! Hardware information & QR code loaded.',
+          );
+        }
+      }
+    } catch (e) {
+      debugPrint('[TeacherEsp32HubModal] _refreshHubStatus error: $e');
+    } finally {
+      if (mounted && !silent && _isCheckingHub) {
+        setState(() => _isCheckingHub = false);
+      }
+    }
+  }
+
+  /// Opens the material viewer for the teacher to view the material's offline contents, questions, or PDF
+  Future<void> _openMaterialViewer(HubMaterialItem item) async {
+    HubMaterialItem itemToView = item;
+
+    // If content is empty and connected to hub, attempt quick fetch
+    if ((itemToView.content == null || itemToView.content!.isEmpty) &&
+        itemToView.localPath == null &&
+        _hubStatus.isDevKitConnected) {
+      AppToast.showInfo(context, 'Loading "${item.title}" from ESP32...');
+      try {
+        itemToView = await Esp32ClientService.instance.downloadFile(
+          ipAddress: _hubStatus.ipAddress,
+          item: item,
+        );
+      } catch (_) {}
+    }
 
     if (!mounted) return;
+    showDialog(
+      context: context,
+      barrierDismissible: true,
+      builder: (ctx) => OfflineMaterialReaderDialog(item: itemToView),
+    );
+  }
 
-    setState(() {
-      _hubStatus = status;
-      _isCheckingHub = false;
-    });
+  /// Downloads the material from the ESP32 Hub and saves it to the teacher's phone offline library
+  Future<void> _retrieveMaterialToPhone(HubMaterialItem item) async {
+    try {
+      AppToast.showInfo(context, 'Retrieving "${item.title}" to device...');
+      HubMaterialItem itemToSave = item;
 
-    if (status.isDevKitConnected) {
-      final manifest = await Esp32ClientService.instance.fetchManifest(status.ipAddress);
+      // If content isn't downloaded yet and we are connected to the ESP32 hub
+      if ((itemToSave.content == null || itemToSave.content!.isEmpty) &&
+          itemToSave.localPath == null &&
+          _hubStatus.isDevKitConnected) {
+        itemToSave = await Esp32ClientService.instance.downloadFile(
+          ipAddress: _hubStatus.ipAddress,
+          item: item,
+        );
+      }
+
+      await SavedMaterialsService.instance.saveMaterials([itemToSave]);
+
       if (!mounted) return;
-      if (manifest != null && manifest.items.isNotEmpty) {
-        setState(() {
-          final existingIds = _availableMaterials.map((m) => m.id).toSet();
-          for (final item in manifest.items) {
-            if (!existingIds.contains(item.id)) {
-              _availableMaterials.add(item);
-              _selectedMaterialIds.add(item.id);
-            }
-          }
-        });
+      AppToast.showSuccess(
+        context,
+        'Retrieved "${item.title}"! Saved to your offline materials library.',
+      );
+    } catch (e) {
+      if (!mounted) return;
+      AppToast.showError(context, 'Failed to retrieve "${item.title}": $e');
+    }
+  }
+
+  /// Prompts for confirmation and deletes the material from the ESP32 MicroSD card and manifest
+  Future<void> _confirmAndDeleteMaterial(HubMaterialItem item) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: AppTheme.surface,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: Row(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                color: AppTheme.error.withValues(alpha: 0.15),
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: Icon(Icons.delete_forever, color: AppTheme.error, size: 22),
+            ),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Text(
+                'Delete Material?',
+                style: TextStyle(
+                  color: AppTheme.text,
+                  fontSize: 16,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+            ),
+          ],
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'Are you sure you want to delete "${item.title}" (${item.fileName ?? 'file'})?',
+              style: TextStyle(color: AppTheme.text, fontSize: 13, fontWeight: FontWeight.w600),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              _hubStatus.isDevKitConnected
+                  ? 'This will remove the file from the ESP32 MicroSD card and update the manifest. Students will no longer be able to download this material.'
+                  : 'This will remove the item from your upload staging list.',
+              style: TextStyle(color: AppTheme.textSecondary, fontSize: 12, height: 1.4),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: Text('Cancel', style: TextStyle(color: AppTheme.textMuted)),
+          ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppTheme.error,
+              foregroundColor: Colors.white,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+            ),
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text('Delete'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed != true || !mounted) return;
+
+    try {
+      AppToast.showInfo(context, 'Deleting "${item.title}"...');
+
+      // If connected to ESP32 and fileName is set, call DELETE API on the ESP32
+      if (_hubStatus.isDevKitConnected && item.fileName != null) {
+        final success = await Esp32ClientService.instance.deleteFileFromHub(
+          ipAddress: _hubStatus.ipAddress,
+          fileName: item.fileName!,
+        );
+        debugPrint('[TeacherHub] File delete on ESP32 returned: $success');
+      }
+
+      if (!mounted) return;
+
+      setState(() {
+        _availableMaterials.removeWhere((m) => m.id == item.id);
+        _selectedMaterialIds.remove(item.id);
+      });
+
+      // Update the manifest on the ESP32 MicroSD so students won't see it anymore
+      if (_hubStatus.isDevKitConnected) {
+        final remainingItems = List<HubMaterialItem>.from(_availableMaterials);
+        final updatedManifest = HubSyncManifest(
+          hubId: _hubManifest?.hubId ?? 'AIRAMP-HUB-01',
+          hubName: _hubManifest?.hubName ?? 'AIRA Classroom Station',
+          teacherName: widget.teacherName,
+          sectionName: _hubManifest?.sectionName ?? widget.initialSection ?? 'Grade 10',
+          generatedAt: DateTime.now().toIso8601String(),
+          items: remainingItems,
+          qrPayload: _hubManifest?.qrPayload ?? '',
+        );
+
+        await Esp32ClientService.instance.uploadManifest(
+          ipAddress: _hubStatus.ipAddress,
+          manifest: updatedManifest,
+        );
+        _hubManifest = updatedManifest;
+      }
+
+      if (mounted) {
+        AppToast.showSuccess(context, 'Deleted "${item.title}" successfully.');
+      }
+    } catch (e) {
+      if (mounted) {
+        AppToast.showError(context, 'Failed to delete: $e');
       }
     }
   }
@@ -229,13 +434,15 @@ class _TeacherEsp32HubModalState extends State<TeacherEsp32HubModal>
       _uploadProgress = 0.95;
     });
 
-    final qrPayload = 'WIFI:S:${_hubStatus.ssid};T:WPA;P:${_hubStatus.password};;AIRAMP:SEC=${widget.initialSection ?? 'Grade 10'};IP=${_hubStatus.ipAddress}';
+    final qrPayload = (_hubManifest != null && _hubManifest!.qrPayload.isNotEmpty)
+        ? _hubManifest!.qrPayload
+        : 'WIFI:S:${_hubStatus.ssid};T:WPA;P:${_hubStatus.password};;AIRAMP:SEC=${_hubManifest?.sectionName ?? widget.initialSection ?? 'Grade 10'};IP=${_hubStatus.ipAddress}';
 
     final updatedManifest = HubSyncManifest(
-      hubId: 'AIRAMP-HUB-01',
-      hubName: 'AIRA Classroom Station',
+      hubId: _hubManifest?.hubId ?? 'AIRAMP-HUB-01',
+      hubName: _hubManifest?.hubName ?? 'AIRA Classroom Station',
       teacherName: widget.teacherName,
-      sectionName: widget.initialSection ?? 'Grade 10',
+      sectionName: _hubManifest?.sectionName ?? widget.initialSection ?? 'Grade 10',
       generatedAt: DateTime.now().toIso8601String(),
       items: selectedItems,
       qrPayload: qrPayload,
@@ -249,6 +456,7 @@ class _TeacherEsp32HubModalState extends State<TeacherEsp32HubModal>
     if (!mounted) return;
 
     setState(() {
+      _hubManifest = updatedManifest;
       _uploadProgress = 1.0;
       _uploadStepText = 'Success! Materials are now stored in ESP32 MicroSD.';
       _isUploading = false;
@@ -460,9 +668,8 @@ class _TeacherEsp32HubModalState extends State<TeacherEsp32HubModal>
             indicatorColor: AppTheme.primary,
             indicatorWeight: 3,
             tabs: const [
-              Tab(icon: Icon(Icons.cloud_upload_outlined, size: 20), text: 'Upload'),
+              Tab(icon: Icon(Icons.folder_shared_outlined, size: 20), text: 'Materials'),
               Tab(icon: Icon(Icons.qr_code, size: 20), text: 'Classroom QR'),
-              Tab(icon: Icon(Icons.memory, size: 20), text: 'Hardware Guide'),
             ],
           ),
 
@@ -471,9 +678,8 @@ class _TeacherEsp32HubModalState extends State<TeacherEsp32HubModal>
             child: TabBarView(
               controller: _tabController,
               children: [
-                _buildUploadTab(),
+                _buildMaterialsTab(),
                 _buildQrTab(),
-                _buildHardwareGuideTab(),
               ],
             ),
           ),
@@ -482,7 +688,7 @@ class _TeacherEsp32HubModalState extends State<TeacherEsp32HubModal>
     );
   }
 
-  Widget _buildUploadTab() {
+  Widget _buildMaterialsTab() {
     return SingleChildScrollView(
       padding: const EdgeInsets.all(20),
       child: Column(
@@ -510,8 +716,8 @@ class _TeacherEsp32HubModalState extends State<TeacherEsp32HubModal>
                 Expanded(
                   child: Text(
                     _hubStatus.isDevKitConnected
-                        ? 'Connected to ESP32 Hub! Select real files below to upload directly to the MicroSD card.'
-                        : 'Connect your phone to Wi-Fi "${_hubStatus.ssid}" (Password: "${_hubStatus.password}") to upload files directly to the ESP32.',
+                        ? 'Connected to ESP32 Hub! You can view materials stored on the MicroSD, retrieve them to phone storage, delete items, or upload new files.'
+                        : 'Connect your phone to Wi-Fi "${_hubStatus.ssid}" (Password: "${_hubStatus.password}") to manage materials on the ESP32 Hub.',
                     style: TextStyle(fontSize: 12, color: AppTheme.text, height: 1.4),
                   ),
                 ),
@@ -520,20 +726,51 @@ class _TeacherEsp32HubModalState extends State<TeacherEsp32HubModal>
           ),
           const SizedBox(height: 16),
 
-          // Action Button: Add Real Files from Phone
-          SizedBox(
-            width: double.infinity,
-            height: 44,
-            child: OutlinedButton.icon(
-              onPressed: _pickRealFiles,
-              icon: const Icon(Icons.note_add_outlined, size: 18),
-              label: const Text('+ Pick Real PDF / Documents from Phone', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
-              style: OutlinedButton.styleFrom(
-                foregroundColor: AppTheme.primary,
-                side: BorderSide(color: AppTheme.primary, width: 1.5),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+          // Action Buttons: Pick Files & View Saved Offline Materials
+          Row(
+            children: [
+              Expanded(
+                flex: 3,
+                child: SizedBox(
+                  height: 44,
+                  child: ElevatedButton.icon(
+                    onPressed: _pickRealFiles,
+                    icon: const Icon(Icons.note_add_outlined, size: 18),
+                    label: const Text(
+                      'Upload Materials',
+                      style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+                    ),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: AppTheme.primary,
+                      foregroundColor: Colors.white,
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                    ),
+                  ),
+                ),
               ),
-            ),
+              const SizedBox(width: 8),
+              Expanded(
+                flex: 2,
+                child: SizedBox(
+                  height: 44,
+                  child: OutlinedButton.icon(
+                    onPressed: () {
+                      SavedOfflineMaterialsModal.show(context);
+                    },
+                    icon: const Icon(Icons.folder_special_outlined, size: 18),
+                    label: const Text(
+                      'Saved',
+                      style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12),
+                    ),
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: AppTheme.text,
+                      side: BorderSide(color: AppTheme.border),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                    ),
+                  ),
+                ),
+              ),
+            ],
           ),
 
           const SizedBox(height: 18),
@@ -543,7 +780,7 @@ class _TeacherEsp32HubModalState extends State<TeacherEsp32HubModal>
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               Text(
-                'Materials to Package & Upload (${_availableMaterials.length})',
+                'Classroom Materials (${_availableMaterials.length})',
                 style: TextStyle(
                   fontSize: 14,
                   fontWeight: FontWeight.bold,
@@ -572,15 +809,27 @@ class _TeacherEsp32HubModalState extends State<TeacherEsp32HubModal>
 
           if (_availableMaterials.isEmpty)
             Container(
-              padding: const EdgeInsets.all(24),
+              padding: const EdgeInsets.all(28),
               alignment: Alignment.center,
+              decoration: BoxDecoration(
+                color: AppTheme.background,
+                borderRadius: BorderRadius.circular(14),
+                border: Border.all(color: AppTheme.border),
+              ),
               child: Column(
                 children: [
-                  Icon(Icons.folder_open_outlined, size: 36, color: AppTheme.textMuted),
-                  const SizedBox(height: 8),
-                  Text('No materials added yet.', style: TextStyle(color: AppTheme.textMuted, fontSize: 13)),
+                  Icon(Icons.folder_open_outlined, size: 40, color: AppTheme.textMuted),
+                  const SizedBox(height: 10),
+                  Text(
+                    'No materials on ESP32 MicroSD yet',
+                    style: TextStyle(color: AppTheme.text, fontWeight: FontWeight.bold, fontSize: 14),
+                  ),
                   const SizedBox(height: 4),
-                  Text('Tap "+ Pick Real PDF / Documents" above to add real materials.', style: TextStyle(color: AppTheme.textMuted, fontSize: 11)),
+                  Text(
+                    'Tap "+ Upload Materials" above to pick PDFs or files from your phone to transfer to the classroom hub.',
+                    textAlign: TextAlign.center,
+                    style: TextStyle(color: AppTheme.textSecondary, fontSize: 12, height: 1.4),
+                  ),
                 ],
               ),
             )
@@ -590,75 +839,166 @@ class _TeacherEsp32HubModalState extends State<TeacherEsp32HubModal>
               final isLocal = item.localPath != null;
 
               return Container(
-                margin: const EdgeInsets.only(bottom: 8),
+                margin: const EdgeInsets.only(bottom: 12),
                 decoration: BoxDecoration(
-                  color: isChecked ? AppTheme.primarySoft.withValues(alpha: 0.1) : AppTheme.background,
-                  borderRadius: BorderRadius.circular(12),
+                  color: AppTheme.surfaceLight,
+                  borderRadius: BorderRadius.circular(14),
                   border: Border.all(
-                    color: isChecked ? AppTheme.primary.withValues(alpha: 0.4) : AppTheme.border,
+                    color: isChecked ? AppTheme.primary.withValues(alpha: 0.5) : AppTheme.border,
+                    width: isChecked ? 1.5 : 1.0,
                   ),
                 ),
-                child: CheckboxListTile(
-                  value: isChecked,
-                  activeColor: AppTheme.primary,
-                  title: Row(
-                    children: [
-                      Expanded(
-                        child: Text(
-                          item.title,
-                          style: TextStyle(
-                            fontSize: 13,
-                            fontWeight: FontWeight.w600,
-                            color: AppTheme.text,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Padding(
+                      padding: const EdgeInsets.fromLTRB(12, 12, 12, 8),
+                      child: Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Checkbox(
+                            value: isChecked,
+                            activeColor: AppTheme.primary,
+                            materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                            visualDensity: VisualDensity.compact,
+                            onChanged: (val) {
+                              setState(() {
+                                if (val == true) {
+                                  _selectedMaterialIds.add(item.id);
+                                } else {
+                                  _selectedMaterialIds.remove(item.id);
+                                }
+                              });
+                            },
                           ),
-                          overflow: TextOverflow.ellipsis,
-                        ),
+                          const SizedBox(width: 4),
+                          Container(
+                            padding: const EdgeInsets.all(8),
+                            decoration: BoxDecoration(
+                              color: (item.fileType == HubFileType.pdf
+                                      ? AppTheme.error
+                                      : item.fileType == HubFileType.quiz
+                                          ? AppTheme.warning
+                                          : AppTheme.primary)
+                                  .withValues(alpha: 0.15),
+                              borderRadius: BorderRadius.circular(10),
+                            ),
+                            child: Icon(
+                              item.fileType == HubFileType.pdf
+                                  ? Icons.picture_as_pdf
+                                  : item.fileType == HubFileType.quiz
+                                      ? Icons.assignment
+                                      : Icons.menu_book,
+                              size: 20,
+                              color: item.fileType == HubFileType.pdf
+                                  ? AppTheme.error
+                                  : item.fileType == HubFileType.quiz
+                                      ? AppTheme.warning
+                                      : AppTheme.primary,
+                            ),
+                          ),
+                          const SizedBox(width: 10),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Row(
+                                  children: [
+                                    Expanded(
+                                      child: Text(
+                                        item.title,
+                                        style: TextStyle(
+                                          fontSize: 14,
+                                          fontWeight: FontWeight.bold,
+                                          color: AppTheme.text,
+                                        ),
+                                        maxLines: 1,
+                                        overflow: TextOverflow.ellipsis,
+                                      ),
+                                    ),
+                                    Container(
+                                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                      decoration: BoxDecoration(
+                                        color: isLocal
+                                            ? AppTheme.warning.withValues(alpha: 0.15)
+                                            : AppTheme.success.withValues(alpha: 0.15),
+                                        borderRadius: BorderRadius.circular(6),
+                                      ),
+                                      child: Text(
+                                        isLocal ? 'Phone File' : 'On MicroSD',
+                                        style: TextStyle(
+                                          fontSize: 10,
+                                          fontWeight: FontWeight.bold,
+                                          color: isLocal ? AppTheme.warning : AppTheme.success,
+                                        ),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                                const SizedBox(height: 3),
+                                Text(
+                                  '${item.fileName ?? item.title} • ${item.formattedSize} • ${item.fileType.name.toUpperCase()}',
+                                  style: TextStyle(fontSize: 11, color: AppTheme.textSecondary),
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
                       ),
-                      if (isLocal)
-                        Container(
-                          margin: const EdgeInsets.only(left: 6),
-                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                          decoration: BoxDecoration(
-                            color: AppTheme.primary.withValues(alpha: 0.15),
-                            borderRadius: BorderRadius.circular(4),
+                    ),
+                    const Divider(height: 1),
+                    // Action Buttons: View, Retrieve (save to phone), Delete
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                      child: Row(
+                        children: [
+                          // View Button
+                          TextButton.icon(
+                            onPressed: () => _openMaterialViewer(item),
+                            icon: Icon(Icons.visibility_outlined, size: 16, color: AppTheme.primary),
+                            label: Text(
+                              'View',
+                              style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: AppTheme.primary),
+                            ),
+                            style: TextButton.styleFrom(
+                              visualDensity: VisualDensity.compact,
+                              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                            ),
                           ),
-                          child: Text('Phone File', style: TextStyle(fontSize: 9, fontWeight: FontWeight.bold, color: AppTheme.primary)),
-                        ),
-                    ],
-                  ),
-                  subtitle: Text(
-                    '${item.fileName ?? item.title} • ${item.formattedSize} • ${item.fileType.name.toUpperCase()}',
-                    style: TextStyle(fontSize: 11, color: AppTheme.textSecondary),
-                  ),
-                  secondary: Container(
-                    padding: const EdgeInsets.all(8),
-                    decoration: BoxDecoration(
-                      color: AppTheme.surfaceLight,
-                      borderRadius: BorderRadius.circular(8),
+                          const SizedBox(width: 4),
+                          // Retrieve Button
+                          TextButton.icon(
+                            onPressed: () => _retrieveMaterialToPhone(item),
+                            icon: Icon(Icons.download_for_offline_outlined, size: 16, color: AppTheme.success),
+                            label: Text(
+                              'Retrieve',
+                              style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: AppTheme.success),
+                            ),
+                            style: TextButton.styleFrom(
+                              visualDensity: VisualDensity.compact,
+                              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                            ),
+                          ),
+                          const Spacer(),
+                          // Delete Button
+                          TextButton.icon(
+                            onPressed: () => _confirmAndDeleteMaterial(item),
+                            icon: Icon(Icons.delete_outline, size: 16, color: AppTheme.error),
+                            label: Text(
+                              'Delete',
+                              style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: AppTheme.error),
+                            ),
+                            style: TextButton.styleFrom(
+                              visualDensity: VisualDensity.compact,
+                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+                            ),
+                          ),
+                        ],
+                      ),
                     ),
-                    child: Icon(
-                      item.fileType == HubFileType.pdf
-                          ? Icons.picture_as_pdf
-                          : item.fileType == HubFileType.quiz
-                              ? Icons.assignment
-                              : Icons.menu_book,
-                      size: 18,
-                      color: item.fileType == HubFileType.pdf
-                          ? AppTheme.error
-                          : item.fileType == HubFileType.quiz
-                              ? AppTheme.warning
-                              : AppTheme.primary,
-                    ),
-                  ),
-                  onChanged: (val) {
-                    setState(() {
-                      if (val == true) {
-                        _selectedMaterialIds.add(item.id);
-                      } else {
-                        _selectedMaterialIds.remove(item.id);
-                      }
-                    });
-                  },
+                  ],
                 ),
               );
             }),
@@ -689,7 +1029,7 @@ class _TeacherEsp32HubModalState extends State<TeacherEsp32HubModal>
                 Column(
                   crossAxisAlignment: CrossAxisAlignment.end,
                   children: [
-                    Text('Selected Items:', style: TextStyle(fontSize: 11, color: AppTheme.textMuted)),
+                    Text('Selected for Upload:', style: TextStyle(fontSize: 11, color: AppTheme.textMuted)),
                     Text(
                       '${_selectedMaterialIds.length} of ${_availableMaterials.length}',
                       style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: AppTheme.text),
@@ -760,7 +1100,7 @@ class _TeacherEsp32HubModalState extends State<TeacherEsp32HubModal>
                     )
                   : const Icon(Icons.cloud_upload, size: 20),
               label: Text(
-                _isUploading ? 'Transferring to MicroSD...' : 'Upload to ESP32 MicroSD',
+                _isUploading ? 'Transferring to MicroSD...' : 'Upload Selected to MicroSD',
                 style: const TextStyle(fontSize: 15, fontWeight: FontWeight.bold),
               ),
               style: ElevatedButton.styleFrom(
@@ -777,103 +1117,381 @@ class _TeacherEsp32HubModalState extends State<TeacherEsp32HubModal>
   }
 
   Widget _buildQrTab() {
-    final qrData = 'WIFI:S:${_hubStatus.ssid};T:WPA;P:${_hubStatus.password};;AIRAMP:SEC=${widget.initialSection ?? 'Grade 10'};IP=${_hubStatus.ipAddress}';
+    final qrData = (_hubManifest != null && _hubManifest!.qrPayload.isNotEmpty)
+        ? _hubManifest!.qrPayload
+        : 'WIFI:S:${_hubStatus.ssid};T:WPA;P:${_hubStatus.password};;AIRAMP:SEC=${_hubManifest?.sectionName ?? widget.initialSection ?? 'Grade 10'};IP=${_hubStatus.ipAddress}';
 
-    return SingleChildScrollView(
-      padding: const EdgeInsets.all(20),
+    // When NOT connected to the ESP32 Wi-Fi, hide the QR code and show the connection guide with refresh button
+    if (!_hubStatus.isDevKitConnected) {
+      return RefreshIndicator(
+        onRefresh: () => _refreshHubStatus(silent: false),
+        child: SingleChildScrollView(
+          physics: const AlwaysScrollableScrollPhysics(),
+          padding: const EdgeInsets.all(20),
+          child: Column(
+            children: [
+              // Offline State Card (Guides user to connect)
+              _buildOfflineDisconnectedCard(),
+              const SizedBox(height: 16),
+              // Required Station Credentials Card
+              _buildDisconnectedCredentialsCard(),
+              const SizedBox(height: 20),
+            ],
+          ),
+        ),
+      );
+    }
+
+    // When CONNECTED to the ESP32 Wi-Fi, show the authentic QR code and station details
+    return RefreshIndicator(
+      onRefresh: () => _refreshHubStatus(silent: false),
+      child: SingleChildScrollView(
+        physics: const AlwaysScrollableScrollPhysics(),
+        padding: const EdgeInsets.all(20),
+        child: Column(
+          children: [
+            // Connected Success Banner with Refresh Button
+            _buildConnectedBanner(),
+            const SizedBox(height: 12),
+
+            Text(
+              'Present this QR Code to Students',
+              style: TextStyle(
+                fontSize: 16,
+                fontWeight: FontWeight.bold,
+                color: AppTheme.text,
+              ),
+            ),
+            const SizedBox(height: 4),
+            Text(
+              'Students scan this with their AIRAMP app to connect to your ESP32 station and download your uploaded modules offline.',
+              textAlign: TextAlign.center,
+              style: TextStyle(fontSize: 12, color: AppTheme.textSecondary),
+            ),
+            const SizedBox(height: 20),
+
+            // Authentic QR Code Graphic matching ESP32 OLED
+            HubQrCodeWidget(
+              qrData: qrData,
+              hubSsid: _hubStatus.ssid,
+              hubIp: _hubStatus.ipAddress,
+              size: 210,
+            ),
+
+            const SizedBox(height: 20),
+
+            // Station Details Card
+            Container(
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: AppTheme.background,
+                borderRadius: BorderRadius.circular(14),
+                border: Border.all(color: AppTheme.border),
+              ),
+              child: Column(
+                children: [
+                  _buildInfoRow(Icons.wifi, 'Wi-Fi Network', _hubStatus.ssid),
+                  const Divider(height: 16),
+                  _buildInfoRow(Icons.lock_outline, 'Wi-Fi Password', _hubStatus.password),
+                  const Divider(height: 16),
+                  _buildInfoRow(Icons.language, 'Hub IP Gateway', _hubStatus.ipAddress),
+                  const Divider(height: 16),
+                  _buildInfoRow(
+                    Icons.class_outlined,
+                    'Class / Section',
+                    _hubManifest?.sectionName ?? widget.initialSection ?? 'Grade 10',
+                  ),
+                  const Divider(height: 16),
+                  _buildInfoRow(
+                    Icons.folder_shared,
+                    'Packaged Materials',
+                    _availableMaterials.isNotEmpty
+                        ? '${_availableMaterials.length} Items (${_formatBytes(_selectedBytes)})'
+                        : (_hubManifest != null && _hubManifest!.items.isNotEmpty
+                            ? '${_hubManifest!.items.length} Items'
+                            : '0 Items (0 B)'),
+                    trailing: _availableMaterials.isNotEmpty
+                        ? InkWell(
+                            onTap: () => _tabController.animateTo(0),
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                              decoration: BoxDecoration(
+                                color: AppTheme.primary.withValues(alpha: 0.15),
+                                borderRadius: BorderRadius.circular(6),
+                              ),
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Text('View List', style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: AppTheme.primary)),
+                                  const SizedBox(width: 2),
+                                  Icon(Icons.arrow_forward_ios, size: 9, color: AppTheme.primary),
+                                ],
+                              ),
+                            ),
+                          )
+                        : null,
+                  ),
+                  const Divider(height: 16),
+                  _buildInfoRow(
+                    Icons.sd_storage,
+                    'MicroSD Storage',
+                    _hubStatus.isSdCardDetected
+                        ? _hubStatus.formattedTotalStorage
+                        : (_hubStatus.isDevKitConnected ? 'No Card Detected' : 'Connect Wi-Fi to check'),
+                  ),
+                  if (_hubStatus.isDevKitConnected) ...[
+                    const Divider(height: 16),
+                    _buildInfoRow(
+                      Icons.people_outline,
+                      'Connected Students',
+                      '${_hubStatus.connectedClients} Connected',
+                    ),
+                  ],
+                ],
+              ),
+            ),
+
+            const SizedBox(height: 16),
+
+            // Copy / Share Actions
+            Row(
+              children: [
+                Expanded(
+                  child: OutlinedButton.icon(
+                    onPressed: () {
+                      Clipboard.setData(ClipboardData(
+                        text: 'Wi-Fi: ${_hubStatus.ssid} | Password: ${_hubStatus.password} | Hub IP: ${_hubStatus.ipAddress}',
+                      ));
+                      AppToast.showSuccess(context, 'Station credentials copied to clipboard!');
+                    },
+                    icon: const Icon(Icons.copy, size: 16),
+                    label: const Text('Copy Info'),
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: AppTheme.text,
+                      side: BorderSide(color: AppTheme.border),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: ElevatedButton.icon(
+                    onPressed: () {
+                      _showFullscreenQrDialog(context, qrData);
+                    },
+                    icon: const Icon(Icons.fullscreen, size: 18),
+                    label: const Text('Projector Mode'),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: AppTheme.primary,
+                      foregroundColor: Colors.white,
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 20),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildConnectedBanner() {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+      decoration: BoxDecoration(
+        color: AppTheme.success.withValues(alpha: 0.1),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: AppTheme.success.withValues(alpha: 0.3)),
+      ),
+      child: Row(
+        children: [
+          Icon(Icons.check_circle, color: AppTheme.success, size: 20),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Text(
+              'Connected to ${_hubStatus.ssid}! Hardware synchronized.',
+              style: TextStyle(fontSize: 12, color: AppTheme.text, fontWeight: FontWeight.w600),
+            ),
+          ),
+          IconButton(
+            tooltip: 'Refresh Status',
+            icon: _isCheckingHub
+                ? const SizedBox(
+                    width: 16,
+                    height: 16,
+                    child: CircularProgressIndicator(strokeWidth: 2),
+                  )
+                : const Icon(Icons.refresh, size: 18),
+            onPressed: _isCheckingHub ? null : () => _refreshHubStatus(silent: false),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildOfflineDisconnectedCard() {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(22),
+      decoration: BoxDecoration(
+        color: AppTheme.surfaceLight,
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: AppTheme.border),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.05),
+            blurRadius: 10,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
       child: Column(
         children: [
+          Container(
+            width: 72,
+            height: 72,
+            decoration: BoxDecoration(
+              color: AppTheme.warning.withValues(alpha: 0.15),
+              shape: BoxShape.circle,
+            ),
+            child: Icon(
+              Icons.wifi_off_rounded,
+              size: 38,
+              color: AppTheme.warning,
+            ),
+          ),
+          const SizedBox(height: 16),
           Text(
-            'Present this QR Code to Students',
+            'ESP32 Hub Not Connected',
             style: TextStyle(
-              fontSize: 16,
+              fontSize: 18,
               fontWeight: FontWeight.bold,
               color: AppTheme.text,
             ),
           ),
-          const SizedBox(height: 4),
+          const SizedBox(height: 8),
           Text(
-            'Students scan this with their AIRAMP app to connect to your ESP32 station and download your uploaded modules offline.',
+            'Connect your phone to the ESP32 Wi-Fi station to load the real classroom materials and display the student QR code.',
             textAlign: TextAlign.center,
-            style: TextStyle(fontSize: 12, color: AppTheme.textSecondary),
+            style: TextStyle(fontSize: 13, color: AppTheme.textSecondary, height: 1.4),
           ),
           const SizedBox(height: 20),
-
-          // QR Code Graphic
-          HubQrCodeWidget(
-            qrData: qrData,
-            hubSsid: _hubStatus.ssid,
-            hubIp: _hubStatus.ipAddress,
-            size: 210,
-          ),
-
-          const SizedBox(height: 20),
-
-          // Station Details Card
           Container(
-            padding: const EdgeInsets.all(16),
+            padding: const EdgeInsets.all(14),
             decoration: BoxDecoration(
               color: AppTheme.background,
-              borderRadius: BorderRadius.circular(14),
+              borderRadius: BorderRadius.circular(12),
               border: Border.all(color: AppTheme.border),
             ),
             child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                _buildInfoRow(Icons.wifi, 'Wi-Fi Network', _hubStatus.ssid),
-                const Divider(height: 16),
-                _buildInfoRow(Icons.lock_outline, 'Wi-Fi Password', _hubStatus.password),
-                const Divider(height: 16),
-                _buildInfoRow(Icons.language, 'Hub IP Gateway', _hubStatus.ipAddress),
-                const Divider(height: 16),
-                _buildInfoRow(
-                  Icons.folder_shared,
-                  'Packaged Materials',
-                  '${_selectedMaterialIds.length} Items (${_formatBytes(_selectedBytes)})',
-                ),
+                _buildGuideStep('1', 'Open your phone\'s Wi-Fi Settings'),
+                const SizedBox(height: 8),
+                _buildGuideStep('2', 'Connect to "${_hubStatus.ssid}"'),
+                const SizedBox(height: 8),
+                _buildGuideStep('3', 'Password is "${_hubStatus.password}"'),
+                const SizedBox(height: 8),
+                _buildGuideStep('4', 'Return here — QR code will show automatically'),
               ],
             ),
           ),
-
-          const SizedBox(height: 16),
-
-          // Copy / Share Actions
-          Row(
-            children: [
-              Expanded(
-                child: OutlinedButton.icon(
-                  onPressed: () {
-                    Clipboard.setData(ClipboardData(
-                      text: 'Wi-Fi: ${_hubStatus.ssid} | Password: ${_hubStatus.password} | Hub IP: ${_hubStatus.ipAddress}',
-                    ));
-                    AppToast.showSuccess(context, 'Station credentials copied to clipboard!');
-                  },
-                  icon: const Icon(Icons.copy, size: 16),
-                  label: const Text('Copy Info'),
-                  style: OutlinedButton.styleFrom(
-                    foregroundColor: AppTheme.text,
-                    side: BorderSide(color: AppTheme.border),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                  ),
-                ),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: ElevatedButton.icon(
-                  onPressed: () {
-                    _showFullscreenQrDialog(context, qrData);
-                  },
-                  icon: const Icon(Icons.fullscreen, size: 18),
-                  label: const Text('Projector Mode'),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: AppTheme.primary,
-                    foregroundColor: Colors.white,
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                  ),
-                ),
-              ),
-            ],
-          ),
           const SizedBox(height: 20),
+          SizedBox(
+            width: double.infinity,
+            height: 46,
+            child: ElevatedButton.icon(
+              onPressed: _isCheckingHub ? null : () => _refreshHubStatus(silent: false),
+              icon: _isCheckingHub
+                  ? const SizedBox(
+                      width: 18,
+                      height: 18,
+                      child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                    )
+                  : const Icon(Icons.refresh, size: 20),
+              label: Text(
+                _isCheckingHub ? 'Checking Connection...' : 'Refresh Connection',
+                style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
+              ),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppTheme.primary,
+                foregroundColor: Colors.white,
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildGuideStep(String stepNumber, String instruction) {
+    return Row(
+      children: [
+        Container(
+          width: 22,
+          height: 22,
+          alignment: Alignment.center,
+          decoration: BoxDecoration(
+            color: AppTheme.primary.withValues(alpha: 0.15),
+            shape: BoxShape.circle,
+          ),
+          child: Text(
+            stepNumber,
+            style: TextStyle(
+              fontSize: 11,
+              fontWeight: FontWeight.bold,
+              color: AppTheme.primary,
+            ),
+          ),
+        ),
+        const SizedBox(width: 10),
+        Expanded(
+          child: Text(
+            instruction,
+            style: TextStyle(fontSize: 12, color: AppTheme.text),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildDisconnectedCredentialsCard() {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: AppTheme.background,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: AppTheme.border),
+      ),
+      child: Column(
+        children: [
+          _buildInfoRow(Icons.wifi, 'Required Wi-Fi SSID', _hubStatus.ssid),
+          const Divider(height: 16),
+          _buildInfoRow(Icons.lock_outline, 'Wi-Fi Password', _hubStatus.password),
+          const Divider(height: 16),
+          _buildInfoRow(Icons.language, 'Hub IP Gateway', _hubStatus.ipAddress),
+          const SizedBox(height: 12),
+          SizedBox(
+            width: double.infinity,
+            child: OutlinedButton.icon(
+              onPressed: () {
+                Clipboard.setData(ClipboardData(
+                  text: 'SSID: ${_hubStatus.ssid} | Password: ${_hubStatus.password}',
+                ));
+                AppToast.showSuccess(context, 'Wi-Fi credentials copied to clipboard!');
+              },
+              icon: const Icon(Icons.copy, size: 16),
+              label: const Text('Copy Wi-Fi Password', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
+              style: OutlinedButton.styleFrom(
+                foregroundColor: AppTheme.text,
+                side: BorderSide(color: AppTheme.border),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+              ),
+            ),
+          ),
         ],
       ),
     );
@@ -939,89 +1557,7 @@ class _TeacherEsp32HubModalState extends State<TeacherEsp32HubModal>
     );
   }
 
-  Widget _buildHardwareGuideTab() {
-    return SingleChildScrollView(
-      padding: const EdgeInsets.all(20),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            'Wiring & Pinout Reference (MicroSD SPI Module)',
-            style: TextStyle(
-              fontSize: 16,
-              fontWeight: FontWeight.bold,
-              color: AppTheme.text,
-            ),
-          ),
-          const SizedBox(height: 6),
-          Text(
-            'Connect your MicroSD Card Module to your ESP32 DevKit using standard SPI pins as shown below:',
-            style: TextStyle(fontSize: 12, color: AppTheme.textSecondary, height: 1.4),
-          ),
-          const SizedBox(height: 16),
-
-          // Pinout Table
-          Container(
-            decoration: BoxDecoration(
-              color: AppTheme.background,
-              borderRadius: BorderRadius.circular(12),
-              border: Border.all(color: AppTheme.border),
-            ),
-            child: Column(
-              children: [
-                _buildPinRow('MicroSD Pin', 'ESP32 DevKit Pin', 'Function', isHeader: true),
-                const Divider(height: 1),
-                _buildPinRow('VCC', '3.3V or 5V', 'Power supply'),
-                const Divider(height: 1),
-                _buildPinRow('GND', 'GND', 'Ground'),
-                const Divider(height: 1),
-                _buildPinRow('CS / SS', 'GPIO 5', 'Chip Select'),
-                const Divider(height: 1),
-                _buildPinRow('MOSI', 'GPIO 23', 'Data In'),
-                const Divider(height: 1),
-                _buildPinRow('SCK / CLK', 'GPIO 18', 'SPI Clock'),
-                const Divider(height: 1),
-                _buildPinRow('MISO', 'GPIO 19', 'Data Out'),
-              ],
-            ),
-          ),
-
-          const SizedBox(height: 20),
-
-          // How It Operates
-          Text(
-            'How the Offline Classroom Station Works',
-            style: TextStyle(
-              fontSize: 14,
-              fontWeight: FontWeight.bold,
-              color: AppTheme.text,
-            ),
-          ),
-          const SizedBox(height: 10),
-          _buildStepCard(
-            '1. Standalone Wi-Fi SoftAP',
-            'The ESP32 broadcasts a private Wi-Fi network with no router or internet connection needed. Up to 4–8 students can connect simultaneously to download.',
-            Icons.wifi_tethering,
-          ),
-          const SizedBox(height: 8),
-          _buildStepCard(
-            '2. MicroSD File Server',
-            'Materials (PDFs, quizzes) uploaded by the teacher are saved directly into the MicroSD card. Fast SPI streaming delivers files directly to student devices.',
-            Icons.sd_card,
-          ),
-          const SizedBox(height: 8),
-          _buildStepCard(
-            '3. Zero Data Cost for Students',
-            'Students scan the QR code to auto-connect to the hub and sync modules directly into their offline library with 0 MB cellular data used.',
-            Icons.offline_pin,
-          ),
-          const SizedBox(height: 20),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildInfoRow(IconData icon, String label, String value) {
+  Widget _buildInfoRow(IconData icon, String label, String value, {Widget? trailing}) {
     return Row(
       children: [
         Icon(icon, size: 18, color: AppTheme.primary),
@@ -1036,71 +1572,11 @@ class _TeacherEsp32HubModalState extends State<TeacherEsp32HubModal>
             color: AppTheme.text,
           ),
         ),
+        if (trailing != null) ...[
+          const SizedBox(width: 8),
+          trailing,
+        ],
       ],
-    );
-  }
-
-  Widget _buildPinRow(String pin1, String pin2, String desc, {bool isHeader = false}) {
-    final style = TextStyle(
-      fontSize: 12,
-      fontWeight: isHeader ? FontWeight.bold : FontWeight.normal,
-      color: isHeader ? AppTheme.primary : AppTheme.text,
-    );
-
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-      child: Row(
-        children: [
-          Expanded(flex: 2, child: Text(pin1, style: style)),
-          Expanded(flex: 3, child: Text(pin2, style: style)),
-          Expanded(flex: 3, child: Text(desc, style: TextStyle(fontSize: 11, color: AppTheme.textSecondary))),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildStepCard(String title, String desc, IconData icon) {
-    return Container(
-      padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(
-        color: AppTheme.background,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: AppTheme.border),
-      ),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Container(
-            padding: const EdgeInsets.all(8),
-            decoration: BoxDecoration(
-              color: AppTheme.primary.withValues(alpha: 0.15),
-              borderRadius: BorderRadius.circular(8),
-            ),
-            child: Icon(icon, color: AppTheme.primary, size: 20),
-          ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  title,
-                  style: TextStyle(
-                    fontSize: 13,
-                    fontWeight: FontWeight.bold,
-                    color: AppTheme.text,
-                  ),
-                ),
-                const SizedBox(height: 2),
-                Text(
-                  desc,
-                  style: TextStyle(fontSize: 11, color: AppTheme.textSecondary, height: 1.4),
-                ),
-              ],
-            ),
-          ),
-        ],
-      ),
     );
   }
 }

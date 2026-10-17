@@ -141,7 +141,7 @@ class _SavedOfflineMaterialsModalState extends State<SavedOfflineMaterialsModal>
     showDialog(
       context: context,
       barrierDismissible: true,
-      builder: (ctx) => _OfflineMaterialReaderDialog(item: item),
+      builder: (ctx) => OfflineMaterialReaderDialog(item: item),
     );
   }
 
@@ -699,16 +699,16 @@ class _SavedOfflineMaterialsModalState extends State<SavedOfflineMaterialsModal>
 }
 
 /// Interactive Reader Dialog for reading modules, reviewing PDFs, or taking diagnostic quizzes offline.
-class _OfflineMaterialReaderDialog extends StatefulWidget {
+class OfflineMaterialReaderDialog extends StatefulWidget {
   final HubMaterialItem item;
 
-  const _OfflineMaterialReaderDialog({required this.item});
+  const OfflineMaterialReaderDialog({super.key, required this.item});
 
   @override
-  State<_OfflineMaterialReaderDialog> createState() => _OfflineMaterialReaderDialogState();
+  State<OfflineMaterialReaderDialog> createState() => _OfflineMaterialReaderDialogState();
 }
 
-class _OfflineMaterialReaderDialogState extends State<_OfflineMaterialReaderDialog> {
+class _OfflineMaterialReaderDialogState extends State<OfflineMaterialReaderDialog> {
   final Map<int, String> _quizAnswers = {};
   bool _quizSubmitted = false;
   int _score = 0;

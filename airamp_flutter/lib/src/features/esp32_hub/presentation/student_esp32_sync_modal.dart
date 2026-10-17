@@ -55,10 +55,100 @@ class _StudentEsp32SyncModalState extends State<StudentEsp32SyncModal>
   HubQrPayload? _scannedPayload;
   HubSyncManifest? _manifest;
   List<HubMaterialItem> _itemsToDownload = [];
+  Set<String> _selectedItemIds = {};
+  String _selectedTypeFilter = 'all';
   int _completedDownloads = 0;
   String _activeDownloadTitle = '';
   double _overallProgress = 0.0;
   bool _isReconnecting = false;
+
+  int get _selectedTotalBytes {
+    if (_manifest == null) return 0;
+    return _manifest!.items
+        .where((item) => _selectedItemIds.contains(item.id))
+        .fold(0, (sum, item) => sum + item.sizeBytes);
+  }
+
+  String _formatSize(int bytes) {
+    if (bytes < 1024) return '$bytes B';
+    if (bytes < 1024 * 1024) {
+      return '${(bytes / 1024).toStringAsFixed(1)} KB';
+    }
+    return '${(bytes / (1024 * 1024)).toStringAsFixed(1)} MB';
+  }
+
+  String _getItemCategory(HubMaterialItem item) {
+    final name = (item.fileName ?? item.title).toLowerCase();
+    if (name.endsWith('.pdf') || item.fileType == HubFileType.pdf) {
+      return 'pdf';
+    }
+    if (name.endsWith('.html') || name.endsWith('.htm')) {
+      return 'html';
+    }
+    if (name.endsWith('.json') || item.fileType == HubFileType.quiz) {
+      return 'quiz';
+    }
+    if (name.endsWith('.doc') || name.endsWith('.docx') || item.fileType == HubFileType.doc) {
+      return 'doc';
+    }
+    return 'module';
+  }
+
+  String _getCategoryTitle(String category) {
+    switch (category) {
+      case 'pdf':
+        return 'PDF Documents';
+      case 'html':
+        return 'HTML & Web Pages';
+      case 'quiz':
+        return 'Interactive Quizzes';
+      case 'doc':
+        return 'Word & Text Docs';
+      case 'module':
+      default:
+        return 'Curriculum Modules';
+    }
+  }
+
+  IconData _getCategoryIcon(String category) {
+    switch (category) {
+      case 'pdf':
+        return Icons.picture_as_pdf_rounded;
+      case 'html':
+        return Icons.language_rounded;
+      case 'quiz':
+        return Icons.assignment_turned_in_rounded;
+      case 'doc':
+        return Icons.description_rounded;
+      case 'module':
+      default:
+        return Icons.menu_book_rounded;
+    }
+  }
+
+  Color _getCategoryColor(String category) {
+    switch (category) {
+      case 'pdf':
+        return const Color(0xFFEF4444);
+      case 'html':
+        return const Color(0xFF3B82F6);
+      case 'quiz':
+        return const Color(0xFFF59E0B);
+      case 'doc':
+        return const Color(0xFF6366F1);
+      case 'module':
+      default:
+        return AppTheme.primary;
+    }
+  }
+
+  Color _getFileColor(HubMaterialItem item) {
+    return _getCategoryColor(_getItemCategory(item));
+  }
+
+  IconData _getFileIcon(HubMaterialItem item) {
+    return _getCategoryIcon(_getItemCategory(item));
+  }
 
   @override
   void initState() {
@@ -111,6 +201,8 @@ class _StudentEsp32SyncModalState extends State<StudentEsp32SyncModal>
       setState(() {
         _manifest = manifest;
         _itemsToDownload = List.from(manifest.items);
+        _selectedItemIds = manifest.items.map((e) => e.id).toSet();
+        _selectedTypeFilter = 'all';
         _currentStep = _SyncStep.manifest;
       });
 
@@ -133,6 +225,8 @@ class _StudentEsp32SyncModalState extends State<StudentEsp32SyncModal>
       setState(() {
         _manifest = fallbackManifest;
         _itemsToDownload = [];
+        _selectedItemIds = {};
+        _selectedTypeFilter = 'all';
         _currentStep = _SyncStep.manifest;
       });
 
@@ -143,16 +237,23 @@ class _StudentEsp32SyncModalState extends State<StudentEsp32SyncModal>
     }
   }
 
-  /// Downloads all curriculum files from the ESP32 SD card into local phone storage
-  Future<void> _startOfflineDownload() async {
-    if (_itemsToDownload.isEmpty) {
-      AppToast.showInfo(context, 'No materials to download.');
+  /// Downloads selected curriculum files from the ESP32 SD card into local phone storage
+  Future<void> _startOfflineDownload({List<HubMaterialItem>? targetItems}) async {
+    final targets = targetItems ??
+        (_manifest?.items
+            .where((item) => _selectedItemIds.contains(item.id))
+            .toList() ??
+            []);
+
+    if (targets.isEmpty) {
+      AppToast.showInfo(context, 'Please select at least one material to download.');
       return;
     }
 
     final ip = _scannedPayload?.ipAddress ?? _ipController.text;
 
     setState(() {
+      _itemsToDownload = List.from(targets);
       _currentStep = _SyncStep.downloading;
       _completedDownloads = 0;
       _overallProgress = 0.0;
@@ -206,7 +307,7 @@ class _StudentEsp32SyncModalState extends State<StudentEsp32SyncModal>
 
     AppToast.showSuccess(
       context,
-      'All materials saved offline! Ready to study without internet.',
+      '${savedResults.length} ${savedResults.length == 1 ? 'material' : 'materials'} saved offline! Ready to study without internet.',
     );
     widget.onSyncCompleted?.call();
   }
@@ -653,8 +754,326 @@ class _StudentEsp32SyncModalState extends State<StudentEsp32SyncModal>
     );
   }
 
+  Widget _buildTypeFilterChip(String key, String label, IconData icon, Color color) {
+    final isSelected = _selectedTypeFilter == key;
+    return InkWell(
+      onTap: () {
+        setState(() {
+          _selectedTypeFilter = key;
+        });
+      },
+      borderRadius: BorderRadius.circular(10),
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 150),
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+        decoration: BoxDecoration(
+          color: isSelected ? color.withValues(alpha: 0.15) : AppTheme.background,
+          borderRadius: BorderRadius.circular(10),
+          border: Border.all(
+            color: isSelected ? color : AppTheme.border,
+            width: isSelected ? 1.5 : 1.0,
+          ),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(
+              icon,
+              size: 14,
+              color: isSelected ? color : AppTheme.textMuted,
+            ),
+            const SizedBox(width: 6),
+            Text(
+              label,
+              style: TextStyle(
+                fontSize: 11.5,
+                fontWeight: isSelected ? FontWeight.bold : FontWeight.w500,
+                color: isSelected ? color : AppTheme.textSecondary,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildCategorySectionHeader(String category, List<HubMaterialItem> items) {
+    final color = _getCategoryColor(category);
+    final icon = _getCategoryIcon(category);
+    final title = _getCategoryTitle(category);
+    final allCategorySelected = items.isNotEmpty && items.every((i) => _selectedItemIds.contains(i.id));
+
+    return Padding(
+      padding: const EdgeInsets.only(top: 10, bottom: 8),
+      child: Row(
+        children: [
+          Container(
+            padding: const EdgeInsets.all(5),
+            decoration: BoxDecoration(
+              color: color.withValues(alpha: 0.12),
+              borderRadius: BorderRadius.circular(6),
+            ),
+            child: Icon(icon, size: 14, color: color),
+          ),
+          const SizedBox(width: 8),
+          Text(
+            title,
+            style: TextStyle(
+              fontSize: 13,
+              fontWeight: FontWeight.bold,
+              color: AppTheme.text,
+            ),
+          ),
+          const SizedBox(width: 6),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1.5),
+            decoration: BoxDecoration(
+              color: color.withValues(alpha: 0.15),
+              borderRadius: BorderRadius.circular(10),
+            ),
+            child: Text(
+              '${items.length}',
+              style: TextStyle(
+                fontSize: 10,
+                fontWeight: FontWeight.bold,
+                color: color,
+              ),
+            ),
+          ),
+          const Spacer(),
+          TextButton(
+            onPressed: () {
+              setState(() {
+                if (allCategorySelected) {
+                  for (final item in items) {
+                    _selectedItemIds.remove(item.id);
+                  }
+                } else {
+                  for (final item in items) {
+                    _selectedItemIds.add(item.id);
+                  }
+                }
+              });
+            },
+            style: TextButton.styleFrom(
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+              visualDensity: VisualDensity.compact,
+            ),
+            child: Text(
+              allCategorySelected ? 'Deselect Category' : 'Select Category',
+              style: TextStyle(
+                fontSize: 11,
+                fontWeight: FontWeight.bold,
+                color: color,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildMaterialItemCard(HubMaterialItem item, Set<String> savedItemIds) {
+    final isSelected = _selectedItemIds.contains(item.id);
+    final isSaved = savedItemIds.contains(item.id);
+    final fileColor = _getFileColor(item);
+    final fileIcon = _getFileIcon(item);
+
+    return InkWell(
+      onTap: () {
+        setState(() {
+          if (isSelected) {
+            _selectedItemIds.remove(item.id);
+          } else {
+            _selectedItemIds.add(item.id);
+          }
+        });
+      },
+      borderRadius: BorderRadius.circular(12),
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 150),
+        margin: const EdgeInsets.only(bottom: 8),
+        padding: const EdgeInsets.all(12),
+        decoration: BoxDecoration(
+          color: isSelected
+              ? AppTheme.primarySoft.withValues(alpha: 0.3)
+              : AppTheme.background,
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(
+            color: isSelected
+                ? AppTheme.primary.withValues(alpha: 0.7)
+                : AppTheme.border,
+            width: isSelected ? 1.5 : 1.0,
+          ),
+        ),
+        child: Row(
+          children: [
+            // Selection Checkbox
+            SizedBox(
+              width: 24,
+              height: 24,
+              child: Checkbox(
+                value: isSelected,
+                activeColor: AppTheme.primary,
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(4)),
+                onChanged: (val) {
+                  setState(() {
+                    if (val == true) {
+                      _selectedItemIds.add(item.id);
+                    } else {
+                      _selectedItemIds.remove(item.id);
+                    }
+                  });
+                },
+              ),
+            ),
+            const SizedBox(width: 10),
+
+            // File Type Icon
+            Container(
+              padding: const EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                color: fileColor.withValues(alpha: 0.12),
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: Icon(
+                fileIcon,
+                size: 20,
+                color: fileColor,
+              ),
+            ),
+            const SizedBox(width: 12),
+
+            // Title & Subject/Size
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    item.title,
+                    style: TextStyle(
+                      fontSize: 13,
+                      fontWeight: isSelected ? FontWeight.bold : FontWeight.w600,
+                      color: AppTheme.text,
+                    ),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                  const SizedBox(height: 2),
+                  Row(
+                    children: [
+                      Text(
+                        '${item.subjectName} • ${item.formattedSize}',
+                        style: TextStyle(fontSize: 11, color: AppTheme.textSecondary),
+                      ),
+                      if (isSaved) ...[
+                        const SizedBox(width: 6),
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
+                          decoration: BoxDecoration(
+                            color: AppTheme.success.withValues(alpha: 0.15),
+                            borderRadius: BorderRadius.circular(4),
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(Icons.check_circle, size: 10, color: AppTheme.success),
+                              const SizedBox(width: 2),
+                              Text(
+                                'Saved',
+                                style: TextStyle(
+                                  fontSize: 9.5,
+                                  fontWeight: FontWeight.bold,
+                                  color: AppTheme.success,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ],
+                  ),
+                ],
+              ),
+            ),
+
+            // Quick Download Button for this specific file
+            Tooltip(
+              message: isSaved ? 'Re-download this file' : 'Download this file only',
+              child: InkWell(
+                onTap: () => _startOfflineDownload(targetItems: [item]),
+                borderRadius: BorderRadius.circular(8),
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                  decoration: BoxDecoration(
+                    color: isSaved
+                        ? AppTheme.surfaceLight
+                        : AppTheme.primarySoft,
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(
+                      color: isSaved
+                          ? AppTheme.border
+                          : AppTheme.primary.withValues(alpha: 0.3),
+                    ),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(
+                        isSaved ? Icons.check : Icons.download_rounded,
+                        size: 14,
+                        color: isSaved ? AppTheme.success : AppTheme.primary,
+                      ),
+                      const SizedBox(width: 4),
+                      Text(
+                        isSaved ? 'Sync' : 'Get',
+                        style: TextStyle(
+                          fontSize: 11,
+                          fontWeight: FontWeight.bold,
+                          color: isSaved ? AppTheme.success : AppTheme.primary,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   Widget _buildManifestView() {
     final manifest = _manifest!;
+    final savedItemIds = SavedMaterialsService.instance.savedMaterialsNotifier.value
+        .map((e) => e.id)
+        .toSet();
+
+    // Group items by category to segregate them cleanly
+    final grouped = <String, List<HubMaterialItem>>{};
+    for (final item in manifest.items) {
+      final cat = _getItemCategory(item);
+      grouped.putIfAbsent(cat, () => []).add(item);
+    }
+
+    // Determine filtered groups
+    final filteredGroups = _selectedTypeFilter == 'all'
+        ? grouped
+        : {
+            if (grouped.containsKey(_selectedTypeFilter))
+              _selectedTypeFilter: grouped[_selectedTypeFilter]!,
+          };
+
+    final visibleItems = filteredGroups.values.expand((list) => list).toList();
+    final allVisibleSelected = visibleItems.isNotEmpty &&
+        visibleItems.every((item) => _selectedItemIds.contains(item.id));
+
+    final pdfCount = grouped['pdf']?.length ?? 0;
+    final htmlCount = grouped['html']?.length ?? 0;
+    final quizCount = grouped['quiz']?.length ?? 0;
+    final moduleCount = grouped['module']?.length ?? 0;
+    final docCount = grouped['doc']?.length ?? 0;
 
     return SingleChildScrollView(
       padding: const EdgeInsets.all(20),
@@ -697,17 +1116,142 @@ class _StudentEsp32SyncModalState extends State<StudentEsp32SyncModal>
           ),
           const SizedBox(height: 18),
 
-          Text(
-            'Available Classroom Materials (${_itemsToDownload.length})',
-            style: TextStyle(
-              fontSize: 15,
-              fontWeight: FontWeight.bold,
-              color: AppTheme.text,
-            ),
+          // Header with Select All / Deselect All
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            crossAxisAlignment: CrossAxisAlignment.center,
+            children: [
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Available Classroom Materials (${manifest.items.length})',
+                      style: TextStyle(
+                        fontSize: 15,
+                        fontWeight: FontWeight.bold,
+                        color: AppTheme.text,
+                      ),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      _selectedItemIds.isEmpty
+                          ? 'Tap materials or categories to select'
+                          : '${_selectedItemIds.length} of ${manifest.items.length} selected (${_formatSize(_selectedTotalBytes)})',
+                      style: TextStyle(
+                        fontSize: 11,
+                        color: _selectedItemIds.isEmpty ? AppTheme.textMuted : AppTheme.primary,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              if (visibleItems.isNotEmpty)
+                TextButton.icon(
+                  onPressed: () {
+                    setState(() {
+                      if (allVisibleSelected) {
+                        for (final item in visibleItems) {
+                          _selectedItemIds.remove(item.id);
+                        }
+                      } else {
+                        for (final item in visibleItems) {
+                          _selectedItemIds.add(item.id);
+                        }
+                      }
+                    });
+                  },
+                  icon: Icon(
+                    allVisibleSelected
+                        ? Icons.remove_done_rounded
+                        : Icons.done_all_rounded,
+                    size: 16,
+                    color: AppTheme.primary,
+                  ),
+                  label: Text(
+                    allVisibleSelected
+                        ? (_selectedTypeFilter == 'all' ? 'Deselect All' : 'Deselect Category')
+                        : (_selectedTypeFilter == 'all' ? 'Select All' : 'Select Category'),
+                    style: TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.bold,
+                      color: AppTheme.primary,
+                    ),
+                  ),
+                  style: TextButton.styleFrom(
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                    visualDensity: VisualDensity.compact,
+                  ),
+                ),
+            ],
           ),
-          const SizedBox(height: 8),
+          const SizedBox(height: 12),
 
-          if (_itemsToDownload.isEmpty)
+          // Filter of specific type of files
+          if (manifest.items.isNotEmpty) ...[
+            SingleChildScrollView(
+              scrollDirection: Axis.horizontal,
+              child: Row(
+                children: [
+                  _buildTypeFilterChip(
+                    'all',
+                    'All (${manifest.items.length})',
+                    Icons.grid_view_rounded,
+                    AppTheme.primary,
+                  ),
+                  if (pdfCount > 0) ...[
+                    const SizedBox(width: 8),
+                    _buildTypeFilterChip(
+                      'pdf',
+                      'PDFs ($pdfCount)',
+                      Icons.picture_as_pdf_rounded,
+                      const Color(0xFFEF4444),
+                    ),
+                  ],
+                  if (htmlCount > 0) ...[
+                    const SizedBox(width: 8),
+                    _buildTypeFilterChip(
+                      'html',
+                      'HTML / Web ($htmlCount)',
+                      Icons.language_rounded,
+                      const Color(0xFF3B82F6),
+                    ),
+                  ],
+                  if (quizCount > 0) ...[
+                    const SizedBox(width: 8),
+                    _buildTypeFilterChip(
+                      'quiz',
+                      'Quizzes ($quizCount)',
+                      Icons.assignment_turned_in_rounded,
+                      const Color(0xFFF59E0B),
+                    ),
+                  ],
+                  if (moduleCount > 0) ...[
+                    const SizedBox(width: 8),
+                    _buildTypeFilterChip(
+                      'module',
+                      'Modules ($moduleCount)',
+                      Icons.menu_book_rounded,
+                      AppTheme.primary,
+                    ),
+                  ],
+                  if (docCount > 0) ...[
+                    const SizedBox(width: 8),
+                    _buildTypeFilterChip(
+                      'doc',
+                      'Docs ($docCount)',
+                      Icons.description_rounded,
+                      const Color(0xFF6366F1),
+                    ),
+                  ],
+                ],
+              ),
+            ),
+            const SizedBox(height: 14),
+          ],
+
+          if (manifest.items.isEmpty)
             Container(
               padding: const EdgeInsets.all(24),
               alignment: Alignment.center,
@@ -716,99 +1260,80 @@ class _StudentEsp32SyncModalState extends State<StudentEsp32SyncModal>
                 style: TextStyle(color: AppTheme.textMuted, fontSize: 13),
               ),
             )
+          else if (filteredGroups.isEmpty)
+            Container(
+              padding: const EdgeInsets.all(28),
+              alignment: Alignment.center,
+              decoration: BoxDecoration(
+                color: AppTheme.background,
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: AppTheme.border),
+              ),
+              child: Column(
+                children: [
+                  Icon(Icons.filter_list_off_rounded, size: 36, color: AppTheme.textMuted),
+                  const SizedBox(height: 8),
+                  Text(
+                    'No files found for this filter.',
+                    style: TextStyle(color: AppTheme.textSecondary, fontSize: 13),
+                  ),
+                ],
+              ),
+            )
           else
-            ..._itemsToDownload.map((item) {
-              return Container(
-                margin: const EdgeInsets.only(bottom: 8),
-                padding: const EdgeInsets.all(12),
-                decoration: BoxDecoration(
-                  color: AppTheme.background,
-                  borderRadius: BorderRadius.circular(12),
-                  border: Border.all(color: AppTheme.border),
-                ),
-                child: Row(
-                  children: [
-                    Container(
-                      padding: const EdgeInsets.all(8),
-                      decoration: BoxDecoration(
-                        color: AppTheme.surfaceLight,
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                      child: Icon(
-                        item.fileType == HubFileType.pdf
-                            ? Icons.picture_as_pdf
-                            : item.fileType == HubFileType.quiz
-                                ? Icons.assignment
-                                : Icons.menu_book,
-                        size: 20,
-                        color: item.fileType == HubFileType.pdf
-                            ? AppTheme.error
-                            : item.fileType == HubFileType.quiz
-                                ? AppTheme.warning
-                                : AppTheme.primary,
-                      ),
-                    ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            item.title,
-                            style: TextStyle(
-                              fontSize: 13,
-                              fontWeight: FontWeight.bold,
-                              color: AppTheme.text,
-                            ),
-                          ),
-                          Text(
-                            '${item.subjectName} • ${item.formattedSize}',
-                            style: TextStyle(fontSize: 11, color: AppTheme.textSecondary),
-                          ),
-                        ],
-                      ),
-                    ),
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                      decoration: BoxDecoration(
-                        color: AppTheme.primarySoft,
-                        borderRadius: BorderRadius.circular(6),
-                      ),
-                      child: Text(
-                        'Ready to Sync',
-                        style: TextStyle(
-                          fontSize: 10,
-                          fontWeight: FontWeight.bold,
-                          color: AppTheme.primary,
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              );
+            ...filteredGroups.entries.expand((entry) {
+              final cat = entry.key;
+              final catItems = entry.value;
+
+              return [
+                _buildCategorySectionHeader(cat, catItems),
+                ...catItems.map((item) => _buildMaterialItemCard(item, savedItemIds)),
+                const SizedBox(height: 8),
+              ];
             }),
 
-          const SizedBox(height: 20),
+          const SizedBox(height: 12),
 
           // Download CTA
-          if (_itemsToDownload.isNotEmpty)
+          if (manifest.items.isNotEmpty) ...[
             SizedBox(
               width: double.infinity,
               height: 48,
               child: ElevatedButton.icon(
-                onPressed: _startOfflineDownload,
-                icon: const Icon(Icons.download, size: 20),
+                onPressed: _selectedItemIds.isEmpty ? null : () => _startOfflineDownload(),
+                icon: Icon(
+                  _selectedItemIds.isEmpty
+                      ? Icons.file_download_off_outlined
+                      : Icons.download_rounded,
+                  size: 20,
+                ),
                 label: Text(
-                  'Download & Save All Offline (${_itemsToDownload.length})',
+                  _selectedItemIds.isEmpty
+                      ? 'Select Files to Download'
+                      : _selectedItemIds.length == manifest.items.length
+                          ? 'Download All Offline (${manifest.items.length})'
+                          : 'Download Selected (${_selectedItemIds.length})',
                   style: const TextStyle(fontSize: 15, fontWeight: FontWeight.bold),
                 ),
                 style: ElevatedButton.styleFrom(
                   backgroundColor: AppTheme.primary,
                   foregroundColor: Colors.white,
+                  disabledBackgroundColor: AppTheme.border,
+                  disabledForegroundColor: AppTheme.textMuted,
                   shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                 ),
               ),
             ),
+            if (_selectedItemIds.isNotEmpty) ...[
+              const SizedBox(height: 8),
+              Center(
+                child: Text(
+                  '${_selectedItemIds.length} of ${manifest.items.length} files selected (${_formatSize(_selectedTotalBytes)}) · Zero mobile data needed',
+                  style: TextStyle(fontSize: 11, color: AppTheme.textMuted),
+                ),
+              ),
+            ],
+          ],
           const SizedBox(height: 20),
         ],
       ),
@@ -896,7 +1421,7 @@ class _StudentEsp32SyncModalState extends State<StudentEsp32SyncModal>
           ),
           const SizedBox(height: 6),
           Text(
-            'All ${_itemsToDownload.length} materials from your teacher have been safely stored on your device. You can browse, read PDFs, and take quizzes offline anytime.',
+            '${_itemsToDownload.length} ${_itemsToDownload.length == 1 ? 'material' : 'materials'} from your teacher ${(_itemsToDownload.length == 1 ? 'has' : 'have')} been safely stored on your device. You can browse, read, and take quizzes offline anytime.',
             textAlign: TextAlign.center,
             style: TextStyle(fontSize: 13, color: AppTheme.textSecondary, height: 1.4),
           ),
@@ -929,10 +1454,25 @@ class _StudentEsp32SyncModalState extends State<StudentEsp32SyncModal>
               Expanded(
                 child: OutlinedButton.icon(
                   onPressed: () {
-                    Navigator.pop(context);
+                    if (_manifest != null && _manifest!.items.isNotEmpty) {
+                      setState(() {
+                        _currentStep = _SyncStep.manifest;
+                      });
+                    } else {
+                      Navigator.pop(context);
+                    }
                   },
-                  icon: const Icon(Icons.close, size: 16),
-                  label: const Text('Close'),
+                  icon: Icon(
+                    _manifest != null && _manifest!.items.isNotEmpty
+                        ? Icons.arrow_back_rounded
+                        : Icons.close,
+                    size: 16,
+                  ),
+                  label: Text(
+                    _manifest != null && _manifest!.items.isNotEmpty
+                        ? 'Download More'
+                        : 'Close',
+                  ),
                   style: OutlinedButton.styleFrom(
                     foregroundColor: AppTheme.textSecondary,
                     side: BorderSide(color: AppTheme.border),

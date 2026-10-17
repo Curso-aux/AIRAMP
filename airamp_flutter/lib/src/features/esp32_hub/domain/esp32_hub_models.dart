@@ -253,13 +253,17 @@ class HubSyncManifest {
 
   factory HubSyncManifest.fromJson(Map<String, dynamic> json, {String? qrPayload}) {
     final rawItems = json['items'] as List<dynamic>? ?? [];
+    final extractedQr = (qrPayload != null && qrPayload.isNotEmpty)
+        ? qrPayload
+        : (json['qrPayload'] as String? ?? '');
+
     return HubSyncManifest(
       hubId: json['hubId'] as String? ?? 'AIRAMP-HUB-01',
       hubName: json['hubName'] as String? ?? 'AIRA Classroom Station',
       teacherName: json['teacherName'] as String? ?? 'Faculty Instructor',
       sectionName: json['sectionName'] as String? ?? 'General Section',
       generatedAt: json['generatedAt'] as String? ?? DateTime.now().toIso8601String(),
-      qrPayload: qrPayload ?? '',
+      qrPayload: extractedQr,
       items: rawItems
           .map((item) => HubMaterialItem.fromJson(item as Map<String, dynamic>))
           .toList(),
@@ -291,6 +295,7 @@ class HubSyncManifest {
     'hubName': hubName,
     'teacherName': teacherName,
     'sectionName': sectionName,
+    'qrPayload': qrPayload,
     'generatedAt': generatedAt,
     'items': items.map((e) => e.toJson()).toList(),
   };

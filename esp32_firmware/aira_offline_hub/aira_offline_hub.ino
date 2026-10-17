@@ -19,6 +19,8 @@
 #include <Adafruit_SSD1306.h>
 #include "aira_qrcode.h"
 #include <ArduinoJson.h>
+#include "soc/soc.h"
+#include "soc/rtc_cntl_reg.h"
 
 // ─── PIN DEFINITIONS ────────────────────────────────────────────────────────
 // OLED Display (I2C)
@@ -30,7 +32,7 @@
 #define SCREEN_ADDRESS 0x3C  // Common I2C address for 0.96" OLED
 
 // MicroSD Card Module (VSPI)
-#define SD_CS_PIN      5
+#define SD_CS_PIN      13
 #define SD_MOSI_PIN    23
 #define SD_CLK_PIN     18
 #define SD_MISO_PIN    19
@@ -47,6 +49,7 @@ const char* AP_PASS = "aira1234";
 Adafruit_SSD1306 display(SCREEN_WIDTH, SCREEN_HEIGHT, &Wire, OLED_RESET);
 WebServer server(80);
 QRCode qrcode;
+SPIClass spiSD(VSPI);
 
 // ─── STATE VARIABLES ────────────────────────────────────────────────────────
 enum DisplayMode {
@@ -56,6 +59,7 @@ enum DisplayMode {
 
 DisplayMode currentMode = MODE_QR;
 bool oledOn = true;
+bool oledPresent = false;
 bool sdReady = false;
 unsigned long lastButtonPress = 0;
 int lastConnectedClients = 0;
@@ -75,7 +79,7 @@ void soundBeep(int durationMs = 120, int repeatCount = 1) {
 
 // ─── DRAW MANUAL CREDENTIALS SCREEN ─────────────────────────────────────────
 void drawManualScreen() {
-  if (!oledOn) return;
+  if (!oledOn || !oledPresent) return;
 
   display.clearDisplay();
 
@@ -117,7 +121,7 @@ void drawManualScreen() {
 
 // ─── DRAW QR CODE & STATION STATS ON OLED ────────────────────────────────────
 void drawHubScreen() {
-  if (!oledOn) return;
+  if (!oledOn || !oledPresent) return;
 
   // If in Manual Mode, render the text credentials screen
   if (currentMode == MODE_MANUAL) {
@@ -177,12 +181,20 @@ void drawHubScreen() {
 
 // ─── HTTP API HANDLERS ──────────────────────────────────────────────────────
 
+bool initSDCard();
+
 // GET /api/ping -> Device handshake
 void handlePing() {
   soundBeep(80); // Quick chirp to indicate mobile client reached the hub
-  StaticJsonDocument<256> doc;
+  if (!sdReady) {
+    initSDCard();
+  }
+  StaticJsonDocument<384> doc;
   doc["status"] = "online";
   doc["hub"] = "AIRAMP-HUB-01";
+  doc["ssid"] = AP_SSID;
+  doc["password"] = AP_PASS;
+  doc["ip"] = "192.168.4.1";
   doc["sd_ready"] = sdReady;
   doc["clients"] = WiFi.softAPgetStationNum();
   if (sdReady) {
@@ -207,6 +219,10 @@ void handleSaveManifest() {
   if (!sdReady) {
     server.send(503, "application/json", "{\"status\":\"error\",\"message\":\"MicroSD module not mounted\"}");
     return;
+  }
+
+  if (SD.exists("/manifest.json")) {
+    SD.remove("/manifest.json");
   }
 
   File file = SD.open("/manifest.json", FILE_WRITE);
@@ -240,6 +256,7 @@ void handleManifest() {
   doc["hubName"] = "AIRA Offline Classroom Station";
   doc["sectionName"] = "Grade 10";
   doc["teacherName"] = "Faculty Instructor";
+  doc["qrPayload"] = QR_PAYLOAD;
 
   JsonArray items = doc.createNestedArray("items");
   JsonObject item1 = items.createNestedObject();
@@ -278,32 +295,70 @@ void handleDownload() {
     return;
   }
 
-  String filename = server.arg("file");
-  if (!filename.startsWith("/")) {
-    filename = "/modules/" + filename;
+  String rawName = server.arg("file");
+  if (!rawName.startsWith("/")) {
+    rawName = "/" + rawName;
   }
 
-  if (!sdReady || !SD.exists(filename)) {
-    server.send(404, "text/plain", "File not found on SD card: " + filename);
+  String targetPath = "";
+  if (sdReady) {
+    if (SD.exists("/modules" + rawName)) {
+      targetPath = "/modules" + rawName;
+    } else if (SD.exists(rawName)) {
+      targetPath = rawName;
+    } else if (rawName.startsWith("/modules/") && SD.exists(rawName.substring(8))) {
+      targetPath = rawName.substring(8);
+    }
+  }
+
+  if (targetPath == "" || !SD.exists(targetPath)) {
+    server.send(404, "text/plain", "File not found on SD card: " + rawName);
     return;
   }
 
-  File file = SD.open(filename, FILE_READ);
+  File file = SD.open(targetPath, FILE_READ);
   if (!file) {
     server.send(500, "text/plain", "Failed to open file");
     return;
   }
 
   String contentType = "application/octet-stream";
-  if (filename.endsWith(".pdf")) contentType = "application/pdf";
-  else if (filename.endsWith(".json")) contentType = "application/json";
-  else if (filename.endsWith(".txt")) contentType = "text/plain";
+  if (targetPath.endsWith(".pdf")) contentType = "application/pdf";
+  else if (targetPath.endsWith(".json")) contentType = "application/json";
+  else if (targetPath.endsWith(".txt")) contentType = "text/plain";
+  else if (targetPath.endsWith(".html") || targetPath.endsWith(".htm")) contentType = "text/html";
 
   server.streamFile(file, contentType);
   file.close();
 
   // Play a happy 2-tone beep upon successful download transfer!
   soundBeep(80, 2);
+}
+
+// POST or GET /api/delete?file=filename.pdf -> Deletes file from MicroSD
+void handleDeleteFile() {
+  if (!server.hasArg("file")) {
+    server.send(400, "application/json", "{\"status\":\"error\",\"message\":\"Missing 'file' parameter\"}");
+    return;
+  }
+
+  String filename = server.arg("file");
+  bool removed = false;
+
+  if (sdReady) {
+    String modPath = filename.startsWith("/") ? filename : ("/modules/" + filename);
+    if (SD.exists(modPath)) {
+      removed = SD.remove(modPath);
+    } else {
+      String rootPath = filename.startsWith("/") ? filename : ("/" + filename);
+      if (SD.exists(rootPath)) {
+        removed = SD.remove(rootPath);
+      }
+    }
+  }
+
+  soundBeep(60);
+  server.send(200, "application/json", "{\"status\":\"ok\",\"message\":\"File deleted\",\"removed\":" + String(removed ? "true" : "false") + "}");
 }
 
 // ─── WIRELESS FILE UPLOAD OVER WI-FI ────────────────────────────────────────
@@ -334,7 +389,7 @@ void handleFileUpload() {
   if (upload.status == UPLOAD_FILE_START) {
     String filename = upload.filename;
     if (!filename.startsWith("/")) {
-      if (filename.endsWith(".pdf")) {
+      if (filename.endsWith(".pdf") || filename.endsWith(".json") || filename.endsWith(".txt") || filename.endsWith(".doc") || filename.endsWith(".docx") || filename.endsWith(".html") || filename.endsWith(".htm")) {
         if (!SD.exists("/modules")) SD.mkdir("/modules");
         filename = "/modules/" + filename;
       } else {
@@ -342,6 +397,9 @@ void handleFileUpload() {
       }
     }
     Serial.printf("[Upload] Starting: %s\n", filename.c_str());
+    if (SD.exists(filename)) {
+      SD.remove(filename);
+    }
     uploadFile = SD.open(filename, FILE_WRITE);
   } else if (upload.status == UPLOAD_FILE_WRITE) {
     if (uploadFile) {
@@ -376,20 +434,75 @@ void handleRoot() {
   server.send(200, "text/html", html);
 }
 
+// ─── SD CARD INITIALIZATION & HOT-MOUNT ─────────────────────────────────────
+bool initSDCard() {
+  if (sdReady) return true;
+
+  Serial.println("[SD] Attempting MicroSD mount...");
+  Serial.printf("[SD] Pins: CS=%d, CLK=%d, MOSI=%d, MISO=%d\n", SD_CS_PIN, SD_CLK_PIN, SD_MOSI_PIN, SD_MISO_PIN);
+
+  // Single mount attempt at safe breadboard speed
+  bool mounted = SD.begin(SD_CS_PIN, spiSD, 4000000);
+
+  if (mounted) {
+    uint8_t cardType = SD.cardType();
+    Serial.printf("[SD] SD.begin() returned OK. cardType = %d\n", cardType);
+    if (cardType != CARD_NONE) {
+      sdReady = true;
+      uint64_t cardSize = SD.cardSize() / (1024 * 1024);
+      const char* typeStr = "Unknown";
+      if (cardType == CARD_MMC) typeStr = "MMC";
+      else if (cardType == CARD_SD) typeStr = "SDSC";
+      else if (cardType == CARD_SDHC) typeStr = "SDHC";
+
+      Serial.printf("[SD] MicroSD Card Mounted! Type: %s, Size: %llu MB\n", typeStr, cardSize);
+
+      if (!SD.exists("/modules")) {
+        SD.mkdir("/modules");
+      }
+
+      if (!SD.exists("/manifest.json")) {
+        File f = SD.open("/manifest.json", FILE_WRITE);
+        if (f) {
+          f.print("{\"hubId\":\"AIRAMP-HUB-01\",\"hubName\":\"AIRA Classroom Station\",\"sectionName\":\"Grade 10\",\"teacherName\":\"Faculty Instructor\",\"qrPayload\":\"WIFI:S:AIRAMP-HUB-01;T:WPA;P:aira1234;;AIRAMP:SEC=Grade 10;IP=192.168.4.1\",\"items\":[]}");
+          f.close();
+          Serial.println("[SD] Initialized clean /manifest.json on MicroSD card.");
+        }
+      }
+      return true;
+    } else {
+      Serial.println("[SD] SD.begin() OK but cardType == CARD_NONE.");
+    }
+  } else {
+    Serial.println("[SD] SD.begin() returned FAIL. Card not detected.");
+  }
+
+  sdReady = false;
+  return false;
+}
+
 // ─── SETUP ──────────────────────────────────────────────────────────────────
 void setup() {
+  WRITE_PERI_REG(RTC_CNTL_BROWN_OUT_REG, 0);
   Serial.begin(115200);
   delay(500);
-  Serial.println("\n[AIRA] Initializing ESP32 Offline Learning Hub...");
+  Serial.println("\n\n========================================");
+  Serial.println("   AIRAMP ESP32 OFFLINE HUB STARTING   ");
+  Serial.println("========================================");
+  Serial.printf("ESP32 Chip Rev: %d, CPU Freq: %d MHz\n", ESP.getChipRevision(), ESP.getCpuFreqMHz());
+  Serial.printf("Free Heap: %d bytes\n", ESP.getFreeHeap());
 
   // Setup Button & Buzzer Pins
   pinMode(BUTTON_PIN, INPUT_PULLUP);
   pinMode(BUZZER_PIN, OUTPUT);
   digitalWrite(BUZZER_PIN, LOW);
 
-  // Initialize OLED Display (I2C)
+  // Initialize OLED Display (I2C) with hardware timeout protection
   Wire.begin(I2C_SDA_PIN, I2C_SCL_PIN);
+  Wire.setTimeOut(50);
+
   if (display.begin(SSD1306_SWITCHCAPVCC, SCREEN_ADDRESS)) {
+    oledPresent = true;
     Serial.println("[OLED] Display initialized successfully.");
     display.clearDisplay();
     display.setTextColor(SSD1306_WHITE);
@@ -398,19 +511,17 @@ void setup() {
     display.println("Starting AIRA Hub...");
     display.display();
   } else {
-    Serial.println("[OLED] SSD1306 allocation failed. Check wiring!");
+    oledPresent = false;
+    Serial.println("[OLED] Display NOT detected.");
   }
 
-  // Initialize MicroSD Card (SPI)
-  SPI.begin(SD_CLK_PIN, SD_MISO_PIN, SD_MOSI_PIN, SD_CS_PIN);
-  if (SD.begin(SD_CS_PIN)) {
-    sdReady = true;
-    uint64_t cardSize = SD.cardSize() / (1024 * 1024);
-    Serial.printf("[SD] MicroSD Card Mounted! Size: %llu MB\n", cardSize);
-  } else {
-    sdReady = false;
-    Serial.println("[SD] MicroSD card not detected or mount failed. Using fallback internal memory.");
-  }
+  // Prepare SPI bus pins but DO NOT call SD.begin() yet
+  // (On ESP32 Core 3.x, SD.begin() can crash if card is missing or not FAT32)
+  pinMode(SD_CS_PIN, OUTPUT);
+  digitalWrite(SD_CS_PIN, HIGH);
+  pinMode(SD_MISO_PIN, INPUT_PULLUP);
+  spiSD.begin(SD_CLK_PIN, SD_MISO_PIN, SD_MOSI_PIN, SD_CS_PIN);
+  Serial.println("[SPI] Bus initialized. SD mount deferred to avoid boot crash.");
 
   // Start Wi-Fi SoftAP (No router / internet needed)
   WiFi.mode(WIFI_AP);
@@ -424,6 +535,8 @@ void setup() {
   server.on("/api/manifest", HTTP_GET, handleManifest);
   server.on("/api/manifest", HTTP_POST, handleSaveManifest);
   server.on("/download", handleDownload);
+  server.on("/api/delete", HTTP_POST, handleDeleteFile);
+  server.on("/api/delete", HTTP_GET, handleDeleteFile);
   server.on("/upload", HTTP_GET, handleUploadPage);
   server.on("/upload", HTTP_POST, []() {
     if (server.hasHeader("Accept") && server.header("Accept").indexOf("application/json") >= 0) {
@@ -432,7 +545,7 @@ void setup() {
       server.send(200, "text/html", "<html><body style='background:#0F172A;color:#10B981;font-family:sans-serif;text-align:center;padding:40px;'><h2>File Uploaded Successfully!</h2><p><a href='/upload' style='color:#38BDF8;'>Upload Another File</a> | <a href='/' style='color:#38BDF8;'>Back to Home</a></p></body></html>");
     }
   }, handleFileUpload);
-  server.enableCORS(true); // Allow mobile app fetch without CORS errors
+  server.enableCORS(true);
   server.begin();
   Serial.println("[HTTP] Web Server started on port 80.");
 
@@ -441,24 +554,50 @@ void setup() {
 
   // Startup Sound (Joyful 3-beep chime)
   soundBeep(70, 3);
+
+  Serial.println("\n[READY] Hub is running. SD will be tested in 10 seconds...");
+  Serial.println("[READY] Or press the BUTTON to test SD card now.\n");
 }
 
 // ─── MAIN LOOP ──────────────────────────────────────────────────────────────
 void loop() {
   server.handleClient();
 
-  // Check Button to toggle OLED screen between QR Mode and Manual Mode (debounced 250ms)
+  // Deferred SD card mount: try once after 10 seconds of stable boot
+  static bool firstSdAttemptDone = false;
+  if (!sdReady && !firstSdAttemptDone && millis() > 10000) {
+    firstSdAttemptDone = true;
+    Serial.println("\n[SD] === DEFERRED SD CARD TEST ===");
+    if (initSDCard()) {
+      Serial.println("[SD] SUCCESS! MicroSD is working!");
+      soundBeep(80, 2);
+      drawHubScreen();
+    } else {
+      Serial.println("[SD] FAILED. Check: card inserted? FAT32 format? wiring?");
+    }
+  }
+
+  // Check Button to toggle OLED screen and retry SD mount
   int btnState = digitalRead(BUTTON_PIN);
   if (btnState == LOW && (millis() - lastButtonPress > 250)) {
     lastButtonPress = millis();
+    if (!sdReady) {
+      Serial.println("\n[BUTTON] Manual SD card test...");
+      if (initSDCard()) {
+        Serial.println("[SD] SUCCESS! Card mounted on button press!");
+        soundBeep(80, 2);
+      } else {
+        Serial.println("[SD] Still not mounting. Check card & wiring.");
+      }
+    }
     if (currentMode == MODE_QR) {
       currentMode = MODE_MANUAL;
-      Serial.println("[BUTTON] Clicked! Switched to MANUAL MODE");
+      Serial.println("[BUTTON] Switched to MANUAL MODE");
     } else {
       currentMode = MODE_QR;
-      Serial.println("[BUTTON] Clicked! Switched to QR CODE MODE");
+      Serial.println("[BUTTON] Switched to QR CODE MODE");
     }
-    soundBeep(60); // Satisfying tactile click chime
+    soundBeep(60);
     drawHubScreen();
   }
 
@@ -468,7 +607,8 @@ void loop() {
     lastConnectedClients = currentClients;
     drawHubScreen();
     if (currentClients > 0) {
-      soundBeep(100); // Beep when a student connects
+      soundBeep(100);
     }
   }
 }
+

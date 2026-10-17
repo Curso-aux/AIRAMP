@@ -26,7 +26,13 @@ class Esp32ClientService {
     final cleanIp = ipAddress.trim().replaceAll(RegExp(r'^https?:\/\/'), '');
     final url = 'http://$cleanIp/api/ping';
     try {
-      final response = await _dio.get(url);
+      final response = await _dio.get(
+        url,
+        options: Options(
+          sendTimeout: const Duration(milliseconds: 2500),
+          receiveTimeout: const Duration(milliseconds: 2500),
+        ),
+      );
       if (response.statusCode == 200) {
         if (response.data is Map<String, dynamic>) {
           return response.data as Map<String, dynamic>;
@@ -35,8 +41,8 @@ class Esp32ClientService {
         }
         return {'status': 'online', 'hub': 'AIRAMP-HUB-01'};
       }
-    } catch (e) {
-      debugPrint('[Esp32ClientService] Ping to $url failed: $e');
+    } catch (_) {
+      // Quiet when offline
     }
     return null;
   }
@@ -103,7 +109,7 @@ class Esp32ClientService {
 
       if (response.statusCode == 200) {
         String? content;
-        if (fileName.endsWith('.json') || fileName.endsWith('.txt')) {
+        if (fileName.endsWith('.json') || fileName.endsWith('.txt') || fileName.endsWith('.html') || fileName.endsWith('.htm')) {
           final file = File(savePath);
           if (await file.exists()) {
             content = await file.readAsString();
@@ -138,6 +144,9 @@ class Esp32ClientService {
       final cardMb = (pingData['card_size_mb'] as num?)?.toInt() ?? 0;
       final usedBytes = (pingData['used_bytes'] as num?)?.toInt() ?? 0;
       final clients = (pingData['clients'] as num?)?.toInt() ?? 0;
+      final ssid = pingData['ssid'] as String? ?? 'AIRAMP-HUB-01';
+      final pass = pingData['password'] as String? ?? 'aira1234';
+      final cleanIp = ipAddress.trim().replaceAll(RegExp(r'^https?:\/\/'), '');
 
       return Esp32HubStatus(
         isDevKitConnected: true,
@@ -145,7 +154,9 @@ class Esp32ClientService {
         sdCardStatusText: isSd
             ? (cardMb > 0 ? '$cardMb MB Ready' : 'Mounted & Ready')
             : 'No SD Card Mounted',
-        ipAddress: ipAddress,
+        ipAddress: cleanIp,
+        ssid: ssid,
+        password: pass,
         totalStorageBytes: cardMb * 1024 * 1024,
         usedStorageBytes: usedBytes,
         connectedClients: clients,
@@ -223,6 +234,29 @@ class Esp32ClientService {
       return response.statusCode == 200;
     } catch (e) {
       debugPrint('[Esp32ClientService] Upload manifest to $url failed: $e');
+      return false;
+    }
+  }
+
+  /// Deletes a file from the ESP32 MicroSD card (/api/delete?file=...)
+  Future<bool> deleteFileFromHub({
+    required String ipAddress,
+    required String fileName,
+  }) async {
+    final cleanIp = ipAddress.trim().replaceAll(RegExp(r'^https?:\/\/'), '');
+    final url = 'http://$cleanIp/api/delete?file=$fileName';
+
+    try {
+      final response = await _dio.post(
+        url,
+        options: Options(
+          headers: {'Accept': 'application/json'},
+          sendTimeout: const Duration(seconds: 10),
+        ),
+      );
+      return response.statusCode == 200;
+    } catch (e) {
+      debugPrint('[Esp32ClientService] Delete $fileName from $url failed: $e');
       return false;
     }
   }
