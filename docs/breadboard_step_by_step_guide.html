@@ -1,0 +1,712 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>AIRA ESP32 Hub — Exact 830 Tie-Point Breadboard Visual Guide</title>
+  <style>
+    :root {
+      --bg: #090d16;
+      --card-bg: #131c2e;
+      --border: #233554;
+      --accent: #38bdf8;
+      --text: #f1f5f9;
+      --text-muted: #94a3b8;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; }
+
+    body {
+      background: var(--bg);
+      color: var(--text);
+      padding: 24px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+    }
+
+    header {
+      text-align: center;
+      max-width: 1000px;
+      margin-bottom: 20px;
+    }
+
+    h1 {
+      font-size: 2.2rem;
+      font-weight: 800;
+      background: linear-gradient(135deg, #38bdf8, #818cf8, #c084fc);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      margin-bottom: 8px;
+    }
+
+    p.subtitle {
+      color: var(--text-muted);
+      font-size: 1rem;
+      line-height: 1.5;
+    }
+
+    .kit-callout {
+      background: rgba(56, 189, 248, 0.1);
+      border: 1px solid rgba(56, 189, 248, 0.3);
+      border-radius: 12px;
+      padding: 12px 20px;
+      margin-top: 12px;
+      font-size: 0.9rem;
+      color: #bae6fd;
+      text-align: left;
+    }
+
+    /* Step Selector Pills */
+    .steps-container {
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+      justify-content: center;
+      margin: 20px 0;
+      max-width: 1200px;
+    }
+
+    .step-pill {
+      background: var(--card-bg);
+      border: 1px solid var(--border);
+      color: var(--text-muted);
+      padding: 10px 20px;
+      border-radius: 9999px;
+      font-size: 0.95rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.25s ease;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .step-pill:hover {
+      border-color: var(--accent);
+      color: #fff;
+      transform: translateY(-2px);
+    }
+
+    .step-pill.active {
+      background: linear-gradient(135deg, #0284c7, #6366f1);
+      border-color: #38bdf8;
+      color: #ffffff;
+      box-shadow: 0 0 20px rgba(56, 189, 248, 0.4);
+    }
+
+    /* Detail Card */
+    .detail-card {
+      background: var(--card-bg);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      padding: 24px;
+      max-width: 1300px;
+      width: 100%;
+      margin-bottom: 24px;
+      box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+    }
+
+    .detail-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      border-bottom: 1px solid var(--border);
+      padding-bottom: 12px;
+      margin-bottom: 16px;
+    }
+
+    .detail-title {
+      font-size: 1.4rem;
+      font-weight: 700;
+      color: var(--accent);
+    }
+
+    .cable-badge {
+      font-size: 0.8rem;
+      background: #1e293b;
+      border: 1px solid #475569;
+      color: #e2e8f0;
+      padding: 4px 12px;
+      border-radius: 6px;
+      font-weight: 600;
+    }
+
+    .detail-desc {
+      color: #cbd5e1;
+      font-size: 1rem;
+      line-height: 1.6;
+      margin-bottom: 16px;
+    }
+
+    .pin-grid {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 0.9rem;
+    }
+
+    .pin-grid th {
+      background: #0b1120;
+      color: var(--text-muted);
+      text-align: left;
+      padding: 10px 14px;
+      border-bottom: 2px solid var(--border);
+    }
+
+    .pin-grid td {
+      padding: 10px 14px;
+      border-bottom: 1px solid #1e293b;
+      color: #e2e8f0;
+    }
+
+    .pin-badge {
+      display: inline-block;
+      width: 12px;
+      height: 12px;
+      border-radius: 50%;
+      margin-right: 8px;
+      vertical-align: middle;
+    }
+
+    /* Diagram Viewer */
+    .viewer-box {
+      background: #060911;
+      border: 2px solid var(--border);
+      border-radius: 20px;
+      padding: 24px;
+      max-width: 1350px;
+      width: 100%;
+      overflow-x: auto;
+      box-shadow: 0 25px 50px rgba(0,0,0,0.7);
+      position: relative;
+    }
+
+    svg {
+      width: 100%;
+      min-width: 1200px;
+      height: auto;
+      display: block;
+    }
+
+    .comp-dimmed {
+      opacity: 0.12 !important;
+      filter: grayscale(90%);
+      transition: all 0.4s ease;
+    }
+
+    .comp-active {
+      opacity: 1 !important;
+      filter: drop-shadow(0 0 10px rgba(56, 189, 248, 0.9));
+      transition: all 0.4s ease;
+    }
+
+    .wire-line {
+      fill: none;
+      stroke-linecap: round;
+      stroke-linejoin: round;
+      transition: all 0.3s ease;
+    }
+
+    .hole-circle {
+      fill: #1e293b;
+      stroke: #334155;
+      stroke-width: 0.8;
+    }
+    
+    .hole-highlight {
+      fill: #38bdf8 !important;
+      stroke: #fff !important;
+      stroke-width: 1.5 !important;
+      animation: pulse 1.5s infinite;
+    }
+
+    @keyframes pulse {
+      0% { transform: scale(1); filter: drop-shadow(0 0 2px #38bdf8); }
+      50% { transform: scale(1.3); filter: drop-shadow(0 0 6px #38bdf8); }
+      100% { transform: scale(1); filter: drop-shadow(0 0 2px #38bdf8); }
+    }
+  </style>
+</head>
+<body>
+
+  <header>
+    <h1>AIRA ESP32 Hub — Exact 830 Tie-Point Visual Guide</h1>
+    <p class="subtitle">
+      Exact 1-to-1 match for your horizontal <strong>830 Tie-Point Breadboard</strong> (Rows 1 to 63, A–E top, F–J bottom).
+    </p>
+    <div class="kit-callout">
+      📦 <strong>Your Kit Parts Used:</strong> 830-point Breadboard, 0.96" OLED screen, Red Push Button, Active Buzzer (black resin base), MicroSD module + 16GB SanDisk card, ESP32 DevKit V1, and DuPont F-M cables. 
+      <em>(No external resistors are needed because the ESP32 and modules have built-in pullups & regulators!)</em>
+    </div>
+  </header>
+
+  <!-- Step Selection Tabs -->
+  <div class="steps-container">
+    <button class="step-pill active" onclick="showStep(1)">1. OLED Screen (First)</button>
+    <button class="step-pill" onclick="showStep(2)">2. Red Push Button (Next)</button>
+    <button class="step-pill" onclick="showStep(3)">3. Active Buzzer</button>
+    <button class="step-pill" onclick="showStep(4)">4. MicroSD Module</button>
+    <button class="step-pill" onclick="showStep(5)">5. View Complete Circuit</button>
+  </div>
+
+  <!-- Step Detail Card -->
+  <div class="detail-card" id="stepDetailCard">
+    <!-- Populated by JavaScript -->
+  </div>
+
+  <!-- SVG Visual Canvas -->
+  <div class="viewer-box">
+    <svg viewBox="0 0 1320 860" xmlns="http://www.w3.org/2000/svg">
+      <defs>
+        <linearGradient id="bbGrad" x1="0%" y1="0%" x2="0%" y2="100%">
+          <stop offset="0%" stop-color="#ffffff"/>
+          <stop offset="100%" stop-color="#f1f5f9"/>
+        </linearGradient>
+        <linearGradient id="espGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+          <stop offset="0%" stop-color="#27272a"/>
+          <stop offset="100%" stop-color="#09090b"/>
+        </linearGradient>
+      </defs>
+
+      <!-- ======================================================== -->
+      <!-- BREADBOARD (830 TIE-POINTS EXACT HORIZONTAL LAYOUT)      -->
+      <!-- Width: 63 columns, A-E top, Trench, F-J bottom           -->
+      <!-- ======================================================== -->
+      <g id="breadboardBody">
+        <!-- White Body -->
+        <rect x="20" y="30" width="1280" height="380" rx="14" fill="url(#bbGrad)" stroke="#cbd5e1" stroke-width="3" filter="drop-shadow(0 15px 30px rgba(0,0,0,0.5))"/>
+
+        <!-- Top Power Rails (Red + and Blue -) -->
+        <line x1="45" y1="52" x2="1275" y2="52" stroke="#ef4444" stroke-width="2.5"/>
+        <line x1="45" y1="84" x2="1275" y2="84" stroke="#3b82f6" stroke-width="2.5"/>
+        <text x="32" y="56" fill="#ef4444" font-size="14" font-weight="bold" font-family="monospace">+</text>
+        <text x="32" y="88" fill="#3b82f6" font-size="16" font-weight="bold" font-family="monospace">-</text>
+        <text x="1285" y="56" fill="#ef4444" font-size="14" font-weight="bold" font-family="monospace">+</text>
+        <text x="1285" y="88" fill="#3b82f6" font-size="16" font-weight="bold" font-family="monospace">-</text>
+
+        <!-- Center Divider Trench -->
+        <rect x="30" y="210" width="1260" height="18" fill="#e2e8f0" rx="3"/>
+
+        <!-- Bottom Power Rails (Red + and Blue -) -->
+        <line x1="45" y1="355" x2="1275" y2="355" stroke="#ef4444" stroke-width="2.5"/>
+        <line x1="45" y1="387" x2="1275" y2="387" stroke="#3b82f6" stroke-width="2.5"/>
+        <text x="32" y="359" fill="#ef4444" font-size="14" font-weight="bold" font-family="monospace">+</text>
+        <text x="32" y="391" fill="#3b82f6" font-size="16" font-weight="bold" font-family="monospace">-</text>
+        <text x="1285" y="359" fill="#ef4444" font-size="14" font-weight="bold" font-family="monospace">+</text>
+        <text x="1285" y="391" fill="#3b82f6" font-size="16" font-weight="bold" font-family="monospace">-</text>
+
+        <!-- Column Letter Labels (A B C D E | F G H I J) on left and right -->
+        <g fill="#64748b" font-size="10" font-weight="bold" font-family="monospace" text-anchor="middle">
+          <!-- Left side labels -->
+          <text x="42" y="117">A</text><text x="42" y="137">B</text><text x="42" y="157">C</text><text x="42" y="177">D</text><text x="42" y="197">E</text>
+          <text x="42" y="247">F</text><text x="42" y="267">G</text><text x="42" y="287">H</text><text x="42" y="307">I</text><text x="42" y="327">J</text>
+
+          <!-- Right side labels -->
+          <text x="1278" y="117">A</text><text x="1278" y="137">B</text><text x="1278" y="157">C</text><text x="1278" y="177">D</text><text x="1278" y="197">E</text>
+          <text x="1278" y="247">F</text><text x="1278" y="267">G</text><text x="1278" y="287">H</text><text x="1278" y="307">I</text><text x="1278" y="327">J</text>
+        </g>
+
+        <!-- Column Numbers (1 to 60/63 across top and bottom) -->
+        <g fill="#475569" font-size="10" font-weight="bold" font-family="monospace" text-anchor="middle">
+          <!-- Col 1 at x=70, step=19px -->
+          <text x="70" y="103">1</text>
+          <text x="146" y="103">5</text>
+          <text x="241" y="103">10</text>
+          <text x="336" y="103">15</text>
+          <text x="431" y="103">20</text>
+          <text x="526" y="103">25</text>
+          <text x="621" y="103">30</text>
+          <text x="716" y="103">35</text>
+          <text x="811" y="103">40</text>
+          <text x="906" y="103">45</text>
+          <text x="1001" y="103">50</text>
+          <text x="1096" y="103">55</text>
+          <text x="1191" y="103">60</text>
+          <text x="1248" y="103">63</text>
+
+          <!-- Bottom numbers -->
+          <text x="70" y="342">1</text>
+          <text x="146" y="342">5</text>
+          <text x="241" y="342">10</text>
+          <text x="336" y="342">15</text>
+          <text x="431" y="342">20</text>
+          <text x="526" y="342">25</text>
+          <text x="621" y="342">30</text>
+          <text x="716" y="342">35</text>
+          <text x="811" y="342">40</text>
+          <text x="906" y="342">45</text>
+          <text x="1001" y="342">50</text>
+          <text x="1096" y="342">55</text>
+          <text x="1191" y="342">60</text>
+          <text x="1248" y="342">63</text>
+        </g>
+      </g>
+
+      <!-- Key Holes Grid Highlights -->
+      <!-- OLED Holes: Col 3, 4, 5, 6 (x=108, 127, 146, 165) -->
+      <!-- SD Holes: Col 12 to 17 (x=279, 298, 317, 336, 355, 374) -->
+      <!-- Buzzer Holes: Col 24, 26 (x=507, 545) -->
+      <!-- Button Holes: Col 34, 36 (x=697, 735) -->
+
+      <!-- ======================================================== -->
+      <!-- ESP32 DEVKIT V1 (HORIZONTALLY POSITIONED BELOW)          -->
+      <!-- ======================================================== -->
+      <g id="esp32Unit" transform="translate(360, 480)">
+        <!-- ESP32 Black Board Body -->
+        <rect x="0" y="0" width="600" height="340" rx="14" fill="url(#espGrad)" stroke="#3f3f46" stroke-width="3"/>
+        
+        <!-- Metal RF Shield -->
+        <rect x="180" y="50" width="240" height="200" rx="8" fill="#52525b" stroke="#71717a" stroke-width="2"/>
+        <text x="300" y="145" fill="#f4f4f5" font-size="16" font-weight="bold" font-family="monospace" text-anchor="middle">ESP32-WROOM-32</text>
+        <text x="300" y="170" fill="#a1a1aa" font-size="12" font-family="monospace" text-anchor="middle">AIRA OFFLINE HUB</text>
+
+        <!-- Micro USB Port at Bottom -->
+        <rect x="260" y="320" width="80" height="28" rx="4" fill="#94a3b8" stroke="#cbd5e1" stroke-width="1.5"/>
+        <text x="300" y="338" fill="#0f172a" font-size="10" font-weight="bold" text-anchor="middle">USB-C / MICRO</text>
+
+        <!-- EN & BOOT Buttons -->
+        <rect x="80" y="270" width="40" height="30" rx="4" fill="#ef4444"/>
+        <text x="100" y="290" fill="#fff" font-size="10" font-weight="bold" text-anchor="middle">EN</text>
+        <rect x="480" y="270" width="40" height="30" rx="4" fill="#3b82f6"/>
+        <text x="500" y="290" fill="#fff" font-size="10" font-weight="bold" text-anchor="middle">BOOT</text>
+
+        <!-- ================= TOP HEADER PINS (Facing Breadboard) ================= -->
+        <!-- Pins from left to right along top edge (y=20): -->
+        <!-- 3V3, GND, D15, D2, D4, RX2, TX2, D5, D18, D19, D21, RX0, TX0, D22, D23, GND, VIN -->
+        
+        <!-- 1. 3V3 (x=30, y=20) -->
+        <circle id="esp_pin_3v3" cx="30" cy="20" r="7" fill="#ef4444" stroke="#fff" stroke-width="1.5"/>
+        <text x="30" y="42" fill="#ef4444" font-size="11" font-weight="bold" font-family="monospace" text-anchor="middle">3V3</text>
+
+        <!-- 2. GND (x=65, y=20) -->
+        <circle id="esp_pin_gnd" cx="65" cy="20" r="7" fill="#1e293b" stroke="#fff" stroke-width="1.5"/>
+        <text x="65" y="42" fill="#94a3b8" font-size="11" font-weight="bold" font-family="monospace" text-anchor="middle">GND</text>
+
+        <!-- 3. D4 (x=115, y=20) -> BUTTON -->
+        <circle id="esp_pin_d4" cx="115" cy="20" r="7" fill="#f97316" stroke="#fff" stroke-width="1.5"/>
+        <text x="115" y="42" fill="#f97316" font-size="11" font-weight="bold" font-family="monospace" text-anchor="middle">D4</text>
+
+        <!-- 4. D5 (x=165, y=20) -> SD CS -->
+        <circle id="esp_pin_d5" cx="165" cy="20" r="7" fill="#38bdf8" stroke="#fff" stroke-width="1.5"/>
+        <text x="165" y="42" fill="#38bdf8" font-size="11" font-weight="bold" font-family="monospace" text-anchor="middle">D5</text>
+
+        <!-- 5. D18 (x=215, y=20) -> SD SCK -->
+        <circle id="esp_pin_d18" cx="215" cy="20" r="7" fill="#3b82f6" stroke="#fff" stroke-width="1.5"/>
+        <text x="215" y="42" fill="#3b82f6" font-size="11" font-weight="bold" font-family="monospace" text-anchor="middle">D18</text>
+
+        <!-- 6. D19 (x=265, y=20) -> SD MISO -->
+        <circle id="esp_pin_d19" cx="265" cy="20" r="7" fill="#a855f7" stroke="#fff" stroke-width="1.5"/>
+        <text x="265" y="42" fill="#a855f7" font-size="11" font-weight="bold" font-family="monospace" text-anchor="middle">D19</text>
+
+        <!-- 7. D21 (x=335, y=20) -> OLED SDA -->
+        <circle id="esp_pin_d21" cx="335" cy="20" r="7" fill="#22c55e" stroke="#fff" stroke-width="1.5"/>
+        <text x="335" y="42" fill="#22c55e" font-size="11" font-weight="bold" font-family="monospace" text-anchor="middle">D21</text>
+
+        <!-- 8. D22 (x=385, y=20) -> OLED SCL -->
+        <circle id="esp_pin_d22" cx="385" cy="20" r="7" fill="#0284c7" stroke="#fff" stroke-width="1.5"/>
+        <text x="385" y="42" fill="#0284c7" font-size="11" font-weight="bold" font-family="monospace" text-anchor="middle">D22</text>
+
+        <!-- 9. D23 (x=435, y=20) -> SD MOSI -->
+        <circle id="esp_pin_d23" cx="435" cy="20" r="7" fill="#eab308" stroke="#fff" stroke-width="1.5"/>
+        <text x="435" y="42" fill="#eab308" font-size="11" font-weight="bold" font-family="monospace" text-anchor="middle">D23</text>
+
+        <!-- 10. D25 (x=485, y=20) -> BUZZER -->
+        <circle id="esp_pin_d25" cx="485" cy="20" r="7" fill="#ec4899" stroke="#fff" stroke-width="1.5"/>
+        <text x="485" y="42" fill="#ec4899" font-size="11" font-weight="bold" font-family="monospace" text-anchor="middle">D25</text>
+
+        <!-- 11. VIN 5V (x=565, y=20) -> SD 5V POWER -->
+        <circle id="esp_pin_vin" cx="565" cy="20" r="7" fill="#dc2626" stroke="#fff" stroke-width="1.5"/>
+        <text x="565" y="42" fill="#dc2626" font-size="11" font-weight="bold" font-family="monospace" text-anchor="middle">VIN(5V)</text>
+      </g>
+
+      <!-- ======================================================== -->
+      <!-- COMPONENT 1: 0.96" OLED SCREEN (Cols 3, 4, 5, 6 - Top)   -->
+      <!-- ======================================================== -->
+      <g id="compOled" class="comp-active">
+        <!-- OLED PCB (Mounted over Row A-C, pins inserted into Row E) -->
+        <rect x="90" y="80" width="130" height="90" rx="8" fill="#1e293b" stroke="#38bdf8" stroke-width="2.5" filter="drop-shadow(0 6px 12px rgba(0,0,0,0.4))"/>
+        <!-- OLED Glass -->
+        <rect x="100" y="92" width="110" height="64" rx="4" fill="#020617" stroke="#475569" stroke-width="1"/>
+        <text x="155" y="125" fill="#38bdf8" font-size="11" font-weight="bold" font-family="monospace" text-anchor="middle">AIRA HUB</text>
+        <text x="155" y="142" fill="#94a3b8" font-size="8" text-anchor="middle">0.96" OLED I2C</text>
+
+        <!-- OLED 4 Pins inserted into Row E (y=197): Col 3, Col 4, Col 5, Col 6 -->
+        <!-- Pin 1: GND (Col 3, x=108, y=197) -->
+        <circle cx="108" cy="197" r="5" fill="#1e293b" stroke="#fff" stroke-width="1.5"/>
+        <text x="108" y="185" fill="#e2e8f0" font-size="8" font-weight="bold" text-anchor="middle">GND</text>
+        <!-- Pin 2: VCC (Col 4, x=127, y=197) -->
+        <circle cx="127" cy="197" r="5" fill="#ef4444" stroke="#fff" stroke-width="1.5"/>
+        <text x="127" y="185" fill="#ef4444" font-size="8" font-weight="bold" text-anchor="middle">VCC</text>
+        <!-- Pin 3: SCL (Col 5, x=146, y=197) -->
+        <circle cx="146" cy="197" r="5" fill="#0284c7" stroke="#fff" stroke-width="1.5"/>
+        <text x="146" y="185" fill="#0284c7" font-size="8" font-weight="bold" text-anchor="middle">SCL</text>
+        <!-- Pin 4: SDA (Col 6, x=165, y=197) -->
+        <circle cx="165" cy="197" r="5" fill="#22c55e" stroke="#fff" stroke-width="1.5"/>
+        <text x="165" y="185" fill="#22c55e" font-size="8" font-weight="bold" text-anchor="middle">SDA</text>
+
+        <!-- Wires from Breadboard (Col D, y=177) to ESP32 / GND Rail -->
+        <!-- Wire 1: GND (Col 3, Row D: x=108, y=177 -> Top Blue (-) Rail at x=108, y=84) -->
+        <path d="M 108 177 L 108 84" class="wire-line" stroke="#1e293b" stroke-width="4"/>
+        <circle cx="108" cy="84" r="5" fill="#1e293b" stroke="#3b82f6" stroke-width="1.5"/>
+
+        <!-- Wire 2: VCC (Col 4, Row D: x=127, y=177 -> ESP32 3V3 at x=390, y=500) -->
+        <path d="M 127 177 C 127 320, 390 380, 390 500" class="wire-line" stroke="#ef4444" stroke-width="4"/>
+        <circle cx="127" cy="177" r="5" fill="#ef4444" stroke="#fff" stroke-width="1.5"/>
+
+        <!-- Wire 3: SCL (Col 5, Row D: x=146, y=177 -> ESP32 D22 at x=745, y=500) -->
+        <path d="M 146 177 C 146 360, 745 380, 745 500" class="wire-line" stroke="#0284c7" stroke-width="4"/>
+        <circle cx="146" cy="177" r="5" fill="#0284c7" stroke="#fff" stroke-width="1.5"/>
+
+        <!-- Wire 4: SDA (Col 6, Row D: x=165, y=177 -> ESP32 D21 at x=695, y=500) -->
+        <path d="M 165 177 C 165 340, 695 380, 695 500" class="wire-line" stroke="#22c55e" stroke-width="4"/>
+        <circle cx="165" cy="177" r="5" fill="#22c55e" stroke="#fff" stroke-width="1.5"/>
+      </g>
+
+      <!-- ======================================================== -->
+      <!-- COMPONENT 2: RED PUSH BUTTON (Cols 34 & 36 Across Trench)-->
+      <!-- ======================================================== -->
+      <g id="compButton" class="comp-active">
+        <!-- Tactile Button Square Body centered over trench at Col 35 (x=716, y=219) -->
+        <rect x="685" y="195" width="62" height="48" rx="6" fill="#18181b" stroke="#f97316" stroke-width="2.5"/>
+        <circle cx="716" cy="219" r="16" fill="#dc2626" stroke="#b91c1c" stroke-width="2"/>
+        <text x="716" y="223" fill="#fff" font-size="8" font-weight="bold" text-anchor="middle">BTN</text>
+
+        <!-- Button Legs: Top legs in Row E (y=197), Bottom legs in Row F (y=247) -->
+        <!-- Leg 1 Top-Left: Col 34, Row E (x=697, y=197) -->
+        <circle cx="697" cy="197" r="5" fill="#f97316" stroke="#fff" stroke-width="1.5"/>
+        <!-- Leg 2 Top-Right: Col 36, Row E (x=735, y=197) -->
+        <circle cx="735" cy="197" r="5" fill="#1e293b" stroke="#fff" stroke-width="1.5"/>
+
+        <!-- Wire 1 (Signal): Col 34, Row D (x=697, y=177) -> ESP32 D4 (x=475, y=500) -->
+        <path d="M 697 177 C 697 320, 475 360, 475 500" class="wire-line" stroke="#f97316" stroke-width="4"/>
+        <circle cx="697" cy="177" r="5" fill="#f97316" stroke="#fff" stroke-width="1.5"/>
+
+        <!-- Wire 2 (Ground): Col 36, Row D (x=735, y=177) -> Top Blue (-) Rail at x=735, y=84 -->
+        <path d="M 735 177 L 735 84" class="wire-line" stroke="#1e293b" stroke-width="4"/>
+        <circle cx="735" cy="84" r="5" fill="#1e293b" stroke="#3b82f6" stroke-width="1.5"/>
+      </g>
+
+      <!-- ======================================================== -->
+      <!-- COMPONENT 3: ACTIVE BUZZER (Cols 24 & 26 - Top Half)     -->
+      <!-- ======================================================== -->
+      <g id="compBuzzer" class="comp-active">
+        <!-- Buzzer Cylinder Body -->
+        <circle cx="526" cy="140" r="34" fill="#18181b" stroke="#ec4899" stroke-width="2.5"/>
+        <circle cx="526" cy="140" r="9" fill="#09090b"/>
+        <text x="526" y="125" fill="#ec4899" font-size="9" font-weight="bold" font-family="monospace" text-anchor="middle">BUZZER</text>
+        <text x="507" y="145" fill="#ef4444" font-size="14" font-weight="bold">+</text>
+
+        <!-- Long Leg (+) in Col 24, Row E (x=507, y=197) -->
+        <circle cx="507" cy="197" r="5" fill="#ec4899" stroke="#fff" stroke-width="1.5"/>
+        <!-- Short Leg (-) in Col 26, Row E (x=545, y=197) -->
+        <circle cx="545" cy="197" r="5" fill="#1e293b" stroke="#fff" stroke-width="1.5"/>
+
+        <!-- Wire 1 (+): Col 24, Row D (x=507, y=177) -> ESP32 D25 (x=845, y=500) -->
+        <path d="M 507 177 C 507 330, 845 360, 845 500" class="wire-line" stroke="#ec4899" stroke-width="4"/>
+        <circle cx="507" cy="177" r="5" fill="#ec4899" stroke="#fff" stroke-width="1.5"/>
+
+        <!-- Wire 2 (-): Col 26, Row D (x=545, y=177) -> Top Blue (-) Rail at x=545, y=84 -->
+        <path d="M 545 177 L 545 84" class="wire-line" stroke="#1e293b" stroke-width="4"/>
+        <circle cx="545" cy="84" r="5" fill="#1e293b" stroke="#3b82f6" stroke-width="1.5"/>
+      </g>
+
+      <!-- ======================================================== -->
+      <!-- COMPONENT 4: MICRO SD MODULE (Cols 12 to 17 - Top Half)  -->
+      <!-- ======================================================== -->
+      <g id="compSd" class="comp-active">
+        <!-- Module PCB -->
+        <rect x="260" y="75" width="130" height="95" rx="6" fill="#0284c7" stroke="#38bdf8" stroke-width="2.5"/>
+        <!-- Silver SD Slot -->
+        <rect x="270" y="90" width="60" height="65" rx="3" fill="#cbd5e1" stroke="#94a3b8" stroke-width="1.5"/>
+        <text x="300" y="128" fill="#1e293b" font-size="8" font-weight="bold" text-anchor="middle">MicroSD</text>
+
+        <!-- 6 Pins in Row E (y=197): Col 12 to 17 -->
+        <!-- Col 12: CS (x=279) -->
+        <circle cx="279" cy="197" r="5" fill="#38bdf8" stroke="#fff" stroke-width="1"/>
+        <text x="279" y="185" fill="#38bdf8" font-size="7" font-weight="bold" text-anchor="middle">CS</text>
+
+        <!-- Col 13: SCK (x=298) -->
+        <circle cx="298" cy="197" r="5" fill="#3b82f6" stroke="#fff" stroke-width="1"/>
+        <text x="298" y="185" fill="#3b82f6" font-size="7" font-weight="bold" text-anchor="middle">SCK</text>
+
+        <!-- Col 14: MOSI (x=317) -->
+        <circle cx="317" cy="197" r="5" fill="#eab308" stroke="#fff" stroke-width="1"/>
+        <text x="317" y="185" fill="#eab308" font-size="7" font-weight="bold" text-anchor="middle">MOSI</text>
+
+        <!-- Col 15: MISO (x=336) -->
+        <circle cx="336" cy="197" r="5" fill="#a855f7" stroke="#fff" stroke-width="1"/>
+        <text x="336" y="185" fill="#a855f7" font-size="7" font-weight="bold" text-anchor="middle">MISO</text>
+
+        <!-- Col 16: VCC (x=355) -->
+        <circle cx="355" cy="197" r="5" fill="#dc2626" stroke="#fff" stroke-width="1"/>
+        <text x="355" y="185" fill="#dc2626" font-size="7" font-weight="bold" text-anchor="middle">VCC</text>
+
+        <!-- Col 17: GND (x=374) -->
+        <circle cx="374" cy="197" r="5" fill="#1e293b" stroke="#fff" stroke-width="1"/>
+        <text x="374" y="185" fill="#94a3b8" font-size="7" font-weight="bold" text-anchor="middle">GND</text>
+
+        <!-- 6 Wires from Breadboard Row D to ESP32 / Rail -->
+        <!-- Wire 1: CS (Col 12, x=279 -> ESP32 D5, x=525, y=500) -->
+        <path d="M 279 177 C 279 320, 525 360, 525 500" class="wire-line" stroke="#38bdf8" stroke-width="3.5"/>
+
+        <!-- Wire 2: SCK (Col 13, x=298 -> ESP32 D18, x=575, y=500) -->
+        <path d="M 298 177 C 298 330, 575 360, 575 500" class="wire-line" stroke="#3b82f6" stroke-width="3.5"/>
+
+        <!-- Wire 3: MOSI (Col 14, x=317 -> ESP32 D23, x=795, y=500) -->
+        <path d="M 317 177 C 317 350, 795 360, 795 500" class="wire-line" stroke="#eab308" stroke-width="3.5"/>
+
+        <!-- Wire 4: MISO (Col 15, x=336 -> ESP32 D19, x=625, y=500) -->
+        <path d="M 336 177 C 336 340, 625 360, 625 500" class="wire-line" stroke="#a855f7" stroke-width="3.5"/>
+
+        <!-- Wire 5: VCC (Col 16, x=355 -> ESP32 VIN 5V, x=925, y=500) -->
+        <path d="M 355 177 C 355 360, 925 360, 925 500" class="wire-line" stroke="#dc2626" stroke-width="3.5"/>
+
+        <!-- Wire 6: GND (Col 17, x=374 -> Top Blue (-) Rail at x=374, y=84) -->
+        <path d="M 374 177 L 374 84" class="wire-line" stroke="#1e293b" stroke-width="3.5"/>
+        <circle cx="374" cy="84" r="5" fill="#1e293b" stroke="#3b82f6" stroke-width="1.5"/>
+      </g>
+
+      <!-- ======================================================== -->
+      <!-- MASTER GROUND LINK: ESP32 GND -> TOP BLUE (-) RAIL       -->
+      <!-- ======================================================== -->
+      <g id="masterGndLink">
+        <path d="M 425 500 C 425 420, 50 400, 50 84" class="wire-line" stroke="#1e293b" stroke-width="5" stroke-dasharray="8,4"/>
+        <circle cx="50" cy="84" r="6" fill="#3b82f6" stroke="#fff" stroke-width="2"/>
+        <text x="65" y="70" fill="#38bdf8" font-size="11" font-weight="bold" font-family="monospace">ESP32 GND &rarr; Rail</text>
+      </g>
+    </svg>
+  </div>
+
+  <script>
+    const guideData = {
+      1: {
+        title: "Step 1: OLED Screen Placement & Wiring (Start Here!)",
+        cable: "Use 4x Female-to-Male (F-M) DuPont Cables",
+        desc: "Look at your 830-point breadboard horizontally with Column 1 on the left. The OLED screen has 4 pins labeled <strong>GND, VCC, SCL, SDA</strong>. Gently push its 4 pins into <strong>Row E</strong> from <strong>Column 3 to Column 6</strong>.",
+        table: [
+          { color: "#1e293b", pin: "OLED GND", bb: "Col 3, Row D", dest: "Top Blue (-) Rail (or ESP32 GND)", note: "Provides common Ground" },
+          { color: "#ef4444", pin: "OLED VCC", bb: "Col 4, Row D", dest: "ESP32 3V3 Pin", note: "3.3V Power (Never use 5V/VIN!)" },
+          { color: "#0284c7", pin: "OLED SCL", bb: "Col 5, Row D", dest: "ESP32 GPIO 22 (D22)", note: "I2C Clock line" },
+          { color: "#22c55e", pin: "OLED SDA", bb: "Col 6, Row D", dest: "ESP32 GPIO 21 (D21)", note: "I2C Data line" }
+        ]
+      },
+      2: {
+        title: "Step 2: Red Tactile Push Button Placement & Wiring",
+        cable: "Use 2x Male-to-Male (M-M) or F-M DuPont Cables",
+        desc: "The red tactile button has 4 curved legs. It must straddle the horizontal center groove so the top half and bottom half are separate circuits. Press its top legs into <strong>Columns 34 and 36 (Row E)</strong>, and bottom legs into <strong>Row F</strong>.",
+        table: [
+          { color: "#f97316", pin: "Button Top-Left Leg", bb: "Col 34, Row D", dest: "ESP32 GPIO 4 (D4)", note: "Trigger line (uses ESP32 internal pullup)" },
+          { color: "#1e293b", pin: "Button Top-Right Leg", bb: "Col 36, Row D", dest: "Top Blue (-) Ground Rail", note: "Connects to Ground when pressed" }
+        ]
+      },
+      3: {
+        title: "Step 3: Active Buzzer Placement & Wiring",
+        cable: "Use 2x Female-to-Male (F-M) DuPont Cables",
+        desc: "Find your <strong>Active Buzzer</strong> (the round black cylinder with the removable sticker on top and sealed black resin underside). It has a longer positive (+) leg and a shorter negative (-) leg.",
+        table: [
+          { color: "#ec4899", pin: "Long Leg (+)", bb: "Col 24, Row E (tap at D24)", dest: "ESP32 GPIO 25 (D25)", note: "PWM Chime trigger signal" },
+          { color: "#1e293b", pin: "Short Leg (-)", bb: "Col 26, Row E (tap at D26)", dest: "Top Blue (-) Ground Rail", note: "Ground reference" }
+        ]
+      },
+      4: {
+        title: "Step 4: MicroSD Module Placement & Wiring",
+        cable: "Use 6x Female-to-Male (F-M) DuPont Cables",
+        desc: "The MicroSD module has 6 pins: <strong>CS, SCK, MOSI, MISO, VCC, GND</strong>. Push the 6 pins into <strong>Row E</strong> from <strong>Column 12 to Column 17</strong>. Push your DuPont wires into Row D directly above each pin.",
+        table: [
+          { color: "#38bdf8", pin: "CS (Chip Select)", bb: "Col 12, Row D", dest: "ESP32 GPIO 5 (D5)", note: "SPI Slave select" },
+          { color: "#3b82f6", pin: "SCK (Clock)", bb: "Col 13, Row D", dest: "ESP32 GPIO 18 (D18)", note: "High-speed SPI clock" },
+          { color: "#eab308", pin: "MOSI", bb: "Col 14, Row D", dest: "ESP32 GPIO 23 (D23)", note: "Master Out Slave In" },
+          { color: "#a855f7", pin: "MISO", bb: "Col 15, Row D", dest: "ESP32 GPIO 19 (D19)", note: "Master In Slave Out" },
+          { color: "#dc2626", pin: "VCC (Power)", bb: "Col 16, Row D", dest: "ESP32 VIN Pin", note: "5V USB power into module voltage regulator" },
+          { color: "#1e293b", pin: "GND", bb: "Col 17, Row D", dest: "Top Blue (-) Ground Rail", note: "Shared Ground" }
+        ]
+      },
+      5: {
+        title: "Step 5: Complete Circuit Overview — All Peripherals Connected",
+        cable: "Shared Ground Link: 1x F-M Wire from ESP32 GND to Blue Rail",
+        desc: "All 4 peripherals connected cleanly in the top half of your 830-point breadboard. Because all components are placed in the top half (Rows 1 to 40), they all share the exact same continuous top blue (-) ground rail without any gaps!",
+        table: [
+          { color: "#38bdf8", pin: "OLED Display", bb: "Cols 3-6 (Row E)", dest: "ESP32 GND, 3V3, D22, D21", note: "Shows Wi-Fi QR Code & status" },
+          { color: "#f97316", pin: "Red Button", bb: "Cols 34, 36 (Row E)", dest: "ESP32 D4 & GND Rail", note: "Turns OLED screen ON/OFF" },
+          { color: "#ec4899", pin: "Active Buzzer", bb: "Cols 24, 26 (Row E)", dest: "ESP32 D25 & GND Rail", note: "Plays connection chime" },
+          { color: "#eab308", pin: "MicroSD Module", bb: "Cols 12-17 (Row E)", dest: "ESP32 D5, D18, D23, D19, VIN, GND", note: "Holds offline modules & PDFs" }
+        ]
+      }
+    };
+
+    function showStep(num) {
+      // Update pills
+      document.querySelectorAll('.step-pill').forEach((btn, idx) => {
+        btn.classList.toggle('active', idx + 1 === num);
+      });
+
+      const d = guideData[num];
+      let rowsHtml = d.table.map(r => `
+        <tr>
+          <td><span class="pin-badge" style="background-color: ${r.color}"></span><strong>${r.pin}</strong></td>
+          <td style="font-family: monospace; color: #38bdf8;">${r.bb}</td>
+          <td style="font-weight: 700;">${r.dest}</td>
+          <td style="color: #94a3b8;">${r.note}</td>
+        </tr>
+      `).join('');
+
+      document.getElementById('stepDetailCard').innerHTML = `
+        <div class="detail-header">
+          <div class="detail-title">${d.title}</div>
+          <div class="cable-badge">${d.cable}</div>
+        </div>
+        <p class="detail-desc">${d.desc}</p>
+        <table class="pin-grid">
+          <thead>
+            <tr>
+              <th>Component Pin</th>
+              <th>Breadboard Hole (Insert Wire Here)</th>
+              <th>Connects To (ESP32 / Rail)</th>
+              <th>Purpose</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${rowsHtml}
+          </tbody>
+        </table>
+      `;
+
+      // SVG Highlights
+      const oled = document.getElementById('compOled');
+      const btn = document.getElementById('compButton');
+      const buzz = document.getElementById('compBuzzer');
+      const sd = document.getElementById('compSd');
+
+      if (num === 1) {
+        oled.className.baseVal = "comp-active";
+        btn.className.baseVal = "comp-dimmed";
+        buzz.className.baseVal = "comp-dimmed";
+        sd.className.baseVal = "comp-dimmed";
+      } else if (num === 2) {
+        oled.className.baseVal = "comp-dimmed";
+        btn.className.baseVal = "comp-active";
+        buzz.className.baseVal = "comp-dimmed";
+        sd.className.baseVal = "comp-dimmed";
+      } else if (num === 3) {
+        oled.className.baseVal = "comp-dimmed";
+        btn.className.baseVal = "comp-dimmed";
+        buzz.className.baseVal = "comp-active";
+        sd.className.baseVal = "comp-dimmed";
+      } else if (num === 4) {
+        oled.className.baseVal = "comp-dimmed";
+        btn.className.baseVal = "comp-dimmed";
+        buzz.className.baseVal = "comp-dimmed";
+        sd.className.baseVal = "comp-active";
+      } else {
+        oled.className.baseVal = "comp-active";
+        btn.className.baseVal = "comp-active";
+        buzz.className.baseVal = "comp-active";
+        sd.className.baseVal = "comp-active";
+      }
+    }
+
+    // Default load Step 1
+    showStep(1);
+  </script>
+</body>
+</html>

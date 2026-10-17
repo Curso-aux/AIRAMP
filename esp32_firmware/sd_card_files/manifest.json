@@ -1,0 +1,41 @@
+{
+  "hubId": "AIRAMP-HUB-DEVKIT-01",
+  "hubName": "AIRA Classroom Station #1",
+  "sectionName": "Grade 10 - Emerald",
+  "teacherName": "Sir John Reyes",
+  "generatedAt": "2026-10-17T08:00:00Z",
+  "items": [
+    {
+      "id": "mat_01",
+      "title": "Module 1: Cellular Biology & Mitosis",
+      "subjectName": "General Science",
+      "fileType": "pdf",
+      "sizeBytes": 1450000,
+      "fileName": "bio_module1.pdf"
+    },
+    {
+      "id": "mat_02",
+      "title": "Unit 2: Quadratic Functions & Parabolas",
+      "subjectName": "Mathematics",
+      "fileType": "pdf",
+      "sizeBytes": 980000,
+      "fileName": "math_unit2.pdf"
+    },
+    {
+      "id": "mat_03",
+      "title": "Quarter 1 Diagnostic Assessment (20 Items)",
+      "subjectName": "General Science",
+      "fileType": "quiz",
+      "sizeBytes": 320000,
+      "fileName": "science_quiz_q1.json"
+    },
+    {
+      "id": "mat_04",
+      "title": "Reading Comprehension & Critical Analysis",
+      "subjectName": "English",
+      "fileType": "module",
+      "sizeBytes": 650000,
+      "fileName": "english_module1.pdf"
+    }
+  ]
+}
