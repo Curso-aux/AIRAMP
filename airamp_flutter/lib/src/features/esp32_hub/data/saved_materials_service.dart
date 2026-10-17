@@ -38,8 +38,8 @@ class SavedMaterialsService {
       debugPrint('[SavedMaterialsService] Error loading saved materials: $e');
     }
 
-    // Default seeded materials from the classroom hub manifest
-    final initialList = List<HubMaterialItem>.from(HubSyncManifest.sample().items);
+    // Return empty list if nothing saved yet (no fake data)
+    final initialList = <HubMaterialItem>[];
     savedMaterialsNotifier.value = initialList;
     return initialList;
   }

@@ -1,4 +1,3 @@
-/// Status of the physical ESP32 device and attached peripherals
 class Esp32HubStatus {
   final String boardModel;
   final bool isDevKitConnected;
@@ -9,24 +8,54 @@ class Esp32HubStatus {
   final String password;
   final int totalStorageBytes;
   final int usedStorageBytes;
+  final int connectedClients;
 
   const Esp32HubStatus({
     this.boardModel = 'ESP32 DevKit V1 (30-pin / 38-pin)',
-    this.isDevKitConnected = true,
+    this.isDevKitConnected = false,
     this.isSdCardDetected = false,
-    this.sdCardStatusText = 'Module Pending (Awaiting delivery)',
+    this.sdCardStatusText = 'Checking MicroSD...',
     this.ipAddress = '192.168.4.1',
     this.ssid = 'AIRAMP-HUB-01',
     this.password = 'aira1234',
-    this.totalStorageBytes = 4194304, // 4MB internal SPI flash fallback
-    this.usedStorageBytes = 1048576,
+    this.totalStorageBytes = 0,
+    this.usedStorageBytes = 0,
+    this.connectedClients = 0,
   });
 
+  Esp32HubStatus copyWith({
+    bool? isDevKitConnected,
+    bool? isSdCardDetected,
+    String? sdCardStatusText,
+    String? ipAddress,
+    String? ssid,
+    String? password,
+    int? totalStorageBytes,
+    int? usedStorageBytes,
+    int? connectedClients,
+  }) {
+    return Esp32HubStatus(
+      boardModel: boardModel,
+      isDevKitConnected: isDevKitConnected ?? this.isDevKitConnected,
+      isSdCardDetected: isSdCardDetected ?? this.isSdCardDetected,
+      sdCardStatusText: sdCardStatusText ?? this.sdCardStatusText,
+      ipAddress: ipAddress ?? this.ipAddress,
+      ssid: ssid ?? this.ssid,
+      password: password ?? this.password,
+      totalStorageBytes: totalStorageBytes ?? this.totalStorageBytes,
+      usedStorageBytes: usedStorageBytes ?? this.usedStorageBytes,
+      connectedClients: connectedClients ?? this.connectedClients,
+    );
+  }
+
   String get formattedTotalStorage {
-    if (isSdCardDetected) {
-      return '${(totalStorageBytes / (1024 * 1024 * 1024)).toStringAsFixed(1)} GB (MicroSD)';
+    if (isSdCardDetected && totalStorageBytes > 0) {
+      if (totalStorageBytes >= 1024 * 1024 * 1024) {
+        return '${(totalStorageBytes / (1024 * 1024 * 1024)).toStringAsFixed(1)} GB (MicroSD)';
+      }
+      return '${(totalStorageBytes / (1024 * 1024)).toStringAsFixed(0)} MB (MicroSD)';
     }
-    return '${(totalStorageBytes / (1024 * 1024)).toStringAsFixed(0)} MB (DevKit Flash)';
+    return isSdCardDetected ? 'MicroSD Mounted' : 'No SD Card';
   }
 }
 
@@ -41,6 +70,7 @@ class HubMaterialItem {
   final String subjectName;
   final HubFileType fileType;
   final int sizeBytes;
+  final String? fileName;
   final String? localPath;
   final HubDownloadStatus downloadStatus;
   final double downloadProgress;
@@ -54,6 +84,7 @@ class HubMaterialItem {
     required this.subjectName,
     required this.fileType,
     required this.sizeBytes,
+    this.fileName,
     this.localPath,
     this.downloadStatus = HubDownloadStatus.notDownloaded,
     this.downloadProgress = 0.0,
@@ -73,6 +104,7 @@ class HubMaterialItem {
   HubMaterialItem copyWith({
     HubDownloadStatus? downloadStatus,
     double? downloadProgress,
+    String? fileName,
     String? localPath,
     String? savedAt,
     String? description,
@@ -84,6 +116,7 @@ class HubMaterialItem {
       subjectName: subjectName,
       fileType: fileType,
       sizeBytes: sizeBytes,
+      fileName: fileName ?? this.fileName,
       localPath: localPath ?? this.localPath,
       downloadStatus: downloadStatus ?? this.downloadStatus,
       downloadProgress: downloadProgress ?? this.downloadProgress,
@@ -99,6 +132,7 @@ class HubMaterialItem {
     'subjectName': subjectName,
     'fileType': fileType.name,
     'sizeBytes': sizeBytes,
+    'fileName': fileName,
     'localPath': localPath,
     'downloadStatus': downloadStatus.name,
     'downloadProgress': downloadProgress,
@@ -109,23 +143,90 @@ class HubMaterialItem {
 
   factory HubMaterialItem.fromJson(Map<String, dynamic> json) {
     return HubMaterialItem(
-      id: json['id'] as String,
-      title: json['title'] as String,
+      id: json['id'] as String? ?? 'item_${DateTime.now().millisecondsSinceEpoch}',
+      title: json['title'] as String? ?? 'Classroom Material',
       subjectName: json['subjectName'] as String? ?? 'General Subject',
+      fileName: json['fileName'] as String?,
       fileType: HubFileType.values.firstWhere(
         (e) => e.name == json['fileType'],
-        orElse: () => HubFileType.module,
+        orElse: () => json['fileType'] == 'pdf'
+            ? HubFileType.pdf
+            : json['fileType'] == 'quiz'
+                ? HubFileType.quiz
+                : HubFileType.module,
       ),
       sizeBytes: (json['sizeBytes'] as num?)?.toInt() ?? 0,
       localPath: json['localPath'] as String?,
       downloadStatus: HubDownloadStatus.values.firstWhere(
         (e) => e.name == json['downloadStatus'],
-        orElse: () => HubDownloadStatus.downloaded,
+        orElse: () => HubDownloadStatus.notDownloaded,
       ),
-      downloadProgress: (json['downloadProgress'] as num?)?.toDouble() ?? 1.0,
+      downloadProgress: (json['downloadProgress'] as num?)?.toDouble() ?? 0.0,
       savedAt: json['savedAt'] as String?,
       description: json['description'] as String?,
       content: json['content'] as String?,
+    );
+  }
+}
+
+/// Parsed data from the classroom QR code payload
+class HubQrPayload {
+  final String ssid;
+  final String password;
+  final String sectionName;
+  final String ipAddress;
+  final String raw;
+
+  const HubQrPayload({
+    required this.ssid,
+    required this.password,
+    required this.sectionName,
+    required this.ipAddress,
+    required this.raw,
+  });
+
+  factory HubQrPayload.parse(String raw) {
+    String ssid = 'AIRAMP-HUB-01';
+    String pass = 'aira1234';
+    String sec = 'Grade 10';
+    String ip = '192.168.4.1';
+
+    final ssidMatch = RegExp(r'WIFI:S:([^;]+);').firstMatch(raw);
+    if (ssidMatch != null && ssidMatch.group(1) != null) {
+      ssid = ssidMatch.group(1)!;
+    }
+
+    final passMatch = RegExp(r'P:([^;]*);').firstMatch(raw);
+    if (passMatch != null && passMatch.group(1) != null) {
+      pass = passMatch.group(1)!;
+    }
+
+    final secMatch = RegExp(r'SEC=([^;]+);?').firstMatch(raw);
+    if (secMatch != null && secMatch.group(1) != null) {
+      sec = secMatch.group(1)!;
+    }
+
+    final ipMatch = RegExp(r'IP=([^;]+)').firstMatch(raw);
+    if (ipMatch != null && ipMatch.group(1) != null) {
+      ip = ipMatch.group(1)!;
+    } else {
+      final urlMatch = RegExp(r'https?:\/\/([0-9]+\.[0-9]+\.[0-9]+\.[0-9]+)').firstMatch(raw);
+      if (urlMatch != null && urlMatch.group(1) != null) {
+        ip = urlMatch.group(1)!;
+      } else {
+        final rawIpMatch = RegExp(r'\b([0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3})\b').firstMatch(raw);
+        if (rawIpMatch != null && rawIpMatch.group(1) != null) {
+          ip = rawIpMatch.group(1)!;
+        }
+      }
+    }
+
+    return HubQrPayload(
+      ssid: ssid,
+      password: pass,
+      sectionName: sec,
+      ipAddress: ip,
+      raw: raw,
     );
   }
 }
@@ -149,6 +250,50 @@ class HubSyncManifest {
     required this.items,
     required this.qrPayload,
   });
+
+  factory HubSyncManifest.fromJson(Map<String, dynamic> json, {String? qrPayload}) {
+    final rawItems = json['items'] as List<dynamic>? ?? [];
+    return HubSyncManifest(
+      hubId: json['hubId'] as String? ?? 'AIRAMP-HUB-01',
+      hubName: json['hubName'] as String? ?? 'AIRA Classroom Station',
+      teacherName: json['teacherName'] as String? ?? 'Faculty Instructor',
+      sectionName: json['sectionName'] as String? ?? 'General Section',
+      generatedAt: json['generatedAt'] as String? ?? DateTime.now().toIso8601String(),
+      qrPayload: qrPayload ?? '',
+      items: rawItems
+          .map((item) => HubMaterialItem.fromJson(item as Map<String, dynamic>))
+          .toList(),
+    );
+  }
+
+  HubSyncManifest copyWith({
+    String? hubId,
+    String? hubName,
+    String? teacherName,
+    String? sectionName,
+    String? generatedAt,
+    List<HubMaterialItem>? items,
+    String? qrPayload,
+  }) {
+    return HubSyncManifest(
+      hubId: hubId ?? this.hubId,
+      hubName: hubName ?? this.hubName,
+      teacherName: teacherName ?? this.teacherName,
+      sectionName: sectionName ?? this.sectionName,
+      generatedAt: generatedAt ?? this.generatedAt,
+      items: items ?? this.items,
+      qrPayload: qrPayload ?? this.qrPayload,
+    );
+  }
+
+  Map<String, dynamic> toJson() => {
+    'hubId': hubId,
+    'hubName': hubName,
+    'teacherName': teacherName,
+    'sectionName': sectionName,
+    'generatedAt': generatedAt,
+    'items': items.map((e) => e.toJson()).toList(),
+  };
 
   /// Default mock manifest representing materials uploaded by the teacher
   factory HubSyncManifest.sample({

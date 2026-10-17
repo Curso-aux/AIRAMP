@@ -180,15 +180,47 @@ void drawHubScreen() {
 // GET /api/ping -> Device handshake
 void handlePing() {
   soundBeep(80); // Quick chirp to indicate mobile client reached the hub
-  StaticJsonDocument<128> doc;
+  StaticJsonDocument<256> doc;
   doc["status"] = "online";
   doc["hub"] = "AIRAMP-HUB-01";
   doc["sd_ready"] = sdReady;
   doc["clients"] = WiFi.softAPgetStationNum();
+  if (sdReady) {
+    doc["card_size_mb"] = (uint32_t)(SD.cardSize() / (1024 * 1024));
+    doc["total_bytes"] = (uint32_t)SD.totalBytes();
+    doc["used_bytes"] = (uint32_t)SD.usedBytes();
+  }
 
   String response;
   serializeJson(doc, response);
   server.send(200, "application/json", response);
+}
+
+// POST /api/manifest -> Updates the curriculum manifest on the MicroSD card
+void handleSaveManifest() {
+  if (!server.hasArg("plain")) {
+    server.send(400, "application/json", "{\"status\":\"error\",\"message\":\"Missing JSON body\"}");
+    return;
+  }
+
+  String body = server.arg("plain");
+  if (!sdReady) {
+    server.send(503, "application/json", "{\"status\":\"error\",\"message\":\"MicroSD module not mounted\"}");
+    return;
+  }
+
+  File file = SD.open("/manifest.json", FILE_WRITE);
+  if (!file) {
+    server.send(500, "application/json", "{\"status\":\"error\",\"message\":\"Failed to open /manifest.json for write\"}");
+    return;
+  }
+
+  file.print(body);
+  file.close();
+
+  soundBeep(80, 2);
+  Serial.println("[Manifest] Successfully updated /manifest.json on MicroSD card!");
+  server.send(200, "application/json", "{\"status\":\"ok\",\"message\":\"Manifest updated successfully\"}");
 }
 
 // GET /api/manifest -> Returns the curriculum manifest
@@ -389,11 +421,16 @@ void setup() {
   // Register Web Server Routes
   server.on("/", handleRoot);
   server.on("/api/ping", handlePing);
-  server.on("/api/manifest", handleManifest);
+  server.on("/api/manifest", HTTP_GET, handleManifest);
+  server.on("/api/manifest", HTTP_POST, handleSaveManifest);
   server.on("/download", handleDownload);
   server.on("/upload", HTTP_GET, handleUploadPage);
   server.on("/upload", HTTP_POST, []() {
-    server.send(200, "text/html", "<html><body style='background:#0F172A;color:#10B981;font-family:sans-serif;text-align:center;padding:40px;'><h2>File Uploaded Successfully!</h2><p><a href='/upload' style='color:#38BDF8;'>Upload Another File</a> | <a href='/' style='color:#38BDF8;'>Back to Home</a></p></body></html>");
+    if (server.hasHeader("Accept") && server.header("Accept").indexOf("application/json") >= 0) {
+      server.send(200, "application/json", "{\"status\":\"ok\",\"message\":\"Uploaded successfully to MicroSD\"}");
+    } else {
+      server.send(200, "text/html", "<html><body style='background:#0F172A;color:#10B981;font-family:sans-serif;text-align:center;padding:40px;'><h2>File Uploaded Successfully!</h2><p><a href='/upload' style='color:#38BDF8;'>Upload Another File</a> | <a href='/' style='color:#38BDF8;'>Back to Home</a></p></body></html>");
+    }
   }, handleFileUpload);
   server.enableCORS(true); // Allow mobile app fetch without CORS errors
   server.begin();

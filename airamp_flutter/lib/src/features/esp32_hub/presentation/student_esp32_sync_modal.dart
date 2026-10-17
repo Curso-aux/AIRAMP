@@ -3,11 +3,12 @@ import '../../../core/theme/app_theme.dart';
 import '../../../core/components/app_toast.dart';
 import '../domain/esp32_hub_models.dart';
 import '../data/saved_materials_service.dart';
+import '../data/esp32_client_service.dart';
 import 'components/qr_viewfinder_widget.dart';
 import 'saved_offline_materials_modal.dart';
 
-/// Modal bottom sheet for students to scan the teacher's ESP32 QR code,
-/// discover classroom learning materials, and save them offline.
+/// Modal bottom sheet for students to scan the teacher's ESP32 QR code with the real camera,
+/// discover classroom learning materials from the ESP32 Hub, and save them offline.
 class StudentEsp32SyncModal extends StatefulWidget {
   final String studentName;
   final String? studentSection;
@@ -42,7 +43,7 @@ class StudentEsp32SyncModal extends StatefulWidget {
   State<StudentEsp32SyncModal> createState() => _StudentEsp32SyncModalState();
 }
 
-enum _SyncStep { scan, connecting, manifest, downloading, done }
+enum _SyncStep { scan, connecting, wifiPrompt, manifest, downloading, done }
 
 class _StudentEsp32SyncModalState extends State<StudentEsp32SyncModal>
     with SingleTickerProviderStateMixin {
@@ -51,20 +52,18 @@ class _StudentEsp32SyncModalState extends State<StudentEsp32SyncModal>
   final TextEditingController _ipController = TextEditingController(text: '192.168.4.1');
   final TextEditingController _ssidController = TextEditingController(text: 'AIRAMP-HUB-01');
 
-  late HubSyncManifest _manifest;
-  late List<HubMaterialItem> _itemsToDownload;
+  HubQrPayload? _scannedPayload;
+  HubSyncManifest? _manifest;
+  List<HubMaterialItem> _itemsToDownload = [];
   int _completedDownloads = 0;
   String _activeDownloadTitle = '';
   double _overallProgress = 0.0;
+  bool _isReconnecting = false;
 
   @override
   void initState() {
     super.initState();
     _tabController = TabController(length: 3, vsync: this);
-    _manifest = HubSyncManifest.sample(
-      sectionName: widget.studentSection ?? 'Grade 10 - Rizal',
-    );
-    _itemsToDownload = List.from(_manifest.items);
   }
 
   @override
@@ -75,30 +74,91 @@ class _StudentEsp32SyncModalState extends State<StudentEsp32SyncModal>
     super.dispose();
   }
 
+  /// Handles real connection attempt with the ESP32 Hub
   Future<void> _processHubConnection(String sourceInfo) async {
+    final payload = HubQrPayload.parse(sourceInfo);
+    _scannedPayload = payload;
+    _ipController.text = payload.ipAddress;
+    _ssidController.text = payload.ssid;
+
     setState(() {
       _currentStep = _SyncStep.connecting;
+      _isReconnecting = false;
     });
 
-    await Future.delayed(const Duration(milliseconds: 900));
+    // Step 1: Ping the ESP32 Hub (Triggers buzzer chime on hardware)
+    final pingResult = await Esp32ClientService.instance.ping(payload.ipAddress);
+
     if (!mounted) return;
 
-    setState(() {
-      _currentStep = _SyncStep.manifest;
-    });
+    if (pingResult == null) {
+      // Could not connect to ESP32 (Phone is likely not connected to the ESP32's Wi-Fi hotspot)
+      setState(() {
+        _currentStep = _SyncStep.wifiPrompt;
+      });
+      return;
+    }
 
-    AppToast.showSuccess(
-      context,
-      'Connected to ${_manifest.hubName}! ${_itemsToDownload.length} materials found.',
+    // Step 2: Fetch the real curriculum manifest from the ESP32
+    final manifest = await Esp32ClientService.instance.fetchManifest(
+      payload.ipAddress,
+      qrPayload: payload.raw,
     );
+
+    if (!mounted) return;
+
+    if (manifest != null && manifest.items.isNotEmpty) {
+      setState(() {
+        _manifest = manifest;
+        _itemsToDownload = List.from(manifest.items);
+        _currentStep = _SyncStep.manifest;
+      });
+
+      AppToast.showSuccess(
+        context,
+        'Connected to ${manifest.hubName}! ${manifest.items.length} materials ready.',
+      );
+    } else {
+      // Manifest returned empty or SD card had no files
+      final fallbackManifest = HubSyncManifest(
+        hubId: 'AIRAMP-HUB-01',
+        hubName: 'AIRA Offline Classroom Hub',
+        teacherName: 'Classroom Instructor',
+        sectionName: payload.sectionName,
+        generatedAt: DateTime.now().toIso8601String(),
+        items: [],
+        qrPayload: payload.raw,
+      );
+
+      setState(() {
+        _manifest = fallbackManifest;
+        _itemsToDownload = [];
+        _currentStep = _SyncStep.manifest;
+      });
+
+      AppToast.showInfo(
+        context,
+        'Connected to ESP32 Hub! No files currently in manifest.',
+      );
+    }
   }
 
+  /// Downloads all curriculum files from the ESP32 SD card into local phone storage
   Future<void> _startOfflineDownload() async {
+    if (_itemsToDownload.isEmpty) {
+      AppToast.showInfo(context, 'No materials to download.');
+      return;
+    }
+
+    final ip = _scannedPayload?.ipAddress ?? _ipController.text;
+
     setState(() {
       _currentStep = _SyncStep.downloading;
       _completedDownloads = 0;
       _overallProgress = 0.0;
     });
+
+    final List<HubMaterialItem> savedResults = [];
 
     for (int i = 0; i < _itemsToDownload.length; i++) {
       final item = _itemsToDownload[i];
@@ -109,30 +169,34 @@ class _StudentEsp32SyncModalState extends State<StudentEsp32SyncModal>
         _itemsToDownload[i] = item.copyWith(downloadStatus: HubDownloadStatus.downloading);
       });
 
-      // Simulate download chunks
-      for (double p = 0.2; p <= 1.0; p += 0.3) {
-        await Future.delayed(const Duration(milliseconds: 180));
-        if (!mounted) return;
-        setState(() {
-          _itemsToDownload[i] = item.copyWith(
-            downloadStatus: HubDownloadStatus.downloading,
-            downloadProgress: p,
-          );
-          _overallProgress = ((i + p) / _itemsToDownload.length).clamp(0.0, 1.0);
-        });
-      }
+      // Real HTTP download from ESP32 /download?file=...
+      final downloadedItem = await Esp32ClientService.instance.downloadFile(
+        ipAddress: ip,
+        item: item,
+        onProgress: (p) {
+          if (!mounted) return;
+          setState(() {
+            _itemsToDownload[i] = item.copyWith(
+              downloadStatus: HubDownloadStatus.downloading,
+              downloadProgress: p,
+            );
+            _overallProgress = ((i + p) / _itemsToDownload.length).clamp(0.0, 1.0);
+          });
+        },
+      );
 
+      savedResults.add(downloadedItem);
+
+      if (!mounted) return;
       setState(() {
-        _itemsToDownload[i] = item.copyWith(
-          downloadStatus: HubDownloadStatus.downloaded,
-          downloadProgress: 1.0,
-        );
+        _itemsToDownload[i] = downloadedItem;
         _completedDownloads++;
+        _overallProgress = (_completedDownloads / _itemsToDownload.length).clamp(0.0, 1.0);
       });
     }
 
-    // Persist downloaded materials to local device storage
-    await SavedMaterialsService.instance.saveMaterials(_itemsToDownload);
+    // Persist real downloaded materials to local phone storage
+    await SavedMaterialsService.instance.saveMaterials(savedResults);
 
     if (!mounted) return;
     setState(() {
@@ -142,7 +206,7 @@ class _StudentEsp32SyncModalState extends State<StudentEsp32SyncModal>
 
     AppToast.showSuccess(
       context,
-      'All materials saved offline! You can browse and study without internet.',
+      'All materials saved offline! Ready to study without internet.',
     );
     widget.onSyncCompleted?.call();
   }
@@ -152,7 +216,7 @@ class _StudentEsp32SyncModalState extends State<StudentEsp32SyncModal>
     final size = MediaQuery.of(context).size;
 
     return Container(
-      height: size.height * 0.88,
+      height: size.height * 0.90,
       decoration: BoxDecoration(
         color: AppTheme.surface,
         borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
@@ -242,6 +306,8 @@ class _StudentEsp32SyncModalState extends State<StudentEsp32SyncModal>
         return _buildScanView();
       case _SyncStep.connecting:
         return _buildConnectingView();
+      case _SyncStep.wifiPrompt:
+        return _buildWifiPromptView();
       case _SyncStep.manifest:
         return _buildManifestView();
       case _SyncStep.downloading:
@@ -279,20 +345,20 @@ class _StudentEsp32SyncModalState extends State<StudentEsp32SyncModal>
           child: TabBarView(
             controller: _tabController,
             children: [
-              // Tab 1: QR Viewfinder
+              // Tab 1: Real Camera QR Viewfinder
               SingleChildScrollView(
                 padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 20),
                 child: Column(
                   children: [
                     QrViewfinderWidget(
-                      statusText: 'Point camera at Teacher\'s ESP32 QR',
-                      onSimulatedScan: () {
-                        _processHubConnection('Simulated QR: ${_manifest.qrPayload}');
+                      statusText: 'Point camera at Teacher\'s ESP32 screen',
+                      onScanned: (qrCode) {
+                        _processHubConnection(qrCode);
                       },
                     ),
                     const SizedBox(height: 14),
                     Text(
-                      'No Wi-Fi or data required! Your device will communicate directly with the classroom ESP32 station.',
+                      'Scan the QR code displayed on the ESP32 OLED screen or classroom projector.',
                       textAlign: TextAlign.center,
                       style: TextStyle(fontSize: 12, color: AppTheme.textMuted),
                     ),
@@ -300,6 +366,7 @@ class _StudentEsp32SyncModalState extends State<StudentEsp32SyncModal>
                     ValueListenableBuilder<List<HubMaterialItem>>(
                       valueListenable: SavedMaterialsService.instance.savedMaterialsNotifier,
                       builder: (context, savedList, _) {
+                        if (savedList.isEmpty) return const SizedBox.shrink();
                         return Container(
                           padding: const EdgeInsets.all(12),
                           decoration: BoxDecoration(
@@ -383,7 +450,7 @@ class _StudentEsp32SyncModalState extends State<StudentEsp32SyncModal>
                     ),
                     const SizedBox(height: 4),
                     Text(
-                      'Connect your phone to the ESP32 Wi-Fi hotspot in your phone settings, then tap Connect below:',
+                      'If camera is unavailable, connect your phone to the ESP32 Wi-Fi hotspot in your phone settings, then tap Connect below:',
                       style: TextStyle(fontSize: 12, color: AppTheme.textSecondary),
                     ),
                     const SizedBox(height: 16),
@@ -410,7 +477,9 @@ class _StudentEsp32SyncModalState extends State<StudentEsp32SyncModal>
                       height: 48,
                       child: ElevatedButton.icon(
                         onPressed: () {
-                          _processHubConnection('Manual: ${_ipController.text}');
+                          _processHubConnection(
+                            'WIFI:S:${_ssidController.text};P:aira1234;;AIRAMP:SEC=Class;IP=${_ipController.text}',
+                          );
                         },
                         icon: const Icon(Icons.link),
                         label: const Text('Connect & Discover Materials'),
@@ -432,6 +501,9 @@ class _StudentEsp32SyncModalState extends State<StudentEsp32SyncModal>
   }
 
   Widget _buildConnectingView() {
+    final ip = _scannedPayload?.ipAddress ?? _ipController.text;
+    final ssid = _scannedPayload?.ssid ?? _ssidController.text;
+
     return Center(
       child: Padding(
         padding: const EdgeInsets.all(32),
@@ -450,7 +522,7 @@ class _StudentEsp32SyncModalState extends State<StudentEsp32SyncModal>
             ),
             const SizedBox(height: 8),
             Text(
-              'Handshaking with ${_manifest.hubName} at ${_ipController.text} via local Wi-Fi SoftAP',
+              'Handshaking with $ssid at http://$ip/api/ping',
               textAlign: TextAlign.center,
               style: TextStyle(fontSize: 12, color: AppTheme.textMuted),
             ),
@@ -460,7 +532,130 @@ class _StudentEsp32SyncModalState extends State<StudentEsp32SyncModal>
     );
   }
 
+  /// Displays clear Wi-Fi instructions when phone cannot reach the ESP32 IP
+  Widget _buildWifiPromptView() {
+    final payload = _scannedPayload ?? HubQrPayload.parse('');
+
+    return SingleChildScrollView(
+      padding: const EdgeInsets.all(24),
+      child: Column(
+        children: [
+          Container(
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: AppTheme.warning.withValues(alpha: 0.15),
+              shape: BoxShape.circle,
+            ),
+            child: Icon(Icons.wifi_off_rounded, color: AppTheme.warning, size: 40),
+          ),
+          const SizedBox(height: 16),
+          Text(
+            'Connect Phone to ESP32 Wi-Fi',
+            style: TextStyle(
+              fontSize: 18,
+              fontWeight: FontWeight.bold,
+              color: AppTheme.text,
+            ),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            'QR code was recognized successfully! However, your phone is not currently connected to the ESP32\'s local Wi-Fi station.',
+            textAlign: TextAlign.center,
+            style: TextStyle(fontSize: 13, color: AppTheme.textSecondary, height: 1.4),
+          ),
+          const SizedBox(height: 20),
+
+          // Wi-Fi Credentials Card
+          Container(
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: AppTheme.background,
+              borderRadius: BorderRadius.circular(14),
+              border: Border.all(color: AppTheme.primary.withValues(alpha: 0.3)),
+            ),
+            child: Column(
+              children: [
+                _buildWifiCredentialRow(Icons.wifi, 'Wi-Fi Name (SSID)', payload.ssid),
+                const Divider(height: 16),
+                _buildWifiCredentialRow(Icons.lock_outline, 'Password', payload.password),
+                const Divider(height: 16),
+                _buildWifiCredentialRow(Icons.language, 'Gateway IP', payload.ipAddress),
+              ],
+            ),
+          ),
+          const SizedBox(height: 16),
+
+          Text(
+            '👉 Open your phone Wi-Fi settings, connect to "${payload.ssid}" using password "${payload.password}", then tap Retry below.',
+            textAlign: TextAlign.center,
+            style: TextStyle(fontSize: 12, color: AppTheme.textMuted, fontStyle: FontStyle.italic),
+          ),
+          const SizedBox(height: 24),
+
+          // Retry Button
+          SizedBox(
+            width: double.infinity,
+            height: 48,
+            child: ElevatedButton.icon(
+              onPressed: _isReconnecting
+                  ? null
+                  : () async {
+                      setState(() => _isReconnecting = true);
+                      await _processHubConnection(payload.raw);
+                    },
+              icon: _isReconnecting
+                  ? const SizedBox(
+                      width: 18,
+                      height: 18,
+                      child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2),
+                    )
+                  : const Icon(Icons.refresh, size: 20),
+              label: Text(_isReconnecting ? 'Connecting...' : 'I\'m Connected · Retry Handshake'),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppTheme.primary,
+                foregroundColor: Colors.white,
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+              ),
+            ),
+          ),
+          const SizedBox(height: 12),
+
+          TextButton.icon(
+            onPressed: () {
+              setState(() {
+                _currentStep = _SyncStep.scan;
+              });
+            },
+            icon: const Icon(Icons.qr_code_scanner, size: 18),
+            label: const Text('Back to Camera Scanner'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildWifiCredentialRow(IconData icon, String label, String value) {
+    return Row(
+      children: [
+        Icon(icon, size: 18, color: AppTheme.primary),
+        const SizedBox(width: 10),
+        Text(label, style: TextStyle(fontSize: 12, color: AppTheme.textSecondary)),
+        const Spacer(),
+        SelectableText(
+          value,
+          style: TextStyle(
+            fontSize: 13,
+            fontWeight: FontWeight.bold,
+            color: AppTheme.text,
+          ),
+        ),
+      ],
+    );
+  }
+
   Widget _buildManifestView() {
+    final manifest = _manifest!;
+
     return SingleChildScrollView(
       padding: const EdgeInsets.all(20),
       child: Column(
@@ -483,7 +678,7 @@ class _StudentEsp32SyncModalState extends State<StudentEsp32SyncModal>
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        _manifest.hubName,
+                        manifest.hubName,
                         style: TextStyle(
                           fontSize: 14,
                           fontWeight: FontWeight.bold,
@@ -491,7 +686,7 @@ class _StudentEsp32SyncModalState extends State<StudentEsp32SyncModal>
                         ),
                       ),
                       Text(
-                        'Section: ${_manifest.sectionName} • Instructor: ${_manifest.teacherName}',
+                        'Section: ${manifest.sectionName} • Teacher: ${manifest.teacherName}',
                         style: TextStyle(fontSize: 11, color: AppTheme.textSecondary),
                       ),
                     ],
@@ -512,97 +707,108 @@ class _StudentEsp32SyncModalState extends State<StudentEsp32SyncModal>
           ),
           const SizedBox(height: 8),
 
-          ..._itemsToDownload.map((item) {
-            return Container(
-              margin: const EdgeInsets.only(bottom: 8),
-              padding: const EdgeInsets.all(12),
-              decoration: BoxDecoration(
-                color: AppTheme.background,
-                borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: AppTheme.border),
+          if (_itemsToDownload.isEmpty)
+            Container(
+              padding: const EdgeInsets.all(24),
+              alignment: Alignment.center,
+              child: Text(
+                'No curriculum files found on this hub yet.',
+                style: TextStyle(color: AppTheme.textMuted, fontSize: 13),
               ),
-              child: Row(
-                children: [
-                  Container(
-                    padding: const EdgeInsets.all(8),
-                    decoration: BoxDecoration(
-                      color: AppTheme.surfaceLight,
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                    child: Icon(
-                      item.fileType == HubFileType.pdf
-                          ? Icons.picture_as_pdf
-                          : item.fileType == HubFileType.quiz
-                              ? Icons.assignment
-                              : Icons.menu_book,
-                      size: 20,
-                      color: item.fileType == HubFileType.pdf
-                          ? AppTheme.error
-                          : item.fileType == HubFileType.quiz
-                              ? AppTheme.warning
-                              : AppTheme.primary,
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          item.title,
-                          style: TextStyle(
-                            fontSize: 13,
-                            fontWeight: FontWeight.bold,
-                            color: AppTheme.text,
-                          ),
-                        ),
-                        Text(
-                          '${item.subjectName} • ${item.formattedSize}',
-                          style: TextStyle(fontSize: 11, color: AppTheme.textSecondary),
-                        ),
-                      ],
-                    ),
-                  ),
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                    decoration: BoxDecoration(
-                      color: AppTheme.primarySoft,
-                      borderRadius: BorderRadius.circular(6),
-                    ),
-                    child: Text(
-                      'Ready to Sync',
-                      style: TextStyle(
-                        fontSize: 10,
-                        fontWeight: FontWeight.bold,
-                        color: AppTheme.primary,
+            )
+          else
+            ..._itemsToDownload.map((item) {
+              return Container(
+                margin: const EdgeInsets.only(bottom: 8),
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: AppTheme.background,
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: AppTheme.border),
+                ),
+                child: Row(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(8),
+                      decoration: BoxDecoration(
+                        color: AppTheme.surfaceLight,
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: Icon(
+                        item.fileType == HubFileType.pdf
+                            ? Icons.picture_as_pdf
+                            : item.fileType == HubFileType.quiz
+                                ? Icons.assignment
+                                : Icons.menu_book,
+                        size: 20,
+                        color: item.fileType == HubFileType.pdf
+                            ? AppTheme.error
+                            : item.fileType == HubFileType.quiz
+                                ? AppTheme.warning
+                                : AppTheme.primary,
                       ),
                     ),
-                  ),
-                ],
-              ),
-            );
-          }),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            item.title,
+                            style: TextStyle(
+                              fontSize: 13,
+                              fontWeight: FontWeight.bold,
+                              color: AppTheme.text,
+                            ),
+                          ),
+                          Text(
+                            '${item.subjectName} • ${item.formattedSize}',
+                            style: TextStyle(fontSize: 11, color: AppTheme.textSecondary),
+                          ),
+                        ],
+                      ),
+                    ),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                      decoration: BoxDecoration(
+                        color: AppTheme.primarySoft,
+                        borderRadius: BorderRadius.circular(6),
+                      ),
+                      child: Text(
+                        'Ready to Sync',
+                        style: TextStyle(
+                          fontSize: 10,
+                          fontWeight: FontWeight.bold,
+                          color: AppTheme.primary,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              );
+            }),
 
           const SizedBox(height: 20),
 
           // Download CTA
-          SizedBox(
-            width: double.infinity,
-            height: 48,
-            child: ElevatedButton.icon(
-              onPressed: _startOfflineDownload,
-              icon: const Icon(Icons.download, size: 20),
-              label: const Text(
-                'Download & Save All Offline',
-                style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold),
-              ),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: AppTheme.primary,
-                foregroundColor: Colors.white,
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+          if (_itemsToDownload.isNotEmpty)
+            SizedBox(
+              width: double.infinity,
+              height: 48,
+              child: ElevatedButton.icon(
+                onPressed: _startOfflineDownload,
+                icon: const Icon(Icons.download, size: 20),
+                label: Text(
+                  'Download & Save All Offline (${_itemsToDownload.length})',
+                  style: const TextStyle(fontSize: 15, fontWeight: FontWeight.bold),
+                ),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AppTheme.primary,
+                  foregroundColor: Colors.white,
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                ),
               ),
             ),
-          ),
           const SizedBox(height: 20),
         ],
       ),
