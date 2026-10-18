@@ -7,6 +7,7 @@ import '../../../core/utils/section_key_helper.dart';
 import '../../../core/utils/csv_helper.dart';
 
 import '../../../core/services/email_service.dart';
+import '../../../core/database/firestore_service.dart';
 
 // --- Announcements ---
 final announcementsProvider = NotifierProvider<AnnouncementsNotifier, List<Map<String, dynamic>>>(() {
@@ -609,6 +610,9 @@ class AdminAnalyticsNotifier extends Notifier<Map<String, dynamic>> {
     if (filter != null) {
       _currentFilter = filter;
     }
+    try {
+      await FirestoreService().syncCloudUsersToLocal();
+    } catch (_) {}
     final summary = await DatabaseHelper().getAdminAnalyticsSummary(
       subjectId: _currentFilter.subjectId,
       section: _currentFilter.section,

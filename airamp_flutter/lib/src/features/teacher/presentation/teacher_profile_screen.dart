@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
-import '../../../core/components/auth/required_change_password_dialog.dart';
 import '../../../core/components/otp_verification_dialog.dart';
 import '../../../core/components/skeleton_loader.dart';
 import '../../../core/services/otp_service.dart';
@@ -20,6 +19,9 @@ class TeacherProfileScreen extends ConsumerStatefulWidget {
 class _TeacherProfileScreenState extends ConsumerState<TeacherProfileScreen> {
   bool _isEditing = false;
   bool _showPasswordForm = false;
+  bool _obscureNewPassword = true;
+  bool _obscureConfirmPassword = true;
+  bool _isSavingPassword = false;
   final GlobalKey _passwordSectionKey = GlobalKey();
   final ScrollController _scrollController = ScrollController();
 
@@ -37,29 +39,22 @@ class _TeacherProfileScreenState extends ConsumerState<TeacherProfileScreen> {
     _usernameController = TextEditingController(text: user?.username ?? '');
     _emailController = TextEditingController(text: user?.email ?? '');
 
+    _newPasswordController.addListener(_onPasswordFieldsChanged);
+    _confirmPasswordController.addListener(_onPasswordFieldsChanged);
+
     if (user?.mustChangePassword == true) {
       _showPasswordForm = true;
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        // If app was reopened / launched directly to profile without passing through login screen
-        if (!RequiredChangePasswordDialog.hasSeenInThisSession && mounted) {
-          RequiredChangePasswordDialog.show(context, isTeacher: true);
-        }
-        // Auto-scroll to the change password card with guide highlight
-        Future.delayed(const Duration(milliseconds: 350), () {
-          if (_passwordSectionKey.currentContext != null) {
-            Scrollable.ensureVisible(
-              _passwordSectionKey.currentContext!,
-              duration: const Duration(milliseconds: 650),
-              curve: Curves.easeInOutCubic,
-            );
-          }
-        });
-      });
     }
+  }
+
+  void _onPasswordFieldsChanged() {
+    if (mounted) setState(() {});
   }
 
   @override
   void dispose() {
+    _newPasswordController.removeListener(_onPasswordFieldsChanged);
+    _confirmPasswordController.removeListener(_onPasswordFieldsChanged);
     _fullNameController.dispose();
     _usernameController.dispose();
     _emailController.dispose();
@@ -107,9 +102,11 @@ class _TeacherProfileScreenState extends ConsumerState<TeacherProfileScreen> {
         canPop: !currentUser.mustChangePassword,
         onPopInvokedWithResult: (didPop, result) {
           if (didPop) return;
-          RequiredChangePasswordDialog.show(context, isTeacher: true);
+          _showMustChangePasswordBackAlert(isTeacher: true);
         },
-        child: SafeArea(
+        child: currentUser.mustChangePassword
+            ? _buildMandatoryPasswordChangeView(currentUser)
+            : SafeArea(
           child: SingleChildScrollView(
             controller: _scrollController,
             padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 0),
@@ -733,12 +730,35 @@ class _TeacherProfileScreenState extends ConsumerState<TeacherProfileScreen> {
     }
 
     final user = ref.read(authProvider);
-    if (user == null || user.email.isEmpty) {
+    if (user == null) {
+      _showAlert('Error', 'Teacher account session not found.');
+      return;
+    }
+
+    // MANDATORY FIRST-TIME PASSWORD CHANGE: INSTANT UPDATE WITHOUT OTP!
+    if (user.mustChangePassword) {
+      setState(() => _isSavingPassword = true);
+      try {
+        await ref.read(authProvider.notifier).updateProfile(password: newPass);
+        if (!mounted) return;
+        _newPasswordController.clear();
+        _confirmPasswordController.clear();
+        _showSuccessUnlockedDialog(isTeacher: true);
+      } catch (e) {
+        if (!mounted) return;
+        _showAlert('Error', 'Failed to update password: $e');
+      } finally {
+        if (mounted) setState(() => _isSavingPassword = false);
+      }
+      return;
+    }
+
+    if (user.email.isEmpty) {
       _showAlert('Error', 'Teacher account or email could not be determined.');
       return;
     }
 
-    // Show sending progress indicator
+    // Show sending progress indicator for voluntary password change
     showDialog(
       context: context,
       barrierDismissible: false,
@@ -816,6 +836,377 @@ class _TeacherProfileScreenState extends ConsumerState<TeacherProfileScreen> {
         _showAlert('Success', 'Password changed successfully!');
       }
     }
+  }
+
+  void _showMustChangePasswordBackAlert({required bool isTeacher}) {
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: AppTheme.surface,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
+        title: Row(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                color: Colors.amber.withValues(alpha: 0.15),
+                shape: BoxShape.circle,
+              ),
+              child: const Icon(Icons.warning_amber_rounded, color: Colors.amberAccent, size: 24),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Text(
+                'Password Required',
+                style: TextStyle(
+                  color: AppTheme.text,
+                  fontWeight: FontWeight.bold,
+                  fontSize: 17,
+                ),
+              ),
+            ),
+          ],
+        ),
+        content: Text(
+          'For your account security, you must set a new password before you can use AIRAMP. You cannot go back or access courses until this step is completed.',
+          style: TextStyle(
+            color: AppTheme.textSecondary,
+            fontSize: 14,
+            height: 1.45,
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () {
+              Navigator.of(ctx).pop();
+              _handleLogout();
+            },
+            child: Text(
+              'Sign Out',
+              style: TextStyle(color: AppTheme.error, fontWeight: FontWeight.w600),
+            ),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.of(ctx).pop(),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppTheme.primary,
+              foregroundColor: Colors.black,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+            ),
+            child: const Text('Set Password Now', style: TextStyle(fontWeight: FontWeight.bold)),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // ═══════════════════════════════════════════════════════════
+  //  MANDATORY PASSWORD CHANGE VIEW (Unskippable First-Login)
+  // ═══════════════════════════════════════════════════════════
+  Widget _buildMandatoryPasswordChangeView(User currentUser) {
+    final isDark = AppTheme.isDark;
+    final newPass = _newPasswordController.text;
+    final confirmPass = _confirmPasswordController.text;
+    final hasMinLength = newPass.length >= 6;
+    final doPasswordsMatch = newPass.isNotEmpty && newPass == confirmPass;
+
+    return SafeArea(
+      child: Center(
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 20),
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 460),
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              crossAxisAlignment: CrossAxisAlignment.center,
+              children: [
+                // Glowing Security Shield
+                Container(
+                  width: 76,
+                  height: 76,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    gradient: LinearGradient(
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                      colors: [
+                        Colors.amber.shade400,
+                        const Color(0xFFFF8F00),
+                      ],
+                    ),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.amber.withValues(alpha: 0.35),
+                        blurRadius: 22,
+                        spreadRadius: 2,
+                        offset: const Offset(0, 6),
+                      ),
+                    ],
+                  ),
+                  child: const Center(
+                    child: Icon(
+                      Icons.lock_reset_rounded,
+                      size: 42,
+                      color: Colors.black,
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 20),
+
+                // Title
+                Text(
+                  'Password Change Required',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    fontSize: 22,
+                    fontWeight: FontWeight.bold,
+                    color: AppTheme.text,
+                    letterSpacing: -0.4,
+                  ),
+                ),
+                const SizedBox(height: 8),
+
+                // Personalized welcome & security notice
+                Text(
+                  'Welcome to AIRAMP, ${currentUser.fullName}!\nThis is a new account with a temporary password. You must set your personal password immediately to unlock your teaching dashboard.',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    fontSize: 13.5,
+                    color: AppTheme.textSecondary,
+                    height: 1.45,
+                  ),
+                ),
+                const SizedBox(height: 24),
+
+                // Form Container
+                Container(
+                  padding: const EdgeInsets.all(20),
+                  decoration: BoxDecoration(
+                    color: AppTheme.surface,
+                    borderRadius: BorderRadius.circular(18),
+                    border: Border.all(
+                      color: Colors.amberAccent.withValues(alpha: 0.5),
+                      width: 1.5,
+                    ),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withValues(alpha: 0.08),
+                        blurRadius: 18,
+                        offset: const Offset(0, 6),
+                      ),
+                    ],
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Create New Password',
+                        style: TextStyle(
+                          fontSize: 14,
+                          fontWeight: FontWeight.w700,
+                          color: AppTheme.text,
+                        ),
+                      ),
+                      const SizedBox(height: 12),
+
+                      // New Password Field
+                      TextField(
+                        controller: _newPasswordController,
+                        obscureText: _obscureNewPassword,
+                        style: TextStyle(color: AppTheme.text, fontSize: 14),
+                        decoration: InputDecoration(
+                          hintText: 'Enter new password',
+                          hintStyle: TextStyle(color: AppTheme.textMuted),
+                          prefixIcon: Icon(Icons.lock_outline_rounded, color: AppTheme.accent, size: 20),
+                          suffixIcon: IconButton(
+                            icon: Icon(
+                              _obscureNewPassword ? Icons.visibility_off_outlined : Icons.visibility_outlined,
+                              color: AppTheme.textMuted,
+                              size: 20,
+                            ),
+                            onPressed: () => setState(() => _obscureNewPassword = !_obscureNewPassword),
+                          ),
+                          filled: true,
+                          fillColor: AppTheme.inputBg,
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(12),
+                            borderSide: BorderSide(color: AppTheme.border),
+                          ),
+                          enabledBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(12),
+                            borderSide: BorderSide(color: AppTheme.border),
+                          ),
+                          focusedBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(12),
+                            borderSide: BorderSide(color: AppTheme.primary, width: 1.5),
+                          ),
+                          contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
+                        ),
+                      ),
+                      const SizedBox(height: 14),
+
+                      Text(
+                        'Confirm New Password',
+                        style: TextStyle(
+                          fontSize: 14,
+                          fontWeight: FontWeight.w700,
+                          color: AppTheme.text,
+                        ),
+                      ),
+                      const SizedBox(height: 12),
+
+                      // Confirm Password Field
+                      TextField(
+                        controller: _confirmPasswordController,
+                        obscureText: _obscureConfirmPassword,
+                        style: TextStyle(color: AppTheme.text, fontSize: 14),
+                        decoration: InputDecoration(
+                          hintText: 'Re-enter new password',
+                          hintStyle: TextStyle(color: AppTheme.textMuted),
+                          prefixIcon: Icon(Icons.lock_clock_outlined, color: AppTheme.accent, size: 20),
+                          suffixIcon: IconButton(
+                            icon: Icon(
+                              _obscureConfirmPassword ? Icons.visibility_off_outlined : Icons.visibility_outlined,
+                              color: AppTheme.textMuted,
+                              size: 20,
+                            ),
+                            onPressed: () => setState(() => _obscureConfirmPassword = !_obscureConfirmPassword),
+                          ),
+                          filled: true,
+                          fillColor: AppTheme.inputBg,
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(12),
+                            borderSide: BorderSide(color: AppTheme.border),
+                          ),
+                          enabledBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(12),
+                            borderSide: BorderSide(color: AppTheme.border),
+                          ),
+                          focusedBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(12),
+                            borderSide: BorderSide(color: AppTheme.primary, width: 1.5),
+                          ),
+                          contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
+                        ),
+                      ),
+                      const SizedBox(height: 16),
+
+                      // Criteria checklist
+                      Container(
+                        padding: const EdgeInsets.all(12),
+                        decoration: BoxDecoration(
+                          color: isDark ? Colors.white.withValues(alpha: 0.03) : Colors.grey.shade100,
+                          borderRadius: BorderRadius.circular(10),
+                          border: Border.all(
+                            color: isDark ? Colors.white10 : Colors.grey.shade300,
+                          ),
+                        ),
+                        child: Column(
+                          children: [
+                            _buildRequirementRow(
+                              text: 'At least 6 characters',
+                              isMet: hasMinLength,
+                            ),
+                            const SizedBox(height: 6),
+                            _buildRequirementRow(
+                              text: 'Passwords match',
+                              isMet: doPasswordsMatch,
+                            ),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(height: 20),
+
+                      // Submit Button (Instant save)
+                      SizedBox(
+                        width: double.infinity,
+                        height: 48,
+                        child: ElevatedButton(
+                          onPressed: _isSavingPassword ? null : _handleChangePassword,
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: Colors.amber.shade400,
+                            foregroundColor: Colors.black,
+                            elevation: 2,
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                          ),
+                          child: _isSavingPassword
+                              ? const SizedBox(
+                                  width: 22,
+                                  height: 22,
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 2.5,
+                                    color: Colors.black,
+                                  ),
+                                )
+                              : const Row(
+                                  mainAxisAlignment: MainAxisAlignment.center,
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    Icon(Icons.check_circle_outline_rounded, size: 18, color: Colors.black),
+                                    SizedBox(width: 8),
+                                    Flexible(
+                                      child: Text(
+                                        'Save Password & Unlock Account',
+                                        overflow: TextOverflow.ellipsis,
+                                        style: TextStyle(
+                                          fontSize: 14,
+                                          fontWeight: FontWeight.bold,
+                                          letterSpacing: 0.2,
+                                        ),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 24),
+
+                // Sign Out Option
+                TextButton.icon(
+                  onPressed: _handleLogout,
+                  icon: Icon(Icons.logout_rounded, size: 18, color: AppTheme.error),
+                  label: Text(
+                    'Sign out to switch account',
+                    style: TextStyle(
+                      color: AppTheme.error,
+                      fontSize: 13.5,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildRequirementRow({required String text, required bool isMet}) {
+    return Row(
+      children: [
+        Icon(
+          isMet ? Icons.check_circle_rounded : Icons.radio_button_unchecked_rounded,
+          size: 16,
+          color: isMet ? Colors.greenAccent : AppTheme.textMuted,
+        ),
+        const SizedBox(width: 8),
+        Text(
+          text,
+          style: TextStyle(
+            fontSize: 12.5,
+            color: isMet ? AppTheme.text : AppTheme.textMuted,
+            fontWeight: isMet ? FontWeight.w600 : FontWeight.normal,
+          ),
+        ),
+      ],
+    );
   }
 
   void _showSuccessUnlockedDialog({required bool isTeacher}) {

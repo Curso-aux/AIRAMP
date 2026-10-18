@@ -3587,79 +3587,88 @@ class DatabaseHelper {
       );
     } catch (_) {}
 
-    // Ensure authentic students across multiple sections exist and are enrolled in teacher courses
+    // Ensure authentic students exist: only seed defaults if no real students exist
     try {
-      final defaultStudents = [
-        {
-          'id': 'student_1',
-          'email': 'maria@test.com',
-          'username': 'maria.lopez',
-          'password': 'Maria@123',
-          'role': 'student',
-          'full_name': 'Maria Lopez',
-          'section': 'Grade 10 - Emerald',
-          'grade': 'Grade 10',
-          'created_at': DateTime.now().subtract(const Duration(days: 5)).toIso8601String(),
-        },
-        {
-          'id': 'student_2',
-          'email': 'juan.delacruz@school.edu',
-          'username': 'juan.delacruz',
-          'password': 'Juan@123',
-          'role': 'student',
-          'full_name': 'Juan Dela Cruz',
-          'section': 'Grade 10 - Emerald',
-          'grade': 'Grade 10',
-          'created_at': DateTime.now().subtract(const Duration(days: 4)).toIso8601String(),
-        },
-        {
-          'id': 'student_3',
-          'email': 'angela.santos@school.edu',
-          'username': 'angela.santos',
-          'password': 'Angela@123',
-          'role': 'student',
-          'full_name': 'Angela Santos',
-          'section': 'Grade 11 - STEM B',
-          'grade': 'Grade 11',
-          'created_at': DateTime.now().subtract(const Duration(days: 4)).toIso8601String(),
-        },
-        {
-          'id': 'student_4',
-          'email': 'mark.bautista@school.edu',
-          'username': 'mark.bautista',
-          'password': 'Mark@123',
-          'role': 'student',
-          'full_name': 'Mark Bautista',
-          'section': 'Grade 10 - Emerald',
-          'grade': 'Grade 10',
-          'created_at': DateTime.now().subtract(const Duration(days: 3)).toIso8601String(),
-        },
-      ];
+      final realStudentCount = Sqflite.firstIntValue(await db.rawQuery(
+        "SELECT COUNT(*) FROM users WHERE role = 'student' AND email NOT LIKE '%@school.edu' AND email != 'maria@test.com'"
+      )) ?? 0;
 
-      for (final s in defaultStudents) {
-        final existing = await db.query('users', where: 'id = ? OR email = ?', whereArgs: [s['id'], s['email']]);
-        if (existing.isEmpty) {
-          final salt = generateSalt();
-          final userToInsert = Map<String, dynamic>.from(s);
-          userToInsert['password'] = hashPassword(s['password'] as String, salt);
-          userToInsert['password_salt'] = salt;
-          await db.insert('users', userToInsert);
-        } else {
-          final currentSalt = existing.first['password_salt'] as String?;
-          final currentPass = existing.first['password'] as String?;
-          final updateData = <String, dynamic>{
-            'section': s['section'],
-            'grade': s['grade'],
+      if (realStudentCount == 0) {
+        final defaultStudents = [
+          {
+            'id': 'student_1',
+            'email': 'maria@test.com',
+            'username': 'maria.lopez',
+            'password': 'Maria@123',
             'role': 'student',
-            'full_name': s['full_name'],
-          };
-          if (currentSalt == null || currentSalt.isEmpty || currentPass == s['password']) {
+            'full_name': 'Maria Lopez',
+            'section': 'Grade 10 - Emerald',
+            'grade': 'Grade 10',
+            'created_at': DateTime.now().subtract(const Duration(days: 5)).toIso8601String(),
+          },
+          {
+            'id': 'student_2',
+            'email': 'juan.delacruz@school.edu',
+            'username': 'juan.delacruz',
+            'password': 'Juan@123',
+            'role': 'student',
+            'full_name': 'Juan Dela Cruz',
+            'section': 'Grade 10 - Emerald',
+            'grade': 'Grade 10',
+            'created_at': DateTime.now().subtract(const Duration(days: 4)).toIso8601String(),
+          },
+          {
+            'id': 'student_3',
+            'email': 'angela.santos@school.edu',
+            'username': 'angela.santos',
+            'password': 'Angela@123',
+            'role': 'student',
+            'full_name': 'Angela Santos',
+            'section': 'Grade 11 - STEM B',
+            'grade': 'Grade 11',
+            'created_at': DateTime.now().subtract(const Duration(days: 4)).toIso8601String(),
+          },
+          {
+            'id': 'student_4',
+            'email': 'mark.bautista@school.edu',
+            'username': 'mark.bautista',
+            'password': 'Mark@123',
+            'role': 'student',
+            'full_name': 'Mark Bautista',
+            'section': 'Grade 10 - Emerald',
+            'grade': 'Grade 10',
+            'created_at': DateTime.now().subtract(const Duration(days: 3)).toIso8601String(),
+          },
+        ];
+
+        for (final s in defaultStudents) {
+          final existing = await db.query('users', where: 'id = ? OR email = ?', whereArgs: [s['id'], s['email']]);
+          if (existing.isEmpty) {
             final salt = generateSalt();
-            updateData['password'] = hashPassword(s['password'] as String, salt);
-            updateData['password_salt'] = salt;
+            final userToInsert = Map<String, dynamic>.from(s);
+            userToInsert['password'] = hashPassword(s['password'] as String, salt);
+            userToInsert['password_salt'] = salt;
+            await db.insert('users', userToInsert);
+          } else {
+            final currentSalt = existing.first['password_salt'] as String?;
+            final currentPass = existing.first['password'] as String?;
+            final updateData = <String, dynamic>{
+              'section': s['section'],
+              'grade': s['grade'],
+              'role': 'student',
+              'full_name': s['full_name'],
+            };
+            if (currentSalt == null || currentSalt.isEmpty || currentPass == s['password']) {
+              final salt = generateSalt();
+              updateData['password'] = hashPassword(s['password'] as String, salt);
+              updateData['password_salt'] = salt;
+            }
+            await db.update('users', updateData, where: 'id = ?', whereArgs: [s['id']]);
           }
-          await db.update('users', updateData, where: 'id = ?', whereArgs: [s['id']]);
         }
+      } else {
+        // Real students exist; clean out mock student seeds from local database
+        await db.delete('users', where: "id IN ('student_1', 'student_2', 'student_3', 'student_4') OR email LIKE '%@school.edu'");
       }
 
       // Normalize existing student records to valid section names from the sections table

@@ -344,21 +344,37 @@ class FirestoreService {
     return user != null;
   }
 
-  /// Syncs all existing local SQLite users to Cloud Firestore so no accounts are lost
+  /// Syncs all existing local SQLite users to Cloud Firestore so no authentic accounts are lost
   Future<void> syncLocalUsersToCloud() async {
     try {
       final db = await DatabaseHelper().database;
       final localUsers = await db.query('users');
+      int pushedCount = 0;
       for (final user in localUsers) {
+        final email = (user['email'] as String? ?? '').toLowerCase().trim();
+        final id = (user['id'] as String? ?? '').toLowerCase().trim();
+        final isTestDummy = email.contains('newstudent_') ||
+            email.contains('dup_student_') ||
+            email.contains('newteacher_') ||
+            email.contains('test_') ||
+            email.contains('security_test_') ||
+            email.contains('legacy_user_') ||
+            email.contains('@school.edu') ||
+            email == 'maria@test.com' ||
+            id.startsWith('student_test_') ||
+            id.startsWith('teacher_test_');
+        if (isTestDummy) continue;
+
         await saveUser(user);
+        pushedCount++;
       }
-      debugPrint('[FirestoreService] Pushed ${localUsers.length} local users to Cloud Firestore');
+      debugPrint('[FirestoreService] Pushed $pushedCount authentic local users to Cloud Firestore');
     } catch (e) {
       debugPrint('[FirestoreService] Error pushing local users to Cloud: $e');
     }
   }
 
-  /// Syncs Cloud Firestore users down to local SQLite cache
+  /// Syncs Cloud Firestore users down to local SQLite cache and prunes deleted accounts
   Future<void> syncCloudUsersToLocal() async {
     try {
       List<Map<String, dynamic>> cloudUsers = [];
@@ -382,11 +398,16 @@ class FirestoreService {
 
       final db = await DatabaseHelper().database;
 
+      final cloudIds = <String>{};
+      final cloudEmails = <String>{};
+
       for (final data in cloudUsers) {
         try {
           final userId = data['id']?.toString();
           if (userId == null || userId.isEmpty) continue;
           final email = (data['email']?.toString() ?? '').toLowerCase().trim();
+          cloudIds.add(userId);
+          if (email.isNotEmpty) cloudEmails.add(email);
 
           List<Map<String, dynamic>> existing = await db.query('users', where: 'id = ?', whereArgs: [userId]);
           if (existing.isEmpty && email.isNotEmpty) {
@@ -400,7 +421,7 @@ class FirestoreService {
             'password': data['password'] ?? '',
             'password_salt': data['password_salt'],
             'role': data['role'] ?? 'student',
-            'full_name': data['full_name'] ?? '',
+            'full_name': data['full_name'] ?? data['name'] ?? '',
             'section': data['section'],
             'grade': data['grade'],
             'student_type': data['student_type'] ?? 'regular',
@@ -419,6 +440,27 @@ class FirestoreService {
           debugPrint('[FirestoreService] Note syncing user ${data['id']}: $e');
         }
       }
+
+      // Prune local SQLite users that no longer exist in Cloud Firestore
+      final localUsers = await db.query('users');
+      for (final local in localUsers) {
+        final localId = local['id']?.toString() ?? '';
+        final localEmail = (local['email']?.toString() ?? '').toLowerCase().trim();
+
+        // Keep system super_admin seeds if needed, otherwise verify presence in cloud
+        final isPermanentSeed = localId == 'admin_1' || localId == 'superadmin_1';
+        if (!isPermanentSeed && !cloudIds.contains(localId) && !cloudEmails.contains(localEmail)) {
+          await db.delete('users', where: 'id = ?', whereArgs: [localId]);
+          try {
+            await db.delete('enrollments', where: 'student_id = ?', whereArgs: [localId]);
+            await db.delete('quiz_attempts', where: 'student_id = ?', whereArgs: [localId]);
+            await db.delete('student_progress', where: 'student_id = ?', whereArgs: [localId]);
+            await db.delete('submissions', where: 'student_id = ?', whereArgs: [localId]);
+          } catch (_) {}
+          debugPrint('[FirestoreService] Pruned obsolete local user: $localId ($localEmail)');
+        }
+      }
+
       debugPrint('[FirestoreService] Synced ${cloudUsers.length} Cloud Firestore users to local SQLite cache');
     } catch (e) {
       debugPrint('[FirestoreService] Error syncing cloud users to local SQLite: $e');

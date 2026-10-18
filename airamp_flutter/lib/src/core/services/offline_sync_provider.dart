@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../database/firestore_service.dart';
 
 enum SyncConnectivityStatus {
   onlineSynced,
@@ -68,8 +69,8 @@ class OfflineSyncNotifier extends Notifier<OfflineSyncState> {
     );
 
     try {
-      // Simulate/perform async sync roundtrip
-      await Future.delayed(const Duration(milliseconds: 1200));
+      // Perform actual Cloud Firestore to local SQLite sync roundtrip
+      await FirestoreService().syncCloudUsersToLocal();
 
       state = state.copyWith(
         status: SyncConnectivityStatus.onlineSynced,

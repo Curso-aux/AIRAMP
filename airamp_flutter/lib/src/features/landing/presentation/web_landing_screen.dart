@@ -21,14 +21,38 @@ class WebLandingScreen extends ConsumerStatefulWidget {
 class _WebLandingScreenState extends ConsumerState<WebLandingScreen> {
   final GlobalKey _ecosystemKey = GlobalKey();
   final ScrollController _scrollController = ScrollController();
+  bool _showExplorePrompt = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _scrollController.addListener(_onScroll);
+  }
+
+  void _onScroll() {
+    if (!_scrollController.hasClients) return;
+    if (_scrollController.offset > 20) {
+      if (_showExplorePrompt) {
+        setState(() => _showExplorePrompt = false);
+      }
+    } else {
+      if (!_showExplorePrompt) {
+        setState(() => _showExplorePrompt = true);
+      }
+    }
+  }
 
   @override
   void dispose() {
+    _scrollController.removeListener(_onScroll);
     _scrollController.dispose();
     super.dispose();
   }
 
   void _scrollToEcosystem() {
+    if (_showExplorePrompt) {
+      setState(() => _showExplorePrompt = false);
+    }
     if (_ecosystemKey.currentContext != null) {
       Scrollable.ensureVisible(
         _ecosystemKey.currentContext!,
@@ -47,6 +71,7 @@ class _WebLandingScreenState extends ConsumerState<WebLandingScreen> {
     final size = MediaQuery.of(context).size;
     final isMobile = size.width < 768;
     final isTablet = size.width >= 768 && size.width < 1100;
+    final contentPadding = isMobile ? 16.0 : (isTablet ? 32.0 : 40.0);
 
     return Scaffold(
       backgroundColor: theme.scaffoldBackgroundColor,
@@ -72,304 +97,334 @@ class _WebLandingScreenState extends ConsumerState<WebLandingScreen> {
                     ),
 
                     // ── 3-Pillar Ecosystem Grid ──────────────────────────
-                    Container(
-                      key: _ecosystemKey,
-                      width: double.infinity,
-                      padding: EdgeInsets.symmetric(
-                        horizontal: isMobile ? 20 : (isTablet ? 40 : 80),
-                        vertical: isMobile ? 40 : 64,
-                      ),
-                      child: Column(
-                      children: [
-                        Text(
-                          'AIRAMP Role Ecosystem',
-                          style: TextStyle(
-                            color: AppTheme.text,
-                            fontSize: isMobile ? 22 : 28,
-                            fontWeight: FontWeight.w800,
+                    Center(
+                      child: ConstrainedBox(
+                        constraints: const BoxConstraints(maxWidth: 1200),
+                        child: Container(
+                          key: _ecosystemKey,
+                          width: double.infinity,
+                          padding: EdgeInsets.fromLTRB(
+                            contentPadding,
+                            isMobile ? 48.0 : 80.0,
+                            contentPadding,
+                            isMobile ? 36.0 : 48.0,
                           ),
-                        ),
-                        const SizedBox(height: 10),
-                        Text(
-                          'Dedicated platforms customized for each role in the academic institution',
-                          textAlign: TextAlign.center,
-                          style: TextStyle(
-                            color: AppTheme.textSecondary,
-                            fontSize: 14,
-                          ),
-                        ),
-                        const SizedBox(height: 36),
-
-                        // Pillars Cards (Interactive Role CTAs & Flex-Column Layout)
-                        LayoutBuilder(
-                          builder: (context, constraints) {
-                            if (constraints.maxWidth > 900) {
-                              return IntrinsicHeight(
-                                child: Row(
-                                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                                  children: [
-                                    Expanded(
-                                      child: _buildRoleCard(
-                                        context,
-                                        title: 'Admin Web Console',
-                                        subtitle: 'Institutional Oversight',
-                                        icon: Icons.admin_panel_settings_rounded,
-                                        badge: 'Active on Web',
-                                        isFeatured: true,
-                                        color: AppTheme.primary,
-                                        items: [
-                                          'Live school analytics and pass rates',
-                                          'Curriculum management (Subjects, Topics, LOs)',
-                                          'Organize student cohorts & enrollment sections',
-                                          'Generate & distribute section enrollment keys',
-                                          'Broadcast school-wide announcements',
-                                        ],
-                                        ctaText: 'Sign in as Admin →',
-                                        onCta: () => _navigateToLogin(context, role: 'admin'),
-                                      ),
-                                    ),
-                                    const SizedBox(width: 20),
-                                    Expanded(
-                                      child: _buildRoleCard(
-                                        context,
-                                        title: 'Teacher Portal',
-                                        subtitle: 'Classroom & Scoring Hub',
-                                        icon: Icons.assignment_ind_rounded,
-                                        badge: 'Web & Desktop',
-                                        isFeatured: false,
-                                        color: AppTheme.accent,
-                                        items: [
-                                          'Section & class cohort tracking',
-                                          'Student assessment scorebooks',
-                                          'Direct messaging & student consultations',
-                                          'Learning outcome pacing and mastery tracking',
-                                          'Class announcements broadcast',
-                                        ],
-                                        ctaText: 'Sign in as Teacher →',
-                                        onCta: () => _navigateToLogin(context, role: 'teacher'),
-                                      ),
-                                    ),
-                                    const SizedBox(width: 20),
-                                    Expanded(
-                                      child: _buildRoleCard(
-                                        context,
-                                        title: 'Student Portal',
-                                        subtitle: 'Personalized Learning',
-                                        icon: Icons.school_rounded,
-                                        badge: 'Web, Mobile & Desktop',
-                                        isFeatured: false,
-                                        color: AppTheme.info,
-                                        items: [
-                                          'Offline-ready interactive learning modules',
-                                          'Sequential or flexible Learning Outcome navigation',
-                                          'Instant quiz feedback & mastery scores',
-                                          'Section key enrollment self-service',
-                                          'Direct teacher inquiries & study support',
-                                        ],
-                                        ctaText: 'Sign in as Student →',
-                                        onCta: () => _navigateToLogin(context, role: 'student'),
-                                      ),
-                                    ),
-                                  ],
+                          child: Column(
+                            children: [
+                              Text(
+                                'AIRAMP Role Ecosystem',
+                                style: TextStyle(
+                                  color: AppTheme.text,
+                                  fontSize: isMobile ? 22 : 28,
+                                  fontWeight: FontWeight.w800,
                                 ),
-                              );
-                            } else {
-                              // Stacked for tablet / mobile
-                              return Column(
-                                children: [
-                                  _buildRoleCard(
-                                    context,
-                                    title: 'Admin Web Console',
-                                    subtitle: 'Institutional Oversight',
-                                    icon: Icons.admin_panel_settings_rounded,
-                                    badge: 'Active on Web',
-                                    isFeatured: true,
-                                    color: AppTheme.primary,
-                                    items: [
-                                      'Live school analytics and pass rates',
-                                      'Curriculum management (Subjects, Topics, LOs)',
-                                      'Organize student cohorts & enrollment sections',
-                                      'Generate & distribute section enrollment keys',
-                                      'Broadcast school-wide announcements',
-                                    ],
-                                    ctaText: 'Sign in as Admin →',
-                                    onCta: () => _navigateToLogin(context, role: 'admin'),
-                                  ),
-                                  const SizedBox(height: 20),
-                                  _buildRoleCard(
-                                    context,
-                                    title: 'Teacher Portal',
-                                    subtitle: 'Classroom & Scoring Hub',
-                                    icon: Icons.assignment_ind_rounded,
-                                    badge: 'Web & Desktop',
-                                    isFeatured: false,
-                                    color: AppTheme.accent,
-                                    items: [
-                                      'Section & class cohort tracking',
-                                      'Student assessment scorebooks',
-                                      'Direct messaging & student consultations',
-                                      'Learning outcome pacing and mastery tracking',
-                                      'Class announcements broadcast',
-                                    ],
-                                    ctaText: 'Sign in as Teacher →',
-                                    onCta: () => _navigateToLogin(context, role: 'teacher'),
-                                  ),
-                                  const SizedBox(height: 20),
-                                  _buildRoleCard(
-                                    context,
-                                    title: 'Student Portal',
-                                    subtitle: 'Personalized Learning',
-                                    icon: Icons.school_rounded,
-                                    badge: 'Web, Mobile & Desktop',
-                                    isFeatured: false,
-                                    color: AppTheme.info,
-                                    items: [
-                                      'Offline-ready interactive learning modules',
-                                      'Sequential or flexible Learning Outcome navigation',
-                                      'Instant quiz feedback & mastery scores',
-                                      'Section key enrollment self-service',
-                                      'Direct teacher inquiries & study support',
-                                    ],
-                                    ctaText: 'Sign in as Student →',
-                                    onCta: () => _navigateToLogin(context, role: 'student'),
-                                  ),
-                                ],
-                              );
-                            }
-                          },
-                        ),
-                      ],
-                    ),
-                  ),
+                              ),
+                              const SizedBox(height: 10),
+                              Text(
+                                'Dedicated platforms customized for each role in the academic institution',
+                                textAlign: TextAlign.center,
+                                style: TextStyle(
+                                  color: AppTheme.textSecondary,
+                                  fontSize: 14,
+                                ),
+                              ),
+                              const SizedBox(height: 36),
 
-            // ── Interactive School Management Assistant Section ────
-            Container(
-              margin: EdgeInsets.symmetric(
-                horizontal: isMobile ? 20 : (isTablet ? 40 : 80),
-                vertical: 20,
-              ),
-              decoration: BoxDecoration(
-                color: isDark
-                    ? const Color(0xFF0F172A).withValues(alpha: 0.55)
-                    : Colors.white.withValues(alpha: 0.75),
-                borderRadius: BorderRadius.circular(24),
-                border: Border.all(
-                  color: isDark
-                      ? Colors.white.withValues(alpha: 0.1)
-                      : Colors.black.withValues(alpha: 0.08),
-                ),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black.withValues(alpha: isDark ? 0.35 : 0.06),
-                    blurRadius: 24,
-                    offset: const Offset(0, 8),
-                  ),
-                ],
-              ),
-              child: PlaceholdersAndVanishInputDemo(
-                isDark: isDark,
-                isCompact: isMobile,
-              ),
-            ),
-
-            // ── Cross-Platform Ecosystem Cloud (Animated) ──────────
-            Container(
-              margin: EdgeInsets.symmetric(
-                horizontal: isMobile ? 20 : (isTablet ? 40 : 80),
-                vertical: 16,
-              ),
-              child: CrossPlatformEcosystemCloud(
-                isDark: isDark,
-                isCompact: isMobile,
-              ),
-            ),
-
-            // ── Access Authorization Notice ───────────────────────
-            Container(
-              margin: EdgeInsets.symmetric(
-                horizontal: isMobile ? 20 : (isTablet ? 40 : 80),
-                vertical: 24,
-              ),
-              padding: const EdgeInsets.all(24),
-              decoration: BoxDecoration(
-                color: AppTheme.surfaceLight,
-                borderRadius: BorderRadius.circular(16),
-                border: Border.all(
-                  color: AppTheme.primary.withValues(alpha: 0.25),
-                ),
-              ),
-              child: Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Container(
-                    padding: const EdgeInsets.all(10),
-                    decoration: BoxDecoration(
-                      color: AppTheme.primary.withValues(alpha: 0.15),
-                      shape: BoxShape.circle,
-                    ),
-                    child: Icon(Icons.devices_rounded, color: AppTheme.primary, size: 28),
-                  ),
-                  const SizedBox(width: 18),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        const Text(
-                          'Institutional & Multi-Device Access Guidelines',
-                          style: TextStyle(
-                            fontSize: 16,
-                            fontWeight: FontWeight.w800,
+                              // Pillars Cards (Interactive Role CTAs & Flex-Column Layout)
+                              LayoutBuilder(
+                                builder: (context, constraints) {
+                                  if (constraints.maxWidth > 900) {
+                                    return IntrinsicHeight(
+                                      child: Row(
+                                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                                        children: [
+                                          Expanded(
+                                            child: _buildRoleCard(
+                                              context,
+                                              title: 'Admin Web Console',
+                                              subtitle: 'Institutional Oversight',
+                                              icon: Icons.admin_panel_settings_rounded,
+                                              badge: 'Active on Web',
+                                              isFeatured: true,
+                                              color: AppTheme.primary,
+                                              items: [
+                                                'Live school analytics and pass rates',
+                                                'Curriculum management (Subjects, Topics, LOs)',
+                                                'Organize student cohorts & enrollment sections',
+                                                'Generate & distribute section enrollment keys',
+                                                'Broadcast school-wide announcements',
+                                              ],
+                                              ctaText: 'Sign in as Admin →',
+                                              onCta: () => _navigateToLogin(context, role: 'admin'),
+                                            ),
+                                          ),
+                                          const SizedBox(width: 20),
+                                          Expanded(
+                                            child: _buildRoleCard(
+                                              context,
+                                              title: 'Teacher Portal',
+                                              subtitle: 'Classroom & Scoring Hub',
+                                              icon: Icons.assignment_ind_rounded,
+                                              badge: 'Web & Desktop',
+                                              isFeatured: false,
+                                              color: AppTheme.accent,
+                                              items: [
+                                                'Section & class cohort tracking',
+                                                'Student assessment scorebooks',
+                                                'Direct messaging & student consultations',
+                                                'Learning outcome pacing and mastery tracking',
+                                                'Class announcements broadcast',
+                                              ],
+                                              ctaText: 'Sign in as Teacher →',
+                                              onCta: () => _navigateToLogin(context, role: 'teacher'),
+                                            ),
+                                          ),
+                                          const SizedBox(width: 20),
+                                          Expanded(
+                                            child: _buildRoleCard(
+                                              context,
+                                              title: 'Student Portal',
+                                              subtitle: 'Personalized Learning',
+                                              icon: Icons.school_rounded,
+                                              badge: 'Web, Mobile & Desktop',
+                                              isFeatured: false,
+                                              color: AppTheme.info,
+                                              items: [
+                                                'Offline-ready interactive learning modules',
+                                                'Sequential or flexible Learning Outcome navigation',
+                                                'Instant quiz feedback & mastery scores',
+                                                'Section key enrollment self-service',
+                                                'Direct teacher inquiries & study support',
+                                              ],
+                                              ctaText: 'Sign in as Student →',
+                                              onCta: () => _navigateToLogin(context, role: 'student'),
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    );
+                                  } else {
+                                    // Stacked for tablet / mobile
+                                    return Column(
+                                      children: [
+                                        _buildRoleCard(
+                                          context,
+                                          title: 'Admin Web Console',
+                                          subtitle: 'Institutional Oversight',
+                                          icon: Icons.admin_panel_settings_rounded,
+                                          badge: 'Active on Web',
+                                          isFeatured: true,
+                                          color: AppTheme.primary,
+                                          items: [
+                                            'Live school analytics and pass rates',
+                                            'Curriculum management (Subjects, Topics, LOs)',
+                                            'Organize student cohorts & enrollment sections',
+                                            'Generate & distribute section enrollment keys',
+                                            'Broadcast school-wide announcements',
+                                          ],
+                                          ctaText: 'Sign in as Admin →',
+                                          onCta: () => _navigateToLogin(context, role: 'admin'),
+                                        ),
+                                        const SizedBox(height: 20),
+                                        _buildRoleCard(
+                                          context,
+                                          title: 'Teacher Portal',
+                                          subtitle: 'Classroom & Scoring Hub',
+                                          icon: Icons.assignment_ind_rounded,
+                                          badge: 'Web & Desktop',
+                                          isFeatured: false,
+                                          color: AppTheme.accent,
+                                          items: [
+                                            'Section & class cohort tracking',
+                                            'Student assessment scorebooks',
+                                            'Direct messaging & student consultations',
+                                            'Learning outcome pacing and mastery tracking',
+                                            'Class announcements broadcast',
+                                          ],
+                                          ctaText: 'Sign in as Teacher →',
+                                          onCta: () => _navigateToLogin(context, role: 'teacher'),
+                                        ),
+                                        const SizedBox(height: 20),
+                                        _buildRoleCard(
+                                          context,
+                                          title: 'Student Portal',
+                                          subtitle: 'Personalized Learning',
+                                          icon: Icons.school_rounded,
+                                          badge: 'Web, Mobile & Desktop',
+                                          isFeatured: false,
+                                          color: AppTheme.info,
+                                          items: [
+                                            'Offline-ready interactive learning modules',
+                                            'Sequential or flexible Learning Outcome navigation',
+                                            'Instant quiz feedback & mastery scores',
+                                            'Section key enrollment self-service',
+                                            'Direct teacher inquiries & study support',
+                                          ],
+                                          ctaText: 'Sign in as Student →',
+                                          onCta: () => _navigateToLogin(context, role: 'student'),
+                                        ),
+                                      ],
+                                    );
+                                  }
+                                },
+                              ),
+                            ],
                           ),
                         ),
-                        const SizedBox(height: 6),
-                        Text(
-                          'AIRAMP supports seamless multi-device accessibility. Administrators manage institutional curriculum, section keys, and master schedules via the Web Console. Teachers and students can sign in directly through the web portal or use dedicated Windows and mobile applications for offline lesson caching and continuous synchronization.',
-                          style: TextStyle(
-                            color: AppTheme.textSecondary,
-                            fontSize: 13,
-                            height: 1.5,
+                      ),
+                    ),
+
+                    // ── Interactive School Management Assistant Section ────
+                    Center(
+                      child: ConstrainedBox(
+                        constraints: const BoxConstraints(maxWidth: 1200),
+                        child: Padding(
+                          padding: EdgeInsets.symmetric(horizontal: contentPadding),
+                          child: Container(
+                            margin: const EdgeInsets.symmetric(vertical: 20),
+                            decoration: BoxDecoration(
+                              color: isDark
+                                  ? const Color(0xFF0F172A).withValues(alpha: 0.55)
+                                  : Colors.white.withValues(alpha: 0.75),
+                              borderRadius: BorderRadius.circular(24),
+                              border: Border.all(
+                                color: isDark
+                                    ? Colors.white.withValues(alpha: 0.1)
+                                    : Colors.black.withValues(alpha: 0.08),
+                              ),
+                              boxShadow: [
+                                BoxShadow(
+                                  color: Colors.black.withValues(alpha: isDark ? 0.35 : 0.06),
+                                  blurRadius: 24,
+                                  offset: const Offset(0, 8),
+                                ),
+                              ],
+                            ),
+                            child: PlaceholdersAndVanishInputDemo(
+                              isDark: isDark,
+                              isCompact: isMobile,
+                            ),
                           ),
                         ),
-                      ],
+                      ),
                     ),
-                  ),
-                ],
-              ),
-            ),
 
-            // ── Footer ───────────────────────────────────────────
-            Container(
-              width: double.infinity,
-              padding: const EdgeInsets.symmetric(vertical: 28, horizontal: 32),
-              decoration: BoxDecoration(
-                border: Border(
-                  top: BorderSide(
-                    color: isDark ? Colors.white.withValues(alpha: 0.08) : Colors.black.withValues(alpha: 0.06),
-                  ),
-                ),
-              ),
-              child: Column(
-                children: [
-                  Text(
-                    'AIRAMP © 2026 Academic Integrated Review & Assessment Management Platform',
-                    textAlign: TextAlign.center,
-                    style: TextStyle(
-                      color: AppTheme.textSecondary,
-                      fontSize: 12,
+                    // ── Cross-Platform Ecosystem Cloud (Animated) ──────────
+                    Center(
+                      child: ConstrainedBox(
+                        constraints: const BoxConstraints(maxWidth: 1200),
+                        child: Padding(
+                          padding: EdgeInsets.symmetric(horizontal: contentPadding),
+                          child: Container(
+                            margin: const EdgeInsets.symmetric(vertical: 16),
+                            child: CrossPlatformEcosystemCloud(
+                              isDark: isDark,
+                              isCompact: isMobile,
+                            ),
+                          ),
+                        ),
+                      ),
                     ),
-                  ),
-                  const SizedBox(height: 6),
-                  Text(
-                    'Built for DepEd Senior High School Competencies & Institutional Analytics',
-                    textAlign: TextAlign.center,
-                    style: TextStyle(
-                      color: AppTheme.textMuted,
-                      fontSize: 11,
+
+                    // ── Access Authorization Notice ───────────────────────
+                    Center(
+                      child: ConstrainedBox(
+                        constraints: const BoxConstraints(maxWidth: 1200),
+                        child: Padding(
+                          padding: EdgeInsets.symmetric(horizontal: contentPadding),
+                          child: Container(
+                            margin: const EdgeInsets.symmetric(vertical: 24),
+                            padding: const EdgeInsets.all(24),
+                            decoration: BoxDecoration(
+                              color: AppTheme.surfaceLight,
+                              borderRadius: BorderRadius.circular(16),
+                              border: Border.all(
+                                color: AppTheme.primary.withValues(alpha: 0.25),
+                              ),
+                            ),
+                            child: Row(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Container(
+                                  padding: const EdgeInsets.all(10),
+                                  decoration: BoxDecoration(
+                                    color: AppTheme.primary.withValues(alpha: 0.15),
+                                    shape: BoxShape.circle,
+                                  ),
+                                  child: Icon(Icons.devices_rounded, color: AppTheme.primary, size: 28),
+                                ),
+                                const SizedBox(width: 18),
+                                Expanded(
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      const Text(
+                                        'Institutional & Multi-Device Access Guidelines',
+                                        style: TextStyle(
+                                          fontSize: 16,
+                                          fontWeight: FontWeight.w800,
+                                        ),
+                                      ),
+                                      const SizedBox(height: 6),
+                                      Text(
+                                        'AIRAMP supports seamless multi-device accessibility. Administrators manage institutional curriculum, section keys, and master schedules via the Web Console. Teachers and students can sign in directly through the web portal or use dedicated Windows and mobile applications for offline lesson caching and continuous synchronization.',
+                                        style: TextStyle(
+                                          color: AppTheme.textSecondary,
+                                          fontSize: 13,
+                                          height: 1.5,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                      ),
                     ),
-                  ),
-                ],
-              ),
-            ),
+
+                    // ── Footer ───────────────────────────────────────────
+                    Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.symmetric(vertical: 28),
+                      decoration: BoxDecoration(
+                        border: Border(
+                          top: BorderSide(
+                            color: isDark ? Colors.white.withValues(alpha: 0.08) : Colors.black.withValues(alpha: 0.06),
+                          ),
+                        ),
+                      ),
+                      child: Center(
+                        child: ConstrainedBox(
+                          constraints: const BoxConstraints(maxWidth: 1200),
+                          child: Padding(
+                            padding: EdgeInsets.symmetric(horizontal: contentPadding),
+                            child: Column(
+                              children: [
+                                Text(
+                                  'AIRAMP © 2026 Academic Integrated Review & Assessment Management Platform',
+                                  textAlign: TextAlign.center,
+                                  style: TextStyle(
+                                    color: AppTheme.textSecondary,
+                                    fontSize: 12,
+                                  ),
+                                ),
+                                const SizedBox(height: 6),
+                                Text(
+                                  'Built for DepEd Senior High School Competencies & Institutional Analytics',
+                                  textAlign: TextAlign.center,
+                                  style: TextStyle(
+                                    color: AppTheme.textMuted,
+                                    fontSize: 11,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
                   ],
                 ),
               ),
@@ -388,6 +443,7 @@ class _WebLandingScreenState extends ConsumerState<WebLandingScreen> {
                 user: user,
                 size: size,
                 isMobile: isMobile,
+                isTablet: isTablet,
               ),
             ),
           ],
@@ -405,24 +461,25 @@ class _WebLandingScreenState extends ConsumerState<WebLandingScreen> {
     required bool isMobile,
     required bool isTablet,
   }) {
-    final horizontalPadding = isMobile ? 16.0 : (isTablet ? 48.0 : 96.0);
+    final horizontalPadding = isMobile ? 16.0 : (isTablet ? 32.0 : 40.0);
     final minHeroHeight = isMobile
         ? math.max(600.0, size.height)
         : math.max(680.0, size.height);
 
-    return ConstrainedBox(
-      constraints: BoxConstraints(
-        minHeight: minHeroHeight,
-        minWidth: double.infinity,
-      ),
-      child: Padding(
-        padding: EdgeInsets.fromLTRB(
-          horizontalPadding,
-          isMobile ? 76.0 : 96.0,
-          horizontalPadding,
-          isMobile ? 16.0 : 24.0,
+    return Center(
+      child: ConstrainedBox(
+        constraints: BoxConstraints(
+          minHeight: minHeroHeight,
+          maxWidth: 1200,
         ),
-        child: Column(
+        child: Padding(
+          padding: EdgeInsets.fromLTRB(
+            horizontalPadding,
+            isMobile ? 76.0 : 96.0,
+            horizontalPadding,
+            isMobile ? 16.0 : 24.0,
+          ),
+          child: Column(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
             const SizedBox(height: 1), // Top optical balancing anchor
@@ -598,58 +655,67 @@ class _WebLandingScreenState extends ConsumerState<WebLandingScreen> {
         ],
       ),
     ),
-  );
+  ),
+);
 }
 
   Widget _buildExplorePrompt(BuildContext context, bool isDark, bool isMobile) {
-    return Padding(
-      padding: EdgeInsets.only(top: 16, bottom: isMobile ? 8 : 14),
-      child: MouseRegion(
-        cursor: SystemMouseCursors.click,
-        child: GestureDetector(
-          onTap: _scrollToEcosystem,
-          child: Container(
-            padding: EdgeInsets.symmetric(
-              horizontal: isMobile ? 12 : 16,
-              vertical: isMobile ? 6 : 8,
-            ),
-            decoration: BoxDecoration(
-              color: isDark
-                  ? const Color(0xFF1E293B).withValues(alpha: 0.70)
-                  : Colors.white.withValues(alpha: 0.88),
-              borderRadius: BorderRadius.circular(24),
-              border: Border.all(
-                color: isDark
-                    ? Colors.white.withValues(alpha: 0.12)
-                    : Colors.black.withValues(alpha: 0.08),
-              ),
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.black.withValues(alpha: isDark ? 0.25 : 0.05),
-                  blurRadius: 12,
-                  offset: const Offset(0, 4),
+    return AnimatedOpacity(
+      opacity: _showExplorePrompt ? 1.0 : 0.0,
+      duration: const Duration(milliseconds: 300),
+      curve: Curves.easeInOut,
+      child: IgnorePointer(
+        ignoring: !_showExplorePrompt,
+        child: Padding(
+          padding: EdgeInsets.only(top: 16, bottom: isMobile ? 8 : 14),
+          child: MouseRegion(
+            cursor: SystemMouseCursors.click,
+            child: GestureDetector(
+              onTap: _scrollToEcosystem,
+              child: Container(
+                padding: EdgeInsets.symmetric(
+                  horizontal: isMobile ? 12 : 16,
+                  vertical: isMobile ? 6 : 8,
                 ),
-              ],
-            ),
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Text(
-                  isMobile ? 'Explore Ecosystem' : 'Explore Role Ecosystem',
-                  style: TextStyle(
-                    color: AppTheme.textSecondary,
-                    fontSize: isMobile ? 11.5 : 13,
-                    fontWeight: FontWeight.w600,
-                    letterSpacing: 0.3,
+                decoration: BoxDecoration(
+                  color: isDark
+                      ? const Color(0xFF1E293B).withValues(alpha: 0.70)
+                      : Colors.white.withValues(alpha: 0.88),
+                  borderRadius: BorderRadius.circular(24),
+                  border: Border.all(
+                    color: isDark
+                        ? Colors.white.withValues(alpha: 0.12)
+                        : Colors.black.withValues(alpha: 0.08),
                   ),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withValues(alpha: isDark ? 0.25 : 0.05),
+                      blurRadius: 12,
+                      offset: const Offset(0, 4),
+                    ),
+                  ],
                 ),
-                const SizedBox(width: 4),
-                Icon(
-                  Icons.keyboard_arrow_down_rounded,
-                  color: AppTheme.primary,
-                  size: isMobile ? 18 : 20,
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(
+                      isMobile ? 'Explore Ecosystem' : 'Explore Role Ecosystem',
+                      style: TextStyle(
+                        color: AppTheme.textSecondary,
+                        fontSize: isMobile ? 11.5 : 13,
+                        fontWeight: FontWeight.w600,
+                        letterSpacing: 0.3,
+                      ),
+                    ),
+                    const SizedBox(width: 4),
+                    Icon(
+                      Icons.keyboard_arrow_down_rounded,
+                      color: AppTheme.primary,
+                      size: isMobile ? 18 : 20,
+                    ),
+                  ],
                 ),
-              ],
+              ),
             ),
           ),
         ),
@@ -665,6 +731,7 @@ class _WebLandingScreenState extends ConsumerState<WebLandingScreen> {
     required dynamic user,
     required Size size,
     required bool isMobile,
+    bool? isTablet,
   }) {
     return ClipRect(
       child: BackdropFilter(
