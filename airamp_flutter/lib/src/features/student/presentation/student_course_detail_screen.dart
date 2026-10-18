@@ -1422,27 +1422,41 @@ class _StudentCourseDetailScreenState
                   height: 50,
                   child: ElevatedButton.icon(
                     style: ElevatedButton.styleFrom(
-                      backgroundColor: AppTheme.primary,
-                      foregroundColor: Colors.black,
+                      backgroundColor: isCompleted ? AppTheme.surface : AppTheme.primary,
+                      foregroundColor: isCompleted ? AppTheme.textMuted : Colors.black,
+                      side: isCompleted ? BorderSide(color: AppTheme.border.withValues(alpha: 0.5)) : null,
                       shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(12),
                       ),
                     ),
                     icon: Icon(
-                      isCompleted ? Icons.refresh : Icons.play_arrow,
-                      color: Colors.black,
+                      isCompleted ? Icons.lock_outline : Icons.play_arrow,
+                      color: isCompleted ? AppTheme.textMuted : Colors.black,
                     ),
                     label: Text(
-                      isCompleted ? 'Retake Quiz' : 'Take Quiz',
+                      isCompleted ? 'Quiz Completed' : 'Take Quiz',
                       style: const TextStyle(
                         fontWeight: FontWeight.bold,
                         fontSize: 16,
                       ),
                     ),
-                    onPressed: () {
-                      Navigator.pop(ctx);
-                      context.push('/quiz/$loId').then((_) => _loadData());
-                    },
+                    onPressed: isCompleted
+                        ? () {
+                            Navigator.pop(ctx);
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(
+                                backgroundColor: AppTheme.surface,
+                                content: Text(
+                                  'You have already completed this assessment. Contact your instructor if a reset is required.',
+                                  style: TextStyle(color: AppTheme.text),
+                                ),
+                              ),
+                            );
+                          }
+                        : () {
+                            Navigator.pop(ctx);
+                            context.push('/quiz/$loId').then((_) => _loadData());
+                          },
                   ),
                 ),
               ),
@@ -1464,6 +1478,56 @@ class _StudentCourseDetailScreenState
     final passingScore = (q['passing_score'] as int?) ?? 70;
     final isPassed = pct >= passingScore;
     final quizId = q['quiz_id'];
+    final scheduleStart = q['schedule_start']?.toString();
+    final scheduleEnd = q['schedule_end']?.toString();
+    final dueDate = q['due_date']?.toString();
+
+    bool isDatePassed(String isoString) {
+      try {
+        final dt = DateTime.parse(isoString).toLocal();
+        if (isoString.length <= 10 && !isoString.contains('T')) {
+          final endOfDay = DateTime(dt.year, dt.month, dt.day, 23, 59, 59);
+          return endOfDay.isBefore(DateTime.now());
+        }
+        return dt.isBefore(DateTime.now());
+      } catch (_) {
+        return true;
+      }
+    }
+
+    String formatDateTime(String? isoString) {
+      if (isoString == null || isoString.isEmpty) return '';
+      try {
+        final dt = DateTime.parse(isoString).toLocal();
+        const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+        final dateStr = '${months[dt.month - 1]} ${dt.day.toString().padLeft(2, '0')}, ${dt.year}';
+        if (isoString.contains('T') || isoString.length > 10) {
+          final hour = dt.hour % 12 == 0 ? 12 : dt.hour % 12;
+          final ampm = dt.hour >= 12 ? 'PM' : 'AM';
+          final min = dt.minute.toString().padLeft(2, '0');
+          return '$dateStr at $hour:$min $ampm';
+        }
+        return dateStr;
+      } catch (_) {
+        return isoString;
+      }
+    }
+
+    // Authoritative deadline: scheduleEnd takes priority over dueDate
+    final effectiveDeadline = (scheduleEnd != null && scheduleEnd.isNotEmpty) ? scheduleEnd : dueDate;
+    final isDeadlinePassed = effectiveDeadline != null && effectiveDeadline.isNotEmpty && isDatePassed(effectiveDeadline);
+
+    // Quiz is missed if not completed AND deadline has passed
+    final isMissed = !isCompleted && isDeadlinePassed;
+
+    // Quiz has a future start time that hasn't arrived yet (and deadline hasn't passed)
+    final isNotYetAvailable = !isCompleted && !isMissed && scheduleStart != null && scheduleStart.isNotEmpty && !isDatePassed(scheduleStart);
+
+    // Auto-mark missed in local DB if deadline passed while still pending
+    final studentId = q['student_id']?.toString() ?? ref.read(authProvider)?.id ?? '';
+    if (isMissed && q['status'] == 'pending' && quizId is int && studentId.isNotEmpty) {
+      DatabaseHelper().markQuizAssignmentMissed(quizId: quizId, studentId: studentId);
+    }
 
     return Container(
       margin: const EdgeInsets.only(bottom: 12),
@@ -1476,7 +1540,11 @@ class _StudentCourseDetailScreenState
               ? (isPassed
                     ? AppTheme.success.withValues(alpha: 0.4)
                     : AppTheme.error.withValues(alpha: 0.4))
-              : AppTheme.warning.withValues(alpha: 0.4),
+              : isMissed
+                  ? AppTheme.error.withValues(alpha: 0.4)
+                  : isNotYetAvailable
+                      ? AppTheme.info.withValues(alpha: 0.4)
+                      : AppTheme.warning.withValues(alpha: 0.4),
         ),
       ),
       child: Column(
@@ -1501,51 +1569,148 @@ class _StudentCourseDetailScreenState
                       ? (isPassed
                             ? AppTheme.success.withValues(alpha: 0.15)
                             : AppTheme.error.withValues(alpha: 0.15))
-                      : AppTheme.warning.withValues(alpha: 0.15),
+                      : isMissed
+                          ? AppTheme.error.withValues(alpha: 0.15)
+                          : isNotYetAvailable
+                              ? AppTheme.info.withValues(alpha: 0.15)
+                              : AppTheme.warning.withValues(alpha: 0.15),
                   borderRadius: BorderRadius.circular(6),
                 ),
                 child: Text(
                   isCompleted
-                      ? (isPassed ? 'PASSED' : 'RETAKE REQUIRED')
-                      : 'PENDING',
+                      ? (isPassed ? 'PASSED' : 'FAILED')
+                      : isMissed
+                          ? 'MISSED'
+                          : isNotYetAvailable
+                              ? 'UPCOMING'
+                              : 'PENDING',
                   style: TextStyle(
                     fontSize: 11,
                     fontWeight: FontWeight.bold,
                     color: isCompleted
                         ? (isPassed ? AppTheme.success : AppTheme.error)
-                        : AppTheme.warning,
+                        : isMissed
+                            ? AppTheme.error
+                            : isNotYetAvailable
+                                ? AppTheme.info
+                                : AppTheme.warning,
                   ),
                 ),
               ),
             ],
           ),
-          const SizedBox(height: 8),
-          Row(
-            children: [
-              Icon(Icons.help_outline, size: 14, color: AppTheme.textMuted),
-              const SizedBox(width: 4),
-              Text(
-                '$qCount questions',
-                style: TextStyle(fontSize: 12, color: AppTheme.textSecondary),
+          if (isMissed) ...[
+            const SizedBox(height: 8),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+              decoration: BoxDecoration(
+                color: AppTheme.error.withValues(alpha: 0.1),
+                borderRadius: BorderRadius.circular(6),
+                border: Border.all(color: AppTheme.error.withValues(alpha: 0.25)),
               ),
-              const SizedBox(width: 14),
-              Icon(Icons.timer_outlined, size: 14, color: AppTheme.textMuted),
-              const SizedBox(width: 4),
-              Text(
-                timeLimit > 0 ? '${timeLimit}m limit' : 'Untimed',
-                style: TextStyle(fontSize: 12, color: AppTheme.textSecondary),
-              ),
-              if (isCompleted) ...[
-                const SizedBox(width: 14),
-                Icon(Icons.grade_outlined, size: 14, color: AppTheme.textMuted),
-                const SizedBox(width: 4),
-                Text(
-                  'Score: $score/$totalQ (${pct.toStringAsFixed(0)}%)',
-                  style: TextStyle(
-                    fontSize: 12,
-                    fontWeight: FontWeight.w600,
-                    color: isPassed ? AppTheme.success : AppTheme.error,
+              child: Row(
+                children: [
+                  Icon(Icons.event_busy, size: 14, color: AppTheme.error),
+                  const SizedBox(width: 6),
+                  Expanded(
+                    child: Text(
+                      'Missed Quiz — The availability deadline has passed.',
+                      style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: AppTheme.error),
+                    ),
                   ),
+                ],
+              ),
+            ),
+          ],
+          if (isNotYetAvailable) ...[
+            const SizedBox(height: 8),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+              decoration: BoxDecoration(
+                color: AppTheme.info.withValues(alpha: 0.1),
+                borderRadius: BorderRadius.circular(6),
+                border: Border.all(color: AppTheme.info.withValues(alpha: 0.25)),
+              ),
+              child: Row(
+                children: [
+                  Icon(Icons.access_time, size: 14, color: AppTheme.info),
+                  const SizedBox(width: 6),
+                  Expanded(
+                    child: Text(
+                      'Available from ${formatDateTime(scheduleStart)}',
+                      style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: AppTheme.info),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+          const SizedBox(height: 8),
+          Wrap(
+            spacing: 14,
+            runSpacing: 4,
+            children: [
+              Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(Icons.help_outline, size: 14, color: AppTheme.textMuted),
+                  const SizedBox(width: 4),
+                  Text(
+                    '$qCount questions',
+                    style: TextStyle(fontSize: 12, color: AppTheme.textSecondary),
+                  ),
+                ],
+              ),
+              Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(Icons.timer_outlined, size: 14, color: AppTheme.textMuted),
+                  const SizedBox(width: 4),
+                  Text(
+                    timeLimit > 0 ? '${timeLimit}m limit' : 'Untimed',
+                    style: TextStyle(fontSize: 12, color: AppTheme.textSecondary),
+                  ),
+                ],
+              ),
+              if (scheduleEnd != null && scheduleEnd.isNotEmpty)
+                Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(Icons.event, size: 14, color: AppTheme.textMuted),
+                    const SizedBox(width: 4),
+                    Text(
+                      'Until ${formatDateTime(scheduleEnd)}',
+                      style: TextStyle(fontSize: 12, color: AppTheme.textSecondary),
+                    ),
+                  ],
+                )
+              else if (dueDate != null && dueDate.isNotEmpty)
+                Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(Icons.calendar_today, size: 14, color: AppTheme.textMuted),
+                    const SizedBox(width: 4),
+                    Text(
+                      'Due ${formatDateTime(dueDate)}',
+                      style: TextStyle(fontSize: 12, color: AppTheme.textSecondary),
+                    ),
+                  ],
+                ),
+              if (isCompleted) ...[
+                Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(Icons.grade_outlined, size: 14, color: AppTheme.textMuted),
+                    const SizedBox(width: 4),
+                    Text(
+                      'Score: $score/$totalQ (${pct.toStringAsFixed(0)}%)',
+                      style: TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
+                        color: isPassed ? AppTheme.success : AppTheme.error,
+                      ),
+                    ),
+                  ],
                 ),
               ],
             ],
@@ -1553,31 +1718,62 @@ class _StudentCourseDetailScreenState
           const SizedBox(height: 12),
           SizedBox(
             width: double.infinity,
-            child: ElevatedButton.icon(
-              onPressed: () {
-                if (quizId != null) {
-                  context.push('/quiz/$quizId').then((_) => _loadData());
-                }
-              },
-              icon: Icon(
-                isCompleted ? Icons.replay : Icons.play_arrow,
-                size: 16,
-              ),
-              label: Text(
-                isCompleted ? 'Retake Quiz' : 'Start Quiz',
-                style: const TextStyle(fontWeight: FontWeight.bold),
-              ),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: isCompleted
-                    ? AppTheme.surface
-                    : AppTheme.primary,
-                foregroundColor: isCompleted ? AppTheme.text : Colors.black,
-                side: isCompleted ? BorderSide(color: AppTheme.border) : null,
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(8),
-                ),
-              ),
-            ),
+            child: isCompleted
+                ? ElevatedButton.icon(
+                    onPressed: null,
+                    icon: const Icon(Icons.lock_outline, size: 16),
+                    label: const Text('Quiz Completed', style: TextStyle(fontWeight: FontWeight.bold)),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: AppTheme.surface,
+                      foregroundColor: AppTheme.textMuted,
+                      side: BorderSide(color: AppTheme.border.withValues(alpha: 0.5)),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                    ),
+                  )
+                : isMissed
+                    ? OutlinedButton.icon(
+                        onPressed: null,
+                        icon: Icon(Icons.event_busy, size: 16, color: AppTheme.error),
+                        label: Text(
+                          'Missed Quiz (Closed)',
+                          style: TextStyle(fontWeight: FontWeight.bold, color: AppTheme.error),
+                        ),
+                        style: OutlinedButton.styleFrom(
+                          foregroundColor: AppTheme.error,
+                          side: BorderSide(color: AppTheme.error.withValues(alpha: 0.4)),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                          padding: const EdgeInsets.symmetric(vertical: 12),
+                        ),
+                      )
+                    : isNotYetAvailable
+                        ? OutlinedButton.icon(
+                            onPressed: null,
+                            icon: Icon(Icons.lock_clock, size: 16, color: AppTheme.textMuted),
+                            label: Text(
+                              'Locked — Opens ${formatDateTime(scheduleStart)}',
+                              style: TextStyle(fontWeight: FontWeight.bold, color: AppTheme.textMuted),
+                            ),
+                            style: OutlinedButton.styleFrom(
+                              foregroundColor: AppTheme.textMuted,
+                              side: BorderSide(color: AppTheme.border.withValues(alpha: 0.6)),
+                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                              padding: const EdgeInsets.symmetric(vertical: 12),
+                            ),
+                          )
+                        : ElevatedButton.icon(
+                            onPressed: () {
+                              if (quizId != null) {
+                                context.push('/quiz/$quizId').then((_) => _loadData());
+                              }
+                            },
+                            icon: const Icon(Icons.play_arrow, size: 16),
+                            label: const Text('Start Quiz', style: TextStyle(fontWeight: FontWeight.bold)),
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: AppTheme.primary,
+                              foregroundColor: Colors.black,
+                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                            ),
+                          ),
           ),
         ],
       ),

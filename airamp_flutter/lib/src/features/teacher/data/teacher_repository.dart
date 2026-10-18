@@ -3,6 +3,7 @@ import '../../../core/database/database_helper.dart';
 import '../../../core/utils/cache_manager.dart';
 import '../../admin/data/admin_repository.dart';
 import '../../auth/application/auth_provider.dart';
+import '../domain/item_analysis_model.dart';
 
 // Teacher Dashboard Stats
 final teacherDashboardProvider = NotifierProvider<TeacherDashboardNotifier, Map<String, dynamic>>(() {
@@ -268,4 +269,23 @@ class TeacherAnnouncementsNotifier extends Notifier<List<Map<String, dynamic>>> 
     await _load();
   }
 }
+
+// --- Item Analysis Providers ---
+
+/// Returns quizzes available for Item Analysis (optionally filtered by subject)
+final teacherQuizzesForAnalysisProvider = FutureProvider.autoDispose.family<List<Map<String, dynamic>>, int?>((ref, subjectId) async {
+  final user = ref.watch(authProvider);
+  final teacherId = user?.role == 'teacher' ? user?.id : null;
+  return await DatabaseHelper().getQuizzesAvailableForAnalysis(
+    teacherId: teacherId,
+    subjectId: subjectId,
+  );
+});
+
+/// Computes psychometric Item Analysis for a specified quiz
+final quizItemAnalysisProvider = FutureProvider.autoDispose.family<ItemAnalysisReport, int>((ref, quizId) async {
+  return await DatabaseHelper().calculateQuizItemAnalysis(quizId);
+});
+
+
 

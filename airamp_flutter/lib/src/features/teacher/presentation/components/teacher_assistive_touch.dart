@@ -6,6 +6,7 @@ import '../../../../core/theme/app_theme.dart';
 import '../../../../core/theme/theme_provider.dart';
 
 import '../../../../core/components/aira/aira_floating_assistant.dart';
+import '../../../../routing/app_router.dart';
 
 /// A floating, draggable quick actions bubble styled to match AIRAMP's theme.
 ///
@@ -43,9 +44,10 @@ class TeacherAssistiveTouch extends ConsumerStatefulWidget {
 class _TeacherAssistiveTouchState extends ConsumerState<TeacherAssistiveTouch> {
   void _openMenu() {
     HapticFeedback.mediumImpact();
+    final targetContext = rootNavigatorKey.currentContext ?? context;
 
     showGeneralDialog(
-      context: context,
+      context: targetContext,
       barrierDismissible: true,
       barrierLabel: 'Quick Actions Hub',
       barrierColor: Colors.transparent,

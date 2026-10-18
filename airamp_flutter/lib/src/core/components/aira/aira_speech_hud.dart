@@ -50,9 +50,11 @@ class _AiraSpeechHUDState extends State<AiraSpeechHUD>
         return ValueListenableBuilder<String>(
           valueListenable: voiceService.currentPhraseNotifier,
           builder: (context, phrase, _) {
-            return ClipRRect(
-              borderRadius: BorderRadius.circular(20),
-              child: BackdropFilter(
+            return Material(
+              type: MaterialType.transparency,
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(20),
+                child: BackdropFilter(
                 filter: ImageFilter.blur(sigmaX: 16, sigmaY: 16),
                 child: Container(
                   constraints: const BoxConstraints(maxWidth: 260),
@@ -175,7 +177,8 @@ class _AiraSpeechHUDState extends State<AiraSpeechHUD>
                   ),
                 ),
               ),
-            );
+            ),
+          );
           },
         );
       },

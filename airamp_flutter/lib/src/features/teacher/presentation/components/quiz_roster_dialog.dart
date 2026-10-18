@@ -5,6 +5,7 @@ import '../../../../core/theme/app_theme.dart';
 import '../../data/teacher_repository.dart';
 import '../../../student/data/student_repository.dart';
 import '../../../admin/data/admin_repository.dart';
+import 'quiz_item_analysis_dialog.dart';
 
 class QuizRosterDialog extends ConsumerWidget {
   final int quizId;
@@ -58,6 +59,15 @@ class QuizRosterDialog extends ConsumerWidget {
                         overflow: TextOverflow.ellipsis,
                       ),
                     ],
+                  ),
+                ),
+                Tooltip(
+                  message: 'View Item Analysis',
+                  child: IconButton(
+                    onPressed: () {
+                      QuizItemAnalysisDialog.show(context, initialQuizId: quizId);
+                    },
+                    icon: Icon(Icons.analytics_outlined, color: AppTheme.primary),
                   ),
                 ),
                 IconButton(
@@ -247,6 +257,8 @@ class QuizRosterDialog extends ConsumerWidget {
                 );
                 // Invalidate all affected providers across teacher, student, and admin views
                 ref.invalidate(quizRosterProvider(quizId));
+                ref.invalidate(quizItemAnalysisProvider(quizId));
+                ref.invalidate(teacherQuizzesForAnalysisProvider);
                 ref.invalidate(subjectQuizzesProvider);
                 ref.invalidate(teacherDashboardProvider);
                 ref.invalidate(teacherScoresProvider);

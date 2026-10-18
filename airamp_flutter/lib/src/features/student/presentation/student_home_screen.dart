@@ -1566,6 +1566,40 @@ class _StudentHomeScreenState extends ConsumerState<StudentHomeScreen> {
     final timeLimit = q['time_limit_minutes'] ?? 0;
     final dueDate = q['due_date']?.toString();
     final quizId = q['quiz_id'];
+    final scheduleStart = q['schedule_start']?.toString();
+    final scheduleEnd = q['schedule_end']?.toString();
+    final effectiveDeadline = (scheduleEnd != null && scheduleEnd.isNotEmpty) ? scheduleEnd : dueDate;
+
+    bool isDatePassed(String isoString) {
+      try {
+        final dt = DateTime.parse(isoString).toLocal();
+        if (isoString.length <= 10 && !isoString.contains('T')) {
+          final endOfDay = DateTime(dt.year, dt.month, dt.day, 23, 59, 59);
+          return endOfDay.isBefore(DateTime.now());
+        }
+        return dt.isBefore(DateTime.now());
+      } catch (_) {
+        return true;
+      }
+    }
+
+    String formatDateTime(String? isoString) {
+      if (isoString == null || isoString.isEmpty) return '';
+      try {
+        final dt = DateTime.parse(isoString).toLocal();
+        const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+        final dateStr = '${months[dt.month - 1]} ${dt.day.toString().padLeft(2, '0')}';
+        final hour = dt.hour % 12 == 0 ? 12 : dt.hour % 12;
+        final ampm = dt.hour >= 12 ? 'PM' : 'AM';
+        final min = dt.minute.toString().padLeft(2, '0');
+        return '$dateStr at $hour:$min $ampm';
+      } catch (_) {
+        return isoString;
+      }
+    }
+
+    final isDeadlinePassed = effectiveDeadline != null && effectiveDeadline.isNotEmpty && isDatePassed(effectiveDeadline);
+    final isNotYetAvailable = !isDeadlinePassed && scheduleStart != null && scheduleStart.isNotEmpty && !isDatePassed(scheduleStart);
 
     return Container(
       margin: const EdgeInsets.only(bottom: 12),
@@ -1573,7 +1607,11 @@ class _StudentHomeScreenState extends ConsumerState<StudentHomeScreen> {
       decoration: BoxDecoration(
         color: AppTheme.surface,
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: AppTheme.border),
+        border: Border.all(
+          color: isDeadlinePassed
+              ? AppTheme.error.withValues(alpha: 0.4)
+              : (isNotYetAvailable ? AppTheme.border : AppTheme.primary.withValues(alpha: 0.3)),
+        ),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -1602,8 +1640,8 @@ class _StudentHomeScreenState extends ConsumerState<StudentHomeScreen> {
                   overflow: TextOverflow.ellipsis,
                 ),
               ),
-              if (dueDate != null && dueDate.isNotEmpty)
-                _buildDueDateBadge(dueDate),
+              if (effectiveDeadline != null && effectiveDeadline.isNotEmpty)
+                _buildDueDateBadge(effectiveDeadline),
             ],
           ),
           const SizedBox(height: 10),
@@ -1636,26 +1674,50 @@ class _StudentHomeScreenState extends ConsumerState<StudentHomeScreen> {
           const SizedBox(height: 14),
           SizedBox(
             width: double.infinity,
-            child: ElevatedButton.icon(
-              onPressed: () async {
-                if (quizId != null) {
-                  await context.push('/quiz/$quizId');
-                  if (context.mounted) {
-                    ref.read(studentQuizAssignmentsProvider.notifier).reload();
-                    ref.read(studentProgressProvider.notifier).loadProgress();
-                    ref.read(studentCoursesProvider.notifier).reload();
-                  }
-                }
-              },
-              icon: const Icon(Icons.play_arrow, size: 16),
-              label: const Text('Start Quiz', style: TextStyle(fontWeight: FontWeight.bold)),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: AppTheme.primary,
-                foregroundColor: Colors.white,
-                padding: const EdgeInsets.symmetric(vertical: 10),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-              ),
-            ),
+            child: isDeadlinePassed
+                ? OutlinedButton.icon(
+                    onPressed: null,
+                    icon: Icon(Icons.event_busy, size: 16, color: AppTheme.error),
+                    label: Text('Missed Quiz (Closed)', style: TextStyle(fontWeight: FontWeight.bold, color: AppTheme.error)),
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: AppTheme.error,
+                      side: BorderSide(color: AppTheme.error.withValues(alpha: 0.4)),
+                      padding: const EdgeInsets.symmetric(vertical: 10),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                    ),
+                  )
+                : isNotYetAvailable
+                    ? OutlinedButton.icon(
+                        onPressed: null,
+                        icon: Icon(Icons.lock_clock, size: 16, color: AppTheme.textMuted),
+                        label: Text('Locked — Opens ${formatDateTime(scheduleStart)}', style: TextStyle(fontWeight: FontWeight.bold, color: AppTheme.textMuted)),
+                        style: OutlinedButton.styleFrom(
+                          foregroundColor: AppTheme.textMuted,
+                          side: BorderSide(color: AppTheme.border.withValues(alpha: 0.6)),
+                          padding: const EdgeInsets.symmetric(vertical: 10),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                        ),
+                      )
+                    : ElevatedButton.icon(
+                        onPressed: () async {
+                          if (quizId != null) {
+                            await context.push('/quiz/$quizId');
+                            if (context.mounted) {
+                              ref.read(studentQuizAssignmentsProvider.notifier).reload();
+                              ref.read(studentProgressProvider.notifier).loadProgress();
+                              ref.read(studentCoursesProvider.notifier).reload();
+                            }
+                          }
+                        },
+                        icon: const Icon(Icons.play_arrow, size: 16),
+                        label: const Text('Start Quiz', style: TextStyle(fontWeight: FontWeight.bold)),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: AppTheme.primary,
+                          foregroundColor: Colors.black,
+                          padding: const EdgeInsets.symmetric(vertical: 10),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                        ),
+                      ),
           ),
         ],
       ),

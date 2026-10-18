@@ -35,11 +35,78 @@ class _CreateQuizDialogState extends ConsumerState<CreateQuizDialog> {
   final _titleController = TextEditingController();
   final _descController = TextEditingController();
   int _timeLimitMinutes = 15;
-  int _passingScore = 70;
-  DateTime? _dueDate;
+  int _passingScore = 75;
   DateTime? _scheduleStart;
   DateTime? _scheduleEnd;
   String _quizStatus = 'published'; // 'published' or 'draft'
+
+  String _formatDateTimeDisplay(DateTime dt) {
+    const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+    final m = months[dt.month - 1];
+    final d = dt.day.toString().padLeft(2, '0');
+    final y = dt.year;
+    final h = dt.hour == 0 ? 12 : (dt.hour > 12 ? dt.hour - 12 : dt.hour);
+    final min = dt.minute.toString().padLeft(2, '0');
+    final ampm = dt.hour >= 12 ? 'PM' : 'AM';
+    return '$m $d, $y at $h:$min $ampm';
+  }
+
+  Future<DateTime?> _pickDateTime({
+    required BuildContext context,
+    DateTime? initialDateTime,
+    required DateTime firstDate,
+    required DateTime lastDate,
+  }) async {
+    final base = initialDateTime ?? DateTime.now();
+    final pickedDate = await showDatePicker(
+      context: context,
+      initialDate: base.isBefore(firstDate) ? firstDate : base,
+      firstDate: firstDate,
+      lastDate: lastDate,
+      builder: (ctx, child) => Theme(
+        data: Theme.of(ctx).copyWith(
+          colorScheme: ColorScheme.dark(
+            primary: AppTheme.primary,
+            onPrimary: Colors.black,
+            surface: AppTheme.surface,
+            onSurface: AppTheme.text,
+          ),
+        ),
+        child: child!,
+      ),
+    );
+
+    if (pickedDate == null || !context.mounted) return null;
+
+    final initialTime = initialDateTime != null
+        ? TimeOfDay(hour: initialDateTime.hour, minute: initialDateTime.minute)
+        : TimeOfDay(hour: DateTime.now().hour, minute: 0);
+
+    final pickedTime = await showTimePicker(
+      context: context,
+      initialTime: initialTime,
+      builder: (ctx, child) => Theme(
+        data: Theme.of(ctx).copyWith(
+          colorScheme: ColorScheme.dark(
+            primary: AppTheme.primary,
+            onPrimary: Colors.black,
+            surface: AppTheme.surface,
+            onSurface: AppTheme.text,
+          ),
+        ),
+        child: child!,
+      ),
+    );
+
+    final time = pickedTime ?? initialTime;
+    return DateTime(
+      pickedDate.year,
+      pickedDate.month,
+      pickedDate.day,
+      time.hour,
+      time.minute,
+    );
+  }
 
   // Step 2: Questions
   int _questionInputMode = 0; // 0: Bulk Paste / Upload, 1: Manual
@@ -72,7 +139,6 @@ class _CreateQuizDialogState extends ConsumerState<CreateQuizDialog> {
   @override
   void initState() {
     super.initState();
-    _dueDate = DateTime.now().add(const Duration(days: 7));
     if (widget.initialSubjectId != null) {
       _subjectId = widget.initialSubjectId!;
     }
@@ -97,16 +163,23 @@ class _CreateQuizDialogState extends ConsumerState<CreateQuizDialog> {
   Future<void> _loadExistingQuiz() async {
     final quizData = await DatabaseHelper().getQuizForEditing(widget.quizId!);
     if (quizData != null && mounted) {
+      final qSubjectId = quizData['subject_id'];
+      if (qSubjectId is int && qSubjectId > 0) {
+        _subjectId = qSubjectId;
+      }
       setState(() {
         // Load quiz details into controllers
         _titleController.text = quizData['title']?.toString() ?? '';
         _descController.text = quizData['description']?.toString() ?? '';
         _timeLimitMinutes = (quizData['time_limit_minutes'] as int?) ?? 15;
-        _passingScore = (quizData['passing_score'] as int?) ?? 70;
+        _passingScore = 75; // Fixed standard 75%
         _quizStatus = (quizData['status']?.toString() ?? 'published');
-        _dueDate = quizData['due_date'] != null
-            ? DateTime.tryParse(quizData['due_date'].toString())
-            : DateTime.now().add(const Duration(days: 7));
+        _scheduleStart = quizData['schedule_start'] != null
+            ? DateTime.tryParse(quizData['schedule_start'].toString())
+            : null;
+        _scheduleEnd = quizData['schedule_end'] != null
+            ? DateTime.tryParse(quizData['schedule_end'].toString())
+            : (quizData['due_date'] != null ? DateTime.tryParse(quizData['due_date'].toString()) : null);
 
         // Load questions from database
         final questions = quizData['questions'] as List<dynamic>? ?? [];
@@ -174,8 +247,8 @@ Answer: B''';
           _availableStudents = students;
           _sections = secSet.toList();
           // If editing an existing quiz, preserve current selection;
-          // otherwise select all available students
-          if (widget.quizId == null) {
+          // if no students were previously selected, select all available students by default
+          if (widget.quizId == null || _selectedStudentIds.isEmpty) {
             _selectedStudentIds.addAll(
               students.map((s) => s['id']?.toString() ?? '').where((id) => id.isNotEmpty),
             );
@@ -268,6 +341,7 @@ Answer: B''';
       }
       final teacherId = user.id;
       final teacherName = user.fullName;
+      final effectiveDueDate = (_scheduleEnd ?? _scheduleStart ?? DateTime.now().add(const Duration(days: 7))).toIso8601String();
 
       if (widget.quizId != null) {
         // Update existing quiz
@@ -279,7 +353,7 @@ Answer: B''';
           timeLimitMinutes: _timeLimitMinutes,
           passingScore: _passingScore,
           status: _quizStatus,
-          dueDate: _dueDate?.toIso8601String(),
+          dueDate: effectiveDueDate,
           scheduleStart: _scheduleStart?.toIso8601String(),
           scheduleEnd: _scheduleEnd?.toIso8601String(),
           questions: _parsedQuestions.map((q) => q.toMap()).toList(),
@@ -289,11 +363,15 @@ Answer: B''';
         await DatabaseHelper().updateQuizAssignments(
           quizId: widget.quizId!,
           studentIds: _selectedStudentIds.toList(),
-          dueDate: _dueDate?.toIso8601String(),
+          dueDate: effectiveDueDate,
         );
 
         ref.invalidate(subjectQuizzesProvider(_subjectId));
         ref.invalidate(teacherDashboardProvider);
+        ref.invalidate(studentQuizAssignmentsProvider);
+        ref.invalidate(studentQuizAttemptsProvider);
+        ref.invalidate(studentCoursesProvider);
+        ref.invalidate(studentProgressProvider);
 
         if (mounted) {
           AppToast.showSuccess(context, 'Quiz "$title" updated successfully!');
@@ -309,7 +387,7 @@ Answer: B''';
           teacherName: teacherName,
           timeLimitMinutes: _timeLimitMinutes,
           passingScore: _passingScore,
-          dueDate: _dueDate?.toIso8601String(),
+          dueDate: effectiveDueDate,
           scheduleStart: _scheduleStart?.toIso8601String(),
           scheduleEnd: _scheduleEnd?.toIso8601String(),
           status: _quizStatus,
@@ -319,7 +397,7 @@ Answer: B''';
         final assignedCount = await DatabaseHelper().assignQuizToStudents(
           quizId: quizId,
           studentIds: _selectedStudentIds.toList(),
-          dueDate: _dueDate?.toIso8601String(),
+          dueDate: effectiveDueDate,
         );
 
         ref.invalidate(subjectQuizzesProvider(_subjectId));
@@ -335,8 +413,13 @@ Answer: B''';
         }
       }
     } catch (e) {
+      debugPrint('Error saving quiz: $e');
       if (mounted) {
-        AppToast.showError(context, 'Error saving quiz: ${e.toString().replaceFirst("Exception: ", "")}');
+        String msg = e.toString().replaceFirst("Exception: ", "");
+        if (msg.contains('DatabaseException') || msg.contains('SQLITE_ERROR')) {
+          msg = 'Unable to save quiz. Please verify your inputs and try again.';
+        }
+        AppToast.showError(context, msg);
       }
     } finally {
       if (mounted) {
@@ -512,6 +595,10 @@ Answer: B''';
                           onPressed: () {
                             if (_currentStep == 0 && _titleController.text.trim().isEmpty) {
                               AppToast.showWarning(context, 'Please enter a quiz title');
+                              return;
+                            }
+                            if (_currentStep == 0 && _scheduleStart != null && _scheduleEnd != null && _scheduleEnd!.isBefore(_scheduleStart!)) {
+                              AppToast.showWarning(context, 'End time must be after start time (e.g. 9:00 AM to 10:00 AM)');
                               return;
                             }
                             if (_currentStep == 1 && _parsedQuestions.isEmpty) {
@@ -705,84 +792,80 @@ Answer: B''';
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text('Passing Score (%)', style: TextStyle(fontWeight: FontWeight.bold, color: AppTheme.text, fontSize: 13)),
-                    const SizedBox(height: 6),
-                    DropdownButtonFormField<int>(
-                      initialValue: _passingScore,
-                      dropdownColor: AppTheme.surface,
-                      style: TextStyle(color: AppTheme.text, fontSize: 14),
-                      decoration: InputDecoration(
-                        filled: true,
-                        fillColor: AppTheme.surface,
-                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: BorderSide(color: AppTheme.border)),
-                        enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: BorderSide(color: AppTheme.border)),
-                        focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: BorderSide(color: AppTheme.primary, width: 1.5)),
-                      ),
-                      items: const [
-                        DropdownMenuItem(value: 50, child: Text('50%')),
-                        DropdownMenuItem(value: 60, child: Text('60%')),
-                        DropdownMenuItem(value: 70, child: Text('70% (Standard)')),
-                        DropdownMenuItem(value: 75, child: Text('75%')),
-                        DropdownMenuItem(value: 80, child: Text('80%')),
-                        DropdownMenuItem(value: 90, child: Text('90%')),
+                    Row(
+                      children: [
+                        Text('Passing Score', style: TextStyle(fontWeight: FontWeight.bold, color: AppTheme.text, fontSize: 13)),
+                        const SizedBox(width: 6),
+                        Icon(Icons.lock, size: 13, color: AppTheme.textMuted),
                       ],
-                      onChanged: (val) {
-                        if (val != null) setState(() => _passingScore = val);
-                      },
+                    ),
+                    const SizedBox(height: 6),
+                    Container(
+                      height: 48,
+                      padding: const EdgeInsets.symmetric(horizontal: 14),
+                      decoration: BoxDecoration(
+                        color: AppTheme.surfaceElevated,
+                        borderRadius: BorderRadius.circular(8),
+                        border: Border.all(color: AppTheme.border),
+                      ),
+                      child: Row(
+                        children: [
+                          Icon(Icons.verified_outlined, size: 16, color: AppTheme.primary),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: Text(
+                              '$_passingScore% (Fixed Standard)',
+                              style: TextStyle(color: AppTheme.text, fontWeight: FontWeight.bold, fontSize: 13),
+                            ),
+                          ),
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                            decoration: BoxDecoration(
+                              color: AppTheme.primary.withValues(alpha: 0.15),
+                              borderRadius: BorderRadius.circular(4),
+                            ),
+                            child: Text(
+                              'LOCKED',
+                              style: TextStyle(color: AppTheme.primary, fontWeight: FontWeight.w800, fontSize: 9),
+                            ),
+                          ),
+                        ],
+                      ),
                     ),
                   ],
                 ),
               ),
             ],
           ),
-          const SizedBox(height: 16),
+          const SizedBox(height: 18),
 
-          Text('Due Date', style: TextStyle(fontWeight: FontWeight.bold, color: AppTheme.text, fontSize: 13)),
-          const SizedBox(height: 6),
-          InkWell(
-            onTap: () async {
-              final picked = await showDatePicker(
-                context: context,
-                initialDate: _dueDate ?? DateTime.now().add(const Duration(days: 7)),
-                firstDate: DateTime.now(),
-                lastDate: DateTime.now().add(const Duration(days: 365)),
-              );
-              if (picked != null) {
-                setState(() => _dueDate = picked);
-              }
-            },
-            child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
-              decoration: BoxDecoration(
-                color: AppTheme.surface,
-                borderRadius: BorderRadius.circular(8),
-                border: Border.all(color: AppTheme.border),
+          // 2 SET TIME: Start Time & End Time
+          Row(
+            children: [
+              Icon(Icons.access_time_filled, size: 16, color: AppTheme.primary),
+              const SizedBox(width: 8),
+              Text(
+                'Quiz Schedule (Start & End Time)',
+                style: TextStyle(fontWeight: FontWeight.bold, color: AppTheme.text, fontSize: 13),
               ),
-              child: Row(
-                children: [
-                  Icon(Icons.calendar_today, size: 18, color: AppTheme.primary),
-                  const SizedBox(width: 10),
-                  Text(
-                    _dueDate != null
-                        ? '${_dueDate!.year}-${_dueDate!.month.toString().padLeft(2, '0')}-${_dueDate!.day.toString().padLeft(2, '0')}'
-                        : 'Select Due Date',
-                    style: TextStyle(color: AppTheme.text),
-                  ),
-                ],
-              ),
-            ),
+            ],
           ),
-          const SizedBox(height: 16),
+          const SizedBox(height: 4),
+          Text(
+            'Set the exact start time and end time when students are allowed to take the quiz.',
+            style: TextStyle(color: AppTheme.textMuted, fontSize: 11),
+          ),
+          const SizedBox(height: 12),
 
-          // Availability Window: Schedule Start
-          Text('Quiz Available From', style: TextStyle(fontWeight: FontWeight.bold, color: AppTheme.text, fontSize: 13)),
+          // SET 1: Quiz Start Time & Date (Time need to start)
+          Text('1. Quiz Start (Date & Time)', style: TextStyle(fontWeight: FontWeight.bold, color: AppTheme.text, fontSize: 13)),
           const SizedBox(height: 6),
           InkWell(
             onTap: () async {
-              final picked = await showDatePicker(
+              final picked = await _pickDateTime(
                 context: context,
-                initialDate: _scheduleStart ?? DateTime.now(),
-                firstDate: DateTime.now(),
+                initialDateTime: _scheduleStart ?? DateTime.now(),
+                firstDate: DateTime.now().subtract(const Duration(days: 1)),
                 lastDate: DateTime.now().add(const Duration(days: 365)),
               );
               if (picked != null) {
@@ -790,7 +873,7 @@ Answer: B''';
               }
             },
             child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
               decoration: BoxDecoration(
                 color: AppTheme.surface,
                 borderRadius: BorderRadius.circular(8),
@@ -798,56 +881,142 @@ Answer: B''';
               ),
               child: Row(
                 children: [
-                  Icon(Icons.schedule_outlined, size: 18, color: AppTheme.primary),
+                  Icon(Icons.play_circle_outline, size: 20, color: AppTheme.primary),
                   const SizedBox(width: 10),
-                  Text(
-                    _scheduleStart != null
-                        ? 'Starts: ${_scheduleStart!.year}-${_scheduleStart!.month.toString().padLeft(2, '0')}-${_scheduleStart!.day.toString().padLeft(2, '0')}'
-                        : 'Available immediately',
-                    style: TextStyle(color: AppTheme.text),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          _scheduleStart != null
+                              ? 'Starts: ${_formatDateTimeDisplay(_scheduleStart!)}'
+                              : 'Select Start Date & Time (e.g. 9:00 AM)',
+                          style: TextStyle(
+                            color: _scheduleStart != null ? AppTheme.text : AppTheme.textMuted,
+                            fontWeight: _scheduleStart != null ? FontWeight.bold : FontWeight.normal,
+                          ),
+                        ),
+                        Text(
+                          _scheduleStart != null
+                              ? 'Tap to change start date & time'
+                              : 'Tap to set when quiz opens for students',
+                          style: TextStyle(color: AppTheme.textMuted, fontSize: 11),
+                        ),
+                      ],
+                    ),
                   ),
+                  if (_scheduleStart != null)
+                    GestureDetector(
+                      onTap: () => setState(() => _scheduleStart = null),
+                      child: Padding(
+                        padding: const EdgeInsets.all(4),
+                        child: Icon(Icons.close, size: 18, color: AppTheme.textMuted),
+                      ),
+                    ),
                 ],
               ),
             ),
           ),
-          const SizedBox(height: 12),
+          const SizedBox(height: 14),
 
-          // Availability Window: Schedule End
-          Text('Quiz Available Until', style: TextStyle(fontWeight: FontWeight.bold, color: AppTheme.text, fontSize: 13)),
+          // SET 2: Quiz End Time & Date (Time until it ends the quiz)
+          Text('2. Quiz End (Date & Time)', style: TextStyle(fontWeight: FontWeight.bold, color: AppTheme.text, fontSize: 13)),
           const SizedBox(height: 6),
           InkWell(
             onTap: () async {
-              final picked = await showDatePicker(
+              final picked = await _pickDateTime(
                 context: context,
-                initialDate: _scheduleEnd ?? DateTime.now().add(const Duration(days: 7)),
-                firstDate: DateTime.now(),
+                initialDateTime: _scheduleEnd ?? (_scheduleStart?.add(const Duration(hours: 1)) ?? DateTime.now().add(const Duration(hours: 1))),
+                firstDate: DateTime.now().subtract(const Duration(days: 1)),
                 lastDate: DateTime.now().add(const Duration(days: 365)),
               );
               if (picked != null) {
-                setState(() => _scheduleEnd = picked);
+                setState(() {
+                  _scheduleEnd = picked;
+                });
               }
             },
             child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
               decoration: BoxDecoration(
                 color: AppTheme.surface,
                 borderRadius: BorderRadius.circular(8),
-                border: Border.all(color: AppTheme.border),
+                border: Border.all(
+                  color: (_scheduleStart != null && _scheduleEnd != null && _scheduleEnd!.isBefore(_scheduleStart!))
+                      ? AppTheme.error
+                      : AppTheme.border,
+                ),
               ),
               child: Row(
                 children: [
-                  Icon(Icons.event_outlined, size: 18, color: AppTheme.primary),
-                  const SizedBox(width: 10),
-                  Text(
-                    _scheduleEnd != null
-                        ? 'Ends: ${_scheduleEnd!.year}-${_scheduleEnd!.month.toString().padLeft(2, '0')}-${_scheduleEnd!.day.toString().padLeft(2, '0')}'
-                        : 'No end date',
-                    style: TextStyle(color: AppTheme.text),
+                  Icon(
+                    Icons.stop_circle_outlined,
+                    size: 20,
+                    color: (_scheduleStart != null && _scheduleEnd != null && _scheduleEnd!.isBefore(_scheduleStart!))
+                        ? AppTheme.error
+                        : AppTheme.primary,
                   ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          _scheduleEnd != null
+                              ? 'Ends: ${_formatDateTimeDisplay(_scheduleEnd!)}'
+                              : 'Select End Date & Time (e.g. 10:00 AM)',
+                          style: TextStyle(
+                            color: (_scheduleStart != null && _scheduleEnd != null && _scheduleEnd!.isBefore(_scheduleStart!))
+                                ? AppTheme.error
+                                : (_scheduleEnd != null ? AppTheme.text : AppTheme.textMuted),
+                            fontWeight: _scheduleEnd != null ? FontWeight.bold : FontWeight.normal,
+                          ),
+                        ),
+                        Text(
+                          _scheduleEnd != null
+                              ? 'Tap to change end date & time'
+                              : 'Quiz automatically closes & marks missed after this time',
+                          style: TextStyle(color: AppTheme.textMuted, fontSize: 11),
+                        ),
+                      ],
+                    ),
+                  ),
+                  if (_scheduleEnd != null)
+                    GestureDetector(
+                      onTap: () => setState(() {
+                        _scheduleEnd = null;
+                      }),
+                      child: Padding(
+                        padding: const EdgeInsets.all(4),
+                        child: Icon(Icons.close, size: 18, color: AppTheme.textMuted),
+                      ),
+                    ),
                 ],
               ),
             ),
           ),
+          if (_scheduleStart != null && _scheduleEnd != null && _scheduleEnd!.isBefore(_scheduleStart!))
+            Container(
+              margin: const EdgeInsets.only(top: 8),
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+              decoration: BoxDecoration(
+                color: AppTheme.error.withValues(alpha: 0.12),
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: AppTheme.error.withValues(alpha: 0.3)),
+              ),
+              child: Row(
+                children: [
+                  Icon(Icons.warning_amber_rounded, size: 16, color: AppTheme.error),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      'End time must be after start time (e.g. 9:00 AM to 10:00 AM)',
+                      style: TextStyle(color: AppTheme.error, fontSize: 12, fontWeight: FontWeight.w600),
+                    ),
+                  ),
+                ],
+              ),
+            ),
           const SizedBox(height: 16),
 
           // Status Selector

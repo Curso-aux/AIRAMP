@@ -9,6 +9,7 @@ import '../utils/cache_manager.dart';
 import '../utils/section_key_helper.dart';
 import 'firestore_service.dart';
 import '../services/email_service.dart';
+import '../../features/teacher/domain/item_analysis_model.dart';
 
 class DatabaseHelper {
   static final DatabaseHelper _instance = DatabaseHelper._internal();
@@ -80,6 +81,9 @@ class DatabaseHelper {
     } catch (_) {}
     try {
       await db.execute("ALTER TABLE users ADD COLUMN category TEXT");
+    } catch (_) {}
+    try {
+      await db.execute("ALTER TABLE users ADD COLUMN must_change_password INTEGER DEFAULT 0");
     } catch (_) {}
     try {
       await db.execute('ALTER TABLE sections ADD COLUMN enrollment_key TEXT');
@@ -310,6 +314,15 @@ class DatabaseHelper {
           created_at TEXT NOT NULL
         )
       ''');
+    } catch (_) {}
+    try {
+      await db.execute('ALTER TABLE quizzes ADD COLUMN schedule_start TEXT');
+    } catch (_) {}
+    try {
+      await db.execute('ALTER TABLE quizzes ADD COLUMN schedule_end TEXT');
+    } catch (_) {}
+    try {
+      await db.execute('ALTER TABLE quizzes ADD COLUMN updated_at TEXT');
     } catch (_) {}
     await _seedInitialData(db);
   }
@@ -626,12 +639,13 @@ class DatabaseHelper {
         teacher_id TEXT NOT NULL,
         teacher_name TEXT,
         time_limit_minutes INTEGER DEFAULT 0,
-        passing_score INTEGER DEFAULT 70,
+        passing_score INTEGER DEFAULT 75,
         status TEXT DEFAULT 'published',
         due_date TEXT,
         schedule_start TEXT,
         schedule_end TEXT,
         created_at TEXT NOT NULL,
+        updated_at TEXT,
         FOREIGN KEY (subject_id) REFERENCES subjects (id) ON DELETE CASCADE
       )
     ''');
@@ -1773,6 +1787,22 @@ class DatabaseHelper {
     return (results.first['count'] as int) == 0;
   }
 
+  /// Check if a student has already completed a specific Learning Outcome quiz
+  /// Returns true if student has NOT completed the LO quiz, false if already completed
+  Future<bool> hasStudentCompletedLoQuiz({
+    required String studentId,
+    required int loId,
+  }) async {
+    final db = await database;
+    final results = await db.rawQuery('''
+      SELECT COUNT(*) as count
+      FROM quiz_attempts
+      WHERE student_id = ? AND lo_id = ? AND (quiz_id IS NULL OR quiz_id = 0)
+    ''', [studentId, loId]);
+
+    return (results.first['count'] as int) == 0;
+  }
+
   /// Get the latest quiz attempt status for a student on a specific quiz
   /// Returns a map with attempt status information
   Future<Map<String, dynamic>> getStudentQuizAttemptStatus({
@@ -1904,6 +1934,11 @@ class DatabaseHelper {
       final canAttempt = await hasStudentCompletedQuiz(studentId: studentId, quizId: quizId);
       if (!canAttempt) {
         throw Exception('Student has already completed this quiz. Contact the teacher for a reset if needed.');
+      }
+    } else if (loId > 0) {
+      final canAttempt = await hasStudentCompletedLoQuiz(studentId: studentId, loId: loId);
+      if (!canAttempt) {
+        throw Exception('Student has already completed this assessment. Contact the teacher for a reset if needed.');
       }
     }
 
@@ -2230,30 +2265,80 @@ class DatabaseHelper {
     };
   }
 
-  /// Update quiz student assignments (clear old and add new)
+  /// Update quiz student assignments (updates deadline, reopens missed if rescheduled, preserves completed, and manages assignees)
   Future<void> updateQuizAssignments({
     required int quizId,
     required List<String> studentIds,
     String? dueDate,
   }) async {
     final db = await database;
+    final now = DateTime.now().toIso8601String();
 
-    // Clear existing assignments for this quiz
-    await db.delete('quiz_assignments', where: 'quiz_id = ?', whereArgs: [quizId]);
+    final qCountRes = await db.rawQuery('SELECT COUNT(*) as count FROM questions WHERE quiz_id = ?', [quizId]);
+    final totalQuestions = (qCountRes.first['count'] as int?) ?? 0;
 
-    // Add updated assignments
+    // 1. Update due_date on all existing assignments for this quiz
+    await db.update(
+      'quiz_assignments',
+      {'due_date': dueDate},
+      where: 'quiz_id = ?',
+      whereArgs: [quizId],
+    );
+
+    // 2. If the quiz was rescheduled with a future deadline, reopen any 'missed' assignments back to 'pending'
+    if (dueDate != null && dueDate.isNotEmpty) {
+      try {
+        final d = DateTime.parse(dueDate).toLocal();
+        final effectiveEnd = (dueDate.length <= 10 && !dueDate.contains('T'))
+            ? DateTime(d.year, d.month, d.day, 23, 59, 59)
+            : d;
+        if (effectiveEnd.isAfter(DateTime.now())) {
+          await db.update(
+            'quiz_assignments',
+            {'status': 'pending'},
+            where: 'quiz_id = ? AND status = ?',
+            whereArgs: [quizId, 'missed'],
+          );
+        }
+      } catch (_) {}
+    }
+
+    if (studentIds.isEmpty) return;
+
+    // 3. Add or update assignments for the selected students
+    final existingRows = await db.query(
+      'quiz_assignments',
+      where: 'quiz_id = ?',
+      whereArgs: [quizId],
+    );
+    final existingStudentMap = {
+      for (final r in existingRows) r['student_id']?.toString() ?? '': r,
+    };
+
     for (final studentId in studentIds) {
-      await db.insert('quiz_assignments', {
-        'quiz_id': quizId,
-        'student_id': studentId,
-        'assigned_at': DateTime.now().toIso8601String(),
-        'due_date': dueDate,
-        'status': 'pending',
-        'score': 0,
-        'total_questions': 0,
-        'percentage': 0.0,
-        'completed_at': null,
-      });
+      if (!existingStudentMap.containsKey(studentId)) {
+        await db.insert('quiz_assignments', {
+          'quiz_id': quizId,
+          'student_id': studentId,
+          'assigned_at': now,
+          'due_date': dueDate,
+          'status': 'pending',
+          'score': 0,
+          'total_questions': totalQuestions,
+          'percentage': 0.0,
+          'completed_at': null,
+        });
+      } else {
+        await db.update(
+          'quiz_assignments',
+          {
+            'due_date': dueDate,
+            'total_questions': totalQuestions,
+          },
+          where: 'quiz_id = ? AND student_id = ?',
+          whereArgs: [quizId, studentId],
+        );
+      }
     }
   }
 
@@ -2274,32 +2359,51 @@ class DatabaseHelper {
     final db = await database;
 
     // Update quiz basic info
-    await db.update(
-      'quizzes',
-      {
-        'title': title.trim(),
-        'description': description?.trim(),
-        'subject_id': subjectId,
-        'time_limit_minutes': timeLimitMinutes,
-        'passing_score': passingScore,
-        'status': status ?? 'published',
-        'due_date': dueDate,
-        'schedule_start': scheduleStart,
-        'schedule_end': scheduleEnd,
-        'updated_at': DateTime.now().toIso8601String(),
-      },
-      where: 'id = ?',
-      whereArgs: [quizId],
-    );
+    final updateData = <String, dynamic>{
+      'title': title.trim(),
+      'description': description?.trim(),
+      'subject_id': subjectId,
+      'time_limit_minutes': timeLimitMinutes,
+      'passing_score': passingScore,
+      'status': status ?? 'published',
+      'due_date': dueDate,
+      'schedule_start': scheduleStart,
+      'schedule_end': scheduleEnd,
+    };
+    try {
+      updateData['updated_at'] = DateTime.now().toIso8601String();
+      await db.update(
+        'quizzes',
+        updateData,
+        where: 'id = ?',
+        whereArgs: [quizId],
+      );
+    } catch (_) {
+      updateData.remove('updated_at');
+      await db.update(
+        'quizzes',
+        updateData,
+        where: 'id = ?',
+        whereArgs: [quizId],
+      );
+    }
 
     // Clear old questions for this quiz
     await db.delete('questions', where: 'quiz_id = ?', whereArgs: [quizId]);
 
     // Insert updated questions
+    final now = DateTime.now().toIso8601String();
     for (final q in questions) {
       await db.insert('questions', {
-        ...q,
+        'lo_id': q['lo_id'] ?? 0,
         'quiz_id': quizId,
+        'question_text': q['question_text'] ?? '',
+        'option_a': q['option_a'] ?? '',
+        'option_b': q['option_b'] ?? '',
+        'option_c': q['option_c'] ?? '',
+        'option_d': q['option_d'] ?? '',
+        'correct_option': (q['correct_option'] ?? 'A').toString().toUpperCase().trim(),
+        'created_at': q['created_at'] ?? now,
       });
     }
   }
@@ -3965,6 +4069,7 @@ class DatabaseHelper {
       'category': 'teacher',
       'full_name': fullName.trim(),
       'school_id': 'sch_main',
+      'must_change_password': 1,
       'created_at': DateTime.now().toIso8601String(),
     };
 
@@ -4065,6 +4170,7 @@ class DatabaseHelper {
       'student_type': studentType,
       'special_notes': specialNotes,
       'school_id': 'sch_main',
+      'must_change_password': 1,
       'created_at': DateTime.now().toIso8601String(),
     };
 
@@ -4135,6 +4241,58 @@ class DatabaseHelper {
     }
 
     return finalStudentId;
+  }
+
+  /// Resets a user's password, forces must_change_password on first login,
+  /// updates local database & Cloud Firestore, and dispatches credentials via Gmail SMTP.
+  Future<EmailResult> resetAndSendCredentials({
+    required String userId,
+    required String newPassword,
+  }) async {
+    final db = await database;
+    final userRows = await db.query('users', where: 'id = ?', whereArgs: [userId], limit: 1);
+    if (userRows.isEmpty) {
+      return EmailResult(success: false, message: 'User $userId not found in database.', channel: 'none');
+    }
+    final user = userRows.first;
+    final email = (user['email'] as String? ?? '').trim();
+    if (email.isEmpty) {
+      return EmailResult(success: false, message: 'User does not have an email address configured.', channel: 'none');
+    }
+
+    final salt = generateSalt();
+    final hashedPassword = hashPassword(newPassword, salt);
+    final updates = {
+      'password': hashedPassword,
+      'password_salt': salt,
+      'must_change_password': 1,
+    };
+
+    await db.update('users', updates, where: 'id = ?', whereArgs: [userId]);
+
+    try {
+      await FirestoreService().saveUser({'id': userId, ...updates});
+    } catch (e) {
+      debugPrint('[DatabaseHelper] Error syncing reset password to Firestore: $e');
+    }
+
+    final fullName = user['full_name'] as String? ?? 'User';
+    final role = user['role'] as String? ?? 'student';
+    final resolvedUsername = (user['username'] as String?)?.isNotEmpty == true
+        ? user['username'] as String
+        : (email.contains('@') ? email.split('@').first : fullName.toLowerCase().replaceAll(' ', '.'));
+
+    return await EmailService().sendAccountCredentials(
+      toEmail: email,
+      fullName: fullName,
+      userId: userId,
+      username: resolvedUsername,
+      plainPassword: newPassword,
+      role: role,
+      grade: user['grade'] as String?,
+      section: user['section'] as String?,
+      specialNotes: user['special_notes'] as String?,
+    );
   }
 
   Future<void> updateTeacher(
@@ -4952,7 +5110,15 @@ class DatabaseHelper {
   Future<List<Map<String, dynamic>>> getAssignedQuizzesForStudent(String studentId, {int? subjectId}) async {
     final db = await database;
     String query = '''
-      SELECT qa.*,
+      SELECT qa.id as assignment_id,
+             qa.quiz_id,
+             qa.student_id,
+             qa.assigned_at,
+             qa.status,
+             qa.score,
+             qa.total_questions,
+             qa.percentage,
+             qa.completed_at,
              q.title,
              q.description,
              q.subject_id,
@@ -4964,13 +5130,14 @@ class DatabaseHelper {
              q.status as quiz_status,
              q.schedule_start,
              q.schedule_end,
+             COALESCE(q.due_date, qa.due_date) as due_date,
              s.name as subject_name,
              s.subject_code,
              (SELECT COUNT(*) FROM questions WHERE quiz_id = q.id) as question_count
       FROM quiz_assignments qa
       JOIN quizzes q ON qa.quiz_id = q.id
       LEFT JOIN subjects s ON q.subject_id = s.id
-      WHERE qa.student_id = ?
+      WHERE qa.student_id = ? AND (q.status != 'draft' OR q.status IS NULL)
     ''';
     List<dynamic> args = [studentId];
     if (subjectId != null) {
@@ -4980,6 +5147,20 @@ class DatabaseHelper {
     query += ' ORDER BY CASE WHEN qa.status = \'pending\' THEN 0 ELSE 1 END, qa.assigned_at DESC';
 
     return await db.rawQuery(query, args);
+  }
+
+  /// Mark a quiz assignment as missed when student failed to take it before the deadline
+  Future<void> markQuizAssignmentMissed({
+    required int quizId,
+    required String studentId,
+  }) async {
+    final db = await database;
+    await db.update(
+      'quiz_assignments',
+      {'status': 'missed'},
+      where: 'quiz_id = ? AND student_id = ? AND status = ?',
+      whereArgs: [quizId, studentId, 'pending'],
+    );
   }
 
   Future<Map<String, dynamic>?> getQuizById(int quizId) async {
@@ -5084,6 +5265,7 @@ class DatabaseHelper {
                  SELECT passing_score FROM quizzes WHERE id = qa.quiz_id
                ) THEN 'Passed'
                WHEN qa.status = 'completed' THEN 'Failed'
+               WHEN qa.status = 'missed' THEN 'Missed'
                ELSE 'Pending'
              END as result
       FROM quiz_assignments qa
@@ -5162,6 +5344,393 @@ class DatabaseHelper {
     await db.delete('quiz_assignments', where: 'quiz_id = ?', whereArgs: [quizId]);
     await db.delete('questions', where: 'quiz_id = ?', whereArgs: [quizId]);
     await db.delete('quizzes', where: 'id = ?', whereArgs: [quizId]);
+  }
+
+  /// Retrieves all quizzes available for analysis, optionally filtered by teacher or subject.
+  Future<List<Map<String, dynamic>>> getQuizzesAvailableForAnalysis({String? teacherId, int? subjectId}) async {
+    final db = await database;
+    String query = '''
+      SELECT q.id,
+             q.title,
+             q.subject_id,
+             q.passing_score,
+             q.created_at,
+             s.name as subject_name,
+             s.subject_code,
+             (SELECT COUNT(*) FROM questions WHERE quiz_id = q.id) as question_count,
+             (SELECT COUNT(DISTINCT student_id) FROM quiz_attempts WHERE quiz_id = q.id) as attempt_count
+      FROM quizzes q
+      LEFT JOIN subjects s ON q.subject_id = s.id
+      WHERE 1=1
+    ''';
+    final List<dynamic> args = [];
+    if (subjectId != null && subjectId > 0) {
+      query += ' AND q.subject_id = ?';
+      args.add(subjectId);
+    }
+    if (teacherId != null && teacherId.isNotEmpty) {
+      query += ' AND (q.teacher_id = ? OR s.teacher_id = ?)';
+      args.add(teacherId);
+      args.add(teacherId);
+    }
+    query += ' ORDER BY q.created_at DESC, q.id DESC';
+    return await db.rawQuery(query, args);
+  }
+
+  /// Calculates DepEd-compliant psychometric Item Analysis for a given quiz.
+  Future<ItemAnalysisReport> calculateQuizItemAnalysis(int quizId) async {
+    final db = await database;
+
+    final quizRes = await db.rawQuery('''
+      SELECT q.*, s.name as subject_name, s.subject_code
+      FROM quizzes q
+      LEFT JOIN subjects s ON q.subject_id = s.id
+      WHERE q.id = ?
+    ''', [quizId]);
+
+    if (quizRes.isEmpty) {
+      return ItemAnalysisReport.empty(
+        quizId: quizId,
+        quizTitle: 'Quiz #$quizId',
+      );
+    }
+
+    final quiz = quizRes.first;
+    final quizTitle = quiz['title']?.toString() ?? 'Quiz #$quizId';
+    final subjectName = quiz['subject_name']?.toString() ?? 'General';
+    final subjectCode = quiz['subject_code']?.toString() ?? '';
+    final passingScore = ((quiz['passing_score'] as num?)?.toDouble()) ?? 70.0;
+
+    final questionsRaw = await db.query(
+      'questions',
+      where: 'quiz_id = ?',
+      whereArgs: [quizId],
+      orderBy: 'id ASC',
+    );
+
+    if (questionsRaw.isEmpty) {
+      return ItemAnalysisReport.empty(
+        quizId: quizId,
+        quizTitle: quizTitle,
+        subjectName: subjectName,
+        subjectCode: subjectCode,
+        totalQuestions: 0,
+        passingScore: passingScore,
+      );
+    }
+
+    // Fetch all completed attempts for this quiz
+    final attemptsRaw = await db.query(
+      'quiz_attempts',
+      where: 'quiz_id = ?',
+      whereArgs: [quizId],
+      orderBy: 'attempted_at DESC',
+    );
+
+    // Deduplicate by student_id to only evaluate each student's most recent attempt
+    final Map<String, Map<String, dynamic>> deduplicated = {};
+    for (final att in attemptsRaw) {
+      final sid = att['student_id']?.toString() ?? '';
+      if (sid.isNotEmpty && !deduplicated.containsKey(sid)) {
+        deduplicated[sid] = att;
+      }
+    }
+    final attempts = deduplicated.values.toList();
+    final int totalAttempts = attempts.length;
+
+    if (totalAttempts == 0) {
+      return ItemAnalysisReport.empty(
+        quizId: quizId,
+        quizTitle: quizTitle,
+        subjectName: subjectName,
+        subjectCode: subjectCode,
+        totalQuestions: questionsRaw.length,
+        passingScore: passingScore,
+      );
+    }
+
+    // Extract student scores and calculate mean, median, pass rate
+    final List<double> studentScores = [];
+    int passedCount = 0;
+    for (final att in attempts) {
+      final scoreVal = ((att['score'] as num?)?.toDouble()) ?? 0.0;
+      final totalQ = ((att['total_questions'] as num?)?.toInt()) ?? questionsRaw.length;
+      final pct = totalQ > 0 ? (scoreVal / totalQ) * 100 : (((att['percentage'] as num?)?.toDouble()) ?? 0.0);
+      studentScores.add(scoreVal);
+      if (pct >= passingScore || att['is_passed'] == 1 || att['is_passed'] == true) {
+        passedCount++;
+      }
+    }
+
+    studentScores.sort();
+    final double meanScore = studentScores.reduce((a, b) => a + b) / totalAttempts;
+    final double medianScore = (totalAttempts % 2 == 1)
+        ? studentScores[totalAttempts ~/ 2]
+        : (studentScores[(totalAttempts ~/ 2) - 1] + studentScores[totalAttempts ~/ 2]) / 2.0;
+    final double passRate = (passedCount / totalAttempts) * 100.0;
+
+    // Variance of test scores: sigma^2 = sum((x - mean)^2) / N
+    final double scoreVariance = studentScores
+        .map((s) => pow(s - meanScore, 2).toDouble())
+        .reduce((a, b) => a + b) / totalAttempts;
+
+    // Rank attempts by score descending for Upper & Lower group partitioning
+    attempts.sort((a, b) {
+      final sA = ((a['score'] as num?)?.toDouble()) ?? 0.0;
+      final sB = ((b['score'] as num?)?.toDouble()) ?? 0.0;
+      return sB.compareTo(sA);
+    });
+
+    // Kelly's 27% Rule: Adaptive based on sample size
+    final int groupSize;
+    if (totalAttempts >= 30) {
+      groupSize = (totalAttempts * 0.27).round().clamp(1, totalAttempts ~/ 2);
+    } else if (totalAttempts >= 10) {
+      groupSize = (totalAttempts * 0.33).round().clamp(1, totalAttempts ~/ 2);
+    } else {
+      groupSize = (totalAttempts ~/ 2).clamp(1, totalAttempts);
+    }
+
+    final upperGroup = attempts.take(groupSize).toList();
+    final lowerGroup = attempts.reversed.take(groupSize).toList();
+
+    // Parse each attempt's answers JSON map
+    final Map<String, Map<String, String>> studentAnswersMap = {};
+    for (final att in attempts) {
+      final sid = att['student_id']?.toString() ?? '';
+      final answersStr = att['answers']?.toString();
+      if (answersStr != null && answersStr.isNotEmpty) {
+        try {
+          final decoded = jsonDecode(answersStr);
+          if (decoded is Map) {
+            studentAnswersMap[sid] = decoded.map((k, v) => MapEntry(k.toString(), v.toString().trim().toUpperCase()));
+          }
+        } catch (_) {}
+      }
+    }
+
+    final List<QuestionItemAnalysis> questionAnalyses = [];
+    double sumP = 0.0;
+    double sumD = 0.0;
+    double sumPtimesOneMinusP = 0.0;
+    int retainCount = 0;
+    int reviseCount = 0;
+    int discardCount = 0;
+    int checkKeyCount = 0;
+
+    for (int qIdx = 0; qIdx < questionsRaw.length; qIdx++) {
+      final q = questionsRaw[qIdx];
+      final qId = q['id'] as int;
+      final qText = q['question_text']?.toString() ?? 'Question #${qIdx + 1}';
+      final correctOpt = (q['correct_option']?.toString() ?? 'A').trim().toUpperCase();
+
+      final optionTexts = <String, String>{
+        'A': q['option_a']?.toString() ?? '',
+        'B': q['option_b']?.toString() ?? '',
+        'C': q['option_c']?.toString() ?? '',
+        'D': q['option_d']?.toString() ?? '',
+      };
+
+      final totalSelections = <String, int>{'A': 0, 'B': 0, 'C': 0, 'D': 0};
+      final upperSelections = <String, int>{'A': 0, 'B': 0, 'C': 0, 'D': 0};
+      final lowerSelections = <String, int>{'A': 0, 'B': 0, 'C': 0, 'D': 0};
+      int skippedCount = 0;
+
+      // Helper to extract option chosen by a student
+      String? getOption(String sid) {
+        final ans = studentAnswersMap[sid];
+        if (ans == null) return null;
+        // Check 0-based question index first, then question ID
+        return ans[qIdx.toString()] ?? ans[qId.toString()];
+      }
+
+      // Count across all attempts
+      for (final att in attempts) {
+        final sid = att['student_id']?.toString() ?? '';
+        final opt = getOption(sid);
+        if (opt != null && totalSelections.containsKey(opt)) {
+          totalSelections[opt] = totalSelections[opt]! + 1;
+        } else {
+          skippedCount++;
+        }
+      }
+
+      // Count in Upper group
+      for (final att in upperGroup) {
+        final sid = att['student_id']?.toString() ?? '';
+        final opt = getOption(sid);
+        if (opt != null && upperSelections.containsKey(opt)) {
+          upperSelections[opt] = upperSelections[opt]! + 1;
+        }
+      }
+
+      // Count in Lower group
+      for (final att in lowerGroup) {
+        final sid = att['student_id']?.toString() ?? '';
+        final opt = getOption(sid);
+        if (opt != null && lowerSelections.containsKey(opt)) {
+          lowerSelections[opt] = lowerSelections[opt]! + 1;
+        }
+      }
+
+      // Percentages
+      final selectionPercentages = <String, double>{};
+      totalSelections.forEach((key, count) {
+        selectionPercentages[key] = totalAttempts > 0 ? (count / totalAttempts) * 100.0 : 0.0;
+      });
+
+      // Difficulty Index (p) = Total Correct / Total Examinees
+      final int correctCount = totalSelections[correctOpt] ?? 0;
+      final double p = (totalAttempts > 0 ? (correctCount / totalAttempts) : 0.0).clamp(0.0, 1.0);
+      sumP += p;
+      sumPtimesOneMinusP += (p * (1.0 - p));
+
+      final String difficultyLabel;
+      if (p <= 0.20) {
+        difficultyLabel = 'Very Difficult';
+      } else if (p <= 0.40) {
+        difficultyLabel = 'Difficult';
+      } else if (p <= 0.60) {
+        difficultyLabel = 'Moderate';
+      } else if (p <= 0.80) {
+        difficultyLabel = 'Easy';
+      } else {
+        difficultyLabel = 'Very Easy';
+      }
+
+      // Discrimination Index (D) = (Upper Correct - Lower Correct) / GroupSize
+      final int uCorrect = upperSelections[correctOpt] ?? 0;
+      final int lCorrect = lowerSelections[correctOpt] ?? 0;
+      final double d = (groupSize > 0 ? ((uCorrect - lCorrect) / groupSize.toDouble()) : 0.0).clamp(-1.0, 1.0);
+      sumD += d;
+
+      final String discriminationLabel;
+      if (d >= 0.40) {
+        discriminationLabel = 'Very Good';
+      } else if (d >= 0.30) {
+        discriminationLabel = 'Reasonably Good';
+      } else if (d >= 0.20) {
+        discriminationLabel = 'Marginal';
+      } else if (d >= 0.00) {
+        discriminationLabel = 'Poor';
+      } else {
+        discriminationLabel = 'Defective';
+      }
+
+      // Distractor Efficiency Warnings
+      final List<String> distractorWarnings = [];
+      for (final entry in totalSelections.entries) {
+        final opt = entry.key;
+        if (opt == correctOpt) continue;
+        final count = entry.value;
+        final pct = selectionPercentages[opt] ?? 0.0;
+        final uCount = upperSelections[opt] ?? 0;
+        final lCount = lowerSelections[opt] ?? 0;
+
+        if (pct < 5.0) {
+          distractorWarnings.add('Option $opt is non-functioning ($count selections, ${pct.toStringAsFixed(1)}%). It provides no plausible alternative.');
+        } else if (uCount > lCount) {
+          distractorWarnings.add('Option $opt attracted more high-scoring students ($uCount) than low-scoring students ($lCount). Review wording for ambiguity.');
+        }
+      }
+
+      // Automated Recommendation Decision
+      final ItemAction recommendation;
+      final String recommendationLabel;
+      final String pedagogicalAdvice;
+
+      if (d < 0.0) {
+        recommendation = ItemAction.checkKey;
+        recommendationLabel = 'Check Answer Key';
+        pedagogicalAdvice = 'Negative discrimination: Lower-scoring students outperformed higher-scoring students. Verify that the answer key is correct or investigate misleading phrasing.';
+        checkKeyCount++;
+      } else if ((p <= 0.20 && d < 0.20) || (p >= 0.90 && d < 0.15)) {
+        recommendation = ItemAction.discard;
+        recommendationLabel = 'Discard or Replace';
+        pedagogicalAdvice = 'Question has very low discrimination and extreme difficulty. Consider removing or replacing it.';
+        discardCount++;
+      } else if (p <= 0.25 || p >= 0.85 || d < 0.25) {
+        recommendation = ItemAction.reviseStem;
+        recommendationLabel = 'Revise Question Stem';
+        pedagogicalAdvice = 'Difficulty or discrimination is marginal. Polish the question stem for better clarity and precision.';
+        reviseCount++;
+      } else if (distractorWarnings.isNotEmpty) {
+        recommendation = ItemAction.reviseDistractor;
+        recommendationLabel = 'Revise Distractors';
+        pedagogicalAdvice = 'Stem difficulty and discrimination are acceptable, but one or more incorrect options should be updated to function as plausible distractors.';
+        reviseCount++;
+      } else {
+        recommendation = ItemAction.retain;
+        recommendationLabel = 'Retain Item';
+        pedagogicalAdvice = 'High-performing item. Effectively discriminates between upper and lower students with balanced difficulty.';
+        retainCount++;
+      }
+
+      questionAnalyses.add(QuestionItemAnalysis(
+        index: qIdx + 1,
+        questionId: qId,
+        questionText: qText,
+        correctOption: correctOpt,
+        optionTexts: optionTexts,
+        totalSelections: totalSelections,
+        selectionPercentages: selectionPercentages,
+        upperGroupSelections: upperSelections,
+        lowerGroupSelections: lowerSelections,
+        skippedCount: skippedCount,
+        totalRespondents: totalAttempts,
+        difficultyIndex: p,
+        difficultyLabel: difficultyLabel,
+        discriminationIndex: d,
+        discriminationLabel: discriminationLabel,
+        recommendation: recommendation,
+        recommendationLabel: recommendationLabel,
+        distractorWarnings: distractorWarnings,
+        pedagogicalAdvice: pedagogicalAdvice,
+      ));
+    }
+
+    final double meanDiff = questionsRaw.isNotEmpty ? (sumP / questionsRaw.length) : 0.0;
+    final double meanDisc = questionsRaw.isNotEmpty ? (sumD / questionsRaw.length) : 0.0;
+
+    // KR-20 Reliability: (k / (k - 1)) * (1 - (sum(p * (1 - p)) / sigma^2))
+    double? kr20;
+    String reliabilityRating = 'N/A';
+    final int k = questionsRaw.length;
+    if (k > 1 && scoreVariance > 0.0001) {
+      final rawKr20 = (k / (k - 1)) * (1.0 - (sumPtimesOneMinusP / scoreVariance));
+      kr20 = rawKr20.clamp(0.0, 1.0);
+      if (kr20 >= 0.85) {
+        reliabilityRating = 'Excellent';
+      } else if (kr20 >= 0.75) {
+        reliabilityRating = 'Good';
+      } else if (kr20 >= 0.60) {
+        reliabilityRating = 'Acceptable';
+      } else {
+        reliabilityRating = 'Low Reliability';
+      }
+    }
+
+    return ItemAnalysisReport(
+      quizId: quizId,
+      quizTitle: quizTitle,
+      subjectName: subjectName,
+      subjectCode: subjectCode,
+      totalQuestions: questionsRaw.length,
+      totalAttempts: totalAttempts,
+      passingScore: passingScore,
+      meanScore: meanScore,
+      medianScore: medianScore,
+      passRate: passRate,
+      kr20Reliability: kr20,
+      reliabilityRating: reliabilityRating,
+      meanDifficulty: meanDiff,
+      meanDiscrimination: meanDisc,
+      retainCount: retainCount,
+      reviseCount: reviseCount,
+      discardCount: discardCount,
+      checkKeyCount: checkKeyCount,
+      questions: questionAnalyses,
+    );
   }
 
   Future<void> updateSubjectUnlockType(int subjectId, String unlockType) async {

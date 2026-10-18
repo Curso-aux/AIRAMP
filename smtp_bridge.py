@@ -46,9 +46,9 @@ SMTP_PORT = int(os.environ.get("SMTP_PORT", 587))
 import time
 from collections import defaultdict
 
-IP_MAX_PER_MINUTE = 15
-RECIPIENT_MAX_PER_3MIN = 3
-RECIPIENT_COOLDOWN_SECONDS = 45
+IP_MAX_PER_MINUTE = 30
+RECIPIENT_MAX_PER_3MIN = 10
+RECIPIENT_COOLDOWN_SECONDS = 5
 
 _ip_history = defaultdict(list)
 _recipient_history = defaultdict(list)

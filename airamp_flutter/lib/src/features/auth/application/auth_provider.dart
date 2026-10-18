@@ -1,7 +1,9 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/api/api_client.dart';
+import '../../../core/components/auth/required_change_password_dialog.dart';
 import '../../../core/database/database_helper.dart';
+import '../../../core/database/firestore_service.dart';
 import '../data/auth_repository.dart';
 
 class User {
@@ -15,6 +17,7 @@ class User {
   final String? grade;
   final String? schoolId;
   final List<String> availableRoles;
+  final bool mustChangePassword;
 
   User({
     required this.id,
@@ -27,6 +30,7 @@ class User {
     this.grade,
     this.schoolId = 'sch_main',
     this.availableRoles = const ['student', 'teacher'],
+    this.mustChangePassword = false,
   });
 
   bool get isSuperAdmin => role == 'super_admin';
@@ -66,6 +70,11 @@ class User {
   }
 
   factory User.fromJson(Map<String, dynamic> json) {
+    final mustChange = json['mustChangePassword'] == true ||
+        json['must_change_password'] == 1 ||
+        json['must_change_password'] == true ||
+        json['must_change_password'] == '1';
+
     return User(
       id: json['id'] ?? '',
       email: json['email'] ?? '',
@@ -77,6 +86,7 @@ class User {
       grade: json['grade'],
       schoolId: json['schoolId'] ?? json['school_id'] ?? 'sch_main',
       availableRoles: (json['availableRoles'] as List?)?.cast<String>() ?? const ['student', 'teacher'],
+      mustChangePassword: mustChange,
     );
   }
 
@@ -91,6 +101,7 @@ class User {
     String? grade,
     String? schoolId,
     List<String>? availableRoles,
+    bool? mustChangePassword,
   }) {
     return User(
       id: id,
@@ -103,6 +114,7 @@ class User {
       grade: grade ?? this.grade,
       schoolId: schoolId ?? this.schoolId,
       availableRoles: availableRoles ?? this.availableRoles,
+      mustChangePassword: mustChangePassword ?? this.mustChangePassword,
     );
   }
 }
@@ -176,6 +188,26 @@ class AuthNotifier extends Notifier<User?> {
     if (userRows.isNotEmpty) {
       final u = userRows.first;
       final actualRole = u['role'] as String? ?? session.role;
+      var mustChange = u['must_change_password'] == 1 ||
+          u['must_change_password'] == true ||
+          u['must_change_password'] == '1';
+
+      if (!mustChange) {
+        try {
+          final cloudUser = await FirestoreService()
+              .findUserByIdentifier(session.userId)
+              .timeout(const Duration(seconds: 2), onTimeout: () => null);
+          if (cloudUser != null) {
+            final cm = cloudUser['must_change_password'];
+            if (cm == 1 || cm == true || cm == '1') {
+              mustChange = true;
+              await db.update('users', {'must_change_password': 1},
+                  where: 'id = ?', whereArgs: [session.userId]);
+            }
+          }
+        } catch (_) {}
+      }
+
       state = User(
         id: session.userId,
         email: u['email'] as String? ?? '',
@@ -185,6 +217,7 @@ class AuthNotifier extends Notifier<User?> {
         section: u['section'] as String?,
         grade: u['grade'] as String?,
         schoolId: u['school_id'] as String? ?? 'sch_main',
+        mustChangePassword: mustChange,
       );
     } else {
       state = User(
@@ -236,12 +269,15 @@ class AuthNotifier extends Notifier<User?> {
   }) async {
     if (state == null) return;
 
+    final isPasswordChanged = password != null && password.trim().isNotEmpty;
+
     // Update local state immediately
     state = state!.copyWith(
       fullName: fullName,
       username: username,
       email: email,
       profileImage: profileImage,
+      mustChangePassword: isPasswordChanged ? false : state!.mustChangePassword,
     );
 
     // Persist changes to local SQLite and cloud backend
@@ -306,6 +342,7 @@ class AuthNotifier extends Notifier<User?> {
     } finally {
       isLoading = false;
       state = null;
+      RequiredChangePasswordDialog.resetSession();
     }
   }
 }

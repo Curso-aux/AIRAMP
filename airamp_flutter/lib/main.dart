@@ -11,6 +11,7 @@ import 'src/core/services/session_draft_service.dart';
 import 'src/core/services/aira_voice_service.dart';
 import 'src/features/auth/application/auth_provider.dart';
 import 'src/features/esp32_hub/data/saved_materials_service.dart';
+import 'src/core/components/aira/global_aira_floating_overlay.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -129,6 +130,14 @@ class _AirampAppState extends ConsumerState<AirampApp> {
       themeAnimationDuration: Duration.zero,
       routerConfig: router,
       debugShowCheckedModeBanner: false,
+      builder: (context, child) {
+        return Stack(
+          children: [
+            ?child,
+            const GlobalAiraFloatingOverlay(),
+          ],
+        );
+      },
     );
   }
 }

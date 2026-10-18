@@ -65,6 +65,10 @@ class AuthRepository {
 
     if (cloudUser != null) {
       final cloudId = cloudUser['id']?.toString() ?? 'usr_${DateTime.now().millisecondsSinceEpoch}';
+      final localCandidate = candidateRows.where((r) => r['id'] == cloudId).firstOrNull;
+      final rawMustChange = cloudUser['must_change_password'] ?? (localCandidate != null ? localCandidate['must_change_password'] : null);
+      final mustChangeVal = (rawMustChange == 1 || rawMustChange == true || rawMustChange == '1') ? 1 : 0;
+
       final cloudDbRow = <String, Object?>{
         'id': cloudId,
         'email': cloudUser['email'] ?? '',
@@ -78,6 +82,7 @@ class AuthRepository {
         'student_type': cloudUser['student_type'] ?? 'regular',
         'special_notes': cloudUser['special_notes'],
         'school_id': cloudUser['school_id'] ?? 'sch_main',
+        'must_change_password': mustChangeVal,
         'created_at': cloudUser['created_at'] ?? DateTime.now().toIso8601String(),
       };
       // Place cloud user first so latest cloud password/salt is verified first
@@ -189,6 +194,8 @@ class AuthRepository {
         'section': user['section'],
         'grade': user['grade'],
         'schoolId': user['school_id'] ?? 'sch_main',
+        'must_change_password': user['must_change_password'] == 1 || user['must_change_password'] == true || user['must_change_password'] == '1',
+        'mustChangePassword': user['must_change_password'] == 1 || user['must_change_password'] == true || user['must_change_password'] == '1',
       },
       'session': token,
     };
@@ -354,6 +361,7 @@ class AuthRepository {
       final salt = DatabaseHelper.generateSalt();
       updates['password'] = DatabaseHelper.hashPassword(password, salt);
       updates['password_salt'] = salt;
+      updates['must_change_password'] = 0;
     }
     if (updates.isNotEmpty) {
       try {

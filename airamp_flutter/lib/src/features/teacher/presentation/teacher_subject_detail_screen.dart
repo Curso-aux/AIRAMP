@@ -13,6 +13,7 @@ import '../../teacher/data/teacher_repository.dart';
 import 'components/create_quiz_dialog.dart';
 import 'components/quiz_roster_dialog.dart';
 import 'components/quiz_view_dialog.dart';
+import 'components/quiz_item_analysis_dialog.dart';
 import 'components/create_assignment_dialog.dart';
 import 'components/assignment_roster_dialog.dart';
 import '../../submissions/data/submissions_repository.dart';
@@ -605,9 +606,40 @@ class _TeacherSubjectDetailScreenState extends ConsumerState<TeacherSubjectDetai
         }
         return ListView.builder(
           padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
-          itemCount: quizzes.length,
+          itemCount: quizzes.length + 1,
           itemBuilder: (context, index) {
-            final quiz = quizzes[index];
+            if (index == 0) {
+              return Padding(
+                padding: const EdgeInsets.only(bottom: 12),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Text(
+                      'Quizzes (${quizzes.length})',
+                      style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15, color: AppTheme.text),
+                    ),
+                    ElevatedButton.icon(
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: AppTheme.primary,
+                        foregroundColor: Colors.black,
+                        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                        elevation: 1,
+                      ),
+                      onPressed: () {
+                        QuizItemAnalysisDialog.show(
+                          context,
+                          subjectId: subjectId,
+                        );
+                      },
+                      icon: const Icon(Icons.analytics_outlined, size: 16),
+                      label: const Text('Item Analysis', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12)),
+                    ),
+                  ],
+                ),
+              );
+            }
+            final quiz = quizzes[index - 1];
             final qId = quiz['id'] as int;
             final title = quiz['title']?.toString() ?? 'Quiz';
             final qCount = quiz['question_count'] ?? 0;
@@ -766,6 +798,26 @@ class _TeacherSubjectDetailScreenState extends ConsumerState<TeacherSubjectDetai
                           },
                           icon: const Icon(Icons.visibility_outlined, size: 16),
                           label: const Text('View Quiz'),
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: OutlinedButton.icon(
+                          style: OutlinedButton.styleFrom(
+                            foregroundColor: AppTheme.accent,
+                            side: BorderSide(color: AppTheme.accent),
+                            padding: const EdgeInsets.symmetric(vertical: 8),
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                          ),
+                          onPressed: () {
+                            QuizItemAnalysisDialog.show(
+                              context,
+                              initialQuizId: qId,
+                              subjectId: int.parse(widget.subjectId),
+                            );
+                          },
+                          icon: const Icon(Icons.analytics_outlined, size: 16),
+                          label: const Text('Analysis'),
                         ),
                       ),
                     ],

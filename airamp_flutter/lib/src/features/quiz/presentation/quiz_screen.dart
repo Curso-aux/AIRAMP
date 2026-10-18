@@ -8,7 +8,6 @@ import '../../../core/theme/theme_provider.dart';
 import '../../../core/database/database_helper.dart';
 import '../../student/data/student_repository.dart';
 import '../../auth/application/auth_provider.dart';
-import 'quiz_flashcard_screen.dart';
 
 class QuizScreen extends ConsumerStatefulWidget {
   final String quizId;
@@ -40,6 +39,7 @@ class _QuizScreenState extends ConsumerState<QuizScreen> {
   int _score = 0;
   double _percentage = 0.0;
   bool _isPassed = false;
+  bool _isTimedOut = false;
   DateTime? _startTime;
   bool _hasAlreadyTaken = false; // Track if student already completed this quiz
 
@@ -47,6 +47,26 @@ class _QuizScreenState extends ConsumerState<QuizScreen> {
   Timer? _countdownTimer;
   int _remainingSeconds = 0;
   DateTime? _scheduleStartDate;
+  DateTime? _scheduleEndDate;
+  bool _isMissed = false;
+
+  String _formatScheduleDateTime(DateTime dt) {
+    const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+    final h = dt.hour == 0 ? 12 : (dt.hour > 12 ? dt.hour - 12 : dt.hour);
+    final m = dt.minute.toString().padLeft(2, '0');
+    final ampm = dt.hour >= 12 ? 'PM' : 'AM';
+    return '${months[dt.month - 1]} ${dt.day}, ${dt.year} at $h:$m $ampm';
+  }
+
+  String _formatDateTimeString(String? isoStr) {
+    if (isoStr == null || isoStr.isEmpty) return '';
+    try {
+      final dt = DateTime.parse(isoStr).toLocal();
+      return _formatScheduleDateTime(dt);
+    } catch (_) {
+      return isoStr;
+    }
+  }
 
   @override
   void initState() {
@@ -115,11 +135,52 @@ class _QuizScreenState extends ConsumerState<QuizScreen> {
       final tLimit = (quizData['time_limit_minutes'] as int?) ?? 0;
       _scheduleStart = quizData['schedule_start'] as String?;
       _scheduleEnd = quizData['schedule_end'] as String?;
+      final dueDateStr = quizData['due_date'] as String?;
+
       DateTime? scheduleDate;
       if (_scheduleStart != null && _scheduleStart!.isNotEmpty) {
         try {
           scheduleDate = DateTime.parse(_scheduleStart!).toLocal();
         } catch (_) {}
+      }
+
+      DateTime? scheduleEndDate;
+      if (_scheduleEnd != null && _scheduleEnd!.isNotEmpty) {
+        try {
+          scheduleEndDate = DateTime.parse(_scheduleEnd!).toLocal();
+          if (_scheduleEnd!.length == 10 && !_scheduleEnd!.contains('T')) {
+            scheduleEndDate = DateTime(scheduleEndDate.year, scheduleEndDate.month, scheduleEndDate.day, 23, 59, 59);
+          }
+        } catch (_) {}
+      } else if (dueDateStr != null && dueDateStr.isNotEmpty) {
+        try {
+          final d = DateTime.parse(dueDateStr).toLocal();
+          if (dueDateStr.length == 10 && !dueDateStr.contains('T')) {
+            scheduleEndDate = DateTime(d.year, d.month, d.day, 23, 59, 59);
+          } else {
+            scheduleEndDate = d;
+          }
+        } catch (_) {}
+      }
+
+      // Check if student missed this quiz (past due deadline without completing)
+      if (!isTeacher && scheduleEndDate != null && DateTime.now().isAfter(scheduleEndDate)) {
+        await DatabaseHelper().markQuizAssignmentMissed(
+          quizId: parsedId,
+          studentId: studentId,
+        );
+
+        if (mounted) {
+          setState(() {
+            _quizId = parsedId;
+            _quizData = quizData;
+            _quizTitle = quizData['title']?.toString() ?? 'Assessment';
+            _scheduleEndDate = scheduleEndDate;
+            _isMissed = true;
+            _loading = false;
+          });
+        }
+        return;
       }
 
       setState(() {
@@ -133,6 +194,7 @@ class _QuizScreenState extends ConsumerState<QuizScreen> {
         _timeLimitMinutes = tLimit;
         _remainingSeconds = tLimit * 60;
         _scheduleStartDate = scheduleDate;
+        _scheduleEndDate = scheduleEndDate;
         _loading = false;
       });
       // Start schedule check if quiz has a future start time
@@ -146,6 +208,19 @@ class _QuizScreenState extends ConsumerState<QuizScreen> {
     final loData = await DatabaseHelper().getLoQuiz(parsedId);
     if (mounted) {
       if (loData != null) {
+        if (!isTeacher) {
+          final canAttemptLo = await DatabaseHelper().hasStudentCompletedLoQuiz(
+            studentId: studentId,
+            loId: parsedId,
+          );
+          if (!canAttemptLo && mounted) {
+            setState(() {
+              _loading = false;
+              _hasAlreadyTaken = true;
+            });
+            return;
+          }
+        }
         final qList = (loData['questions'] as List?)?.cast<Map<String, dynamic>>() ?? [];
         setState(() {
           _quizId = null;
@@ -183,96 +258,54 @@ class _QuizScreenState extends ConsumerState<QuizScreen> {
     }
   }
 
-  /// Full reset: resets DB attempt and clears all in-memory quiz state
-  Future<void> _resetAndRetakeQuiz() async {
-    final student = ref.read(authProvider);
-    final studentId = student?.id ?? '';
-    final parsedId = int.tryParse(widget.quizId);
-
-    if (parsedId != null && studentId.isNotEmpty) {
-      if (_quizId != null && _quizId! > 0) {
-        await ref.read(studentQuizAttemptsProvider.notifier).resetQuizAttempt(
-          quizId: _quizId!,
-          loId: _loId,
-          subjectId: _subjectId,
-        );
-      } else if (_loId > 0) {
-        await ref.read(studentQuizAttemptsProvider.notifier).resetQuizAttempt(
-          quizId: 0,
-          loId: _loId,
-          subjectId: _subjectId,
-        );
-      } else {
-        await ref.read(studentQuizAttemptsProvider.notifier).resetQuizAttempt(
-          quizId: parsedId,
-          subjectId: _subjectId,
-        );
-      }
-    }
-
+  /// Restart preview (teacher preview only - in-memory only)
+  void _restartPreview() {
     _resetQuizState();
-    await _loadQuiz();
-  }
-
-  Future<void> _showMidQuizResetConfirmation() async {
-    final shouldReset = await showDialog<bool>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        backgroundColor: AppTheme.surface,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        title: Text('Reset Quiz?', style: TextStyle(color: AppTheme.text, fontWeight: FontWeight.bold)),
-        content: Text(
-          'This will clear all your answers, reset the timer to the beginning, and return to Question 1.',
-          style: TextStyle(color: AppTheme.textSecondary),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx, false),
-            child: Text('Cancel', style: TextStyle(color: AppTheme.textMuted)),
-          ),
-          ElevatedButton(
-            style: ElevatedButton.styleFrom(backgroundColor: AppTheme.error, foregroundColor: Colors.white),
-            onPressed: () => Navigator.pop(ctx, true),
-            child: const Text('Reset Quiz'),
-          ),
-        ],
-      ),
-    );
-
-    if (shouldReset == true && mounted) {
-      _resetQuizState();
-    }
+    _loadQuiz();
   }
 
   Future<bool> _handlePopScope() async {
     if (_state != 1) return true;
 
-    final shouldLeave = await showDialog<bool>(
+    final isTeacher = widget.isTeacherPreview || (ref.read(authProvider)?.role == 'teacher');
+    if (isTeacher) {
+      _resetQuizState();
+      return true;
+    }
+
+    final shouldSubmitAndExit = await showDialog<bool>(
       context: context,
+      barrierDismissible: false,
       builder: (ctx) => AlertDialog(
         backgroundColor: AppTheme.surface,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        title: Text('Leave Quiz?', style: TextStyle(color: AppTheme.text, fontWeight: FontWeight.bold)),
+        title: Row(
+          children: [
+            Icon(Icons.warning_amber_rounded, color: AppTheme.error, size: 24),
+            const SizedBox(width: 8),
+            Text('Exit & Submit Quiz?', style: TextStyle(color: AppTheme.text, fontWeight: FontWeight.bold, fontSize: 18)),
+          ],
+        ),
         content: Text(
-          'Your progress will be reset. Selected answers, question index, and timer will not be saved.',
-          style: TextStyle(color: AppTheme.textSecondary),
+          'Leaving now will automatically submit your quiz with your current answers as your final attempt. You will NOT be able to retake this quiz unless your instructor resets it.\n\nAre you sure you want to submit and exit?',
+          style: TextStyle(color: AppTheme.textSecondary, height: 1.4),
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx, false),
-            child: Text('Continue Quiz', style: TextStyle(color: AppTheme.textMuted)),
+            child: Text('Continue Quiz', style: TextStyle(color: AppTheme.primary, fontWeight: FontWeight.bold)),
           ),
           ElevatedButton(
             style: ElevatedButton.styleFrom(backgroundColor: AppTheme.error, foregroundColor: Colors.white),
             onPressed: () => Navigator.pop(ctx, true),
-            child: const Text('Reset & Exit'),
+            child: const Text('Submit & Exit'),
           ),
         ],
       ),
     );
 
-    if (shouldLeave == true) {
-      _resetQuizState();
+    if (shouldSubmitAndExit == true) {
+      await _submitQuiz(isTimeout: false);
       return true;
     }
     return false;
@@ -285,6 +318,12 @@ class _QuizScreenState extends ConsumerState<QuizScreen> {
     _countdownTimer = Timer.periodic(const Duration(seconds: 1), (timer) {
       if (!mounted) {
         timer.cancel();
+        return;
+      }
+      // If quiz window deadline has passed during active quiz, auto-submit with timeout
+      if (_scheduleEndDate != null && DateTime.now().isAfter(_scheduleEndDate!)) {
+        timer.cancel();
+        _submitQuiz(isTimeout: true);
         return;
       }
       if (_remainingSeconds > 0) {
@@ -330,7 +369,7 @@ class _QuizScreenState extends ConsumerState<QuizScreen> {
 
       final total = _questions.length;
       final pct = total > 0 ? (score / total) * 100 : 0.0;
-      final passed = pct >= _passingScore;
+      final passed = isTimeout ? false : (pct >= _passingScore);
       final duration = _startTime != null ? DateTime.now().difference(_startTime!).inSeconds : 0;
 
       final isTeacher = widget.isTeacherPreview || (ref.read(authProvider)?.role == 'teacher');
@@ -354,6 +393,7 @@ class _QuizScreenState extends ConsumerState<QuizScreen> {
           _score = score;
           _percentage = pct;
           _isPassed = passed;
+          _isTimedOut = isTimeout;
           _state = 2;
         });
       }
@@ -362,7 +402,8 @@ class _QuizScreenState extends ConsumerState<QuizScreen> {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             backgroundColor: AppTheme.error,
-            content: const Text("Time is up! Your quiz has been automatically submitted."),
+            duration: const Duration(seconds: 4),
+            content: const Text("Time is up! You exceeded the time limit, so the quiz is marked as failed."),
           ),
         );
       }
@@ -431,45 +472,73 @@ class _QuizScreenState extends ConsumerState<QuizScreen> {
                 const SizedBox(height: 8),
                 Text(
                   _hasAlreadyTaken
-                      ? 'You have already completed this quiz. Contact your instructor if you need to retake it.'
+                      ? 'You have already completed this quiz. Only your instructor can reset this quiz if a retake is permitted.'
                       : 'The instructor has not added quiz questions for this assessment yet.',
                   textAlign: TextAlign.center,
                   style: TextStyle(color: AppTheme.textSecondary),
                 ),
                 const SizedBox(height: 24),
-                if (_hasAlreadyTaken) ...[
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      OutlinedButton(
-                        onPressed: () => context.pop(),
-                        style: OutlinedButton.styleFrom(
-                          foregroundColor: AppTheme.text,
-                          side: BorderSide(color: AppTheme.border),
-                        ),
-                        child: const Text('Back to Course'),
-                      ),
-                      const SizedBox(width: 12),
-                      ElevatedButton.icon(
-                        onPressed: () => _resetAndRetakeQuiz(),
-                        icon: const Icon(Icons.refresh, size: 16),
-                        label: const Text('Reset & Retake', style: TextStyle(fontWeight: FontWeight.bold)),
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: AppTheme.primary,
-                          foregroundColor: Colors.black,
-                        ),
-                      ),
-                    ],
+                ElevatedButton(
+                  onPressed: () => context.pop(),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: AppTheme.primary,
+                    foregroundColor: Colors.black,
                   ),
-                ] else
-                  ElevatedButton(
-                    onPressed: () => context.pop(),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: AppTheme.primary,
-                      foregroundColor: Colors.black,
-                    ),
-                    child: const Text('Back to Course', style: TextStyle(fontWeight: FontWeight.bold)),
+                  child: const Text('Back to Course', style: TextStyle(fontWeight: FontWeight.bold)),
+                ),
+              ],
+            ),
+          ),
+        ),
+      );
+    }
+
+    if (_isMissed) {
+      return Scaffold(
+        backgroundColor: AppTheme.background,
+        appBar: AppBar(
+          title: Text(_quizTitle.isNotEmpty ? _quizTitle : 'Assessment', style: TextStyle(color: AppTheme.text)),
+          iconTheme: IconThemeData(color: AppTheme.text),
+        ),
+        body: Center(
+          child: Padding(
+            padding: const EdgeInsets.all(32.0),
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(20),
+                  decoration: BoxDecoration(
+                    color: AppTheme.error.withValues(alpha: 0.15),
+                    shape: BoxShape.circle,
                   ),
+                  child: Icon(Icons.event_busy, size: 64, color: AppTheme.error),
+                ),
+                const SizedBox(height: 20),
+                Text(
+                  'Quiz Missed (Past Due)',
+                  style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: AppTheme.text),
+                  textAlign: TextAlign.center,
+                ),
+                const SizedBox(height: 10),
+                Text(
+                  _scheduleEndDate != null
+                      ? 'This quiz closed on ${_formatScheduleDateTime(_scheduleEndDate!)}. You did not complete it within the scheduled window, so it is marked as Missed.\n\nPlease contact your instructor if you need a reset or an extension.'
+                      : 'The deadline for this quiz has passed. It is marked as Missed.\n\nPlease contact your instructor if you need a reset or an extension.',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(color: AppTheme.textSecondary, height: 1.4, fontSize: 14),
+                ),
+                const SizedBox(height: 28),
+                ElevatedButton(
+                  onPressed: () => context.pop(),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: AppTheme.primary,
+                    foregroundColor: Colors.black,
+                    padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 14),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                  ),
+                  child: const Text('Back to Course', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
+                ),
               ],
             ),
           ),
@@ -509,12 +578,12 @@ class _QuizScreenState extends ConsumerState<QuizScreen> {
             },
           ),
           actions: [
-            if (_state == 1)
+            if (_state == 1 && (widget.isTeacherPreview || (ref.read(authProvider)?.role == 'teacher')))
               IconButton(
                 icon: const Icon(Icons.refresh),
-                tooltip: 'Reset Quiz',
+                tooltip: 'Restart Preview',
                 color: AppTheme.textSecondary,
-                onPressed: _showMidQuizResetConfirmation,
+                onPressed: _restartPreview,
               ),
             if (_state == 1 && _timeLimitMinutes > 0)
               Padding(
@@ -611,7 +680,7 @@ class _QuizScreenState extends ConsumerState<QuizScreen> {
               const SizedBox(height: 16),
               if (_scheduleStart != null && _scheduleStart!.isNotEmpty)
                 Text(
-                  _scheduleStart!.substring(0, _scheduleStart!.length - 3),
+                  _formatDateTimeString(_scheduleStart),
                   style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: AppTheme.primary),
                 ),
               const SizedBox(height: 32),
@@ -641,7 +710,7 @@ class _QuizScreenState extends ConsumerState<QuizScreen> {
               const SizedBox(height: 24),
               if (_scheduleEnd != null && _scheduleEnd!.isNotEmpty)
                 Text(
-                  'Quiz will close at ${_scheduleEnd!.substring(0, _scheduleEnd!.length - 3)}',
+                  'Quiz will close at ${_formatDateTimeString(_scheduleEnd)}',
                   style: TextStyle(fontSize: 12, color: AppTheme.textMuted),
                 ),
               const SizedBox(height: 32),
@@ -752,12 +821,54 @@ class _QuizScreenState extends ConsumerState<QuizScreen> {
                 ),
               ),
             ],
+            if (_scheduleStart != null || _scheduleEnd != null) ...[
+              const SizedBox(height: 10),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                decoration: BoxDecoration(
+                  color: AppTheme.surface,
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(color: AppTheme.border),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(Icons.event, size: 16, color: AppTheme.primary),
+                    const SizedBox(width: 8),
+                    Flexible(
+                      child: Text(
+                        _scheduleStart != null && _scheduleEnd != null
+                            ? 'Available: ${_formatDateTimeString(_scheduleStart)} – ${_formatDateTimeString(_scheduleEnd)}'
+                            : (_scheduleEnd != null
+                                ? 'Available until: ${_formatDateTimeString(_scheduleEnd)}'
+                                : 'Available from: ${_formatDateTimeString(_scheduleStart)}'),
+                        style: TextStyle(fontSize: 12, color: AppTheme.textMuted),
+                        textAlign: TextAlign.center,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
             const SizedBox(height: 36),
             SizedBox(
               width: double.infinity,
               height: 50,
               child: ElevatedButton(
                 onPressed: () {
+                  final isTeacher = widget.isTeacherPreview || (ref.read(authProvider)?.role == 'teacher');
+                  if (!isTeacher && _scheduleEndDate != null && DateTime.now().isAfter(_scheduleEndDate!)) {
+                    final studentId = ref.read(authProvider)?.id;
+                    final targetQuizId = _quizId ?? int.tryParse(widget.quizId);
+                    if (studentId != null && targetQuizId != null) {
+                      DatabaseHelper().markQuizAssignmentMissed(
+                        quizId: targetQuizId,
+                        studentId: studentId,
+                      );
+                    }
+                    setState(() => _isMissed = true);
+                    return;
+                  }
                   setState(() {
                     _state = 1;
                     _startTime = DateTime.now();
@@ -1034,7 +1145,9 @@ class _QuizScreenState extends ConsumerState<QuizScreen> {
             ),
             const SizedBox(height: 16),
             Text(
-              _isPassed ? 'Congratulations! You Passed' : 'Assessment Not Passed',
+              _isPassed
+                  ? 'Congratulations! You Passed'
+                  : (_isTimedOut ? 'Time Expired - Quiz Failed' : 'Assessment Not Passed'),
               style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: AppTheme.text),
               textAlign: TextAlign.center,
             ),
@@ -1042,7 +1155,9 @@ class _QuizScreenState extends ConsumerState<QuizScreen> {
             Text(
               _isPassed
                   ? 'Great job! Your score and progress have been recorded.'
-                  : 'You scored ${_percentage.round()}%, which is below the passing mark of $_passingScore%. Review the answers below and try again.',
+                  : (_isTimedOut
+                      ? 'You exceeded the time limit. This quiz has been marked as failed. You cannot retake this quiz unless your instructor resets it.'
+                      : 'You scored ${_percentage.round()}%, which is below the passing mark of $_passingScore%. Your result has been submitted. You cannot retake this quiz unless your instructor resets it.'),
               textAlign: TextAlign.center,
               style: TextStyle(color: AppTheme.textSecondary, fontSize: 13, height: 1.4),
             ),
@@ -1163,61 +1278,30 @@ class _QuizScreenState extends ConsumerState<QuizScreen> {
             }),
 
             const SizedBox(height: 24),
-            SizedBox(
-              width: double.infinity,
-              height: 50,
-              child: ElevatedButton.icon(
-                icon: const Icon(Icons.style, size: 20),
-                onPressed: () {
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (ctx) => QuizFlashcardScreen(
-                        quizTitle: _quizTitle,
-                        initialQuestions: _questions,
-                        initialSelectedAnswers: _selectedAnswers,
-                        quizId: _quizId,
-                        loId: _loId,
-                      ),
-                    ),
-                  );
-                },
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: AppTheme.primary,
-                  foregroundColor: Colors.black,
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                ),
-                label: const Text(
-                  'Review as Flashcards',
-                  style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
+            if (widget.isTeacherPreview || (ref.read(authProvider)?.role == 'teacher')) ...[
+              SizedBox(
+                width: double.infinity,
+                height: 48,
+                child: OutlinedButton.icon(
+                  icon: const Icon(Icons.refresh, size: 18),
+                  onPressed: _restartPreview,
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: AppTheme.text,
+                    side: BorderSide(color: AppTheme.border),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                  ),
+                  label: const Text(
+                    'Restart Preview',
+                    style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
+                  ),
                 ),
               ),
-            ),
-            const SizedBox(height: 12),
+              const SizedBox(height: 12),
+            ],
             SizedBox(
               width: double.infinity,
               height: 48,
-              child: OutlinedButton.icon(
-                icon: const Icon(Icons.refresh, size: 18),
-                onPressed: () => _resetAndRetakeQuiz(),
-                style: OutlinedButton.styleFrom(
-                  foregroundColor: AppTheme.text,
-                  side: BorderSide(color: AppTheme.border),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                ),
-                label: Text(
-                  (widget.isTeacherPreview || (ref.read(authProvider)?.role == 'teacher'))
-                      ? 'Restart Preview'
-                      : 'Retake Assessment',
-                  style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
-                ),
-              ),
-            ),
-            const SizedBox(height: 12),
-            SizedBox(
-              width: double.infinity,
-              height: 48,
-              child: OutlinedButton(
+              child: ElevatedButton(
                 onPressed: () {
                   if (Navigator.of(context).canPop()) {
                     Navigator.of(context).pop();
@@ -1225,12 +1309,12 @@ class _QuizScreenState extends ConsumerState<QuizScreen> {
                     context.go('/student/quiz-history');
                   }
                 },
-                style: OutlinedButton.styleFrom(
-                  foregroundColor: AppTheme.text,
-                  side: BorderSide(color: AppTheme.border),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AppTheme.primary,
+                  foregroundColor: Colors.black,
                   shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                 ),
-                child: const Text('Back to Quizzes', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
+                child: const Text('Back to Course', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
               ),
             ),
             const SizedBox(height: 10),

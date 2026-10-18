@@ -5,6 +5,7 @@ import 'package:go_router/go_router.dart';
 import 'package:flutter/foundation.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/components/app_logo.dart';
+import '../../../core/components/auth/required_change_password_dialog.dart';
 import '../../../core/services/app_update_service.dart';
 import '../../../core/services/session_draft_service.dart';
 import '../application/auth_provider.dart';
@@ -83,6 +84,15 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
         }
 
         SessionDraftService.instance.clearForm(_formId);
+
+        if (user.mustChangePassword) {
+          final isTeacher = user.role == 'teacher';
+          RequiredChangePasswordDialog.resetSession();
+          if (mounted) {
+            context.go(isTeacher ? '/teacher/profile' : '/student/profile');
+          }
+          return;
+        }
 
         if (user.role == 'teacher') {
           if (mounted) context.go('/teacher/dashboard');

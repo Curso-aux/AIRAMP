@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
+import '../../routing/app_router.dart';
+import 'aira_route_observer.dart';
 
 class ExtractedTextItem {
   final String text;
@@ -14,12 +16,13 @@ class ExtractedTextItem {
 /// Extracts all visible on-screen text in natural reading order
 /// by traversing Flutter's active RenderTree.
 ///
-/// Accurately targets ONLY the screen the user is currently viewing:
-/// - Skips inactive branches in RenderIndexedStack (StatefulNavigationShell tabs)
-/// - Skips inactive/offstage navigation tabs (Offstage branches)
-/// - Skips invisible opacity elements
-/// - Skips offscreen elements scrolled outside the current viewport
-/// - Filters out bottom navigation bar buttons, desktop sidebar menu items, and AIRA's own floating widget
+/// Modality-aware:
+/// - If a Modal (Dialog, BottomSheet, PopupMenu, CupertinoModal, etc.) is active above the page,
+///   AIRA strictly scans ONLY the active modal and its contents, completely ignoring the underlying occluded page.
+/// - When scanning a modal, bottom nav padding cutoff is removed so action buttons at the bottom of the modal
+///   (e.g., Save, Confirm, Close, Submit) are fully captured and read aloud.
+/// - If no modal is active, AIRA scans the current page, accurately pruning inactive IndexedStack/Offstage tabs
+///   and filtering out persistent navigation elements.
 class AiraScreenTextExtractor {
   AiraScreenTextExtractor._();
 
@@ -45,27 +48,42 @@ class AiraScreenTextExtractor {
     'sign out',
   };
 
-  /// Scans the current active screen starting from [context].
+  /// Scans the currently visible on-screen UI starting from [context].
+  ///
+  /// Prioritizes active modals above the page. If a modal is open, only the modal
+  /// contents are extracted. Otherwise, the visible page is extracted.
   static String extractScreenText(
     BuildContext context, {
     Rect? ignoreRect,
   }) {
-    final mediaQuery = MediaQuery.maybeOf(context);
+    final effectiveContext = rootNavigatorKey.currentContext ?? context;
+    final mediaQuery = MediaQuery.maybeOf(effectiveContext) ?? MediaQuery.maybeOf(context);
     final screenSize = mediaQuery?.size ?? const Size(1200, 2400);
-    final bottomNavHeight = (mediaQuery?.padding.bottom ?? 0) + 68.0;
 
-    final RenderObject? rootRenderObject = _findRootRenderObject(context);
-    if (rootRenderObject == null) {
+    // 1. Check if a modal/dialog/bottomsheet is currently displayed above the page
+    final RenderObject? modalRenderObject = _findActiveModalRenderObject(effectiveContext);
+    final bool isScanningModal = modalRenderObject != null;
+
+    final RenderObject? targetRenderObject =
+        modalRenderObject ?? _findPageRootRenderObject(effectiveContext);
+
+    if (targetRenderObject == null) {
       return '';
     }
 
+    // When scanning a modal, do not cut off the bottom of the screen (bottom sheets often reach the bottom)
+    final double bottomCutoff = isScanningModal
+        ? (mediaQuery?.padding.bottom ?? 0)
+        : ((mediaQuery?.padding.bottom ?? 0) + 68.0);
+
     final items = <ExtractedTextItem>[];
     _traverseRenderTree(
-      rootRenderObject,
+      targetRenderObject,
       items,
       ignoreRect,
       screenSize,
-      bottomNavHeight,
+      bottomCutoff,
+      isScanningModal: isScanningModal,
     );
 
     if (items.isEmpty) {
@@ -117,25 +135,84 @@ class AiraScreenTextExtractor {
     return buffer.toString().trim();
   }
 
-  static RenderObject? _findRootRenderObject(BuildContext context) {
-    // 1. Try WidgetsBinding root element for full tree traversal with branch pruning
+  /// Locates the active modal's RenderObject if a dialog/sheet/popup is showing above the pages.
+  static RenderObject? _findActiveModalRenderObject(BuildContext context) {
+    // 1. Direct inquiry to AiraRouteObserver which tracks the Navigator route stack
+    final roFromObserver = AiraRouteObserver.instance.findTopModalRenderObject();
+    if (roFromObserver != null && roFromObserver.attached) {
+      debugPrint('[AiraScanner] Detected active modal via AiraRouteObserver: $roFromObserver');
+      return roFromObserver;
+    }
+
+    // 2. Check primaryFocus element for enclosing ModalRoute
+    final focusContext = FocusManager.instance.primaryFocus?.context;
+    if (focusContext != null) {
+      try {
+        final route = ModalRoute.of(focusContext);
+        if (route != null && AiraRouteObserver.isModalRoute(route) && route.subtreeContext != null) {
+          final ro = route.subtreeContext!.findRenderObject();
+          if (ro != null && ro.attached) {
+            debugPrint('[AiraScanner] Detected active modal via primaryFocus: $ro');
+            return ro;
+          }
+        }
+      } catch (_) {}
+    }
+
+    // 3. Inspect Root Navigator Overlay for active modal entry above modal barrier
+    try {
+      final navState = rootNavigatorKey.currentState ??
+          Navigator.maybeOf(context, rootNavigator: true);
+      final overlay = navState?.overlay;
+      if (overlay != null) {
+        final overlayRo = overlay.context.findRenderObject();
+        if (overlayRo is RenderStack) {
+          RenderBox? candidate;
+          bool hasBarrier = false;
+          RenderBox? child = overlayRo.firstChild;
+          while (child != null) {
+            final childName = child.runtimeType.toString();
+            if (childName.contains('Barrier') || childName.contains('ModalBarrier')) {
+              hasBarrier = true;
+              // Reset candidate to whatever comes AFTER the barrier
+              candidate = null;
+            } else if (hasBarrier) {
+              candidate = child;
+            }
+            child = overlayRo.childAfter(child);
+          }
+
+          if (hasBarrier && candidate != null && candidate.attached) {
+            debugPrint('[AiraScanner] Detected active modal above barrier in Overlay: $candidate');
+            return candidate;
+          }
+        }
+      }
+    } catch (_) {}
+
+    return null;
+  }
+
+  /// Fallback root RenderObject for regular full-page scanning when no modal is open.
+  static RenderObject? _findPageRootRenderObject(BuildContext context) {
+    // 1. Try WidgetsBinding root element for full tree traversal
     try {
       final rootRo = WidgetsBinding.instance.rootElement?.renderObject;
-      if (rootRo != null) return rootRo;
+      if (rootRo != null && rootRo.attached) return rootRo;
     } catch (_) {}
 
     // 2. Try Navigator context
     final navigator = Navigator.maybeOf(context);
     if (navigator?.context != null) {
       final ro = navigator!.context.findRenderObject();
-      if (ro != null) return ro;
+      if (ro != null && ro.attached) return ro;
     }
 
     // 3. Fallback to route or current context
     final modalRoute = ModalRoute.of(context);
     if (modalRoute?.subtreeContext != null) {
       final ro = modalRoute!.subtreeContext!.findRenderObject();
-      if (ro != null) return ro;
+      if (ro != null && ro.attached) return ro;
     }
 
     return context.findRenderObject();
@@ -146,12 +223,11 @@ class AiraScreenTextExtractor {
     List<ExtractedTextItem> items,
     Rect? ignoreRect,
     Size screenSize,
-    double bottomNavHeight,
-  ) {
+    double bottomCutoff, {
+    bool isScanningModal = false,
+  }) {
     // 1. CRITICAL: Handle RenderIndexedStack (StatefulNavigationShell / IndexedStack tabs)
     // Only the child at node.index is active and painted on screen!
-    // All other children (such as Dashboard at index 0 when viewing Courses/Progress)
-    // are completely hidden from the user and must NEVER be traversed.
     if (node is RenderIndexedStack) {
       final activeIndex = node.index;
       if (activeIndex == null) return;
@@ -164,7 +240,8 @@ class AiraScreenTextExtractor {
             items,
             ignoreRect,
             screenSize,
-            bottomNavHeight,
+            bottomCutoff,
+            isScanningModal: isScanningModal,
           );
           return;
         }
@@ -203,9 +280,9 @@ class AiraScreenTextExtractor {
             node.size.height,
           );
 
-          // Must be actively visible on the user's screen (excluding bottom nav bar)
-          final isVisibleOnScreen = bounds.bottom > 12 &&
-              bounds.top < (screenSize.height - bottomNavHeight) &&
+          // Must be actively visible on the user's screen
+          final isVisibleOnScreen = bounds.bottom > 8 &&
+              bounds.top < (screenSize.height - bottomCutoff) &&
               bounds.right > 0 &&
               bounds.left < screenSize.width;
 
@@ -213,7 +290,7 @@ class AiraScreenTextExtractor {
             return;
           }
 
-          // Check if this text overlaps AIRA's floating widget or speech HUD
+          // Check if this text overlaps AIRA's floating avatar button
           if (ignoreRect != null && ignoreRect.overlaps(bounds)) {
             return;
           }
@@ -221,8 +298,9 @@ class AiraScreenTextExtractor {
           final text = node.text.toPlainText();
           final trimmed = text.trim();
 
-          // On Desktop Web (width >= 900), ignore persistent sidebar navigation drawer items
-          if (screenSize.width >= 900 &&
+          // On Desktop Web (width >= 900), ignore persistent sidebar navigation drawer items when scanning the page
+          if (!isScanningModal &&
+              screenSize.width >= 900 &&
               bounds.left < 265 &&
               _ignoredNavLabels.contains(trimmed.toLowerCase())) {
             return;
@@ -245,7 +323,8 @@ class AiraScreenTextExtractor {
         items,
         ignoreRect,
         screenSize,
-        bottomNavHeight,
+        bottomCutoff,
+        isScanningModal: isScanningModal,
       );
     });
   }

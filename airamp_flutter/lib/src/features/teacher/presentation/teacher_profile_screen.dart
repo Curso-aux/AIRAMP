@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import '../../../core/components/auth/required_change_password_dialog.dart';
 import '../../../core/components/otp_verification_dialog.dart';
 import '../../../core/components/skeleton_loader.dart';
 import '../../../core/services/otp_service.dart';
@@ -19,6 +20,8 @@ class TeacherProfileScreen extends ConsumerStatefulWidget {
 class _TeacherProfileScreenState extends ConsumerState<TeacherProfileScreen> {
   bool _isEditing = false;
   bool _showPasswordForm = false;
+  final GlobalKey _passwordSectionKey = GlobalKey();
+  final ScrollController _scrollController = ScrollController();
 
   late TextEditingController _fullNameController;
   late TextEditingController _usernameController;
@@ -33,6 +36,26 @@ class _TeacherProfileScreenState extends ConsumerState<TeacherProfileScreen> {
     _fullNameController = TextEditingController(text: user?.fullName ?? '');
     _usernameController = TextEditingController(text: user?.username ?? '');
     _emailController = TextEditingController(text: user?.email ?? '');
+
+    if (user?.mustChangePassword == true) {
+      _showPasswordForm = true;
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        // If app was reopened / launched directly to profile without passing through login screen
+        if (!RequiredChangePasswordDialog.hasSeenInThisSession && mounted) {
+          RequiredChangePasswordDialog.show(context, isTeacher: true);
+        }
+        // Auto-scroll to the change password card with guide highlight
+        Future.delayed(const Duration(milliseconds: 350), () {
+          if (_passwordSectionKey.currentContext != null) {
+            Scrollable.ensureVisible(
+              _passwordSectionKey.currentContext!,
+              duration: const Duration(milliseconds: 650),
+              curve: Curves.easeInOutCubic,
+            );
+          }
+        });
+      });
+    }
   }
 
   @override
@@ -42,6 +65,7 @@ class _TeacherProfileScreenState extends ConsumerState<TeacherProfileScreen> {
     _emailController.dispose();
     _newPasswordController.dispose();
     _confirmPasswordController.dispose();
+    _scrollController.dispose();
     super.dispose();
   }
 
@@ -79,46 +103,54 @@ class _TeacherProfileScreenState extends ConsumerState<TeacherProfileScreen> {
 
     return Scaffold(
       backgroundColor: AppTheme.background,
-      body: SafeArea(
-        child: SingleChildScrollView(
-          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 0),
-          child: Column(
-            children: [
-              if (context.canPop()) ...[
-                const SizedBox(height: 12),
-                Row(
-                  children: [
-                    IconButton(
-                      icon: Icon(Icons.arrow_back_rounded, color: AppTheme.text),
-                      tooltip: 'Back',
-                      onPressed: () => context.pop(),
-                    ),
-                    const SizedBox(width: 4),
-                    Text(
-                      'Profile & Settings',
-                      style: TextStyle(
-                        fontSize: 18,
-                        fontWeight: FontWeight.bold,
-                        color: AppTheme.text,
+      body: PopScope(
+        canPop: !currentUser.mustChangePassword,
+        onPopInvokedWithResult: (didPop, result) {
+          if (didPop) return;
+          RequiredChangePasswordDialog.show(context, isTeacher: true);
+        },
+        child: SafeArea(
+          child: SingleChildScrollView(
+            controller: _scrollController,
+            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 0),
+            child: Column(
+              children: [
+                if (!currentUser.mustChangePassword && context.canPop()) ...[
+                  const SizedBox(height: 12),
+                  Row(
+                    children: [
+                      IconButton(
+                        icon: Icon(Icons.arrow_back_rounded, color: AppTheme.text),
+                        tooltip: 'Back',
+                        onPressed: () => context.pop(),
                       ),
-                    ),
-                  ],
-                ),
+                      const SizedBox(width: 4),
+                      Text(
+                        'Profile & Settings',
+                        style: TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.bold,
+                          color: AppTheme.text,
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+                const SizedBox(height: 16),
+                _buildAvatarSection(currentUser, initial),
+                const SizedBox(height: 20),
+                _buildAppearanceCard(themeState),
+                const SizedBox(height: 16),
+                _buildPersonalInfoCard(currentUser),
+                const SizedBox(height: 16),
+                _buildChangePasswordCard(currentUser),
+                const SizedBox(height: 16),
+                _buildTeachingInfoCard(ref.watch(teacherSubjectsProvider)),
+                const SizedBox(height: 24),
+                _buildSignOutButton(),
+                const SizedBox(height: 40),
               ],
-              const SizedBox(height: 16),
-              _buildAvatarSection(currentUser, initial),
-              const SizedBox(height: 20),
-              _buildAppearanceCard(themeState),
-              const SizedBox(height: 16),
-              _buildPersonalInfoCard(currentUser),
-              const SizedBox(height: 16),
-              _buildChangePasswordCard(),
-              const SizedBox(height: 16),
-              _buildTeachingInfoCard(ref.watch(teacherSubjectsProvider)),
-              const SizedBox(height: 24),
-              _buildSignOutButton(),
-              const SizedBox(height: 40),
-            ],
+            ),
           ),
         ),
       ),
@@ -231,25 +263,281 @@ class _TeacherProfileScreenState extends ConsumerState<TeacherProfileScreen> {
     ));
   }
 
-  Widget _buildChangePasswordCard() {
-    return _sectionCard(child: Column(
-      children: [
-        GestureDetector(
-          onTap: () => setState(() => _showPasswordForm = !_showPasswordForm),
-          child: Row(children: [Icon(Icons.lock_outline, size: 18, color: AppTheme.accent), const SizedBox(width: 12), Expanded(child: Text('Change Password', style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600, color: AppTheme.text))), Icon(_showPasswordForm ? Icons.keyboard_arrow_up : Icons.keyboard_arrow_down, color: AppTheme.textMuted, size: 20)]),
+  Widget _buildChangePasswordCard(User currentUser) {
+    final isRequired = currentUser.mustChangePassword;
+
+    return Container(
+      key: _passwordSectionKey,
+      width: double.infinity,
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: AppTheme.surface,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(
+          color: isRequired ? Colors.amberAccent : AppTheme.border,
+          width: isRequired ? 2 : 1,
         ),
-        if (_showPasswordForm) ...[
-          const SizedBox(height: 16),
-          Padding(padding: EdgeInsets.only(left: 30), child: Column(children: [
-            TextField(controller: _newPasswordController, maxLength: 16, buildCounter: (context, {required currentLength, required isFocused, maxLength}) => null, obscureText: true, style: TextStyle(color: AppTheme.text, fontSize: 14), decoration: InputDecoration(hintText: 'New Password', counterText: '', hintStyle: TextStyle(color: AppTheme.textMuted), filled: true, fillColor: AppTheme.inputBg, border: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: BorderSide(color: AppTheme.border)), enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: BorderSide(color: AppTheme.border)), focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: BorderSide(color: AppTheme.primary)), contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10))),
-            const SizedBox(height: 10),
-            TextField(controller: _confirmPasswordController, maxLength: 16, buildCounter: (context, {required currentLength, required isFocused, maxLength}) => null, obscureText: true, style: TextStyle(color: AppTheme.text, fontSize: 14), decoration: InputDecoration(hintText: 'Confirm Password', counterText: '', hintStyle: TextStyle(color: AppTheme.textMuted), filled: true, fillColor: AppTheme.inputBg, border: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: BorderSide(color: AppTheme.border)), enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: BorderSide(color: AppTheme.border)), focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: BorderSide(color: AppTheme.primary)), contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10))),
-            const SizedBox(height: 10),
-            SizedBox(width: double.infinity, height: 42, child: ElevatedButton(onPressed: _handleChangePassword, style: ElevatedButton.styleFrom(backgroundColor: AppTheme.primary, foregroundColor: Colors.black, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)), textStyle: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600)), child: const Text('Update Password'))),
-          ])),
+        boxShadow: isRequired
+            ? [
+                BoxShadow(
+                  color: Colors.amber.withValues(alpha: 0.28),
+                  blurRadius: 20,
+                  spreadRadius: 1,
+                  offset: const Offset(0, 4),
+                ),
+              ]
+            : null,
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Visual Guide Highlight Banner if password change is required
+          if (isRequired) ...[
+            Container(
+              margin: const EdgeInsets.only(bottom: 14),
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: Colors.amber.withValues(alpha: 0.12),
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(
+                  color: Colors.amberAccent.withValues(alpha: 0.4),
+                ),
+              ),
+              child: Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(6),
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      color: Colors.amber.withValues(alpha: 0.2),
+                    ),
+                    child: const Icon(
+                      Icons.warning_amber_rounded,
+                      color: Colors.amberAccent,
+                      size: 20,
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Text(
+                          'MANDATORY: CHANGE DEFAULT PASSWORD',
+                          style: TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.bold,
+                            color: Colors.amberAccent,
+                            letterSpacing: 0.4,
+                          ),
+                        ),
+                        const SizedBox(height: 2),
+                        Text(
+                          'For your security, set a new password before accessing classes and faculty tools.',
+                          style: TextStyle(
+                            fontSize: 11.5,
+                            color: AppTheme.textSecondary,
+                            height: 1.3,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+
+          // Toggle row
+          GestureDetector(
+            onTap: () {
+              if (isRequired) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(
+                    content: Text('Password change is required to unlock your account.'),
+                    duration: Duration(seconds: 2),
+                  ),
+                );
+                return;
+              }
+              setState(() => _showPasswordForm = !_showPasswordForm);
+            },
+            child: Row(
+              children: [
+                Icon(
+                  isRequired ? Icons.lock_reset_rounded : Icons.lock_outline,
+                  size: 18,
+                  color: isRequired ? Colors.amberAccent : AppTheme.accent,
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Row(
+                    children: [
+                      Text(
+                        'Change Password',
+                        style: TextStyle(
+                          fontSize: 15,
+                          fontWeight: FontWeight.w600,
+                          color: AppTheme.text,
+                        ),
+                      ),
+                      if (isRequired) ...[
+                        const SizedBox(width: 8),
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+                          decoration: BoxDecoration(
+                            color: Colors.amber.withValues(alpha: 0.2),
+                            borderRadius: BorderRadius.circular(6),
+                            border: Border.all(color: Colors.amberAccent.withValues(alpha: 0.5)),
+                          ),
+                          child: const Text(
+                            'Required',
+                            style: TextStyle(
+                              fontSize: 10,
+                              fontWeight: FontWeight.bold,
+                              color: Colors.amberAccent,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ],
+                  ),
+                ),
+                if (!isRequired)
+                  Icon(
+                    _showPasswordForm
+                        ? Icons.keyboard_arrow_up
+                        : Icons.keyboard_arrow_down,
+                    color: AppTheme.textMuted,
+                    size: 20,
+                  ),
+              ],
+            ),
+          ),
+
+          // Expandable password form
+          if (_showPasswordForm || isRequired) ...[
+            const SizedBox(height: 16),
+            Padding(
+              padding: const EdgeInsets.only(left: 30),
+              child: Column(
+                children: [
+                  // New Password
+                  TextField(
+                    controller: _newPasswordController,
+                    maxLength: 16,
+                    buildCounter: (context, {required currentLength, required isFocused, maxLength}) => null,
+                    obscureText: true,
+                    style: TextStyle(color: AppTheme.text, fontSize: 14),
+                    decoration: InputDecoration(
+                      hintText: 'New Password',
+                      counterText: '',
+                      hintStyle: TextStyle(color: AppTheme.textMuted),
+                      filled: true,
+                      fillColor: AppTheme.inputBg,
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(10),
+                        borderSide: BorderSide(
+                          color: isRequired ? Colors.amberAccent.withValues(alpha: 0.5) : AppTheme.border,
+                        ),
+                      ),
+                      enabledBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(10),
+                        borderSide: BorderSide(
+                          color: isRequired ? Colors.amberAccent.withValues(alpha: 0.5) : AppTheme.border,
+                        ),
+                      ),
+                      focusedBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(10),
+                        borderSide: BorderSide(
+                          color: isRequired ? Colors.amberAccent : AppTheme.primary,
+                        ),
+                      ),
+                      contentPadding: const EdgeInsets.symmetric(
+                          horizontal: 14, vertical: 10),
+                    ),
+                  ),
+                  const SizedBox(height: 10),
+
+                  // Confirm Password
+                  TextField(
+                    controller: _confirmPasswordController,
+                    maxLength: 16,
+                    buildCounter: (context, {required currentLength, required isFocused, maxLength}) => null,
+                    obscureText: true,
+                    style: TextStyle(color: AppTheme.text, fontSize: 14),
+                    decoration: InputDecoration(
+                      hintText: 'Confirm Password',
+                      counterText: '',
+                      hintStyle: TextStyle(color: AppTheme.textMuted),
+                      filled: true,
+                      fillColor: AppTheme.inputBg,
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(10),
+                        borderSide: BorderSide(
+                          color: isRequired ? Colors.amberAccent.withValues(alpha: 0.5) : AppTheme.border,
+                        ),
+                      ),
+                      enabledBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(10),
+                        borderSide: BorderSide(
+                          color: isRequired ? Colors.amberAccent.withValues(alpha: 0.5) : AppTheme.border,
+                        ),
+                      ),
+                      focusedBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(10),
+                        borderSide: BorderSide(
+                          color: isRequired ? Colors.amberAccent : AppTheme.primary,
+                        ),
+                      ),
+                      contentPadding: const EdgeInsets.symmetric(
+                          horizontal: 14, vertical: 10),
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+
+                  // Update Password button
+                  SizedBox(
+                    width: double.infinity,
+                    height: 44,
+                    child: ElevatedButton(
+                      onPressed: _handleChangePassword,
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: isRequired ? Colors.amber.shade400 : AppTheme.primary,
+                        foregroundColor: Colors.black,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                        textStyle: const TextStyle(
+                          fontSize: 14,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Icon(
+                            isRequired ? Icons.lock_open_rounded : Icons.check_circle_outline,
+                            size: 18,
+                            color: Colors.black,
+                          ),
+                          const SizedBox(width: 8),
+                          Text(
+                            isRequired
+                                ? 'Save Password & Unlock Account'
+                                : 'Update Password',
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
         ],
-      ],
-    ));
+      ),
+    );
   }
 
   Widget _buildTeachingInfoCard(List<Map<String, dynamic>> subjects) {
@@ -515,13 +803,90 @@ class _TeacherProfileScreenState extends ConsumerState<TeacherProfileScreen> {
     );
 
     if (verified == true) {
+      final wasMustChange = user.mustChangePassword;
       await ref.read(authProvider.notifier).updateProfile(password: newPass);
       if (!mounted) return;
       setState(() => _showPasswordForm = false);
       _newPasswordController.clear();
       _confirmPasswordController.clear();
-      _showAlert('Success', 'Password changed successfully!');
+
+      if (wasMustChange) {
+        _showSuccessUnlockedDialog(isTeacher: true);
+      } else {
+        _showAlert('Success', 'Password changed successfully!');
+      }
     }
+  }
+
+  void _showSuccessUnlockedDialog({required bool isTeacher}) {
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx) => PopScope(
+        canPop: false,
+        child: AlertDialog(
+          backgroundColor: AppTheme.surface,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
+          content: Padding(
+            padding: const EdgeInsets.symmetric(vertical: 8),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Container(
+                  width: 64,
+                  height: 64,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    color: Colors.green.withValues(alpha: 0.15),
+                    border: Border.all(color: Colors.greenAccent, width: 2),
+                  ),
+                  child: const Icon(Icons.check_circle_rounded, color: Colors.greenAccent, size: 38),
+                ),
+                const SizedBox(height: 16),
+                Text(
+                  'Account Secured! 🎉',
+                  style: TextStyle(
+                    color: AppTheme.text,
+                    fontWeight: FontWeight.bold,
+                    fontSize: 18,
+                  ),
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  'Your faculty password has been set successfully. All teacher dashboards, classes, and tools are now fully unlocked.',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    color: AppTheme.textSecondary,
+                    fontSize: 13.5,
+                    height: 1.4,
+                  ),
+                ),
+                const SizedBox(height: 20),
+                SizedBox(
+                  width: double.infinity,
+                  child: ElevatedButton(
+                    onPressed: () {
+                      Navigator.of(ctx).pop();
+                      context.go(isTeacher ? '/teacher/dashboard' : '/student/home');
+                    },
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: AppTheme.primary,
+                      foregroundColor: Colors.black,
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                      padding: const EdgeInsets.symmetric(vertical: 12),
+                    ),
+                    child: Text(
+                      isTeacher ? 'Proceed to Dashboard' : 'Proceed to Home',
+                      style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
   }
 
   void _handleLogout() {

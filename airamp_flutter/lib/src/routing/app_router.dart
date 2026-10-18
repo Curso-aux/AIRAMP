@@ -41,6 +41,8 @@ import '../features/quiz/presentation/quiz_screen.dart';
 import '../features/quiz/presentation/module_gizmo_review_screen.dart';
 import '../features/submissions/presentation/submissions_screen.dart';
 
+import '../core/services/aira_route_observer.dart';
+
 // Placeholder screens for unresolved domains
 class PlaceholderScreen extends StatelessWidget {
   final String title;
@@ -54,6 +56,9 @@ class PlaceholderScreen extends StatelessWidget {
     );
   }
 }
+
+/// Global key to access the root NavigatorState from any location
+final GlobalKey<NavigatorState> rootNavigatorKey = GlobalKey<NavigatorState>();
 
 /// A stable notifier bridge that notifies GoRouter on auth state changes
 /// without re-instantiating the GoRouter instance itself.
@@ -71,15 +76,19 @@ final routerProvider = Provider<GoRouter>((ref) {
   ref.onDispose(authNotifier.dispose);
 
   final initialAuth = ref.read(authProvider);
-  final initialLoc = (initialAuth != null && (initialAuth.role == 'admin' || initialAuth.role == 'super_admin'))
-      ? '/admin/dashboard'
-      : (initialAuth != null && initialAuth.role == 'teacher'
-          ? '/teacher/dashboard'
-          : (initialAuth != null
-              ? '/student/home'
-              : (kIsWeb ? '/' : '/login')));
+  final initialLoc = (initialAuth != null && initialAuth.mustChangePassword)
+      ? (initialAuth.role == 'teacher' ? '/teacher/profile' : '/student/profile')
+      : (initialAuth != null && (initialAuth.role == 'admin' || initialAuth.role == 'super_admin'))
+          ? '/admin/dashboard'
+          : (initialAuth != null && initialAuth.role == 'teacher'
+              ? '/teacher/dashboard'
+              : (initialAuth != null
+                  ? '/student/home'
+                  : (kIsWeb ? '/' : '/login')));
 
   return GoRouter(
+    navigatorKey: rootNavigatorKey,
+    observers: [AiraRouteObserver.instance],
     initialLocation: initialLoc,
     refreshListenable: authNotifier,
     routes: [
@@ -517,6 +526,16 @@ final routerProvider = Provider<GoRouter>((ref) {
         if (matched.startsWith('/admin')) {
           return '/login';
         }
+      }
+
+      // Mandatory First-Login Password Change Guard:
+      // If user must change password, strictly lock navigation to only their profile page.
+      if (isAuth && authState.mustChangePassword) {
+        final profilePath = authState.role == 'teacher' ? '/teacher/profile' : '/student/profile';
+        if (matched != profilePath) {
+          return profilePath;
+        }
+        return null;
       }
 
       // 1. Unauthenticated user trying to access protected route

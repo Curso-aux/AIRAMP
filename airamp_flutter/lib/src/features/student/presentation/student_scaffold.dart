@@ -2,10 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../../core/components/swipeable_nav_scaffold.dart';
-import '../../auth/application/auth_provider.dart';
-import 'components/student_announcements_sheet.dart';
-import 'components/student_assistive_touch.dart';
-import 'components/student_schedule_widget.dart';
 import 'web/student_web_scaffold.dart';
 
 class StudentScaffold extends ConsumerWidget {
@@ -15,31 +11,12 @@ class StudentScaffold extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final currentUser = ref.watch(authProvider);
     final screenWidth = MediaQuery.of(context).size.width;
-
-    final assistiveTouch = StudentAssistiveTouch(
-      onCourses: () => context.go('/student/courses'),
-      onSchedule: () {
-        final sec = currentUser?.section;
-        if (sec != null && sec.isNotEmpty) {
-          showStudentTimetableModal(context, initialSection: sec);
-        } else {
-          showStudentTimetableModal(context);
-        }
-      },
-      onQuizzes: () => context.go('/student/quiz-history'),
-      onProgress: () => context.go('/student/progress'),
-      onChat: () => context.go('/student/chat'),
-      onAnnouncements: () => showStudentAnnouncementsFromRef(context, ref),
-      onProfile: () => context.go('/student/profile'),
-    );
 
     // Responsive Desktop Web layout with Collapsible Sidebar (Screens >= 900px)
     if (screenWidth >= 900) {
       return StudentWebScaffold(
         navigationShell: navigationShell,
-        floatingOverlay: assistiveTouch,
       );
     }
 
@@ -50,7 +27,6 @@ class StudentScaffold extends ConsumerWidget {
       swipeDisabledIndices: const {4},
       selectedFontSize: 11,
       unselectedFontSize: 11,
-      floatingOverlay: assistiveTouch,
       items: const [
         BottomNavigationBarItem(
           icon: Icon(Icons.home_outlined),

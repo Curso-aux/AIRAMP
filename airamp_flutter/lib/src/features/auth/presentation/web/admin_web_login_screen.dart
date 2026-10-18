@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import '../../../../core/components/auth/required_change_password_dialog.dart';
 import '../../../../core/components/otp_verification_dialog.dart';
 import '../../../../core/services/otp_service.dart';
 import '../../../../core/theme/app_theme.dart';
@@ -152,9 +153,19 @@ class _AdminWebLoginScreenState extends ConsumerState<AdminWebLoginScreen> {
 
           if (mounted) context.go('/admin/dashboard');
         } else if (user.role == 'teacher') {
-          if (mounted) context.go('/teacher/dashboard');
+          if (user.mustChangePassword) {
+            RequiredChangePasswordDialog.resetSession();
+            if (mounted) context.go('/teacher/profile');
+          } else {
+            if (mounted) context.go('/teacher/dashboard');
+          }
         } else {
-          if (mounted) context.go('/student/home');
+          if (user.mustChangePassword) {
+            RequiredChangePasswordDialog.resetSession();
+            if (mounted) context.go('/student/profile');
+          } else {
+            if (mounted) context.go('/student/home');
+          }
         }
       }
     } catch (e) {

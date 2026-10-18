@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../../core/theme/theme_provider.dart';
 import '../../../../core/database/database_helper.dart';
+import '../../../../core/services/email_service.dart';
 import '../../../../core/utils/file_download_helper.dart';
 import '../../data/admin_repository.dart';
 import 'components/bulk_import_modal.dart';
@@ -1073,6 +1074,23 @@ class _AdminWebStudentsScreenState extends ConsumerState<AdminWebStudentsScreen>
                           ),
                           const SizedBox(width: 8),
                           Tooltip(
+                            message: 'Resend Credentials Email',
+                            child: InkWell(
+                              onTap: () => _resendStudentCredentialsDialog(context, s),
+                              borderRadius: BorderRadius.circular(8),
+                              child: Container(
+                                padding: const EdgeInsets.all(8),
+                                decoration: BoxDecoration(
+                                  color: Colors.blue.withValues(alpha: 0.1),
+                                  borderRadius: BorderRadius.circular(8),
+                                  border: Border.all(color: Colors.blue.withValues(alpha: 0.3)),
+                                ),
+                                child: const Icon(Icons.forward_to_inbox_rounded, size: 16, color: Colors.blue),
+                              ),
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          Tooltip(
                             message: 'Delete student permanently',
                             child: InkWell(
                               onTap: () => _confirmDeleteStudent(context, s),
@@ -1216,6 +1234,19 @@ class _AdminWebStudentsScreenState extends ConsumerState<AdminWebStudentsScreen>
                         foregroundColor: AppTheme.primary,
                         side: BorderSide(color: AppTheme.primary),
                         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  IconButton(
+                    onPressed: () => _resendStudentCredentialsDialog(context, s),
+                    tooltip: 'Resend Credentials Email',
+                    icon: const Icon(Icons.forward_to_inbox_rounded, color: Colors.blue),
+                    style: IconButton.styleFrom(
+                      backgroundColor: Colors.blue.withValues(alpha: 0.1),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(10),
+                        side: BorderSide(color: Colors.blue.withValues(alpha: 0.3)),
                       ),
                     ),
                   ),
@@ -1853,6 +1884,241 @@ class _AdminWebStudentsScreenState extends ConsumerState<AdminWebStudentsScreen>
     );
   }
 
+  // ── Resend Student Credentials Dialog ───────────────────────
+  void _resendStudentCredentialsDialog(BuildContext context, Map<String, dynamic> student) {
+    final studentId = student['id'] as String? ?? '';
+    final studentName = student['full_name'] as String? ?? 'Student';
+    final studentEmail = (student['email'] as String? ?? '').trim();
+
+    if (studentEmail.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Cannot send email: This student has no email address configured.'),
+          backgroundColor: Colors.orange,
+        ),
+      );
+      return;
+    }
+
+    final passwordCtrl = TextEditingController(text: 'Student@123');
+    bool obscurePassword = false;
+    bool isSending = false;
+    final formKey = GlobalKey<FormState>();
+
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (dialogCtx) {
+        return StatefulBuilder(
+          builder: (context, setDialogState) {
+            return AlertDialog(
+              backgroundColor: AppTheme.surface,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+              title: Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(8),
+                    decoration: BoxDecoration(
+                      color: Colors.blue.withValues(alpha: 0.12),
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: const Icon(Icons.forward_to_inbox_rounded, color: Colors.blue, size: 22),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'Resend Credentials Email',
+                          style: TextStyle(color: AppTheme.text, fontSize: 18, fontWeight: FontWeight.bold),
+                        ),
+                        Text(
+                          'Dispatches login details directly to student email via Gmail SMTP',
+                          style: TextStyle(color: AppTheme.textSecondary, fontSize: 12),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+              content: ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 480),
+                child: Form(
+                  key: formKey,
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.all(12),
+                        decoration: BoxDecoration(
+                          color: AppTheme.background,
+                          borderRadius: BorderRadius.circular(10),
+                          border: Border.all(color: AppTheme.border),
+                        ),
+                        child: Column(
+                          children: [
+                            Row(
+                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                              children: [
+                                Text('Recipient:', style: TextStyle(fontSize: 12, color: AppTheme.textMuted)),
+                                Flexible(
+                                  child: Text(
+                                    studentName,
+                                    style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.bold, color: AppTheme.text),
+                                  ),
+                                ),
+                              ],
+                            ),
+                            const Divider(height: 12),
+                            Row(
+                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                              children: [
+                                Text('Email Address:', style: TextStyle(fontSize: 12, color: AppTheme.textMuted)),
+                                Flexible(
+                                  child: Text(
+                                    studentEmail,
+                                    style: TextStyle(fontSize: 12, color: AppTheme.primary, fontWeight: FontWeight.w600),
+                                  ),
+                                ),
+                              ],
+                            ),
+                            const Divider(height: 12),
+                            Row(
+                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                              children: [
+                                Text('Student ID:', style: TextStyle(fontSize: 12, color: AppTheme.textMuted)),
+                                Text(
+                                  studentId,
+                                  style: const TextStyle(fontSize: 12, fontFamily: 'monospace', fontWeight: FontWeight.w600),
+                                ),
+                              ],
+                            ),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(height: 16),
+                      Text(
+                        'Temporary Password for Reset',
+                        style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: AppTheme.textSecondary),
+                      ),
+                      const SizedBox(height: 6),
+                      TextFormField(
+                        controller: passwordCtrl,
+                        obscureText: obscurePassword,
+                        style: TextStyle(color: AppTheme.text, fontSize: 14),
+                        decoration: InputDecoration(
+                          hintText: 'e.g. Student@123',
+                          prefixIcon: Icon(Icons.lock_outline, size: 20, color: AppTheme.textMuted),
+                          suffixIcon: IconButton(
+                            icon: Icon(
+                              obscurePassword ? Icons.visibility_off_outlined : Icons.visibility_outlined,
+                              size: 18,
+                              color: AppTheme.textMuted,
+                            ),
+                            onPressed: () => setDialogState(() => obscurePassword = !obscurePassword),
+                          ),
+                          filled: true,
+                          fillColor: AppTheme.background,
+                          border: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: BorderSide(color: AppTheme.border)),
+                        ),
+                        validator: (v) => v == null || v.length < 6 ? 'Minimum 6 characters' : null,
+                      ),
+                      const SizedBox(height: 12),
+                      Container(
+                        padding: const EdgeInsets.all(10),
+                        decoration: BoxDecoration(
+                          color: Colors.blue.withValues(alpha: 0.08),
+                          borderRadius: BorderRadius.circular(8),
+                          border: Border.all(color: Colors.blue.withValues(alpha: 0.2)),
+                        ),
+                        child: Row(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            const Icon(Icons.info_outline, size: 16, color: Colors.blue),
+                            const SizedBox(width: 8),
+                            Expanded(
+                              child: Text(
+                                'The student password will be reset to this temporary password. Upon their next login, they will be required to change their password.',
+                                style: TextStyle(fontSize: 11.5, color: AppTheme.text, height: 1.35),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+              actions: [
+                TextButton(
+                  onPressed: isSending ? null : () => Navigator.of(dialogCtx).pop(),
+                  child: Text('Cancel', style: TextStyle(color: AppTheme.textSecondary)),
+                ),
+                ElevatedButton.icon(
+                  onPressed: isSending
+                      ? null
+                      : () async {
+                          if (!formKey.currentState!.validate()) return;
+                          setDialogState(() => isSending = true);
+                          final newPass = passwordCtrl.text.trim();
+
+                          final result = await DatabaseHelper().resetAndSendCredentials(
+                            userId: studentId,
+                            newPassword: newPass,
+                          );
+
+                          if (context.mounted) {
+                            Navigator.of(dialogCtx).pop();
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(
+                                content: Row(
+                                  children: [
+                                    Icon(
+                                      result.success ? Icons.mark_email_read_rounded : Icons.warning_amber_rounded,
+                                      color: Colors.white,
+                                    ),
+                                    const SizedBox(width: 10),
+                                    Expanded(
+                                      child: Text(
+                                        result.success
+                                            ? 'Credentials email dispatched to $studentEmail via Gmail SMTP! Password: $newPass'
+                                            : 'Password updated to "$newPass", but email delivery failed: ${result.message}',
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                                backgroundColor: result.success ? Colors.green.shade700 : Colors.amber.shade900,
+                                duration: Duration(seconds: result.success ? 4 : 8),
+                                behavior: SnackBarBehavior.floating,
+                              ),
+                            );
+                          }
+                        },
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.blue.shade700,
+                    foregroundColor: Colors.white,
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                    minimumSize: const Size(0, 40),
+                  ),
+                  icon: isSending
+                      ? const SizedBox(
+                          width: 16,
+                          height: 16,
+                          child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                        )
+                      : const Icon(Icons.send_rounded, size: 16),
+                  label: Text(isSending ? 'Sending via SMTP...' : 'Send via SMTP'),
+                ),
+              ],
+            );
+          },
+        );
+      },
+    );
+  }
+
   // ── Add New Student Dialog ──────────────────────────────────
   Future<void> _openAddStudentDialog(
     BuildContext context,
@@ -2276,20 +2542,31 @@ class _AdminWebStudentsScreenState extends ConsumerState<AdminWebStudentsScreen>
                                   specialNotes: notesCtrl.text.trim().isNotEmpty ? notesCtrl.text.trim() : null,
                                   enrollSubjectIds: selectedSubjectIds.isNotEmpty ? selectedSubjectIds.toList() : null,
                                 );
+                            final emailResult = EmailService.lastResult;
+                            final emailSent = emailResult?.success ?? false;
+
                             if (context.mounted) {
                               Navigator.of(dialogCtx).pop();
                               ScaffoldMessenger.of(context).showSnackBar(
                                 SnackBar(
                                   content: Row(
                                     children: [
-                                      const Icon(Icons.mark_email_read_rounded, color: Colors.white),
+                                      Icon(
+                                        emailSent ? Icons.mark_email_read_rounded : Icons.warning_amber_rounded,
+                                        color: Colors.white,
+                                      ),
                                       const SizedBox(width: 10),
                                       Expanded(
-                                        child: Text('Student "${nameCtrl.text.trim()}" onboarded! Credentials sent to ${emailCtrl.text.trim()} via Gmail SMTP & synced to Cloud Database!'),
+                                        child: Text(
+                                          emailSent
+                                              ? 'Student "${nameCtrl.text.trim()}" onboarded! Credentials sent to ${emailCtrl.text.trim()} via Gmail SMTP!'
+                                              : 'Student "${nameCtrl.text.trim()}" created! Note: SMTP email could not be delivered (${emailResult?.message ?? "SMTP bridge error"}). You can resend anytime using the Resend button.',
+                                        ),
                                       ),
                                     ],
                                   ),
-                                  backgroundColor: Colors.green.shade700,
+                                  backgroundColor: emailSent ? Colors.green.shade700 : Colors.amber.shade900,
+                                  duration: Duration(seconds: emailSent ? 4 : 8),
                                   behavior: SnackBarBehavior.floating,
                                 ),
                               );

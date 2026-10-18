@@ -257,6 +257,11 @@ class StudentQuizAttemptsNotifier extends Notifier<List<Map<String, dynamic>>> {
     int? loId,
     int? subjectId,
   }) async {
+    final user = ref.read(authProvider);
+    if (user == null || (user.role != 'teacher' && user.role != 'admin')) {
+      throw Exception('Only instructors or administrators are permitted to reset quiz attempts.');
+    }
+
     final studentId = _getStudentId();
     if (studentId == null) return;
 
@@ -301,6 +306,11 @@ class StudentQuizAttemptsNotifier extends Notifier<List<Map<String, dynamic>>> {
       if (!canAttempt) {
         throw Exception('You have already completed this quiz. Contact your teacher for a reset if needed.');
       }
+    } else if (loId > 0) {
+      final canAttempt = await DatabaseHelper().hasStudentCompletedLoQuiz(studentId: studentId, loId: loId);
+      if (!canAttempt) {
+        throw Exception('You have already completed this assessment. Contact your teacher for a reset if needed.');
+      }
     }
 
     await DatabaseHelper().recordQuizAttempt(
@@ -325,7 +335,9 @@ class StudentQuizAttemptsNotifier extends Notifier<List<Map<String, dynamic>>> {
     ref.invalidate(adminAnalyticsProvider);
     if (quizId != null && quizId > 0) {
       ref.invalidate(quizRosterProvider(quizId));
+      ref.invalidate(quizItemAnalysisProvider(quizId));
     }
+    ref.invalidate(teacherQuizzesForAnalysisProvider);
     if (subjectId > 0) {
       ref.invalidate(subjectQuizzesProvider(subjectId));
     }
@@ -368,7 +380,9 @@ class StudentQuizAttemptsNotifier extends Notifier<List<Map<String, dynamic>>> {
     ref.invalidate(adminAnalyticsProvider);
     if (quizId != null && quizId > 0) {
       ref.invalidate(quizRosterProvider(quizId));
+      ref.invalidate(quizItemAnalysisProvider(quizId));
     }
+    ref.invalidate(teacherQuizzesForAnalysisProvider);
     if (subjectId > 0) {
       ref.invalidate(subjectQuizzesProvider(subjectId));
     }

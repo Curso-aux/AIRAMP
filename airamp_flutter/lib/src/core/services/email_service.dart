@@ -24,6 +24,9 @@ class EmailService {
   factory EmailService() => _instance;
   EmailService._internal();
 
+  /// Holds the outcome of the most recent email dispatch
+  static EmailResult? lastResult;
+
   /// Sends a welcome and account credentials email to a student or teacher.
   Future<EmailResult> sendAccountCredentials({
     required String toEmail,
@@ -498,8 +501,8 @@ Evangelista Christian School & Institutional Assessment Platform
     // 2. HTTP SMTP Bridge Delivery (For Web & fallback on emulator/desktop)
     if (!sent) {
       final dio = Dio(BaseOptions(
-        connectTimeout: const Duration(seconds: 3),
-        receiveTimeout: const Duration(seconds: 5),
+        connectTimeout: const Duration(seconds: 10),
+        receiveTimeout: const Duration(seconds: 35),
       ))..interceptors.add(RateLimitInterceptor());
 
       final List<String> bridgeCandidates = [];
@@ -508,18 +511,34 @@ Evangelista Christian School & Institutional Assessment Platform
       }
 
       if (kIsWeb) {
-        // In web browser, only attempt localhost bridge if running in a local environment
-        final isLocalWeb = Uri.base.host == 'localhost' || Uri.base.host == '127.0.0.1' || Uri.base.host.isEmpty;
-        if (isLocalWeb) {
+        final host = Uri.base.host;
+        if (host == 'localhost') {
           bridgeCandidates.addAll([
-            EmailConfig.localBridgeUrl,
             'http://localhost:8088/send-email',
+            'http://127.0.0.1:8088/send-email',
+          ]);
+        } else if (host == '127.0.0.1') {
+          bridgeCandidates.addAll([
+            'http://127.0.0.1:8088/send-email',
+            'http://localhost:8088/send-email',
+          ]);
+        } else if (host.isNotEmpty) {
+          bridgeCandidates.addAll([
+            'http://$host:8088/send-email',
+            'http://localhost:8088/send-email',
+            'http://127.0.0.1:8088/send-email',
+          ]);
+        } else {
+          bridgeCandidates.addAll([
+            'http://localhost:8088/send-email',
+            'http://127.0.0.1:8088/send-email',
           ]);
         }
       } else {
         bridgeCandidates.addAll([
           EmailConfig.emulatorBridgeUrl,
           EmailConfig.localBridgeUrl,
+          'http://localhost:8088/send-email',
         ]);
       }
 
@@ -545,7 +564,7 @@ Evangelista Christian School & Institutional Assessment Platform
             break;
           }
         } catch (bridgeErr) {
-          debugPrint('[EmailService] Bridge endpoint ($endpoint) attempt: $bridgeErr');
+          debugPrint('[EmailService] Bridge endpoint ($endpoint) attempt note: $bridgeErr');
         }
       }
     }
@@ -576,19 +595,20 @@ Evangelista Christian School & Institutional Assessment Platform
       debugPrint('[EmailService] Cloud mail audit note: $e');
     }
 
-    if (sent) {
-      return EmailResult(
-        success: true,
-        message: successMessage,
-        channel: channel,
-      );
-    } else {
-      return EmailResult(
-        success: false,
-        message: 'Could not deliver email to $toEmail. Please check your network connection and SMTP service.',
-        channel: 'failed',
-      );
-    }
+    final result = sent
+        ? EmailResult(
+            success: true,
+            message: successMessage,
+            channel: channel,
+          )
+        : EmailResult(
+            success: false,
+            message: 'Could not deliver email to $toEmail. Please ensure the SMTP bridge daemon (start_smtp_bridge.bat) is running on port 8088.',
+            channel: 'failed',
+          );
+
+    lastResult = result;
+    return result;
   }
 }
 

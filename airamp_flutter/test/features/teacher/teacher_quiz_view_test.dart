@@ -164,5 +164,111 @@ void main() {
       expect(questions.first['question_text'], equals('What does SQL stand for?'));
       expect(questions.first['correct_option'], equals('A'));
     });
+
+    testWidgets('4. CreateQuizDialog locks Passing Score to 75% and displays 2 SET TIME controls', (tester) async {
+      await tester.pumpWidget(
+        ProviderScope(
+          child: MaterialApp(
+            theme: AppTheme.darkTheme,
+            home: const CreateQuizDialog(
+              subjectId: 1,
+              subjectName: 'Subject Test',
+            ),
+          ),
+        ),
+      );
+
+      await tester.pumpAndSettle();
+
+      // Verify passing score is locked at 75% (teacher cannot change it)
+      expect(find.text('75% (Fixed Standard)'), findsOneWidget);
+      expect(find.text('LOCKED'), findsOneWidget);
+
+      // Verify 2 Set Time controls
+      expect(find.text('1. Quiz Start (Date & Time)'), findsOneWidget);
+      expect(find.text('2. Quiz End (Date & Time)'), findsOneWidget);
+      expect(find.text('Quiz Schedule (Start & End Time)'), findsOneWidget);
+    });
+
+    test('5. DatabaseHelper updateQuiz successfully saves and updates updated_at without SQLite error', () async {
+      final dbHelper = DatabaseHelper();
+      final now = DateTime.now().millisecondsSinceEpoch;
+      final teacherId = 't_upd_$now';
+      final db = await dbHelper.database;
+
+      await db.insert('users', {
+        'id': teacherId,
+        'email': '$teacherId@test.edu',
+        'username': teacherId,
+        'password': 'Password123',
+        'role': 'teacher',
+        'full_name': 'Teacher Update',
+        'created_at': DateTime.now().toIso8601String(),
+      });
+
+      final subjectId = await db.insert('subjects', {
+        'name': 'Subject Upd $now',
+        'subject_code': 'UPD-$now',
+        'description': 'Subject for update test',
+        'teacher_id': teacherId,
+        'created_at': DateTime.now().toIso8601String(),
+      });
+
+      final quizId = await dbHelper.createQuiz(
+        title: 'Initial Quiz $now',
+        description: 'Initial description',
+        subjectId: subjectId,
+        teacherId: teacherId,
+        timeLimitMinutes: 15,
+        passingScore: 75,
+        status: 'published',
+        questions: [
+          {
+            'question_text': 'Question 1',
+            'option_a': 'A',
+            'option_b': 'B',
+            'option_c': 'C',
+            'option_d': 'D',
+            'correct_option': 'A',
+          },
+        ],
+      );
+
+      // Perform updateQuiz with updated schedule start and end
+      final startIso = DateTime.now().add(const Duration(hours: 1)).toIso8601String();
+      final endIso = DateTime.now().add(const Duration(hours: 2)).toIso8601String();
+
+      await dbHelper.updateQuiz(
+        quizId: quizId,
+        title: 'Updated Quiz $now',
+        description: 'Updated description',
+        subjectId: subjectId,
+        timeLimitMinutes: 20,
+        passingScore: 75,
+        status: 'published',
+        dueDate: endIso,
+        scheduleStart: startIso,
+        scheduleEnd: endIso,
+        questions: [
+          {
+            'question_text': 'Updated Question 1',
+            'option_a': 'A1',
+            'option_b': 'B1',
+            'option_c': 'C1',
+            'option_d': 'D1',
+            'correct_option': 'B',
+          },
+        ],
+      );
+
+      final updated = await dbHelper.getQuizById(quizId);
+      expect(updated, isNotNull);
+      expect(updated!['title'], equals('Updated Quiz $now'));
+      expect(updated['passing_score'], equals(75));
+      expect(updated['time_limit_minutes'], equals(20));
+      expect(updated['schedule_start'], equals(startIso));
+      expect(updated['schedule_end'], equals(endIso));
+      expect(updated['due_date'], equals(endIso));
+    });
   });
 }

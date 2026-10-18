@@ -10,6 +10,7 @@ import '../../admin/data/admin_repository.dart';
 import '../../auth/application/auth_provider.dart';
 import '../../student/data/student_repository.dart';
 import '../../teacher/data/teacher_repository.dart';
+import '../../teacher/presentation/components/quiz_item_analysis_dialog.dart';
 
 class ScoresScreen extends ConsumerStatefulWidget {
   final bool isEmbedded;
@@ -209,6 +210,21 @@ class _ScoresScreenState extends ConsumerState<ScoresScreen> {
                           ),
                         ],
                       ),
+                    ),
+                    const SizedBox(width: 8),
+                    ElevatedButton.icon(
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: AppTheme.primary,
+                        foregroundColor: Colors.black,
+                        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                        elevation: 1,
+                      ),
+                      onPressed: () {
+                        QuizItemAnalysisDialog.show(context);
+                      },
+                      icon: const Icon(Icons.analytics_outlined, size: 18),
+                      label: const Text('Item Analysis', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
                     ),
                   ],
                 ),

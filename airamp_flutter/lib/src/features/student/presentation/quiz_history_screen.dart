@@ -22,15 +22,26 @@ class _QuizHistoryScreenState extends ConsumerState<QuizHistoryScreen> {
     try {
       final dt = DateTime.parse(isoString).toLocal();
       const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-      return '${months[dt.month - 1]} ${dt.day.toString().padLeft(2, '0')}, ${dt.year}';
+      final dateStr = '${months[dt.month - 1]} ${dt.day.toString().padLeft(2, '0')}, ${dt.year}';
+      if (isoString.contains('T') || isoString.length > 10) {
+        final hour = dt.hour % 12 == 0 ? 12 : dt.hour % 12;
+        final ampm = dt.hour >= 12 ? 'PM' : 'AM';
+        final min = dt.minute.toString().padLeft(2, '0');
+        return '$dateStr at $hour:$min $ampm';
+      }
+      return dateStr;
     } catch (_) {
-      return 'Recent';
+      return isoString;
     }
   }
 
   bool _isDatePassed(String isoString) {
     try {
       final dt = DateTime.parse(isoString).toLocal();
+      if (isoString.length <= 10 && !isoString.contains('T')) {
+        final endOfDay = DateTime(dt.year, dt.month, dt.day, 23, 59, 59);
+        return endOfDay.isBefore(DateTime.now());
+      }
       return dt.isBefore(DateTime.now());
     } catch (_) {
       return true;
@@ -314,13 +325,22 @@ class _QuizHistoryScreenState extends ConsumerState<QuizHistoryScreen> {
             final scheduleStart = item['schedule_start']?.toString();
             final scheduleEnd = item['schedule_end']?.toString();
 
+            final isDeadlinePassed = (scheduleEnd != null && scheduleEnd.isNotEmpty && _isDatePassed(scheduleEnd)) ||
+                (dueDate != null && dueDate.isNotEmpty && _isDatePassed(dueDate));
+            final isMissed = !isCompleted && (item['status'] == 'missed' || isDeadlinePassed);
+            final isNotYetAvailable = !isCompleted && !isMissed && scheduleStart != null && scheduleStart.isNotEmpty && !_isDatePassed(scheduleStart);
+
             return Container(
               padding: const EdgeInsets.all(16),
               decoration: BoxDecoration(
                 color: AppTheme.surface,
                 borderRadius: BorderRadius.circular(14),
                 border: Border.all(
-                  color: isCompleted ? AppTheme.border : AppTheme.primary.withValues(alpha: 0.5),
+                  color: isCompleted
+                      ? AppTheme.border
+                      : isMissed
+                          ? AppTheme.error.withValues(alpha: 0.5)
+                          : AppTheme.primary.withValues(alpha: 0.5),
                   width: isCompleted ? 1 : 1.5,
                 ),
               ),
@@ -353,13 +373,31 @@ class _QuizHistoryScreenState extends ConsumerState<QuizHistoryScreen> {
                       Container(
                         padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                         decoration: BoxDecoration(
-                          color: isCompleted ? AppTheme.success.withValues(alpha: 0.15) : AppTheme.warning.withValues(alpha: 0.15),
+                          color: isCompleted
+                              ? AppTheme.success.withValues(alpha: 0.15)
+                              : isMissed
+                                  ? AppTheme.error.withValues(alpha: 0.15)
+                                  : isNotYetAvailable
+                                      ? AppTheme.info.withValues(alpha: 0.15)
+                                      : AppTheme.warning.withValues(alpha: 0.15),
                           borderRadius: BorderRadius.circular(6),
                         ),
                         child: Text(
-                          isCompleted ? 'Completed · $pct%' : 'Pending',
+                          isCompleted
+                              ? 'Completed · $pct%'
+                              : isMissed
+                                  ? 'MISSED'
+                                  : isNotYetAvailable
+                                      ? 'Upcoming'
+                                      : 'Pending',
                           style: TextStyle(
-                            color: isCompleted ? AppTheme.success : AppTheme.warning,
+                            color: isCompleted
+                                ? AppTheme.success
+                                : isMissed
+                                    ? AppTheme.error
+                                    : isNotYetAvailable
+                                        ? AppTheme.info
+                                        : AppTheme.warning,
                             fontWeight: FontWeight.bold,
                             fontSize: 11,
                           ),
@@ -369,8 +407,32 @@ class _QuizHistoryScreenState extends ConsumerState<QuizHistoryScreen> {
                   ),
                   const SizedBox(height: 10),
 
+                  // Missed Quiz banner
+                  if (isMissed)
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                      decoration: BoxDecoration(
+                        color: AppTheme.error.withValues(alpha: 0.12),
+                        borderRadius: BorderRadius.circular(8),
+                        border: Border.all(color: AppTheme.error.withValues(alpha: 0.3)),
+                      ),
+                      child: Row(
+                        children: [
+                          Icon(Icons.event_busy, size: 16, color: AppTheme.error),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: Text(
+                              'Missed Quiz — The availability deadline has passed.',
+                              style: TextStyle(color: AppTheme.error, fontWeight: FontWeight.w600, fontSize: 12),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  if (isMissed) const SizedBox(height: 10),
+
                   // Not Yet Available banner
-                  if (scheduleStart != null && scheduleStart.isNotEmpty && !_isDatePassed(scheduleStart))
+                  if (isNotYetAvailable)
                     Container(
                       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                       decoration: BoxDecoration(
@@ -382,15 +444,16 @@ class _QuizHistoryScreenState extends ConsumerState<QuizHistoryScreen> {
                         children: [
                           Icon(Icons.access_time, size: 16, color: AppTheme.info),
                           const SizedBox(width: 8),
-                          Text(
-                            'Available from ${_formatDate(scheduleStart)}',
-                            style: TextStyle(color: AppTheme.info, fontWeight: FontWeight.w600, fontSize: 12),
+                          Expanded(
+                            child: Text(
+                              'Available from ${_formatDate(scheduleStart)}',
+                              style: TextStyle(color: AppTheme.info, fontWeight: FontWeight.w600, fontSize: 12),
+                            ),
                           ),
                         ],
                       ),
                     ),
-                  if (scheduleStart != null && scheduleStart.isNotEmpty && !_isDatePassed(scheduleStart))
-                    const SizedBox(height: 10),
+                  if (isNotYetAvailable) const SizedBox(height: 10),
 
                   // Quiz Title
                   Text(
@@ -480,42 +543,63 @@ class _QuizHistoryScreenState extends ConsumerState<QuizHistoryScreen> {
                                 child: OutlinedButton.icon(
                                   style: OutlinedButton.styleFrom(
                                     foregroundColor: AppTheme.textMuted,
-                                    side: BorderSide(color: AppTheme.border),
+                                    side: BorderSide(color: AppTheme.border.withValues(alpha: 0.5)),
                                     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
                                     padding: const EdgeInsets.symmetric(vertical: 10),
                                   ),
-                                  onPressed: () async {
-                                    await context.push('/quiz/$quizId');
-                                    if (context.mounted) {
-                                      ref.read(studentQuizAssignmentsProvider.notifier).reload();
-                                      ref.read(studentQuizAttemptsProvider.notifier).loadAttempts();
-                                      ref.read(studentCoursesProvider.notifier).reload();
-                                    }
-                                  },
-                                  icon: const Icon(Icons.refresh, size: 16),
-                                  label: const Text('Retake Quiz', style: TextStyle(fontWeight: FontWeight.w600)),
+                                  onPressed: null,
+                                  icon: const Icon(Icons.lock_outline, size: 16),
+                                  label: const Text('Quiz Completed (Locked)', style: TextStyle(fontWeight: FontWeight.w600)),
                                 ),
                               ),
                             ],
                           )
-                        : ElevatedButton.icon(
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: AppTheme.primary,
-                              foregroundColor: Colors.black,
-                              padding: const EdgeInsets.symmetric(vertical: 13),
-                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                            ),
-                            onPressed: () async {
-                              await context.push('/quiz/$quizId');
-                              if (context.mounted) {
-                                ref.read(studentQuizAssignmentsProvider.notifier).reload();
-                                ref.read(studentQuizAttemptsProvider.notifier).loadAttempts();
-                                ref.read(studentCoursesProvider.notifier).reload();
-                              }
-                            },
-                            icon: const Icon(Icons.play_arrow, size: 18),
-                            label: const Text('Take Quiz Now', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
-                          ),
+                        : isMissed
+                            ? OutlinedButton.icon(
+                                style: OutlinedButton.styleFrom(
+                                  foregroundColor: AppTheme.error,
+                                  side: BorderSide(color: AppTheme.error.withValues(alpha: 0.4)),
+                                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                                  padding: const EdgeInsets.symmetric(vertical: 13),
+                                ),
+                                onPressed: null,
+                                icon: Icon(Icons.event_busy, size: 18, color: AppTheme.error),
+                                label: Text('Missed Quiz (Closed)', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: AppTheme.error)),
+                              )
+                            : isNotYetAvailable
+                                ? OutlinedButton.icon(
+                                    style: OutlinedButton.styleFrom(
+                                      foregroundColor: AppTheme.info,
+                                      side: BorderSide(color: AppTheme.info.withValues(alpha: 0.4)),
+                                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                                      padding: const EdgeInsets.symmetric(vertical: 13),
+                                    ),
+                                    onPressed: () {
+                                      ScaffoldMessenger.of(context).showSnackBar(
+                                        SnackBar(content: Text('This quiz opens on ${_formatDate(scheduleStart)}')),
+                                      );
+                                    },
+                                    icon: Icon(Icons.lock_clock, size: 18, color: AppTheme.info),
+                                    label: Text('Opens ${_formatDate(scheduleStart)}', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: AppTheme.info)),
+                                  )
+                                : ElevatedButton.icon(
+                                    style: ElevatedButton.styleFrom(
+                                      backgroundColor: AppTheme.primary,
+                                      foregroundColor: Colors.black,
+                                      padding: const EdgeInsets.symmetric(vertical: 13),
+                                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                                    ),
+                                    onPressed: () async {
+                                      await context.push('/quiz/$quizId');
+                                      if (context.mounted) {
+                                        ref.read(studentQuizAssignmentsProvider.notifier).reload();
+                                        ref.read(studentQuizAttemptsProvider.notifier).loadAttempts();
+                                        ref.read(studentCoursesProvider.notifier).reload();
+                                      }
+                                    },
+                                    icon: const Icon(Icons.play_arrow, size: 18),
+                                    label: const Text('Take Quiz Now', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
+                                  ),
                   ),
                 ],
               ),
