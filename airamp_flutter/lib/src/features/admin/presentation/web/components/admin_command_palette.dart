@@ -201,7 +201,7 @@ class _AdminCommandPaletteState extends ConsumerState<AdminCommandPalette> {
         category: CommandCategory.actions,
         onSelect: () {
           _safeClose();
-          context.go('/admin/admin-management');
+          context.go('/super-admin');
         },
       ));
     }

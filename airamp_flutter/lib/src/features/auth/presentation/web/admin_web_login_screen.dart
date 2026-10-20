@@ -29,16 +29,6 @@ class _AdminWebLoginScreenState extends ConsumerState<AdminWebLoginScreen> {
   final _passwordController = TextEditingController();
   bool _showPassword = false;
   String _error = '';
-  late String _selectedRole;
-
-  @override
-  void initState() {
-    super.initState();
-    _selectedRole = widget.initialRole;
-    if (_selectedRole != 'admin' && _selectedRole != 'teacher' && _selectedRole != 'student') {
-      _selectedRole = 'unified';
-    }
-  }
 
   @override
   void dispose() {
@@ -65,7 +55,11 @@ class _AdminWebLoginScreenState extends ConsumerState<AdminWebLoginScreen> {
 
       if (user != null) {
         // Automatic routing based on verified account role
-        if (user.role == 'admin' || user.role == 'super_admin') {
+        if (user.role == 'super_admin') {
+          // Super admin goes directly to the Super Admin Governance Portal
+          if (mounted) context.go('/super-admin');
+          return;
+        } else if (user.role == 'admin') {
           // Allow seeded demo admin (aira@admin, @admin, or non-FQDN emails) to bypass 2FA OTP
           final isDemoAdmin = user.email.toLowerCase() == 'aira@admin' ||
               user.email.toLowerCase().endsWith('@admin') ||
@@ -186,15 +180,7 @@ class _AdminWebLoginScreenState extends ConsumerState<AdminWebLoginScreen> {
     final badgeBg = accentColor.withValues(alpha: isDark ? 0.2 : 0.12);
     final screenWidth = MediaQuery.sizeOf(context).width;
     final isMobile = screenWidth < 600;
-
-    String identifierHint = 'e.g. 001-0001, teacher@aira.edu, or aira@admin';
-    if (widget.initialRole == 'admin') {
-      identifierHint = 'e.g. aira@admin or admin@school.edu.ph';
-    } else if (widget.initialRole == 'teacher') {
-      identifierHint = 'e.g. teacher@aira.edu or TCH-1001';
-    } else if (widget.initialRole == 'student') {
-      identifierHint = 'e.g. 001-0001 or student@aira.edu';
-    }
+    const identifierHint = 'e.g. 001-0001, teacher@aira.edu, or aira@admin';
 
     return Scaffold(
       backgroundColor: theme.scaffoldBackgroundColor,
@@ -209,7 +195,7 @@ class _AdminWebLoginScreenState extends ConsumerState<AdminWebLoginScreen> {
                     vertical: isMobile ? 20 : 36,
                   ),
                   child: ConstrainedBox(
-                    constraints: const BoxConstraints(maxWidth: 480),
+                    constraints: const BoxConstraints(maxWidth: 500),
                     child: Container(
                       padding: EdgeInsets.all(isMobile ? 22 : 36),
                       decoration: BoxDecoration(
@@ -305,11 +291,15 @@ class _AdminWebLoginScreenState extends ConsumerState<AdminWebLoginScreen> {
                             child: Row(
                               crossAxisAlignment: CrossAxisAlignment.center,
                               children: [
-                                Icon(Icons.info_outline_rounded, color: accentColor, size: 18),
+                                Icon(
+                                  Icons.info_outline_rounded,
+                                  color: accentColor,
+                                  size: 18,
+                                ),
                                 const SizedBox(width: 10),
                                 Expanded(
                                   child: Text(
-                                    'Single Sign-In: Enter your Student ID, Faculty Email, or Admin Account. You will be automatically routed to your authorized dashboard.',
+                                    'Single Sign-In: Enter your Student ID, Faculty Email, or Admin Account. You will be automatically authenticated and routed to your authorized dashboard.',
                                     style: TextStyle(
                                       color: AppTheme.text,
                                       fontSize: 12,
@@ -320,7 +310,7 @@ class _AdminWebLoginScreenState extends ConsumerState<AdminWebLoginScreen> {
                               ],
                             ),
                           ),
-                          const SizedBox(height: 22),
+                          const SizedBox(height: 18),
 
                           // Error Message Banner
                           if (_error.isNotEmpty) ...[

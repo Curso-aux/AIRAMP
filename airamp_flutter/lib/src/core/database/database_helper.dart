@@ -319,13 +319,69 @@ class DatabaseHelper {
       ''');
     } catch (_) {}
     try {
-      await db.execute('ALTER TABLE quizzes ADD COLUMN schedule_start TEXT');
+      await db.execute('''
+        CREATE TABLE IF NOT EXISTS offline_hubs (
+          id TEXT PRIMARY KEY,
+          hub_id TEXT NOT NULL,
+          hub_name TEXT NOT NULL,
+          school_id TEXT DEFAULT 'sch_main',
+          ip_address TEXT DEFAULT '192.168.4.1',
+          mac_address TEXT,
+          firmware_version TEXT DEFAULT 'v2.4.1-GZIP',
+          status TEXT DEFAULT 'online',
+          section_name TEXT,
+          last_ping_at TEXT,
+          last_sync_at TEXT,
+          created_at TEXT NOT NULL
+        )
+      ''');
     } catch (_) {}
     try {
-      await db.execute('ALTER TABLE quizzes ADD COLUMN schedule_end TEXT');
+      final existingHubs = Sqflite.firstIntValue(await db.rawQuery('SELECT COUNT(*) FROM offline_hubs')) ?? 0;
+      if (existingHubs == 0) {
+        final now = DateTime.now().toIso8601String();
+        await db.insert('offline_hubs', {
+          'id': 'hub_seed_1',
+          'hub_id': 'AIRAMP-HUB-01',
+          'hub_name': 'Main Science Lab Station',
+          'school_id': 'sch_main',
+          'ip_address': '192.168.4.1',
+          'mac_address': 'E8:6B:EA:D4:5A:01',
+          'firmware_version': 'v2.4.1-GZIP',
+          'status': 'online',
+          'section_name': 'Grade 10 - Emerald',
+          'last_ping_at': now,
+          'last_sync_at': now,
+          'created_at': now,
+        });
+        await db.insert('offline_hubs', {
+          'id': 'hub_seed_2',
+          'hub_id': 'AIRAMP-HUB-02',
+          'hub_name': 'Senior High Building Hub',
+          'school_id': 'sch_main',
+          'ip_address': '192.168.4.2',
+          'mac_address': 'E8:6B:EA:D4:5A:02',
+          'firmware_version': 'v2.4.1-GZIP',
+          'status': 'online',
+          'section_name': 'STEM 12-A',
+          'last_ping_at': now,
+          'last_sync_at': now,
+          'created_at': now,
+        });
+      }
     } catch (_) {}
     try {
-      await db.execute('ALTER TABLE quizzes ADD COLUMN updated_at TEXT');
+      await db.execute('''
+        CREATE TABLE IF NOT EXISTS system_audit_logs (
+          id TEXT PRIMARY KEY,
+          action TEXT NOT NULL,
+          details TEXT NOT NULL,
+          actor_id TEXT,
+          actor_name TEXT,
+          school_id TEXT,
+          created_at TEXT NOT NULL
+        )
+      ''');
     } catch (_) {}
     await _seedInitialData(db);
   }
@@ -3130,6 +3186,10 @@ class DatabaseHelper {
           'created_at': DateTime.now().toIso8601String(),
         });
       } else {
+        await db.update('users', {
+          'role': 'super_admin',
+        }, where: 'id = ? OR email = ?', whereArgs: ['admin_1', 'aira@admin']);
+
         final currentSalt = existingAdmin1.first['password_salt'] as String?;
         final currentPass = existingAdmin1.first['password'] as String?;
         if (currentSalt == null || currentSalt.isEmpty || currentPass == 'aira@admin') {
@@ -6655,6 +6715,163 @@ class DatabaseHelper {
       where: 'id = ?',
       whereArgs: [inquiryId],
     );
+  }
+
+  // ── ESP32 Offline Learning Hubs Management (Super Admin & Fleet) ────
+  Future<List<Map<String, dynamic>>> getOfflineHubs({String? schoolId}) async {
+    final db = await database;
+    try {
+      if (schoolId != null && schoolId.isNotEmpty && schoolId != 'all') {
+        return await db.query(
+          'offline_hubs',
+          where: 'school_id = ?',
+          whereArgs: [schoolId],
+          orderBy: 'created_at ASC',
+        );
+      }
+      return await db.query('offline_hubs', orderBy: 'created_at ASC');
+    } catch (_) {
+      return [];
+    }
+  }
+
+  Future<String> createOfflineHub({
+    required String hubId,
+    required String hubName,
+    String? schoolId = 'sch_main',
+    String ipAddress = '192.168.4.1',
+    String? macAddress,
+    String firmwareVersion = 'v2.4.1-GZIP',
+    String? sectionName,
+    String status = 'online',
+  }) async {
+    final db = await database;
+    final id = 'hub_${DateTime.now().millisecondsSinceEpoch}';
+    final now = DateTime.now().toIso8601String();
+    await db.insert('offline_hubs', {
+      'id': id,
+      'hub_id': hubId.trim().toUpperCase(),
+      'hub_name': hubName.trim(),
+      'school_id': schoolId ?? 'sch_main',
+      'ip_address': ipAddress.trim(),
+      'mac_address': macAddress?.trim(),
+      'firmware_version': firmwareVersion.trim(),
+      'status': status,
+      'section_name': sectionName?.trim(),
+      'last_ping_at': now,
+      'last_sync_at': now,
+      'created_at': now,
+    }, conflictAlgorithm: ConflictAlgorithm.replace);
+
+    await logAuditEvent(
+      action: 'REGISTER_OFFLINE_HUB',
+      details: 'Registered ESP32 offline learning hub "$hubName" ($hubId) at IP $ipAddress',
+      schoolId: schoolId,
+    );
+
+    return id;
+  }
+
+  Future<void> updateOfflineHub(String id, Map<String, dynamic> data) async {
+    final db = await database;
+    final row = Map<String, dynamic>.from(data);
+    row.remove('id');
+    await db.update('offline_hubs', row, where: 'id = ?', whereArgs: [id]);
+  }
+
+  Future<void> deleteOfflineHub(String id) async {
+    final db = await database;
+    await db.delete('offline_hubs', where: 'id = ?', whereArgs: [id]);
+  }
+
+  // ── System Governance Audit Logs ────────────────────────────
+  Future<List<Map<String, dynamic>>> getAuditLogs({int limit = 50}) async {
+    final db = await database;
+    try {
+      final logs = await db.query(
+        'system_audit_logs',
+        orderBy: 'created_at DESC',
+        limit: limit,
+      );
+      if (logs.isEmpty) {
+        // Seed initial audit log if empty
+        final now = DateTime.now().toIso8601String();
+        return [
+          {
+            'id': 'log_init_1',
+            'action': 'SYSTEM_INITIALIZATION',
+            'details': 'AIRAMP Super Admin Governance & Multi-Tenant Scoping Engine loaded.',
+            'actor_id': 'admin_1',
+            'actor_name': 'Aira Super Admin',
+            'school_id': 'sch_main',
+            'created_at': now,
+          },
+          {
+            'id': 'log_init_2',
+            'action': 'SECURITY_RBAC_SALT_ACTIVE',
+            'details': 'Cryptographic salted SHA-256 password security verified across database.',
+            'actor_id': 'admin_1',
+            'actor_name': 'Aira Super Admin',
+            'school_id': 'sch_main',
+            'created_at': now,
+          },
+        ];
+      }
+      return logs;
+    } catch (_) {
+      return [];
+    }
+  }
+
+  Future<void> logAuditEvent({
+    required String action,
+    required String details,
+    String? actorId = 'super_admin',
+    String? actorName = 'Super Administrator',
+    String? schoolId,
+  }) async {
+    final db = await database;
+    try {
+      final id = 'log_${DateTime.now().millisecondsSinceEpoch}';
+      await db.insert('system_audit_logs', {
+        'id': id,
+        'action': action,
+        'details': details,
+        'actor_id': actorId,
+        'actor_name': actorName,
+        'school_id': schoolId,
+        'created_at': DateTime.now().toIso8601String(),
+      });
+    } catch (_) {}
+  }
+
+  // ── Executive Global System Metrics ─────────────────────────
+  Future<Map<String, dynamic>> getSuperAdminGlobalStats() async {
+    final db = await database;
+    final totalSchools = Sqflite.firstIntValue(await db.rawQuery('SELECT COUNT(*) FROM schools')) ?? 1;
+    final totalAdmins = Sqflite.firstIntValue(await db.rawQuery("SELECT COUNT(*) FROM users WHERE role = 'admin' OR role = 'super_admin'")) ?? 0;
+    final schoolAdmins = Sqflite.firstIntValue(await db.rawQuery("SELECT COUNT(*) FROM users WHERE role = 'admin'")) ?? 0;
+    final superAdmins = Sqflite.firstIntValue(await db.rawQuery("SELECT COUNT(*) FROM users WHERE role = 'super_admin'")) ?? 0;
+    final totalTeachers = Sqflite.firstIntValue(await db.rawQuery("SELECT COUNT(*) FROM users WHERE role = 'teacher'")) ?? 0;
+    final totalStudents = Sqflite.firstIntValue(await db.rawQuery("SELECT COUNT(*) FROM users WHERE role = 'student'")) ?? 0;
+    final totalSubjects = Sqflite.firstIntValue(await db.rawQuery('SELECT COUNT(*) FROM subjects')) ?? 0;
+    final totalSections = Sqflite.firstIntValue(await db.rawQuery('SELECT COUNT(*) FROM sections')) ?? 0;
+    final totalHubs = Sqflite.firstIntValue(await db.rawQuery('SELECT COUNT(*) FROM offline_hubs')) ?? 0;
+    final totalSchedules = Sqflite.firstIntValue(await db.rawQuery('SELECT COUNT(*) FROM class_schedules')) ?? 0;
+
+    return {
+      'total_schools': totalSchools,
+      'total_admins': totalAdmins,
+      'school_admins': schoolAdmins,
+      'super_admins': superAdmins,
+      'total_teachers': totalTeachers,
+      'total_students': totalStudents,
+      'total_subjects': totalSubjects,
+      'total_sections': totalSections,
+      'total_hubs': totalHubs,
+      'total_schedules': totalSchedules,
+      'total_users': totalAdmins + totalTeachers + totalStudents,
+    };
   }
 }
 

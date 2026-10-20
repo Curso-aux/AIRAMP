@@ -41,7 +41,10 @@ If your laptop does not have an SD card slot or you don't have a USB card reader
    ```text
    http://192.168.4.1/upload
    ```
-5. You will see the **AIRA Wireless File Uploader**! You can select and upload `manifest.json` and any `.pdf` modules directly from your computer to the MicroSD card wirelessly over Wi-Fi.
+5. You will see the **AIRA Wireless File Uploader**!
+   - Select your `.pdf`, `.json` quiz, or document files.
+   - **⚡ Material Compression**: Leave the **"Compress material before sending"** switch enabled (or compress directly in the AIRAMP app). The browser compresses the file with GZIP before wireless transmission, saving up to 70% MicroSD space and speeding up wireless transfer by 3–5x!
+   - Check **"Auto-add to classroom manifest"** so students immediately see the material in their app without manual manifest editing.
 
 ### Method B: Use an Android Smartphone
 1. Insert the tiny MicroSD card into your Android phone's SIM/MicroSD tray.

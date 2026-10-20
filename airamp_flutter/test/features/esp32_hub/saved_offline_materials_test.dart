@@ -5,16 +5,56 @@ import 'package:airamp_flutter/src/features/esp32_hub/data/saved_materials_servi
 import 'package:airamp_flutter/src/features/esp32_hub/domain/esp32_hub_models.dart';
 import 'package:airamp_flutter/src/features/esp32_hub/presentation/saved_offline_materials_modal.dart';
 
+import 'dart:convert';
+
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
+  final initialTestItems = [
+    const HubMaterialItem(
+      id: 'mat_01',
+      title: 'Module 1: Cellular Biology & Mitosis',
+      subjectName: 'General Science',
+      fileType: HubFileType.module,
+      sizeBytes: 1450000,
+      fileName: 'bio_module1.pdf',
+    ),
+    const HubMaterialItem(
+      id: 'mat_02',
+      title: 'Unit 2: Quadratic Functions & Parabolas',
+      subjectName: 'Mathematics',
+      fileType: HubFileType.pdf,
+      sizeBytes: 980000,
+      fileName: 'math_unit2.pdf',
+    ),
+    const HubMaterialItem(
+      id: 'mat_03',
+      title: 'Quarter 1 Diagnostic Assessment (20 Items)',
+      subjectName: 'General Science',
+      fileType: HubFileType.quiz,
+      sizeBytes: 320000,
+      fileName: 'science_quiz_q1.json',
+    ),
+    const HubMaterialItem(
+      id: 'mat_04',
+      title: 'Reading Comprehension & Critical Analysis',
+      subjectName: 'English',
+      fileType: HubFileType.doc,
+      sizeBytes: 650000,
+      fileName: 'english_module1.pdf',
+    ),
+  ];
+
   setUp(() async {
-    SharedPreferences.setMockInitialValues({});
+    final encoded = jsonEncode(initialTestItems.map((e) => e.toJson()).toList());
+    SharedPreferences.setMockInitialValues({
+      'airamp_saved_esp32_materials_v1': encoded,
+    });
     await SavedMaterialsService.instance.init(force: true);
   });
 
-  group('SavedMaterialsService Tests', () {
-    test('loads default seeded materials when storage is empty', () async {
+  group('SavedMaterialsService & Compression Tests', () {
+    test('loads seeded materials', () async {
       final materials = await SavedMaterialsService.instance.getSavedMaterials();
       expect(materials.isNotEmpty, isTrue);
       expect(materials.length, greaterThanOrEqualTo(4));
@@ -22,14 +62,14 @@ void main() {
 
     test('correctly calculates formatted storage size', () {
       final items = [
-        HubMaterialItem(
+        const HubMaterialItem(
           id: 'test_1',
           title: 'Item 1',
           subjectName: 'Math',
           fileType: HubFileType.pdf,
           sizeBytes: 1048576, // 1 MB
         ),
-        HubMaterialItem(
+        const HubMaterialItem(
           id: 'test_2',
           title: 'Item 2',
           subjectName: 'Science',
@@ -41,6 +81,21 @@ void main() {
       expect(formatted, contains('MB'));
     });
 
+    test('correctly calculates compression savings in formattedSize', () {
+      const compressedItem = HubMaterialItem(
+        id: 'test_comp',
+        title: 'Compressed Biology Module',
+        subjectName: 'Science',
+        fileType: HubFileType.pdf,
+        sizeBytes: 300000,
+        originalSizeBytes: 1000000,
+        isCompressed: true,
+      );
+
+      expect(compressedItem.isCompressed, isTrue);
+      expect(compressedItem.formattedSize, contains('Saved 70%'));
+    });
+
     test('can remove and add offline materials', () async {
       final initial = await SavedMaterialsService.instance.getSavedMaterials();
       final firstId = initial.first.id;
@@ -49,7 +104,7 @@ void main() {
       final afterRemove = await SavedMaterialsService.instance.getSavedMaterials();
       expect(afterRemove.any((m) => m.id == firstId), isFalse);
 
-      final newItem = HubMaterialItem(
+      const newItem = HubMaterialItem(
         id: 'new_item_99',
         title: 'New Offline Material',
         subjectName: 'Filipino',
@@ -135,4 +190,27 @@ void main() {
       expect(find.text('Unit 2: Quadratic Functions & Parabolas'), findsNothing);
     });
   });
+
+  group('ESP32 OLED QR Payload & Teacher Scanner Tests', () {
+    test('HubQrPayload accurately parses OLED QR screen payload format', () {
+      const oledPayload = 'WIFI:S:AIRAMP-HUB-01;T:WPA;P:aira1234;;AIRAMP:SEC=Grade 10 - Rizal;IP=192.168.4.1';
+      final parsed = HubQrPayload.parse(oledPayload);
+
+      expect(parsed.ssid, equals('AIRAMP-HUB-01'));
+      expect(parsed.password, equals('aira1234'));
+      expect(parsed.sectionName, equals('Grade 10 - Rizal'));
+      expect(parsed.ipAddress, equals('192.168.4.1'));
+    });
+
+    test('HubQrPayload parses custom SSID and IP gateway', () {
+      const customPayload = 'WIFI:S:ROOM-101-HUB;P:securePass99;;AIRAMP:SEC=Science 9;IP=192.168.4.254';
+      final parsed = HubQrPayload.parse(customPayload);
+
+      expect(parsed.ssid, equals('ROOM-101-HUB'));
+      expect(parsed.password, equals('securePass99'));
+      expect(parsed.sectionName, equals('Science 9'));
+      expect(parsed.ipAddress, equals('192.168.4.254'));
+    });
+  });
 }
+

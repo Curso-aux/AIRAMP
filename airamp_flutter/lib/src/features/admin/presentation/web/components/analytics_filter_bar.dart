@@ -26,11 +26,11 @@ class _AnalyticsFilterBarState extends ConsumerState<AnalyticsFilterBar> {
   ];
 
   static const List<Map<String, String>> _categoryOptions = [
-    {'value': 'all', 'label': 'All Categories / Roles'},
+    {'value': 'all', 'label': 'All Students'},
     {'value': 'regular', 'label': 'Regular Students'},
-    {'value': 'irregular', 'label': 'Irregular / Cross-Enrollees'},
+    {'value': 'irregular', 'label': 'Irregular Students'},
     {'value': 'transferee', 'label': 'Transferees'},
-    {'value': 'sped', 'label': 'SPED / Accommodations'},
+    {'value': 'sped', 'label': 'Accommodations (SPED)'},
     {'value': 'unassigned', 'label': 'Unassigned Section'},
   ];
 

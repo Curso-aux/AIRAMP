@@ -276,31 +276,31 @@ class _OfflineSyncStatusPillState extends ConsumerState<OfflineSyncStatusPill>
             : const Color(0xFFD97706); // Amber / orange
 
     final statusLabel = isSyncing
-        ? 'Syncing Cloud...'
+        ? 'Syncing...'
         : isOnline
-            ? 'Online • Synced'
+            ? 'Cloud Synced'
             : syncState.pendingQueueCount > 0
-                ? 'Offline Mode • Queued for sync (${syncState.pendingQueueCount})'
-                : 'Offline Mode • Queued for sync';
+                ? 'Offline • Queued (${syncState.pendingQueueCount})'
+                : 'Offline Mode';
 
-    final tooltipMessage = 'Status: ${isOnline ? 'Online (SQLite & Cloud Connected)' : 'Offline (Local Storage Active)'}\n'
+    final tooltipMessage = 'Database Status: ${isOnline ? 'Online (SQLite & Cloud Connected)' : 'Offline (Local Storage Active)'}\n'
         'Last Synced: $lastSyncedStr\n'
-        'Queued Mutations: ${syncState.pendingQueueCount}\n'
-        'Tap to view details or force synchronize';
+        'Pending Changes: ${syncState.pendingQueueCount}\n'
+        'Click to view details or sync database';
 
     if (widget.compact) {
       return Tooltip(
         message: tooltipMessage,
         child: InkWell(
-          borderRadius: BorderRadius.circular(20),
+          borderRadius: BorderRadius.circular(8),
           onTap: () => _showSyncDetailsDialog(context, syncState, isDark),
           child: Container(
-            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
             decoration: BoxDecoration(
-              color: statusColor.withValues(alpha: isDark ? 0.15 : 0.08),
-              borderRadius: BorderRadius.circular(20),
+              color: isDark ? AppTheme.darkSurface : Colors.white,
+              borderRadius: BorderRadius.circular(8),
               border: Border.all(
-                color: statusColor.withValues(alpha: isDark ? 0.4 : 0.3),
+                color: isDark ? AppTheme.darkBorder : AppTheme.lightBorder,
                 width: 1,
               ),
             ),
@@ -310,7 +310,7 @@ class _OfflineSyncStatusPillState extends ConsumerState<OfflineSyncStatusPill>
                 if (isSyncing)
                   RotationTransition(
                     turns: _rotationController,
-                    child: Icon(Icons.sync, size: 13, color: statusColor),
+                    child: Icon(Icons.sync_rounded, size: 13, color: statusColor),
                   )
                 else
                   Container(
@@ -319,16 +319,9 @@ class _OfflineSyncStatusPillState extends ConsumerState<OfflineSyncStatusPill>
                     decoration: BoxDecoration(
                       shape: BoxShape.circle,
                       color: statusColor,
-                      boxShadow: [
-                        BoxShadow(
-                          color: statusColor.withValues(alpha: 0.5),
-                          blurRadius: 4,
-                          spreadRadius: 1,
-                        ),
-                      ],
                     ),
                   ),
-                const SizedBox(width: 5),
+                const SizedBox(width: 6),
                 Text(
                   isSyncing
                       ? 'Syncing'
@@ -337,8 +330,8 @@ class _OfflineSyncStatusPillState extends ConsumerState<OfflineSyncStatusPill>
                           : 'Offline',
                   style: TextStyle(
                     fontSize: 11,
-                    fontWeight: FontWeight.bold,
-                    color: statusColor,
+                    fontWeight: FontWeight.w600,
+                    color: isDark ? AppTheme.darkText : AppTheme.lightText,
                   ),
                 ),
               ],
@@ -354,15 +347,15 @@ class _OfflineSyncStatusPillState extends ConsumerState<OfflineSyncStatusPill>
         padding: const EdgeInsets.fromLTRB(10, 4, 6, 4),
         decoration: BoxDecoration(
           color: isDark ? AppTheme.darkSurface : Colors.white,
-          borderRadius: BorderRadius.circular(10),
+          borderRadius: BorderRadius.circular(8),
           border: Border.all(
-            color: statusColor.withValues(alpha: isDark ? 0.35 : 0.25),
+            color: isDark ? AppTheme.darkBorder : AppTheme.lightBorder,
             width: 1,
           ),
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withValues(alpha: isDark ? 0.15 : 0.03),
-              blurRadius: 4,
+              color: Colors.black.withValues(alpha: isDark ? 0.12 : 0.02),
+              blurRadius: 2,
               offset: const Offset(0, 1),
             ),
           ],
@@ -379,22 +372,15 @@ class _OfflineSyncStatusPillState extends ConsumerState<OfflineSyncStatusPill>
             else
               InkWell(
                 onTap: () => _showSyncDetailsDialog(context, syncState, isDark),
-                borderRadius: BorderRadius.circular(10),
+                borderRadius: BorderRadius.circular(8),
                 child: Padding(
                   padding: const EdgeInsets.all(2.0),
                   child: Container(
-                    width: 8,
-                    height: 8,
+                    width: 7,
+                    height: 7,
                     decoration: BoxDecoration(
                       shape: BoxShape.circle,
                       color: statusColor,
-                      boxShadow: [
-                        BoxShadow(
-                          color: statusColor.withValues(alpha: 0.6),
-                          blurRadius: 5,
-                          spreadRadius: 1,
-                        ),
-                      ],
                     ),
                   ),
                 ),
@@ -409,25 +395,19 @@ class _OfflineSyncStatusPillState extends ConsumerState<OfflineSyncStatusPill>
                 crossAxisAlignment: CrossAxisAlignment.start,
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Text(
-                        statusLabel,
-                        style: TextStyle(
-                          fontSize: 11.5,
-                          fontWeight: FontWeight.bold,
-                          color: statusColor,
-                          letterSpacing: 0.1,
-                        ),
-                      ),
-                    ],
+                  Text(
+                    statusLabel,
+                    style: TextStyle(
+                      fontSize: 11.5,
+                      fontWeight: FontWeight.w600,
+                      color: isDark ? AppTheme.darkText : AppTheme.lightText,
+                    ),
                   ),
                   Text(
                     'Synced $lastSyncedStr',
                     style: TextStyle(
                       fontSize: 9.5,
-                      fontWeight: FontWeight.w500,
+                      fontWeight: FontWeight.w400,
                       color: isDark ? AppTheme.darkTextMuted : AppTheme.lightTextMuted,
                     ),
                   ),
@@ -443,12 +423,12 @@ class _OfflineSyncStatusPillState extends ConsumerState<OfflineSyncStatusPill>
                 borderRadius: BorderRadius.circular(6),
                 onTap: isSyncing ? null : _triggerManualSync,
                 child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
+                  padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 4),
                   decoration: BoxDecoration(
-                    color: statusColor.withValues(alpha: isDark ? 0.12 : 0.08),
+                    color: isDark ? AppTheme.darkSurfaceLight : const Color(0xFFF1F5F9),
                     borderRadius: BorderRadius.circular(6),
                     border: Border.all(
-                      color: statusColor.withValues(alpha: 0.2),
+                      color: isDark ? AppTheme.darkBorder : AppTheme.lightBorder,
                       width: 1,
                     ),
                   ),
@@ -457,16 +437,16 @@ class _OfflineSyncStatusPillState extends ConsumerState<OfflineSyncStatusPill>
                     children: [
                       Icon(
                         Icons.sync_rounded,
-                        size: 13,
-                        color: statusColor,
+                        size: 12,
+                        color: isDark ? AppTheme.darkTextSecondary : AppTheme.lightTextSecondary,
                       ),
                       const SizedBox(width: 4),
                       Text(
                         'Sync Now',
                         style: TextStyle(
                           fontSize: 10.5,
-                          fontWeight: FontWeight.bold,
-                          color: statusColor,
+                          fontWeight: FontWeight.w600,
+                          color: isDark ? AppTheme.darkText : AppTheme.lightText,
                         ),
                       ),
                     ],

@@ -413,7 +413,14 @@ class _TeacherDashboardScreenState extends ConsumerState<TeacherDashboardScreen>
                 ),
                 const SizedBox(height: 20),
 
-                // Collapsible & Filterable Performance Analytics Section
+                // 1. Today's Class Schedule Banner (Time-sensitive daily operational context)
+                const TodayScheduleBanner(),
+
+                // 2. ESP32 Offline Learning Hub Management Card (Hardware sync for offline teaching)
+                _buildEsp32HubCard(context, teacherName, currentUser?.section),
+                const SizedBox(height: 20),
+
+                // 3. Collapsible & Filterable Performance Analytics Section
                 _buildAnalyticsSection(
                   isDesktop: isDesktop,
                   totalSubjects: totalSubjects,
@@ -425,14 +432,6 @@ class _TeacherDashboardScreenState extends ConsumerState<TeacherDashboardScreen>
                   handledSections: handledSections,
                   allStudents: allStudents,
                 ),
-                const SizedBox(height: 20),
-
-                // Today's Class Schedule Banner
-                const TodayScheduleBanner(),
-                const SizedBox(height: 20),
-
-                // ESP32 Offline Learning Hub Management Card
-                _buildEsp32HubCard(context, teacherName, currentUser?.section),
                 const SizedBox(height: 24),
 
                 // Responsive Area: 2 Columns on Desktop, 1 Column on Mobile
@@ -484,7 +483,7 @@ class _TeacherDashboardScreenState extends ConsumerState<TeacherDashboardScreen>
                       _buildAssignedSubjectsSection(context, subjects),
                     ],
                   ),
-                const SizedBox(height: 100),
+                const SizedBox(height: 110),
               ],
             ),
           ),
@@ -510,93 +509,199 @@ class _TeacherDashboardScreenState extends ConsumerState<TeacherDashboardScreen>
           ),
         ],
       ),
-      child: Row(
-        children: [
-          Container(
-            padding: const EdgeInsets.all(12),
-            decoration: BoxDecoration(
-              color: AppTheme.primary.withValues(alpha: 0.15),
-              borderRadius: BorderRadius.circular(12),
-            ),
-            child: Icon(Icons.router, color: AppTheme.primary, size: 28),
-          ),
-          const SizedBox(width: 14),
-          Expanded(
-            child: Column(
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          final isCompact = constraints.maxWidth < 560;
+
+          if (isCompact) {
+            return Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Wrap(
-                  crossAxisAlignment: WrapCrossAlignment.center,
-                  spacing: 8,
-                  runSpacing: 4,
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.center,
                   children: [
-                    Text(
-                      'ESP32 Offline Learning Hub',
-                      style: TextStyle(
-                        fontSize: 15,
-                        fontWeight: FontWeight.bold,
-                        color: AppTheme.text,
-                      ),
-                    ),
                     Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                      padding: const EdgeInsets.all(10),
                       decoration: BoxDecoration(
-                        color: AppTheme.success.withValues(alpha: 0.15),
-                        borderRadius: BorderRadius.circular(4),
+                        color: AppTheme.primary.withValues(alpha: 0.15),
+                        borderRadius: BorderRadius.circular(10),
                       ),
-                      child: Text(
-                        'DevKit Ready',
-                        style: TextStyle(
-                          color: AppTheme.success,
-                          fontSize: 10,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
+                      child: Icon(Icons.router, color: AppTheme.primary, size: 24),
                     ),
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                      decoration: BoxDecoration(
-                        color: AppTheme.warning.withValues(alpha: 0.15),
-                        borderRadius: BorderRadius.circular(4),
-                      ),
-                      child: Text(
-                        'MicroSD: Pending',
-                        style: TextStyle(
-                          color: AppTheme.warning,
-                          fontSize: 10,
-                          fontWeight: FontWeight.bold,
-                        ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'ESP32 Offline Learning Hub',
+                            style: TextStyle(
+                              fontSize: 15,
+                              fontWeight: FontWeight.bold,
+                              color: AppTheme.text,
+                            ),
+                          ),
+                          const SizedBox(height: 4),
+                          Wrap(
+                            spacing: 6,
+                            runSpacing: 4,
+                            children: [
+                              Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                decoration: BoxDecoration(
+                                  color: AppTheme.success.withValues(alpha: 0.15),
+                                  borderRadius: BorderRadius.circular(4),
+                                ),
+                                child: Text(
+                                  'DevKit Ready',
+                                  style: TextStyle(
+                                    color: AppTheme.success,
+                                    fontSize: 10,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
+                              ),
+                              Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                decoration: BoxDecoration(
+                                  color: AppTheme.warning.withValues(alpha: 0.15),
+                                  borderRadius: BorderRadius.circular(4),
+                                ),
+                                child: Text(
+                                  'MicroSD: Pending',
+                                  style: TextStyle(
+                                    color: AppTheme.warning,
+                                    fontSize: 10,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ],
                       ),
                     ),
                   ],
                 ),
-                const SizedBox(height: 4),
+                const SizedBox(height: 10),
                 Text(
                   'Package & upload modules to your ESP32 station so students can download and study offline without internet.',
                   style: TextStyle(fontSize: 12, color: AppTheme.textSecondary),
                 ),
+                const SizedBox(height: 14),
+                SizedBox(
+                  width: double.infinity,
+                  child: ElevatedButton.icon(
+                    onPressed: () {
+                      TeacherEsp32HubModal.show(
+                        context,
+                        teacherName: teacherName,
+                        initialSection: defaultSection,
+                      );
+                    },
+                    icon: const Icon(Icons.cloud_upload_outlined, size: 16),
+                    label: const Text('Manage Hub'),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: AppTheme.primary,
+                      foregroundColor: Colors.white,
+                      padding: const EdgeInsets.symmetric(vertical: 11),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                    ),
+                  ),
+                ),
               ],
-            ),
-          ),
-          const SizedBox(width: 12),
-          ElevatedButton.icon(
-            onPressed: () {
-              TeacherEsp32HubModal.show(
-                context,
-                teacherName: teacherName,
-                initialSection: defaultSection,
-              );
-            },
-            icon: const Icon(Icons.cloud_upload_outlined, size: 16),
-            label: const Text('Manage Hub'),
-            style: ElevatedButton.styleFrom(
-              backgroundColor: AppTheme.primary,
-              foregroundColor: Colors.white,
-              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-            ),
-          ),
-        ],
+            );
+          }
+
+          return Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: AppTheme.primary.withValues(alpha: 0.15),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Icon(Icons.router, color: AppTheme.primary, size: 28),
+              ),
+              const SizedBox(width: 14),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Wrap(
+                      crossAxisAlignment: WrapCrossAlignment.center,
+                      spacing: 8,
+                      runSpacing: 4,
+                      children: [
+                        Text(
+                          'ESP32 Offline Learning Hub',
+                          style: TextStyle(
+                            fontSize: 15,
+                            fontWeight: FontWeight.bold,
+                            color: AppTheme.text,
+                          ),
+                        ),
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                          decoration: BoxDecoration(
+                            color: AppTheme.success.withValues(alpha: 0.15),
+                            borderRadius: BorderRadius.circular(4),
+                          ),
+                          child: Text(
+                            'DevKit Ready',
+                            style: TextStyle(
+                              color: AppTheme.success,
+                              fontSize: 10,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                        ),
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                          decoration: BoxDecoration(
+                            color: AppTheme.warning.withValues(alpha: 0.15),
+                            borderRadius: BorderRadius.circular(4),
+                          ),
+                          child: Text(
+                            'MicroSD: Pending',
+                            style: TextStyle(
+                              color: AppTheme.warning,
+                              fontSize: 10,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      'Package & upload modules to your ESP32 station so students can download and study offline without internet.',
+                      style: TextStyle(fontSize: 12, color: AppTheme.textSecondary),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(width: 12),
+              ElevatedButton.icon(
+                onPressed: () {
+                  TeacherEsp32HubModal.show(
+                    context,
+                    teacherName: teacherName,
+                    initialSection: defaultSection,
+                  );
+                },
+                icon: const Icon(Icons.cloud_upload_outlined, size: 16),
+                label: const Text('Manage Hub'),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AppTheme.primary,
+                  foregroundColor: Colors.white,
+                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                ),
+              ),
+            ],
+          );
+        },
       ),
     );
   }
@@ -940,7 +1045,7 @@ class _TeacherDashboardScreenState extends ConsumerState<TeacherDashboardScreen>
                       children: [
                         Flexible(
                           child: Text(
-                            'Performance & Analytics',
+                            'Class Performance',
                             style: TextStyle(
                               fontSize: 15,
                               fontWeight: FontWeight.bold,
@@ -1068,7 +1173,7 @@ class _TeacherDashboardScreenState extends ConsumerState<TeacherDashboardScreen>
                       children: [
                         Flexible(
                           child: Text(
-                            'Performance & Analytics',
+                            'Class Performance',
                             style: TextStyle(
                               fontSize: 15,
                               fontWeight: FontWeight.bold,
@@ -1108,25 +1213,27 @@ class _TeacherDashboardScreenState extends ConsumerState<TeacherDashboardScreen>
               ),
               const SizedBox(width: 8),
 
-              // View Mode Switcher: Cards, Donut, Gauge
-              Container(
-                padding: const EdgeInsets.all(2),
-                decoration: BoxDecoration(
-                  color: isDark ? AppTheme.darkSurfaceLight : const Color(0xFFF1F5F9),
-                  borderRadius: BorderRadius.circular(10),
-                  border: Border.all(color: AppTheme.border.withValues(alpha: 0.5)),
+              // View Mode Switcher: Cards, Donut, Gauge (Desktop only in header)
+              if (isDesktop) ...[
+                Container(
+                  padding: const EdgeInsets.all(2),
+                  decoration: BoxDecoration(
+                    color: isDark ? AppTheme.darkSurfaceLight : const Color(0xFFF1F5F9),
+                    borderRadius: BorderRadius.circular(10),
+                    border: Border.all(color: AppTheme.border.withValues(alpha: 0.5)),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      _buildAnalyticsViewModeBtn(0, Icons.grid_view_rounded, 'Cards View'),
+                      _buildAnalyticsViewModeBtn(1, Icons.pie_chart_rounded, 'Donut Breakdown'),
+                      _buildAnalyticsViewModeBtn(2, Icons.trending_up_rounded, 'Performance Mastery'),
+                      _buildAnalyticsViewModeBtn(3, Icons.grid_on_rounded, 'LO Heatmap Matrix'),
+                    ],
+                  ),
                 ),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    _buildAnalyticsViewModeBtn(0, Icons.grid_view_rounded, 'Cards View'),
-                    _buildAnalyticsViewModeBtn(1, Icons.pie_chart_rounded, 'Donut Breakdown'),
-                    _buildAnalyticsViewModeBtn(2, Icons.trending_up_rounded, 'Performance Mastery'),
-                    _buildAnalyticsViewModeBtn(3, Icons.grid_on_rounded, 'LO Heatmap Matrix'),
-                  ],
-                ),
-              ),
-              const SizedBox(width: 6),
+                const SizedBox(width: 6),
+              ],
 
               Tooltip(
                 message: 'Hide Analytics',
@@ -1163,6 +1270,28 @@ class _TeacherDashboardScreenState extends ConsumerState<TeacherDashboardScreen>
               ),
             ],
           ),
+
+          // On mobile, render the view switcher as a clean segmented pill bar below the title
+          if (!isDesktop) ...[
+            const SizedBox(height: 12),
+            Container(
+              height: 38,
+              padding: const EdgeInsets.all(3),
+              decoration: BoxDecoration(
+                color: isDark ? AppTheme.darkSurfaceLight : const Color(0xFFF1F5F9),
+                borderRadius: BorderRadius.circular(10),
+                border: Border.all(color: AppTheme.border.withValues(alpha: 0.5)),
+              ),
+              child: Row(
+                children: [
+                  _buildMobileViewSegment(0, Icons.grid_view_rounded, 'Cards'),
+                  _buildMobileViewSegment(1, Icons.pie_chart_rounded, 'Donut'),
+                  _buildMobileViewSegment(2, Icons.trending_up_rounded, 'Mastery'),
+                  _buildMobileViewSegment(3, Icons.grid_on_rounded, 'Heatmap'),
+                ],
+              ),
+            ),
+          ],
           const SizedBox(height: 14),
 
           // Filters: Section Dropdown & Student Dropdown
@@ -1456,7 +1585,59 @@ class _TeacherDashboardScreenState extends ConsumerState<TeacherDashboardScreen>
           child: Icon(
             icon,
             size: 15,
-            color: isSelected ? Colors.black : AppTheme.textMuted,
+            color: isSelected ? Colors.white : AppTheme.textMuted,
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildMobileViewSegment(int index, IconData icon, String label) {
+    final isSelected = _analyticsViewIndex == index;
+    final primary = Theme.of(context).colorScheme.primary;
+    return Expanded(
+      child: InkWell(
+        borderRadius: BorderRadius.circular(8),
+        onTap: () {
+          HapticFeedback.lightImpact();
+          setState(() => _analyticsViewIndex = index);
+          _saveAnalyticsPreferences();
+        },
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 180),
+          alignment: Alignment.center,
+          decoration: BoxDecoration(
+            color: isSelected ? primary : Colors.transparent,
+            borderRadius: BorderRadius.circular(8),
+            boxShadow: isSelected
+                ? [
+                    BoxShadow(
+                      color: primary.withValues(alpha: 0.25),
+                      blurRadius: 4,
+                      offset: const Offset(0, 1),
+                    ),
+                  ]
+                : null,
+          ),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(
+                icon,
+                size: 14,
+                color: isSelected ? Colors.white : AppTheme.textSecondary,
+              ),
+              const SizedBox(width: 4),
+              Text(
+                label,
+                style: TextStyle(
+                  fontSize: 11,
+                  fontWeight: isSelected ? FontWeight.bold : FontWeight.w500,
+                  color: isSelected ? Colors.white : AppTheme.textSecondary,
+                ),
+              ),
+            ],
           ),
         ),
       ),

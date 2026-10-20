@@ -20,7 +20,7 @@ import '../features/admin/presentation/subjects_mgmt_screen.dart';
 import '../features/admin/presentation/subject_detail_screen.dart';
 import '../features/admin/presentation/sections_mgmt_screen.dart';
 import '../features/admin/presentation/scores_screen.dart';
-import '../features/admin/presentation/admin_management_screen.dart';
+import '../features/super_admin/presentation/super_admin_portal_screen.dart';
 import '../features/admin/presentation/web/admin_web_scaffold.dart';
 import '../features/admin/presentation/web/admin_web_analytics_view.dart';
 import '../features/admin/presentation/web/admin_web_students_screen.dart';
@@ -78,13 +78,15 @@ final routerProvider = Provider<GoRouter>((ref) {
   final initialAuth = ref.read(authProvider);
   final initialLoc = (initialAuth != null && initialAuth.mustChangePassword)
       ? (initialAuth.role == 'teacher' ? '/teacher/profile' : '/student/profile')
-      : (initialAuth != null && (initialAuth.role == 'admin' || initialAuth.role == 'super_admin'))
-          ? '/admin/dashboard'
-          : (initialAuth != null && initialAuth.role == 'teacher'
-              ? '/teacher/dashboard'
-              : (initialAuth != null
-                  ? '/student/home'
-                  : (kIsWeb ? '/' : '/login')));
+      : (initialAuth != null && initialAuth.role == 'super_admin')
+          ? '/super-admin'
+          : (initialAuth != null && initialAuth.role == 'admin')
+              ? '/admin/dashboard'
+              : (initialAuth != null && initialAuth.role == 'teacher'
+                  ? '/teacher/dashboard'
+                  : (initialAuth != null
+                      ? '/student/home'
+                      : (kIsWeb ? '/' : '/login')));
 
   return GoRouter(
     navigatorKey: rootNavigatorKey,
@@ -102,6 +104,10 @@ final routerProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: '/admin/login',
         redirect: (context, state) => '/login?role=admin',
+      ),
+      GoRoute(
+        path: '/super-admin/login',
+        redirect: (context, state) => '/login?role=super_admin',
       ),
       GoRoute(
         path: '/teacher/login',
@@ -433,11 +439,15 @@ final routerProvider = Provider<GoRouter>((ref) {
         ),
       ),
       GoRoute(
-        path: '/admin/admin-management',
-        pageBuilder: (context, state) => AppPageTransitions.page(
+        path: '/super-admin',
+        pageBuilder: (context, state) => AppPageTransitions.fadeThrough(
           key: state.pageKey,
-          child: const AdminManagementScreen(),
+          child: const SuperAdminPortalScreen(),
         ),
+      ),
+      GoRoute(
+        path: '/admin/admin-management',
+        redirect: (context, state) => '/super-admin',
       ),
       // Shared Routes & Activity Screens
       GoRoute(
@@ -523,7 +533,7 @@ final routerProvider = Provider<GoRouter>((ref) {
         if (isAuth && (authState.role == 'admin' || authState.role == 'super_admin')) {
           return '/login';
         }
-        if (matched.startsWith('/admin')) {
+        if (matched.startsWith('/admin') || matched.startsWith('/super-admin')) {
           return '/login';
         }
       }
@@ -540,16 +550,18 @@ final routerProvider = Provider<GoRouter>((ref) {
 
       // 1. Unauthenticated user trying to access protected route
       if (!isAuth && !isPublicRoute) {
-        if (kIsWeb && matched.startsWith('/admin')) {
-          return '/login';
+        if (kIsWeb && (matched.startsWith('/admin') || matched.startsWith('/super-admin'))) {
+          return matched.startsWith('/super-admin') ? '/login?role=super_admin' : '/login';
         }
         return kIsWeb ? '/' : '/login';
       }
 
       // 2. On Web, visiting generic login routes to appropriate portal
-      if (kIsWeb && (matched == '/login' || matched == '/student/login' || matched == '/teacher/login' || matched == '/admin/login')) {
+      if (kIsWeb && (matched == '/login' || matched == '/student/login' || matched == '/teacher/login' || matched == '/admin/login' || matched == '/super-admin/login')) {
         if (!isAuth) return null;
-        if (authState.role == 'admin' || authState.role == 'super_admin') {
+        if (authState.role == 'super_admin') {
+          return '/super-admin';
+        } else if (authState.role == 'admin') {
           return '/admin/dashboard';
         } else if (authState.role == 'teacher') {
           return '/teacher/dashboard';
@@ -559,12 +571,15 @@ final routerProvider = Provider<GoRouter>((ref) {
 
       // 3. Authenticated user visiting landing page '/' or login routes
       if (isAuth) {
-        final isAdmin = authState.role == 'admin' || authState.role == 'super_admin';
+        final isSuperAdmin = authState.role == 'super_admin';
+        final isAdmin = authState.role == 'admin';
         final isTeacher = authState.role == 'teacher';
 
         // When authenticated, visiting '/' automatically routes to the appropriate portal
         if (matched == '/') {
-          if (isAdmin) {
+          if (isSuperAdmin) {
+            return '/super-admin';
+          } else if (isAdmin) {
             return '/admin/dashboard';
           } else if (isTeacher) {
             return '/teacher/dashboard';
@@ -575,6 +590,7 @@ final routerProvider = Provider<GoRouter>((ref) {
 
         final isLoginRoute = matched == '/login' ||
             matched == '/admin/login' ||
+            matched == '/super-admin/login' ||
             matched == '/teacher/login' ||
             matched == '/student/login' ||
             matched == '/signup' ||
@@ -582,7 +598,9 @@ final routerProvider = Provider<GoRouter>((ref) {
             matched == '/forgot-password';
 
         if (isLoginRoute) {
-          if (isAdmin) {
+          if (isSuperAdmin) {
+            return '/super-admin';
+          } else if (isAdmin) {
             return '/admin/dashboard';
           } else if (isTeacher) {
             return '/teacher/dashboard';
@@ -595,20 +613,26 @@ final routerProvider = Provider<GoRouter>((ref) {
       // 4. Role-based Route Guard
       if (isAuth) {
         final isSuperAdmin = authState.role == 'super_admin';
-        final isAdmin = authState.role == 'admin' || isSuperAdmin;
+        final isAdmin = authState.role == 'admin';
         final isTeacher = authState.role == 'teacher';
         final isStudent = authState.role == 'student';
 
-        // Super Admin Guard: Only super_admin can access the Super Admin Console
-        if (matched.startsWith('/admin/admin-management') && !isSuperAdmin) {
+        // Super Admin Guard: Only super_admin can access the Super Admin Portal
+        if (matched.startsWith('/super-admin') && !isSuperAdmin) {
+          return isAdmin ? '/admin/dashboard' : (isTeacher ? '/teacher/dashboard' : '/student/home');
+        }
+
+        // Backward compatibility redirect
+        if (matched.startsWith('/admin/admin-management')) {
+          return isSuperAdmin ? '/super-admin' : '/admin/dashboard';
+        }
+
+        // Regular campus admin cannot access student or teacher portal
+        if (isAdmin && (matched.startsWith('/student') || matched.startsWith('/teacher') || matched.startsWith('/super-admin'))) {
           return '/admin/dashboard';
         }
 
-        if (isAdmin && (matched.startsWith('/student') || matched.startsWith('/teacher'))) {
-          return '/admin/dashboard';
-        }
-
-        if (!isAdmin && matched.startsWith('/admin') && matched != '/admin/login') {
+        if (!isAdmin && !isSuperAdmin && matched.startsWith('/admin') && matched != '/admin/login') {
           return isTeacher ? '/teacher/dashboard' : '/student/home';
         }
 

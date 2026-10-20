@@ -268,6 +268,9 @@ class _AdminWebScaffoldState extends ConsumerState<AdminWebScaffold> {
                     children: [
                       // Top Navigation Bar (Stretches full width, pushing theme toggle and role badge to far right)
                       _buildTopBar(context, isDark, currentUser, isDesktop, constraints.maxWidth),
+                      // Super Admin Campus Oversight Notification Banner
+                      if (currentUser?.role == 'super_admin')
+                        _buildSuperAdminInspectBanner(context),
                       // Main View Content
                       Expanded(
                         child: AppBranchTransition(
@@ -408,22 +411,50 @@ class _AdminWebScaffoldState extends ConsumerState<AdminWebScaffold> {
           ),
           const SizedBox(width: 12),
 
+          // Return to Super Admin Hub (Only shown when Super Admin is inspecting campus)
+          if (currentUser?.role == 'super_admin') ...[
+            ElevatedButton.icon(
+              onPressed: () => context.go('/super-admin'),
+              icon: const Icon(Icons.shield_rounded, size: 14),
+              label: const Text('Super Admin Hub'),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: const Color(0xFF7C3AED),
+                foregroundColor: Colors.white,
+                elevation: 0,
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                minimumSize: const Size(0, 32),
+                textStyle: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+              ),
+            ),
+            const SizedBox(width: 12),
+          ],
+
           // Role Badge
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
             decoration: BoxDecoration(
-              color: AppTheme.primary.withValues(alpha: 0.12),
+              color: isDark ? AppTheme.darkSurfaceLight : const Color(0xFFF1F5F9),
               borderRadius: BorderRadius.circular(8),
-              border: Border.all(color: AppTheme.primary.withValues(alpha: 0.3)),
+              border: Border.all(color: isDark ? AppTheme.darkBorder : AppTheme.lightBorder),
             ),
             child: Row(
               mainAxisSize: MainAxisSize.min,
               children: [
-                Icon(Icons.verified_user, size: 14, color: AppTheme.primary),
+                Icon(
+                  Icons.admin_panel_settings_outlined,
+                  size: 14,
+                  color: isDark ? AppTheme.darkTextSecondary : AppTheme.lightTextSecondary,
+                ),
                 const SizedBox(width: 6),
                 Text(
                   currentUser?.role == 'super_admin' ? 'SUPER ADMIN' : 'ADMINISTRATOR',
-                  style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: AppTheme.primary, letterSpacing: 0.5),
+                  style: TextStyle(
+                    fontSize: 11.5,
+                    fontWeight: FontWeight.w600,
+                    letterSpacing: 0.6,
+                    color: isDark ? AppTheme.darkText : AppTheme.lightText,
+                  ),
                 ),
               ],
             ),
@@ -437,30 +468,44 @@ class _AdminWebScaffoldState extends ConsumerState<AdminWebScaffold> {
     final schools = ref.watch(schoolsListProvider);
     final selectedSchoolId = ref.watch(superAdminSelectedSchoolProvider);
     final isSuperAdmin = currentUser?.role == 'super_admin';
+    final isDark = Theme.of(context).brightness == Brightness.dark;
 
     if (!isSuperAdmin) {
       final userSchoolId = currentUser?.schoolId ?? 'sch_main';
       final matchedSchool = schools.firstWhere(
         (s) => s['id'] == userSchoolId,
-        orElse: () => {'name': 'Default Campus', 'code': 'ADM-01'},
+        orElse: () => {'name': 'Main Campus', 'code': 'ADM-01'},
       );
-      return Container(
-        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-        decoration: BoxDecoration(
-          color: AppTheme.background,
-          borderRadius: BorderRadius.circular(8),
-          border: Border.all(color: AppTheme.border),
-        ),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(Icons.account_balance_outlined, size: 14, color: AppTheme.textSecondary),
-            const SizedBox(width: 6),
-            Text(
-              '${matchedSchool['code']}',
-              style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: AppTheme.text),
-            ),
-          ],
+      final schoolDisplayName = matchedSchool['code'] != null && matchedSchool['code'].toString().isNotEmpty
+          ? '${matchedSchool['code']}'
+          : 'ADM-01';
+
+      return Tooltip(
+        message: matchedSchool['name'] != null && matchedSchool['name'].toString().isNotEmpty
+            ? '${matchedSchool['name']} (${matchedSchool['code']})'
+            : 'School Campus',
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+          decoration: BoxDecoration(
+            color: isDark ? AppTheme.darkSurfaceLight : const Color(0xFFF1F5F9),
+            borderRadius: BorderRadius.circular(8),
+            border: Border.all(color: isDark ? AppTheme.darkBorder : AppTheme.lightBorder),
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(Icons.school_outlined, size: 14, color: isDark ? AppTheme.darkTextSecondary : AppTheme.lightTextSecondary),
+              const SizedBox(width: 6),
+              Text(
+                schoolDisplayName,
+                style: TextStyle(
+                  fontSize: 11.5,
+                  fontWeight: FontWeight.w600,
+                  color: isDark ? AppTheme.darkText : AppTheme.lightText,
+                ),
+              ),
+            ],
+          ),
         ),
       );
     }
@@ -512,10 +557,10 @@ class _AdminWebScaffoldState extends ConsumerState<AdminWebScaffold> {
               value: sId,
               child: Row(
                 children: [
-                  Icon(
+                    Icon(
                     Icons.account_balance_rounded,
                     size: 16,
-                    color: isSelected ? Colors.teal : AppTheme.textSecondary,
+                    color: isSelected ? AppTheme.primary : AppTheme.textSecondary,
                   ),
                   const SizedBox(width: 10),
                   Expanded(
@@ -524,7 +569,7 @@ class _AdminWebScaffoldState extends ConsumerState<AdminWebScaffold> {
                       style: TextStyle(
                         fontSize: 13,
                         fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
-                        color: isSelected ? Colors.teal : AppTheme.text,
+                        color: isSelected ? AppTheme.primary : AppTheme.text,
                       ),
                       overflow: TextOverflow.ellipsis,
                     ),
@@ -540,12 +585,12 @@ class _AdminWebScaffoldState extends ConsumerState<AdminWebScaffold> {
         decoration: BoxDecoration(
           color: selectedSchoolId == null
               ? AppTheme.background
-              : Colors.teal.withValues(alpha: 0.1),
+              : AppTheme.primary.withValues(alpha: 0.08),
           borderRadius: BorderRadius.circular(8),
           border: Border.all(
             color: selectedSchoolId == null
                 ? AppTheme.border
-                : Colors.teal.withValues(alpha: 0.4),
+                : AppTheme.primary.withValues(alpha: 0.25),
           ),
         ),
         child: Row(
@@ -554,7 +599,7 @@ class _AdminWebScaffoldState extends ConsumerState<AdminWebScaffold> {
             Icon(
               selectedSchoolId == null ? Icons.public_rounded : Icons.account_balance_rounded,
               size: 14,
-              color: selectedSchoolId == null ? AppTheme.textSecondary : Colors.teal,
+              color: selectedSchoolId == null ? AppTheme.textSecondary : AppTheme.primary,
             ),
             const SizedBox(width: 6),
             Text(
@@ -562,7 +607,7 @@ class _AdminWebScaffoldState extends ConsumerState<AdminWebScaffold> {
               style: TextStyle(
                 fontSize: 11,
                 fontWeight: FontWeight.bold,
-                color: selectedSchoolId == null ? AppTheme.text : Colors.teal,
+                color: selectedSchoolId == null ? AppTheme.text : AppTheme.primary,
               ),
             ),
             const SizedBox(width: 4),
@@ -600,18 +645,11 @@ class _AdminWebScaffoldState extends ConsumerState<AdminWebScaffold> {
                 decoration: BoxDecoration(
                   color: AppTheme.primary,
                   borderRadius: BorderRadius.circular(8),
-                  boxShadow: [
-                    BoxShadow(
-                      color: AppTheme.primary.withValues(alpha: 0.25),
-                      blurRadius: 6,
-                      offset: const Offset(0, 2),
-                    ),
-                  ],
                 ),
                 alignment: Alignment.center,
                 child: const Text(
                   'A',
-                  style: TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.bold),
+                  style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold),
                 ),
               ),
               const SizedBox(width: 14),
@@ -624,13 +662,13 @@ class _AdminWebScaffoldState extends ConsumerState<AdminWebScaffold> {
                     children: [
                       Text(
                         'AIRAMP',
-                        style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: AppTheme.text, letterSpacing: 1),
+                        style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: AppTheme.text, letterSpacing: 0.5),
                         maxLines: 1,
                         overflow: TextOverflow.clip,
                       ),
                       Text(
                         'Web Admin Portal',
-                        style: TextStyle(fontSize: 11, color: AppTheme.primary, fontWeight: FontWeight.w600),
+                        style: TextStyle(fontSize: 11, color: AppTheme.textMuted, fontWeight: FontWeight.w500),
                         maxLines: 1,
                         overflow: TextOverflow.clip,
                       ),
@@ -655,7 +693,7 @@ class _AdminWebScaffoldState extends ConsumerState<AdminWebScaffold> {
                     children: [
                       // ── Navigation Items ──
                       Padding(
-                        padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 10),
+                        padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 10),
                         child: Column(
                           children: List.generate(_navItems.length, (index) {
                             final item = _navItems[index];
@@ -666,14 +704,16 @@ class _AdminWebScaffoldState extends ConsumerState<AdminWebScaffold> {
                                 if (isDrawer) Navigator.pop(context);
                                 _onSelectTab(index);
                               },
-                              borderRadius: BorderRadius.circular(12),
+                              borderRadius: BorderRadius.circular(8),
                               child: Container(
-                                height: 46,
+                                height: 42,
                                 decoration: BoxDecoration(
-                                  color: isSelected ? AppTheme.primary.withValues(alpha: 0.15) : Colors.transparent,
-                                  borderRadius: BorderRadius.circular(12),
+                                  color: isSelected
+                                      ? (isDark ? AppTheme.darkSurfaceLight : const Color(0xFFF1F5F9))
+                                      : Colors.transparent,
+                                  borderRadius: BorderRadius.circular(8),
                                   border: isSelected
-                                      ? Border.all(color: AppTheme.primary.withValues(alpha: 0.4))
+                                      ? Border.all(color: isDark ? AppTheme.darkBorder : const Color(0xFFE2E8F0))
                                       : Border.all(color: Colors.transparent),
                                 ),
                                 child: Row(
@@ -684,40 +724,26 @@ class _AdminWebScaffoldState extends ConsumerState<AdminWebScaffold> {
                                       child: Center(
                                         child: Icon(
                                           isSelected ? item.activeIcon : item.icon,
-                                          color: isSelected ? AppTheme.primary : AppTheme.textSecondary,
-                                          size: 22,
+                                          color: isSelected
+                                              ? (isDark ? AppTheme.primaryLight : AppTheme.primary)
+                                              : AppTheme.textSecondary,
+                                          size: 20,
                                         ),
                                       ),
                                     ),
-                                    // Label & Selection Indicator Dot
+                                    // Label
                                     Expanded(
                                       child: Opacity(
                                         opacity: isCollapsed ? 0.0 : 1.0,
-                                        child: Row(
-                                          children: [
-                                            Expanded(
-                                              child: Text(
-                                                item.label,
-                                                style: TextStyle(
-                                                  fontSize: 13,
-                                                  fontWeight: isSelected ? FontWeight.bold : FontWeight.w500,
-                                                  color: isSelected ? AppTheme.text : AppTheme.textSecondary,
-                                                ),
-                                                maxLines: 1,
-                                                overflow: TextOverflow.ellipsis,
-                                              ),
-                                            ),
-                                            if (isSelected)
-                                              Container(
-                                                width: 6,
-                                                height: 6,
-                                                margin: const EdgeInsets.only(right: 14),
-                                                decoration: BoxDecoration(
-                                                  color: AppTheme.primary,
-                                                  shape: BoxShape.circle,
-                                                ),
-                                              ),
-                                          ],
+                                        child: Text(
+                                          item.label,
+                                          style: TextStyle(
+                                            fontSize: 13,
+                                            fontWeight: isSelected ? FontWeight.w600 : FontWeight.w400,
+                                            color: isSelected ? AppTheme.text : AppTheme.textSecondary,
+                                          ),
+                                          maxLines: 1,
+                                          overflow: TextOverflow.ellipsis,
                                         ),
                                       ),
                                     ),
@@ -751,45 +777,6 @@ class _AdminWebScaffoldState extends ConsumerState<AdminWebScaffold> {
                         child: Column(
                           mainAxisSize: MainAxisSize.min,
                           children: [
-                            // Super Admin Console Access for Super Admins
-                            if (currentUser?.role == 'super_admin') ...[
-                              InkWell(
-                                onTap: () => context.go('/admin/admin-management'),
-                                borderRadius: BorderRadius.circular(10),
-                                child: Container(
-                                  height: 40,
-                                  margin: const EdgeInsets.only(bottom: 10),
-                                  decoration: BoxDecoration(
-                                    color: isDark ? AppTheme.darkSurfaceLight : const Color(0xFFF1F5F9),
-                                    borderRadius: BorderRadius.circular(10),
-                                    border: Border.all(
-                                      color: isDark ? AppTheme.darkBorder : AppTheme.lightBorder,
-                                    ),
-                                  ),
-                                  child: isCollapsed
-                                      ? Tooltip(
-                                          message: 'Super Admin Console',
-                                          preferBelow: false,
-                                          waitDuration: const Duration(milliseconds: 250),
-                                          child: Center(
-                                            child: Icon(Icons.shield_outlined, size: 18, color: AppTheme.primary),
-                                          ),
-                                        )
-                                      : Row(
-                                          mainAxisAlignment: MainAxisAlignment.center,
-                                          children: [
-                                            Icon(Icons.shield_outlined, size: 16, color: AppTheme.primary),
-                                            const SizedBox(width: 8),
-                                            Text(
-                                              'Super Admin Console',
-                                              style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: AppTheme.text),
-                                            ),
-                                          ],
-                                        ),
-                                ),
-                              ),
-                            ],
-
                             // User Profile Section
                             Container(
                               height: 44,
@@ -939,6 +926,55 @@ class _AdminWebScaffoldState extends ConsumerState<AdminWebScaffold> {
               padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 10),
             ),
             child: const Text('Sign Out', style: TextStyle(fontWeight: FontWeight.bold)),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildSuperAdminInspectBanner(BuildContext context) {
+    final selectedSchoolId = ref.watch(superAdminSelectedSchoolProvider);
+    final schools = ref.watch(schoolsListProvider);
+    final currentSchool = schools.firstWhere(
+      (s) => s['id'] == selectedSchoolId,
+      orElse: () => {'name': 'All Campuses (Global View)', 'code': selectedSchoolId ?? 'GLOBAL'},
+    );
+
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 9),
+      decoration: const BoxDecoration(
+        gradient: LinearGradient(
+          colors: [Color(0xFF5B21B6), Color(0xFF2E1065)],
+          begin: Alignment.centerLeft,
+          end: Alignment.centerRight,
+        ),
+      ),
+      child: Row(
+        children: [
+          const Icon(Icons.shield_rounded, size: 16, color: Colors.amber),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Text(
+              'Super Admin Oversight: Currently inspecting campus [${currentSchool['name']} (${currentSchool['code']})]. Changes apply to this campus scope.',
+              style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.white),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+            ),
+          ),
+          const SizedBox(width: 12),
+          OutlinedButton.icon(
+            onPressed: () => context.go('/super-admin'),
+            icon: const Icon(Icons.arrow_back_rounded, size: 13),
+            label: const Text('Return to Super Admin Hub'),
+            style: OutlinedButton.styleFrom(
+              foregroundColor: Colors.white,
+              side: const BorderSide(color: Colors.white60),
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+              minimumSize: const Size(0, 30),
+              textStyle: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(6)),
+            ),
           ),
         ],
       ),

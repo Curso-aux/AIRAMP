@@ -217,7 +217,7 @@ class GlobalDashboardFilterBar extends ConsumerWidget {
 
               final gradeLevelDropdown = _buildDropdown(
                 context: context,
-                label: 'Department / Grade Level',
+                label: 'Department / Grade',
                 icon: Icons.school_outlined,
                 value: defaultGradeLevels.contains(effectiveGrade) ? effectiveGrade : defaultGradeLevels.first,
                 items: defaultGradeLevels,
@@ -235,7 +235,7 @@ class GlobalDashboardFilterBar extends ConsumerWidget {
 
               final subjectDropdown = _buildDropdown(
                 context: context,
-                label: 'Subject / Course',
+                label: 'Subject',
                 icon: Icons.menu_book_outlined,
                 value: subjectOptions.contains(effectiveSubject) ? effectiveSubject : 'All Subjects',
                 items: subjectOptions,
@@ -341,12 +341,16 @@ class GlobalDashboardFilterBar extends ConsumerWidget {
           children: [
             Icon(icon, size: 12, color: isDark ? AppTheme.darkTextMuted : AppTheme.lightTextMuted),
             const SizedBox(width: 4),
-            Text(
-              label,
-              style: TextStyle(
-                fontSize: 11,
-                fontWeight: FontWeight.w600,
-                color: isDark ? AppTheme.darkTextSecondary : AppTheme.lightTextSecondary,
+            Expanded(
+              child: Text(
+                label,
+                style: TextStyle(
+                  fontSize: 11,
+                  fontWeight: FontWeight.w600,
+                  color: isDark ? AppTheme.darkTextSecondary : AppTheme.lightTextSecondary,
+                ),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
               ),
             ),
           ],

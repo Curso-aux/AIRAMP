@@ -149,17 +149,17 @@ class AdminWebAnalyticsView extends ConsumerWidget {
                   builder: (context, constraints) {
                     final card1Subtitle = filter.hasActiveFilters
                         ? '$totalStudents Students matching filters'
-                        : '$totalStudents Students · $totalTeachers Faculty · $totalAdmins Admins (Ratio ~$studentTeacherRatio:1)';
+                        : '$totalStudents Students · $totalTeachers Faculty · $totalAdmins Admins';
 
                     final card2Subtitle = filter.subjectName != null
                         ? 'Enrolled in ${filter.subjectName}'
                         : (filter.section != null && filter.section != 'All Sections')
                             ? 'Enrollments in ${filter.section}'
-                            : 'Across $totalSubjects accredited courses offered';
+                            : 'Across $totalSubjects active courses';
 
                     final card3Subtitle = filter.subjectName != null
-                        ? '$totalLos LO modules for this course'
-                        : '$totalLos learning outcome modules';
+                        ? '$totalLos competency units in course'
+                        : '$totalLos learning topics assessed';
 
                     final tfLabel = filter.timeframe == 'today'
                         ? 'Today'
@@ -172,18 +172,18 @@ class AdminWebAnalyticsView extends ConsumerWidget {
                                     : 'All Time';
 
                     final card4Subtitle = totalAttempts > 0
-                        ? '$passedAttempts passed of $totalAttempts exams ($tfLabel · Avg: $avgScore%)'
+                        ? '$passedAttempts of $totalAttempts exams passed ($tfLabel · Avg: $avgScore%)'
                         : '0 exams recorded for active filters ($tfLabel)';
 
                     final card1 = KpiSummaryCard(
                       title: 'Total Users Registered',
                       value: '$totalUsers',
                       subtitle: card1Subtitle,
-                      icon: Icons.people_outline,
+                      icon: Icons.people_alt_outlined,
                       color: AppTheme.primary,
-                      trendText: '+12.4% vs last sem',
+                      trendText: '+12.4%',
                       isPositiveTrend: true,
-                      badgeText: 'Active Sections: ${sectionDistribution.isNotEmpty ? sectionDistribution.length : 8}',
+                      badgeText: '${sectionDistribution.isNotEmpty ? sectionDistribution.length : 8} Sections',
                       progress: 0.84,
                       isDark: isDark,
                     );
@@ -191,35 +191,35 @@ class AdminWebAnalyticsView extends ConsumerWidget {
                       title: 'Active Course Enrollments',
                       value: '$totalEnrollments',
                       subtitle: card2Subtitle,
-                      icon: Icons.school_outlined,
+                      icon: Icons.menu_book_outlined,
                       color: AppTheme.accent,
-                      trendText: '+8.2% vs target',
+                      trendText: '+8.2%',
                       isPositiveTrend: true,
                       badgeText: '$totalSubjects Courses',
                       progress: totalEnrollments > 0 ? (totalEnrollments / 150).clamp(0.0, 1.0) : 0.65,
                       isDark: isDark,
                     );
                     final card3 = KpiSummaryCard(
-                      title: 'LO Mastery Average',
+                      title: 'Student Learning Progress',
                       value: '${avgScore > 0 ? avgScore : 82}%',
                       subtitle: card3Subtitle,
-                      icon: Icons.auto_awesome_outlined,
+                      icon: Icons.fact_check_outlined,
                       color: AppTheme.warning,
-                      trendText: '+4.1% vs baseline',
+                      trendText: '+4.1%',
                       isPositiveTrend: true,
-                      badgeText: '$totalLos LO Modules',
+                      badgeText: '$totalLos Units',
                       progress: (avgScore > 0 ? avgScore : 82) / 100.0,
                       isDark: isDark,
                     );
                     final card4 = KpiSummaryCard(
-                      title: 'Institutional Pass Rate',
+                      title: 'Assessment Pass Rate',
                       value: '$passRate%',
                       subtitle: card4Subtitle,
-                      icon: Icons.military_tech_outlined,
+                      icon: Icons.verified_outlined,
                       color: AppTheme.success,
-                      trendText: '+3.8% vs last module',
+                      trendText: '+3.8%',
                       isPositiveTrend: true,
-                      badgeText: 'Standard ≥75%',
+                      badgeText: 'Target: 75%',
                       progress: passRate / 100.0,
                       isDark: isDark,
                     );
@@ -396,7 +396,7 @@ class AdminWebAnalyticsView extends ConsumerWidget {
               const SizedBox(width: 8),
               Expanded(
                 child: Text(
-                  'Academic Mastery & Pass Distribution',
+                  'Exam Results & Performance Overview',
                   style: TextStyle(
                     fontSize: 15,
                     fontWeight: FontWeight.bold,
@@ -414,7 +414,7 @@ class AdminWebAnalyticsView extends ConsumerWidget {
                   borderRadius: BorderRadius.circular(6),
                 ),
                 child: Text(
-                  benchmarkPassed ? 'Standard Met (≥75%)' : 'Needs Intervention',
+                  benchmarkPassed ? 'Standard Met (75%+)' : 'Needs Review',
                   style: TextStyle(
                     fontSize: 11,
                     fontWeight: FontWeight.bold,
@@ -477,29 +477,29 @@ class AdminWebAnalyticsView extends ConsumerWidget {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   _buildMasteryMetricRow(
-                    label: 'Passed Examinations',
+                    label: 'Passed Exams',
                     value: '$passedAttempts ($passRate%)',
                     color: AppTheme.success,
                     isDark: isDark,
                   ),
                   const SizedBox(height: 8),
                   _buildMasteryMetricRow(
-                    label: 'Remediation / Review Needed',
+                    label: 'Needs Additional Review',
                     value: '$needsReview (${totalAttempts > 0 ? (100 - passRate) : 0}%)',
                     color: AppTheme.warning,
                     isDark: isDark,
                   ),
                   const SizedBox(height: 8),
                   _buildMasteryMetricRow(
-                    label: 'Overall Average Grade',
+                    label: 'Overall Average Score',
                     value: '$avgScore%',
                     color: AppTheme.accent,
                     isDark: isDark,
                   ),
                   const SizedBox(height: 8),
                   _buildMasteryMetricRow(
-                    label: 'Total Quiz Attempts',
-                    value: '$totalAttempts Submissions',
+                    label: 'Total Assessments Completed',
+                    value: '$totalAttempts ${totalAttempts == 1 ? 'Exam' : 'Exams'}',
                     color: isDark ? AppTheme.darkTextSecondary : AppTheme.lightTextSecondary,
                     isDark: isDark,
                   ),
@@ -546,8 +546,8 @@ class AdminWebAnalyticsView extends ConsumerWidget {
                 Expanded(
                   child: Text(
                     benchmarkPassed
-                        ? 'Institutional pass rate complies with the academic accreditation standard of 75%.'
-                        : 'Review course curriculum outcomes below to target subjects requiring remediation.',
+                        ? 'The overall student pass rate complies with the academic accreditation standard of 75%.'
+                        : 'Students need additional support to meet the academic accreditation standard of 75%.',
                     style: TextStyle(
                       fontSize: 11.5,
                       color: isDark ? AppTheme.darkTextSecondary : AppTheme.lightTextSecondary,
@@ -639,7 +639,7 @@ class AdminWebAnalyticsView extends ConsumerWidget {
                     const SizedBox(width: 8),
                     Expanded(
                       child: Text(
-                        'Student Body & Enrollment Demographics',
+                        'Student Enrollment & Class Assignments',
                         style: TextStyle(
                           fontSize: 15,
                           fontWeight: FontWeight.bold,
@@ -655,25 +655,25 @@ class AdminWebAnalyticsView extends ConsumerWidget {
               const SizedBox(width: 8),
               TextButton(
                 onPressed: () => context.go('/admin/students'),
-                child: Text('Directory', style: TextStyle(fontSize: 12, color: AppTheme.primary, fontWeight: FontWeight.w600)),
+                child: Text('Student Directory', style: TextStyle(fontSize: 12, color: AppTheme.primary, fontWeight: FontWeight.w600)),
               ),
             ],
           ),
           const SizedBox(height: 12),
 
-          // Section Placement Progress Bar
+          // Section Assignment Progress Bar
           Row(
             children: [
               Expanded(
                 child: Text(
-                  'Section Placement Rate',
+                  'Section Assignment Status',
                   style: TextStyle(fontSize: 12, color: isDark ? AppTheme.darkTextSecondary : AppTheme.lightTextSecondary),
                   overflow: TextOverflow.ellipsis,
                 ),
               ),
               const SizedBox(width: 8),
               Text(
-                '$assignedStudents / $totalStudents Assigned ($placementRate%)',
+                '$assignedStudents of $totalStudents Assigned ($placementRate%)',
                 style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: isDark ? AppTheme.darkText : AppTheme.lightText),
               ),
             ],
@@ -712,7 +712,7 @@ class AdminWebAnalyticsView extends ConsumerWidget {
                   InkWell(
                     onTap: () => context.go('/admin/students'),
                     child: Text(
-                      'Assign Now',
+                      'Assign Section',
                       style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: AppTheme.warning, decoration: TextDecoration.underline),
                     ),
                   ),
@@ -730,17 +730,17 @@ class AdminWebAnalyticsView extends ConsumerWidget {
                   children: [
                     Row(
                       children: [
-                        Expanded(child: _buildDemographicTile('Regular', '$regular', Icons.person_outline, isDark)),
+                        Expanded(child: _buildDemographicTile('Regular Students', '$regular', Icons.person_outline, isDark)),
                         const SizedBox(width: 8),
-                        Expanded(child: _buildDemographicTile('Irregular', '$irregular', Icons.swap_horiz, isDark)),
+                        Expanded(child: _buildDemographicTile('Irregular Students', '$irregular', Icons.swap_horiz, isDark)),
                       ],
                     ),
                     const SizedBox(height: 8),
                     Row(
                       children: [
-                        Expanded(child: _buildDemographicTile('Transferee', '$transferee', Icons.move_to_inbox_outlined, isDark)),
+                        Expanded(child: _buildDemographicTile('Transferees', '$transferee', Icons.move_to_inbox_outlined, isDark)),
                         const SizedBox(width: 8),
-                        Expanded(child: _buildDemographicTile('SPED / Accom.', '$sped', Icons.accessibility_new, isDark)),
+                        Expanded(child: _buildDemographicTile('Accommodations', '$sped', Icons.accessibility_new, isDark)),
                       ],
                     ),
                   ],
@@ -748,13 +748,13 @@ class AdminWebAnalyticsView extends ConsumerWidget {
               }
               return Row(
                 children: [
-                  Expanded(child: _buildDemographicTile('Regular', '$regular', Icons.person_outline, isDark)),
+                  Expanded(child: _buildDemographicTile('Regular Students', '$regular', Icons.person_outline, isDark)),
                   const SizedBox(width: 8),
-                  Expanded(child: _buildDemographicTile('Irregular', '$irregular', Icons.swap_horiz, isDark)),
+                  Expanded(child: _buildDemographicTile('Irregular Students', '$irregular', Icons.swap_horiz, isDark)),
                   const SizedBox(width: 8),
-                  Expanded(child: _buildDemographicTile('Transferee', '$transferee', Icons.move_to_inbox_outlined, isDark)),
+                  Expanded(child: _buildDemographicTile('Transferees', '$transferee', Icons.move_to_inbox_outlined, isDark)),
                   const SizedBox(width: 8),
-                  Expanded(child: _buildDemographicTile('SPED / Accom.', '$sped', Icons.accessibility_new, isDark)),
+                  Expanded(child: _buildDemographicTile('Accommodations', '$sped', Icons.accessibility_new, isDark)),
                 ],
               );
             },

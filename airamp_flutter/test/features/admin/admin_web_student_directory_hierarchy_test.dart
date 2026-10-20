@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 import 'package:airamp_flutter/src/core/theme/app_theme.dart';
 import 'package:airamp_flutter/src/features/admin/data/admin_repository.dart';
 import 'package:airamp_flutter/src/features/admin/presentation/web/admin_web_students_screen.dart';
@@ -19,6 +20,11 @@ class MockAdminStudentsNotifier extends AdminStudentsNotifier {
 }
 
 void main() {
+  setUpAll(() {
+    sqfliteFfiInit();
+    databaseFactory = databaseFactoryFfi;
+  });
+
   final mockStudents = [
     {
       'id': 's1',
@@ -142,6 +148,7 @@ void main() {
       // Tap Special Students chip
       final specialChip = find.textContaining('Special Students');
       expect(specialChip, findsOneWidget);
+      await tester.ensureVisible(specialChip);
       await tester.tap(specialChip);
       await tester.pump(const Duration(milliseconds: 100));
 

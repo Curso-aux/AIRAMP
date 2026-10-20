@@ -29,9 +29,9 @@ class LoMasteryItem {
   });
 
   String get tier {
-    if (score >= 80.0) return 'Mastered';
+    if (score >= 80.0) return 'Proficient';
     if (score >= 60.0) return 'Developing';
-    return 'At-Risk';
+    return 'Needs Help';
   }
 }
 
@@ -583,7 +583,7 @@ class _LoMasteryMatrixState extends State<LoMasteryMatrix> {
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Text(
-                            'Competency Mastery Score',
+                            'Average Student Score',
                             style: TextStyle(
                               fontSize: 11.5,
                               color: isDark ? AppTheme.darkTextSecondary : AppTheme.lightTextSecondary,
@@ -779,7 +779,7 @@ class _LoMasteryMatrixState extends State<LoMasteryMatrix> {
                             const SizedBox(width: 4),
                             Expanded(
                               child: Text(
-                                'Identified Misconception: ${q.commonMistake}',
+                                'Common Student Difficulty: ${q.commonMistake}',
                                 style: TextStyle(
                                   fontSize: 11.5,
                                   fontStyle: FontStyle.italic,
@@ -808,14 +808,14 @@ class _LoMasteryMatrixState extends State<LoMasteryMatrix> {
                   child: Row(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Icon(Icons.auto_awesome_rounded, color: AppTheme.primary, size: 18),
+                      Icon(Icons.lightbulb_outline_rounded, color: AppTheme.primary, size: 18),
                       const SizedBox(width: 8),
                       Expanded(
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             Text(
-                              'Remediation Recommendation',
+                              'Suggested Teaching Strategy',
                               style: TextStyle(
                                 fontSize: 12,
                                 fontWeight: FontWeight.bold,
@@ -854,14 +854,14 @@ class _LoMasteryMatrixState extends State<LoMasteryMatrix> {
               Navigator.pop(ctx);
               ScaffoldMessenger.of(context).showSnackBar(
                 SnackBar(
-                  content: Text('Targeted review task queued for ${item.section} (${item.loCode})!'),
+                  content: Text('Practice quiz assigned to ${item.section} (${item.loCode})!'),
                   backgroundColor: AppTheme.primary,
                   behavior: SnackBarBehavior.floating,
                 ),
               );
             },
-            icon: const Icon(Icons.send_rounded, size: 15),
-            label: const Text('Deploy Remediation Quiz'),
+            icon: const Icon(Icons.assignment_outlined, size: 15),
+            label: const Text('Assign Review Quiz'),
             style: ElevatedButton.styleFrom(
               backgroundColor: AppTheme.primary,
               foregroundColor: Colors.white,
@@ -973,7 +973,7 @@ class _LoMasteryMatrixState extends State<LoMasteryMatrix> {
                   color: AppTheme.primary.withValues(alpha: isDark ? 0.2 : 0.1),
                   borderRadius: BorderRadius.circular(10),
                 ),
-                child: Icon(Icons.grid_on_rounded, color: AppTheme.primary, size: 20),
+                child: Icon(Icons.table_chart_outlined, color: AppTheme.primary, size: 20),
               ),
               const SizedBox(width: 10),
               Expanded(
@@ -981,7 +981,7 @@ class _LoMasteryMatrixState extends State<LoMasteryMatrix> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      'Learning Outcome (LO) Mastery Heatmap Matrix',
+                      'Curriculum Competencies by Class Section',
                       style: TextStyle(
                         fontSize: 16,
                         fontWeight: FontWeight.bold,
@@ -990,7 +990,7 @@ class _LoMasteryMatrixState extends State<LoMasteryMatrix> {
                     ),
                     const SizedBox(height: 2),
                     Text(
-                      'Cross-cohort competency evaluation. Click any cell to view student distribution and most-missed assessment items.',
+                      'Overview of student performance across core competencies. Click any cell to view detailed assessment results and study topics.',
                       style: TextStyle(
                         fontSize: 12,
                         color: isDark ? AppTheme.darkTextSecondary : AppTheme.lightTextSecondary,
@@ -1009,9 +1009,9 @@ class _LoMasteryMatrixState extends State<LoMasteryMatrix> {
             runSpacing: 8,
             crossAxisAlignment: WrapCrossAlignment.center,
             children: [
-              // Legend: Mastered
+              // Legend: Proficient
               _buildSemanticBadge(
-                label: 'Mastered (≥80%)',
+                label: 'Proficient (80%+)',
                 bg: AppTheme.success.withValues(alpha: isDark ? 0.18 : 0.1),
                 border: AppTheme.success.withValues(alpha: 0.35),
                 textColor: AppTheme.success,
@@ -1023,9 +1023,9 @@ class _LoMasteryMatrixState extends State<LoMasteryMatrix> {
                 border: AppTheme.warning.withValues(alpha: 0.35),
                 textColor: AppTheme.warning,
               ),
-              // Legend: At-Risk
+              // Legend: Needs Help
               _buildSemanticBadge(
-                label: 'At-Risk (<60%)',
+                label: 'Needs Help (Below 60%)',
                 bg: AppTheme.error.withValues(alpha: isDark ? 0.18 : 0.1),
                 border: AppTheme.error.withValues(alpha: 0.35),
                 textColor: AppTheme.error,
@@ -1096,7 +1096,7 @@ class _LoMasteryMatrixState extends State<LoMasteryMatrix> {
                           color: isDark ? AppTheme.darkText : AppTheme.lightText,
                         ),
                         decoration: InputDecoration(
-                          hintText: 'Filter LO / Section...',
+                          hintText: 'Search topic or class...',
                           hintStyle: TextStyle(fontSize: 11.5, color: AppTheme.textMuted),
                           border: InputBorder.none,
                           isDense: true,
@@ -1131,7 +1131,7 @@ class _LoMasteryMatrixState extends State<LoMasteryMatrix> {
               columns: [
                 const DataColumn(
                   label: Text(
-                    'LEARNING OUTCOME (LO)',
+                    'LEARNING COMPETENCY',
                     style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
                   ),
                 ),
@@ -1145,7 +1145,7 @@ class _LoMasteryMatrixState extends State<LoMasteryMatrix> {
                 }),
                 const DataColumn(
                   label: Text(
-                    'COHORT AVG',
+                    'Class Average',
                     style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
                   ),
                 ),

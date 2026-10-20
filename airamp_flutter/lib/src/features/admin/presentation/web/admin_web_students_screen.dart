@@ -353,24 +353,23 @@ class _AdminWebStudentsScreenState extends ConsumerState<AdminWebStudentsScreen>
                           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
                         ),
                       ),
-                      ElevatedButton.icon(
+                      OutlinedButton.icon(
                         onPressed: () => BulkImportModal.show(context),
                         icon: const Icon(Icons.upload_file_rounded, size: 16),
-                        label: const Text('Import CSV', style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold)),
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: AppTheme.primary,
-                          foregroundColor: Colors.white,
-                          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                        label: const Text('Import CSV', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
+                        style: OutlinedButton.styleFrom(
+                          foregroundColor: AppTheme.text,
+                          side: BorderSide(color: AppTheme.border),
+                          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
                           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                          elevation: 0,
                         ),
                       ),
                       ElevatedButton.icon(
                         onPressed: () => _openAddStudentDialog(context, availableSections, subjects),
                         icon: const Icon(Icons.person_add_alt_1_rounded, size: 16),
-                        label: const Text('Add New Student', style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold)),
+                        label: const Text('Add New Student', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
                         style: ElevatedButton.styleFrom(
-                          backgroundColor: Colors.teal.shade700,
+                          backgroundColor: AppTheme.primary,
                           foregroundColor: Colors.white,
                           padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
                           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
@@ -485,18 +484,18 @@ class _AdminWebStudentsScreenState extends ConsumerState<AdminWebStudentsScreen>
                           Container(
                             padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 3),
                             decoration: BoxDecoration(
-                              color: Colors.amber.withValues(alpha: 0.15),
+                              color: AppTheme.primary.withValues(alpha: 0.08),
                               borderRadius: BorderRadius.circular(12),
-                              border: Border.all(color: Colors.amber.withValues(alpha: 0.4)),
+                              border: Border.all(color: AppTheme.primary.withValues(alpha: 0.2)),
                             ),
-                            child: const Row(
+                            child: Row(
                               mainAxisSize: MainAxisSize.min,
                               children: [
-                                Icon(Icons.star, size: 13, color: Colors.amber),
-                                SizedBox(width: 4),
+                                Icon(Icons.info_outline, size: 13, color: AppTheme.primary),
+                                const SizedBox(width: 4),
                                 Text(
-                                  'Special Students Hub Active',
-                                  style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Colors.amber),
+                                  'Special Students Active',
+                                  style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: AppTheme.primary),
                                 ),
                               ],
                             ),
@@ -554,22 +553,26 @@ class _AdminWebStudentsScreenState extends ConsumerState<AdminWebStudentsScreen>
                             margin: const EdgeInsets.symmetric(horizontal: 6),
                           ),
 
-                          // ⭐ SPECIAL STUDENTS OPTION
+                          // Special Students Option
                           Padding(
                             padding: const EdgeInsets.only(right: 8),
                             child: ChoiceChip(
-                              avatar: const Icon(Icons.stars_rounded, size: 16, color: Colors.amber),
-                              label: Text('⭐ Special Students (${specialStudents.length})'),
+                              avatar: Icon(
+                                Icons.workspace_premium_outlined,
+                                size: 15,
+                                color: _isSpecialView ? Colors.white : AppTheme.textSecondary,
+                              ),
+                              label: Text('Special Students (${specialStudents.length})'),
                               selected: _isSpecialView,
-                              selectedColor: Colors.amber.shade700,
+                              selectedColor: AppTheme.primary,
                               labelStyle: TextStyle(
                                 fontSize: 12,
-                                fontWeight: _isSpecialView ? FontWeight.bold : FontWeight.w600,
-                                color: _isSpecialView ? Colors.black : Colors.amber.shade400,
+                                fontWeight: _isSpecialView ? FontWeight.bold : FontWeight.w500,
+                                color: _isSpecialView ? Colors.white : AppTheme.textSecondary,
                               ),
-                              backgroundColor: Colors.amber.withValues(alpha: 0.08),
+                              backgroundColor: AppTheme.background,
                               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-                              side: BorderSide(color: _isSpecialView ? Colors.amber : Colors.amber.withValues(alpha: 0.4)),
+                              side: BorderSide(color: _isSpecialView ? AppTheme.primary : AppTheme.border),
                               onSelected: (_) {
                                 setState(() {
                                   _isSpecialView = true;
@@ -579,24 +582,24 @@ class _AdminWebStudentsScreenState extends ConsumerState<AdminWebStudentsScreen>
                             ),
                           ),
 
-                          // 📋 ALL DIRECTORY (AUDIT VIEW)
+                          // All Directory View
                           ChoiceChip(
                             avatar: Icon(
                               Icons.list_alt_rounded,
                               size: 15,
-                              color: _isAllDirectoryView ? Colors.white : AppTheme.textMuted,
+                              color: _isAllDirectoryView ? Colors.white : AppTheme.textSecondary,
                             ),
                             label: Text('All Students (${allStudents.length})'),
                             selected: _isAllDirectoryView,
-                            selectedColor: Colors.teal,
+                            selectedColor: AppTheme.primary,
                             labelStyle: TextStyle(
                               fontSize: 12,
-                              fontWeight: _isAllDirectoryView ? FontWeight.bold : FontWeight.normal,
-                              color: _isAllDirectoryView ? Colors.white : AppTheme.textMuted,
+                              fontWeight: _isAllDirectoryView ? FontWeight.bold : FontWeight.w500,
+                              color: _isAllDirectoryView ? Colors.white : AppTheme.textSecondary,
                             ),
                             backgroundColor: AppTheme.background,
                             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-                            side: BorderSide(color: _isAllDirectoryView ? Colors.teal : AppTheme.border),
+                            side: BorderSide(color: _isAllDirectoryView ? AppTheme.primary : AppTheme.border),
                             onSelected: (_) {
                               setState(() {
                                 _isAllDirectoryView = true;
@@ -617,14 +620,14 @@ class _AdminWebStudentsScreenState extends ConsumerState<AdminWebStudentsScreen>
                       Row(
                         children: [
                           Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                             decoration: BoxDecoration(
-                              color: Colors.amber.withValues(alpha: 0.2),
+                              color: AppTheme.primary.withValues(alpha: 0.08),
                               borderRadius: BorderRadius.circular(6),
                             ),
-                            child: const Text(
+                            child: Text(
                               'TRACK',
-                              style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Colors.amber),
+                              style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: AppTheme.primary),
                             ),
                           ),
                           const SizedBox(width: 8),
@@ -655,17 +658,31 @@ class _AdminWebStudentsScreenState extends ConsumerState<AdminWebStudentsScreen>
                             return Padding(
                               padding: const EdgeInsets.only(right: 8),
                               child: FilterChip(
-                                label: Text('$name ($count)'),
+                                label: Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    Text(name),
+                                    const SizedBox(width: 4),
+                                    Text(
+                                      '($count)',
+                                      style: TextStyle(
+                                        fontSize: 11,
+                                        fontWeight: FontWeight.normal,
+                                        color: isSel ? Colors.white : AppTheme.textMuted,
+                                      ),
+                                    ),
+                                  ],
+                                ),
                                 selected: isSel,
-                                selectedColor: Colors.amber.shade700,
+                                selectedColor: AppTheme.primary,
                                 labelStyle: TextStyle(
                                   fontSize: 12,
-                                  fontWeight: isSel ? FontWeight.bold : FontWeight.w600,
-                                  color: isSel ? Colors.black : AppTheme.textSecondary,
+                                  fontWeight: isSel ? FontWeight.bold : FontWeight.w500,
+                                  color: isSel ? Colors.white : AppTheme.textSecondary,
                                 ),
                                 backgroundColor: AppTheme.background,
                                 shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-                                side: BorderSide(color: isSel ? Colors.amber : AppTheme.border),
+                                side: BorderSide(color: isSel ? AppTheme.primary : AppTheme.border),
                                 onSelected: (_) => setState(() => _specialSubFilter = cat),
                               ),
                             );
@@ -676,14 +693,14 @@ class _AdminWebStudentsScreenState extends ConsumerState<AdminWebStudentsScreen>
                       Row(
                         children: [
                           Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                             decoration: BoxDecoration(
-                              color: Colors.teal.withValues(alpha: 0.15),
+                              color: AppTheme.primary.withValues(alpha: 0.08),
                               borderRadius: BorderRadius.circular(6),
                             ),
-                            child: const Text(
+                            child: Text(
                               'STEP 2',
-                              style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Colors.teal),
+                              style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: AppTheme.primary),
                             ),
                           ),
                           const SizedBox(width: 8),
@@ -759,24 +776,18 @@ class _AdminWebStudentsScreenState extends ConsumerState<AdminWebStudentsScreen>
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
                 decoration: BoxDecoration(
-                  color: _isSpecialView
-                      ? Colors.amber.withValues(alpha: 0.08)
-                      : AppTheme.primary.withValues(alpha: 0.06),
+                  color: AppTheme.surface,
                   borderRadius: BorderRadius.circular(12),
-                  border: Border.all(
-                    color: _isSpecialView
-                        ? Colors.amber.withValues(alpha: 0.3)
-                        : AppTheme.primary.withValues(alpha: 0.2),
-                  ),
+                  border: Border.all(color: AppTheme.border),
                 ),
                 child: Row(
                   children: [
                     Icon(
                       _isSpecialView
-                          ? Icons.stars_rounded
+                          ? Icons.workspace_premium_outlined
                           : (_isAllDirectoryView ? Icons.folder_shared_outlined : Icons.account_tree_outlined),
                       size: 20,
-                      color: _isSpecialView ? Colors.amber : AppTheme.primary,
+                      color: AppTheme.primary,
                     ),
                     const SizedBox(width: 10),
                     Expanded(
@@ -788,8 +799,8 @@ class _AdminWebStudentsScreenState extends ConsumerState<AdminWebStudentsScreen>
                                 : 'Active Scope: $_selectedGrade ➔ ${_selectedSection == 'All' ? 'All Classrooms' : 'Classroom: $_selectedSection'} (${filteredStudents.length} Students)'),
                         style: TextStyle(
                           fontSize: 13,
-                          fontWeight: FontWeight.w600,
-                          color: _isSpecialView ? Colors.amber.shade200 : AppTheme.text,
+                          fontWeight: FontWeight.w500,
+                          color: AppTheme.text,
                         ),
                       ),
                     ),
@@ -797,6 +808,7 @@ class _AdminWebStudentsScreenState extends ConsumerState<AdminWebStudentsScreen>
                       TextButton.icon(
                         icon: const Icon(Icons.restart_alt, size: 16),
                         label: const Text('Reset Filter', style: TextStyle(fontSize: 12)),
+                        style: TextButton.styleFrom(foregroundColor: AppTheme.textSecondary),
                         onPressed: () {
                           setState(() {
                             _selectedGrade = 'Grade 10';
@@ -825,9 +837,9 @@ class _AdminWebStudentsScreenState extends ConsumerState<AdminWebStudentsScreen>
                   child: Column(
                     children: [
                       Icon(
-                        _isSpecialView ? Icons.stars_outlined : Icons.person_search_outlined,
+                        _isSpecialView ? Icons.workspace_premium_outlined : Icons.person_search_outlined,
                         size: 54,
-                        color: _isSpecialView ? Colors.amber : AppTheme.textMuted,
+                        color: AppTheme.textMuted,
                       ),
                       const SizedBox(height: 16),
                       Text(
@@ -847,10 +859,11 @@ class _AdminWebStudentsScreenState extends ConsumerState<AdminWebStudentsScreen>
                         icon: const Icon(Icons.person_add_alt_1_rounded, size: 16),
                         label: const Text('Add Student to This Classroom'),
                         style: ElevatedButton.styleFrom(
-                          backgroundColor: Colors.teal.shade700,
+                          backgroundColor: AppTheme.primary,
                           foregroundColor: Colors.white,
                           padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 12),
                           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                          elevation: 0,
                         ),
                       ),
                     ],
@@ -876,6 +889,7 @@ class _AdminWebStudentsScreenState extends ConsumerState<AdminWebStudentsScreen>
   }
 
   Widget _buildDesktopStudentTable(List<Map<String, dynamic>> students, List<String> availableSections) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     return Container(
       decoration: BoxDecoration(
         color: AppTheme.surface,
@@ -915,7 +929,6 @@ class _AdminWebStudentsScreenState extends ConsumerState<AdminWebStudentsScreen>
                 final avgScore = s['avg_score'] as int? ?? 0;
 
                 final hasSection = section != 'Unassigned';
-                final isSpecial = studentType.toLowerCase() != 'regular' || !hasSection;
 
                 return DataRow(
                   cells: [
@@ -924,14 +937,14 @@ class _AdminWebStudentsScreenState extends ConsumerState<AdminWebStudentsScreen>
                       Row(
                         children: [
                           CircleAvatar(
-                            radius: 18,
-                            backgroundColor: isSpecial ? Colors.amber.withValues(alpha: 0.2) : AppTheme.primarySoft,
+                            radius: 17,
+                            backgroundColor: isDark ? Colors.white.withValues(alpha: 0.06) : const Color(0xFFF1F5F9),
                             child: Text(
                               name.isNotEmpty ? name[0].toUpperCase() : 'S',
                               style: TextStyle(
                                 fontSize: 13,
-                                fontWeight: FontWeight.bold,
-                                color: isSpecial ? Colors.amber : AppTheme.primary,
+                                fontWeight: FontWeight.w600,
+                                color: AppTheme.primary,
                               ),
                             ),
                           ),
@@ -940,15 +953,11 @@ class _AdminWebStudentsScreenState extends ConsumerState<AdminWebStudentsScreen>
                             crossAxisAlignment: CrossAxisAlignment.start,
                             mainAxisAlignment: MainAxisAlignment.center,
                             children: [
-                              Row(
-                                children: [
-                                  Text(name, style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: AppTheme.text)),
-                                  if (isSpecial) ...[
-                                    const SizedBox(width: 6),
-                                    const Icon(Icons.star, size: 13, color: Colors.amber),
-                                  ],
-                                ],
+                              Text(
+                                name,
+                                style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: AppTheme.text),
                               ),
+                              const SizedBox(height: 2),
                               Text(email, style: TextStyle(fontSize: 11, color: AppTheme.textMuted)),
                             ],
                           ),
@@ -959,20 +968,20 @@ class _AdminWebStudentsScreenState extends ConsumerState<AdminWebStudentsScreen>
                     // Assigned Section
                     DataCell(
                       Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                         decoration: BoxDecoration(
-                          color: hasSection ? AppTheme.primary.withValues(alpha: 0.12) : AppTheme.warning.withValues(alpha: 0.12),
-                          borderRadius: BorderRadius.circular(16),
-                          border: Border.all(
-                            color: hasSection ? AppTheme.primary.withValues(alpha: 0.3) : AppTheme.warning.withValues(alpha: 0.3),
-                          ),
+                          color: hasSection
+                              ? (isDark ? Colors.white.withValues(alpha: 0.05) : const Color(0xFFF8FAFC))
+                              : (isDark ? Colors.white.withValues(alpha: 0.03) : const Color(0xFFF1F5F9)),
+                          borderRadius: BorderRadius.circular(6),
+                          border: Border.all(color: AppTheme.border),
                         ),
                         child: Text(
                           section,
                           style: TextStyle(
                             fontSize: 11,
-                            fontWeight: FontWeight.bold,
-                            color: hasSection ? AppTheme.primary : AppTheme.warning,
+                            fontWeight: hasSection ? FontWeight.w600 : FontWeight.w500,
+                            color: hasSection ? AppTheme.text : AppTheme.textMuted,
                           ),
                         ),
                       ),
@@ -987,29 +996,41 @@ class _AdminWebStudentsScreenState extends ConsumerState<AdminWebStudentsScreen>
                     DataCell(
                       InkWell(
                         onTap: () => _showClassificationDialog(studentId, name, studentType, notes),
-                        borderRadius: BorderRadius.circular(8),
+                        borderRadius: BorderRadius.circular(6),
                         child: Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                           decoration: BoxDecoration(
-                            color: isSpecial ? Colors.amber.withValues(alpha: 0.12) : AppTheme.surface,
-                            borderRadius: BorderRadius.circular(8),
+                            color: studentType.toLowerCase() != 'regular'
+                                ? AppTheme.primary.withValues(alpha: 0.08)
+                                : (isDark ? Colors.white.withValues(alpha: 0.03) : const Color(0xFFF8FAFC)),
+                            borderRadius: BorderRadius.circular(6),
                             border: Border.all(
-                              color: isSpecial ? Colors.amber.withValues(alpha: 0.4) : AppTheme.border,
+                              color: studentType.toLowerCase() != 'regular'
+                                  ? AppTheme.primary.withValues(alpha: 0.25)
+                                  : AppTheme.border,
                             ),
                           ),
                           child: Row(
                             mainAxisSize: MainAxisSize.min,
                             children: [
                               Text(
-                                isSpecial ? studentType.toUpperCase() : 'REGULAR',
+                                studentType.toUpperCase(),
                                 style: TextStyle(
-                                  fontSize: 10,
-                                  fontWeight: FontWeight.bold,
-                                  color: isSpecial ? Colors.amber : AppTheme.textMuted,
+                                  fontSize: 10.5,
+                                  fontWeight: FontWeight.w600,
+                                  color: studentType.toLowerCase() != 'regular'
+                                      ? (isDark ? const Color(0xFF5EEAD4) : AppTheme.primary)
+                                      : AppTheme.textSecondary,
                                 ),
                               ),
                               const SizedBox(width: 4),
-                              Icon(Icons.edit, size: 11, color: isSpecial ? Colors.amber : AppTheme.textMuted),
+                              Icon(
+                                Icons.edit_outlined,
+                                size: 11,
+                                color: studentType.toLowerCase() != 'regular'
+                                    ? (isDark ? const Color(0xFF5EEAD4) : AppTheme.primary)
+                                    : AppTheme.textMuted,
+                              ),
                             ],
                           ),
                         ),
@@ -1020,7 +1041,7 @@ class _AdminWebStudentsScreenState extends ConsumerState<AdminWebStudentsScreen>
                     DataCell(
                       Text(
                         '$enrolledCount subject${enrolledCount == 1 ? '' : 's'}',
-                        style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: AppTheme.text),
+                        style: TextStyle(fontSize: 12.5, color: AppTheme.textSecondary),
                       ),
                     ),
 
@@ -1029,8 +1050,8 @@ class _AdminWebStudentsScreenState extends ConsumerState<AdminWebStudentsScreen>
                       Text(
                         '$avgScore%',
                         style: TextStyle(
-                          fontSize: 13,
-                          fontWeight: FontWeight.bold,
+                          fontSize: 12.5,
+                          fontWeight: FontWeight.w600,
                           color: avgScore >= 75 ? AppTheme.success : AppTheme.textSecondary,
                         ),
                       ),
@@ -1041,70 +1062,45 @@ class _AdminWebStudentsScreenState extends ConsumerState<AdminWebStudentsScreen>
                       Row(
                         mainAxisSize: MainAxisSize.min,
                         children: [
-                          ElevatedButton.icon(
+                          OutlinedButton.icon(
                             onPressed: () => _showManageCoursesDialog(studentId, name),
-                            icon: const Icon(Icons.menu_book, size: 14),
-                            label: const Text('Courses'),
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: Colors.teal.withValues(alpha: 0.12),
-                              foregroundColor: Colors.teal,
-                              elevation: 0,
-                              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(8),
-                                side: BorderSide(color: Colors.teal.withValues(alpha: 0.4)),
-                              ),
+                            icon: const Icon(Icons.menu_book_outlined, size: 14),
+                            label: const Text('Courses', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w500)),
+                            style: OutlinedButton.styleFrom(
+                              foregroundColor: AppTheme.text,
+                              side: BorderSide(color: AppTheme.border),
+                              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
+                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(7)),
+                              minimumSize: const Size(0, 32),
                             ),
                           ),
-                          const SizedBox(width: 8),
-                          ElevatedButton.icon(
+                          const SizedBox(width: 6),
+                          OutlinedButton.icon(
                             onPressed: () => _showArrangeSectionDialog(studentId, name, section, grade, availableSections),
-                            icon: const Icon(Icons.sync_alt, size: 14),
-                            label: const Text('Move / Assign'),
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: AppTheme.primary.withValues(alpha: 0.12),
-                              foregroundColor: AppTheme.primary,
-                              elevation: 0,
-                              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(8),
-                                side: BorderSide(color: AppTheme.primary.withValues(alpha: 0.4)),
-                              ),
+                            icon: const Icon(Icons.swap_horiz, size: 14),
+                            label: const Text('Move / Assign', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w500)),
+                            style: OutlinedButton.styleFrom(
+                              foregroundColor: AppTheme.text,
+                              side: BorderSide(color: AppTheme.border),
+                              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
+                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(7)),
+                              minimumSize: const Size(0, 32),
                             ),
                           ),
-                          const SizedBox(width: 8),
-                          Tooltip(
-                            message: 'Resend Credentials Email',
-                            child: InkWell(
-                              onTap: () => _resendStudentCredentialsDialog(context, s),
-                              borderRadius: BorderRadius.circular(8),
-                              child: Container(
-                                padding: const EdgeInsets.all(8),
-                                decoration: BoxDecoration(
-                                  color: Colors.blue.withValues(alpha: 0.1),
-                                  borderRadius: BorderRadius.circular(8),
-                                  border: Border.all(color: Colors.blue.withValues(alpha: 0.3)),
-                                ),
-                                child: const Icon(Icons.forward_to_inbox_rounded, size: 16, color: Colors.blue),
-                              ),
-                            ),
+                          const SizedBox(width: 4),
+                          IconButton(
+                            onPressed: () => _resendStudentCredentialsDialog(context, s),
+                            tooltip: 'Resend Credentials Email',
+                            icon: const Icon(Icons.forward_to_inbox_rounded, size: 17),
+                            color: AppTheme.textSecondary,
+                            visualDensity: VisualDensity.compact,
                           ),
-                          const SizedBox(width: 8),
-                          Tooltip(
-                            message: 'Delete student permanently',
-                            child: InkWell(
-                              onTap: () => _confirmDeleteStudent(context, s),
-                              borderRadius: BorderRadius.circular(8),
-                              child: Container(
-                                padding: const EdgeInsets.all(8),
-                                decoration: BoxDecoration(
-                                  color: Colors.red.withValues(alpha: 0.1),
-                                  borderRadius: BorderRadius.circular(8),
-                                  border: Border.all(color: Colors.red.withValues(alpha: 0.3)),
-                                ),
-                                child: const Icon(Icons.delete_outline_rounded, size: 16, color: Colors.red),
-                              ),
-                            ),
+                          IconButton(
+                            onPressed: () => _confirmDeleteStudent(context, s),
+                            tooltip: 'Delete student permanently',
+                            icon: const Icon(Icons.delete_outline_rounded, size: 17),
+                            color: AppTheme.error.withValues(alpha: 0.8),
+                            visualDensity: VisualDensity.compact,
                           ),
                         ],
                       ),
@@ -1140,6 +1136,8 @@ class _AdminWebStudentsScreenState extends ConsumerState<AdminWebStudentsScreen>
         final hasSection = section != 'Unassigned';
         final isSpecial = studentType.toLowerCase() != 'regular' || !hasSection;
 
+        final isDark = Theme.of(context).brightness == Brightness.dark;
+
         return Container(
           padding: const EdgeInsets.all(16),
           decoration: BoxDecoration(
@@ -1154,10 +1152,10 @@ class _AdminWebStudentsScreenState extends ConsumerState<AdminWebStudentsScreen>
                 children: [
                   CircleAvatar(
                     radius: 20,
-                    backgroundColor: isSpecial ? Colors.amber.withValues(alpha: 0.2) : AppTheme.primarySoft,
+                    backgroundColor: isDark ? Colors.white.withValues(alpha: 0.06) : const Color(0xFFF1F5F9),
                     child: Text(
                       name.isNotEmpty ? name[0].toUpperCase() : 'S',
-                      style: TextStyle(fontWeight: FontWeight.bold, color: isSpecial ? Colors.amber : AppTheme.primary),
+                      style: TextStyle(fontWeight: FontWeight.w600, color: AppTheme.primary),
                     ),
                   ),
                   const SizedBox(width: 12),
@@ -1165,28 +1163,28 @@ class _AdminWebStudentsScreenState extends ConsumerState<AdminWebStudentsScreen>
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Row(
-                          children: [
-                            Text(name, style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: AppTheme.text)),
-                            if (isSpecial) ...[
-                              const SizedBox(width: 6),
-                              const Icon(Icons.star, size: 14, color: Colors.amber),
-                            ],
-                          ],
-                        ),
+                        Text(name, style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600, color: AppTheme.text)),
+                        const SizedBox(height: 2),
                         Text(email, style: TextStyle(fontSize: 12, color: AppTheme.textMuted)),
                       ],
                     ),
                   ),
                   Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                    padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 3),
                     decoration: BoxDecoration(
-                      color: AppTheme.primary.withValues(alpha: 0.12),
-                      borderRadius: BorderRadius.circular(12),
+                      color: hasSection
+                          ? (isDark ? Colors.white.withValues(alpha: 0.05) : const Color(0xFFF8FAFC))
+                          : (isDark ? Colors.white.withValues(alpha: 0.03) : const Color(0xFFF1F5F9)),
+                      borderRadius: BorderRadius.circular(6),
+                      border: Border.all(color: AppTheme.border),
                     ),
                     child: Text(
                       section,
-                      style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: AppTheme.primary),
+                      style: TextStyle(
+                        fontSize: 11,
+                        fontWeight: hasSection ? FontWeight.w600 : FontWeight.w500,
+                        color: hasSection ? AppTheme.text : AppTheme.textMuted,
+                      ),
                     ),
                   ),
                 ],
@@ -1202,11 +1200,17 @@ class _AdminWebStudentsScreenState extends ConsumerState<AdminWebStudentsScreen>
                     onTap: () => _showClassificationDialog(studentId, name, studentType, notes),
                     child: Text(
                       'Type: ${studentType.toUpperCase()}',
-                      style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: isSpecial ? Colors.amber : AppTheme.textSecondary),
+                      style: TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
+                        color: studentType.toLowerCase() != 'regular'
+                            ? (isDark ? const Color(0xFF5EEAD4) : AppTheme.primary)
+                            : AppTheme.textSecondary,
+                      ),
                     ),
                   ),
                   Text('Courses: $enrolledCount', style: TextStyle(fontSize: 12, color: AppTheme.textSecondary)),
-                  Text('Quiz Avg: $avgScore%', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: AppTheme.text)),
+                  Text('Quiz Avg: $avgScore%', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: AppTheme.text)),
                 ],
               ),
               const SizedBox(height: 12),
@@ -1215,12 +1219,12 @@ class _AdminWebStudentsScreenState extends ConsumerState<AdminWebStudentsScreen>
                   Expanded(
                     child: OutlinedButton.icon(
                       onPressed: () => _showManageCoursesDialog(studentId, name),
-                      icon: const Icon(Icons.menu_book, size: 16),
-                      label: const Text('Courses'),
+                      icon: const Icon(Icons.menu_book_outlined, size: 15),
+                      label: const Text('Courses', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w500)),
                       style: OutlinedButton.styleFrom(
-                        foregroundColor: Colors.teal,
-                        side: const BorderSide(color: Colors.teal),
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                        foregroundColor: AppTheme.text,
+                        side: BorderSide(color: AppTheme.border),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
                       ),
                     ),
                   ),
@@ -1228,40 +1232,29 @@ class _AdminWebStudentsScreenState extends ConsumerState<AdminWebStudentsScreen>
                   Expanded(
                     child: OutlinedButton.icon(
                       onPressed: () => _showArrangeSectionDialog(studentId, name, section, grade, availableSections),
-                      icon: const Icon(Icons.swap_horiz, size: 16),
-                      label: const Text('Move / Assign'),
+                      icon: const Icon(Icons.swap_horiz, size: 15),
+                      label: const Text('Move / Assign', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w500)),
                       style: OutlinedButton.styleFrom(
-                        foregroundColor: AppTheme.primary,
-                        side: BorderSide(color: AppTheme.primary),
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                        foregroundColor: AppTheme.text,
+                        side: BorderSide(color: AppTheme.border),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
                       ),
                     ),
                   ),
-                  const SizedBox(width: 8),
+                  const SizedBox(width: 4),
                   IconButton(
                     onPressed: () => _resendStudentCredentialsDialog(context, s),
                     tooltip: 'Resend Credentials Email',
-                    icon: const Icon(Icons.forward_to_inbox_rounded, color: Colors.blue),
-                    style: IconButton.styleFrom(
-                      backgroundColor: Colors.blue.withValues(alpha: 0.1),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(10),
-                        side: BorderSide(color: Colors.blue.withValues(alpha: 0.3)),
-                      ),
-                    ),
+                    icon: const Icon(Icons.forward_to_inbox_rounded, size: 17),
+                    color: AppTheme.textSecondary,
+                    visualDensity: VisualDensity.compact,
                   ),
-                  const SizedBox(width: 8),
                   IconButton(
                     onPressed: () => _confirmDeleteStudent(context, s),
                     tooltip: 'Delete Student',
-                    icon: const Icon(Icons.delete_outline_rounded, color: Colors.red),
-                    style: IconButton.styleFrom(
-                      backgroundColor: Colors.red.withValues(alpha: 0.1),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(10),
-                        side: BorderSide(color: Colors.red.withValues(alpha: 0.3)),
-                      ),
-                    ),
+                    icon: const Icon(Icons.delete_outline_rounded, size: 17),
+                    color: AppTheme.error.withValues(alpha: 0.8),
+                    visualDensity: VisualDensity.compact,
                   ),
                 ],
               ),
@@ -1286,7 +1279,7 @@ class _AdminWebStudentsScreenState extends ConsumerState<AdminWebStudentsScreen>
             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
             title: Row(
               children: [
-                const Icon(Icons.stars_rounded, color: Colors.amber, size: 24),
+                Icon(Icons.workspace_premium_outlined, color: AppTheme.primary, size: 22),
                 const SizedBox(width: 10),
                 Expanded(
                   child: Text(
@@ -1323,10 +1316,10 @@ class _AdminWebStudentsScreenState extends ConsumerState<AdminWebStudentsScreen>
                     ),
                     items: const [
                       DropdownMenuItem(value: 'regular', child: Text('Regular Student (Standard Section)')),
-                      DropdownMenuItem(value: 'irregular', child: Text('⭐ Irregular / Cross-Enrolled')),
-                      DropdownMenuItem(value: 'transferee', child: Text('⭐ Transferee / Bridging')),
-                      DropdownMenuItem(value: 'sped', child: Text('⭐ SPED / Special Accommodations')),
-                      DropdownMenuItem(value: 'accelerated', child: Text('⭐ Accelerated / Working Student')),
+                      DropdownMenuItem(value: 'irregular', child: Text('Irregular / Cross-Enrolled')),
+                      DropdownMenuItem(value: 'transferee', child: Text('Transferee / Bridging')),
+                      DropdownMenuItem(value: 'sped', child: Text('SPED / Special Accommodations')),
+                      DropdownMenuItem(value: 'accelerated', child: Text('Accelerated / Working Student')),
                     ],
                     onChanged: (val) {
                       if (val != null) setDialogState(() => selectedType = val);
@@ -1372,15 +1365,16 @@ class _AdminWebStudentsScreenState extends ConsumerState<AdminWebStudentsScreen>
                     messenger.showSnackBar(
                       SnackBar(
                         content: Text('Updated classification for $studentName to ${selectedType.toUpperCase()}'),
-                        backgroundColor: Colors.amber.shade800,
+                        backgroundColor: AppTheme.success,
                       ),
                     );
                   }
                 },
                 style: ElevatedButton.styleFrom(
-                  backgroundColor: Colors.amber.shade700,
-                  foregroundColor: Colors.black,
+                  backgroundColor: AppTheme.primary,
+                  foregroundColor: Colors.white,
                   shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                  elevation: 0,
                 ),
                 child: const Text('Save Classification', style: TextStyle(fontWeight: FontWeight.bold)),
               ),
@@ -1569,10 +1563,10 @@ class _AdminWebStudentsScreenState extends ConsumerState<AdminWebStudentsScreen>
                 Container(
                   padding: const EdgeInsets.all(8),
                   decoration: BoxDecoration(
-                    color: Colors.teal.withValues(alpha: 0.1),
+                    color: AppTheme.primary.withValues(alpha: 0.08),
                     borderRadius: BorderRadius.circular(8),
                   ),
-                  child: const Icon(Icons.menu_book, color: Colors.teal, size: 22),
+                  child: Icon(Icons.menu_book_outlined, color: AppTheme.primary, size: 22),
                 ),
                 const SizedBox(width: 12),
                 Expanded(
@@ -1637,7 +1631,7 @@ class _AdminWebStudentsScreenState extends ConsumerState<AdminWebStudentsScreen>
                             subtitle: teacher != null && teacher.isNotEmpty
                                 ? Text('Instructor: $teacher', style: TextStyle(fontSize: 11, color: AppTheme.textMuted))
                                 : null,
-                            activeColor: Colors.teal,
+                            activeColor: AppTheme.primary,
                             dense: true,
                           );
                         },
@@ -1663,13 +1657,13 @@ class _AdminWebStudentsScreenState extends ConsumerState<AdminWebStudentsScreen>
                     messenger.showSnackBar(
                       SnackBar(
                         content: Text('Updated course enrollments for $studentName (${selectedSubjectIds.length} courses)'),
-                        backgroundColor: Colors.green,
+                        backgroundColor: AppTheme.success,
                       ),
                     );
                   }
                 },
                 style: ElevatedButton.styleFrom(
-                  backgroundColor: Colors.teal,
+                  backgroundColor: AppTheme.primary,
                   foregroundColor: Colors.white,
                   shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
                 ),
@@ -2175,10 +2169,10 @@ class _AdminWebStudentsScreenState extends ConsumerState<AdminWebStudentsScreen>
                   Container(
                     padding: const EdgeInsets.all(8),
                     decoration: BoxDecoration(
-                      color: Colors.teal.withValues(alpha: 0.12),
+                      color: AppTheme.primary.withValues(alpha: 0.08),
                       borderRadius: BorderRadius.circular(10),
                     ),
-                    child: const Icon(Icons.person_add_alt_1_rounded, color: Colors.teal, size: 22),
+                    child: Icon(Icons.person_add_alt_1_rounded, color: AppTheme.primary, size: 22),
                   ),
                   const SizedBox(width: 12),
                   Expanded(
@@ -2481,7 +2475,7 @@ class _AdminWebStudentsScreenState extends ConsumerState<AdminWebStudentsScreen>
                                   subtitle: teacher != null && teacher.isNotEmpty
                                       ? Text('Teacher: $teacher', style: TextStyle(fontSize: 11, color: AppTheme.textMuted))
                                       : null,
-                                  activeColor: Colors.teal,
+                                  activeColor: AppTheme.primary,
                                   dense: true,
                                 );
                               },
@@ -2491,13 +2485,13 @@ class _AdminWebStudentsScreenState extends ConsumerState<AdminWebStudentsScreen>
                         Container(
                           padding: const EdgeInsets.all(12),
                           decoration: BoxDecoration(
-                            color: Colors.teal.withValues(alpha: 0.08),
+                            color: AppTheme.primary.withValues(alpha: 0.08),
                             borderRadius: BorderRadius.circular(10),
-                            border: Border.all(color: Colors.teal.withValues(alpha: 0.25)),
+                            border: Border.all(color: AppTheme.primary.withValues(alpha: 0.25)),
                           ),
                           child: Row(
                             children: [
-                              const Icon(Icons.mark_email_read_outlined, size: 20, color: Colors.teal),
+                              Icon(Icons.mark_email_read_outlined, size: 20, color: AppTheme.primary),
                               const SizedBox(width: 10),
                               Expanded(
                                 child: Text(
@@ -2565,7 +2559,7 @@ class _AdminWebStudentsScreenState extends ConsumerState<AdminWebStudentsScreen>
                                       ),
                                     ],
                                   ),
-                                  backgroundColor: emailSent ? Colors.green.shade700 : Colors.amber.shade900,
+                                  backgroundColor: emailSent ? AppTheme.success : AppTheme.warning,
                                   duration: Duration(seconds: emailSent ? 4 : 8),
                                   behavior: SnackBarBehavior.floating,
                                 ),
@@ -2575,13 +2569,13 @@ class _AdminWebStudentsScreenState extends ConsumerState<AdminWebStudentsScreen>
                             setDialogState(() => isSubmitting = false);
                             if (context.mounted) {
                               ScaffoldMessenger.of(context).showSnackBar(
-                                SnackBar(content: Text('Error: $e'), backgroundColor: Colors.red),
+                                SnackBar(content: Text('Error: $e'), backgroundColor: AppTheme.error),
                               );
                             }
                           }
                         },
                   style: ElevatedButton.styleFrom(
-                    backgroundColor: Colors.teal.shade700,
+                    backgroundColor: AppTheme.primary,
                     foregroundColor: Colors.white,
                     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
                     minimumSize: const Size(0, 40),

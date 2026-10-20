@@ -58,20 +58,18 @@ class _KpiSummaryCardState extends State<KpiSummaryCard> {
           padding: const EdgeInsets.all(18),
           decoration: BoxDecoration(
             color: cardColor,
-            borderRadius: BorderRadius.circular(14),
+            borderRadius: BorderRadius.circular(12),
             border: Border.all(
               color: _isHovered
-                  ? widget.color.withValues(alpha: effectiveIsDark ? 0.7 : 0.5)
+                  ? (effectiveIsDark ? const Color(0xFF33455E) : const Color(0xFF94A3B8))
                   : borderColor,
-              width: _isHovered ? 1.5 : 1.0,
+              width: 1.0,
             ),
             boxShadow: [
               BoxShadow(
-                color: _isHovered
-                    ? widget.color.withValues(alpha: effectiveIsDark ? 0.18 : 0.08)
-                    : Colors.black.withValues(alpha: effectiveIsDark ? 0.2 : 0.03),
-                blurRadius: _isHovered ? 14 : 8,
-                offset: Offset(0, _isHovered ? 4 : 2),
+                color: Colors.black.withValues(alpha: effectiveIsDark ? 0.2 : 0.04),
+                blurRadius: _isHovered ? 6 : 2,
+                offset: const Offset(0, 1),
               ),
             ],
           ),
@@ -99,19 +97,22 @@ class _KpiSummaryCardState extends State<KpiSummaryCard> {
                           overflow: TextOverflow.ellipsis,
                         ),
                         if (widget.badgeText != null) ...[
-                          const SizedBox(height: 3),
+                          const SizedBox(height: 4),
                           Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1.5),
+                            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                             decoration: BoxDecoration(
-                              color: widget.color.withValues(alpha: effectiveIsDark ? 0.2 : 0.1),
+                              color: effectiveIsDark ? AppTheme.darkSurfaceLight : const Color(0xFFF1F5F9),
                               borderRadius: BorderRadius.circular(4),
+                              border: Border.all(
+                                color: effectiveIsDark ? AppTheme.darkBorder : const Color(0xFFE2E8F0),
+                              ),
                             ),
                             child: Text(
                               widget.badgeText!,
                               style: TextStyle(
-                                fontSize: 9.5,
-                                fontWeight: FontWeight.bold,
-                                color: widget.color,
+                                fontSize: 10,
+                                fontWeight: FontWeight.w600,
+                                color: effectiveIsDark ? AppTheme.darkTextSecondary : AppTheme.lightTextSecondary,
                               ),
                             ),
                           ),
@@ -121,15 +122,15 @@ class _KpiSummaryCardState extends State<KpiSummaryCard> {
                   ),
                   const SizedBox(width: 8),
                   Container(
-                    padding: const EdgeInsets.all(9),
+                    padding: const EdgeInsets.all(8),
                     decoration: BoxDecoration(
-                      color: widget.color.withValues(alpha: effectiveIsDark ? 0.16 : 0.1),
-                      borderRadius: BorderRadius.circular(10),
+                      color: widget.color.withValues(alpha: effectiveIsDark ? 0.12 : 0.08),
+                      borderRadius: BorderRadius.circular(8),
                       border: Border.all(
-                        color: widget.color.withValues(alpha: effectiveIsDark ? 0.3 : 0.2),
+                        color: widget.color.withValues(alpha: effectiveIsDark ? 0.22 : 0.15),
                       ),
                     ),
-                    child: Icon(widget.icon, color: widget.color, size: 20),
+                    child: Icon(widget.icon, color: widget.color, size: 18),
                   ),
                 ],
               ),
@@ -140,9 +141,9 @@ class _KpiSummaryCardState extends State<KpiSummaryCard> {
                 widget.value,
                 style: TextStyle(
                   fontSize: 26,
-                  fontWeight: FontWeight.w800,
+                  fontWeight: FontWeight.w700,
                   color: effectiveIsDark ? AppTheme.darkText : AppTheme.lightText,
-                  letterSpacing: -0.6,
+                  letterSpacing: -0.5,
                 ),
               ),
               const SizedBox(height: 6),
@@ -151,37 +152,43 @@ class _KpiSummaryCardState extends State<KpiSummaryCard> {
               Row(
                 children: [
                   if (widget.trendText != null) ...[
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2.5),
-                      decoration: BoxDecoration(
-                        color: trendColor.withValues(alpha: effectiveIsDark ? 0.18 : 0.1),
-                        borderRadius: BorderRadius.circular(6),
-                        border: Border.all(
-                          color: trendColor.withValues(alpha: effectiveIsDark ? 0.35 : 0.25),
-                          width: 1,
-                        ),
-                      ),
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Icon(
-                            widget.isPositiveTrend ? Icons.trending_up_rounded : Icons.trending_down_rounded,
-                            size: 13,
-                            color: trendColor,
+                    Flexible(
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                        decoration: BoxDecoration(
+                          color: trendColor.withValues(alpha: effectiveIsDark ? 0.12 : 0.08),
+                          borderRadius: BorderRadius.circular(4),
+                          border: Border.all(
+                            color: trendColor.withValues(alpha: effectiveIsDark ? 0.25 : 0.18),
+                            width: 1,
                           ),
-                          const SizedBox(width: 3),
-                          Text(
-                            widget.trendText!,
-                            style: TextStyle(
-                              fontSize: 10.5,
-                              fontWeight: FontWeight.bold,
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(
+                              widget.isPositiveTrend ? Icons.trending_up_rounded : Icons.trending_down_rounded,
+                              size: 12,
                               color: trendColor,
                             ),
-                          ),
-                        ],
+                            const SizedBox(width: 3),
+                            Flexible(
+                              child: Text(
+                                widget.trendText!,
+                                style: TextStyle(
+                                  fontSize: 10.5,
+                                  fontWeight: FontWeight.w600,
+                                  color: trendColor,
+                                ),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ),
+                          ],
+                        ),
                       ),
                     ),
-                    const SizedBox(width: 8),
+                    const SizedBox(width: 6),
                   ],
                   Expanded(
                     child: Text(

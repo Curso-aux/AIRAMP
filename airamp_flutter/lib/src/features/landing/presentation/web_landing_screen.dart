@@ -557,7 +557,9 @@ class _WebLandingScreenState extends ConsumerState<WebLandingScreen> {
                   if (user != null) ...[
                     ElevatedButton.icon(
                       onPressed: () {
-                        if (user.role == 'admin' || user.role == 'super_admin') {
+                        if (user.role == 'super_admin') {
+                          context.go('/super-admin');
+                        } else if (user.role == 'admin') {
                           context.go('/admin/dashboard');
                         } else if (user.role == 'teacher') {
                           context.go('/teacher/dashboard');
@@ -566,19 +568,23 @@ class _WebLandingScreenState extends ConsumerState<WebLandingScreen> {
                         }
                       },
                       icon: Icon(
-                        user.role == 'teacher'
-                            ? Icons.school_rounded
-                            : (user.role == 'student'
-                                ? Icons.auto_stories_rounded
-                                : Icons.dashboard_rounded),
+                        user.role == 'super_admin'
+                            ? Icons.admin_panel_settings_rounded
+                            : (user.role == 'teacher'
+                                ? Icons.school_rounded
+                                : (user.role == 'student'
+                                    ? Icons.auto_stories_rounded
+                                    : Icons.dashboard_rounded)),
                         size: 20,
                       ),
                       label: Text(
-                        user.role == 'teacher'
-                            ? 'Go to Teacher Portal'
-                            : (user.role == 'student'
-                                ? 'Go to Student Portal'
-                                : 'Go to Admin Console'),
+                        user.role == 'super_admin'
+                            ? 'Go to Super Admin Hub'
+                            : (user.role == 'teacher'
+                                ? 'Go to Teacher Portal'
+                                : (user.role == 'student'
+                                    ? 'Go to Student Portal'
+                                    : 'Go to Admin Console')),
                       ),
                       style: ElevatedButton.styleFrom(
                         backgroundColor: AppTheme.primary,
@@ -860,7 +866,20 @@ class _WebLandingScreenState extends ConsumerState<WebLandingScreen> {
                   const SizedBox(width: 4),
 
                   // Login / Dashboard CTA
-                  if (user != null && (user.role == 'admin' || user.role == 'super_admin'))
+                  if (user != null && user.role == 'super_admin')
+                    ElevatedButton.icon(
+                      onPressed: () => context.go('/super-admin'),
+                      icon: const Icon(Icons.admin_panel_settings_rounded, size: 16),
+                      label: Text(isMobile ? 'Super Admin' : 'Super Admin Hub'),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: const Color(0xFF6366F1),
+                        foregroundColor: Colors.white,
+                        minimumSize: Size(0, isMobile ? 38 : 42),
+                        padding: EdgeInsets.symmetric(horizontal: isMobile ? 12 : 20),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                      ),
+                    )
+                  else if (user != null && user.role == 'admin')
                     ElevatedButton.icon(
                       onPressed: () => context.go('/admin/dashboard'),
                       icon: const Icon(Icons.dashboard_rounded, size: 16),

@@ -97,6 +97,8 @@ class Esp32ClientService {
 
       final savePath = '${modulesDir.path}/$fileName';
 
+      String effectiveSavePath = savePath;
+
       final response = await _dio.download(
         downloadUrl,
         savePath,
@@ -108,16 +110,37 @@ class Esp32ClientService {
       );
 
       if (response.statusCode == 200) {
+        // If downloaded file was stored as .gz, automatically decompress it for offline reading/viewing
+        if (fileName.endsWith('.gz')) {
+          try {
+            final gzFile = File(savePath);
+            if (await gzFile.exists()) {
+              final gzBytes = await gzFile.readAsBytes();
+              if (gzBytes.length > 2 && gzBytes[0] == 0x1F && gzBytes[1] == 0x8B) {
+                final decompressedBytes = gzip.decode(gzBytes);
+                final uncompressedPath = savePath.substring(0, savePath.length - 3);
+                await File(uncompressedPath).writeAsBytes(decompressedBytes);
+                try {
+                  await gzFile.delete();
+                } catch (_) {}
+                effectiveSavePath = uncompressedPath;
+              }
+            }
+          } catch (e) {
+            debugPrint('[Esp32ClientService] Error decompressing downloaded .gz file: $e');
+          }
+        }
+
         String? content;
-        if (fileName.endsWith('.json') || fileName.endsWith('.txt') || fileName.endsWith('.html') || fileName.endsWith('.htm')) {
-          final file = File(savePath);
+        if (effectiveSavePath.endsWith('.json') || effectiveSavePath.endsWith('.txt') || effectiveSavePath.endsWith('.html') || effectiveSavePath.endsWith('.htm')) {
+          final file = File(effectiveSavePath);
           if (await file.exists()) {
             content = await file.readAsString();
           }
         }
 
         return item.copyWith(
-          localPath: savePath,
+          localPath: effectiveSavePath,
           downloadStatus: HubDownloadStatus.downloaded,
           downloadProgress: 1.0,
           savedAt: 'Synced ${DateTime.now().month}/${DateTime.now().day}/${DateTime.now().year}',
@@ -134,6 +157,34 @@ class Esp32ClientService {
       downloadProgress: 1.0,
       savedAt: 'Synced ${DateTime.now().month}/${DateTime.now().day}/${DateTime.now().year}',
     );
+  }
+
+  /// Compresses a file into GZIP format to optimize wireless transfer to ESP32
+  Future<File?> compressFileForUpload(File sourceFile) async {
+    try {
+      final rawBytes = await sourceFile.readAsBytes();
+      if (rawBytes.isEmpty) return null;
+
+      final pathLower = sourceFile.path.toLowerCase();
+      if (pathLower.endsWith('.gz') || pathLower.endsWith('.zip')) {
+        return sourceFile;
+      }
+
+      final compressedBytes = gzip.encode(rawBytes);
+      if (compressedBytes.length >= rawBytes.length) {
+        return sourceFile;
+      }
+
+      final tempDir = await getTemporaryDirectory();
+      final baseName = sourceFile.uri.pathSegments.last;
+      final gzPath = '${tempDir.path}/$baseName.gz';
+      final gzFile = File(gzPath);
+      await gzFile.writeAsBytes(compressedBytes);
+      return gzFile;
+    } catch (e) {
+      debugPrint('[Esp32ClientService] Error compressing file for upload: $e');
+      return null;
+    }
   }
 
   /// Checks status of physical ESP32 and MicroSD module via /api/ping

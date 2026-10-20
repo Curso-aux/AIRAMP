@@ -195,10 +195,18 @@ class _AdminWebAnnouncementsScreenState extends ConsumerState<AdminWebAnnounceme
         duration: const Duration(milliseconds: 200),
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
         decoration: BoxDecoration(
-          color: isSelected
-              ? (isDark ? AppTheme.primary : AppTheme.primary)
-              : Colors.transparent,
+          color: isSelected ? AppTheme.surface : Colors.transparent,
           borderRadius: BorderRadius.circular(8),
+          boxShadow: isSelected
+              ? [
+                  BoxShadow(
+                    color: Colors.black.withValues(alpha: isDark ? 0.2 : 0.06),
+                    blurRadius: 3,
+                    offset: const Offset(0, 1),
+                  ),
+                ]
+              : null,
+          border: isSelected ? Border.all(color: AppTheme.border) : null,
         ),
         child: Row(
           mainAxisSize: MainAxisSize.min,
@@ -206,15 +214,15 @@ class _AdminWebAnnouncementsScreenState extends ConsumerState<AdminWebAnnounceme
             Icon(
               icon,
               size: 18,
-              color: isSelected ? Colors.black : AppTheme.textSecondary,
+              color: isSelected ? AppTheme.primary : AppTheme.textSecondary,
             ),
             const SizedBox(width: 8),
             Text(
               title,
               style: TextStyle(
                 fontSize: 13,
-                fontWeight: isSelected ? FontWeight.w800 : FontWeight.w600,
-                color: isSelected ? Colors.black : AppTheme.text,
+                fontWeight: isSelected ? FontWeight.bold : FontWeight.w500,
+                color: isSelected ? AppTheme.text : AppTheme.textSecondary,
               ),
             ),
             const SizedBox(width: 6),
@@ -222,8 +230,8 @@ class _AdminWebAnnouncementsScreenState extends ConsumerState<AdminWebAnnounceme
               padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
               decoration: BoxDecoration(
                 color: isSelected
-                    ? Colors.black.withValues(alpha: 0.15)
-                    : (isDark ? Colors.white.withValues(alpha: 0.1) : Colors.black.withValues(alpha: 0.08)),
+                    ? AppTheme.primary.withValues(alpha: 0.1)
+                    : (isDark ? Colors.white.withValues(alpha: 0.05) : const Color(0xFFE2E8F0)),
                 borderRadius: BorderRadius.circular(10),
               ),
               child: Text(
@@ -231,7 +239,7 @@ class _AdminWebAnnouncementsScreenState extends ConsumerState<AdminWebAnnounceme
                 style: TextStyle(
                   fontSize: 11,
                   fontWeight: FontWeight.bold,
-                  color: isSelected ? Colors.black : AppTheme.textSecondary,
+                  color: isSelected ? AppTheme.primary : AppTheme.textMuted,
                 ),
               ),
             ),
@@ -240,15 +248,15 @@ class _AdminWebAnnouncementsScreenState extends ConsumerState<AdminWebAnnounceme
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                 decoration: BoxDecoration(
-                  color: isSelected ? Colors.black : AppTheme.warning,
+                  color: AppTheme.warning.withValues(alpha: 0.15),
                   borderRadius: BorderRadius.circular(10),
                 ),
                 child: Text(
                   '$badgeCount pending',
                   style: TextStyle(
                     fontSize: 10.5,
-                    fontWeight: FontWeight.w800,
-                    color: isSelected ? AppTheme.primary : Colors.black,
+                    fontWeight: FontWeight.bold,
+                    color: AppTheme.warning,
                   ),
                 ),
               ),

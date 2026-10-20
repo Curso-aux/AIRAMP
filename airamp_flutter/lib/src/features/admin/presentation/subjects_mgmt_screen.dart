@@ -41,17 +41,99 @@ class _SubjectsMgmtScreenState extends ConsumerState<SubjectsMgmtScreen> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // Header
-              Text(
-                'Manage Subjects',
-                style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold, color: Theme.of(context).colorScheme.onSurface),
-              ),
-              const SizedBox(height: 4),
-              Text(
-                isAdmin
-                    ? 'Create subjects and designate faculty permissions'
-                    : 'Manage topics, lessons, and quizzes for your assigned subjects',
-                style: TextStyle(color: AppTheme.textSecondary, fontSize: 14),
+              // Header & Responsive Action Bar
+              LayoutBuilder(
+                builder: (context, constraints) {
+                  final isWide = constraints.maxWidth >= 860;
+                  final titleSection = Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Manage Subjects',
+                        style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold, color: Theme.of(context).colorScheme.onSurface),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        isAdmin
+                            ? 'Create subjects and designate faculty permissions'
+                            : 'Manage topics, lessons, and quizzes for your assigned subjects',
+                        style: TextStyle(color: AppTheme.textSecondary, fontSize: 14),
+                      ),
+                    ],
+                  );
+
+                  final actionButtons = isAdmin
+                      ? Wrap(
+                          spacing: 10,
+                          runSpacing: 8,
+                          crossAxisAlignment: WrapCrossAlignment.center,
+                          children: [
+                            OutlinedButton.icon(
+                              onPressed: () => _showCreateSubjectDialog(autoExpandGlobal: true),
+                              icon: Icon(Icons.public, size: 16, color: AppTheme.text),
+                              label: const Text('Adopt Global Subject', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
+                              style: OutlinedButton.styleFrom(
+                                foregroundColor: AppTheme.text,
+                                side: BorderSide(color: AppTheme.border),
+                                backgroundColor: AppTheme.surface,
+                                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                                minimumSize: const Size(0, 40),
+                              ),
+                            ),
+                            OutlinedButton.icon(
+                              onPressed: _openCreateSubjectFromPdf,
+                              icon: Icon(Icons.upload_file_outlined, size: 16, color: AppTheme.primary),
+                              label: const Text('Create Subject from PDF Module (Auto-Scan)', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
+                              style: OutlinedButton.styleFrom(
+                                foregroundColor: AppTheme.primary,
+                                side: BorderSide(color: AppTheme.primary.withValues(alpha: 0.4)),
+                                backgroundColor: AppTheme.primary.withValues(alpha: 0.05),
+                                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                                minimumSize: const Size(0, 40),
+                              ),
+                            ),
+                            ElevatedButton.icon(
+                              onPressed: () => _showCreateSubjectDialog(),
+                              icon: const Icon(Icons.add, size: 16),
+                              label: const Text('Create New Subject', style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold)),
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: AppTheme.primary,
+                                foregroundColor: Colors.white,
+                                elevation: 0,
+                                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                                minimumSize: const Size(0, 40),
+                              ),
+                            ),
+                          ],
+                        )
+                      : const SizedBox.shrink();
+
+                  if (isWide) {
+                    return Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Expanded(child: titleSection),
+                        const SizedBox(width: 16),
+                        actionButtons,
+                      ],
+                    );
+                  }
+
+                  return Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      titleSection,
+                      if (isAdmin) ...[
+                        const SizedBox(height: 16),
+                        actionButtons,
+                      ],
+                    ],
+                  );
+                },
               ),
               const SizedBox(height: 20),
 
@@ -61,9 +143,9 @@ class _SubjectsMgmtScreenState extends ConsumerState<SubjectsMgmtScreen> {
                   margin: const EdgeInsets.only(bottom: 20),
                   padding: const EdgeInsets.all(16),
                   decoration: BoxDecoration(
-                    color: Theme.of(context).colorScheme.primary.withValues(alpha: 0.1),
+                    color: Theme.of(context).colorScheme.primary.withValues(alpha: 0.08),
                     borderRadius: BorderRadius.circular(12),
-                    border: Border.all(color: Theme.of(context).colorScheme.primary.withValues(alpha: 0.3)),
+                    border: Border.all(color: Theme.of(context).colorScheme.primary.withValues(alpha: 0.2)),
                   ),
                   child: Row(
                     crossAxisAlignment: CrossAxisAlignment.start,
@@ -91,64 +173,6 @@ class _SubjectsMgmtScreenState extends ConsumerState<SubjectsMgmtScreen> {
                 ),
               ],
 
-              // Admin-Only Subject Creation Actions
-              if (isAdmin) ...[
-                // Create New Subject Button
-                SizedBox(
-                  width: double.infinity,
-                  child: ElevatedButton.icon(
-                    onPressed: () => _showCreateSubjectDialog(),
-                    icon: const Icon(Icons.add, color: Colors.black),
-                    label: const Text('Create New Subject'),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: Theme.of(context).colorScheme.primary,
-                      foregroundColor: Colors.black,
-                      padding: const EdgeInsets.symmetric(vertical: 14),
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                      textStyle: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 12),
-
-                // Create Subject from PDF Module (AI Scan)
-                SizedBox(
-                  width: double.infinity,
-                  child: ElevatedButton.icon(
-                    onPressed: _openCreateSubjectFromPdf,
-                    icon: const Icon(Icons.picture_as_pdf, color: Colors.white, size: 18),
-                    label: const Text('Create Subject from PDF Module (Auto-Scan)'),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: const Color(0xFFE11D48),
-                      foregroundColor: Colors.white,
-                      padding: const EdgeInsets.symmetric(vertical: 14),
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                      textStyle: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 12),
-
-                // Adopt Global Subject Button
-                SizedBox(
-                  width: double.infinity,
-                  child: OutlinedButton.icon(
-                    onPressed: () => _showCreateSubjectDialog(autoExpandGlobal: true),
-                    icon: Icon(Icons.public, color: AppTheme.text),
-                    label: const Text('Adopt Global Subject'),
-                    style: OutlinedButton.styleFrom(
-                      foregroundColor: AppTheme.text,
-                      padding: const EdgeInsets.symmetric(vertical: 14),
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                      side: BorderSide(color: AppTheme.border),
-                      backgroundColor: AppTheme.surface,
-                      textStyle: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 24),
-              ],
-
               // Filter Chips
               Wrap(
                 spacing: 8,
@@ -160,21 +184,21 @@ class _SubjectsMgmtScreenState extends ConsumerState<SubjectsMgmtScreen> {
                     onSelected: (selected) {
                       setState(() => _selectedFilter = index);
                     },
-                    selectedColor: Theme.of(context).colorScheme.primary,
-                    backgroundColor: Theme.of(context).colorScheme.surface,
+                    selectedColor: AppTheme.primary.withValues(alpha: 0.15),
+                    backgroundColor: AppTheme.surface,
                     labelStyle: TextStyle(
-                      color: isSelected ? Colors.black : AppTheme.textSecondary,
-                      fontWeight: FontWeight.w600,
+                      color: isSelected ? AppTheme.primary : AppTheme.textSecondary,
+                      fontWeight: isSelected ? FontWeight.bold : FontWeight.w500,
                       fontSize: 13,
                     ),
                     side: BorderSide(
-                      color: isSelected ? AppTheme.primary : AppTheme.border,
+                      color: isSelected ? AppTheme.primary.withValues(alpha: 0.5) : AppTheme.border,
                     ),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
                   );
                 }),
               ),
-              const SizedBox(height: 24),
+              const SizedBox(height: 20),
 
               // Subjects List or Empty State
               if (subjects.isEmpty)
@@ -249,27 +273,29 @@ class _SubjectsMgmtScreenState extends ConsumerState<SubjectsMgmtScreen> {
                       Container(
                         padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                         decoration: BoxDecoration(
-                          color: Theme.of(context).colorScheme.primary.withValues(alpha: 0.15),
-                          borderRadius: BorderRadius.circular(4),
+                          color: Theme.of(context).brightness == Brightness.dark ? AppTheme.darkSurfaceLight : const Color(0xFFF1F5F9),
+                          borderRadius: BorderRadius.circular(6),
+                          border: Border.all(color: AppTheme.border),
                         ),
                         child: Text(
                           code,
-                          style: TextStyle(color: AppTheme.primary, fontSize: 11, fontWeight: FontWeight.bold),
+                          style: TextStyle(color: AppTheme.text, fontSize: 11.5, fontWeight: FontWeight.w600),
                         ),
                       ),
                     if (isAdopted)
                       Container(
                         padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                         decoration: BoxDecoration(
-                          color: Theme.of(context).colorScheme.primary.withValues(alpha: 0.1),
-                          borderRadius: BorderRadius.circular(4),
+                          color: Theme.of(context).brightness == Brightness.dark ? AppTheme.darkSurfaceLight : const Color(0xFFF8FAFC),
+                          borderRadius: BorderRadius.circular(6),
+                          border: Border.all(color: AppTheme.border),
                         ),
                         child: Row(
                           mainAxisSize: MainAxisSize.min,
                           children: [
-                            Icon(Icons.auto_awesome, size: 12, color: Theme.of(context).colorScheme.primary),
+                            Icon(Icons.copy_outlined, size: 12, color: AppTheme.textSecondary),
                             const SizedBox(width: 4),
-                            Text('Adapted Copy', style: TextStyle(color: AppTheme.primary, fontSize: 11)),
+                            Text('Adapted Copy', style: TextStyle(color: AppTheme.textSecondary, fontSize: 11, fontWeight: FontWeight.w500)),
                           ],
                         ),
                       ),
@@ -284,8 +310,8 @@ class _SubjectsMgmtScreenState extends ConsumerState<SubjectsMgmtScreen> {
                       Container(
                         padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                         decoration: BoxDecoration(
-                          color: Theme.of(context).scaffoldBackgroundColor,
-                          borderRadius: BorderRadius.circular(4),
+                          color: Theme.of(context).brightness == Brightness.dark ? AppTheme.darkSurfaceLight : const Color(0xFFF8FAFC),
+                          borderRadius: BorderRadius.circular(6),
                           border: Border.all(color: AppTheme.border),
                         ),
                         child: Row(
@@ -306,9 +332,9 @@ class _SubjectsMgmtScreenState extends ConsumerState<SubjectsMgmtScreen> {
                       child: Container(
                         padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                         decoration: BoxDecoration(
-                          color: Theme.of(context).scaffoldBackgroundColor,
-                          borderRadius: BorderRadius.circular(4),
-                          border: Border.all(color: AppTheme.primary.withValues(alpha: 0.35)),
+                          color: Theme.of(context).brightness == Brightness.dark ? AppTheme.darkSurfaceLight : const Color(0xFFF8FAFC),
+                          borderRadius: BorderRadius.circular(6),
+                          border: Border.all(color: AppTheme.border),
                         ),
                         child: Row(
                           mainAxisSize: MainAxisSize.min,
@@ -316,15 +342,15 @@ class _SubjectsMgmtScreenState extends ConsumerState<SubjectsMgmtScreen> {
                             Icon(
                               unlockType == 'Sequential' ? Icons.lock_outline : Icons.lock_open_outlined,
                               size: 12,
-                              color: AppTheme.primary,
+                              color: AppTheme.textSecondary,
                             ),
                             const SizedBox(width: 4),
                             Text(
                               unlockType,
-                              style: TextStyle(color: AppTheme.text, fontSize: 11, fontWeight: FontWeight.bold),
+                              style: TextStyle(color: AppTheme.text, fontSize: 11, fontWeight: FontWeight.w600),
                             ),
                             const SizedBox(width: 3),
-                            Icon(Icons.arrow_drop_down, size: 14, color: AppTheme.primary),
+                            Icon(Icons.arrow_drop_down, size: 14, color: AppTheme.textSecondary),
                           ],
                         ),
                       ),
@@ -353,16 +379,16 @@ class _SubjectsMgmtScreenState extends ConsumerState<SubjectsMgmtScreen> {
 
             // Teacher / Faculty Assignment Chip
             Container(
-              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
               decoration: BoxDecoration(
-                color: Theme.of(context).scaffoldBackgroundColor,
+                color: Theme.of(context).brightness == Brightness.dark ? AppTheme.darkSurfaceLight : const Color(0xFFF8FAFC),
                 borderRadius: BorderRadius.circular(6),
                 border: Border.all(color: AppTheme.border),
               ),
               child: Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  Icon(Icons.school_outlined, size: 14, color: AppTheme.primary),
+                  Icon(Icons.person_outline, size: 14, color: AppTheme.textSecondary),
                   const SizedBox(width: 6),
                   Flexible(
                     child: Text(
@@ -372,7 +398,7 @@ class _SubjectsMgmtScreenState extends ConsumerState<SubjectsMgmtScreen> {
                       style: TextStyle(
                         color: teacherName.isNotEmpty
                             ? AppTheme.text
-                            : AppTheme.textSecondary,
+                            : AppTheme.textMuted,
                         fontSize: 12,
                         fontWeight: FontWeight.w500,
                       ),
@@ -387,27 +413,27 @@ class _SubjectsMgmtScreenState extends ConsumerState<SubjectsMgmtScreen> {
             // Bottom row: student count + action buttons
             Row(
               children: [
-                Icon(Icons.groups_outlined, size: 16, color: Theme.of(context).colorScheme.primary),
-                const SizedBox(width: 4),
+                Icon(Icons.people_alt_outlined, size: 15, color: AppTheme.textMuted),
+                const SizedBox(width: 6),
                 Text(
                   '0 students',
-                  style: TextStyle(color: AppTheme.primary, fontSize: 13),
+                  style: TextStyle(color: AppTheme.textSecondary, fontSize: 12.5),
                 ),
                 const Spacer(),
                 if (isAdmin) ...[
                   if (isAdopted) ...[
                     _actionIconButton(
                       icon: Icons.cancel_outlined,
-                      color: Theme.of(context).colorScheme.error,
-                      bgColor: AppTheme.error.withValues(alpha: 0.15),
+                      color: AppTheme.error,
+                      tooltip: 'Remove Adapted Subject',
                       onTap: () => _confirmDelete(context, subject, ref),
                     ),
                     const SizedBox(width: 8),
                   ],
                   _actionIconButton(
-                    icon: Icons.picture_as_pdf,
-                    color: const Color(0xFFE11D48),
-                    bgColor: const Color(0xFFE11D48).withValues(alpha: 0.15),
+                    icon: Icons.picture_as_pdf_outlined,
+                    color: AppTheme.primary,
+                    tooltip: 'Upload PDF Syllabus',
                     onTap: () {
                       showDialog(
                         context: context,
@@ -422,24 +448,25 @@ class _SubjectsMgmtScreenState extends ConsumerState<SubjectsMgmtScreen> {
                   const SizedBox(width: 8),
                   _actionIconButton(
                     icon: Icons.edit_outlined,
-                    color: Theme.of(context).colorScheme.primary,
-                    bgColor: AppTheme.primary.withValues(alpha: 0.15),
+                    color: AppTheme.textSecondary,
+                    tooltip: 'Edit Subject Details',
                     onTap: () => _showEditSubjectDialog(context, subject, ref),
                   ),
                   const SizedBox(width: 8),
                   _actionIconButton(
                     icon: Icons.delete_outline,
-                    color: Theme.of(context).colorScheme.error,
-                    bgColor: AppTheme.error.withValues(alpha: 0.15),
+                    color: AppTheme.error,
+                    tooltip: 'Delete Subject',
                     onTap: () => _confirmDelete(context, subject, ref),
                   ),
                 ] else ...[
-                  // Teacher Action: Direct Curriculum Navigation (Edit Subject removed for teachers)
+                  // Teacher Action: Direct Curriculum Navigation
                   Container(
                     padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
                     decoration: BoxDecoration(
-                      color: AppTheme.primary.withValues(alpha: 0.12),
+                      color: AppTheme.primary.withValues(alpha: 0.1),
                       borderRadius: BorderRadius.circular(8),
+                      border: Border.all(color: AppTheme.primary.withValues(alpha: 0.25)),
                     ),
                     child: Row(
                       mainAxisSize: MainAxisSize.min,
@@ -449,7 +476,7 @@ class _SubjectsMgmtScreenState extends ConsumerState<SubjectsMgmtScreen> {
                           style: TextStyle(
                             color: AppTheme.primary,
                             fontSize: 12,
-                            fontWeight: FontWeight.bold,
+                            fontWeight: FontWeight.w600,
                           ),
                         ),
                         const SizedBox(width: 4),
@@ -469,20 +496,27 @@ class _SubjectsMgmtScreenState extends ConsumerState<SubjectsMgmtScreen> {
   Widget _actionIconButton({
     required IconData icon,
     required Color color,
-    required Color bgColor,
     required VoidCallback onTap,
+    String? tooltip,
   }) {
-    return GestureDetector(
+    final btn = InkWell(
       onTap: onTap,
+      borderRadius: BorderRadius.circular(8),
       child: Container(
-        padding: const EdgeInsets.all(8),
+        padding: const EdgeInsets.all(7),
         decoration: BoxDecoration(
-          color: bgColor,
+          color: AppTheme.surface,
           borderRadius: BorderRadius.circular(8),
+          border: Border.all(color: AppTheme.border),
         ),
-        child: Icon(icon, color: color, size: 18),
+        child: Icon(icon, color: color, size: 16),
       ),
     );
+
+    if (tooltip != null && tooltip.isNotEmpty) {
+      return Tooltip(message: tooltip, child: btn);
+    }
+    return btn;
   }
 
   void _confirmDelete(BuildContext context, Map<String, dynamic> subject, WidgetRef ref) {

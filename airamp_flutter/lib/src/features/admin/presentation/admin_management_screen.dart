@@ -1107,10 +1107,10 @@ class _AdminManagementScreenState extends ConsumerState<AdminManagementScreen> {
                               return Row(
                                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                                 children: [
-                                  _buildSchoolMetricChip(Icons.school, '${stats['students']}', 'Students', Colors.indigo),
-                                  _buildSchoolMetricChip(Icons.badge, '${stats['teachers']}', 'Faculty', Colors.teal),
-                                  _buildSchoolMetricChip(Icons.groups, '${stats['sections']}', 'Sections', Colors.amber.shade800),
-                                  _buildSchoolMetricChip(Icons.menu_book, '${stats['subjects']}', 'Subjects', Colors.purple),
+                                  _buildSchoolMetricChip(Icons.school, '${stats['students']}', 'Students', AppTheme.primary),
+                                  _buildSchoolMetricChip(Icons.badge, '${stats['teachers']}', 'Faculty', AppTheme.primary),
+                                  _buildSchoolMetricChip(Icons.groups, '${stats['sections']}', 'Sections', AppTheme.primary),
+                                  _buildSchoolMetricChip(Icons.menu_book, '${stats['subjects']}', 'Subjects', AppTheme.primary),
                                 ],
                               );
                             },
@@ -1367,11 +1367,11 @@ class _AdminManagementScreenState extends ConsumerState<AdminManagementScreen> {
                   builder: (context, metricsConstraints) {
                     final width = metricsConstraints.maxWidth;
                     final items = [
-                      _buildStatTile('Total Admins', admins.length.toString(), Icons.shield, Colors.purple),
-                      _buildStatTile('Campuses / Schools', schools.length.toString(), Icons.account_balance_rounded, Colors.teal),
-                      _buildStatTile('School Admins', schoolAdminCount.toString(), Icons.manage_accounts, Colors.blue),
-                      _buildStatTile('Super Admins', superAdminCount.toString(), Icons.vpn_key, Colors.amber.shade800),
-                      _buildStatTile('Faculty Staff', teachers.length.toString(), Icons.badge, Colors.indigo),
+                      _buildStatTile('Total Admins', admins.length.toString(), Icons.shield, AppTheme.primary),
+                      _buildStatTile('Campuses / Schools', schools.length.toString(), Icons.account_balance_rounded, AppTheme.primary),
+                      _buildStatTile('School Admins', schoolAdminCount.toString(), Icons.manage_accounts, AppTheme.primary),
+                      _buildStatTile('Super Admins', superAdminCount.toString(), Icons.vpn_key, AppTheme.primary),
+                      _buildStatTile('Faculty Staff', teachers.length.toString(), Icons.badge, AppTheme.primary),
                     ];
 
                     if (width >= 900) {

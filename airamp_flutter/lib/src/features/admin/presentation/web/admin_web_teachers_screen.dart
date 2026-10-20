@@ -39,6 +39,7 @@ class _AdminWebTeachersScreenState extends ConsumerState<AdminWebTeachersScreen>
   @override
   Widget build(BuildContext context) {
     ref.watch(themeProvider);
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     final teachers = ref.watch(adminTeachersProvider);
     final subjects = ref.watch(subjectsProvider);
 
@@ -108,10 +109,10 @@ class _AdminWebTeachersScreenState extends ConsumerState<AdminWebTeachersScreen>
                       OutlinedButton.icon(
                         onPressed: () => context.go('/admin/schedules'),
                         icon: const Icon(Icons.calendar_month_outlined, size: 18),
-                        label: const Text('Master Timetable', style: TextStyle(fontWeight: FontWeight.bold)),
+                        label: const Text('Master Timetable', style: TextStyle(fontWeight: FontWeight.w600)),
                         style: OutlinedButton.styleFrom(
-                          foregroundColor: Colors.teal,
-                          side: BorderSide(color: Colors.teal.withValues(alpha: 0.5)),
+                          foregroundColor: AppTheme.text,
+                          side: BorderSide(color: AppTheme.border),
                           padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
                           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
                           minimumSize: const Size(0, 42),
@@ -120,10 +121,10 @@ class _AdminWebTeachersScreenState extends ConsumerState<AdminWebTeachersScreen>
                       OutlinedButton.icon(
                         onPressed: () => TeacherBulkImportModal.show(context),
                         icon: const Icon(Icons.upload_file_outlined, size: 18),
-                        label: const Text('Bulk Import (CSV)', style: TextStyle(fontWeight: FontWeight.bold)),
+                        label: const Text('Bulk Import (CSV)', style: TextStyle(fontWeight: FontWeight.w600)),
                         style: OutlinedButton.styleFrom(
-                          foregroundColor: AppTheme.primary,
-                          side: BorderSide(color: AppTheme.primary.withValues(alpha: 0.5)),
+                          foregroundColor: AppTheme.text,
+                          side: BorderSide(color: AppTheme.border),
                           padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
                           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
                           minimumSize: const Size(0, 42),
@@ -187,21 +188,21 @@ class _AdminWebTeachersScreenState extends ConsumerState<AdminWebTeachersScreen>
                         title: 'Assigned Courses',
                         value: '$totalAssignedSubjects',
                         icon: Icons.menu_book_outlined,
-                        color: Colors.teal,
+                        color: AppTheme.primary,
                         width: isWide ? (constraints.maxWidth - 48) / 4 : (constraints.maxWidth - 16) / 2,
                       ),
                       _buildKpiCard(
                         title: 'Handled Sections',
                         value: '${allSections.length}',
                         icon: Icons.groups_outlined,
-                        color: Colors.amber.shade700,
+                        color: AppTheme.primary,
                         width: isWide ? (constraints.maxWidth - 48) / 4 : (constraints.maxWidth - 16) / 2,
                       ),
                       _buildKpiCard(
                         title: 'Students Reached',
                         value: '$totalStudentsReached',
                         icon: Icons.school_outlined,
-                        color: Colors.indigo,
+                        color: AppTheme.primary,
                         width: isWide ? (constraints.maxWidth - 48) / 4 : (constraints.maxWidth - 16) / 2,
                       ),
                     ],
@@ -260,13 +261,13 @@ class _AdminWebTeachersScreenState extends ConsumerState<AdminWebTeachersScreen>
                     Container(
                       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
                       decoration: BoxDecoration(
-                        color: AppTheme.primary.withValues(alpha: 0.1),
+                        color: AppTheme.surface,
                         borderRadius: BorderRadius.circular(10),
-                        border: Border.all(color: AppTheme.primary.withValues(alpha: 0.2)),
+                        border: Border.all(color: AppTheme.border),
                       ),
                       child: Text(
-                        '${filteredTeachers.length} Faculty Shown',
-                        style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: AppTheme.primary),
+                        '${filteredTeachers.length} Faculty Members',
+                        style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: AppTheme.textSecondary),
                       ),
                     ),
                   ],
@@ -376,16 +377,9 @@ class _AdminWebTeachersScreenState extends ConsumerState<AdminWebTeachersScreen>
                                             ),
                                           ),
                                           const SizedBox(height: 2),
-                                          Container(
-                                            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                                            decoration: BoxDecoration(
-                                              color: Colors.blue.withValues(alpha: 0.1),
-                                              borderRadius: BorderRadius.circular(4),
-                                            ),
-                                            child: const Text(
-                                              'Faculty Instructor',
-                                              style: TextStyle(fontSize: 10, color: Colors.blue, fontWeight: FontWeight.w600),
-                                            ),
+                                          Text(
+                                            'Faculty Instructor',
+                                            style: TextStyle(fontSize: 11, color: AppTheme.textSecondary, fontWeight: FontWeight.w500),
                                           ),
                                         ],
                                       ),
@@ -416,14 +410,19 @@ class _AdminWebTeachersScreenState extends ConsumerState<AdminWebTeachersScreen>
                                 DataCell(
                                   assignedSubjects.isEmpty
                                       ? Container(
-                                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                                           decoration: BoxDecoration(
-                                            color: Colors.orange.withValues(alpha: 0.1),
+                                            color: isDark ? Colors.white.withValues(alpha: 0.04) : const Color(0xFFF1F5F9),
                                             borderRadius: BorderRadius.circular(6),
+                                            border: Border.all(color: AppTheme.border.withValues(alpha: 0.8)),
                                           ),
-                                          child: const Text(
-                                            'No Courses Assigned',
-                                            style: TextStyle(fontSize: 11, color: Colors.orange, fontWeight: FontWeight.w600),
+                                          child: Text(
+                                            'None assigned',
+                                            style: TextStyle(
+                                              fontSize: 11,
+                                              color: AppTheme.textMuted,
+                                              fontWeight: FontWeight.w500,
+                                            ),
                                           ),
                                         )
                                       : Wrap(
@@ -433,22 +432,26 @@ class _AdminWebTeachersScreenState extends ConsumerState<AdminWebTeachersScreen>
                                             final code = sub['subject_code'] as String? ?? '';
                                             final title = sub['name'] as String? ?? 'Subject';
                                             return Container(
-                                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                                               decoration: BoxDecoration(
-                                                color: Colors.teal.withValues(alpha: 0.1),
+                                                color: AppTheme.primary.withValues(alpha: 0.08),
                                                 borderRadius: BorderRadius.circular(6),
-                                                border: Border.all(color: Colors.teal.withValues(alpha: 0.2)),
+                                                border: Border.all(color: AppTheme.primary.withValues(alpha: 0.2)),
                                               ),
                                               child: Text(
                                                 code.isNotEmpty ? code : title,
-                                                style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: Colors.teal),
+                                                style: TextStyle(
+                                                  fontSize: 11,
+                                                  fontWeight: FontWeight.w600,
+                                                  color: isDark ? const Color(0xFF5EEAD4) : AppTheme.primary,
+                                                ),
                                               ),
                                             );
                                           }).toList()
                                             ..addAll(assignedSubjects.length > 3
                                                 ? [
                                                     Container(
-                                                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
+                                                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
                                                       decoration: BoxDecoration(
                                                         color: AppTheme.surface,
                                                         borderRadius: BorderRadius.circular(6),
@@ -473,15 +476,19 @@ class _AdminWebTeachersScreenState extends ConsumerState<AdminWebTeachersScreen>
                                           runSpacing: 4,
                                           children: handledSections.map((sec) {
                                             return Container(
-                                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                                               decoration: BoxDecoration(
-                                                color: Colors.purple.withValues(alpha: 0.1),
+                                                color: isDark ? Colors.white.withValues(alpha: 0.06) : const Color(0xFFF8FAFC),
                                                 borderRadius: BorderRadius.circular(6),
-                                                border: Border.all(color: Colors.purple.withValues(alpha: 0.2)),
+                                                border: Border.all(color: AppTheme.border),
                                               ),
                                               child: Text(
                                                 sec,
-                                                style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: Colors.purple),
+                                                style: TextStyle(
+                                                  fontSize: 11,
+                                                  fontWeight: FontWeight.w500,
+                                                  color: AppTheme.text,
+                                                ),
                                               ),
                                             );
                                           }).toList(),
@@ -490,35 +497,52 @@ class _AdminWebTeachersScreenState extends ConsumerState<AdminWebTeachersScreen>
 
                                 // Students Reach
                                 DataCell(
-                                  Container(
-                                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                                    decoration: BoxDecoration(
-                                      color: studentCount > 0 ? Colors.green.withValues(alpha: 0.1) : AppTheme.background,
-                                      borderRadius: BorderRadius.circular(8),
-                                      border: Border.all(
-                                        color: studentCount > 0 ? Colors.green.withValues(alpha: 0.2) : AppTheme.border,
-                                      ),
-                                    ),
-                                    child: Row(
-                                      mainAxisSize: MainAxisSize.min,
-                                      children: [
-                                        Icon(
-                                          Icons.people_alt_outlined,
-                                          size: 14,
-                                          color: studentCount > 0 ? Colors.green : AppTheme.textMuted,
-                                        ),
-                                        const SizedBox(width: 6),
-                                        Text(
-                                          '$studentCount Enrolled',
-                                          style: TextStyle(
-                                            fontSize: 12,
-                                            fontWeight: FontWeight.bold,
-                                            color: studentCount > 0 ? Colors.green : AppTheme.textMuted,
+                                  studentCount > 0
+                                      ? Container(
+                                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                          decoration: BoxDecoration(
+                                            color: AppTheme.primary.withValues(alpha: 0.08),
+                                            borderRadius: BorderRadius.circular(6),
+                                            border: Border.all(color: AppTheme.primary.withValues(alpha: 0.18)),
                                           ),
+                                          child: Row(
+                                            mainAxisSize: MainAxisSize.min,
+                                            children: [
+                                              Icon(
+                                                Icons.people_alt_outlined,
+                                                size: 14,
+                                                color: isDark ? const Color(0xFF5EEAD4) : AppTheme.primary,
+                                              ),
+                                              const SizedBox(width: 5),
+                                              Text(
+                                                '$studentCount Enrolled',
+                                                style: TextStyle(
+                                                  fontSize: 12,
+                                                  fontWeight: FontWeight.w600,
+                                                  color: isDark ? const Color(0xFF5EEAD4) : AppTheme.primary,
+                                                ),
+                                              ),
+                                            ],
+                                          ),
+                                        )
+                                      : Row(
+                                          mainAxisSize: MainAxisSize.min,
+                                          children: [
+                                            Icon(
+                                              Icons.people_alt_outlined,
+                                              size: 14,
+                                              color: AppTheme.textMuted,
+                                            ),
+                                            const SizedBox(width: 5),
+                                            Text(
+                                              '0 Enrolled',
+                                              style: TextStyle(
+                                                fontSize: 12,
+                                                color: AppTheme.textMuted,
+                                              ),
+                                            ),
+                                          ],
                                         ),
-                                      ],
-                                    ),
-                                  ),
                                 ),
 
                                 // Action Buttons
@@ -529,31 +553,36 @@ class _AdminWebTeachersScreenState extends ConsumerState<AdminWebTeachersScreen>
                                       IconButton(
                                         icon: const Icon(Icons.calendar_month_outlined, size: 18),
                                         tooltip: 'Manage Teacher Schedule',
-                                        color: Colors.teal,
+                                        color: AppTheme.textSecondary,
+                                        visualDensity: VisualDensity.compact,
                                         onPressed: () => TeacherScheduleModal.show(context, teacher),
                                       ),
                                       IconButton(
                                         icon: const Icon(Icons.assignment_ind_outlined, size: 18),
                                         tooltip: 'Assign Courses',
-                                        color: AppTheme.primary,
+                                        color: AppTheme.textSecondary,
+                                        visualDensity: VisualDensity.compact,
                                         onPressed: () => _openAssignCoursesDialog(context, teacher, subjects),
                                       ),
                                       IconButton(
                                         icon: const Icon(Icons.edit_outlined, size: 18),
                                         tooltip: 'Edit Profile',
                                         color: AppTheme.textSecondary,
+                                        visualDensity: VisualDensity.compact,
                                         onPressed: () => _openEditTeacherDialog(context, teacher),
                                       ),
                                       IconButton(
                                         icon: const Icon(Icons.forward_to_inbox_rounded, size: 18),
                                         tooltip: 'Resend Credentials Email',
-                                        color: Colors.blue.shade400,
+                                        color: AppTheme.textSecondary,
+                                        visualDensity: VisualDensity.compact,
                                         onPressed: () => _resendTeacherCredentialsDialog(context, teacher),
                                       ),
                                       IconButton(
                                         icon: const Icon(Icons.delete_outline, size: 18),
                                         tooltip: 'Delete Faculty',
-                                        color: Colors.red.shade400,
+                                        color: AppTheme.error.withValues(alpha: 0.8),
+                                        visualDensity: VisualDensity.compact,
                                         onPressed: () => _confirmDeleteTeacher(context, teacher),
                                       ),
                                     ],
@@ -894,7 +923,7 @@ class _AdminWebTeachersScreenState extends ConsumerState<AdminWebTeachersScreen>
                                 ),
                               ],
                             ),
-                            backgroundColor: emailSent ? Colors.green.shade700 : Colors.amber.shade900,
+                            backgroundColor: emailSent ? AppTheme.success : AppTheme.warning,
                             duration: Duration(seconds: emailSent ? 4 : 8),
                             behavior: SnackBarBehavior.floating,
                           ),
@@ -944,10 +973,10 @@ class _AdminWebTeachersScreenState extends ConsumerState<AdminWebTeachersScreen>
                   Container(
                     padding: const EdgeInsets.all(8),
                     decoration: BoxDecoration(
-                      color: Colors.teal.withValues(alpha: 0.1),
+                      color: AppTheme.primary.withValues(alpha: 0.08),
                       borderRadius: BorderRadius.circular(8),
                     ),
-                    child: const Icon(Icons.assignment_ind, color: Colors.teal, size: 22),
+                    child: Icon(Icons.assignment_ind_outlined, color: AppTheme.primary, size: 22),
                   ),
                   const SizedBox(width: 12),
                   Expanded(
@@ -1012,9 +1041,9 @@ class _AdminWebTeachersScreenState extends ConsumerState<AdminWebTeachersScreen>
                                   ),
                                   subtitle: isAssignedOther
                                       ? Text('Currently assigned to: $existingTeacherName (will be transferred)',
-                                          style: const TextStyle(fontSize: 11, color: Colors.orange, fontWeight: FontWeight.w500))
+                                          style: TextStyle(fontSize: 11, color: AppTheme.warning, fontWeight: FontWeight.w500))
                                       : null,
-                                  activeColor: Colors.teal,
+                                  activeColor: AppTheme.primary,
                                   dense: true,
                                 );
                               },
@@ -1041,20 +1070,20 @@ class _AdminWebTeachersScreenState extends ConsumerState<AdminWebTeachersScreen>
                         ScaffoldMessenger.of(context).showSnackBar(
                           SnackBar(
                             content: Text('Course assignments updated for $teacherName'),
-                            backgroundColor: Colors.green,
+                            backgroundColor: AppTheme.success,
                           ),
                         );
                       }
                     } catch (e) {
                       if (context.mounted) {
                         ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(content: Text('Error: $e'), backgroundColor: Colors.red),
+                          SnackBar(content: Text('Error: $e'), backgroundColor: AppTheme.error),
                         );
                       }
                     }
                   },
                   style: ElevatedButton.styleFrom(
-                    backgroundColor: Colors.teal,
+                    backgroundColor: AppTheme.primary,
                     foregroundColor: Colors.white,
                     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
                     minimumSize: const Size(0, 40),
@@ -1230,9 +1259,9 @@ class _AdminWebTeachersScreenState extends ConsumerState<AdminWebTeachersScreen>
 
     if (teacherEmail.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Cannot send email: This faculty member has no email address configured.'),
-          backgroundColor: Colors.orange,
+        SnackBar(
+          content: const Text('Cannot send email: This faculty member has no email address configured.'),
+          backgroundColor: AppTheme.warning,
         ),
       );
       return;
@@ -1257,10 +1286,10 @@ class _AdminWebTeachersScreenState extends ConsumerState<AdminWebTeachersScreen>
                   Container(
                     padding: const EdgeInsets.all(8),
                     decoration: BoxDecoration(
-                      color: Colors.blue.withValues(alpha: 0.12),
+                      color: AppTheme.primary.withValues(alpha: 0.08),
                       borderRadius: BorderRadius.circular(10),
                     ),
-                    child: const Icon(Icons.forward_to_inbox_rounded, color: Colors.blue, size: 22),
+                    child: Icon(Icons.forward_to_inbox_rounded, color: AppTheme.primary, size: 22),
                   ),
                   const SizedBox(width: 12),
                   Expanded(
@@ -1367,14 +1396,14 @@ class _AdminWebTeachersScreenState extends ConsumerState<AdminWebTeachersScreen>
                       Container(
                         padding: const EdgeInsets.all(10),
                         decoration: BoxDecoration(
-                          color: Colors.blue.withValues(alpha: 0.08),
+                          color: AppTheme.primary.withValues(alpha: 0.08),
                           borderRadius: BorderRadius.circular(8),
-                          border: Border.all(color: Colors.blue.withValues(alpha: 0.2)),
+                          border: Border.all(color: AppTheme.primary.withValues(alpha: 0.2)),
                         ),
                         child: Row(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            const Icon(Icons.info_outline, size: 16, color: Colors.blue),
+                            Icon(Icons.info_outline, size: 16, color: AppTheme.primary),
                             const SizedBox(width: 8),
                             Expanded(
                               child: Text(
@@ -1427,7 +1456,7 @@ class _AdminWebTeachersScreenState extends ConsumerState<AdminWebTeachersScreen>
                                     ),
                                   ],
                                 ),
-                                backgroundColor: result.success ? Colors.green.shade700 : Colors.amber.shade900,
+                                backgroundColor: result.success ? AppTheme.success : AppTheme.warning,
                                 duration: Duration(seconds: result.success ? 4 : 8),
                                 behavior: SnackBarBehavior.floating,
                               ),
@@ -1435,7 +1464,7 @@ class _AdminWebTeachersScreenState extends ConsumerState<AdminWebTeachersScreen>
                           }
                         },
                   style: ElevatedButton.styleFrom(
-                    backgroundColor: Colors.blue.shade700,
+                    backgroundColor: AppTheme.primary,
                     foregroundColor: Colors.white,
                     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
                     minimumSize: const Size(0, 40),

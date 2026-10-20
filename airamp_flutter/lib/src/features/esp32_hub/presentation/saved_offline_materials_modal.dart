@@ -274,6 +274,11 @@ class _SavedOfflineMaterialsModalState extends State<SavedOfflineMaterialsModal>
           const Divider(height: 1),
         ],
 
+        if (_isLoading)
+          const Expanded(child: Center(child: CircularProgressIndicator()))
+        else if (_materials.isEmpty)
+          Expanded(child: _buildEmptyState())
+        else ...[
           // Search and Filters
           Padding(
             padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
@@ -365,7 +370,9 @@ class _SavedOfflineMaterialsModalState extends State<SavedOfflineMaterialsModal>
                 ),
                 InkWell(
                   onTap: () {
-                    Navigator.pop(context);
+                    if (widget.showHeader) {
+                      Navigator.pop(context);
+                    }
                     StudentEsp32SyncModal.show(
                       context,
                       studentName: widget.studentName ?? 'Student',
@@ -394,22 +401,21 @@ class _SavedOfflineMaterialsModalState extends State<SavedOfflineMaterialsModal>
 
           // Main Material List
           Expanded(
-            child: _isLoading
-                ? const Center(child: CircularProgressIndicator())
-                : _filteredMaterials.isEmpty
-                    ? _buildEmptyState()
-                    : ListView.separated(
-                        padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
-                        itemCount: _filteredMaterials.length,
-                        separatorBuilder: (_, _) => const SizedBox(height: 10),
-                        itemBuilder: (context, index) {
-                          final item = _filteredMaterials[index];
-                          return _buildMaterialCard(item);
-                        },
-                      ),
+            child: _filteredMaterials.isEmpty
+                ? _buildSearchEmptyState()
+                : ListView.separated(
+                    padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
+                    itemCount: _filteredMaterials.length,
+                    separatorBuilder: (_, _) => const SizedBox(height: 10),
+                    itemBuilder: (context, index) {
+                      final item = _filteredMaterials[index];
+                      return _buildMaterialCard(item);
+                    },
+                  ),
           ),
         ],
-      );
+      ],
+    );
 
     if (!widget.showHeader) {
       return content;
@@ -563,6 +569,22 @@ class _SavedOfflineMaterialsModalState extends State<SavedOfflineMaterialsModal>
                                 item.formattedSize,
                                 style: TextStyle(fontSize: 11, color: AppTheme.textMuted),
                               ),
+                              if (item.isCompressed)
+                                Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1.5),
+                                  decoration: BoxDecoration(
+                                    color: AppTheme.success.withValues(alpha: 0.15),
+                                    borderRadius: BorderRadius.circular(4),
+                                  ),
+                                  child: Text(
+                                    '⚡ Compressed',
+                                    style: TextStyle(
+                                      fontSize: 9.5,
+                                      fontWeight: FontWeight.bold,
+                                      color: AppTheme.success,
+                                    ),
+                                  ),
+                                ),
                               Row(
                                 mainAxisSize: MainAxisSize.min,
                                 children: [
@@ -644,56 +666,218 @@ class _SavedOfflineMaterialsModalState extends State<SavedOfflineMaterialsModal>
 
   Widget _buildEmptyState() {
     return Center(
-      child: Padding(
-        padding: const EdgeInsets.all(32),
+      child: SingleChildScrollView(
+        padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 20),
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
+            // Decorative Glowing Backpack Icon
             Container(
-              padding: const EdgeInsets.all(20),
+              width: 88,
+              height: 88,
               decoration: BoxDecoration(
-                color: AppTheme.primary.withValues(alpha: 0.1),
+                color: AppTheme.primary.withValues(alpha: 0.12),
                 shape: BoxShape.circle,
+                border: Border.all(color: AppTheme.primary.withValues(alpha: 0.25), width: 2),
+                boxShadow: [
+                  BoxShadow(
+                    color: AppTheme.primary.withValues(alpha: 0.15),
+                    blurRadius: 18,
+                    spreadRadius: 2,
+                  ),
+                ],
               ),
-              child: Icon(Icons.folder_open_rounded, size: 54, color: AppTheme.primary),
+              child: Icon(Icons.school_outlined, size: 44, color: AppTheme.primary),
             ),
             const SizedBox(height: 18),
+
+            // Badge
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+              decoration: BoxDecoration(
+                color: AppTheme.success.withValues(alpha: 0.12),
+                borderRadius: BorderRadius.circular(20),
+                border: Border.all(color: AppTheme.success.withValues(alpha: 0.3)),
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(Icons.offline_pin, size: 14, color: AppTheme.success),
+                  const SizedBox(width: 5),
+                  Text(
+                    'ZERO DATA · 100% OFFLINE',
+                    style: TextStyle(
+                      fontSize: 10,
+                      fontWeight: FontWeight.bold,
+                      color: AppTheme.success,
+                      letterSpacing: 0.5,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 12),
+
             Text(
-              'No Saved Offline Materials',
+              'Your Offline Backpack is Empty',
               style: TextStyle(
-                fontSize: 16,
+                fontSize: 19,
                 fontWeight: FontWeight.bold,
                 color: AppTheme.text,
               ),
             ),
             const SizedBox(height: 8),
             Text(
-              'Connect to your teacher\'s ESP32 station or scan the classroom QR code to save study modules and quizzes for offline access.',
+              'Take your lessons anywhere. Connect to your teacher\'s ESP32 station to download modules, worksheets, and interactive quizzes for zero-data study.',
               textAlign: TextAlign.center,
-              style: TextStyle(fontSize: 12.5, color: AppTheme.textSecondary, height: 1.4),
+              style: TextStyle(fontSize: 13, color: AppTheme.textSecondary, height: 1.45),
+            ),
+            const SizedBox(height: 22),
+
+            // Big CTA: Scan Classroom Hub QR
+            SizedBox(
+              width: double.infinity,
+              height: 50,
+              child: ElevatedButton.icon(
+                onPressed: () {
+                  if (widget.showHeader) {
+                    Navigator.pop(context);
+                  }
+                  StudentEsp32SyncModal.show(
+                    context,
+                    studentName: widget.studentName ?? 'Student',
+                    studentSection: widget.studentSection,
+                  );
+                },
+                icon: const Icon(Icons.qr_code_scanner, size: 20),
+                label: const Text(
+                  'Scan Classroom Hub QR',
+                  style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold),
+                ),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AppTheme.primary,
+                  foregroundColor: Colors.white,
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                  elevation: 2,
+                ),
+              ),
             ),
             const SizedBox(height: 20),
-            ElevatedButton.icon(
-              onPressed: () {
-                Navigator.pop(context);
-                StudentEsp32SyncModal.show(
-                  context,
-                  studentName: widget.studentName ?? 'Student',
-                  studentSection: widget.studentSection,
-                );
-              },
-              icon: const Icon(Icons.qr_code_scanner, size: 18),
-              label: const Text('Scan Classroom Hub QR'),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: AppTheme.primary,
-                foregroundColor: Colors.white,
-                padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 12),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+
+            // 3-Step Visual Guide
+            Container(
+              padding: const EdgeInsets.all(14),
+              decoration: BoxDecoration(
+                color: AppTheme.background,
+                borderRadius: BorderRadius.circular(14),
+                border: Border.all(color: AppTheme.border),
+              ),
+              child: Column(
+                children: [
+                  _buildStudentStepRow(
+                    Icons.qr_code,
+                    '1. Point Camera at Teacher\'s QR',
+                    'Scans station credentials and section info instantly',
+                  ),
+                  const Divider(height: 16),
+                  _buildStudentStepRow(
+                    Icons.bolt,
+                    '2. Ultra-Fast Offline Transfer',
+                    'Compressed files download over Wi-Fi in seconds',
+                  ),
+                  const Divider(height: 16),
+                  _buildStudentStepRow(
+                    Icons.menu_book,
+                    '3. Read & Take Quizzes Anywhere',
+                    'Open saved materials without cell signal or data load',
+                  ),
+                ],
               ),
             ),
           ],
         ),
       ),
+    );
+  }
+
+  Widget _buildSearchEmptyState() {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(28),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Container(
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: AppTheme.primary.withValues(alpha: 0.1),
+                shape: BoxShape.circle,
+              ),
+              child: Icon(Icons.search_off_rounded, size: 40, color: AppTheme.primary),
+            ),
+            const SizedBox(height: 14),
+            Text(
+              'No materials found',
+              style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: AppTheme.text),
+            ),
+            const SizedBox(height: 6),
+            Text(
+              'No offline files match your search "${_searchController.text}".',
+              textAlign: TextAlign.center,
+              style: TextStyle(fontSize: 12.5, color: AppTheme.textSecondary),
+            ),
+            const SizedBox(height: 16),
+            OutlinedButton.icon(
+              onPressed: () {
+                setState(() {
+                  _searchController.clear();
+                  _selectedFilter = 'all';
+                });
+              },
+              icon: const Icon(Icons.filter_alt_off_outlined, size: 16),
+              label: const Text('Clear Search & Filters'),
+              style: OutlinedButton.styleFrom(
+                foregroundColor: AppTheme.primary,
+                side: BorderSide(color: AppTheme.primary.withValues(alpha: 0.5)),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildStudentStepRow(IconData icon, String title, String subtitle) {
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Container(
+          padding: const EdgeInsets.all(6),
+          decoration: BoxDecoration(
+            color: AppTheme.primary.withValues(alpha: 0.15),
+            borderRadius: BorderRadius.circular(8),
+          ),
+          child: Icon(icon, size: 16, color: AppTheme.primary),
+        ),
+        const SizedBox(width: 10),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                title,
+                style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.bold, color: AppTheme.text),
+              ),
+              const SizedBox(height: 2),
+              Text(
+                subtitle,
+                style: TextStyle(fontSize: 11, color: AppTheme.textSecondary),
+              ),
+            ],
+          ),
+        ),
+      ],
     );
   }
 }

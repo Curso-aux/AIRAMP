@@ -77,6 +77,8 @@ class HubMaterialItem {
   final String? savedAt;
   final String? description;
   final String? content;
+  final bool isCompressed;
+  final int? originalSizeBytes;
 
   const HubMaterialItem({
     required this.id,
@@ -91,17 +93,33 @@ class HubMaterialItem {
     this.savedAt,
     this.description,
     this.content,
+    this.isCompressed = false,
+    this.originalSizeBytes,
   });
 
   String get formattedSize {
-    if (sizeBytes < 1024) return '$sizeBytes B';
-    if (sizeBytes < 1024 * 1024) {
-      return '${(sizeBytes / 1024).toStringAsFixed(1)} KB';
+    String sizeStr;
+    if (sizeBytes < 1024) {
+      sizeStr = '$sizeBytes B';
+    } else if (sizeBytes < 1024 * 1024) {
+      sizeStr = '${(sizeBytes / 1024).toStringAsFixed(1)} KB';
+    } else {
+      sizeStr = '${(sizeBytes / (1024 * 1024)).toStringAsFixed(1)} MB';
     }
-    return '${(sizeBytes / (1024 * 1024)).toStringAsFixed(1)} MB';
+
+    if (isCompressed && originalSizeBytes != null && originalSizeBytes! > sizeBytes) {
+      final savedPercent = (((originalSizeBytes! - sizeBytes) / originalSizeBytes!) * 100).round();
+      return '$sizeStr (Saved $savedPercent%)';
+    }
+    return sizeStr;
   }
 
   HubMaterialItem copyWith({
+    String? id,
+    String? title,
+    String? subjectName,
+    HubFileType? fileType,
+    int? sizeBytes,
     HubDownloadStatus? downloadStatus,
     double? downloadProgress,
     String? fileName,
@@ -109,13 +127,15 @@ class HubMaterialItem {
     String? savedAt,
     String? description,
     String? content,
+    bool? isCompressed,
+    int? originalSizeBytes,
   }) {
     return HubMaterialItem(
-      id: id,
-      title: title,
-      subjectName: subjectName,
-      fileType: fileType,
-      sizeBytes: sizeBytes,
+      id: id ?? this.id,
+      title: title ?? this.title,
+      subjectName: subjectName ?? this.subjectName,
+      fileType: fileType ?? this.fileType,
+      sizeBytes: sizeBytes ?? this.sizeBytes,
       fileName: fileName ?? this.fileName,
       localPath: localPath ?? this.localPath,
       downloadStatus: downloadStatus ?? this.downloadStatus,
@@ -123,6 +143,8 @@ class HubMaterialItem {
       savedAt: savedAt ?? this.savedAt,
       description: description ?? this.description,
       content: content ?? this.content,
+      isCompressed: isCompressed ?? this.isCompressed,
+      originalSizeBytes: originalSizeBytes ?? this.originalSizeBytes,
     );
   }
 
@@ -139,6 +161,8 @@ class HubMaterialItem {
     'savedAt': savedAt,
     'description': description,
     'content': content,
+    'isCompressed': isCompressed,
+    'originalSizeBytes': originalSizeBytes,
   };
 
   factory HubMaterialItem.fromJson(Map<String, dynamic> json) {
@@ -165,6 +189,8 @@ class HubMaterialItem {
       savedAt: json['savedAt'] as String?,
       description: json['description'] as String?,
       content: json['content'] as String?,
+      isCompressed: json['isCompressed'] as bool? ?? false,
+      originalSizeBytes: (json['originalSizeBytes'] as num?)?.toInt(),
     );
   }
 }

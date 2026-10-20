@@ -288,7 +288,7 @@ void handleManifest() {
   server.send(200, "application/json", response);
 }
 
-// GET /download?file=filename.pdf -> Streams file from MicroSD
+// GET /download?file=filename.pdf -> Streams file from MicroSD (supports transparent GZIP decompression)
 void handleDownload() {
   if (!server.hasArg("file")) {
     server.send(400, "text/plain", "Missing 'file' parameter");
@@ -301,13 +301,27 @@ void handleDownload() {
   }
 
   String targetPath = "";
+  bool isCompressed = false;
+
   if (sdReady) {
     if (SD.exists("/modules" + rawName)) {
       targetPath = "/modules" + rawName;
+    } else if (SD.exists("/modules" + rawName + ".gz")) {
+      targetPath = "/modules" + rawName + ".gz";
+      isCompressed = true;
     } else if (SD.exists(rawName)) {
       targetPath = rawName;
-    } else if (rawName.startsWith("/modules/") && SD.exists(rawName.substring(8))) {
-      targetPath = rawName.substring(8);
+    } else if (SD.exists(rawName + ".gz")) {
+      targetPath = rawName + ".gz";
+      isCompressed = true;
+    } else if (rawName.startsWith("/modules/")) {
+      String sub = rawName.substring(8);
+      if (SD.exists(sub)) {
+        targetPath = sub;
+      } else if (SD.exists(sub + ".gz")) {
+        targetPath = sub + ".gz";
+        isCompressed = true;
+      }
     }
   }
 
@@ -323,10 +337,24 @@ void handleDownload() {
   }
 
   String contentType = "application/octet-stream";
-  if (targetPath.endsWith(".pdf")) contentType = "application/pdf";
-  else if (targetPath.endsWith(".json")) contentType = "application/json";
-  else if (targetPath.endsWith(".txt")) contentType = "text/plain";
-  else if (targetPath.endsWith(".html") || targetPath.endsWith(".htm")) contentType = "text/html";
+  if (isCompressed) {
+    server.sendHeader("Content-Encoding", "gzip");
+    String baseName = targetPath.substring(0, targetPath.length() - 3);
+    if (baseName.endsWith(".pdf")) contentType = "application/pdf";
+    else if (baseName.endsWith(".json")) contentType = "application/json";
+    else if (baseName.endsWith(".txt")) contentType = "text/plain";
+    else if (baseName.endsWith(".html") || baseName.endsWith(".htm")) contentType = "text/html";
+  } else {
+    if (targetPath.endsWith(".pdf")) contentType = "application/pdf";
+    else if (targetPath.endsWith(".json")) contentType = "application/json";
+    else if (targetPath.endsWith(".txt")) contentType = "text/plain";
+    else if (targetPath.endsWith(".html") || targetPath.endsWith(".htm")) contentType = "text/html";
+    else if (targetPath.endsWith(".zip")) contentType = "application/zip";
+    else if (targetPath.endsWith(".gz")) {
+      contentType = "application/gzip";
+      server.sendHeader("Content-Encoding", "gzip");
+    }
+  }
 
   server.streamFile(file, contentType);
   file.close();
@@ -349,10 +377,14 @@ void handleDeleteFile() {
     String modPath = filename.startsWith("/") ? filename : ("/modules/" + filename);
     if (SD.exists(modPath)) {
       removed = SD.remove(modPath);
+    } else if (SD.exists(modPath + ".gz")) {
+      removed = SD.remove(modPath + ".gz");
     } else {
       String rootPath = filename.startsWith("/") ? filename : ("/" + filename);
       if (SD.exists(rootPath)) {
         removed = SD.remove(rootPath);
+      } else if (SD.exists(rootPath + ".gz")) {
+        removed = SD.remove(rootPath + ".gz");
       }
     }
   }
@@ -363,25 +395,414 @@ void handleDeleteFile() {
 
 // ─── WIRELESS FILE UPLOAD OVER WI-FI ────────────────────────────────────────
 File uploadFile;
+String lastUploadedFilename = "";
+size_t lastUploadedSize = 0;
+
+// Helper to auto-register an uploaded material in /manifest.json
+void appendItemToManifest(const String& id, const String& title, const String& subject, const String& fileType, uint32_t sizeBytes, const String& fileName, bool isCompressed) {
+  if (!sdReady) return;
+
+  DynamicJsonDocument doc(4096);
+  if (SD.exists("/manifest.json")) {
+    File f = SD.open("/manifest.json", FILE_READ);
+    if (f) {
+      deserializeJson(doc, f);
+      f.close();
+    }
+  }
+
+  if (!doc.containsKey("hubId")) {
+    doc["hubId"] = "AIRAMP-HUB-01";
+    doc["hubName"] = "AIRA Offline Classroom Station";
+    doc["sectionName"] = "Grade 10";
+    doc["teacherName"] = "Faculty Instructor";
+    doc["qrPayload"] = QR_PAYLOAD;
+  }
+
+  JsonArray items;
+  if (!doc.containsKey("items")) {
+    items = doc.createNestedArray("items");
+  } else {
+    items = doc["items"].as<JsonArray>();
+  }
+
+  bool updated = false;
+  for (JsonObject item : items) {
+    String existingFile = item["fileName"] | "";
+    String existingId = item["id"] | "";
+    if (existingFile == fileName || existingId == id) {
+      item["title"] = title;
+      item["subjectName"] = subject;
+      item["fileType"] = fileType;
+      item["sizeBytes"] = sizeBytes;
+      item["fileName"] = fileName;
+      item["isCompressed"] = isCompressed;
+      updated = true;
+      break;
+    }
+  }
+
+  if (!updated) {
+    JsonObject newItem = items.createNestedObject();
+    newItem["id"] = id;
+    newItem["title"] = title;
+    newItem["subjectName"] = subject;
+    newItem["fileType"] = fileType;
+    newItem["sizeBytes"] = sizeBytes;
+    newItem["fileName"] = fileName;
+    newItem["isCompressed"] = isCompressed;
+  }
+
+  SD.remove("/manifest.json");
+  File outFile = SD.open("/manifest.json", FILE_WRITE);
+  if (outFile) {
+    serializeJson(doc, outFile);
+    outFile.close();
+    Serial.printf("[Manifest] Updated with %s (Compressed: %s)\n", fileName.c_str(), isCompressed ? "yes" : "no");
+  }
+}
+
+// POST /api/manifest/append -> Appends or updates a material item in /manifest.json
+void handleAppendManifest() {
+  if (!server.hasArg("plain")) {
+    server.send(400, "application/json", "{\"status\":\"error\",\"message\":\"Missing JSON body\"}");
+    return;
+  }
+
+  StaticJsonDocument<512> doc;
+  DeserializationError err = deserializeJson(doc, server.arg("plain"));
+  if (err) {
+    server.send(400, "application/json", "{\"status\":\"error\",\"message\":\"Invalid JSON\"}");
+    return;
+  }
+
+  String id = doc["id"] | ("mat_" + String(millis()));
+  String title = doc["title"] | "Classroom Material";
+  String subject = doc["subjectName"] | "General";
+  String fileType = doc["fileType"] | "pdf";
+  uint32_t sizeBytes = doc["sizeBytes"] | 0;
+  String fileName = doc["fileName"] | "";
+  bool isCompressed = doc["isCompressed"] | false;
+
+  appendItemToManifest(id, title, subject, fileType, sizeBytes, fileName, isCompressed);
+  soundBeep(80, 2);
+  server.send(200, "application/json", "{\"status\":\"ok\",\"message\":\"Material registered in manifest\"}");
+}
+
+// GET /upload -> Interactive Material Uploader with Client-Side GZIP Compression
+const char UPLOAD_HTML[] PROGMEM = R"rawliteral(<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>AIRA Hub - Material Uploader</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0;}
+body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;background:#0F172A;color:#F8FAFC;padding:20px;display:flex;justify-content:center;min-height:100vh;align-items:center;}
+.card{background:#1E293B;border:1px solid #334155;border-radius:18px;width:100%;max-width:480px;padding:26px;box-shadow:0 12px 32px rgba(0,0,0,0.4);}
+.badge{display:inline-block;background:rgba(16,185,129,0.15);color:#10B981;font-weight:700;font-size:11px;padding:4px 10px;border-radius:20px;margin-bottom:10px;border:1px solid rgba(16,185,129,0.3);}
+h1{font-size:20px;font-weight:700;color:#F8FAFC;margin-bottom:4px;}
+p.sub{font-size:13px;color:#94A3B8;line-height:1.4;margin-bottom:16px;}
+.dropzone{border:2px dashed #475569;border-radius:14px;padding:22px 16px;text-align:center;cursor:pointer;transition:all 0.2s;background:#0F172A;margin-bottom:16px;}
+.dropzone:hover,.dropzone.dragover{border-color:#10B981;background:rgba(16,185,129,0.06);}
+.dropzone svg{width:36px;height:36px;fill:#10B981;margin-bottom:6px;}
+.dropzone p{font-size:13px;color:#CBD5E1;font-weight:600;}
+.dropzone span{font-size:11px;color:#64748B;}
+input[type=file]{display:none;}
+.compress-box{background:rgba(16,185,129,0.08);border:1px solid rgba(16,185,129,0.3);border-radius:12px;padding:12px 14px;margin-bottom:16px;}
+.compress-row{display:flex;align-items:center;justify-content:space-between;cursor:pointer;}
+.compress-label{display:flex;align-items:center;gap:8px;font-size:13px;font-weight:600;color:#10B981;}
+.switch{position:relative;width:42px;height:24px;}
+.switch input{opacity:0;width:0;height:0;}
+.slider{position:absolute;cursor:pointer;top:0;left:0;right:0;bottom:0;background:#475569;border-radius:24px;transition:0.2s;}
+.slider:before{position:absolute;content:"";height:18px;width:18px;left:3px;bottom:3px;background:white;border-radius:50%;transition:0.2s;}
+input:checked+.slider{background:#10B981;}
+input:checked+.slider:before{transform:translateX(18px);}
+.compress-desc{font-size:11.5px;color:#94A3B8;margin-top:6px;line-height:1.35;}
+.preview-box{display:none;background:#0F172A;border:1px solid #334155;border-radius:10px;padding:12px;margin-bottom:16px;}
+.preview-row{display:flex;justify-content:space-between;font-size:12px;margin-bottom:4px;color:#CBD5E1;}
+.savings-badge{display:inline-block;background:#10B981;color:#0F172A;font-weight:bold;font-size:11px;padding:3px 8px;border-radius:8px;margin-top:4px;}
+.field{margin-bottom:12px;text-align:left;}
+.field label{display:block;font-size:11px;font-weight:600;color:#94A3B8;margin-bottom:4px;text-transform:uppercase;letter-spacing:0.5px;}
+.field input,.field select{width:100%;background:#0F172A;border:1px solid #334155;border-radius:8px;color:#F8FAFC;padding:10px 12px;font-size:13px;outline:none;}
+.field input:focus,.field select:focus{border-color:#10B981;}
+.manifest-check{display:flex;align-items:center;gap:8px;font-size:12px;color:#CBD5E1;margin:12px 0 16px;}
+.manifest-check input{cursor:pointer;accent-color:#10B981;}
+.btn{background:#10B981;color:#0F172A;border:none;width:100%;padding:13px;border-radius:10px;font-weight:700;font-size:14px;cursor:pointer;transition:background 0.2s;}
+.btn:hover{background:#059669;color:#fff;}
+.btn:disabled{background:#334155;color:#64748B;cursor:not-allowed;}
+.progress-box{display:none;margin-top:16px;}
+.progress-bar-bg{width:100%;height:8px;background:#334155;border-radius:4px;overflow:hidden;margin:8px 0;}
+.progress-bar-fill{height:100%;width:0%;background:#10B981;transition:width 0.15s;}
+.progress-text{display:flex;justify-content:space-between;font-size:11px;color:#94A3B8;}
+.success-box{display:none;text-align:center;padding:20px 0;}
+.success-icon{width:50px;height:50px;border-radius:50%;background:rgba(16,185,129,0.2);color:#10B981;display:inline-flex;align-items:center;justify-content:center;font-size:26px;margin-bottom:12px;}
+.success-box h2{font-size:18px;color:#10B981;margin-bottom:6px;}
+.success-box p{font-size:12.5px;color:#94A3B8;margin-bottom:16px;}
+.footer-links{margin-top:16px;text-align:center;}
+.footer-links a{color:#38BDF8;font-size:12px;text-decoration:none;}
+</style>
+</head>
+<body>
+<div class="card">
+  <div class="header">
+    <div class="badge">100% OFFLINE ESP32 HUB</div>
+    <h1>Upload Material to SD Card</h1>
+    <p class="sub">Transmit PDFs, quizzes, or modules wirelessly over Wi-Fi with optional instant compression.</p>
+  </div>
+
+  <div id="uploadFormContainer">
+    <div class="dropzone" id="dropzone" onclick="document.getElementById('fileInput').click()">
+      <svg viewBox="0 0 24 24"><path d="M19.35 10.04C18.67 6.59 15.64 4 12 4 9.11 4 6.6 5.64 5.35 8.04 2.34 8.36 0 10.91 0 14c0 3.31 2.69 6 6 6h13c2.76 0 5-2.24 5-5 0-2.64-2.05-4.78-4.65-4.96zM14 13v4h-4v-4H7l5-5 5 5h-3z"/></svg>
+      <p id="dropzoneText">Choose file or drag & drop</p>
+      <span>Supports .pdf, .json, .txt, .docx, .zip, .gz</span>
+    </div>
+    <input type="file" id="fileInput">
+
+    <div class="compress-box">
+      <div class="compress-row" onclick="document.getElementById('compressToggle').click()">
+        <span class="compress-label">
+          <span>⚡</span> Compress material before sending
+        </span>
+        <label class="switch" onclick="event.stopPropagation()">
+          <input type="checkbox" id="compressToggle" checked onchange="updateCompressionPreview()">
+          <span class="slider"></span>
+        </label>
+      </div>
+      <p class="compress-desc">Compresses file in your browser using GZIP. Dramatically speeds up Wi-Fi upload and saves up to 70% MicroSD space!</p>
+    </div>
+
+    <div class="preview-box" id="previewBox">
+      <div class="preview-row"><span>Original Size:</span><b id="origSizeText">-</b></div>
+      <div class="preview-row"><span>Transfer Size:</span><b id="compSizeText" style="color:#10B981;">-</b></div>
+      <div id="savingsBadgeContainer"></div>
+    </div>
+
+    <div class="field">
+      <label for="titleInput">Material Title</label>
+      <input type="text" id="titleInput" placeholder="e.g. Module 1: Cellular Biology">
+    </div>
+
+    <div class="field">
+      <label for="subjectInput">Subject</label>
+      <input type="text" id="subjectInput" placeholder="e.g. Science, Mathematics, English">
+    </div>
+
+    <div class="manifest-check">
+      <input type="checkbox" id="autoManifestCheck" checked>
+      <label for="autoManifestCheck">Auto-add to classroom manifest (manifest.json)</label>
+    </div>
+
+    <button class="btn" id="uploadBtn" onclick="startUpload()" disabled>Upload to MicroSD Card</button>
+
+    <div class="progress-box" id="progressBox">
+      <div class="progress-text">
+        <span id="progressStatus">Uploading to ESP32...</span>
+        <span id="progressPercent">0%</span>
+      </div>
+      <div class="progress-bar-bg">
+        <div class="progress-bar-fill" id="progressBar"></div>
+      </div>
+      <div class="progress-text">
+        <span id="progressBytes">-</span>
+      </div>
+    </div>
+  </div>
+
+  <div class="success-box" id="successBox">
+    <div class="success-icon">&#10003;</div>
+    <h2>Upload Complete!</h2>
+    <p id="successSummary">Material has been successfully saved to the MicroSD card.</p>
+    <button class="btn" onclick="resetForm()">Upload Another File</button>
+  </div>
+
+  <div class="footer-links">
+    <a href="/">&larr; Back to Hub Home</a> | <a href="/api/manifest" target="_blank">View Manifest (JSON)</a>
+  </div>
+</div>
+
+<script>
+let selectedFile = null;
+let compressedBlob = null;
+let isCompressedReady = false;
+
+const dropzone = document.getElementById('dropzone');
+const fileInput = document.getElementById('fileInput');
+const dropzoneText = document.getElementById('dropzoneText');
+const compressToggle = document.getElementById('compressToggle');
+const previewBox = document.getElementById('previewBox');
+const origSizeText = document.getElementById('origSizeText');
+const compSizeText = document.getElementById('compSizeText');
+const savingsBadgeContainer = document.getElementById('savingsBadgeContainer');
+const titleInput = document.getElementById('titleInput');
+const subjectInput = document.getElementById('subjectInput');
+const uploadBtn = document.getElementById('uploadBtn');
+
+dropzone.addEventListener('dragover', (e) => { e.preventDefault(); dropzone.classList.add('dragover'); });
+dropzone.addEventListener('dragleave', () => dropzone.classList.remove('dragover'));
+dropzone.addEventListener('drop', (e) => {
+  e.preventDefault();
+  dropzone.classList.remove('dragover');
+  if (e.dataTransfer.files.length > 0) handleFileSelect(e.dataTransfer.files[0]);
+});
+
+fileInput.addEventListener('change', (e) => {
+  if (e.target.files.length > 0) handleFileSelect(e.target.files[0]);
+});
+
+function formatBytes(bytes) {
+  if (bytes < 1024) return bytes + ' B';
+  if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB';
+  return (bytes / (1024 * 1024)).toFixed(2) + ' MB';
+}
+
+async function handleFileSelect(file) {
+  selectedFile = file;
+  dropzoneText.textContent = file.name;
+  uploadBtn.disabled = false;
+
+  if (!titleInput.value) {
+    titleInput.value = file.name.replace(/\.[^/.]+$/, '').replace(/[_-]/g, ' ');
+  }
+  if (!subjectInput.value) {
+    subjectInput.value = 'General';
+  }
+
+  await updateCompressionPreview();
+}
+
+async function updateCompressionPreview() {
+  if (!selectedFile) return;
+
+  const shouldCompress = compressToggle.checked && !selectedFile.name.endsWith('.gz') && !selectedFile.name.endsWith('.zip');
+  previewBox.style.display = 'block';
+  origSizeText.textContent = formatBytes(selectedFile.size);
+
+  if (shouldCompress && window.CompressionStream) {
+    compSizeText.textContent = 'Compressing preview...';
+    try {
+      const stream = selectedFile.stream().pipeThrough(new CompressionStream('gzip'));
+      compressedBlob = await new Response(stream).blob();
+      isCompressedReady = true;
+
+      const compSize = compressedBlob.size;
+      compSizeText.textContent = formatBytes(compSize) + ' (.gz)';
+
+      const savedPercent = Math.max(0, Math.round((1 - (compSize / selectedFile.size)) * 100));
+      savingsBadgeContainer.innerHTML = '<span class="savings-badge">Saved ' + savedPercent + '% bandwidth & storage!</span>';
+    } catch (e) {
+      compSizeText.textContent = formatBytes(selectedFile.size) + ' (Standard)';
+      savingsBadgeContainer.innerHTML = '';
+      compressedBlob = null;
+      isCompressedReady = false;
+    }
+  } else {
+    compSizeText.textContent = formatBytes(selectedFile.size) + ' (Uncompressed)';
+    savingsBadgeContainer.innerHTML = '';
+    compressedBlob = null;
+    isCompressedReady = false;
+  }
+}
+
+function startUpload() {
+  if (!selectedFile) return;
+
+  uploadBtn.disabled = true;
+  document.getElementById('progressBox').style.display = 'block';
+  const progressBar = document.getElementById('progressBar');
+  const progressPercent = document.getElementById('progressPercent');
+  const progressBytes = document.getElementById('progressBytes');
+  const progressStatus = document.getElementById('progressStatus');
+
+  const willCompress = compressToggle.checked && compressedBlob && isCompressedReady;
+  const uploadPayload = willCompress ? compressedBlob : selectedFile;
+  const fileName = willCompress && !selectedFile.name.endsWith('.gz') ? (selectedFile.name + '.gz') : selectedFile.name;
+
+  progressStatus.textContent = 'Uploading to ESP32...';
+
+  const formData = new FormData();
+  formData.append('data', uploadPayload, fileName);
+
+  const xhr = new XMLHttpRequest();
+  xhr.open('POST', '/upload', true);
+  xhr.setRequestHeader('Accept', 'application/json');
+
+  xhr.upload.onprogress = (e) => {
+    if (e.lengthComputable) {
+      const pct = Math.round((e.loaded / e.total) * 100);
+      progressBar.style.width = pct + '%';
+      progressPercent.textContent = pct + '%';
+      progressBytes.textContent = formatBytes(e.loaded) + ' / ' + formatBytes(e.total);
+    }
+  };
+
+  xhr.onload = async () => {
+    if (xhr.status === 200) {
+      progressBar.style.width = '100%';
+      progressPercent.textContent = '100%';
+      progressStatus.textContent = 'Saved to MicroSD!';
+
+      // Auto-register in manifest if checked
+      if (document.getElementById('autoManifestCheck').checked && fileName !== 'manifest.json') {
+        try {
+          const isPdf = fileName.toLowerCase().includes('.pdf');
+          const isQuiz = fileName.toLowerCase().includes('.json');
+          const payload = {
+            id: 'mat_' + Date.now(),
+            title: titleInput.value || selectedFile.name,
+            subjectName: subjectInput.value || 'General',
+            fileType: isPdf ? 'pdf' : (isQuiz ? 'quiz' : 'module'),
+            sizeBytes: uploadPayload.size,
+            fileName: fileName,
+            isCompressed: willCompress
+          };
+          await fetch('/api/manifest/append', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify(payload)
+          });
+        } catch (_) {}
+      }
+
+      document.getElementById('uploadFormContainer').style.display = 'none';
+      document.getElementById('successBox').style.display = 'block';
+      document.getElementById('successSummary').textContent =
+        'Stored as "' + fileName + '" (' + formatBytes(uploadPayload.size) + (willCompress ? ', compressed' : '') + ').';
+    } else {
+      progressStatus.textContent = 'Upload failed (Error ' + xhr.status + ')';
+      uploadBtn.disabled = false;
+    }
+  };
+
+  xhr.onerror = () => {
+    progressStatus.textContent = 'Connection error. Check Wi-Fi!';
+    uploadBtn.disabled = false;
+  };
+
+  xhr.send(formData);
+}
+
+function resetForm() {
+  selectedFile = null;
+  compressedBlob = null;
+  isCompressedReady = false;
+  fileInput.value = '';
+  titleInput.value = '';
+  dropzoneText.textContent = 'Choose file or drag & drop';
+  previewBox.style.display = 'none';
+  uploadBtn.disabled = true;
+  document.getElementById('progressBox').style.display = 'none';
+  document.getElementById('progressBar').style.width = '0%';
+  document.getElementById('uploadFormContainer').style.display = 'block';
+  document.getElementById('successBox').style.display = 'none';
+}
+</script>
+</body>
+</html>
+)rawliteral";
 
 void handleUploadPage() {
-  String html = "<!DOCTYPE html><html><head><meta name='viewport' content='width=device-width, initial-scale=1'>";
-  html += "<title>AIRA Hub - File Uploader</title>";
-  html += "<style>body{font-family:sans-serif;background:#0F172A;color:#F8FAFC;padding:24px;text-align:center;}";
-  html += ".card{background:#1E293B;padding:24px;border-radius:16px;max-width:440px;margin:0 auto;box-shadow:0 8px 24px rgba(0,0,0,0.3);}";
-  html += "h1{color:#10B981;font-size:20px;margin-bottom:8px;}";
-  html += "input[type=file]{margin:20px 0;display:block;width:100%;color:#94A3B8;}";
-  html += "input[type=submit]{background:#10B981;color:#fff;border:none;padding:12px 24px;border-radius:10px;font-weight:bold;cursor:pointer;width:100%;font-size:15px;}";
-  html += "</style></head><body><div class='card'>";
-  html += "<h1>Upload Files to SD Card</h1>";
-  html += "<p style='color:#94A3B8;font-size:13px;'>Upload <b>manifest.json</b> or <b>.pdf</b> modules wirelessly directly to the MicroSD card without an adapter!</p>";
-  html += "<form method='POST' action='/upload' enctype='multipart/form-data'>";
-  html += "<input type='file' name='data' required>";
-  html += "<input type='submit' value='Upload to MicroSD Card'>";
-  html += "</form>";
-  html += "<p style='margin-top:20px;'><a href='/' style='color:#38BDF8;font-size:13px;text-decoration:none;'>&larr; Back to Hub Home</a></p>";
-  html += "</div></body></html>";
-  server.send(200, "text/html", html);
+  server.send_P(200, "text/html", UPLOAD_HTML);
 }
 
 void handleFileUpload() {
@@ -389,7 +810,9 @@ void handleFileUpload() {
   if (upload.status == UPLOAD_FILE_START) {
     String filename = upload.filename;
     if (!filename.startsWith("/")) {
-      if (filename.endsWith(".pdf") || filename.endsWith(".json") || filename.endsWith(".txt") || filename.endsWith(".doc") || filename.endsWith(".docx") || filename.endsWith(".html") || filename.endsWith(".htm")) {
+      if (filename.endsWith(".pdf") || filename.endsWith(".json") || filename.endsWith(".txt") || 
+          filename.endsWith(".doc") || filename.endsWith(".docx") || filename.endsWith(".html") || 
+          filename.endsWith(".htm") || filename.endsWith(".gz") || filename.endsWith(".zip")) {
         if (!SD.exists("/modules")) SD.mkdir("/modules");
         filename = "/modules/" + filename;
       } else {
@@ -401,6 +824,8 @@ void handleFileUpload() {
       SD.remove(filename);
     }
     uploadFile = SD.open(filename, FILE_WRITE);
+    lastUploadedFilename = upload.filename;
+    lastUploadedSize = 0;
   } else if (upload.status == UPLOAD_FILE_WRITE) {
     if (uploadFile) {
       uploadFile.write(upload.buf, upload.currentSize);
@@ -408,7 +833,8 @@ void handleFileUpload() {
   } else if (upload.status == UPLOAD_FILE_END) {
     if (uploadFile) {
       uploadFile.close();
-      Serial.printf("[Upload] Complete! Size: %u bytes\n", upload.totalSize);
+      lastUploadedSize = upload.totalSize;
+      Serial.printf("[Upload] Complete! Stored: %s, Size: %u bytes\n", lastUploadedFilename.c_str(), upload.totalSize);
       soundBeep(80, 2);
     }
   }
@@ -534,16 +960,14 @@ void setup() {
   server.on("/api/ping", handlePing);
   server.on("/api/manifest", HTTP_GET, handleManifest);
   server.on("/api/manifest", HTTP_POST, handleSaveManifest);
+  server.on("/api/manifest/append", HTTP_POST, handleAppendManifest);
   server.on("/download", handleDownload);
   server.on("/api/delete", HTTP_POST, handleDeleteFile);
   server.on("/api/delete", HTTP_GET, handleDeleteFile);
   server.on("/upload", HTTP_GET, handleUploadPage);
   server.on("/upload", HTTP_POST, []() {
-    if (server.hasHeader("Accept") && server.header("Accept").indexOf("application/json") >= 0) {
-      server.send(200, "application/json", "{\"status\":\"ok\",\"message\":\"Uploaded successfully to MicroSD\"}");
-    } else {
-      server.send(200, "text/html", "<html><body style='background:#0F172A;color:#10B981;font-family:sans-serif;text-align:center;padding:40px;'><h2>File Uploaded Successfully!</h2><p><a href='/upload' style='color:#38BDF8;'>Upload Another File</a> | <a href='/' style='color:#38BDF8;'>Back to Home</a></p></body></html>");
-    }
+    String jsonResp = "{\"status\":\"ok\",\"message\":\"Uploaded successfully to MicroSD\",\"fileName\":\"" + lastUploadedFilename + "\",\"sizeBytes\":" + String(lastUploadedSize) + "}";
+    server.send(200, "application/json", jsonResp);
   }, handleFileUpload);
   server.enableCORS(true);
   server.begin();
