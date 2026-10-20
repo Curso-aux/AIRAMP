@@ -6,6 +6,7 @@ import '../../../core/components/skeleton_loader.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/theme/theme_provider.dart';
 import '../../../core/database/database_helper.dart';
+import '../../../core/utils/philippine_time_helper.dart';
 import '../../student/data/student_repository.dart';
 import '../../auth/application/auth_provider.dart';
 
@@ -60,12 +61,7 @@ class _QuizScreenState extends ConsumerState<QuizScreen> {
 
   String _formatDateTimeString(String? isoStr) {
     if (isoStr == null || isoStr.isEmpty) return '';
-    try {
-      final dt = DateTime.parse(isoStr).toLocal();
-      return _formatScheduleDateTime(dt);
-    } catch (_) {
-      return isoStr;
-    }
+    return PhilippineTimeHelper.formatDate(isoStr);
   }
 
   @override
@@ -83,10 +79,10 @@ class _QuizScreenState extends ConsumerState<QuizScreen> {
 
   Timer? _scheduleTimer;
 
-  /// Periodically check if the quiz has become available
+  /// Periodically check if the quiz has become available and tick countdown
   void _startScheduleCheck() {
     _scheduleTimer?.cancel();
-    _scheduleTimer = Timer.periodic(const Duration(seconds: 10), (timer) {
+    _scheduleTimer = Timer.periodic(const Duration(seconds: 1), (timer) {
       if (!mounted) {
         timer.cancel();
         return;
@@ -97,6 +93,10 @@ class _QuizScreenState extends ConsumerState<QuizScreen> {
           setState(() {
             _state = 0; // Go to intro screen
           });
+        }
+      } else {
+        if (mounted) {
+          setState(() {});
         }
       }
     });
@@ -137,34 +137,27 @@ class _QuizScreenState extends ConsumerState<QuizScreen> {
       _scheduleEnd = quizData['schedule_end'] as String?;
       final dueDateStr = quizData['due_date'] as String?;
 
-      DateTime? scheduleDate;
-      if (_scheduleStart != null && _scheduleStart!.isNotEmpty) {
-        try {
-          scheduleDate = DateTime.parse(_scheduleStart!).toLocal();
-        } catch (_) {}
-      }
-
-      DateTime? scheduleEndDate;
-      if (_scheduleEnd != null && _scheduleEnd!.isNotEmpty) {
-        try {
-          scheduleEndDate = DateTime.parse(_scheduleEnd!).toLocal();
-          if (_scheduleEnd!.length == 10 && !_scheduleEnd!.contains('T')) {
-            scheduleEndDate = DateTime(scheduleEndDate.year, scheduleEndDate.month, scheduleEndDate.day, 23, 59, 59);
-          }
-        } catch (_) {}
+      DateTime? scheduleDate = PhilippineTimeHelper.parseToPht(_scheduleStart);
+      DateTime? scheduleEndDate = PhilippineTimeHelper.parseToPht(_scheduleEnd);
+      if (scheduleEndDate != null) {
+        final sanitized = _scheduleEnd!.trim();
+        if (sanitized.length <= 10 && !sanitized.contains('T') && !sanitized.contains(' ')) {
+          scheduleEndDate = DateTime(scheduleEndDate.year, scheduleEndDate.month, scheduleEndDate.day, 23, 59, 59, 999);
+        }
       } else if (dueDateStr != null && dueDateStr.isNotEmpty) {
-        try {
-          final d = DateTime.parse(dueDateStr).toLocal();
-          if (dueDateStr.length == 10 && !dueDateStr.contains('T')) {
-            scheduleEndDate = DateTime(d.year, d.month, d.day, 23, 59, 59);
+        final d = PhilippineTimeHelper.parseToPht(dueDateStr);
+        if (d != null) {
+          final sanitized = dueDateStr.trim();
+          if (sanitized.length <= 10 && !sanitized.contains('T') && !sanitized.contains(' ')) {
+            scheduleEndDate = DateTime(d.year, d.month, d.day, 23, 59, 59, 999);
           } else {
             scheduleEndDate = d;
           }
-        } catch (_) {}
+        }
       }
 
       // Check if student missed this quiz (past due deadline without completing)
-      if (!isTeacher && scheduleEndDate != null && DateTime.now().isAfter(scheduleEndDate)) {
+      if (!isTeacher && scheduleEndDate != null && PhilippineTimeHelper.now().isAfter(scheduleEndDate)) {
         await DatabaseHelper().markQuizAssignmentMissed(
           quizId: parsedId,
           studentId: studentId,
@@ -321,7 +314,7 @@ class _QuizScreenState extends ConsumerState<QuizScreen> {
         return;
       }
       // If quiz window deadline has passed during active quiz, auto-submit with timeout
-      if (_scheduleEndDate != null && DateTime.now().isAfter(_scheduleEndDate!)) {
+      if (_scheduleEndDate != null && PhilippineTimeHelper.now().isAfter(_scheduleEndDate!)) {
         timer.cancel();
         _submitQuiz(isTimeout: true);
         return;
@@ -338,13 +331,15 @@ class _QuizScreenState extends ConsumerState<QuizScreen> {
   // Check if the quiz is available now based on schedule_start
   bool _isQuizAvailable() {
     if (_scheduleStartDate == null) return true; // No schedule restriction
-    return DateTime.now().isAfter(_scheduleStartDate!);
+    final now = PhilippineTimeHelper.now();
+    return !_scheduleStartDate!.isAfter(now);
   }
 
   // Time remaining until quiz becomes available
   Duration _timeUntilAvailable() {
     if (_scheduleStartDate == null) return Duration.zero;
-    return _scheduleStartDate!.difference(DateTime.now());
+    final diff = _scheduleStartDate!.difference(PhilippineTimeHelper.now());
+    return diff.isNegative ? Duration.zero : diff;
   }
 
   String _formatTimer(int totalSecs) {
@@ -547,8 +542,14 @@ class _QuizScreenState extends ConsumerState<QuizScreen> {
     }
 
     // Check schedule — if not yet available, show countdown
-    if (_state == 3 || (_scheduleStartDate != null && !_isQuizAvailable())) {
+    if (_scheduleStartDate != null && !_isQuizAvailable()) {
       _state = 3; // Show countdown state
+      if (_scheduleTimer == null || !_scheduleTimer!.isActive) {
+        _startScheduleCheck();
+      }
+    } else if (_state == 3) {
+      _state = 0; // Automatically switch to intro when available!
+      _scheduleTimer?.cancel();
     }
 
     return PopScope(
@@ -719,6 +720,32 @@ class _QuizScreenState extends ConsumerState<QuizScreen> {
                 'This page will auto-refresh when the quiz becomes available.',
                 style: TextStyle(fontSize: 12, color: AppTheme.textMuted),
               ),
+              const SizedBox(height: 20),
+              OutlinedButton.icon(
+                onPressed: () {
+                  if (_isQuizAvailable()) {
+                    setState(() => _state = 0);
+                  } else {
+                    setState(() {});
+                    final timeStr = PhilippineTimeHelper.formatRemaining(_timeUntilAvailable());
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                        content: Text('Quiz unlocks in $timeStr. It will open automatically!'),
+                        duration: const Duration(seconds: 2),
+                        behavior: SnackBarBehavior.floating,
+                      ),
+                    );
+                  }
+                },
+                icon: const Icon(Icons.refresh, size: 16),
+                label: const Text('Check Availability'),
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: AppTheme.primary,
+                  side: BorderSide(color: AppTheme.primary.withValues(alpha: 0.5)),
+                  padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                ),
+              ),
             ],
           ),
         ),
@@ -857,7 +884,7 @@ class _QuizScreenState extends ConsumerState<QuizScreen> {
               child: ElevatedButton(
                 onPressed: () {
                   final isTeacher = widget.isTeacherPreview || (ref.read(authProvider)?.role == 'teacher');
-                  if (!isTeacher && _scheduleEndDate != null && DateTime.now().isAfter(_scheduleEndDate!)) {
+                  if (!isTeacher && _scheduleEndDate != null && PhilippineTimeHelper.now().isAfter(_scheduleEndDate!)) {
                     final studentId = ref.read(authProvider)?.id;
                     final targetQuizId = _quizId ?? int.tryParse(widget.quizId);
                     if (studentId != null && targetQuizId != null) {

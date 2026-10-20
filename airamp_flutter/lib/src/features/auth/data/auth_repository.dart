@@ -11,7 +11,15 @@ class AuthSession {
   final String userId;
   final String role;
   final String? schoolId;
-  AuthSession({required this.session, required this.userId, required this.role, this.schoolId = 'sch_main'});
+  final bool mustChangePassword;
+
+  AuthSession({
+    required this.session,
+    required this.userId,
+    required this.role,
+    this.schoolId = 'sch_main',
+    this.mustChangePassword = false,
+  });
 }
 
 class AuthRepository {
@@ -144,6 +152,10 @@ class AuthRepository {
     final userId = user['id'] as String;
     final role = user['role'] as String;
 
+    final mustChange = user['must_change_password'] == 1 ||
+        user['must_change_password'] == true ||
+        user['must_change_password'] == '1';
+
     // Ensure local SQLite cache is updated with the verified user
     try {
       final existing = await db.query('users', where: 'id = ?', whereArgs: [userId]);
@@ -152,7 +164,11 @@ class AuthRepository {
       } else {
         await db.update('users', user, where: 'id = ?', whereArgs: [userId]);
       }
-    } catch (_) {}
+    } catch (_) {
+      try {
+        await db.update('users', user, where: 'LOWER(email) = ?', whereArgs: [(user['email'] as String? ?? '').toLowerCase()]);
+      } catch (_) {}
+    }
 
     // Synchronize authenticated user with Cloud Firestore
     try {
@@ -181,7 +197,7 @@ class AuthRepository {
       }
     }
 
-    await _persistSession(userId: userId, role: role, token: token);
+    await _persistSession(userId: userId, role: role, token: token, mustChangePassword: mustChange);
     ApiClient.setSession(session: token, userId: userId);
 
     return {
@@ -337,10 +353,14 @@ class AuthRepository {
     final rows = await db.query('sessions', orderBy: 'id DESC', limit: 1);
     if (rows.isEmpty) return null;
     final r = rows.first;
+    final mustChange = r['must_change_password'] == 1 ||
+        r['must_change_password'] == true ||
+        r['must_change_password'] == '1';
     return AuthSession(
       session: r['token'] as String,
       userId: r['user_id'] as String,
       role: r['role'] as String,
+      mustChangePassword: mustChange,
     );
   }
 
@@ -362,6 +382,9 @@ class AuthRepository {
       updates['password'] = DatabaseHelper.hashPassword(password, salt);
       updates['password_salt'] = salt;
       updates['must_change_password'] = 0;
+      try {
+        await db.update('sessions', {'must_change_password': 0});
+      } catch (_) {}
     }
     if (updates.isNotEmpty) {
       try {
@@ -498,13 +521,18 @@ class AuthRepository {
     required String userId,
     required String role,
     required String token,
+    bool mustChangePassword = false,
   }) async {
     final db = await DatabaseHelper().database;
+    try {
+      await db.execute('ALTER TABLE sessions ADD COLUMN must_change_password INTEGER DEFAULT 0');
+    } catch (_) {}
     await db.delete('sessions');
     await db.insert('sessions', {
       'user_id': userId,
       'token': token,
       'role': role,
+      'must_change_password': mustChangePassword ? 1 : 0,
       'created_at': DateTime.now().toIso8601String(),
     });
   }

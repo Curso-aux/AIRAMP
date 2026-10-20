@@ -80,9 +80,11 @@ class _AirampAppState extends ConsumerState<AirampApp> {
         precacheImage(const AssetImage('assets/images/aira_avatar_speaking.png'), context);
       } catch (_) {}
     }
-    // Background cloud user sync
+    // Background cloud user sync with network auto-detection
     try {
-      FirestoreService().syncCloudUsersToLocal().then((_) {
+      FirestoreService().probeConnectivity().then((_) {
+        return FirestoreService().syncCloudUsersToLocal();
+      }).then((_) {
         FirestoreService().syncLocalUsersToCloud();
       });
     } catch (_) {}

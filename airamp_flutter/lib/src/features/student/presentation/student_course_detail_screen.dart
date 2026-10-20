@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -5,6 +6,7 @@ import '../../../core/components/empty_state.dart';
 import '../../../core/components/skeleton_loader.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/theme/theme_provider.dart';
+import '../../../core/utils/philippine_time_helper.dart';
 import '../../../core/database/database_helper.dart';
 import '../../admin/data/admin_repository.dart';
 import '../../auth/application/auth_provider.dart';
@@ -28,11 +30,28 @@ class _StudentCourseDetailScreenState
   List<Map<String, dynamic>> _completedLos = [];
   List<Map<String, dynamic>> _assignedQuizzes = [];
   List<Map<String, dynamic>> _assignments = [];
+  Timer? _scheduleTicker;
 
   @override
   void initState() {
     super.initState();
     _loadData();
+    _startScheduleTicker();
+  }
+
+  void _startScheduleTicker() {
+    _scheduleTicker?.cancel();
+    _scheduleTicker = Timer.periodic(const Duration(seconds: 5), (_) {
+      if (mounted) {
+        setState(() {});
+      }
+    });
+  }
+
+  @override
+  void dispose() {
+    _scheduleTicker?.cancel();
+    super.dispose();
   }
 
   Future<void> _loadData() async {
@@ -1482,46 +1501,15 @@ class _StudentCourseDetailScreenState
     final scheduleEnd = q['schedule_end']?.toString();
     final dueDate = q['due_date']?.toString();
 
-    bool isDatePassed(String isoString) {
-      try {
-        final dt = DateTime.parse(isoString).toLocal();
-        if (isoString.length <= 10 && !isoString.contains('T')) {
-          final endOfDay = DateTime(dt.year, dt.month, dt.day, 23, 59, 59);
-          return endOfDay.isBefore(DateTime.now());
-        }
-        return dt.isBefore(DateTime.now());
-      } catch (_) {
-        return true;
-      }
-    }
-
-    String formatDateTime(String? isoString) {
-      if (isoString == null || isoString.isEmpty) return '';
-      try {
-        final dt = DateTime.parse(isoString).toLocal();
-        const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-        final dateStr = '${months[dt.month - 1]} ${dt.day.toString().padLeft(2, '0')}, ${dt.year}';
-        if (isoString.contains('T') || isoString.length > 10) {
-          final hour = dt.hour % 12 == 0 ? 12 : dt.hour % 12;
-          final ampm = dt.hour >= 12 ? 'PM' : 'AM';
-          final min = dt.minute.toString().padLeft(2, '0');
-          return '$dateStr at $hour:$min $ampm';
-        }
-        return dateStr;
-      } catch (_) {
-        return isoString;
-      }
-    }
-
     // Authoritative deadline: scheduleEnd takes priority over dueDate
     final effectiveDeadline = (scheduleEnd != null && scheduleEnd.isNotEmpty) ? scheduleEnd : dueDate;
-    final isDeadlinePassed = effectiveDeadline != null && effectiveDeadline.isNotEmpty && isDatePassed(effectiveDeadline);
+    final isDeadlinePassed = effectiveDeadline != null && effectiveDeadline.isNotEmpty && PhilippineTimeHelper.isDatePassed(effectiveDeadline);
 
     // Quiz is missed if not completed AND deadline has passed
     final isMissed = !isCompleted && isDeadlinePassed;
 
     // Quiz has a future start time that hasn't arrived yet (and deadline hasn't passed)
-    final isNotYetAvailable = !isCompleted && !isMissed && scheduleStart != null && scheduleStart.isNotEmpty && !isDatePassed(scheduleStart);
+    final isNotYetAvailable = !isCompleted && !isMissed && scheduleStart != null && scheduleStart.isNotEmpty && !PhilippineTimeHelper.isDatePassed(scheduleStart);
 
     // Auto-mark missed in local DB if deadline passed while still pending
     final studentId = q['student_id']?.toString() ?? ref.read(authProvider)?.id ?? '';
@@ -1637,7 +1625,7 @@ class _StudentCourseDetailScreenState
                   const SizedBox(width: 6),
                   Expanded(
                     child: Text(
-                      'Available from ${formatDateTime(scheduleStart)}',
+                      'Available from ${PhilippineTimeHelper.formatDateTime(scheduleStart)}',
                       style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: AppTheme.info),
                     ),
                   ),
@@ -1679,7 +1667,7 @@ class _StudentCourseDetailScreenState
                     Icon(Icons.event, size: 14, color: AppTheme.textMuted),
                     const SizedBox(width: 4),
                     Text(
-                      'Until ${formatDateTime(scheduleEnd)}',
+                      'Until ${PhilippineTimeHelper.formatDateTime(scheduleEnd)}',
                       style: TextStyle(fontSize: 12, color: AppTheme.textSecondary),
                     ),
                   ],
@@ -1691,7 +1679,7 @@ class _StudentCourseDetailScreenState
                     Icon(Icons.calendar_today, size: 14, color: AppTheme.textMuted),
                     const SizedBox(width: 4),
                     Text(
-                      'Due ${formatDateTime(dueDate)}',
+                      'Due ${PhilippineTimeHelper.formatDateTime(dueDate)}',
                       style: TextStyle(fontSize: 12, color: AppTheme.textSecondary),
                     ),
                   ],
@@ -1747,10 +1735,26 @@ class _StudentCourseDetailScreenState
                       )
                     : isNotYetAvailable
                         ? OutlinedButton.icon(
-                            onPressed: null,
+                            onPressed: () {
+                              if (PhilippineTimeHelper.isDatePassed(scheduleStart)) {
+                                if (quizId != null) {
+                                  context.push('/quiz/$quizId').then((_) => _loadData());
+                                }
+                              } else {
+                                final remaining = PhilippineTimeHelper.timeUntil(scheduleStart);
+                                final timeStr = PhilippineTimeHelper.formatRemaining(remaining);
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  SnackBar(
+                                    content: Text('Quiz unlocks in $timeStr (at ${PhilippineTimeHelper.formatDateTime(scheduleStart)}). It will automatically unlock!'),
+                                    duration: const Duration(seconds: 3),
+                                    behavior: SnackBarBehavior.floating,
+                                  ),
+                                );
+                              }
+                            },
                             icon: Icon(Icons.lock_clock, size: 16, color: AppTheme.textMuted),
                             label: Text(
-                              'Locked — Opens ${formatDateTime(scheduleStart)}',
+                              'Locked — Opens ${PhilippineTimeHelper.formatDateTime(scheduleStart)}',
                               style: TextStyle(fontWeight: FontWeight.bold, color: AppTheme.textMuted),
                             ),
                             style: OutlinedButton.styleFrom(
@@ -1793,27 +1797,8 @@ class _StudentCourseDetailScreenState
     String formattedDue = 'No due date';
     bool isOverdue = false;
     if (dueDateStr != null && dueDateStr.isNotEmpty) {
-      try {
-        final dt = DateTime.parse(dueDateStr);
-        final months = [
-          'Jan',
-          'Feb',
-          'Mar',
-          'Apr',
-          'May',
-          'Jun',
-          'Jul',
-          'Aug',
-          'Sep',
-          'Oct',
-          'Nov',
-          'Dec',
-        ];
-        formattedDue = 'Due: ${months[dt.month - 1]} ${dt.day}, ${dt.year}';
-        isOverdue = DateTime.now().isAfter(dt);
-      } catch (_) {
-        formattedDue = 'Due: $dueDateStr';
-      }
+      formattedDue = 'Due: ${PhilippineTimeHelper.formatDate(dueDateStr)}';
+      isOverdue = PhilippineTimeHelper.isDatePassed(dueDateStr);
     }
 
     Color statusColor = AppTheme.warning;

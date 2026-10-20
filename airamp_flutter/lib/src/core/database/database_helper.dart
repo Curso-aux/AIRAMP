@@ -86,6 +86,9 @@ class DatabaseHelper {
       await db.execute("ALTER TABLE users ADD COLUMN must_change_password INTEGER DEFAULT 0");
     } catch (_) {}
     try {
+      await db.execute("ALTER TABLE sessions ADD COLUMN must_change_password INTEGER DEFAULT 0");
+    } catch (_) {}
+    try {
       await db.execute('ALTER TABLE sections ADD COLUMN enrollment_key TEXT');
     } catch (_) {}
     try {
@@ -564,6 +567,7 @@ class DatabaseHelper {
         user_id TEXT NOT NULL,
         token TEXT NOT NULL UNIQUE,
         role TEXT NOT NULL,
+        must_change_password INTEGER DEFAULT 0,
         created_at TEXT NOT NULL,
         expires_at TEXT
       )
@@ -2877,6 +2881,7 @@ class DatabaseHelper {
         'student_type': studentType.isNotEmpty ? studentType : 'regular',
         'special_notes': specialNotes.isNotEmpty ? specialNotes : null,
         'school_id': 'sch_main',
+        'must_change_password': 1,
         'created_at': now.toIso8601String(),
       };
 
@@ -2983,6 +2988,7 @@ class DatabaseHelper {
           if (specialty.isNotEmpty) 'Specialty: $specialty',
           if (notes.isNotEmpty) notes,
         ].join(' | '),
+        'must_change_password': 1,
         'created_at': now.toIso8601String(),
         'school_id': 'sch_main',
       };

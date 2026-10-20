@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -6,6 +7,7 @@ import 'package:go_router/go_router.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/theme/theme_provider.dart';
+import '../../../core/utils/philippine_time_helper.dart';
 import '../../auth/application/auth_provider.dart';
 import '../../admin/data/admin_repository.dart';
 import '../../teacher/data/teacher_schedule_repository.dart';
@@ -27,11 +29,28 @@ class _StudentHomeScreenState extends ConsumerState<StudentHomeScreen> {
   bool _isAnalyticsHidden = false;
   // 0: Cards, 1: Pie / Donut, 2: Progress Gauge
   int _analyticsViewIndex = 0;
+  Timer? _scheduleTicker;
 
   @override
   void initState() {
     super.initState();
     _loadAnalyticsPreferences();
+    _startScheduleTicker();
+  }
+
+  void _startScheduleTicker() {
+    _scheduleTicker?.cancel();
+    _scheduleTicker = Timer.periodic(const Duration(seconds: 5), (_) {
+      if (mounted) {
+        setState(() {});
+      }
+    });
+  }
+
+  @override
+  void dispose() {
+    _scheduleTicker?.cancel();
+    super.dispose();
   }
 
   Future<void> _loadAnalyticsPreferences() async {
@@ -1570,36 +1589,8 @@ class _StudentHomeScreenState extends ConsumerState<StudentHomeScreen> {
     final scheduleEnd = q['schedule_end']?.toString();
     final effectiveDeadline = (scheduleEnd != null && scheduleEnd.isNotEmpty) ? scheduleEnd : dueDate;
 
-    bool isDatePassed(String isoString) {
-      try {
-        final dt = DateTime.parse(isoString).toLocal();
-        if (isoString.length <= 10 && !isoString.contains('T')) {
-          final endOfDay = DateTime(dt.year, dt.month, dt.day, 23, 59, 59);
-          return endOfDay.isBefore(DateTime.now());
-        }
-        return dt.isBefore(DateTime.now());
-      } catch (_) {
-        return true;
-      }
-    }
-
-    String formatDateTime(String? isoString) {
-      if (isoString == null || isoString.isEmpty) return '';
-      try {
-        final dt = DateTime.parse(isoString).toLocal();
-        const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-        final dateStr = '${months[dt.month - 1]} ${dt.day.toString().padLeft(2, '0')}';
-        final hour = dt.hour % 12 == 0 ? 12 : dt.hour % 12;
-        final ampm = dt.hour >= 12 ? 'PM' : 'AM';
-        final min = dt.minute.toString().padLeft(2, '0');
-        return '$dateStr at $hour:$min $ampm';
-      } catch (_) {
-        return isoString;
-      }
-    }
-
-    final isDeadlinePassed = effectiveDeadline != null && effectiveDeadline.isNotEmpty && isDatePassed(effectiveDeadline);
-    final isNotYetAvailable = !isDeadlinePassed && scheduleStart != null && scheduleStart.isNotEmpty && !isDatePassed(scheduleStart);
+    final isDeadlinePassed = effectiveDeadline != null && effectiveDeadline.isNotEmpty && PhilippineTimeHelper.isDatePassed(effectiveDeadline);
+    final isNotYetAvailable = !isDeadlinePassed && scheduleStart != null && scheduleStart.isNotEmpty && !PhilippineTimeHelper.isDatePassed(scheduleStart);
 
     return Container(
       margin: const EdgeInsets.only(bottom: 12),
@@ -1688,9 +1679,30 @@ class _StudentHomeScreenState extends ConsumerState<StudentHomeScreen> {
                   )
                 : isNotYetAvailable
                     ? OutlinedButton.icon(
-                        onPressed: null,
+                        onPressed: () async {
+                          if (PhilippineTimeHelper.isDatePassed(scheduleStart)) {
+                            if (quizId != null) {
+                              await context.push('/quiz/$quizId');
+                              if (context.mounted) {
+                                ref.read(studentQuizAssignmentsProvider.notifier).reload();
+                                ref.read(studentProgressProvider.notifier).loadProgress();
+                                ref.read(studentCoursesProvider.notifier).reload();
+                              }
+                            }
+                          } else {
+                            final remaining = PhilippineTimeHelper.timeUntil(scheduleStart);
+                            final timeStr = PhilippineTimeHelper.formatRemaining(remaining);
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(
+                                content: Text('Quiz unlocks in $timeStr (at ${PhilippineTimeHelper.formatDateTime(scheduleStart)}). It will automatically unlock!'),
+                                duration: const Duration(seconds: 3),
+                                behavior: SnackBarBehavior.floating,
+                              ),
+                            );
+                          }
+                        },
                         icon: Icon(Icons.lock_clock, size: 16, color: AppTheme.textMuted),
-                        label: Text('Locked — Opens ${formatDateTime(scheduleStart)}', style: TextStyle(fontWeight: FontWeight.bold, color: AppTheme.textMuted)),
+                        label: Text('Locked — Opens ${PhilippineTimeHelper.formatDateTime(scheduleStart)}', style: TextStyle(fontWeight: FontWeight.bold, color: AppTheme.textMuted)),
                         style: OutlinedButton.styleFrom(
                           foregroundColor: AppTheme.textMuted,
                           side: BorderSide(color: AppTheme.border.withValues(alpha: 0.6)),
@@ -1725,12 +1737,7 @@ class _StudentHomeScreenState extends ConsumerState<StudentHomeScreen> {
   }
 
   Widget _buildDueDateBadge(String rawDate) {
-    DateTime? dt = DateTime.tryParse(rawDate);
-    if (dt == null) {
-      final sanitized = rawDate.replaceAll('T', ' ');
-      dt = DateTime.tryParse(sanitized);
-    }
-
+    final dt = PhilippineTimeHelper.parseToPht(rawDate);
     String label;
     Color badgeColor;
 
@@ -1738,7 +1745,7 @@ class _StudentHomeScreenState extends ConsumerState<StudentHomeScreen> {
       label = rawDate.length > 10 ? rawDate.substring(0, 10) : rawDate;
       badgeColor = AppTheme.error;
     } else {
-      final now = DateTime.now();
+      final now = PhilippineTimeHelper.now();
       final diff = dt.difference(now);
 
       const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];

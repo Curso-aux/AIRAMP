@@ -1,5 +1,6 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../../../core/api/api_client.dart';
 import '../../../core/components/auth/required_change_password_dialog.dart';
 import '../../../core/database/database_helper.dart';
@@ -139,6 +140,12 @@ class AuthNotifier extends Notifier<User?> {
       final data = await repository.login(identifier, password);
       final user = User.fromJson(data['user']);
       state = user;
+      if (user.mustChangePassword) {
+        try {
+          final prefs = await SharedPreferences.getInstance();
+          await prefs.setBool('must_change_password_${user.id}', true);
+        } catch (_) {}
+      }
     } finally {
       isLoading = false;
     }
@@ -182,29 +189,56 @@ class AuthNotifier extends Notifier<User?> {
 
     // On Web (kIsWeb): Web portal is accessible to Students, Teachers, and Administrators.
 
-    // Restore complete user profile from local database
+    // 1. Check persistent safety guard from SharedPreferences
+    bool persistentMustChange = false;
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      persistentMustChange = prefs.getBool('must_change_password_${session.userId}') == true;
+    } catch (_) {}
+
+    // 2. Restore complete user profile from local database
     final db = await DatabaseHelper().database;
-    final userRows = await db.query('users', where: 'id = ?', whereArgs: [session.userId]);
+    List<Map<String, dynamic>> userRows = await db.query('users', where: 'id = ?', whereArgs: [session.userId]);
+    if (userRows.isEmpty) {
+      userRows = await db.query('users', where: 'LOWER(email) = ?', whereArgs: [session.userId.toLowerCase().trim()]);
+    }
+    if (userRows.isEmpty) {
+      userRows = await db.query('users', where: 'LOWER(username) = ?', whereArgs: [session.userId.toLowerCase().trim()]);
+    }
+
+    Map<String, dynamic>? cloudUser;
+    final needsCloudLookup = userRows.isEmpty;
+    if (needsCloudLookup) {
+      try {
+        cloudUser = await FirestoreService()
+            .findUserByIdentifier(session.userId)
+            .timeout(const Duration(seconds: 3), onTimeout: () => null);
+      } catch (_) {}
+    }
+
     if (userRows.isNotEmpty) {
       final u = userRows.first;
       final actualRole = u['role'] as String? ?? session.role;
-      var mustChange = u['must_change_password'] == 1 ||
+      var mustChange = session.mustChangePassword ||
+          persistentMustChange ||
+          u['must_change_password'] == 1 ||
           u['must_change_password'] == true ||
           u['must_change_password'] == '1';
 
-      if (!mustChange) {
+      if (!mustChange && cloudUser != null) {
+        final cm = cloudUser['must_change_password'];
+        if (cm == 1 || cm == true || cm == '1') {
+          mustChange = true;
+        }
+      }
+
+      if (mustChange) {
         try {
-          final cloudUser = await FirestoreService()
-              .findUserByIdentifier(session.userId)
-              .timeout(const Duration(seconds: 2), onTimeout: () => null);
-          if (cloudUser != null) {
-            final cm = cloudUser['must_change_password'];
-            if (cm == 1 || cm == true || cm == '1') {
-              mustChange = true;
-              await db.update('users', {'must_change_password': 1},
-                  where: 'id = ?', whereArgs: [session.userId]);
-            }
-          }
+          await db.update('users', {'must_change_password': 1},
+              where: 'id = ?', whereArgs: [u['id']]);
+          await db.update('sessions', {'must_change_password': 1});
+          final prefs = await SharedPreferences.getInstance();
+          await prefs.setBool('must_change_password_${session.userId}', true);
         } catch (_) {}
       }
 
@@ -220,12 +254,30 @@ class AuthNotifier extends Notifier<User?> {
         mustChangePassword: mustChange,
       );
     } else {
+      final cloudMustChange = cloudUser != null &&
+          (cloudUser['must_change_password'] == 1 ||
+           cloudUser['must_change_password'] == true ||
+           cloudUser['must_change_password'] == '1');
+
+      final mustChange = session.mustChangePassword || persistentMustChange || cloudMustChange;
+
+      if (mustChange) {
+        try {
+          final prefs = await SharedPreferences.getInstance();
+          await prefs.setBool('must_change_password_${session.userId}', true);
+        } catch (_) {}
+      }
+
       state = User(
         id: session.userId,
-        email: '',
-        role: session.role,
-        fullName: session.userId,
-        schoolId: 'sch_main',
+        email: cloudUser?['email'] as String? ?? '',
+        role: cloudUser?['role'] as String? ?? session.role,
+        fullName: cloudUser?['full_name'] as String? ?? session.userId,
+        username: cloudUser?['username'] as String? ?? '',
+        section: cloudUser?['section'] as String?,
+        grade: cloudUser?['grade'] as String?,
+        schoolId: cloudUser?['school_id'] as String? ?? 'sch_main',
+        mustChangePassword: mustChange,
       );
     }
     ApiClient.setSession(session: session.session, userId: session.userId);
@@ -270,6 +322,13 @@ class AuthNotifier extends Notifier<User?> {
     if (state == null) return;
 
     final isPasswordChanged = password != null && password.trim().isNotEmpty;
+
+    if (isPasswordChanged) {
+      try {
+        final prefs = await SharedPreferences.getInstance();
+        await prefs.remove('must_change_password_${state!.id}');
+      } catch (_) {}
+    }
 
     // Update local state immediately
     state = state!.copyWith(
@@ -336,7 +395,14 @@ class AuthNotifier extends Notifier<User?> {
 
   Future<void> logout() async {
     final repository = ref.read(authRepositoryProvider);
+    final userId = state?.id;
     isLoading = true;
+    try {
+      if (userId != null) {
+        final prefs = await SharedPreferences.getInstance();
+        await prefs.remove('must_change_password_$userId');
+      }
+    } catch (_) {}
     try {
       await repository.logout();
     } finally {

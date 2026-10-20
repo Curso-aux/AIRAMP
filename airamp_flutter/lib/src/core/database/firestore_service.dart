@@ -52,6 +52,9 @@ class FirestoreService {
   }
 
   FirebaseFirestore? _firestore;
+  bool _useRestPrimary = false;
+  bool _isNetworkDisabled = false;
+  bool _probeCompleted = false;
 
   bool get isAvailable {
     try {
@@ -68,6 +71,35 @@ class FirestoreService {
 
   CollectionReference<Map<String, dynamic>> get usersCollection {
     return firestore.collection('users');
+  }
+
+  /// Disables native SDK gRPC network channel when gRPC DNS resolution fails on emulators/devices.
+  /// This terminates the native background WriteStream and permanently switches to high-reliability HTTPS REST API.
+  Future<void> _disableSdkNetwork([dynamic reason]) async {
+    if (_isNetworkDisabled) return;
+    _isNetworkDisabled = true;
+    _useRestPrimary = true;
+    if (reason != null) {
+      debugPrint('[FirestoreService] Switching to HTTPS REST API (gRPC unavailable: $reason)');
+    }
+    try {
+      if (Firebase.apps.isNotEmpty) {
+        await firestore.disableNetwork();
+      }
+    } catch (_) {}
+  }
+
+  /// Proactively probes gRPC stream connectivity once. If it times out or fails (e.g. emulator DNS issue),
+  /// it disables the SDK network channel immediately to prevent recurring logcat warnings.
+  Future<void> probeConnectivity() async {
+    if (_probeCompleted || !isAvailable) return;
+    _probeCompleted = true;
+    try {
+      await usersCollection.limit(1).get(const GetOptions(source: Source.server))
+          .timeout(const Duration(seconds: 2));
+    } catch (e) {
+      await _disableSdkNetwork(e);
+    }
   }
 
   /// Parses Firestore REST API field format into a standard Dart Map
@@ -178,21 +210,22 @@ class FirestoreService {
     }
     dataToSave['updated_at'] = DateTime.now().toIso8601String();
 
-    // 1. Try Firebase SDK if available
-    if (isAvailable) {
+    // 1. Try Firebase SDK if available and not switched to REST primary
+    if (isAvailable && !_useRestPrimary) {
       try {
-        await usersCollection.doc(id).set(dataToSave, SetOptions(merge: true));
+        await usersCollection.doc(id).set(dataToSave, SetOptions(merge: true))
+            .timeout(const Duration(seconds: 3));
         debugPrint('[FirestoreService] Successfully saved user $id via SDK');
         return;
       } catch (e) {
         debugPrint('[FirestoreService] SDK save failed, falling back to REST: $e');
+        await _disableSdkNetwork(e);
       }
     }
 
     // 2. REST API Fallback
     try {
       final dio = _dio;
-      final url = 'https://firestore.googleapis.com/v1/projects/$projectId/databases/(default)/documents/users/$id?key=$apiKey';
       final fields = <String, dynamic>{};
       for (final entry in dataToSave.entries) {
         final val = entry.value;
@@ -208,6 +241,8 @@ class FirestoreService {
           fields[entry.key] = {'stringValue': val.toString()};
         }
       }
+      final maskQuery = fields.keys.map((k) => 'updateMask.fieldPaths=$k').join('&');
+      final url = 'https://firestore.googleapis.com/v1/projects/$projectId/databases/(default)/documents/users/$id?key=$apiKey&$maskQuery';
       await dio.patch(url, data: {'fields': fields});
       debugPrint('[FirestoreService] Successfully saved user $id via REST');
     } catch (e) {
@@ -233,15 +268,15 @@ class FirestoreService {
   Future<Map<String, dynamic>?> _findUserInternal(String idLower, String rawTrimmed) async {
     final isEmail = rawTrimmed.contains('@');
 
-    // 1. Try SDK if available
-    if (isAvailable) {
+    // 1. Try SDK if available and not switched to REST primary
+    if (isAvailable && !_useRestPrimary) {
       try {
         if (isEmail) {
           // Parallel search targeted to email fields
           final results = await Future.wait([
-            usersCollection.where('email_lower', isEqualTo: idLower).limit(1).get().catchError((_) => null as dynamic),
-            usersCollection.where('email', isEqualTo: rawTrimmed).limit(1).get().catchError((_) => null as dynamic),
-            usersCollection.doc(idLower).get().catchError((_) => null as dynamic),
+            usersCollection.where('email_lower', isEqualTo: idLower).limit(1).get().timeout(const Duration(seconds: 3)),
+            usersCollection.where('email', isEqualTo: rawTrimmed).limit(1).get().timeout(const Duration(seconds: 3)),
+            usersCollection.doc(idLower).get().timeout(const Duration(seconds: 3)),
           ]);
           for (final snap in results) {
             if (snap is QuerySnapshot<Map<String, dynamic>> && snap.docs.isNotEmpty) {
@@ -257,10 +292,10 @@ class FirestoreService {
         } else {
           // Parallel search targeted to user ID and username
           final results = await Future.wait([
-            usersCollection.doc(rawTrimmed).get().catchError((_) => null as dynamic),
-            usersCollection.where('id', isEqualTo: rawTrimmed).limit(1).get().catchError((_) => null as dynamic),
-            usersCollection.where('username_lower', isEqualTo: idLower).limit(1).get().catchError((_) => null as dynamic),
-            usersCollection.where('username', isEqualTo: rawTrimmed).limit(1).get().catchError((_) => null as dynamic),
+            usersCollection.doc(rawTrimmed).get().timeout(const Duration(seconds: 3)),
+            usersCollection.where('id', isEqualTo: rawTrimmed).limit(1).get().timeout(const Duration(seconds: 3)),
+            usersCollection.where('username_lower', isEqualTo: idLower).limit(1).get().timeout(const Duration(seconds: 3)),
+            usersCollection.where('username', isEqualTo: rawTrimmed).limit(1).get().timeout(const Duration(seconds: 3)),
           ]);
           for (final snap in results) {
             if (snap is DocumentSnapshot<Map<String, dynamic>> && snap.exists && snap.data() != null) {
@@ -276,6 +311,7 @@ class FirestoreService {
         }
       } catch (e) {
         debugPrint('[FirestoreService] SDK search note: $e');
+        await _disableSdkNetwork(e);
       }
     }
 
@@ -321,15 +357,17 @@ class FirestoreService {
   /// Fetches all users from Cloud Firestore (via SDK or REST fallback)
   Future<List<Map<String, dynamic>>> fetchAllUsers() async {
     List<Map<String, dynamic>> cloudUsers = [];
-    if (isAvailable) {
+    if (isAvailable && !_useRestPrimary) {
       try {
-        final snapshot = await usersCollection.get();
+        final snapshot = await usersCollection.get().timeout(const Duration(seconds: 3));
         cloudUsers = snapshot.docs.map((d) {
           final data = d.data();
           data['id'] = d.id;
           return data;
         }).toList();
-      } catch (_) {}
+      } catch (e) {
+        await _disableSdkNetwork(e);
+      }
     }
     if (cloudUsers.isEmpty) {
       cloudUsers = await _fetchAllRest();
@@ -379,15 +417,17 @@ class FirestoreService {
     try {
       List<Map<String, dynamic>> cloudUsers = [];
 
-      if (isAvailable) {
+      if (isAvailable && !_useRestPrimary) {
         try {
-          final snapshot = await usersCollection.get();
+          final snapshot = await usersCollection.get().timeout(const Duration(seconds: 3));
           cloudUsers = snapshot.docs.map((d) {
             final data = d.data();
             data['id'] = d.id;
             return data;
           }).toList();
-        } catch (_) {}
+        } catch (e) {
+          await _disableSdkNetwork(e);
+        }
       }
 
       if (cloudUsers.isEmpty) {
@@ -414,6 +454,9 @@ class FirestoreService {
             existing = await db.query('users', where: 'LOWER(email) = ?', whereArgs: [email]);
           }
 
+          final rawMustChange = data['must_change_password'] ?? (existing.isNotEmpty ? existing.first['must_change_password'] : null);
+          final mustChangeVal = (rawMustChange == 1 || rawMustChange == true || rawMustChange == '1') ? 1 : 0;
+
           final dbRow = {
             'id': existing.isNotEmpty ? existing.first['id'] : userId,
             'email': data['email'] ?? '',
@@ -427,6 +470,7 @@ class FirestoreService {
             'student_type': data['student_type'] ?? 'regular',
             'special_notes': data['special_notes'],
             'school_id': data['school_id'] ?? 'sch_main',
+            'must_change_password': mustChangeVal,
             'created_at': data['created_at'] ?? DateTime.now().toIso8601String(),
           };
 

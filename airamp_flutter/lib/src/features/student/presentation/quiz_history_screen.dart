@@ -1,8 +1,10 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/theme/theme_provider.dart';
+import '../../../core/utils/philippine_time_helper.dart';
 import '../data/student_repository.dart';
 import '../../quiz/presentation/quiz_flashcard_screen.dart';
 
@@ -16,36 +18,35 @@ class QuizHistoryScreen extends ConsumerStatefulWidget {
 class _QuizHistoryScreenState extends ConsumerState<QuizHistoryScreen> {
   int _selectedTab = 0; // 0: Assigned Quizzes, 1: Quiz History
   int _selectedSubjectIndex = 0;
+  Timer? _scheduleTicker;
+
+  @override
+  void initState() {
+    super.initState();
+    _startScheduleTicker();
+  }
+
+  void _startScheduleTicker() {
+    _scheduleTicker?.cancel();
+    _scheduleTicker = Timer.periodic(const Duration(seconds: 5), (_) {
+      if (mounted) {
+        setState(() {});
+      }
+    });
+  }
+
+  @override
+  void dispose() {
+    _scheduleTicker?.cancel();
+    super.dispose();
+  }
 
   String _formatDate(String? isoString) {
-    if (isoString == null || isoString.isEmpty) return 'Recent';
-    try {
-      final dt = DateTime.parse(isoString).toLocal();
-      const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-      final dateStr = '${months[dt.month - 1]} ${dt.day.toString().padLeft(2, '0')}, ${dt.year}';
-      if (isoString.contains('T') || isoString.length > 10) {
-        final hour = dt.hour % 12 == 0 ? 12 : dt.hour % 12;
-        final ampm = dt.hour >= 12 ? 'PM' : 'AM';
-        final min = dt.minute.toString().padLeft(2, '0');
-        return '$dateStr at $hour:$min $ampm';
-      }
-      return dateStr;
-    } catch (_) {
-      return isoString;
-    }
+    return PhilippineTimeHelper.formatDate(isoString);
   }
 
   bool _isDatePassed(String isoString) {
-    try {
-      final dt = DateTime.parse(isoString).toLocal();
-      if (isoString.length <= 10 && !isoString.contains('T')) {
-        final endOfDay = DateTime(dt.year, dt.month, dt.day, 23, 59, 59);
-        return endOfDay.isBefore(DateTime.now());
-      }
-      return dt.isBefore(DateTime.now());
-    } catch (_) {
-      return true;
-    }
+    return PhilippineTimeHelper.isDatePassed(isoString);
   }
 
   String _formatTime(String? isoString) {
@@ -574,10 +575,22 @@ class _QuizHistoryScreenState extends ConsumerState<QuizHistoryScreen> {
                                       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
                                       padding: const EdgeInsets.symmetric(vertical: 13),
                                     ),
-                                    onPressed: () {
-                                      ScaffoldMessenger.of(context).showSnackBar(
-                                        SnackBar(content: Text('This quiz opens on ${_formatDate(scheduleStart)}')),
-                                      );
+                                    onPressed: () async {
+                                      if (_isDatePassed(scheduleStart)) {
+                                        await context.push('/quiz/$quizId');
+                                        if (context.mounted) {
+                                          ref.read(studentQuizAssignmentsProvider.notifier).reload();
+                                        }
+                                      } else {
+                                        final remaining = PhilippineTimeHelper.timeUntil(scheduleStart);
+                                        final timeStr = PhilippineTimeHelper.formatRemaining(remaining);
+                                        ScaffoldMessenger.of(context).showSnackBar(
+                                          SnackBar(
+                                            content: Text('Quiz unlocks in $timeStr (at ${_formatDate(scheduleStart)}). It will automatically unlock!'),
+                                            duration: const Duration(seconds: 3),
+                                          ),
+                                        );
+                                      }
                                     },
                                     icon: Icon(Icons.lock_clock, size: 18, color: AppTheme.info),
                                     label: Text('Opens ${_formatDate(scheduleStart)}', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: AppTheme.info)),

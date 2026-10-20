@@ -9,10 +9,19 @@ import sys
 import json
 import smtplib
 import os
+import time
+from collections import defaultdict
 from http.server import HTTPServer, BaseHTTPRequestHandler
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
 from datetime import datetime
+
+# Enable unbuffered stdout logging
+try:
+    if hasattr(sys.stdout, "reconfigure"):
+        sys.stdout.reconfigure(line_buffering=True)
+except Exception:
+    pass
 
 # Load environment configuration from .env if present
 def _load_env_file():
@@ -43,22 +52,23 @@ SMTP_PORT = int(os.environ.get("SMTP_PORT", 587))
 # ─────────────────────────────────────────────────────────────
 # Rate Limiting Engine: protects SMTP from abuse & quota exhaustion
 # ─────────────────────────────────────────────────────────────
-import time
-from collections import defaultdict
-
-IP_MAX_PER_MINUTE = 30
-RECIPIENT_MAX_PER_3MIN = 10
-RECIPIENT_COOLDOWN_SECONDS = 5
+IP_MAX_PER_MINUTE = 60
+RECIPIENT_MAX_PER_3MIN = 20
+RECIPIENT_COOLDOWN_SECONDS = 3
 
 _ip_history = defaultdict(list)
 _recipient_history = defaultdict(list)
 _recipient_last_dispatch = {}
 
+class ReusableHTTPServer(HTTPServer):
+    allow_reuse_address = True
+
 class SmtpBridgeHandler(BaseHTTPRequestHandler):
     def _send_cors_headers(self):
         self.send_header("Access-Control-Allow-Origin", "*")
         self.send_header("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
-        self.send_header("Access-Control-Allow-Headers", "Content-Type, Authorization, X-Requested-With")
+        self.send_header("Access-Control-Allow-Headers", "Content-Type, Authorization, X-Requested-With, Access-Control-Request-Private-Network")
+        self.send_header("Access-Control-Allow-Private-Network", "true")
 
     def do_OPTIONS(self):
         self.send_response(200)
@@ -75,6 +85,7 @@ class SmtpBridgeHandler(BaseHTTPRequestHandler):
             "status": "online",
             "service": "AIRA Local SMTP Bridge",
             "sender": DEFAULT_SENDER,
+            "port": PORT,
             "rate_limits": {
                 "ip_max_per_minute": IP_MAX_PER_MINUTE,
                 "recipient_max_per_3min": RECIPIENT_MAX_PER_3MIN,
@@ -85,7 +96,8 @@ class SmtpBridgeHandler(BaseHTTPRequestHandler):
         self.wfile.write(json.dumps(response).encode("utf-8"))
 
     def do_POST(self):
-        if self.path not in ["/send-email", "/send", "/api/send-email"]:
+        clean_path = self.path.split('?')[0].rstrip('/')
+        if clean_path not in ["/send-email", "/send", "/api/send-email", ""]:
             self.send_response(404)
             self._send_cors_headers()
             self.send_header("Content-Type", "application/json")
@@ -96,7 +108,7 @@ class SmtpBridgeHandler(BaseHTTPRequestHandler):
         client_ip = self.client_address[0]
         now = time.time()
 
-        # 1. IP-level Rate Limit Check (15 req/min)
+        # 1. IP-level Rate Limit Check
         _ip_history[client_ip] = [t for t in _ip_history[client_ip] if now - t < 60]
         if len(_ip_history[client_ip]) >= IP_MAX_PER_MINUTE:
             oldest = _ip_history[client_ip][0]
@@ -144,7 +156,7 @@ class SmtpBridgeHandler(BaseHTTPRequestHandler):
 
         clean_recipient = to_email.lower().strip()
 
-        # 2. Recipient Cooldown Check (minimum 45s between emails to same target)
+        # 2. Recipient Cooldown Check
         last_sent = _recipient_last_dispatch.get(clean_recipient)
         if last_sent and (now - last_sent < RECIPIENT_COOLDOWN_SECONDS):
             cooldown_wait = max(1, int(RECIPIENT_COOLDOWN_SECONDS - (now - last_sent)))
@@ -161,7 +173,7 @@ class SmtpBridgeHandler(BaseHTTPRequestHandler):
             }).encode("utf-8"))
             return
 
-        # 3. Recipient Rolling Window Check (max 3 emails per 3 minutes)
+        # 3. Recipient Rolling Window Check
         _recipient_history[clean_recipient] = [t for t in _recipient_history[clean_recipient] if now - t < 180]
         if len(_recipient_history[clean_recipient]) >= RECIPIENT_MAX_PER_3MIN:
             oldest = _recipient_history[clean_recipient][0]
@@ -201,15 +213,32 @@ class SmtpBridgeHandler(BaseHTTPRequestHandler):
         elif not text_body:
             msg.attach(MIMEText("No content provided", "plain", "utf-8"))
 
-        # Send via Gmail SMTP
+        # Send via Gmail SMTP with dual-strategy fallback (Port 587 STARTTLS / Port 465 SSL)
+        smtp_success = False
+        smtp_error = None
+
+        # Strategy 1: Port 587 STARTTLS
         try:
-            with smtplib.SMTP(SMTP_HOST, SMTP_PORT, timeout=15) as server:
+            with smtplib.SMTP(SMTP_HOST, SMTP_PORT, timeout=12) as server:
                 server.ehlo()
                 server.starttls()
                 server.ehlo()
                 server.login(sender_email, sender_password)
                 server.send_message(msg)
+            smtp_success = True
+        except Exception as err587:
+            smtp_error = err587
+            # Strategy 2: Port 465 direct SSL
+            try:
+                with smtplib.SMTP_SSL(SMTP_HOST, 465, timeout=12) as server:
+                    server.login(sender_email, sender_password)
+                    server.send_message(msg)
+                smtp_success = True
+                print(f"[{timestamp}] [INFO] Port 587 fell back to Port 465 SSL successfully.")
+            except Exception as err465:
+                smtp_error = err465
 
+        if smtp_success:
             print(f"[{timestamp}] [SUCCESS] Successfully delivered email via Gmail SMTP to: {to_email}")
             self.send_response(200)
             self._send_cors_headers()
@@ -222,16 +251,15 @@ class SmtpBridgeHandler(BaseHTTPRequestHandler):
                 "timestamp": timestamp
             }
             self.wfile.write(json.dumps(response).encode("utf-8"))
-
-        except Exception as err:
-            print(f"[{timestamp}] [ERROR] Failed to send email via SMTP: {err}")
+        else:
+            print(f"[{timestamp}] [ERROR] Failed to send email via SMTP: {smtp_error}")
             self.send_response(500)
             self._send_cors_headers()
             self.send_header("Content-Type", "application/json")
             self.end_headers()
             response = {
                 "success": False,
-                "error": str(err),
+                "error": str(smtp_error),
                 "timestamp": timestamp
             }
             self.wfile.write(json.dumps(response).encode("utf-8"))
@@ -242,13 +270,18 @@ class SmtpBridgeHandler(BaseHTTPRequestHandler):
 
 def run():
     server_address = ("0.0.0.0", PORT)
-    httpd = HTTPServer(server_address, SmtpBridgeHandler)
-    print(f"==================================================")
+    try:
+        httpd = ReusableHTTPServer(server_address, SmtpBridgeHandler)
+    except OSError as e:
+        print(f"[!] Could not bind to port {PORT}: {e}")
+        return
+
+    print("==================================================")
     print(f" AIRA SMTP Bridge Server Running on port {PORT}")
-    print(f" Ready to receive emails from Flutter Web/Mobile")
+    print(" Ready to receive emails from Flutter Web/Mobile")
     print(f" Sender: {DEFAULT_SENDER}")
     print(f" Local URL: http://127.0.0.1:{PORT}/send-email")
-    print(f"==================================================")
+    print("==================================================")
     try:
         httpd.serve_forever()
     except KeyboardInterrupt:
