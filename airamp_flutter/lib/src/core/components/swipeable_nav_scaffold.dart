@@ -7,6 +7,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../animations/app_page_transitions.dart';
 import '../theme/app_theme.dart';
 import '../theme/theme_provider.dart';
+import 'animated_curved_nav_bar.dart';
 
 /// A premium, adaptive scaffold supporting:
 /// 1. Smooth auto-hiding of the bottom navigation bar while actively scrolling
@@ -40,7 +41,6 @@ class SwipeableNavScaffold extends ConsumerStatefulWidget {
 class _SwipeableNavScaffoldState extends ConsumerState<SwipeableNavScaffold> {
   bool _isBarVisible = true;
   Timer? _scrollStopTimer;
-  static const double _baseBarHeight = 58.0;
 
   @override
   void dispose() {
@@ -158,7 +158,6 @@ class _SwipeableNavScaffoldState extends ConsumerState<SwipeableNavScaffold> {
   Widget build(BuildContext context) {
     ref.watch(themeProvider);
     final bottomPadding = MediaQuery.of(context).padding.bottom;
-    final totalBarHeight = _baseBarHeight + bottomPadding;
 
     return Scaffold(
       backgroundColor: widget.backgroundColor ?? AppTheme.background,
@@ -178,44 +177,28 @@ class _SwipeableNavScaffoldState extends ConsumerState<SwipeableNavScaffold> {
           if (widget.floatingOverlay != null) widget.floatingOverlay!,
         ],
       ),
-      bottomNavigationBar: AnimatedContainer(
-        duration: const Duration(milliseconds: 250),
+      bottomNavigationBar: AnimatedSlide(
+        duration: const Duration(milliseconds: 260),
         curve: Curves.easeInOutCubic,
-        height: _isBarVisible ? totalBarHeight : 0.0,
-        child: ClipRect(
-          child: OverflowBox(
-            minHeight: totalBarHeight,
-            maxHeight: totalBarHeight,
-            alignment: Alignment.topCenter,
-            child: AnimatedSlide(
-              duration: const Duration(milliseconds: 250),
-              curve: Curves.easeInOutCubic,
-              offset: _isBarVisible ? Offset.zero : const Offset(0, 0.4),
-              child: AnimatedOpacity(
-                duration: const Duration(milliseconds: 180),
-                opacity: _isBarVisible ? 1.0 : 0.0,
-                child: Container(
-                  height: totalBarHeight,
-                  decoration: BoxDecoration(
-                    color: AppTheme.surface,
-                    border: Border(top: BorderSide(color: AppTheme.border, width: 1)),
-                  ),
-                  child: SafeArea(
-                    top: false,
-                    child: BottomNavigationBar(
-                      backgroundColor: AppTheme.surface,
-                      type: BottomNavigationBarType.fixed,
-                      selectedItemColor: AppTheme.primary,
-                      unselectedItemColor: AppTheme.textMuted,
-                      showUnselectedLabels: true,
-                      selectedFontSize: widget.selectedFontSize,
-                      unselectedFontSize: widget.unselectedFontSize,
-                      currentIndex: widget.navigationShell.currentIndex,
-                      onTap: _goBranch,
-                      items: widget.items,
-                    ),
-                  ),
-                ),
+        offset: _isBarVisible ? Offset.zero : const Offset(0, 1.4),
+        child: AnimatedOpacity(
+          duration: const Duration(milliseconds: 180),
+          opacity: _isBarVisible ? 1.0 : 0.0,
+          child: SafeArea(
+            top: false,
+            child: Padding(
+              padding: EdgeInsets.fromLTRB(
+                14,
+                0,
+                14,
+                bottomPadding > 0 ? (bottomPadding * 0.25).clamp(2.0, 8.0) : 10.0,
+              ),
+              child: AnimatedCurvedNavBar(
+                items: widget.items,
+                currentIndex: widget.navigationShell.currentIndex,
+                onTap: _goBranch,
+                selectedFontSize: widget.selectedFontSize,
+                unselectedFontSize: widget.unselectedFontSize,
               ),
             ),
           ),

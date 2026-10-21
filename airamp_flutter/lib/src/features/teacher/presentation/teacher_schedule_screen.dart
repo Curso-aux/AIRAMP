@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/components/calendar/actual_calendar_view.dart';
 import '../../../core/components/empty_state.dart';
@@ -22,14 +23,14 @@ class _TeacherScheduleScreenState extends ConsumerState<TeacherScheduleScreen> {
   String _selectedSection = 'All Handled Sections';
   ScheduleViewMode _viewMode = ScheduleViewMode.grid;
 
-  static const List<String> _days = [
-    'All Days',
-    'Monday',
-    'Tuesday',
-    'Wednesday',
-    'Thursday',
-    'Friday',
-    'Saturday',
+  static const List<Map<String, String>> _dayOptions = [
+    {'label': 'All', 'full': 'All Days'},
+    {'label': 'Mon', 'full': 'Monday'},
+    {'label': 'Tue', 'full': 'Tuesday'},
+    {'label': 'Wed', 'full': 'Wednesday'},
+    {'label': 'Thu', 'full': 'Thursday'},
+    {'label': 'Fri', 'full': 'Friday'},
+    {'label': 'Sat', 'full': 'Saturday'},
   ];
 
   @override
@@ -111,101 +112,79 @@ class _TeacherScheduleScreenState extends ConsumerState<TeacherScheduleScreen> {
           onRefresh: () async {
             await ref.read(teacherSchedulesProvider.notifier).reload();
           },
-          child: SingleChildScrollView(
-            physics: const AlwaysScrollableScrollPhysics(),
-            padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 20),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                // Top Header with Title and Add Button
-                LayoutBuilder(
-                  builder: (context, constraints) {
-                    final isMobile = constraints.maxWidth < 640;
-
-                    final headerTextColumn = Column(
+          child: LayoutBuilder(
+            builder: (context, constraints) {
+              return SingleChildScrollView(
+                physics: const AlwaysScrollableScrollPhysics(),
+                padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 20),
+                child: ConstrainedBox(
+                  constraints: BoxConstraints(
+                    minHeight: constraints.maxHeight - 40,
+                  ),
+                  child: IntrinsicHeight(
+                    child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Wrap(
-                          spacing: 8,
-                          runSpacing: 4,
-                          crossAxisAlignment: WrapCrossAlignment.center,
-                          children: [
-                            Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                              decoration: BoxDecoration(
-                                color: AppTheme.primary.withValues(alpha: 0.15),
-                                borderRadius: BorderRadius.circular(6),
-                              ),
-                              child: Text(
-                                _viewMode == ScheduleViewMode.calendar
-                                    ? 'MONTHLY CALENDAR'
-                                    : 'WEEKLY TIMETABLE',
-                                style: TextStyle(
-                                  color: AppTheme.primary,
-                                  fontSize: 10,
-                                  fontWeight: FontWeight.bold,
-                                  letterSpacing: 0.5,
+                        // Symmetrically Balanced Top Header (Title + Counter on Left, View Switcher on Right)
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            crossAxisAlignment: CrossAxisAlignment.center,
+                            children: [
+                              Flexible(
+                                child: Text(
+                                  _viewMode == ScheduleViewMode.calendar
+                                      ? 'Calendar'
+                                      : 'Class Schedule',
+                                  style: TextStyle(
+                                    fontSize: 20,
+                                    fontWeight: FontWeight.bold,
+                                    color: AppTheme.text,
+                                    letterSpacing: -0.4,
+                                  ),
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
                                 ),
                               ),
-                            ),
-                            Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                              decoration: BoxDecoration(
-                                color: isDark
-                                    ? Colors.tealAccent.withValues(alpha: 0.15)
-                                    : Colors.teal.withValues(alpha: 0.12),
-                                borderRadius: BorderRadius.circular(6),
-                              ),
-                              child: Text(
-                                '${filtered.length} Scheduled',
-                                style: TextStyle(
-                                  color: isDark ? Colors.tealAccent : Colors.teal,
-                                  fontSize: 10,
-                                  fontWeight: FontWeight.bold,
+                              const SizedBox(width: 8),
+                              Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+                                decoration: BoxDecoration(
+                                  color: AppTheme.primary.withValues(alpha: isDark ? 0.2 : 0.12),
+                                  borderRadius: BorderRadius.circular(12),
+                                ),
+                                child: Text(
+                                  '${filtered.length} Classes',
+                                  style: TextStyle(
+                                    color: AppTheme.primary,
+                                    fontSize: 11,
+                                    fontWeight: FontWeight.bold,
+                                  ),
                                 ),
                               ),
-                            ),
-                            Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                              decoration: BoxDecoration(
-                                color: isDark
-                                    ? const Color(0xFFA855F7).withValues(alpha: 0.15)
-                                    : const Color(0xFF7C3AED).withValues(alpha: 0.12),
-                                borderRadius: BorderRadius.circular(6),
-                              ),
-                              child: Text(
-                                'Admin Assigned',
-                                style: TextStyle(
-                                  color: isDark ? const Color(0xFFA855F7) : const Color(0xFF7C3AED),
-                                  fontSize: 10,
-                                  fontWeight: FontWeight.bold,
-                                ),
-                              ),
-                            ),
-                          ],
-                        ),
-                        const SizedBox(height: 8),
-                        Text(
-                          _viewMode == ScheduleViewMode.calendar
-                              ? 'Interactive Calendar'
-                              : 'Class Schedule & Timetable',
-                          style: TextStyle(
-                            fontSize: isMobile ? 20 : 24,
-                            fontWeight: FontWeight.bold,
-                            color: AppTheme.text,
+                            ],
                           ),
-                        ),
-                        const SizedBox(height: 2),
-                        Text(
-                          _viewMode == ScheduleViewMode.calendar
-                              ? 'Browse class schedule by calendar days, view daily hours, and check active classes'
-                              : 'View your assigned weekly class hours, section schedules, and classroom allocations',
-                          style: TextStyle(fontSize: 12, color: AppTheme.textSecondary),
-                        ),
-                      ],
-                    );
-
-                    final actionButtons = Container(
+                          const SizedBox(height: 2),
+                          Text(
+                            _viewMode == ScheduleViewMode.calendar
+                                ? 'Monthly overview & class times'
+                                : 'Assigned weekly hours & section timetable',
+                            style: TextStyle(fontSize: 12, color: AppTheme.textSecondary),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    // Anchored Top-Right View Switcher
+                    Container(
+                      padding: const EdgeInsets.all(3),
                       decoration: BoxDecoration(
                         color: AppTheme.surface,
                         borderRadius: BorderRadius.circular(10),
@@ -214,134 +193,126 @@ class _TeacherScheduleScreenState extends ConsumerState<TeacherScheduleScreen> {
                       child: Row(
                         mainAxisSize: MainAxisSize.min,
                         children: [
-                          IconButton(
-                            iconSize: 18,
-                            tooltip: 'Weekly Timetable Grid',
-                            icon: Icon(
-                              Icons.grid_view_rounded,
-                              color: _viewMode == ScheduleViewMode.grid ? AppTheme.primary : AppTheme.textMuted,
-                            ),
-                            onPressed: () => setState(() => _viewMode = ScheduleViewMode.grid),
+                          _buildViewIcon(
+                            icon: Icons.grid_view_rounded,
+                            mode: ScheduleViewMode.grid,
+                            tooltip: 'Timetable Grid',
                           ),
-                          IconButton(
-                            iconSize: 18,
-                            tooltip: 'Monthly Calendar Mode',
-                            icon: Icon(
-                              Icons.calendar_month_rounded,
-                              color: _viewMode == ScheduleViewMode.calendar ? AppTheme.primary : AppTheme.textMuted,
-                            ),
-                            onPressed: () => setState(() => _viewMode = ScheduleViewMode.calendar),
+                          _buildViewIcon(
+                            icon: Icons.calendar_month_rounded,
+                            mode: ScheduleViewMode.calendar,
+                            tooltip: 'Monthly Calendar',
                           ),
-                          IconButton(
-                            iconSize: 18,
-                            tooltip: 'Agenda Timeline List',
-                            icon: Icon(
-                              Icons.view_agenda_outlined,
-                              color: _viewMode == ScheduleViewMode.agenda ? AppTheme.primary : AppTheme.textMuted,
-                            ),
-                            onPressed: () => setState(() => _viewMode = ScheduleViewMode.agenda),
+                          _buildViewIcon(
+                            icon: Icons.view_agenda_outlined,
+                            mode: ScheduleViewMode.agenda,
+                            tooltip: 'Agenda Timeline',
                           ),
                         ],
-                      ),
-                    );
-
-                    if (isMobile) {
-                      return Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          headerTextColumn,
-                          const SizedBox(height: 14),
-                          Align(
-                            alignment: Alignment.centerLeft,
-                            child: actionButtons,
-                          ),
-                        ],
-                      );
-                    }
-
-                    return Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      crossAxisAlignment: CrossAxisAlignment.center,
-                      children: [
-                        Expanded(child: headerTextColumn),
-                        const SizedBox(width: 16),
-                        actionButtons,
-                      ],
-                    );
-                  },
-                ),
-                const SizedBox(height: 20),
-
-                // Filter Row (Days of Week + Handled Section selector)
-                Wrap(
-                  spacing: 12,
-                  runSpacing: 10,
-                  crossAxisAlignment: WrapCrossAlignment.center,
-                  children: [
-                    if (_viewMode != ScheduleViewMode.calendar)
-                      // Day Selector Chips
-                      ..._days.map((day) {
-                        final isSel = _selectedDay == day;
-                        return ChoiceChip(
-                          label: Text(day),
-                          selected: isSel,
-                          selectedColor: AppTheme.primary,
-                          labelStyle: TextStyle(
-                            color: isSel
-                                ? (isDark ? const Color(0xFF0A1420) : Colors.white)
-                                : AppTheme.text,
-                            fontSize: 12,
-                            fontWeight: isSel ? FontWeight.bold : FontWeight.w500,
-                          ),
-                          backgroundColor: AppTheme.surface,
-                          side: BorderSide(
-                            color: isSel ? AppTheme.primary : AppTheme.border,
-                          ),
-                          onSelected: (selected) {
-                            if (selected) {
-                              setState(() => _selectedDay = day);
-                            }
-                          },
-                        );
-                      }),
-
-                    // Section Dropdown
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 2),
-                      decoration: BoxDecoration(
-                        color: AppTheme.surface,
-                        borderRadius: BorderRadius.circular(10),
-                        border: Border.all(color: AppTheme.border),
-                      ),
-                      child: DropdownButtonHideUnderline(
-                        child: DropdownButton<String>(
-                          value: _selectedSection,
-                          dropdownColor: AppTheme.surface,
-                          style: TextStyle(color: AppTheme.text, fontSize: 12, fontWeight: FontWeight.w600),
-                          items: [
-                            'All Handled Sections',
-                            ...sections,
-                          ].map((sec) {
-                            return DropdownMenuItem<String>(
-                              value: sec,
-                              child: Text(sec),
-                            );
-                          }).toList(),
-                          onChanged: (val) {
-                            if (val != null) {
-                              setState(() => _selectedSection = val);
-                            }
-                          },
-                        ),
                       ),
                     ),
                   ],
                 ),
-                const SizedBox(height: 24),
+                const SizedBox(height: 14),
+
+                // Compact Filter Bar (Section Selector + Single-line Day Strip)
+                if (_viewMode != ScheduleViewMode.calendar) ...[
+                  Row(
+                    children: [
+                      _buildSectionDropdown(sections),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: SizedBox(
+                          height: 36,
+                          child: ListView.separated(
+                            scrollDirection: Axis.horizontal,
+                            physics: const BouncingScrollPhysics(),
+                            itemCount: _dayOptions.length,
+                            separatorBuilder: (context, index) => const SizedBox(width: 6),
+                            itemBuilder: (context, index) {
+                              final dayItem = _dayOptions[index];
+                              final isSel = _selectedDay == dayItem['full'];
+                              final dayCount = dayItem['full'] == 'All Days'
+                                  ? schedules.length
+                                  : schedules
+                                      .where((s) => s['day_of_week'] == dayItem['full'])
+                                      .length;
+                              final isToday = dayItem['full'] == getCurrentDayOfWeek();
+
+                              return InkWell(
+                                borderRadius: BorderRadius.circular(8),
+                                onTap: () {
+                                  HapticFeedback.lightImpact();
+                                  setState(() => _selectedDay = dayItem['full']!);
+                                },
+                                child: AnimatedContainer(
+                                  duration: const Duration(milliseconds: 160),
+                                  padding: const EdgeInsets.symmetric(horizontal: 11, vertical: 6),
+                                  decoration: BoxDecoration(
+                                    color: isSel ? AppTheme.primary : AppTheme.surface,
+                                    borderRadius: BorderRadius.circular(8),
+                                    border: Border.all(
+                                      color: isSel
+                                          ? AppTheme.primary
+                                          : (isToday
+                                              ? AppTheme.primary.withValues(alpha: 0.5)
+                                              : AppTheme.border),
+                                    ),
+                                  ),
+                                  child: Row(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      Text(
+                                        dayItem['label']!,
+                                        style: TextStyle(
+                                          color: isSel
+                                              ? (isDark ? const Color(0xFF0A1420) : Colors.white)
+                                              : (isToday ? AppTheme.primary : AppTheme.text),
+                                          fontSize: 12,
+                                          fontWeight: isSel || isToday ? FontWeight.bold : FontWeight.w500,
+                                        ),
+                                      ),
+                                      if (dayCount > 0 && dayItem['full'] != 'All Days') ...[
+                                        const SizedBox(width: 4),
+                                        Container(
+                                          width: 5,
+                                          height: 5,
+                                          decoration: BoxDecoration(
+                                            color: isSel
+                                                ? (isDark ? const Color(0xFF0A1420) : Colors.white)
+                                                : AppTheme.primary,
+                                            shape: BoxShape.circle,
+                                          ),
+                                        ),
+                                      ],
+                                    ],
+                                  ),
+                                ),
+                              );
+                            },
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ] else ...[
+                  Align(
+                    alignment: Alignment.centerLeft,
+                    child: _buildSectionDropdown(sections),
+                  ),
+                ],
+                const SizedBox(height: 18),
 
                 // Schedules Display Area
                 if (filtered.isEmpty)
-                  _buildEmptyState()
+                  Expanded(
+                    child: Center(
+                      child: Padding(
+                        padding: const EdgeInsets.only(bottom: 30),
+                        child: _buildEmptyState(),
+                      ),
+                    ),
+                  )
                 else if (_viewMode == ScheduleViewMode.calendar)
                   ActualCalendarView(
                     schedules: filtered,
@@ -351,10 +322,81 @@ class _TeacherScheduleScreenState extends ConsumerState<TeacherScheduleScreen> {
                   _buildTimetableGrid(filtered)
                 else
                   _buildAgendaList(filtered),
-                const SizedBox(height: 100),
+                if (filtered.isNotEmpty) const SizedBox(height: 100),
               ],
             ),
           ),
+        ),
+      );
+    },
+  ),
+),
+),
+);
+  }
+
+  Widget _buildViewIcon({
+    required IconData icon,
+    required ScheduleViewMode mode,
+    required String tooltip,
+  }) {
+    final isSelected = _viewMode == mode;
+    return Tooltip(
+      message: tooltip,
+      child: InkWell(
+        borderRadius: BorderRadius.circular(8),
+        onTap: () {
+          HapticFeedback.lightImpact();
+          setState(() => _viewMode = mode);
+        },
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 180),
+          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+          decoration: BoxDecoration(
+            color: isSelected ? AppTheme.primary : Colors.transparent,
+            borderRadius: BorderRadius.circular(8),
+          ),
+          child: Icon(
+            icon,
+            size: 18,
+            color: isSelected ? Colors.white : AppTheme.textMuted,
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildSectionDropdown(List<String> sections) {
+    return Container(
+      height: 36,
+      padding: const EdgeInsets.symmetric(horizontal: 10),
+      decoration: BoxDecoration(
+        color: AppTheme.surface,
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: AppTheme.border),
+      ),
+      child: DropdownButtonHideUnderline(
+        child: DropdownButton<String>(
+          value: _selectedSection,
+          icon: Icon(Icons.arrow_drop_down, size: 18, color: AppTheme.textSecondary),
+          dropdownColor: AppTheme.surface,
+          style: TextStyle(color: AppTheme.text, fontSize: 12, fontWeight: FontWeight.w600),
+          items: ['All Handled Sections', ...sections].map((sec) {
+            final isAll = sec == 'All Handled Sections';
+            return DropdownMenuItem<String>(
+              value: sec,
+              child: Text(
+                isAll ? 'All Sections' : sec,
+                style: const TextStyle(fontSize: 12),
+              ),
+            );
+          }).toList(),
+          onChanged: (val) {
+            if (val != null) {
+              HapticFeedback.lightImpact();
+              setState(() => _selectedSection = val);
+            }
+          },
         ),
       ),
     );
@@ -362,12 +404,23 @@ class _TeacherScheduleScreenState extends ConsumerState<TeacherScheduleScreen> {
 
   Widget _buildEmptyState() {
     final hasActiveFilter = _selectedDay != 'All Days' || _selectedSection != 'All Handled Sections';
+    final isDark = AppTheme.isDark;
+
     return Container(
       width: double.infinity,
+      constraints: const BoxConstraints(maxWidth: 460),
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 24),
       decoration: BoxDecoration(
         color: AppTheme.surface,
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: BorderRadius.circular(20),
         border: Border.all(color: AppTheme.border),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: isDark ? 0.2 : 0.03),
+            blurRadius: 16,
+            offset: const Offset(0, 4),
+          ),
+        ],
       ),
       child: AppEmptyState(
         icon: hasActiveFilter ? Icons.filter_alt_off_outlined : Icons.calendar_today_outlined,

@@ -573,16 +573,24 @@ class _SavedOfflineMaterialsModalState extends State<SavedOfflineMaterialsModal>
                                 Container(
                                   padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1.5),
                                   decoration: BoxDecoration(
-                                    color: AppTheme.success.withValues(alpha: 0.15),
+                                    color: AppTheme.success.withValues(alpha: 0.12),
                                     borderRadius: BorderRadius.circular(4),
+                                    border: Border.all(color: AppTheme.success.withValues(alpha: 0.25)),
                                   ),
-                                  child: Text(
-                                    '⚡ Compressed',
-                                    style: TextStyle(
-                                      fontSize: 9.5,
-                                      fontWeight: FontWeight.bold,
-                                      color: AppTheme.success,
-                                    ),
+                                  child: Row(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      Icon(Icons.compress, size: 10, color: AppTheme.success),
+                                      const SizedBox(width: 3),
+                                      Text(
+                                        'GZ Compressed',
+                                        style: TextStyle(
+                                          fontSize: 9.5,
+                                          fontWeight: FontWeight.bold,
+                                          color: AppTheme.success,
+                                        ),
+                                      ),
+                                    ],
                                   ),
                                 ),
                               Row(

@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import '../../../core/components/app_toast.dart';
 import '../../../core/components/otp_verification_dialog.dart';
 import '../../../core/components/skeleton_loader.dart';
 import '../../../core/services/otp_service.dart';
@@ -8,6 +11,7 @@ import '../../../core/theme/app_theme.dart';
 import '../../../core/theme/theme_provider.dart';
 import '../../auth/application/auth_provider.dart';
 import '../data/teacher_repository.dart';
+import '../data/teacher_schedule_repository.dart';
 
 class TeacherProfileScreen extends ConsumerStatefulWidget {
   const TeacherProfileScreen({super.key});
@@ -22,6 +26,10 @@ class _TeacherProfileScreenState extends ConsumerState<TeacherProfileScreen> {
   bool _obscureNewPassword = true;
   bool _obscureConfirmPassword = true;
   bool _isSavingPassword = false;
+  bool _quizAlerts = true;
+  bool _scheduleReminders = true;
+  bool _hapticsEnabled = true;
+
   final GlobalKey _passwordSectionKey = GlobalKey();
   final ScrollController _scrollController = ScrollController();
 
@@ -45,6 +53,27 @@ class _TeacherProfileScreenState extends ConsumerState<TeacherProfileScreen> {
     if (user?.mustChangePassword == true) {
       _showPasswordForm = true;
     }
+    _loadPreferences();
+  }
+
+  Future<void> _loadPreferences() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      if (mounted) {
+        setState(() {
+          _quizAlerts = prefs.getBool('teacher_pref_quiz_alerts') ?? true;
+          _scheduleReminders = prefs.getBool('teacher_pref_schedule_reminders') ?? true;
+          _hapticsEnabled = prefs.getBool('teacher_pref_haptics') ?? true;
+        });
+      }
+    } catch (_) {}
+  }
+
+  Future<void> _savePreference(String key, bool value) async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setBool(key, value);
+    } catch (_) {}
   }
 
   void _onPasswordFieldsChanged() {
@@ -68,6 +97,11 @@ class _TeacherProfileScreenState extends ConsumerState<TeacherProfileScreen> {
   Widget build(BuildContext context) {
     final currentUser = ref.watch(authProvider);
     final themeState = ref.watch(themeProvider);
+    final subjects = ref.watch(teacherSubjectsProvider);
+    final handledSections = ref.watch(teacherHandledSectionsProvider).value ?? [];
+    final handledSectionsDetails = ref.watch(teacherHandledSectionsDetailsProvider).value ?? [];
+    final students = ref.watch(teacherStudentsProvider);
+    final schedules = ref.watch(teacherSchedulesProvider);
 
     if (currentUser == null) {
       return Scaffold(
@@ -99,10 +133,10 @@ class _TeacherProfileScreenState extends ConsumerState<TeacherProfileScreen> {
     return Scaffold(
       backgroundColor: AppTheme.background,
       body: PopScope(
-        canPop: !currentUser.mustChangePassword,
+        canPop: false,
         onPopInvokedWithResult: (didPop, result) {
           if (didPop) return;
-          _showMustChangePasswordBackAlert(isTeacher: true);
+          _handleBackNavigation();
         },
         child: currentUser.mustChangePassword
             ? _buildMandatoryPasswordChangeView(currentUser)
@@ -112,38 +146,49 @@ class _TeacherProfileScreenState extends ConsumerState<TeacherProfileScreen> {
             padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 0),
             child: Column(
               children: [
-                if (!currentUser.mustChangePassword && context.canPop()) ...[
-                  const SizedBox(height: 12),
-                  Row(
-                    children: [
-                      IconButton(
-                        icon: Icon(Icons.arrow_back_rounded, color: AppTheme.text),
-                        tooltip: 'Back',
-                        onPressed: () => context.pop(),
-                      ),
-                      const SizedBox(width: 4),
-                      Text(
-                        'Profile & Settings',
-                        style: TextStyle(
-                          fontSize: 18,
-                          fontWeight: FontWeight.bold,
-                          color: AppTheme.text,
-                        ),
-                      ),
-                    ],
-                  ),
-                ],
+                // 1. App Bar Header with Back navigation & Active Faculty pill
+                _buildHeaderBar(context, currentUser),
+                const SizedBox(height: 12),
+
+                // 2. Hero Faculty Identity Card (Avatar, Badges & 4 Quick KPIs)
+                _buildHeroFacultyCard(
+                  context: context,
+                  currentUser: currentUser,
+                  initial: initial,
+                  subjects: subjects,
+                  handledSections: handledSections,
+                  students: students,
+                  schedules: schedules,
+                ),
                 const SizedBox(height: 16),
-                _buildAvatarSection(currentUser, initial),
-                const SizedBox(height: 20),
-                _buildAppearanceCard(themeState),
+
+                // 3. Academic Portfolio & Teaching Load Card
+                _buildAcademicPortfolioCard(
+                  context: context,
+                  subjects: subjects,
+                  handledSections: handledSections,
+                  sectionDetails: handledSectionsDetails,
+                  schedules: schedules,
+                ),
                 const SizedBox(height: 16),
+
+                // 4. Personal & Institutional Information Card
                 _buildPersonalInfoCard(currentUser),
                 const SizedBox(height: 16),
+
+                // 6. Account Security & Password Management Card
                 _buildChangePasswordCard(currentUser),
                 const SizedBox(height: 16),
-                _buildTeachingInfoCard(ref.watch(teacherSubjectsProvider)),
+
+                // 7. Classroom Experience & Preferences Card (Theme & Notifications)
+                _buildPreferencesCard(themeState),
+                const SizedBox(height: 16),
+
+                // 8. Institutional App & Support Information Card
+                _buildAboutAndSupportCard(context),
                 const SizedBox(height: 24),
+
+                // 9. Sign Out Button
                 _buildSignOutButton(),
                 const SizedBox(height: 40),
               ],
@@ -154,110 +199,788 @@ class _TeacherProfileScreenState extends ConsumerState<TeacherProfileScreen> {
     );
   }
 
-  Widget _buildAvatarSection(User currentUser, String initial) {
-    return Column(
-      children: [
-        GestureDetector(
-          onTap: () {
-            if (!mounted) return;
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(content: Text('Image picker will be integrated with image_picker package'), backgroundColor: AppTheme.accent),
-            );
-          },
-          child: Stack(
-            clipBehavior: Clip.none,
-            children: [
-              currentUser.profileImage != null
-                  ? CircleAvatar(radius: 45, backgroundImage: NetworkImage(currentUser.profileImage!))
-                  : CircleAvatar(radius: 45, backgroundColor: AppTheme.primary, child: Text(initial, style: const TextStyle(fontSize: 36, fontWeight: FontWeight.w700, color: Colors.black))),
-              Positioned(
-                bottom: 0, right: 0,
-                child: Container(
-                  width: 30, height: 30,
-                  decoration: BoxDecoration(color: AppTheme.accent, shape: BoxShape.circle, border: Border.all(color: AppTheme.background, width: 2)),
-                  child: const Icon(Icons.camera_alt, size: 14, color: Colors.white),
-                ),
-              ),
-            ],
+  void _handleBackNavigation() {
+    final user = ref.read(authProvider);
+    if (user?.mustChangePassword == true) {
+      _showMustChangePasswordBackAlert(isTeacher: true);
+      return;
+    }
+
+    try {
+      if (GoRouter.maybeOf(context)?.canPop() == true) {
+        context.pop();
+        return;
+      }
+    } catch (_) {}
+
+    try {
+      if (Navigator.of(context, rootNavigator: true).canPop()) {
+        Navigator.of(context, rootNavigator: true).pop();
+        return;
+      }
+    } catch (_) {}
+
+    try {
+      if (Navigator.canPop(context)) {
+        Navigator.pop(context);
+        return;
+      }
+    } catch (_) {}
+
+    // Fallback: If stack cannot be popped, navigate directly to teacher dashboard
+    context.go('/teacher/dashboard');
+  }
+
+  Widget _buildHeaderBar(BuildContext context, User currentUser) {
+    if (currentUser.mustChangePassword) return const SizedBox.shrink();
+
+    return Padding(
+      padding: const EdgeInsets.only(top: 10, bottom: 4),
+      child: Row(
+        children: [
+          IconButton(
+            icon: Icon(Icons.arrow_back_rounded, color: AppTheme.text),
+            tooltip: 'Back to Dashboard',
+            padding: EdgeInsets.zero,
+            constraints: const BoxConstraints(minWidth: 36, minHeight: 36),
+            onPressed: _handleBackNavigation,
           ),
-        ),
-        const SizedBox(height: 16),
-        Text(currentUser.fullName, style: TextStyle(fontSize: 20, fontWeight: FontWeight.w700, color: AppTheme.text)),
-        const SizedBox(height: 2),
-        Text('Teacher', style: TextStyle(fontSize: 13, color: AppTheme.primary, fontWeight: FontWeight.w600)),
-      ],
+          const SizedBox(width: 4),
+          Expanded(
+            child: Text(
+              'Faculty Profile & Settings',
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(
+                fontSize: 18,
+                fontWeight: FontWeight.bold,
+                color: AppTheme.text,
+              ),
+            ),
+          ),
+        ],
+      ),
     );
   }
 
-  Widget _buildAppearanceCard(ThemeState themeState) {
-    return _sectionCard(child: Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text('Appearance', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600, color: AppTheme.text)),
-        const SizedBox(height: 8),
-        Text('Choose your preferred theme between Light and Dark mode.', style: TextStyle(fontSize: 13, color: AppTheme.textMuted, height: 1.4)),
-        const SizedBox(height: 12),
-        Row(
-          children: [
-            _buildThemePill(icon: Icons.wb_sunny_outlined, label: 'Light', mode: AppThemeMode.light, isActive: themeState.preference == AppThemeMode.light),
-            const SizedBox(width: 12),
-            _buildThemePill(icon: Icons.dark_mode, label: 'Dark', mode: AppThemeMode.dark, isActive: themeState.preference == AppThemeMode.dark),
-          ],
-        ),
-        const SizedBox(height: 10),
-        Center(child: Text('Current: ${ref.read(themeProvider.notifier).currentModeLabel}', style: TextStyle(fontSize: 12, color: AppTheme.textMuted))),
-      ],
-    ));
+  Widget _buildHeroFacultyCard({
+    required BuildContext context,
+    required User currentUser,
+    required String initial,
+    required List<Map<String, dynamic>> subjects,
+    required List<String> handledSections,
+    required List<Map<String, dynamic>> students,
+    required List<Map<String, dynamic>> schedules,
+  }) {
+    final advisorySection = currentUser.section;
+    final hasAdvisory = advisorySection != null && advisorySection.isNotEmpty && advisorySection != 'null';
+
+    return Container(
+      width: double.infinity,
+      decoration: BoxDecoration(
+        color: AppTheme.surface,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: AppTheme.border, width: 1),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.04),
+            blurRadius: 10,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: Column(
+        children: [
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 20, 16, 16),
+            child: Column(
+              children: [
+                // Avatar with Camera Overlay
+                Stack(
+                  alignment: Alignment.bottomRight,
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(3),
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        border: Border.all(
+                          color: AppTheme.primary.withValues(alpha: 0.35),
+                          width: 2.5,
+                        ),
+                      ),
+                      child: CircleAvatar(
+                        radius: 42,
+                        backgroundColor: AppTheme.primary.withValues(alpha: 0.15),
+                        backgroundImage: (currentUser.profileImage != null && currentUser.profileImage!.isNotEmpty)
+                            ? NetworkImage(currentUser.profileImage!)
+                            : null,
+                        child: (currentUser.profileImage == null || currentUser.profileImage!.isEmpty)
+                            ? Text(
+                                initial,
+                                style: TextStyle(
+                                  fontSize: 32,
+                                  fontWeight: FontWeight.bold,
+                                  color: AppTheme.primary,
+                                ),
+                              )
+                            : null,
+                      ),
+                    ),
+                    Positioned(
+                      right: 2,
+                      bottom: 2,
+                      child: GestureDetector(
+                        onTap: () {
+                          AppToast.showInfo(
+                            context,
+                            'Profile photo updates are managed by School Admin LIS.',
+                          );
+                        },
+                        child: Container(
+                          padding: const EdgeInsets.all(6),
+                          decoration: BoxDecoration(
+                            color: AppTheme.primary,
+                            shape: BoxShape.circle,
+                            border: Border.all(color: AppTheme.surface, width: 2),
+                          ),
+                          child: const Icon(
+                            Icons.camera_alt_rounded,
+                            size: 13,
+                            color: Colors.white,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 12),
+
+                // Full Name
+                Text(
+                  currentUser.fullName.isNotEmpty ? currentUser.fullName : 'Faculty Member',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    fontSize: 20,
+                    fontWeight: FontWeight.bold,
+                    color: AppTheme.text,
+                    letterSpacing: -0.3,
+                  ),
+                ),
+                const SizedBox(height: 4),
+
+                // Username / Tag
+                Text(
+                  '@${currentUser.username}',
+                  style: TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w500,
+                    color: AppTheme.textMuted,
+                  ),
+                ),
+                const SizedBox(height: 12),
+
+                // Faculty Badges
+                Wrap(
+                  alignment: WrapAlignment.center,
+                  spacing: 6,
+                  runSpacing: 6,
+                  children: [
+                    _buildBadge(
+                      icon: Icons.school_rounded,
+                      label: 'Teacher / Faculty',
+                      color: AppTheme.primary,
+                    ),
+                    _buildBadge(
+                      icon: Icons.verified_user_rounded,
+                      label: 'DepEd Verified',
+                      color: AppTheme.success,
+                    ),
+                    if (hasAdvisory)
+                      _buildBadge(
+                        icon: Icons.group_work_rounded,
+                        label: 'Adviser: $advisorySection',
+                        color: const Color(0xFF2563EB),
+                      ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+
+          // Divider
+          Divider(height: 1, color: AppTheme.border),
+
+          // Quick Teaching Workload Metrics Bar (4 KPIs)
+          Padding(
+            padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 8),
+            child: Row(
+              children: [
+                Expanded(
+                  child: _buildWorkloadStat(
+                    context: context,
+                    icon: Icons.auto_stories_rounded,
+                    count: '${subjects.length}',
+                    label: 'Subjects',
+                    onTap: () => context.push('/teacher/subjects'),
+                  ),
+                ),
+                Container(width: 1, height: 32, color: AppTheme.border),
+                Expanded(
+                  child: _buildWorkloadStat(
+                    context: context,
+                    icon: Icons.grid_view_rounded,
+                    count: '${handledSections.length}',
+                    label: 'Sections',
+                    onTap: () => context.push('/teacher/dashboard'),
+                  ),
+                ),
+                Container(width: 1, height: 32, color: AppTheme.border),
+                Expanded(
+                  child: _buildWorkloadStat(
+                    context: context,
+                    icon: Icons.people_alt_rounded,
+                    count: '${students.length}',
+                    label: 'Students',
+                    onTap: () => context.push('/teacher/students'),
+                  ),
+                ),
+                Container(width: 1, height: 32, color: AppTheme.border),
+                Expanded(
+                  child: _buildWorkloadStat(
+                    context: context,
+                    icon: Icons.calendar_month_rounded,
+                    count: '${schedules.length}',
+                    label: 'Classes',
+                    onTap: () => context.push('/teacher/schedule'),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
   }
 
-  Widget _buildThemePill({required IconData icon, required String label, required AppThemeMode mode, required bool isActive}) {
-    return Expanded(
-      child: GestureDetector(
-        onTap: () => ref.read(themeProvider.notifier).setTheme(mode),
-        child: AnimatedContainer(
-          duration: const Duration(milliseconds: 200),
-          padding: const EdgeInsets.symmetric(vertical: 12),
-          decoration: BoxDecoration(
-            color: isActive ? AppTheme.primary : AppTheme.inputBg,
-            borderRadius: BorderRadius.circular(10),
-            border: Border.all(color: isActive ? AppTheme.primary : AppTheme.border, width: 1.5),
-          ),
-          child: Row(mainAxisAlignment: MainAxisAlignment.center, children: [
-            Icon(icon, size: 16, color: isActive ? Colors.black : AppTheme.textSecondary),
-            const SizedBox(width: 6),
-            Text(label, style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: isActive ? Colors.black : AppTheme.textSecondary)),
-          ]),
+  Widget _buildWorkloadStat({
+    required BuildContext context,
+    required IconData icon,
+    required String count,
+    required String label,
+    required VoidCallback onTap,
+  }) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(10),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: 4),
+        child: Column(
+          children: [
+            Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(icon, size: 14, color: AppTheme.primary),
+                const SizedBox(width: 4),
+                Text(
+                  count,
+                  style: TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.bold,
+                    color: AppTheme.text,
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 2),
+            Text(
+              label,
+              style: TextStyle(
+                fontSize: 11,
+                fontWeight: FontWeight.w500,
+                color: AppTheme.textMuted,
+              ),
+            ),
+          ],
         ),
       ),
     );
   }
 
-  Widget _buildPersonalInfoCard(User currentUser) {
-    return _sectionCard(child: Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: [
-            Text('Personal Information', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600, color: AppTheme.text)),
-            if (!_isEditing)
-              GestureDetector(
-                onTap: () => setState(() => _isEditing = true),
-                child: Row(children: [Icon(Icons.edit, size: 14, color: AppTheme.primary), const SizedBox(width: 4), Text('Edit', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w500, color: AppTheme.primary))]),
-              )
-            else
-              GestureDetector(
-                onTap: _handleSaveProfile,
-                child: Container(padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6), decoration: BoxDecoration(color: AppTheme.primary, borderRadius: BorderRadius.circular(8)), child: const Row(children: [Icon(Icons.save, size: 14, color: Colors.black), SizedBox(width: 4), Text('Save', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: Colors.black))])),
+  Widget _buildBadge({
+    required IconData icon,
+    required String label,
+    required Color color,
+  }) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3.5),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.1),
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: color.withValues(alpha: 0.25)),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, size: 11.5, color: color),
+          const SizedBox(width: 4),
+          Text(
+            label,
+            style: TextStyle(
+              fontSize: 11,
+              fontWeight: FontWeight.w600,
+              color: color,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildAcademicPortfolioCard({
+    required BuildContext context,
+    required List<Map<String, dynamic>> subjects,
+    required List<String> handledSections,
+    required List<Map<String, dynamic>> sectionDetails,
+    required List<Map<String, dynamic>> schedules,
+  }) {
+    return _sectionCard(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Header with Manage button
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Expanded(
+                child: Row(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(6),
+                      decoration: BoxDecoration(
+                        color: AppTheme.primary.withValues(alpha: 0.12),
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: Icon(Icons.auto_stories_rounded, size: 18, color: AppTheme.primary),
+                    ),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: Text(
+                        'Academic Portfolio',
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.bold,
+                          color: AppTheme.text,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
               ),
+              const SizedBox(width: 8),
+              InkWell(
+                onTap: () => context.push('/teacher/subjects'),
+                borderRadius: BorderRadius.circular(6),
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(
+                        'View All',
+                        style: TextStyle(
+                          fontSize: 12.5,
+                          fontWeight: FontWeight.w600,
+                          color: AppTheme.primary,
+                        ),
+                      ),
+                      const SizedBox(width: 2),
+                      Icon(Icons.chevron_right_rounded, size: 16, color: AppTheme.primary),
+                    ],
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 14),
+
+          // Assigned Subjects Sub-section
+          Text(
+            'ASSIGNED SUBJECTS (${subjects.length})',
+            style: TextStyle(
+              fontSize: 11,
+              fontWeight: FontWeight.bold,
+              letterSpacing: 0.5,
+              color: AppTheme.textMuted,
+            ),
+          ),
+          const SizedBox(height: 8),
+
+          if (subjects.isEmpty)
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(14),
+              decoration: BoxDecoration(
+                color: AppTheme.inputBg,
+                borderRadius: BorderRadius.circular(10),
+                border: Border.all(color: AppTheme.border),
+              ),
+              child: Row(
+                children: [
+                  Icon(Icons.info_outline, size: 18, color: AppTheme.textMuted),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Text(
+                      'No subjects currently assigned to your teaching load.',
+                      style: TextStyle(fontSize: 12.5, color: AppTheme.textSecondary),
+                    ),
+                  ),
+                ],
+              ),
+            )
+          else
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: subjects.map((sub) {
+                final code = sub['subject_code'] ?? 'SUBJ';
+                final name = sub['name'] ?? 'Subject';
+                final id = sub['id'];
+
+                return InkWell(
+                  onTap: () {
+                    if (id != null) {
+                      context.push('/teacher/subjects/$id');
+                    } else {
+                      context.push('/teacher/subjects');
+                    }
+                  },
+                  borderRadius: BorderRadius.circular(10),
+                  child: Container(
+                    constraints: const BoxConstraints(maxWidth: 280),
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
+                    decoration: BoxDecoration(
+                      color: AppTheme.inputBg,
+                      borderRadius: BorderRadius.circular(10),
+                      border: Border.all(color: AppTheme.border),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                          decoration: BoxDecoration(
+                            color: AppTheme.primary.withValues(alpha: 0.15),
+                            borderRadius: BorderRadius.circular(5),
+                          ),
+                          child: Text(
+                            code,
+                            style: TextStyle(
+                              fontSize: 10.5,
+                              fontWeight: FontWeight.bold,
+                              color: AppTheme.primary,
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        Flexible(
+                          child: Text(
+                            name,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: TextStyle(
+                              fontSize: 12.5,
+                              fontWeight: FontWeight.w600,
+                              color: AppTheme.text,
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 4),
+                        Icon(Icons.arrow_forward_ios_rounded, size: 10, color: AppTheme.textMuted),
+                      ],
+                    ),
+                  ),
+                );
+              }).toList(),
+            ),
+
+          const SizedBox(height: 16),
+
+          // Handled Sections Sub-section
+          Text(
+            'HANDLED SECTIONS & CLASSROOMS (${handledSections.length})',
+            style: TextStyle(
+              fontSize: 11,
+              fontWeight: FontWeight.bold,
+              letterSpacing: 0.5,
+              color: AppTheme.textMuted,
+            ),
+          ),
+          const SizedBox(height: 8),
+
+          if (handledSections.isEmpty)
+            Text(
+              'No sections assigned yet.',
+              style: TextStyle(fontSize: 12.5, color: AppTheme.textMuted),
+            )
+          else
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: handledSections.map((secName) {
+                Map<String, dynamic> detail = const {};
+                for (final d in sectionDetails) {
+                  if (d['name'] == secName) {
+                    detail = d;
+                    break;
+                  }
+                }
+                final studentCount = detail['studentCount'] ?? detail['student_count'];
+                final room = detail['room'];
+
+                return Container(
+                  constraints: const BoxConstraints(maxWidth: 280),
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                  decoration: BoxDecoration(
+                    color: AppTheme.surface,
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(color: AppTheme.border),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(Icons.meeting_room_outlined, size: 13, color: AppTheme.primary),
+                      const SizedBox(width: 5),
+                      Flexible(
+                        child: Text(
+                          secName,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.bold,
+                            color: AppTheme.text,
+                          ),
+                        ),
+                      ),
+                      if (studentCount != null) ...[
+                        const SizedBox(width: 4),
+                        Text(
+                          '($studentCount sts)',
+                          style: TextStyle(fontSize: 10.5, color: AppTheme.textMuted),
+                        ),
+                      ],
+                      if (room != null && room.toString().isNotEmpty) ...[
+                        const SizedBox(width: 4),
+                        Text(
+                          '• $room',
+                          style: TextStyle(fontSize: 10.5, color: AppTheme.textMuted),
+                        ),
+                      ],
+                    ],
+                  ),
+                );
+              }).toList(),
+            ),
+
+          const SizedBox(height: 14),
+
+          // Weekly Schedule Quick Link
+          InkWell(
+            onTap: () => context.push('/teacher/schedule'),
+            borderRadius: BorderRadius.circular(10),
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+              decoration: BoxDecoration(
+                color: AppTheme.primary.withValues(alpha: 0.08),
+                borderRadius: BorderRadius.circular(10),
+                border: Border.all(color: AppTheme.primary.withValues(alpha: 0.2)),
+              ),
+              child: Row(
+                children: [
+                  Icon(Icons.schedule_rounded, size: 18, color: AppTheme.primary),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'Weekly Class Schedule',
+                          style: TextStyle(
+                            fontSize: 12.5,
+                            fontWeight: FontWeight.bold,
+                            color: AppTheme.text,
+                          ),
+                        ),
+                        Text(
+                          '${schedules.length} periods active across the school week',
+                          style: TextStyle(
+                            fontSize: 11,
+                            color: AppTheme.textMuted,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  Icon(Icons.arrow_forward_ios_rounded, size: 12, color: AppTheme.primary),
+                ],
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildPersonalInfoCard(User currentUser) {
+    final advisory = (currentUser.section != null && currentUser.section!.isNotEmpty && currentUser.section != 'null')
+        ? currentUser.section!
+        : 'None Assigned';
+    final schoolId = (currentUser.schoolId != null && currentUser.schoolId!.isNotEmpty)
+        ? currentUser.schoolId!
+        : 'sch_main (DepEd Central)';
+
+    return _sectionCard(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Expanded(
+                child: Row(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(6),
+                      decoration: BoxDecoration(
+                        color: AppTheme.primary.withValues(alpha: 0.12),
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: Icon(Icons.badge_outlined, size: 18, color: AppTheme.primary),
+                    ),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: Text(
+                        'Personal & Institutional Info',
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.bold,
+                          color: AppTheme.text,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(width: 8),
+              if (!_isEditing)
+                GestureDetector(
+                  onTap: () => setState(() => _isEditing = true),
+                  child: Row(
+                    children: [
+                      Icon(Icons.edit, size: 14, color: AppTheme.primary),
+                      const SizedBox(width: 4),
+                      Text(
+                        'Edit',
+                        style: TextStyle(
+                          fontSize: 13,
+                          fontWeight: FontWeight.w500,
+                          color: AppTheme.primary,
+                        ),
+                      ),
+                    ],
+                  ),
+                )
+              else
+                GestureDetector(
+                  onTap: _handleSaveProfile,
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                    decoration: BoxDecoration(
+                      color: AppTheme.primary,
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: const Row(
+                      children: [
+                        Icon(Icons.save, size: 14, color: Colors.black),
+                        SizedBox(width: 4),
+                        Text(
+                          'Save',
+                          style: TextStyle(
+                            fontSize: 13,
+                            fontWeight: FontWeight.w600,
+                            color: Colors.black,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+            ],
+          ),
+          const SizedBox(height: 16),
+          _buildFieldRow(
+            icon: Icons.person_outline,
+            label: 'Full Name',
+            value: currentUser.fullName,
+            controller: _fullNameController,
+            isEditing: _isEditing,
+            showBorder: true,
+          ),
+          _buildFieldRow(
+            icon: Icons.alternate_email_rounded,
+            label: 'Username',
+            value: currentUser.username,
+            controller: _usernameController,
+            isEditing: _isEditing,
+            showBorder: true,
+          ),
+          _buildFieldRow(
+            icon: Icons.email_outlined,
+            label: 'Email Address (DepEd LIS)',
+            value: currentUser.email,
+            controller: _emailController,
+            isEditing: _isEditing,
+            showBorder: true,
+            keyboardType: TextInputType.emailAddress,
+          ),
+          // Institutional non-editable fields
+          _buildStaticInfoRow(
+            icon: Icons.group_work_outlined,
+            label: 'Advisory Section',
+            value: advisory,
+            showBorder: true,
+          ),
+          _buildStaticInfoRow(
+            icon: Icons.apartment_rounded,
+            label: 'Institutional Campus / Division ID',
+            value: schoolId,
+            showBorder: true,
+          ),
+          _buildStaticInfoRow(
+            icon: Icons.security_rounded,
+            label: 'System Access Tier',
+            value: 'Faculty / Educator (Level 2 Access)',
+            showBorder: false,
+          ),
+          if (_isEditing) ...[
+            const SizedBox(height: 10),
+            Text(
+              '* Note: Advisory class, school division, and security roles are managed by the School LIS Administrator.',
+              style: TextStyle(
+                fontSize: 11,
+                fontStyle: FontStyle.italic,
+                color: AppTheme.textMuted,
+              ),
+            ),
           ],
-        ),
-        const SizedBox(height: 16),
-        _buildFieldRow(icon: Icons.person_outline, label: 'Full Name', value: currentUser.fullName, controller: _fullNameController, isEditing: _isEditing, showBorder: true),
-        _buildFieldRow(icon: Icons.person_outline, label: 'Username', value: currentUser.username, controller: _usernameController, isEditing: _isEditing, showBorder: true),
-        _buildFieldRow(icon: Icons.email_outlined, label: 'Email', value: currentUser.email, controller: _emailController, isEditing: _isEditing, showBorder: false, keyboardType: TextInputType.emailAddress),
-      ],
-    ));
+        ],
+      ),
+    );
   }
 
   Widget _buildChangePasswordCard(User currentUser) {
@@ -537,23 +1260,517 @@ class _TeacherProfileScreenState extends ConsumerState<TeacherProfileScreen> {
     );
   }
 
-  Widget _buildTeachingInfoCard(List<Map<String, dynamic>> subjects) {
-    return _sectionCard(child: Column(
+  Widget _buildPreferencesCard(ThemeState themeState) {
+    final isDark = themeState.isDark;
+
+    return _sectionCard(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(6),
+                decoration: BoxDecoration(
+                  color: AppTheme.primary.withValues(alpha: 0.12),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Icon(Icons.tune_rounded, size: 18, color: AppTheme.primary),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Text(
+                  'Classroom Preferences',
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.bold,
+                    color: AppTheme.text,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 14),
+
+          // Theme Switcher
+          Text(
+            'VISUAL THEME',
+            style: TextStyle(
+              fontSize: 11,
+              fontWeight: FontWeight.bold,
+              letterSpacing: 0.5,
+              color: AppTheme.textMuted,
+            ),
+          ),
+          const SizedBox(height: 8),
+
+          Container(
+            padding: const EdgeInsets.all(4),
+            decoration: BoxDecoration(
+              color: AppTheme.inputBg,
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: AppTheme.border),
+            ),
+            child: Row(
+              children: [
+                Expanded(
+                  child: GestureDetector(
+                    onTap: () {
+                      if (isDark) {
+                        ref.read(themeProvider.notifier).setTheme(AppThemeMode.light);
+                      }
+                    },
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(vertical: 9),
+                      decoration: BoxDecoration(
+                        color: !isDark ? AppTheme.primary : Colors.transparent,
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Icon(
+                            Icons.light_mode_rounded,
+                            size: 16,
+                            color: !isDark ? Colors.black : AppTheme.textMuted,
+                          ),
+                          const SizedBox(width: 6),
+                          Text(
+                            'Light Mode',
+                            style: TextStyle(
+                              fontSize: 13,
+                              fontWeight: FontWeight.w600,
+                              color: !isDark ? Colors.black : AppTheme.textMuted,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+                Expanded(
+                  child: GestureDetector(
+                    onTap: () {
+                      if (!isDark) {
+                        ref.read(themeProvider.notifier).setTheme(AppThemeMode.dark);
+                      }
+                    },
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(vertical: 9),
+                      decoration: BoxDecoration(
+                        color: isDark ? AppTheme.primary : Colors.transparent,
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Icon(
+                            Icons.dark_mode_rounded,
+                            size: 16,
+                            color: isDark ? Colors.black : AppTheme.textMuted,
+                          ),
+                          const SizedBox(width: 6),
+                          Text(
+                            'Dark Mode',
+                            style: TextStyle(
+                              fontSize: 13,
+                              fontWeight: FontWeight.w600,
+                              color: isDark ? Colors.black : AppTheme.textMuted,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+
+          const SizedBox(height: 16),
+
+          // Teaching Notifications & Feedback Toggles
+          Text(
+            'TEACHING NOTIFICATIONS & FEEDBACK',
+            style: TextStyle(
+              fontSize: 11,
+              fontWeight: FontWeight.bold,
+              letterSpacing: 0.5,
+              color: AppTheme.textMuted,
+            ),
+          ),
+          const SizedBox(height: 8),
+
+          _buildToggleRow(
+            title: 'Quiz Submissions Alert',
+            subtitle: 'Notify instantly when a student completes an offline quiz',
+            value: _quizAlerts,
+            onChanged: (val) {
+              setState(() => _quizAlerts = val);
+              _savePreference('teacher_pref_quiz_alerts', val);
+            },
+          ),
+          Divider(height: 1, color: AppTheme.border),
+
+          _buildToggleRow(
+            title: 'Class Schedule Reminders',
+            subtitle: 'Receive alerts 15 minutes prior to scheduled periods',
+            value: _scheduleReminders,
+            onChanged: (val) {
+              setState(() => _scheduleReminders = val);
+              _savePreference('teacher_pref_schedule_reminders', val);
+            },
+          ),
+          Divider(height: 1, color: AppTheme.border),
+
+          _buildToggleRow(
+            title: 'Haptic Touch Feedback',
+            subtitle: 'Provide tactile vibration feedback during grading and approvals',
+            value: _hapticsEnabled,
+            onChanged: (val) {
+              setState(() => _hapticsEnabled = val);
+              _savePreference('teacher_pref_haptics', val);
+              if (val) HapticFeedback.selectionClick();
+            },
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildAboutAndSupportCard(BuildContext context) {
+    return _sectionCard(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(6),
+                decoration: BoxDecoration(
+                  color: AppTheme.primary.withValues(alpha: 0.12),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Icon(Icons.shield_outlined, size: 18, color: AppTheme.primary),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Text(
+                  'Institutional Support & Info',
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.bold,
+                    color: AppTheme.text,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+
+          Container(
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: AppTheme.inputBg,
+              borderRadius: BorderRadius.circular(10),
+              border: Border.all(color: AppTheme.border),
+            ),
+            child: Column(
+              children: [
+                _buildSystemSpecRow(
+                  label: 'Software Platform',
+                  value: 'AIRAMP DepEd Classroom Suite',
+                ),
+                const SizedBox(height: 6),
+                _buildSystemSpecRow(
+                  label: 'App Version',
+                  value: 'v1.4.0 (Build 2026.10)',
+                ),
+                const SizedBox(height: 6),
+                _buildSystemSpecRow(
+                  label: 'Offline Engine',
+                  value: 'SQLite 3.45 + Local Mesh Client',
+                ),
+                const SizedBox(height: 6),
+                _buildSystemSpecRow(
+                  label: 'License',
+                  value: 'DepEd ICT Educational Program',
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 12),
+
+          InkWell(
+            onTap: _showFacultyHelpDialog,
+            borderRadius: BorderRadius.circular(8),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 4),
+              child: Row(
+                children: [
+                  Icon(Icons.help_outline_rounded, size: 18, color: AppTheme.primary),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Text(
+                      'Faculty Quick Help & Offline Guide',
+                      style: TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w600,
+                        color: AppTheme.text,
+                      ),
+                    ),
+                  ),
+                  Icon(Icons.arrow_forward_ios_rounded, size: 12, color: AppTheme.textMuted),
+                ],
+              ),
+            ),
+          ),
+          Divider(height: 1, color: AppTheme.border),
+
+          InkWell(
+            onTap: _showPrivacyDialog,
+            borderRadius: BorderRadius.circular(8),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 4),
+              child: Row(
+                children: [
+                  Icon(Icons.policy_outlined, size: 18, color: AppTheme.primary),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Text(
+                      'Data Privacy & DepEd Compliance',
+                      style: TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w600,
+                        color: AppTheme.text,
+                      ),
+                    ),
+                  ),
+                  Icon(Icons.arrow_forward_ios_rounded, size: 12, color: AppTheme.textMuted),
+                ],
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildToggleRow({
+    required String title,
+    required String subtitle,
+    required bool value,
+    required ValueChanged<bool> onChanged,
+  }) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 8),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.center,
+        children: [
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  title,
+                  style: TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w600,
+                    color: AppTheme.text,
+                  ),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  subtitle,
+                  style: TextStyle(
+                    fontSize: 11,
+                    color: AppTheme.textMuted,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          Switch(
+            value: value,
+            activeThumbColor: AppTheme.primary,
+            activeTrackColor: AppTheme.primary.withValues(alpha: 0.4),
+            onChanged: onChanged,
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildSystemSpecRow({
+    required String label,
+    required String value,
+  }) {
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.spaceBetween,
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text('Teaching Info', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600, color: AppTheme.text)),
-        const SizedBox(height: 12),
-        if (subjects.isEmpty)
-          Text('No subjects assigned yet.', style: TextStyle(fontSize: 13, color: AppTheme.textMuted))
-        else
-          ...subjects.take(3).map((sub) => Padding(
-                padding: const EdgeInsets.symmetric(vertical: 4),
-                child: Row(children: [Icon(Icons.menu_book, size: 16, color: AppTheme.primary), const SizedBox(width: 8), Text('${sub['name'] ?? 'Subject'} (${sub['subject_code'] ?? ''})', style: TextStyle(fontSize: 13, color: AppTheme.text))]),
-              )),
-        if (subjects.length > 3)
-          Text('+${subjects.length - 3} more', style: TextStyle(fontSize: 12, color: AppTheme.textMuted)),
+        Text(
+          label,
+          style: TextStyle(fontSize: 11.5, color: AppTheme.textMuted),
+        ),
+        const SizedBox(width: 12),
+        Flexible(
+          child: Text(
+            value,
+            textAlign: TextAlign.right,
+            style: TextStyle(
+              fontSize: 11.5,
+              fontWeight: FontWeight.w600,
+              color: AppTheme.text,
+            ),
+          ),
+        ),
       ],
-    ));
+    );
+  }
+
+  Widget _buildStaticInfoRow({
+    required IconData icon,
+    required String label,
+    required String value,
+    required bool showBorder,
+  }) {
+    return Container(
+      padding: const EdgeInsets.symmetric(vertical: 10),
+      decoration: BoxDecoration(
+        border: showBorder ? Border(bottom: BorderSide(color: AppTheme.border, width: 1)) : null,
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Padding(
+            padding: const EdgeInsets.only(top: 2),
+            child: Icon(icon, size: 16, color: AppTheme.textMuted),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(label, style: TextStyle(fontSize: 11, color: AppTheme.textMuted)),
+                const SizedBox(height: 2),
+                Text(
+                  value,
+                  style: TextStyle(
+                    color: AppTheme.text,
+                    fontSize: 14,
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showFacultyHelpDialog() {
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: AppTheme.surface,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: Row(
+          children: [
+            Icon(Icons.help_outline_rounded, color: AppTheme.primary),
+            const SizedBox(width: 8),
+            Expanded(
+              child: Text(
+                'Faculty User Guide',
+                style: TextStyle(color: AppTheme.text, fontSize: 16, fontWeight: FontWeight.bold),
+              ),
+            ),
+          ],
+        ),
+        content: SingleChildScrollView(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              _buildHelpItem(
+                title: 'Offline Quiz Submissions',
+                desc: 'Students submit quizzes directly to the ESP32 Hub. Scores and answers will synchronize to your device view once connected to the classroom mesh.',
+              ),
+              const SizedBox(height: 10),
+              _buildHelpItem(
+                title: 'Managing Sections & Roster',
+                desc: 'Class sections and student rosters are provisioned by the School Admin. Tap "Station Hub" above to review live connected student clients.',
+              ),
+              const SizedBox(height: 10),
+              _buildHelpItem(
+                title: 'ESP32 Station Hotspot',
+                desc: 'Ensure your device is connected to the classroom AIRAMP-HUB Access Point to distribute lesson materials and activate timed quizzes.',
+              ),
+            ],
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(),
+            child: Text('Close', style: TextStyle(color: AppTheme.primary, fontWeight: FontWeight.bold)),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildHelpItem({required String title, required String desc}) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          title,
+          style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: AppTheme.text),
+        ),
+        const SizedBox(height: 2),
+        Text(
+          desc,
+          style: TextStyle(fontSize: 12, color: AppTheme.textSecondary, height: 1.3),
+        ),
+      ],
+    );
+  }
+
+  void _showPrivacyDialog() {
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: AppTheme.surface,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: Row(
+          children: [
+            Icon(Icons.policy_outlined, color: AppTheme.primary),
+            const SizedBox(width: 8),
+            Expanded(
+              child: Text(
+                'Data Privacy & Compliance',
+                style: TextStyle(color: AppTheme.text, fontSize: 16, fontWeight: FontWeight.bold),
+              ),
+            ),
+          ],
+        ),
+        content: Text(
+          'AIRAMP complies with Republic Act 10173 (Data Privacy Act of 2012) and DepEd institutional data handling standards.\n\nAll student records, grades, and teaching assets are stored within local encrypted SQLite databases on-premises and are never transmitted to unauthorized third parties.',
+          style: TextStyle(color: AppTheme.textSecondary, fontSize: 13, height: 1.4),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(),
+            child: Text('Understood', style: TextStyle(color: AppTheme.primary, fontWeight: FontWeight.bold)),
+          ),
+        ],
+      ),
+    );
   }
 
   Widget _buildFieldRow({required IconData icon, required String label, required String value, required TextEditingController controller, required bool isEditing, required bool showBorder, TextInputType keyboardType = TextInputType.text, int? maxLength}) {
@@ -619,7 +1836,89 @@ class _TeacherProfileScreenState extends ConsumerState<TeacherProfileScreen> {
   }
 
   Widget _buildSignOutButton() {
-    return SizedBox(width: double.infinity, child: GestureDetector(onTap: _handleLogout, child: Container(padding: const EdgeInsets.symmetric(vertical: 16), decoration: BoxDecoration(color: AppTheme.errorSoft, borderRadius: BorderRadius.circular(14), border: Border.all(color: AppTheme.error.withValues(alpha: 0.19), width: 1)), child: Row(mainAxisAlignment: MainAxisAlignment.center, children: [Icon(Icons.logout, size: 18, color: AppTheme.error), const SizedBox(width: 8), Text('Sign Out', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600, color: AppTheme.error))]))));
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: _handleLogout,
+        borderRadius: BorderRadius.circular(16),
+        splashColor: AppTheme.error.withValues(alpha: 0.12),
+        highlightColor: AppTheme.error.withValues(alpha: 0.06),
+        child: Ink(
+          width: double.infinity,
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+          decoration: BoxDecoration(
+            color: AppTheme.surface,
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(
+              color: AppTheme.error.withValues(alpha: 0.28),
+              width: 1.2,
+            ),
+            boxShadow: [
+              BoxShadow(
+                color: AppTheme.error.withValues(alpha: 0.04),
+                blurRadius: 10,
+                offset: const Offset(0, 3),
+              ),
+            ],
+          ),
+          child: Row(
+            children: [
+              Container(
+                width: 42,
+                height: 42,
+                decoration: BoxDecoration(
+                  color: AppTheme.error.withValues(alpha: 0.10),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Icon(
+                  Icons.logout_rounded,
+                  size: 20,
+                  color: AppTheme.error,
+                ),
+              ),
+              const SizedBox(width: 14),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(
+                      'Sign Out',
+                      style: TextStyle(
+                        fontSize: 15,
+                        fontWeight: FontWeight.w700,
+                        color: AppTheme.error,
+                        letterSpacing: 0.2,
+                      ),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      'End current faculty session safely',
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: AppTheme.textMuted,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              Container(
+                padding: const EdgeInsets.all(7),
+                decoration: BoxDecoration(
+                  color: AppTheme.error.withValues(alpha: 0.08),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Icon(
+                  Icons.arrow_forward_ios_rounded,
+                  size: 13,
+                  color: AppTheme.error,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
   }
 
   Future<void> _handleSaveProfile() async {
@@ -1283,7 +2582,136 @@ class _TeacherProfileScreenState extends ConsumerState<TeacherProfileScreen> {
   void _handleLogout() {
     showDialog(
       context: context,
-      builder: (ctx) => AlertDialog(backgroundColor: AppTheme.surface, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)), title: Text('Sign Out', style: TextStyle(color: AppTheme.text, fontWeight: FontWeight.bold)), content: Text('Are you sure you want to sign out?', style: TextStyle(color: AppTheme.textSecondary)), actions: [TextButton(onPressed: () => Navigator.of(ctx).pop(), child: Text('Cancel', style: TextStyle(color: AppTheme.textSecondary))), TextButton(onPressed: () async { Navigator.of(ctx).pop(); await ref.read(authProvider.notifier).logout(); }, child: Text('Sign Out', style: TextStyle(color: AppTheme.error, fontWeight: FontWeight.bold)))]),
+      builder: (ctx) => Dialog(
+        backgroundColor: AppTheme.surface,
+        surfaceTintColor: Colors.transparent,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(20),
+          side: BorderSide(
+            color: AppTheme.border.withValues(alpha: 0.8),
+            width: 1,
+          ),
+        ),
+        insetPadding: const EdgeInsets.symmetric(horizontal: 24, vertical: 24),
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 380),
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(20, 24, 20, 20),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                // Icon Header Badge
+                Container(
+                  width: 56,
+                  height: 56,
+                  decoration: BoxDecoration(
+                    color: AppTheme.error.withValues(alpha: 0.10),
+                    shape: BoxShape.circle,
+                    border: Border.all(
+                      color: AppTheme.error.withValues(alpha: 0.22),
+                      width: 1.5,
+                    ),
+                  ),
+                  child: Icon(
+                    Icons.logout_rounded,
+                    size: 26,
+                    color: AppTheme.error,
+                  ),
+                ),
+                const SizedBox(height: 16),
+
+                // Title
+                Text(
+                  'Sign Out',
+                  style: TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold,
+                    color: AppTheme.text,
+                    letterSpacing: -0.2,
+                  ),
+                  textAlign: TextAlign.center,
+                ),
+                const SizedBox(height: 8),
+
+                // Body Message
+                Text(
+                  'Are you sure you want to sign out? Your offline classroom records and cache will remain safely stored on this device.',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    fontSize: 13,
+                    height: 1.45,
+                    color: AppTheme.textSecondary,
+                  ),
+                ),
+                const SizedBox(height: 24),
+
+                // Action Buttons Row
+                Row(
+                  children: [
+                    // Cancel
+                    Expanded(
+                      child: OutlinedButton(
+                        onPressed: () => Navigator.of(ctx).pop(),
+                        style: OutlinedButton.styleFrom(
+                          padding: const EdgeInsets.symmetric(vertical: 12),
+                          side: BorderSide(
+                            color: AppTheme.border,
+                            width: 1.2,
+                          ),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          backgroundColor: AppTheme.background.withValues(alpha: 0.5),
+                        ),
+                        child: Text(
+                          'Cancel',
+                          style: TextStyle(
+                            fontSize: 13.5,
+                            fontWeight: FontWeight.w600,
+                            color: AppTheme.text,
+                          ),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+
+                    // Confirm Sign Out
+                    Expanded(
+                      child: ElevatedButton.icon(
+                        onPressed: () async {
+                          Navigator.of(ctx).pop();
+                          await ref.read(authProvider.notifier).logout();
+                        },
+                        icon: const Icon(
+                          Icons.logout_rounded,
+                          size: 15,
+                          color: Colors.white,
+                        ),
+                        label: const Text(
+                          'Sign Out',
+                          style: TextStyle(
+                            fontSize: 13.5,
+                            fontWeight: FontWeight.bold,
+                            color: Colors.white,
+                          ),
+                        ),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: AppTheme.error,
+                          elevation: 0,
+                          padding: const EdgeInsets.symmetric(vertical: 12),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
     );
   }
 

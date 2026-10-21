@@ -31,9 +31,11 @@ class TeacherEsp32HubModal extends StatefulWidget {
     required String teacherName,
     String? initialSection,
     bool startWithScanner = false,
+    bool useRootNavigator = true,
   }) {
     return showModalBottomSheet(
       context: context,
+      useRootNavigator: useRootNavigator,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
       builder: (ctx) => TeacherEsp32HubModal(
@@ -571,7 +573,7 @@ class _TeacherEsp32HubModalState extends State<TeacherEsp32HubModal>
                     color: AppTheme.primary.withValues(alpha: 0.15),
                     borderRadius: BorderRadius.circular(12),
                   ),
-                  child: Icon(Icons.hub_outlined, color: AppTheme.primary, size: 24),
+                  child: Icon(Icons.cloud_upload_rounded, color: AppTheme.primary, size: 24),
                 ),
                 const SizedBox(width: 12),
                 Expanded(
@@ -579,7 +581,7 @@ class _TeacherEsp32HubModalState extends State<TeacherEsp32HubModal>
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        'ESP32 Offline Learning Hub',
+                        'Physical Offline Storage',
                         style: TextStyle(
                           fontSize: 18,
                           fontWeight: FontWeight.bold,
@@ -595,7 +597,7 @@ class _TeacherEsp32HubModalState extends State<TeacherEsp32HubModal>
                   ),
                 ),
                 IconButton(
-                  tooltip: 'Scan ESP32 OLED Screen',
+                  tooltip: 'Scan Station OLED Screen',
                   icon: Icon(Icons.qr_code_scanner, color: AppTheme.primary, size: 22),
                   onPressed: _openOledQrScanner,
                 ),
@@ -655,7 +657,7 @@ class _TeacherEsp32HubModalState extends State<TeacherEsp32HubModal>
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             Text(
-                              'ESP32 DevKit',
+                              'Storage Station',
                               style: TextStyle(
                                 fontSize: 12,
                                 fontWeight: FontWeight.bold,
@@ -699,7 +701,7 @@ class _TeacherEsp32HubModalState extends State<TeacherEsp32HubModal>
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             Text(
-                              'MicroSD Module',
+                              'Storage Card',
                               style: TextStyle(
                                 fontSize: 12,
                                 fontWeight: FontWeight.bold,
@@ -851,8 +853,8 @@ class _TeacherEsp32HubModalState extends State<TeacherEsp32HubModal>
                 Expanded(
                   child: Text(
                     _hubStatus.isDevKitConnected
-                        ? 'Connected to ESP32 Hub! You can view materials stored on the MicroSD, retrieve them to phone storage, delete items, or upload new files.'
-                        : 'Connect your phone to Wi-Fi "${_hubStatus.ssid}" (Password: "${_hubStatus.password}") to manage materials on the ESP32 Hub.',
+                        ? 'Connected to offline storage! You can view materials stored on the storage card, retrieve them to phone storage, delete items, or upload new files.'
+                        : 'Connect your phone to Wi-Fi "${_hubStatus.ssid}" (Password: "${_hubStatus.password}") to manage materials on the physical offline storage.',
                     style: TextStyle(fontSize: 12, color: AppTheme.text, height: 1.4),
                   ),
                 ),
@@ -1019,16 +1021,24 @@ class _TeacherEsp32HubModalState extends State<TeacherEsp32HubModal>
                                       Container(
                                         padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
                                         decoration: BoxDecoration(
-                                          color: AppTheme.primary.withValues(alpha: 0.15),
+                                          color: AppTheme.primary.withValues(alpha: 0.12),
                                           borderRadius: BorderRadius.circular(6),
+                                          border: Border.all(color: AppTheme.primary.withValues(alpha: 0.25)),
                                         ),
-                                        child: Text(
-                                          '⚡ GZ',
-                                          style: TextStyle(
-                                            fontSize: 9.5,
-                                            fontWeight: FontWeight.bold,
-                                            color: AppTheme.primary,
-                                          ),
+                                        child: Row(
+                                          mainAxisSize: MainAxisSize.min,
+                                          children: [
+                                            Icon(Icons.compress, size: 10, color: AppTheme.primary),
+                                            const SizedBox(width: 3),
+                                            Text(
+                                              'GZ',
+                                              style: TextStyle(
+                                                fontSize: 9.5,
+                                                fontWeight: FontWeight.bold,
+                                                color: AppTheme.primary,
+                                              ),
+                                            ),
+                                          ],
                                         ),
                                       ),
                                     ],
@@ -1582,22 +1592,22 @@ class _TeacherEsp32HubModalState extends State<TeacherEsp32HubModal>
           ),
           const SizedBox(height: 6),
           Text(
-            'Pick learning modules, PDF study packets, or quizzes from your device to compress and send to the classroom ESP32 hub.',
+            'Pick learning modules, PDF study packets, or quizzes from your device to compress and send to physical offline storage.',
             textAlign: TextAlign.center,
             style: TextStyle(fontSize: 12.5, color: AppTheme.textSecondary, height: 1.4),
           ),
           const SizedBox(height: 16),
 
-          // Supported Format Chips
+          // Supported Format Badges (Institutional / Academic Styling)
           Wrap(
-            spacing: 6,
-            runSpacing: 6,
+            spacing: 8,
+            runSpacing: 8,
             alignment: WrapAlignment.center,
             children: [
-              _buildStagingPill('📄 PDF Documents', AppTheme.error),
-              _buildStagingPill('📝 Quizzes (.json)', AppTheme.warning),
-              _buildStagingPill('📦 ZIP Archives', AppTheme.primary),
-              _buildStagingPill('⚡ GZ Pre-compressed', const Color(0xFF6366F1)),
+              _buildFormatBadge(Icons.picture_as_pdf_outlined, 'PDF Documents'),
+              _buildFormatBadge(Icons.quiz_outlined, 'Quizzes (.json)'),
+              _buildFormatBadge(Icons.folder_zip_outlined, 'ZIP Archives'),
+              _buildFormatBadge(Icons.compress_outlined, 'GZ Pre-compressed'),
             ],
           ),
           const SizedBox(height: 22),
@@ -1648,7 +1658,7 @@ class _TeacherEsp32HubModalState extends State<TeacherEsp32HubModal>
                 onPressed: _openOledQrScanner,
                 icon: Icon(Icons.qr_code_scanner, size: 17, color: AppTheme.primary),
                 label: Text(
-                  'Scan ESP32 OLED Screen to Connect',
+                  'Scan Station Screen to Connect',
                   style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.bold, color: AppTheme.primary),
                 ),
                 style: OutlinedButton.styleFrom(
@@ -1711,7 +1721,7 @@ class _TeacherEsp32HubModalState extends State<TeacherEsp32HubModal>
           ),
           const SizedBox(height: 16),
           Text(
-            'Connect to ESP32 Station to Activate QR',
+            'Connect to Offline Station to Activate QR',
             style: TextStyle(
               fontSize: 17,
               fontWeight: FontWeight.bold,
@@ -1758,7 +1768,7 @@ class _TeacherEsp32HubModalState extends State<TeacherEsp32HubModal>
               onPressed: _openOledQrScanner,
               icon: const Icon(Icons.qr_code_scanner, size: 20),
               label: const Text(
-                'Scan ESP32 OLED Screen',
+                'Scan Station Screen',
                 style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
               ),
               style: ElevatedButton.styleFrom(
@@ -2203,21 +2213,33 @@ class _TeacherEsp32HubModalState extends State<TeacherEsp32HubModal>
     );
   }
 
-  Widget _buildStagingPill(String text, Color color) {
+  Widget _buildFormatBadge(IconData icon, String label) {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
       decoration: BoxDecoration(
-        color: color.withValues(alpha: 0.1),
+        color: AppTheme.surface,
         borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: color.withValues(alpha: 0.25)),
+        border: Border.all(color: AppTheme.border),
       ),
-      child: Text(
-        text,
-        style: TextStyle(
-          fontSize: 10.5,
-          fontWeight: FontWeight.w600,
-          color: color,
-        ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(
+            icon,
+            size: 13,
+            color: AppTheme.primary,
+          ),
+          const SizedBox(width: 5),
+          Text(
+            label,
+            style: TextStyle(
+              fontSize: 11,
+              fontWeight: FontWeight.w600,
+              color: AppTheme.textSecondary,
+              letterSpacing: 0.1,
+            ),
+          ),
+        ],
       ),
     );
   }

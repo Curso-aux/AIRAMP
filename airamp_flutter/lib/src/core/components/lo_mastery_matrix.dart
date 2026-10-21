@@ -63,7 +63,11 @@ class LoMasteryMatrix extends StatefulWidget {
 
 class _LoMasteryMatrixState extends State<LoMasteryMatrix> {
   String _selectedSubject = 'All Subjects';
+  String _selectedSection = 'All Sections';
   String _searchQuery = '';
+  bool _isCardView = true;
+  bool _initializedViewMode = false;
+  final Set<String> _expandedLoKeys = {'LO-01'};
 
   // Standard curriculum mock database for matrix visualization
   late final List<LoMasteryItem> _masteryData;
@@ -480,8 +484,9 @@ class _LoMasteryMatrixState extends State<LoMasteryMatrix> {
       builder: (ctx) => AlertDialog(
         backgroundColor: isDark ? AppTheme.darkSurface : Colors.white,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
-        contentPadding: const EdgeInsets.all(24),
-        titlePadding: const EdgeInsets.fromLTRB(24, 24, 24, 0),
+        insetPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 24),
+        contentPadding: const EdgeInsets.all(18),
+        titlePadding: const EdgeInsets.fromLTRB(18, 18, 18, 0),
         title: Row(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -504,7 +509,7 @@ class _LoMasteryMatrixState extends State<LoMasteryMatrix> {
                 size: 24,
               ),
             ),
-            const SizedBox(width: 14),
+            const SizedBox(width: 12),
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -527,12 +532,15 @@ class _LoMasteryMatrixState extends State<LoMasteryMatrix> {
                         ),
                       ),
                       const SizedBox(width: 8),
-                      Text(
-                        item.section,
-                        style: TextStyle(
-                          fontSize: 13,
-                          fontWeight: FontWeight.bold,
-                          color: isDark ? AppTheme.darkText : AppTheme.lightText,
+                      Expanded(
+                        child: Text(
+                          item.section,
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(
+                            fontSize: 13,
+                            fontWeight: FontWeight.bold,
+                            color: isDark ? AppTheme.darkText : AppTheme.lightText,
+                          ),
                         ),
                       ),
                     ],
@@ -577,7 +585,10 @@ class _LoMasteryMatrixState extends State<LoMasteryMatrix> {
                       color: _getTierColor(item.score).withValues(alpha: 0.3),
                     ),
                   ),
-                  child: Row(
+                  child: Wrap(
+                    alignment: WrapAlignment.spaceBetween,
+                    runSpacing: 10,
+                    crossAxisAlignment: WrapCrossAlignment.center,
                     children: [
                       Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
@@ -591,6 +602,7 @@ class _LoMasteryMatrixState extends State<LoMasteryMatrix> {
                           ),
                           const SizedBox(height: 2),
                           Row(
+                            mainAxisSize: MainAxisSize.min,
                             children: [
                               Text(
                                 '${item.score.toStringAsFixed(1)}%',
@@ -621,9 +633,8 @@ class _LoMasteryMatrixState extends State<LoMasteryMatrix> {
                           ),
                         ],
                       ),
-                      const Spacer(),
                       Column(
-                        crossAxisAlignment: CrossAxisAlignment.end,
+                        crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Text(
                             'Students Assessed',
@@ -690,9 +701,10 @@ class _LoMasteryMatrixState extends State<LoMasteryMatrix> {
                 ),
                 const SizedBox(height: 8),
 
-                // Distribution Legend Chips
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                // Distribution Legend Chips (Responsive Wrap)
+                Wrap(
+                  spacing: 10,
+                  runSpacing: 6,
                   children: [
                     _buildDistributionLegendItem(
                       label: 'Mastered (≥80%)',
@@ -908,14 +920,20 @@ class _LoMasteryMatrixState extends State<LoMasteryMatrix> {
   }
 
   Color _getTierColor(double score) {
-    if (score >= 80.0) return AppTheme.success; // Emerald
-    if (score >= 60.0) return AppTheme.warning; // Amber
-    return AppTheme.error; // Rose
+    if (score >= 80.0) return const Color(0xFF0D9488); // Academic Deep Teal
+    if (score >= 60.0) return const Color(0xFFD97706); // Warm Ochre / Bronze
+    return const Color(0xFFBE123C); // Muted Wine / Rose
   }
 
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
+    final isMobile = MediaQuery.of(context).size.width < 768;
+
+    if (!_initializedViewMode) {
+      _isCardView = isMobile;
+      _initializedViewMode = true;
+    }
 
     final subjects = [
       'All Subjects',
@@ -940,7 +958,10 @@ class _LoMasteryMatrixState extends State<LoMasteryMatrix> {
     }).toList();
 
     // Collect unique sections and unique LOs
-    final sections = ['11-STEM-A', '11-STEM-B', '11-ABM-A', '11-HUMSS-A', '12-TVL-ICT'];
+    final allSections = ['11-STEM-A', '11-STEM-B', '11-ABM-A', '11-HUMSS-A', '12-TVL-ICT'];
+    final sections = _selectedSection == 'All Sections'
+        ? allSections
+        : [_selectedSection];
     final loCodes = <String, String>{};
     for (final it in filtered) {
       loCodes[it.loCode] = it.loTitle;
@@ -1003,344 +1024,885 @@ class _LoMasteryMatrixState extends State<LoMasteryMatrix> {
           ),
           const SizedBox(height: 14),
 
-          // Semantic Badges Legend & Controls Strip
-          Wrap(
-            spacing: 12,
-            runSpacing: 8,
-            crossAxisAlignment: WrapCrossAlignment.center,
+          // Benchmark Scale Legend (Formal Academic Scale, Zero Traffic Light Bulbs)
+          _buildBenchmarkScale(isDark),
+          const SizedBox(height: 12),
+
+          // Responsive Balanced Filter Bar (Fills 100% Width — No Vacant Dead Space!)
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              // Legend: Proficient
-              _buildSemanticBadge(
-                label: 'Proficient (80%+)',
-                bg: AppTheme.success.withValues(alpha: isDark ? 0.18 : 0.1),
-                border: AppTheme.success.withValues(alpha: 0.35),
-                textColor: AppTheme.success,
-              ),
-              // Legend: Developing
-              _buildSemanticBadge(
-                label: 'Developing (60% – 79%)',
-                bg: AppTheme.warning.withValues(alpha: isDark ? 0.18 : 0.1),
-                border: AppTheme.warning.withValues(alpha: 0.35),
-                textColor: AppTheme.warning,
-              ),
-              // Legend: Needs Help
-              _buildSemanticBadge(
-                label: 'Needs Help (Below 60%)',
-                bg: AppTheme.error.withValues(alpha: isDark ? 0.18 : 0.1),
-                border: AppTheme.error.withValues(alpha: 0.35),
-                textColor: AppTheme.error,
-              ),
-
-              const SizedBox(width: 10),
-
-              // Subject Filter Dropdown
-              ConstrainedBox(
-                constraints: const BoxConstraints(maxWidth: 200),
-                child: Container(
-                  height: 34,
-                  padding: const EdgeInsets.symmetric(horizontal: 10),
-                  decoration: BoxDecoration(
-                    color: isDark ? AppTheme.darkSurfaceLight : const Color(0xFFF1F5F9),
-                    borderRadius: BorderRadius.circular(8),
-                    border: Border.all(color: isDark ? AppTheme.darkBorder : AppTheme.lightBorder),
+              // Row 1: Subject and Section Filters (50% / 50% split)
+              Row(
+                children: [
+                  Expanded(
+                    child: _buildSubjectDropdown(isDark, subjects),
                   ),
-                  child: DropdownButtonHideUnderline(
-                    child: DropdownButton<String>(
-                      value: _selectedSubject,
-                      isDense: true,
-                      isExpanded: true,
-                      borderRadius: BorderRadius.circular(10),
-                      style: TextStyle(
-                        fontSize: 12,
-                        fontWeight: FontWeight.w600,
-                        color: isDark ? AppTheme.darkText : AppTheme.lightText,
-                      ),
-                      dropdownColor: isDark ? AppTheme.darkSurface : Colors.white,
-                      items: subjects.map((sub) {
-                        return DropdownMenuItem(
-                          value: sub,
-                          child: Text(
-                            sub,
-                            overflow: TextOverflow.ellipsis,
-                            maxLines: 1,
-                          ),
-                        );
-                      }).toList(),
-                      onChanged: (val) {
-                        if (val != null) setState(() => _selectedSubject = val);
-                      },
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: _buildSectionDropdown(isDark, allSections),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 8),
+
+              // Row 2: Search Input + View Mode Switcher [Cards / Grid]
+              Row(
+                children: [
+                  Expanded(
+                    child: _buildSearchInput(isDark),
+                  ),
+                  const SizedBox(width: 8),
+                  // View Switcher (Choose between Expandable Cards vs Heatmap Grid)
+                  Container(
+                    height: 34,
+                    decoration: BoxDecoration(
+                      color: isDark ? AppTheme.darkSurfaceLight : const Color(0xFFF1F5F9),
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(color: isDark ? AppTheme.darkBorder : AppTheme.lightBorder),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        _buildViewToggleBtn(
+                          toggleKey: const Key('view_mode_cards'),
+                          icon: Icons.view_agenda_outlined,
+                          tooltip: 'Expandable Cards (Mobile Friendly)',
+                          isActive: _isCardView,
+                          isDark: isDark,
+                          onTap: () => setState(() => _isCardView = true),
+                        ),
+                        _buildViewToggleBtn(
+                          toggleKey: const Key('view_mode_grid'),
+                          icon: Icons.table_chart_outlined,
+                          tooltip: 'Heatmap Matrix (Grid View)',
+                          isActive: !_isCardView,
+                          isDark: isDark,
+                          onTap: () => setState(() => _isCardView = false),
+                        ),
+                      ],
                     ),
                   ),
-                ),
-              ),
-              const SizedBox(width: 8),
-
-              // Search Input
-              Container(
-                height: 34,
-                width: 170,
-                padding: const EdgeInsets.symmetric(horizontal: 10),
-                decoration: BoxDecoration(
-                  color: isDark ? AppTheme.darkSurfaceLight : const Color(0xFFF1F5F9),
-                  borderRadius: BorderRadius.circular(8),
-                  border: Border.all(color: isDark ? AppTheme.darkBorder : AppTheme.lightBorder),
-                ),
-                child: Row(
-                  children: [
-                    Icon(Icons.search, size: 14, color: AppTheme.textMuted),
-                    const SizedBox(width: 6),
-                    Expanded(
-                      child: TextField(
-                        style: TextStyle(
-                          fontSize: 12,
-                          color: isDark ? AppTheme.darkText : AppTheme.lightText,
-                        ),
-                        decoration: InputDecoration(
-                          hintText: 'Search topic or class...',
-                          hintStyle: TextStyle(fontSize: 11.5, color: AppTheme.textMuted),
-                          border: InputBorder.none,
-                          isDense: true,
-                          contentPadding: EdgeInsets.zero,
-                        ),
-                        onChanged: (val) => setState(() => _searchQuery = val),
-                      ),
-                    ),
-                  ],
-                ),
+                ],
               ),
             ],
           ),
-          const SizedBox(height: 16),
+          const SizedBox(height: 14),
 
-          // Interactive Heatmap Matrix Table
-          SingleChildScrollView(
-            scrollDirection: Axis.horizontal,
-            child: DataTable(
-              headingRowColor: WidgetStateProperty.all(
-                isDark ? AppTheme.darkSurfaceLight : const Color(0xFFF8FAFC),
-              ),
-              horizontalMargin: 16,
-              columnSpacing: 18,
-              dataRowMinHeight: 60,
-              dataRowMaxHeight: 68,
-              border: TableBorder.all(
-                color: isDark ? AppTheme.darkBorder : AppTheme.lightBorder,
-                borderRadius: BorderRadius.circular(10),
-                width: 1,
-              ),
-              columns: [
-                const DataColumn(
-                  label: Text(
-                    'LEARNING COMPETENCY',
-                    style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
-                  ),
-                ),
-                ...sections.map((sec) {
-                  return DataColumn(
-                    label: Text(
-                      sec,
-                      style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
-                    ),
-                  );
-                }),
-                const DataColumn(
-                  label: Text(
-                    'Class Average',
-                    style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
-                  ),
-                ),
-              ],
-              rows: loCodes.keys.map((loKey) {
-                final loTitle = loCodes[loKey] ?? '';
-
-                // Calculate cohort average
-                final itemsForLo = filtered.where((item) => item.loCode == loKey).toList();
-                final avgScore = itemsForLo.isNotEmpty
-                    ? itemsForLo.map((e) => e.score).reduce((a, b) => a + b) / itemsForLo.length
-                    : 0.0;
-
-                return DataRow(
-                  cells: [
-                    // LO Code & Title
-                    DataCell(
-                      ConstrainedBox(
-                        constraints: const BoxConstraints(maxWidth: 240),
-                        child: Column(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Row(
-                              children: [
-                                Container(
-                                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                                  decoration: BoxDecoration(
-                                    color: AppTheme.primary.withValues(alpha: 0.15),
-                                    borderRadius: BorderRadius.circular(5),
-                                  ),
-                                  child: Text(
-                                    loKey,
-                                    style: TextStyle(
-                                      fontSize: 10.5,
-                                      fontWeight: FontWeight.bold,
-                                      color: AppTheme.primary,
-                                    ),
-                                  ),
-                                ),
-                              ],
-                            ),
-                            const SizedBox(height: 3),
-                            Text(
-                              loTitle,
-                              style: TextStyle(
-                                fontSize: 12,
-                                fontWeight: FontWeight.w600,
-                                color: isDark ? AppTheme.darkText : AppTheme.lightText,
-                              ),
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                            ),
-                          ],
-                        ),
+          // Main Content: Expandable Cards View OR Heatmap Matrix
+          Builder(
+            builder: (_) {
+              if (loCodes.isEmpty) {
+                return Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 36),
+                  child: Center(
+                    child: Text(
+                      'No learning competencies match the selected criteria.',
+                      style: TextStyle(
+                        fontSize: 13,
+                        color: isDark ? AppTheme.darkTextMuted : AppTheme.lightTextMuted,
                       ),
                     ),
+                  ),
+                );
+              }
 
-                    // Section Cells
-                    ...sections.map((sec) {
-                      final match = filtered.firstWhere(
-                        (it) => it.loCode == loKey && it.section == sec,
-                        orElse: () => LoMasteryItem(
-                          loCode: loKey,
-                          loTitle: loTitle,
-                          subject: _selectedSubject,
-                          section: sec,
-                          score: 75.0,
-                          assessedCount: 30,
-                          masteredCount: 20,
-                          developingCount: 7,
-                          atRiskCount: 3,
-                          mostMissedItems: [],
-                          remediationAction: 'Standard review',
-                        ),
-                      );
-
-                      final cellColor = _getTierColor(match.score);
-
-                      return DataCell(
-                        InkWell(
-                          onTap: () => _showDrillDownDialog(context, match, isDark),
-                          borderRadius: BorderRadius.circular(8),
-                          child: Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                            decoration: BoxDecoration(
-                              color: cellColor.withValues(alpha: isDark ? 0.2 : 0.12),
-                              borderRadius: BorderRadius.circular(8),
-                              border: Border.all(
-                                color: cellColor.withValues(alpha: 0.35),
-                                width: 1,
-                              ),
-                            ),
-                            child: Column(
-                              mainAxisAlignment: MainAxisAlignment.center,
-                              children: [
-                                Text(
-                                  '${match.score.toStringAsFixed(1)}%',
-                                  style: TextStyle(
-                                    fontSize: 13,
-                                    fontWeight: FontWeight.w800,
-                                    color: cellColor,
-                                  ),
-                                ),
-                                Text(
-                                  match.tier,
-                                  style: TextStyle(
-                                    fontSize: 9.5,
-                                    fontWeight: FontWeight.w600,
-                                    color: cellColor.withValues(alpha: 0.9),
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                        ),
-                      );
-                    }),
-
-                    // Overall Cohort Average Cell
-                    DataCell(
-                      Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                        decoration: BoxDecoration(
-                          color: _getTierColor(avgScore).withValues(alpha: isDark ? 0.16 : 0.08),
-                          borderRadius: BorderRadius.circular(8),
-                          border: Border.all(
-                            color: _getTierColor(avgScore).withValues(alpha: 0.3),
-                          ),
-                        ),
-                        child: Column(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            Text(
-                              '${avgScore.toStringAsFixed(1)}%',
-                              style: TextStyle(
-                                fontSize: 13,
-                                fontWeight: FontWeight.w800,
-                                color: _getTierColor(avgScore),
-                              ),
-                            ),
-                            Text(
-                              avgScore >= 80 ? 'Mastered' : (avgScore >= 60 ? 'Developing' : 'At-Risk'),
-                              style: TextStyle(
-                                fontSize: 9.5,
-                                fontWeight: FontWeight.w600,
-                                color: _getTierColor(avgScore),
-                              ),
-                            ),
-                          ],
-                        ),
+              // ── 1. Expandable Cards Mode (Zero horizontal scrolling on mobile!) ──
+              if (_isCardView) {
+                return Column(
+                  children: [
+                    for (final loKey in loCodes.keys)
+                      _buildExpandableLoCard(
+                        loKey: loKey,
+                        loTitle: loCodes[loKey] ?? '',
+                        sections: sections,
+                        filtered: filtered,
+                        isDark: isDark,
                       ),
-                    ),
                   ],
                 );
-              }).toList(),
-            ),
+              }
+
+              // ── 2. Heatmap Matrix Mode (with Pinned Frozen Column) ──
+              final double competencyColWidth = isMobile ? 140.0 : 225.0;
+              final double sectionColWidth = isMobile ? 86.0 : 96.0;
+              final double avgColWidth = isMobile ? 86.0 : 96.0;
+              const double headerHeight = 44.0;
+              const double rowHeight = 72.0;
+              final loKeysList = loCodes.keys.toList();
+              final borderColor = isDark ? AppTheme.darkBorder : AppTheme.lightBorder;
+              final headerBg = isDark ? AppTheme.darkSurfaceLight : const Color(0xFFF8FAFC);
+              final rowBg = isDark ? AppTheme.darkSurface : Colors.white;
+
+              return Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  if (isMobile && sections.length > 1)
+                    Padding(
+                      padding: const EdgeInsets.only(bottom: 8),
+                      child: Row(
+                        children: [
+                          Icon(Icons.swipe_outlined, size: 14, color: AppTheme.primary),
+                          const SizedBox(width: 5),
+                          Expanded(
+                            child: Text(
+                              'Swipe horizontally to view all ${sections.length} sections',
+                              style: TextStyle(
+                                fontSize: 11,
+                                fontWeight: FontWeight.w500,
+                                color: isDark ? AppTheme.darkTextSecondary : AppTheme.lightTextSecondary,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  Container(
+                    decoration: BoxDecoration(
+                      borderRadius: BorderRadius.circular(10),
+                      border: Border.all(color: borderColor),
+                    ),
+                    clipBehavior: Clip.antiAlias,
+                    child: Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        // Pinned Frozen Left Column: Learning Competency
+                        SizedBox(
+                          width: competencyColWidth,
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.stretch,
+                            children: [
+                              Container(
+                                height: headerHeight,
+                                padding: const EdgeInsets.symmetric(horizontal: 10),
+                                alignment: Alignment.centerLeft,
+                                color: headerBg,
+                                child: Text(
+                                  'COMPETENCY',
+                                  style: TextStyle(
+                                    fontSize: 11,
+                                    fontWeight: FontWeight.bold,
+                                    color: isDark ? AppTheme.darkTextSecondary : AppTheme.lightTextSecondary,
+                                    letterSpacing: 0.3,
+                                  ),
+                                ),
+                              ),
+                              for (int i = 0; i < loKeysList.length; i++) ...[
+                                Divider(height: 1, thickness: 1, color: borderColor),
+                                Container(
+                                  height: rowHeight,
+                                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                                  alignment: Alignment.centerLeft,
+                                  color: rowBg,
+                                  child: Column(
+                                    mainAxisAlignment: MainAxisAlignment.center,
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      Container(
+                                        padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1.5),
+                                        decoration: BoxDecoration(
+                                          color: AppTheme.primary.withValues(alpha: 0.12),
+                                          borderRadius: BorderRadius.circular(4),
+                                        ),
+                                        child: Text(
+                                          loKeysList[i],
+                                          style: TextStyle(
+                                            fontSize: 10,
+                                            fontWeight: FontWeight.bold,
+                                            color: AppTheme.primary,
+                                          ),
+                                        ),
+                                      ),
+                                      const SizedBox(height: 3),
+                                      Flexible(
+                                        child: Text(
+                                          loCodes[loKeysList[i]] ?? '',
+                                          maxLines: isMobile ? 1 : 2,
+                                          overflow: TextOverflow.ellipsis,
+                                          style: TextStyle(
+                                            fontSize: isMobile ? 11 : 12,
+                                            height: 1.25,
+                                            fontWeight: FontWeight.w600,
+                                            color: isDark ? AppTheme.darkText : AppTheme.lightText,
+                                          ),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ],
+                            ],
+                          ),
+                        ),
+
+                        // Vertical Divider
+                        Container(
+                          width: 1,
+                          height: headerHeight + (loKeysList.length * (rowHeight + 1)),
+                          color: borderColor,
+                        ),
+
+                        // Scrollable Right Columns: Sections & Class Average
+                        Expanded(
+                          child: SingleChildScrollView(
+                            scrollDirection: Axis.horizontal,
+                            physics: const BouncingScrollPhysics(),
+                            child: SizedBox(
+                              width: (sections.length * sectionColWidth) + avgColWidth,
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Container(
+                                    height: headerHeight,
+                                    color: headerBg,
+                                    child: Row(
+                                      mainAxisSize: MainAxisSize.min,
+                                      children: [
+                                        for (final sec in sections)
+                                          SizedBox(
+                                            width: sectionColWidth,
+                                            height: headerHeight,
+                                            child: Center(
+                                              child: Text(
+                                                sec,
+                                                textAlign: TextAlign.center,
+                                                style: TextStyle(
+                                                  fontSize: 11.5,
+                                                  fontWeight: FontWeight.bold,
+                                                  color: isDark ? AppTheme.darkText : AppTheme.lightText,
+                                                ),
+                                              ),
+                                            ),
+                                          ),
+                                        SizedBox(
+                                          width: avgColWidth,
+                                          height: headerHeight,
+                                          child: Center(
+                                            child: Text(
+                                              'Class Avg',
+                                              textAlign: TextAlign.center,
+                                              style: TextStyle(
+                                                fontSize: 11.5,
+                                                fontWeight: FontWeight.bold,
+                                                color: isDark ? AppTheme.darkText : AppTheme.lightText,
+                                              ),
+                                            ),
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                  for (int i = 0; i < loKeysList.length; i++) ...[
+                                    Divider(height: 1, thickness: 1, color: borderColor),
+                                    Builder(
+                                      builder: (_) {
+                                        final loKey = loKeysList[i];
+                                        final loTitle = loCodes[loKey] ?? '';
+                                        final itemsForLo = filtered.where((item) => item.loCode == loKey).toList();
+                                        final avgScore = itemsForLo.isNotEmpty
+                                            ? itemsForLo.map((e) => e.score).reduce((a, b) => a + b) / itemsForLo.length
+                                            : 0.0;
+
+                                        return Container(
+                                          height: rowHeight,
+                                          color: rowBg,
+                                          child: Row(
+                                            mainAxisSize: MainAxisSize.min,
+                                            children: [
+                                            for (final sec in sections) ...[
+                                              Builder(
+                                                builder: (_) {
+                                                  final match = filtered.firstWhere(
+                                                    (it) => it.loCode == loKey && it.section == sec,
+                                                    orElse: () => LoMasteryItem(
+                                                      loCode: loKey,
+                                                      loTitle: loTitle,
+                                                      subject: _selectedSubject,
+                                                      section: sec,
+                                                      score: 75.0,
+                                                      assessedCount: 30,
+                                                      masteredCount: 20,
+                                                      developingCount: 7,
+                                                      atRiskCount: 3,
+                                                      mostMissedItems: [],
+                                                      remediationAction: 'Standard review',
+                                                    ),
+                                                  );
+                                                  final cellColor = _getTierColor(match.score);
+
+                                                  return SizedBox(
+                                                    width: sectionColWidth,
+                                                    height: rowHeight,
+                                                    child: Center(
+                                                      child: InkWell(
+                                                        onTap: () => _showDrillDownDialog(context, match, isDark),
+                                                        borderRadius: BorderRadius.circular(8),
+                                                        child: Container(
+                                                          width: sectionColWidth - 12,
+                                                          height: 48,
+                                                          decoration: BoxDecoration(
+                                                            color: cellColor.withValues(alpha: isDark ? 0.08 : 0.04),
+                                                            borderRadius: BorderRadius.circular(8),
+                                                            border: Border.all(
+                                                              color: cellColor.withValues(alpha: 0.22),
+                                                              width: 1,
+                                                            ),
+                                                          ),
+                                                          child: Column(
+                                                            mainAxisAlignment: MainAxisAlignment.center,
+                                                            children: [
+                                                              Text(
+                                                                '${match.score.toStringAsFixed(1)}%',
+                                                                style: TextStyle(
+                                                                  fontSize: 12.5,
+                                                                  fontWeight: FontWeight.w800,
+                                                                  color: cellColor,
+                                                                ),
+                                                              ),
+                                                              Padding(
+                                                                padding: const EdgeInsets.symmetric(horizontal: 2),
+                                                                child: Text(
+                                                                  match.tier,
+                                                                  maxLines: 1,
+                                                                  overflow: TextOverflow.ellipsis,
+                                                                  textAlign: TextAlign.center,
+                                                                  style: TextStyle(
+                                                                    fontSize: 9,
+                                                                    fontWeight: FontWeight.w600,
+                                                                    color: isDark ? AppTheme.darkTextSecondary : AppTheme.lightTextSecondary,
+                                                                  ),
+                                                                ),
+                                                              ),
+                                                            ],
+                                                          ),
+                                                        ),
+                                                      ),
+                                                    ),
+                                                  );
+                                                },
+                                              ),
+                                            ],
+                                            SizedBox(
+                                              width: avgColWidth,
+                                              height: rowHeight,
+                                              child: Center(
+                                                child: Container(
+                                                  width: avgColWidth - 12,
+                                                  height: 48,
+                                                  decoration: BoxDecoration(
+                                                    color: _getTierColor(avgScore).withValues(alpha: isDark ? 0.14 : 0.08),
+                                                    borderRadius: BorderRadius.circular(8),
+                                                    border: Border.all(
+                                                      color: _getTierColor(avgScore).withValues(alpha: 0.25),
+                                                    ),
+                                                  ),
+                                                  child: Column(
+                                                    mainAxisAlignment: MainAxisAlignment.center,
+                                                    children: [
+                                                      Text(
+                                                        '${avgScore.toStringAsFixed(1)}%',
+                                                        style: TextStyle(
+                                                          fontSize: 12.5,
+                                                          fontWeight: FontWeight.w800,
+                                                          color: _getTierColor(avgScore),
+                                                        ),
+                                                      ),
+                                                      Text(
+                                                        avgScore >= 80 ? 'Mastered' : (avgScore >= 60 ? 'Developing' : 'At-Risk'),
+                                                        style: TextStyle(
+                                                          fontSize: 9,
+                                                          fontWeight: FontWeight.w600,
+                                                          color: _getTierColor(avgScore),
+                                                        ),
+                                                      ),
+                                                    ],
+                                                  ),
+                                                ),
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+                                      );
+                                    },
+                                  ),
+                                ],
+                              ],
+                            ),
+                          ),
+                        ),
+                      ),
+                    ],
+                    ),
+                  ),
+                ],
+              );
+            },
           ),
         ],
       ),
     );
   }
 
-  Widget _buildSemanticBadge({
-    required String label,
-    required Color bg,
-    required Color border,
-    required Color textColor,
-  }) {
+  Widget _buildSubjectDropdown(bool isDark, List<String> subjects) {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 4),
+      height: 38,
+      padding: const EdgeInsets.symmetric(horizontal: 10),
       decoration: BoxDecoration(
-        color: bg,
+        color: isDark ? AppTheme.darkSurfaceLight : Colors.white,
         borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: border),
+        border: Border.all(color: isDark ? AppTheme.darkBorder : AppTheme.lightBorder),
       ),
+      child: DropdownButtonHideUnderline(
+        child: DropdownButton<String>(
+          value: subjects.contains(_selectedSubject) ? _selectedSubject : subjects.first,
+          isExpanded: true,
+          dropdownColor: isDark ? AppTheme.darkSurface : Colors.white,
+          icon: Icon(
+            Icons.keyboard_arrow_down_rounded,
+            size: 18,
+            color: isDark ? AppTheme.darkTextSecondary : AppTheme.lightTextSecondary,
+          ),
+          style: TextStyle(
+            fontSize: 12.5,
+            fontWeight: FontWeight.w600,
+            color: isDark ? AppTheme.darkText : AppTheme.lightText,
+          ),
+          items: subjects.map((subj) {
+            return DropdownMenuItem<String>(
+              value: subj,
+              child: Text(
+                subj,
+                overflow: TextOverflow.ellipsis,
+              ),
+            );
+          }).toList(),
+          onChanged: (val) {
+            if (val != null) {
+              setState(() => _selectedSubject = val);
+            }
+          },
+        ),
+      ),
+    );
+  }
+
+  Widget _buildSectionDropdown(bool isDark, List<String> allSections) {
+    final options = ['All Sections', ...allSections];
+    return Container(
+      height: 38,
+      padding: const EdgeInsets.symmetric(horizontal: 10),
+      decoration: BoxDecoration(
+        color: isDark ? AppTheme.darkSurfaceLight : Colors.white,
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: isDark ? AppTheme.darkBorder : AppTheme.lightBorder),
+      ),
+      child: DropdownButtonHideUnderline(
+        child: DropdownButton<String>(
+          value: options.contains(_selectedSection) ? _selectedSection : 'All Sections',
+          isExpanded: true,
+          dropdownColor: isDark ? AppTheme.darkSurface : Colors.white,
+          icon: Icon(
+            Icons.keyboard_arrow_down_rounded,
+            size: 18,
+            color: isDark ? AppTheme.darkTextSecondary : AppTheme.lightTextSecondary,
+          ),
+          style: TextStyle(
+            fontSize: 12.5,
+            fontWeight: FontWeight.w600,
+            color: isDark ? AppTheme.darkText : AppTheme.lightText,
+          ),
+          items: options.map((sec) {
+            return DropdownMenuItem<String>(
+              value: sec,
+              child: Text(
+                sec,
+                overflow: TextOverflow.ellipsis,
+              ),
+            );
+          }).toList(),
+          onChanged: (val) {
+            if (val != null) {
+              setState(() => _selectedSection = val);
+            }
+          },
+        ),
+      ),
+    );
+  }
+
+  Widget _buildSearchInput(bool isDark) {
+    return Container(
+      height: 34,
+      decoration: BoxDecoration(
+        color: isDark ? AppTheme.darkSurfaceLight : Colors.white,
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: isDark ? AppTheme.darkBorder : AppTheme.lightBorder),
+      ),
+      padding: const EdgeInsets.symmetric(horizontal: 8),
       child: Row(
-        mainAxisSize: MainAxisSize.min,
         children: [
-          Container(
-            width: 7,
-            height: 7,
-            decoration: BoxDecoration(shape: BoxShape.circle, color: textColor),
+          Icon(
+            Icons.search_rounded,
+            size: 16,
+            color: isDark ? AppTheme.darkTextSecondary : AppTheme.lightTextSecondary,
           ),
           const SizedBox(width: 6),
-          Text(
-            label,
-            style: TextStyle(
-              fontSize: 11,
-              fontWeight: FontWeight.bold,
-              color: textColor,
+          Expanded(
+            child: TextField(
+              style: TextStyle(
+                fontSize: 12,
+                color: isDark ? AppTheme.darkText : AppTheme.lightText,
+              ),
+              decoration: InputDecoration(
+                hintText: 'Search topic, LO code, or section...',
+                hintStyle: TextStyle(
+                  fontSize: 12,
+                  color: isDark ? AppTheme.darkTextMuted : AppTheme.lightTextMuted,
+                ),
+                border: InputBorder.none,
+                isDense: true,
+                contentPadding: const EdgeInsets.symmetric(vertical: 8),
+              ),
+              onChanged: (val) {
+                setState(() => _searchQuery = val);
+              },
             ),
+          ),
+          if (_searchQuery.isNotEmpty)
+            GestureDetector(
+              onTap: () {
+                setState(() => _searchQuery = '');
+              },
+              child: Icon(
+                Icons.close_rounded,
+                size: 14,
+                color: isDark ? AppTheme.darkTextMuted : AppTheme.lightTextMuted,
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildViewToggleBtn({
+    Key? toggleKey,
+    required IconData icon,
+    required String tooltip,
+    required bool isActive,
+    required bool isDark,
+    required VoidCallback onTap,
+  }) {
+    return Tooltip(
+      message: tooltip,
+      child: InkWell(
+        key: toggleKey,
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(7),
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+          decoration: BoxDecoration(
+            color: isActive
+                ? (isDark ? AppTheme.primary.withValues(alpha: 0.25) : Colors.white)
+                : Colors.transparent,
+            borderRadius: BorderRadius.circular(7),
+            boxShadow: isActive && !isDark
+                ? [
+                    BoxShadow(
+                      color: Colors.black.withValues(alpha: 0.05),
+                      blurRadius: 4,
+                      offset: const Offset(0, 1),
+                    ),
+                  ]
+                : null,
+          ),
+          child: Icon(
+            icon,
+            size: 18,
+            color: isActive
+                ? AppTheme.primary
+                : (isDark ? AppTheme.darkTextSecondary : AppTheme.lightTextSecondary),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildExpandableLoCard({
+    required String loKey,
+    required String loTitle,
+    required List<String> sections,
+    required List<LoMasteryItem> filtered,
+    required bool isDark,
+  }) {
+    final isExpanded = _expandedLoKeys.contains(loKey);
+    final itemsForLo = filtered.where((item) => item.loCode == loKey).toList();
+    final avgScore = itemsForLo.isNotEmpty
+        ? itemsForLo.map((e) => e.score).reduce((a, b) => a + b) / itemsForLo.length
+        : 0.0;
+    final avgColor = _getTierColor(avgScore);
+    final borderColor = isDark ? AppTheme.darkBorder : AppTheme.lightBorder;
+
+    return Container(
+      margin: const EdgeInsets.only(bottom: 10),
+      decoration: BoxDecoration(
+        color: isDark ? AppTheme.darkSurfaceLight : Colors.white,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: borderColor),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          // Header (Click to expand/collapse)
+          InkWell(
+            onTap: () {
+              setState(() {
+                if (isExpanded) {
+                  _expandedLoKeys.remove(loKey);
+                } else {
+                  _expandedLoKeys.add(loKey);
+                }
+              });
+            },
+            borderRadius: BorderRadius.circular(12),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+              child: Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                    decoration: BoxDecoration(
+                      color: AppTheme.primary.withValues(alpha: 0.12),
+                      borderRadius: BorderRadius.circular(4),
+                    ),
+                    child: Text(
+                      loKey,
+                      style: TextStyle(
+                        fontSize: 10.5,
+                        fontWeight: FontWeight.bold,
+                        color: AppTheme.primary,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Text(
+                      loTitle,
+                      style: TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w600,
+                        color: isDark ? AppTheme.darkText : AppTheme.lightText,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  // Score Badge (Sober, Institutional Tint)
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                    decoration: BoxDecoration(
+                      color: avgColor.withValues(alpha: isDark ? 0.14 : 0.08),
+                      borderRadius: BorderRadius.circular(6),
+                      border: Border.all(color: avgColor.withValues(alpha: 0.3)),
+                    ),
+                    child: Text(
+                      '${avgScore.toStringAsFixed(1)}%',
+                      style: TextStyle(
+                        fontSize: 11.5,
+                        fontWeight: FontWeight.bold,
+                        color: avgColor,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 6),
+                  Icon(
+                    isExpanded ? Icons.keyboard_arrow_up_rounded : Icons.keyboard_arrow_down_rounded,
+                    size: 20,
+                    color: isDark ? AppTheme.darkTextSecondary : AppTheme.lightTextSecondary,
+                  ),
+                ],
+              ),
+            ),
+          ),
+
+          // Expanded Content: Sections Mastery Breakdown
+          if (isExpanded) ...[
+            Divider(height: 1, thickness: 1, color: borderColor),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+              color: isDark ? AppTheme.darkSurface : const Color(0xFFFAFAFA),
+              child: Column(
+                children: [
+                  for (final sec in sections) ...[
+                    Builder(
+                      builder: (_) {
+                        final match = filtered.firstWhere(
+                          (it) => it.loCode == loKey && it.section == sec,
+                          orElse: () => LoMasteryItem(
+                            loCode: loKey,
+                            loTitle: loTitle,
+                            subject: _selectedSubject,
+                            section: sec,
+                            score: 75.0,
+                            assessedCount: 30,
+                            masteredCount: 20,
+                            developingCount: 7,
+                            atRiskCount: 3,
+                            mostMissedItems: [],
+                            remediationAction: 'Standard review',
+                          ),
+                        );
+                        final secColor = _getTierColor(match.score);
+
+                        return InkWell(
+                          onTap: () => _showDrillDownDialog(context, match, isDark),
+                          borderRadius: BorderRadius.circular(8),
+                          child: Padding(
+                            padding: const EdgeInsets.symmetric(vertical: 6, horizontal: 4),
+                            child: Row(
+                              children: [
+                                SizedBox(
+                                  width: 90,
+                                  child: Text(
+                                    sec,
+                                    style: TextStyle(
+                                      fontSize: 12,
+                                      fontWeight: FontWeight.w600,
+                                      color: isDark ? AppTheme.darkText : AppTheme.lightText,
+                                    ),
+                                  ),
+                                ),
+                                const SizedBox(width: 8),
+                                Expanded(
+                                  child: ClipRRect(
+                                    borderRadius: BorderRadius.circular(4),
+                                    child: LinearProgressIndicator(
+                                      value: match.score / 100.0,
+                                      minHeight: 8,
+                                      backgroundColor: isDark ? AppTheme.darkBorder : const Color(0xFFE2E8F0),
+                                      valueColor: AlwaysStoppedAnimation<Color>(secColor),
+                                    ),
+                                  ),
+                                ),
+                                const SizedBox(width: 12),
+                                Container(
+                                  width: 64,
+                                  alignment: Alignment.centerRight,
+                                  child: Text(
+                                    '${match.score.toStringAsFixed(1)}%',
+                                    style: TextStyle(
+                                      fontSize: 12,
+                                      fontWeight: FontWeight.bold,
+                                      color: secColor,
+                                    ),
+                                  ),
+                                ),
+                                const SizedBox(width: 4),
+                                Icon(
+                                  Icons.chevron_right_rounded,
+                                  size: 16,
+                                  color: isDark ? AppTheme.darkTextMuted : AppTheme.lightTextMuted,
+                                ),
+                              ],
+                            ),
+                          ),
+                        );
+                      },
+                    ),
+                    if (sec != sections.last)
+                      Divider(height: 1, thickness: 0.5, color: borderColor.withValues(alpha: 0.5)),
+                  ],
+                ],
+              ),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
+  Widget _buildBenchmarkScale(bool isDark) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
+      decoration: BoxDecoration(
+        color: isDark ? AppTheme.darkSurfaceLight.withValues(alpha: 0.5) : const Color(0xFFF8FAFC),
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: isDark ? AppTheme.darkBorder : const Color(0xFFE2E8F0)),
+      ),
+      child: Wrap(
+        crossAxisAlignment: WrapCrossAlignment.center,
+        spacing: 16,
+        runSpacing: 6,
+        children: [
+          Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(
+                Icons.tune_rounded,
+                size: 13,
+                color: isDark ? AppTheme.darkTextSecondary : AppTheme.lightTextSecondary,
+              ),
+              const SizedBox(width: 5),
+              Text(
+                'Mastery Scale:',
+                style: TextStyle(
+                  fontSize: 11,
+                  fontWeight: FontWeight.bold,
+                  color: isDark ? AppTheme.darkTextSecondary : AppTheme.lightTextSecondary,
+                  letterSpacing: 0.2,
+                ),
+              ),
+            ],
+          ),
+          _buildBenchmarkTier(
+            label: 'Proficient',
+            range: '80%+',
+            accentColor: const Color(0xFF0D9488),
+            isDark: isDark,
+          ),
+          _buildBenchmarkTier(
+            label: 'Developing',
+            range: '60% – 79%',
+            accentColor: const Color(0xFFD97706),
+            isDark: isDark,
+          ),
+          _buildBenchmarkTier(
+            label: 'Needs Help',
+            range: 'Below 60%',
+            accentColor: const Color(0xFFBE123C),
+            isDark: isDark,
           ),
         ],
       ),
+    );
+  }
+
+  Widget _buildBenchmarkTier({
+    required String label,
+    required String range,
+    required Color accentColor,
+    required bool isDark,
+  }) {
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Container(
+          width: 3.5,
+          height: 11,
+          decoration: BoxDecoration(
+            color: accentColor,
+            borderRadius: BorderRadius.circular(2),
+          ),
+        ),
+        const SizedBox(width: 6),
+        Text(
+          '$label ($range)',
+          style: TextStyle(
+            fontSize: 11,
+            fontWeight: FontWeight.w600,
+            color: isDark ? AppTheme.darkText : AppTheme.lightText,
+          ),
+        ),
+      ],
     );
   }
 }

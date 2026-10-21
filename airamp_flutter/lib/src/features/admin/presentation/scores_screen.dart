@@ -183,102 +183,61 @@ class _ScoresScreenState extends ConsumerState<ScoresScreen> {
         child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                // Header
-                Row(
-                  children: [
-                    Container(
-                      padding: const EdgeInsets.all(10),
-                      decoration: BoxDecoration(
-                        color: AppTheme.primarySoft,
-                        borderRadius: BorderRadius.circular(12),
+                // Header for standalone view (embedded teacher screen uses unified analytics card directly)
+                if (!widget.isEmbedded) ...[
+                  Row(
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.all(10),
+                        decoration: BoxDecoration(
+                          color: AppTheme.primarySoft,
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: Icon(Icons.assignment_turned_in, color: Theme.of(context).colorScheme.primary, size: 28),
                       ),
-                      child: Icon(Icons.assignment_turned_in, color: Theme.of(context).colorScheme.primary, size: 28),
-                    ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            'Student Quiz Scores',
-                            style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: Theme.of(context).colorScheme.onSurface),
-                          ),
-                          const SizedBox(height: 2),
-                          Text(
-                            '$uniqueStudents active students · $totalAttempts total attempts',
-                            style: TextStyle(color: AppTheme.textSecondary, fontSize: 13),
-                          ),
-                        ],
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              'Student Quiz Scores',
+                              style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: Theme.of(context).colorScheme.onSurface),
+                            ),
+                            const SizedBox(height: 2),
+                            Text(
+                              '$uniqueStudents active students · $totalAttempts total attempts',
+                              style: TextStyle(color: AppTheme.textSecondary, fontSize: 13),
+                            ),
+                          ],
+                        ),
                       ),
-                    ),
-                    const SizedBox(width: 8),
-                    ElevatedButton.icon(
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: AppTheme.primary,
-                        foregroundColor: Colors.black,
-                        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                        elevation: 1,
-                      ),
-                      onPressed: () {
-                        QuizItemAnalysisDialog.show(context);
-                      },
-                      icon: const Icon(Icons.analytics_outlined, size: 18),
-                      label: const Text('Item Analysis', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 20),
+                    ],
+                  ),
+                  const SizedBox(height: 16),
+                ],
 
-                // Stats Bar
-                LayoutBuilder(
-                  builder: (context, constraints) {
-                    if (constraints.maxWidth < 600) {
-                      return Column(
-                        children: [
-                          Row(
-                            children: [
-                              Expanded(child: _buildTeacherStatCard('Records', '$totalAttempts', Icons.receipt_long, AppTheme.primary)),
-                              const SizedBox(width: 8),
-                              Expanded(child: _buildTeacherStatCard('Students', '$uniqueStudents', Icons.people, AppTheme.accent)),
-                            ],
-                          ),
-                          const SizedBox(height: 8),
-                          Row(
-                            children: [
-                              Expanded(child: _buildTeacherStatCard('Pass Rate', passRate, Icons.check_circle, AppTheme.success)),
-                              const SizedBox(width: 8),
-                              Expanded(child: _buildTeacherStatCard('Avg Score', avgScore, Icons.trending_up, AppTheme.warning)),
-                            ],
-                          ),
-                        ],
-                      );
-                    }
-                    return Row(
-                      children: [
-                        Expanded(child: _buildTeacherStatCard('Records', '$totalAttempts', Icons.receipt_long, AppTheme.primary)),
-                        const SizedBox(width: 8),
-                        Expanded(child: _buildTeacherStatCard('Students', '$uniqueStudents', Icons.people, AppTheme.accent)),
-                        const SizedBox(width: 8),
-                        Expanded(child: _buildTeacherStatCard('Pass Rate', passRate, Icons.check_circle, AppTheme.success)),
-                        const SizedBox(width: 8),
-                        Expanded(child: _buildTeacherStatCard('Avg Score', avgScore, Icons.trending_up, AppTheme.warning)),
-                      ],
-                    );
-                  },
+                // Unified Performance Analytics Card
+                _buildAnalyticsCard(
+                  totalAttempts: totalAttempts,
+                  uniqueStudents: uniqueStudents,
+                  passRate: passRate,
+                  avgScore: avgScore,
+                  isDark: Theme.of(context).brightness == Brightness.dark,
                 ),
-                const SizedBox(height: 20),
+                const SizedBox(height: 18),
 
                 // Search Bar
                 TextField(
                   controller: _searchController,
                   maxLength: 60,
                   buildCounter: (context, {required currentLength, required isFocused, maxLength}) => null,
-                  style: TextStyle(color: AppTheme.text),
+                  style: TextStyle(color: AppTheme.text, fontSize: 13.5),
                   decoration: InputDecoration(
                     hintText: 'Search student, subject, or quiz...',
+                    hintStyle: TextStyle(color: AppTheme.textMuted, fontSize: 13.5),
                     counterText: '',
-                    prefixIcon: Icon(Icons.search, color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.4)),
+                    prefixIcon: Icon(Icons.search_rounded, color: AppTheme.textMuted, size: 20),
                     suffixIcon: _searchController.text.isNotEmpty
                         ? IconButton(
                             icon: const Icon(Icons.clear, size: 18),
@@ -289,14 +248,19 @@ class _ScoresScreenState extends ConsumerState<ScoresScreen> {
                           )
                         : null,
                     filled: true,
-                    fillColor: Theme.of(context).colorScheme.surface,
+                    fillColor: AppTheme.surface,
+                    contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
                     border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12),
-                      borderSide: BorderSide(color: Theme.of(context).dividerColor),
+                      borderRadius: BorderRadius.circular(14),
+                      borderSide: BorderSide(color: AppTheme.border),
                     ),
                     enabledBorder: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12),
-                      borderSide: BorderSide(color: Theme.of(context).dividerColor),
+                      borderRadius: BorderRadius.circular(14),
+                      borderSide: BorderSide(color: AppTheme.border),
+                    ),
+                    focusedBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(14),
+                      borderSide: BorderSide(color: AppTheme.primary, width: 1.5),
                     ),
                   ),
                 ),
@@ -504,31 +468,144 @@ class _ScoresScreenState extends ConsumerState<ScoresScreen> {
     );
   }
 
-  Widget _buildTeacherStatCard(String label, String value, IconData icon, Color color) {
+  Widget _buildAnalyticsCard({
+    required int totalAttempts,
+    required int uniqueStudents,
+    required String passRate,
+    required String avgScore,
+    required bool isDark,
+  }) {
     return Container(
-      padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 8),
       decoration: BoxDecoration(
         color: AppTheme.surface,
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(16),
         border: Border.all(color: AppTheme.border),
-      ),
-      child: Column(
-        children: [
-          Icon(icon, color: color, size: 16),
-          const SizedBox(height: 6),
-          Text(
-            value,
-            style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: AppTheme.text),
-          ),
-          const SizedBox(height: 2),
-          Text(
-            label,
-            style: TextStyle(fontSize: 10, color: AppTheme.textMuted),
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: isDark ? 0.20 : 0.03),
+            blurRadius: 8,
+            offset: const Offset(0, 2),
           ),
         ],
       ),
+      child: Column(
+        children: [
+          // Header Row of the Analytics Card
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 12, 12, 12),
+            child: Row(
+              children: [
+                Icon(
+                  Icons.insights_rounded,
+                  size: 18,
+                  color: AppTheme.primary,
+                ),
+                const SizedBox(width: 8),
+                Text(
+                  'Assessment Analytics',
+                  style: TextStyle(
+                    fontSize: 13.5,
+                    fontWeight: FontWeight.w600,
+                    color: AppTheme.text,
+                    letterSpacing: -0.2,
+                  ),
+                ),
+                const Spacer(),
+                Material(
+                  color: Colors.transparent,
+                  child: InkWell(
+                    onTap: () => QuizItemAnalysisDialog.show(context),
+                    borderRadius: BorderRadius.circular(8),
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                      decoration: BoxDecoration(
+                        color: AppTheme.primary.withValues(alpha: 0.08),
+                        borderRadius: BorderRadius.circular(8),
+                        border: Border.all(color: AppTheme.primary.withValues(alpha: 0.25)),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(Icons.analytics_outlined, size: 14, color: AppTheme.primary),
+                          const SizedBox(width: 5),
+                          Text(
+                            'Item Analysis',
+                            style: TextStyle(
+                              fontSize: 11.5,
+                              fontWeight: FontWeight.w600,
+                              color: AppTheme.primary,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          Divider(height: 1, thickness: 1, color: AppTheme.border.withValues(alpha: 0.6)),
+          // 4-Column balanced metric summary
+          Padding(
+            padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 8),
+            child: Row(
+              children: [
+                Expanded(
+                  child: _buildMetricCell('Attempts', '$totalAttempts'),
+                ),
+                _buildMetricDivider(),
+                Expanded(
+                  child: _buildMetricCell('Students', '$uniqueStudents'),
+                ),
+                _buildMetricDivider(),
+                Expanded(
+                  child: _buildMetricCell('Pass Rate', passRate),
+                ),
+                _buildMetricDivider(),
+                Expanded(
+                  child: _buildMetricCell('Avg Score', avgScore),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildMetricCell(String label, String value) {
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Text(
+          value,
+          style: TextStyle(
+            fontSize: 18,
+            fontWeight: FontWeight.w700,
+            color: AppTheme.text,
+            letterSpacing: -0.3,
+          ),
+        ),
+        const SizedBox(height: 2),
+        Text(
+          label,
+          style: TextStyle(
+            fontSize: 11,
+            fontWeight: FontWeight.w500,
+            color: AppTheme.textSecondary,
+          ),
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+        ),
+      ],
+    );
+  }
+
+  Widget _buildMetricDivider() {
+    return Container(
+      height: 24,
+      width: 1,
+      color: AppTheme.border.withValues(alpha: 0.6),
     );
   }
 
@@ -547,134 +624,274 @@ class _ScoresScreenState extends ConsumerState<ScoresScreen> {
     required String time,
     required String duration,
   }) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
+    // Clean section/grade formatting without redundancy or dangling dots
+    final String sectionGradeText;
+    if (studentGrade.isEmpty || studentSection.contains(studentGrade)) {
+      sectionGradeText = (studentSection.isEmpty || studentSection == 'Section') ? 'General' : studentSection;
+    } else if (studentSection.isEmpty || studentSection == 'Section') {
+      sectionGradeText = studentGrade;
+    } else {
+      sectionGradeText = '$studentSection · $studentGrade';
+    }
+
+    // Parse subject code vs subject title
+    String subjectCode = '';
+    String subjectTitle = subjectName;
+    if (item['subject_code'] != null && (item['subject_code'] as String).isNotEmpty) {
+      subjectCode = item['subject_code'] as String;
+      subjectTitle = item['subject_name'] as String? ?? '';
+    } else if (subjectName.contains('·')) {
+      final parts = subjectName.split('·');
+      subjectCode = parts[0].trim();
+      subjectTitle = parts.sublist(1).join('·').trim();
+    }
+
     return Container(
       decoration: BoxDecoration(
         color: AppTheme.surface,
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: AppTheme.border),
+        border: Border.all(color: AppTheme.border), // Neutral professional border
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: isDark ? 0.20 : 0.03),
+            blurRadius: 8,
+            offset: const Offset(0, 2),
+          ),
+        ],
       ),
-      child: InkWell(
-        onTap: () => _showScoreDetailModal(item, studentName, studentSection, studentGrade, subjectName, loTitle, score, total, percentage, isPassed, date, time, duration),
-        borderRadius: BorderRadius.circular(16),
-        child: Padding(
-          padding: const EdgeInsets.all(16),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              // Top student info row
-              Row(
-                children: [
-                  CircleAvatar(
-                    radius: 18,
-                    backgroundColor: AppTheme.primarySoft,
-                    child: Text(
-                      studentName.isNotEmpty ? studentName[0].toUpperCase() : 'S',
-                      style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: AppTheme.primary),
-                    ),
-                  ),
-                  const SizedBox(width: 10),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          studentName,
-                          style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: AppTheme.text),
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          onTap: () => _showScoreDetailModal(
+            item,
+            studentName,
+            studentSection,
+            studentGrade,
+            subjectName,
+            loTitle,
+            score,
+            total,
+            percentage,
+            isPassed,
+            date,
+            time,
+            duration,
+          ),
+          borderRadius: BorderRadius.circular(16),
+          child: Padding(
+            padding: const EdgeInsets.all(15),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // Top student info row
+                Row(
+                  children: [
+                    CircleAvatar(
+                      radius: 19,
+                      backgroundColor: isDark
+                          ? Colors.white.withValues(alpha: 0.08)
+                          : const Color(0xFFF1F5F9),
+                      child: Text(
+                        studentName.isNotEmpty ? studentName[0].toUpperCase() : 'S',
+                        style: TextStyle(
+                          fontSize: 14,
+                          fontWeight: FontWeight.w700,
+                          color: isDark ? Colors.white70 : const Color(0xFF475569),
                         ),
-                        Text(
-                          studentGrade.isNotEmpty ? '$studentSection · $studentGrade' : studentSection,
-                          style: TextStyle(fontSize: 12, color: AppTheme.textSecondary),
-                        ),
-                      ],
-                    ),
-                  ),
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                    decoration: BoxDecoration(
-                      color: isPassed ? AppTheme.success.withValues(alpha: 0.12) : AppTheme.error.withValues(alpha: 0.12),
-                      borderRadius: BorderRadius.circular(20),
-                      border: Border.all(
-                        color: isPassed ? AppTheme.success.withValues(alpha: 0.3) : AppTheme.error.withValues(alpha: 0.3),
                       ),
                     ),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Icon(
-                          isPassed ? Icons.check_circle : Icons.cancel,
-                          size: 12,
-                          color: isPassed ? AppTheme.success : AppTheme.error,
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            studentName,
+                            style: TextStyle(
+                              fontSize: 15,
+                              fontWeight: FontWeight.w700,
+                              color: AppTheme.text,
+                              letterSpacing: -0.2,
+                            ),
+                          ),
+                          const SizedBox(height: 2),
+                          Text(
+                            sectionGradeText,
+                            style: TextStyle(
+                              fontSize: 12,
+                              fontWeight: FontWeight.w500,
+                              color: AppTheme.textSecondary,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    // Muted, dignified institutional status badge
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3.5),
+                      decoration: BoxDecoration(
+                        color: isPassed
+                            ? (isDark ? const Color(0xFF064E3B).withValues(alpha: 0.35) : const Color(0xFFF0FDF4))
+                            : (isDark ? const Color(0xFF451A1A).withValues(alpha: 0.35) : const Color(0xFFFEF2F2)),
+                        borderRadius: BorderRadius.circular(16),
+                        border: Border.all(
+                          color: isPassed
+                              ? (isDark ? const Color(0xFF047857) : const Color(0xFFDCFCE7))
+                              : (isDark ? const Color(0xFF7F1D1D) : const Color(0xFFFEE2E2)),
+                          width: 1,
                         ),
-                        const SizedBox(width: 4),
-                        Text(
-                          isPassed ? 'PASSED' : 'FAILED',
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Container(
+                            width: 6,
+                            height: 6,
+                            decoration: BoxDecoration(
+                              shape: BoxShape.circle,
+                              color: isPassed
+                                  ? (isDark ? const Color(0xFF86EFAC) : const Color(0xFF166534))
+                                  : (isDark ? const Color(0xFFFCA5A5) : const Color(0xFF991B1B)),
+                            ),
+                          ),
+                          const SizedBox(width: 5),
+                          Text(
+                            isPassed ? 'PASSED' : 'FAILED',
+                            style: TextStyle(
+                              fontSize: 10.5,
+                              fontWeight: FontWeight.w700,
+                              letterSpacing: 0.3,
+                              color: isPassed
+                                  ? (isDark ? const Color(0xFF86EFAC) : const Color(0xFF166534))
+                                  : (isDark ? const Color(0xFFFCA5A5) : const Color(0xFF991B1B)),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 12),
+
+                // Subject info
+                Row(
+                  children: [
+                    if (subjectCode.isNotEmpty) ...[
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                        decoration: BoxDecoration(
+                          color: isDark ? Colors.white.withValues(alpha: 0.06) : const Color(0xFFF1F5F9),
+                          borderRadius: BorderRadius.circular(5),
+                          border: Border.all(color: AppTheme.border.withValues(alpha: 0.6)),
+                        ),
+                        child: Text(
+                          subjectCode,
                           style: TextStyle(
-                            fontSize: 11,
-                            fontWeight: FontWeight.bold,
-                            color: isPassed ? AppTheme.success : AppTheme.error,
+                            fontSize: 10.5,
+                            fontWeight: FontWeight.w600,
+                            color: AppTheme.textSecondary,
+                            letterSpacing: 0.2,
                           ),
                         ),
-                      ],
+                      ),
+                      const SizedBox(width: 8),
+                    ],
+                    Expanded(
+                      child: Text(
+                        subjectTitle,
+                        style: TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w500,
+                          color: AppTheme.textSecondary,
+                        ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 4),
+
+                // Quiz / Learning Outcome title
+                Text(
+                  loTitle,
+                  style: TextStyle(
+                    fontSize: 14.5,
+                    fontWeight: FontWeight.w700,
+                    color: AppTheme.text,
+                    letterSpacing: -0.2,
+                  ),
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                ),
+                const SizedBox(height: 12),
+
+                // Dedicated performance footer bar
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                  decoration: BoxDecoration(
+                    color: isDark
+                        ? Colors.white.withValues(alpha: 0.03)
+                        : const Color(0xFFF8FAFC),
+                    borderRadius: BorderRadius.circular(10),
+                    border: Border.all(
+                      color: AppTheme.border.withValues(alpha: 0.6),
                     ),
                   ),
-                ],
-              ),
-              const SizedBox(height: 12),
-              Divider(height: 1, color: AppTheme.border),
-              const SizedBox(height: 12),
-
-              // Subject and LO info
-              Text(
-                subjectName,
-                style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: AppTheme.primary),
-              ),
-              const SizedBox(height: 2),
-              Text(
-                loTitle,
-                style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: AppTheme.text),
-              ),
-              const SizedBox(height: 10),
-
-              // Score and timing bar
-              Wrap(
-                alignment: WrapAlignment.spaceBetween,
-                crossAxisAlignment: WrapCrossAlignment.center,
-                spacing: 12,
-                runSpacing: 6,
-                children: [
-                  Row(
-                    mainAxisSize: MainAxisSize.min,
+                  child: Row(
                     children: [
+                      // Score text without loud neon box
                       Text(
-                        '$score/$total',
+                        '$score / $total',
                         style: TextStyle(
-                          fontSize: 16,
-                          fontWeight: FontWeight.bold,
-                          color: isPassed ? AppTheme.success : AppTheme.error,
+                          fontSize: 13,
+                          fontWeight: FontWeight.w700,
+                          color: AppTheme.text,
                         ),
                       ),
-                      const SizedBox(width: 6),
+                      const SizedBox(width: 4),
                       Text(
                         '(${percentage.toStringAsFixed(0)}%)',
-                        style: TextStyle(fontSize: 13, color: AppTheme.textSecondary),
+                        style: TextStyle(
+                          fontSize: 11.5,
+                          fontWeight: FontWeight.w600,
+                          color: isPassed
+                              ? (isDark ? const Color(0xFF86EFAC) : const Color(0xFF166534))
+                              : (isDark ? const Color(0xFFFCA5A5) : const Color(0xFF991B1B)),
+                        ),
+                      ),
+                      const Spacer(),
+                      // Date info
+                      Icon(Icons.calendar_today_outlined, size: 12, color: AppTheme.textMuted),
+                      const SizedBox(width: 4),
+                      Text(
+                        date,
+                        style: TextStyle(
+                          fontSize: 11,
+                          fontWeight: FontWeight.w500,
+                          color: AppTheme.textSecondary,
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      // Duration info
+                      Icon(Icons.timer_outlined, size: 12, color: AppTheme.textMuted),
+                      const SizedBox(width: 4),
+                      Text(
+                        duration,
+                        style: TextStyle(
+                          fontSize: 11,
+                          fontWeight: FontWeight.w500,
+                          color: AppTheme.textSecondary,
+                        ),
                       ),
                     ],
                   ),
-                  Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Icon(Icons.calendar_today, size: 12, color: AppTheme.textMuted),
-                      const SizedBox(width: 4),
-                      Text(date, style: TextStyle(fontSize: 11, color: AppTheme.textSecondary)),
-                      const SizedBox(width: 10),
-                      Icon(Icons.schedule, size: 12, color: AppTheme.textMuted),
-                      const SizedBox(width: 4),
-                      Text(duration, style: TextStyle(fontSize: 11, color: AppTheme.textSecondary)),
-                    ],
-                  ),
-                ],
-              ),
-            ],
+                ),
+              ],
+            ),
           ),
         ),
       ),
@@ -696,7 +913,26 @@ class _ScoresScreenState extends ConsumerState<ScoresScreen> {
     String time,
     String duration,
   ) {
-    final email = item['student_email'] as String? ?? 'No email';
+    final email = item['student_email'] as String? ?? 'No email provided';
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
+    // Clean section/grade string formatting (fixes "Section · " bug)
+    final String cleanSection;
+    if (studentGrade.isEmpty || studentSection.contains(studentGrade)) {
+      cleanSection = (studentSection.isEmpty || studentSection == 'Section') ? 'General' : studentSection;
+    } else if (studentSection.isEmpty || studentSection == 'Section') {
+      cleanSection = studentGrade;
+    } else {
+      cleanSection = '$studentSection · $studentGrade';
+    }
+
+    // Clean completion date/time formatting (fixes "Recent at " bug)
+    final String cleanCompleted;
+    if (time.isEmpty || date == 'Recent') {
+      cleanCompleted = date;
+    } else {
+      cleanCompleted = '$date at $time';
+    }
 
     AppModalTransitions.showSmoothBottomSheet(
       context: context,
@@ -713,90 +949,268 @@ class _ScoresScreenState extends ConsumerState<ScoresScreen> {
         return SafeArea(
           child: SingleChildScrollView(
             padding: EdgeInsets.only(
-              left: 24,
-              right: 24,
-              top: 16,
+              left: 20,
+              right: 20,
+              top: 14,
               bottom: MediaQuery.of(ctx).padding.bottom + 20,
             ),
             child: Column(
               mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
+                // Top drag handle
                 Center(
                   child: Container(
-                    width: 40,
+                    width: 36,
                     height: 4,
                     decoration: BoxDecoration(
-                      color: AppTheme.border,
+                      color: AppTheme.border.withValues(alpha: 0.8),
                       borderRadius: BorderRadius.circular(2),
                     ),
                   ),
                 ),
                 const SizedBox(height: 16),
+
+                // Student Identity Row with Status Badge
                 Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    Text(
-                      'Student Attempt Record',
-                      style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: AppTheme.text),
-                    ),
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                      decoration: BoxDecoration(
-                        color: isPassed ? AppTheme.success.withValues(alpha: 0.15) : AppTheme.error.withValues(alpha: 0.15),
-                        borderRadius: BorderRadius.circular(20),
-                      ),
+                    CircleAvatar(
+                      radius: 22,
+                      backgroundColor: isDark
+                          ? Colors.white.withValues(alpha: 0.08)
+                          : const Color(0xFFF1F5F9),
                       child: Text(
-                        isPassed ? 'PASSED' : 'FAILED',
+                        studentName.isNotEmpty ? studentName[0].toUpperCase() : 'S',
                         style: TextStyle(
-                          fontSize: 12,
-                          fontWeight: FontWeight.bold,
-                          color: isPassed ? AppTheme.success : AppTheme.error,
+                          fontSize: 16,
+                          fontWeight: FontWeight.w700,
+                          color: isDark ? Colors.white70 : const Color(0xFF475569),
                         ),
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            studentName,
+                            style: TextStyle(
+                              fontSize: 16,
+                              fontWeight: FontWeight.w700,
+                              color: AppTheme.text,
+                              letterSpacing: -0.2,
+                            ),
+                          ),
+                          const SizedBox(height: 2),
+                          Text(
+                            email,
+                            style: TextStyle(
+                              fontSize: 12,
+                              color: AppTheme.textSecondary,
+                            ),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 4),
+                      decoration: BoxDecoration(
+                        color: isPassed
+                            ? (isDark ? const Color(0xFF064E3B).withValues(alpha: 0.35) : const Color(0xFFF0FDF4))
+                            : (isDark ? const Color(0xFF451A1A).withValues(alpha: 0.35) : const Color(0xFFFEF2F2)),
+                        borderRadius: BorderRadius.circular(16),
+                        border: Border.all(
+                          color: isPassed
+                              ? (isDark ? const Color(0xFF047857) : const Color(0xFFDCFCE7))
+                              : (isDark ? const Color(0xFF7F1D1D) : const Color(0xFFFEE2E2)),
+                          width: 1,
+                        ),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Container(
+                            width: 6,
+                            height: 6,
+                            decoration: BoxDecoration(
+                              shape: BoxShape.circle,
+                              color: isPassed
+                                  ? (isDark ? const Color(0xFF86EFAC) : const Color(0xFF166534))
+                                  : (isDark ? const Color(0xFFFCA5A5) : const Color(0xFF991B1B)),
+                            ),
+                          ),
+                          const SizedBox(width: 5),
+                          Text(
+                            isPassed ? 'PASSED' : 'FAILED',
+                            style: TextStyle(
+                              fontSize: 11,
+                              fontWeight: FontWeight.w700,
+                              letterSpacing: 0.3,
+                              color: isPassed
+                                  ? (isDark ? const Color(0xFF86EFAC) : const Color(0xFF166534))
+                                  : (isDark ? const Color(0xFFFCA5A5) : const Color(0xFF991B1B)),
+                            ),
+                          ),
+                        ],
                       ),
                     ),
                   ],
                 ),
-                const SizedBox(height: 16),
+                const SizedBox(height: 18),
+
+                // Hero Performance Card
                 Container(
-                  padding: const EdgeInsets.all(16),
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
                   decoration: BoxDecoration(
-                    color: AppTheme.background,
-                    borderRadius: BorderRadius.circular(16),
-                    border: Border.all(color: AppTheme.border),
+                    color: isDark ? Colors.white.withValues(alpha: 0.04) : const Color(0xFFF8FAFC),
+                    borderRadius: BorderRadius.circular(14),
+                    border: Border.all(color: AppTheme.border.withValues(alpha: 0.8)),
                   ),
-                  child: Column(
+                  child: Row(
                     children: [
-                      _buildModalRow('Student Name', studentName),
-                      const Divider(height: 14),
-                      _buildModalRow('Email', email),
-                      const Divider(height: 14),
-                      _buildModalRow('Section & Grade', '$studentSection · $studentGrade'),
-                      const Divider(height: 14),
-                      _buildModalRow('Subject', subjectName),
-                      const Divider(height: 14),
-                      _buildModalRow('Quiz / LO', loTitle),
-                      const Divider(height: 14),
-                      _buildModalRow('Score', '$score / $total (${percentage.toStringAsFixed(0)}%)'),
-                      const Divider(height: 14),
-                      _buildModalRow('Completed', '$date at $time'),
-                      const Divider(height: 14),
-                      _buildModalRow('Duration', duration),
+                      // Score section
+                      Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'Final Score',
+                            style: TextStyle(
+                              fontSize: 11,
+                              fontWeight: FontWeight.w500,
+                              color: AppTheme.textSecondary,
+                            ),
+                          ),
+                          const SizedBox(height: 2),
+                          Row(
+                            crossAxisAlignment: CrossAxisAlignment.baseline,
+                            textBaseline: TextBaseline.alphabetic,
+                            children: [
+                              Text(
+                                '$score',
+                                style: TextStyle(
+                                  fontSize: 26,
+                                  fontWeight: FontWeight.w800,
+                                  color: AppTheme.text,
+                                  letterSpacing: -0.5,
+                                ),
+                              ),
+                              Text(
+                                ' / $total',
+                                style: TextStyle(
+                                  fontSize: 14,
+                                  fontWeight: FontWeight.w600,
+                                  color: AppTheme.textSecondary,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ],
+                      ),
+                      const Spacer(),
+                      // Score percentage & timing chips
+                      Column(
+                        crossAxisAlignment: CrossAxisAlignment.end,
+                        children: [
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 3.5),
+                            decoration: BoxDecoration(
+                              color: isPassed
+                                  ? (isDark ? const Color(0xFF064E3B).withValues(alpha: 0.4) : const Color(0xFFDCFCE7))
+                                  : (isDark ? const Color(0xFF451A1A).withValues(alpha: 0.4) : const Color(0xFFFEE2E2)),
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                            child: Text(
+                              '${percentage.toStringAsFixed(0)}% Accuracy',
+                              style: TextStyle(
+                                fontSize: 12,
+                                fontWeight: FontWeight.w700,
+                                color: isPassed
+                                    ? (isDark ? const Color(0xFF86EFAC) : const Color(0xFF166534))
+                                    : (isDark ? const Color(0xFFFCA5A5) : const Color(0xFF991B1B)),
+                              ),
+                            ),
+                          ),
+                          const SizedBox(height: 6),
+                          Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(Icons.timer_outlined, size: 13, color: AppTheme.textMuted),
+                              const SizedBox(width: 4),
+                              Text(
+                                duration,
+                                style: TextStyle(
+                                  fontSize: 11.5,
+                                  fontWeight: FontWeight.w500,
+                                  color: AppTheme.textSecondary,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ],
+                      ),
                     ],
                   ),
                 ),
-                const SizedBox(height: 16),
+                const SizedBox(height: 18),
+
+                // Assessment Details Grid (Clean structured metadata)
+                Text(
+                  'Assessment Details',
+                  style: TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w700,
+                    color: AppTheme.text,
+                    letterSpacing: -0.2,
+                  ),
+                ),
+                const SizedBox(height: 10),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                  decoration: BoxDecoration(
+                    color: AppTheme.surface,
+                    borderRadius: BorderRadius.circular(14),
+                    border: Border.all(color: AppTheme.border.withValues(alpha: 0.8)),
+                  ),
+                  child: Column(
+                    children: [
+                      _buildModalRow('Subject', subjectName),
+                      Padding(
+                        padding: const EdgeInsets.symmetric(vertical: 8),
+                        child: Divider(height: 1, thickness: 1, color: AppTheme.border.withValues(alpha: 0.5)),
+                      ),
+                      _buildModalRow('Quiz / LO', loTitle),
+                      Padding(
+                        padding: const EdgeInsets.symmetric(vertical: 8),
+                        child: Divider(height: 1, thickness: 1, color: AppTheme.border.withValues(alpha: 0.5)),
+                      ),
+                      _buildModalRow('Section', cleanSection),
+                      Padding(
+                        padding: const EdgeInsets.symmetric(vertical: 8),
+                        child: Divider(height: 1, thickness: 1, color: AppTheme.border.withValues(alpha: 0.5)),
+                      ),
+                      _buildModalRow('Completed', cleanCompleted),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 20),
+
+                // Clean Close Button
                 SizedBox(
                   width: double.infinity,
                   child: ElevatedButton(
                     onPressed: () => Navigator.pop(ctx),
                     style: ElevatedButton.styleFrom(
-                      backgroundColor: AppTheme.primary,
+                      backgroundColor: isDark ? const Color(0xFF334155) : const Color(0xFF0F172A),
                       foregroundColor: Colors.white,
                       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                      padding: const EdgeInsets.symmetric(vertical: 14),
+                      padding: const EdgeInsets.symmetric(vertical: 13),
+                      elevation: 0,
                     ),
-                    child: const Text('Close', style: TextStyle(fontWeight: FontWeight.bold)),
+                    child: const Text('Close', style: TextStyle(fontWeight: FontWeight.w600, fontSize: 14)),
                   ),
                 ),
               ],

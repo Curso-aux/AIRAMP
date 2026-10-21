@@ -13,7 +13,7 @@ import '../data/teacher_repository.dart';
 
 class TeacherStudentsScreen extends ConsumerStatefulWidget {
   final String? initialSection;
-  final int initialTab; // 0: Roster, 1: Scores
+  final int initialTab; // 0: Students, 1: Scores
 
   const TeacherStudentsScreen({
     super.key,
@@ -120,20 +120,20 @@ class _TeacherStudentsScreenState extends ConsumerState<TeacherStudentsScreen> {
       body: SafeArea(
         child: Column(
           children: [
-            // Top Segmented Pill Toggle: Class Roster vs Quiz Scores
+            // Top Segmented Pill Toggle: Students vs Quiz Scores
             Padding(
               padding: const EdgeInsets.fromLTRB(20, 10, 20, 4),
               child: Container(
-                height: 42,
+                height: 48,
                 padding: const EdgeInsets.all(4),
                 decoration: BoxDecoration(
                   color: AppTheme.surface,
-                  borderRadius: BorderRadius.circular(12),
+                  borderRadius: BorderRadius.circular(14),
                   border: Border.all(color: AppTheme.border),
                   boxShadow: [
                     BoxShadow(
                       color: Colors.black.withValues(alpha: 0.04),
-                      blurRadius: 6,
+                      blurRadius: 8,
                       offset: const Offset(0, 2),
                     ),
                   ],
@@ -142,17 +142,17 @@ class _TeacherStudentsScreenState extends ConsumerState<TeacherStudentsScreen> {
                   children: [
                     Expanded(
                       child: _buildSegmentTab(
-                        label: 'Class Roster',
-                        icon: Icons.people_alt_outlined,
+                        label: 'Students',
+                        icon: Icons.people_alt_rounded,
                         isActive: _activeTab == 0,
                         onTap: () => setState(() => _activeTab = 0),
                       ),
                     ),
-                    const SizedBox(width: 4),
+                    const SizedBox(width: 6),
                     Expanded(
                       child: _buildSegmentTab(
                         label: 'Quiz Scores',
-                        icon: Icons.assignment_turned_in_outlined,
+                        icon: Icons.assignment_turned_in_rounded,
                         isActive: _activeTab == 1,
                         onTap: () => setState(() => _activeTab = 1),
                       ),
@@ -201,17 +201,18 @@ class _TeacherStudentsScreenState extends ConsumerState<TeacherStudentsScreen> {
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
                               Text(
-                                'Handled Sections & Roster',
+                                'My Students',
                                 style: TextStyle(
                                   fontSize: 20,
                                   fontWeight: FontWeight.bold,
                                   color: AppTheme.text,
+                                  letterSpacing: -0.4,
                                 ),
                               ),
                               const SizedBox(height: 2),
                               Text(
                                 _selectedSection == 'All Sections'
-                                    ? '${students.length} students across your handled sections'
+                                    ? '${students.length} students across your assigned sections'
                                     : '${students.length} students enrolled in Section $_selectedSection',
                                 style: TextStyle(fontSize: 12, color: AppTheme.textSecondary),
                               ),
@@ -222,13 +223,13 @@ class _TeacherStudentsScreenState extends ConsumerState<TeacherStudentsScreen> {
                     ),
                     const SizedBox(height: 16),
 
-                    // Section Cards Overview (Handled Sections)
+                    // Section Cards Overview (Assigned Sections)
                     if (handledSections.isNotEmpty) ...[
                       Row(
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
                           Text(
-                            'Your Handled Sections',
+                            'Assigned Sections',
                             style: TextStyle(
                               fontSize: 13,
                               fontWeight: FontWeight.bold,
@@ -414,7 +415,7 @@ class _TeacherStudentsScreenState extends ConsumerState<TeacherStudentsScreen> {
                             ? AppEmptyState(
                                 icon: Icons.group_off_outlined,
                                 title: 'No Students in Section $_selectedSection',
-                                message: 'No enrolled students are currently assigned to section "$_selectedSection". Tap below to view all sections.',
+                                message: 'No students are currently enrolled in section "$_selectedSection". Tap below to view all sections.',
                                 actionLabel: 'View All Sections',
                                 actionIcon: Icons.groups_outlined,
                                 onAction: () => _onSelectSection('All Sections'),
@@ -422,8 +423,8 @@ class _TeacherStudentsScreenState extends ConsumerState<TeacherStudentsScreen> {
                             : AppEmptyState(
                                 icon: Icons.people_outline,
                                 title: 'No Students Found',
-                                message: 'No students have been assigned to your classes yet. Tap below to reload your student roster.',
-                                actionLabel: 'Reload Roster',
+                                message: 'No students have been assigned to your classes yet. Tap below to refresh your student list.',
+                                actionLabel: 'Refresh Students',
                                 actionIcon: Icons.refresh_rounded,
                                 onAction: () {
                                   ref.read(teacherStudentsProvider.notifier).reload(
@@ -641,17 +642,18 @@ class _TeacherStudentsScreenState extends ConsumerState<TeacherStudentsScreen> {
         HapticFeedback.lightImpact();
         onTap();
       },
-      borderRadius: BorderRadius.circular(9),
+      borderRadius: BorderRadius.circular(10),
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 180),
+        alignment: Alignment.center,
         decoration: BoxDecoration(
           color: isActive ? AppTheme.primary : Colors.transparent,
-          borderRadius: BorderRadius.circular(9),
+          borderRadius: BorderRadius.circular(10),
           boxShadow: isActive
               ? [
                   BoxShadow(
-                    color: AppTheme.primary.withValues(alpha: 0.25),
-                    blurRadius: 6,
+                    color: AppTheme.primary.withValues(alpha: 0.28),
+                    blurRadius: 8,
                     offset: const Offset(0, 2),
                   ),
                 ]
@@ -662,16 +664,17 @@ class _TeacherStudentsScreenState extends ConsumerState<TeacherStudentsScreen> {
           children: [
             Icon(
               icon,
-              size: 16,
+              size: 18,
               color: isActive ? Colors.white : AppTheme.textSecondary,
             ),
-            const SizedBox(width: 6),
+            const SizedBox(width: 8),
             Text(
               label,
               style: TextStyle(
-                fontSize: 12.5,
-                fontWeight: isActive ? FontWeight.bold : FontWeight.w500,
+                fontSize: 13.5,
+                fontWeight: isActive ? FontWeight.bold : FontWeight.w600,
                 color: isActive ? Colors.white : AppTheme.textSecondary,
+                letterSpacing: -0.2,
               ),
             ),
           ],

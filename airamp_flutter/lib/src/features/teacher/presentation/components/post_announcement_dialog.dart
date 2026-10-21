@@ -347,12 +347,21 @@ class _PostAnnouncementDialogState extends ConsumerState<PostAnnouncementDialog>
                         const SizedBox(height: 8),
                         Row(
                           children: [
-                            _buildPriorityChip('normal', 'Normal', AppTheme.primary),
+                            _buildPriorityChip('normal', 'Standard', Icons.article_outlined, AppTheme.primary),
                             const SizedBox(width: 8),
-                            _buildPriorityChip('medium', 'Medium', AppTheme.warning),
+                            _buildPriorityChip('medium', 'Important', Icons.bookmark_border_rounded, AppTheme.warning),
                             const SizedBox(width: 8),
-                            _buildPriorityChip('high', 'High', AppTheme.error),
+                            _buildPriorityChip('high', 'Urgent', Icons.priority_high_rounded, AppTheme.error),
                           ],
+                        ),
+                        const SizedBox(height: 6),
+                        Text(
+                          _priorityHelperText,
+                          style: TextStyle(
+                            fontSize: 11,
+                            color: AppTheme.textMuted,
+                            height: 1.35,
+                          ),
                         ),
                         const SizedBox(height: 16),
 
@@ -497,16 +506,28 @@ class _PostAnnouncementDialogState extends ConsumerState<PostAnnouncementDialog>
     );
   }
 
-  Widget _buildPriorityChip(String value, String label, Color color) {
+  String get _priorityHelperText {
+    switch (_selectedPriority) {
+      case 'high':
+        return 'Urgent: High-priority notice displayed with an alert highlight for time-sensitive updates.';
+      case 'medium':
+        return 'Important: Flags key academic deadlines, exam schedules, and syllabus milestones.';
+      case 'normal':
+      default:
+        return 'Standard: Everyday classroom updates, lesson notes, and general announcements.';
+    }
+  }
+
+  Widget _buildPriorityChip(String value, String label, IconData icon, Color color) {
     final isSelected = _selectedPriority == value;
     return Expanded(
       child: GestureDetector(
         onTap: () => setState(() => _selectedPriority = value),
         child: AnimatedContainer(
           duration: const Duration(milliseconds: 150),
-          padding: const EdgeInsets.symmetric(vertical: 10),
+          padding: const EdgeInsets.symmetric(vertical: 9, horizontal: 4),
           decoration: BoxDecoration(
-            color: isSelected ? color.withValues(alpha: 0.15) : AppTheme.surface,
+            color: isSelected ? color.withValues(alpha: 0.12) : AppTheme.surface,
             borderRadius: BorderRadius.circular(10),
             border: Border.all(
               color: isSelected ? color : AppTheme.border,
@@ -516,11 +537,12 @@ class _PostAnnouncementDialogState extends ConsumerState<PostAnnouncementDialog>
           alignment: Alignment.center,
           child: Row(
             mainAxisAlignment: MainAxisAlignment.center,
+            mainAxisSize: MainAxisSize.min,
             children: [
-              Container(
-                width: 7,
-                height: 7,
-                decoration: BoxDecoration(color: color, shape: BoxShape.circle),
+              Icon(
+                icon,
+                size: 14,
+                color: isSelected ? color : AppTheme.textMuted,
               ),
               const SizedBox(width: 5),
               Flexible(
@@ -529,8 +551,8 @@ class _PostAnnouncementDialogState extends ConsumerState<PostAnnouncementDialog>
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                   style: TextStyle(
-                    fontSize: 11,
-                    fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+                    fontSize: 11.5,
+                    fontWeight: isSelected ? FontWeight.w600 : FontWeight.normal,
                     color: isSelected ? color : AppTheme.textSecondary,
                   ),
                 ),

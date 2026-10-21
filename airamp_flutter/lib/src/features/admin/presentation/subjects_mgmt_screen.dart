@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../../core/theme/app_theme.dart';
@@ -22,16 +23,69 @@ class _SubjectsMgmtScreenState extends ConsumerState<SubjectsMgmtScreen> {
   @override
   Widget build(BuildContext context) {
     ref.watch(themeProvider);
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     final currentUser = ref.watch(authProvider);
     final isAdmin = currentUser == null || currentUser.role == 'admin' || currentUser.role == 'super_admin';
     final isTeacher = currentUser?.role == 'teacher';
 
-    var subjects = ref.watch(subjectsProvider);
+    var rawSubjects = ref.watch(subjectsProvider);
     if (isTeacher && currentUser != null) {
-      subjects = subjects.where((s) {
+      rawSubjects = rawSubjects.where((s) {
         final tId = s['teacher_id']?.toString();
         return tId == currentUser.id || tId == null || tId.isEmpty;
       }).toList();
+    }
+    final allRoleSubjects = rawSubjects;
+
+    // Filter subjects by selected category
+    var subjects = allRoleSubjects;
+    if (_selectedFilter == 1) {
+      // My Subjects
+      subjects = allRoleSubjects.where((s) {
+        final tId = s['teacher_id']?.toString();
+        return currentUser != null && tId == currentUser.id;
+      }).toList();
+    } else if (_selectedFilter == 2) {
+      // Adopted
+      subjects = allRoleSubjects.where((s) {
+        final code = s['subject_code']?.toString() ?? '';
+        return (code.isNotEmpty &&
+                (code == 'CSS-NC-II' || code == 'VGD-NC-III' || code == 'EMP-TECH')) ||
+            s['is_adopted'] == true;
+      }).toList();
+    } else if (_selectedFilter == 3) {
+      // Global & Shared
+      subjects = allRoleSubjects.where((s) {
+        final isGlobal = s['is_global'] == true || s['is_shared'] == true;
+        final tId = s['teacher_id']?.toString();
+        return isGlobal || tId == null || tId.isEmpty;
+      }).toList();
+    }
+
+    int countForFilter(int index) {
+      if (index == 0) return allRoleSubjects.length;
+      if (index == 1) {
+        return allRoleSubjects.where((s) {
+          final tId = s['teacher_id']?.toString();
+          return currentUser != null && tId == currentUser.id;
+        }).length;
+      }
+      if (index == 2) {
+        return allRoleSubjects.where((s) {
+          final code = s['subject_code']?.toString() ?? '';
+          return (code.isNotEmpty &&
+                  (code == 'CSS-NC-II' || code == 'VGD-NC-III' || code == 'EMP-TECH')) ||
+              s['is_adopted'] == true;
+        }).length;
+      }
+      if (index == 3) {
+        return allRoleSubjects.where((s) {
+          final isGlobal = s['is_global'] == true || s['is_shared'] == true;
+          final tId = s['teacher_id']?.toString();
+          return isGlobal || tId == null || tId.isEmpty;
+        }).length;
+      }
+      return 0;
     }
 
     return Scaffold(
@@ -137,33 +191,33 @@ class _SubjectsMgmtScreenState extends ConsumerState<SubjectsMgmtScreen> {
               ),
               const SizedBox(height: 20),
 
-              // Teacher Role Notice
+              // Teacher Role Notice (Compact & Informational)
               if (isTeacher) ...[
                 Container(
-                  margin: const EdgeInsets.only(bottom: 20),
-                  padding: const EdgeInsets.all(16),
+                  margin: const EdgeInsets.only(bottom: 16),
+                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
                   decoration: BoxDecoration(
-                    color: Theme.of(context).colorScheme.primary.withValues(alpha: 0.08),
-                    borderRadius: BorderRadius.circular(12),
-                    border: Border.all(color: Theme.of(context).colorScheme.primary.withValues(alpha: 0.2)),
+                    color: AppTheme.primary.withValues(alpha: isDark ? 0.12 : 0.06),
+                    borderRadius: BorderRadius.circular(10),
+                    border: Border.all(color: AppTheme.primary.withValues(alpha: 0.18)),
                   ),
                   child: Row(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Icon(Icons.assignment_ind_outlined, color: AppTheme.primary, size: 22),
-                      const SizedBox(width: 12),
+                      Icon(Icons.info_outline_rounded, color: AppTheme.primary, size: 18),
+                      const SizedBox(width: 10),
                       Expanded(
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             Text(
-                              'Faculty Course Assignment Notice',
-                              style: TextStyle(color: AppTheme.primary, fontWeight: FontWeight.bold, fontSize: 14),
+                              'Faculty Assignment Notice',
+                              style: TextStyle(color: AppTheme.primary, fontWeight: FontWeight.bold, fontSize: 12.5),
                             ),
-                            const SizedBox(height: 4),
+                            const SizedBox(height: 2),
                             Text(
-                              'Subject courses and sections are created and designated by School Administrators. You have permission to manage Topics, Learning Outcomes, Lessons, and Quizzes for your assigned subjects below.',
-                              style: TextStyle(color: AppTheme.textSecondary, fontSize: 12, height: 1.4),
+                              'Courses are designated by School Administration. You may manage topics, lessons, and quizzes for assigned subjects below.',
+                              style: TextStyle(color: AppTheme.textSecondary, fontSize: 11, height: 1.35),
                             ),
                           ],
                         ),
@@ -173,46 +227,114 @@ class _SubjectsMgmtScreenState extends ConsumerState<SubjectsMgmtScreen> {
                 ),
               ],
 
-              // Filter Chips
-              Wrap(
-                spacing: 8,
-                children: List.generate(_filterLabels.length, (index) {
-                  final isSelected = _selectedFilter == index;
-                  return ChoiceChip(
-                    label: Text(_filterLabels[index]),
-                    selected: isSelected,
-                    onSelected: (selected) {
-                      setState(() => _selectedFilter = index);
-                    },
-                    selectedColor: AppTheme.primary.withValues(alpha: 0.15),
-                    backgroundColor: AppTheme.surface,
-                    labelStyle: TextStyle(
-                      color: isSelected ? AppTheme.primary : AppTheme.textSecondary,
-                      fontWeight: isSelected ? FontWeight.bold : FontWeight.w500,
-                      fontSize: 13,
-                    ),
-                    side: BorderSide(
-                      color: isSelected ? AppTheme.primary.withValues(alpha: 0.5) : AppTheme.border,
-                    ),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                  );
-                }),
+              // Horizontal Single-Line Filter Strip with Live Counts & Haptics
+              SizedBox(
+                height: 36,
+                child: ListView.separated(
+                  scrollDirection: Axis.horizontal,
+                  physics: const BouncingScrollPhysics(),
+                  itemCount: _filterLabels.length,
+                  separatorBuilder: (context, index) => const SizedBox(width: 8),
+                  itemBuilder: (context, index) {
+                    final isSelected = _selectedFilter == index;
+                    final count = countForFilter(index);
+
+                    return InkWell(
+                      borderRadius: BorderRadius.circular(8),
+                      onTap: () {
+                        HapticFeedback.lightImpact();
+                        setState(() => _selectedFilter = index);
+                      },
+                      child: AnimatedContainer(
+                        duration: const Duration(milliseconds: 160),
+                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                        decoration: BoxDecoration(
+                          color: isSelected ? AppTheme.primary : AppTheme.surface,
+                          borderRadius: BorderRadius.circular(8),
+                          border: Border.all(
+                            color: isSelected ? AppTheme.primary : AppTheme.border,
+                          ),
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Text(
+                              _filterLabels[index],
+                              style: TextStyle(
+                                color: isSelected
+                                    ? (isDark ? const Color(0xFF0A1420) : Colors.white)
+                                    : AppTheme.text,
+                                fontWeight: isSelected ? FontWeight.bold : FontWeight.w500,
+                                fontSize: 12,
+                              ),
+                            ),
+                            if (count > 0) ...[
+                              const SizedBox(width: 6),
+                              Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
+                                decoration: BoxDecoration(
+                                  color: isSelected
+                                      ? (isDark
+                                          ? Colors.black.withValues(alpha: 0.25)
+                                          : Colors.white.withValues(alpha: 0.25))
+                                      : AppTheme.primary.withValues(alpha: 0.12),
+                                  borderRadius: BorderRadius.circular(10),
+                                ),
+                                child: Text(
+                                  '$count',
+                                  style: TextStyle(
+                                    fontSize: 10,
+                                    fontWeight: FontWeight.bold,
+                                    color: isSelected
+                                        ? (isDark ? const Color(0xFF0A1420) : Colors.white)
+                                        : AppTheme.primary,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ],
+                        ),
+                      ),
+                    );
+                  },
+                ),
               ),
-              const SizedBox(height: 20),
+              const SizedBox(height: 18),
 
               // Subjects List or Empty State
               if (subjects.isEmpty)
                 Center(
                   child: Padding(
-                    padding: const EdgeInsets.only(top: 24.0),
+                    padding: const EdgeInsets.only(top: 32.0),
                     child: Column(
                       children: [
-                        Icon(Icons.menu_book, size: 64, color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.4)),
-                        const SizedBox(height: 16),
-                        Text(
-                          isTeacher ? 'No assigned subjects found' : 'No subjects created yet',
-                          style: TextStyle(color: AppTheme.textMuted, fontSize: 16),
+                        Icon(
+                          Icons.menu_book,
+                          size: 56,
+                          color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.35),
                         ),
+                        const SizedBox(height: 14),
+                        Text(
+                          _selectedFilter != 0
+                              ? 'No ${_filterLabels[_selectedFilter]} subjects found'
+                              : (isTeacher ? 'No assigned subjects found' : 'No subjects created yet'),
+                          style: TextStyle(color: AppTheme.textMuted, fontSize: 15, fontWeight: FontWeight.w500),
+                        ),
+                        if (_selectedFilter != 0) ...[
+                          const SizedBox(height: 12),
+                          OutlinedButton.icon(
+                            onPressed: () {
+                              HapticFeedback.lightImpact();
+                              setState(() => _selectedFilter = 0);
+                            },
+                            icon: const Icon(Icons.clear_all_rounded, size: 16),
+                            label: const Text('Show All Subjects', style: TextStyle(fontSize: 12)),
+                            style: OutlinedButton.styleFrom(
+                              side: BorderSide(color: AppTheme.border),
+                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                            ),
+                          ),
+                        ],
                       ],
                     ),
                   ),

@@ -96,6 +96,7 @@ class AppModalTransitions {
     bool isScrollControlled = true,
     bool isDismissible = true,
     bool enableDrag = true,
+    bool useRootNavigator = true,
     Color? backgroundColor,
     ShapeBorder? shape,
     BoxConstraints? constraints,
@@ -103,6 +104,7 @@ class AppModalTransitions {
     HapticFeedback.lightImpact();
     return showModalBottomSheet<T>(
       context: context,
+      useRootNavigator: useRootNavigator,
       isScrollControlled: isScrollControlled,
       isDismissible: isDismissible,
       enableDrag: enableDrag,

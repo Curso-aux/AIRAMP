@@ -110,8 +110,8 @@ void main() {
     'recentAttempts': <Map<String, dynamic>>[],
   };
 
-  group('Teacher Dashboard Collapsible & Filterable Analytics Tests', () {
-    testWidgets('1. Analytics is collapsed by default and shows compact banner', (tester) async {
+  group('Teacher Dashboard Analytics Modal & Top Header Tests', () {
+    testWidgets('1. Inline analytics is removed from dashboard body; analytics is launched via top header button', (tester) async {
       await tester.pumpWidget(
         ProviderScope(
           overrides: [
@@ -129,18 +129,20 @@ void main() {
       );
       await tester.pumpAndSettle();
 
-      // Compact banner should be visible
-      expect(find.text('Performance & Analytics'), findsOneWidget);
-      expect(find.text('Show'), findsOneWidget);
-      expect(find.text('33% Pass Rate'), findsOneWidget);
+      // Inline analytics banner and "Show" toggle must NOT be present in dashboard body
+      expect(find.text('Show'), findsNothing);
+      expect(find.text('Class Performance'), findsNothing);
 
-      // The 4 KPI cards and dropdowns should NOT be visible when collapsed
+      // The 4 KPI cards should NOT be cluttering the dashboard body
       expect(find.text('Class Pass Rate'), findsNothing);
       expect(find.text('Average Score'), findsNothing);
       expect(find.text('Assigned Subjects'), findsNothing);
+
+      // Top header analytics quick launcher button must be present
+      expect(find.byTooltip('Class Performance & Analytics'), findsOneWidget);
     });
 
-    testWidgets('2. Tapping Show button expands analytics revealing filters and KPI metric cards', (tester) async {
+    testWidgets('2. Tapping top header Analytics button opens modal with filters, KPI cards, and segmented view switcher', (tester) async {
       await tester.pumpWidget(
         ProviderScope(
           overrides: [
@@ -158,32 +160,39 @@ void main() {
       );
       await tester.pumpAndSettle();
 
-      // Tap "Show" to expand analytics
-      await tester.tap(find.text('Show'));
+      // Tap the top header analytics launcher button
+      await tester.tap(find.byTooltip('Class Performance & Analytics'));
       await tester.pumpAndSettle();
 
-      // Header should show "Hide" button
-      expect(find.text('Hide'), findsOneWidget);
+      // Modal title and close button should be visible
+      expect(find.text('Class Performance'), findsOneWidget);
+      expect(find.byTooltip('Close Analytics'), findsOneWidget);
+
+      // View mode segmented pills should be rendered
+      expect(find.text('Cards'), findsOneWidget);
+      expect(find.text('Donut'), findsOneWidget);
+      expect(find.text('Mastery'), findsOneWidget);
+      expect(find.text('Heatmap'), findsOneWidget);
 
       // Dropdowns should be present
       expect(find.text('All Sections'), findsOneWidget);
       expect(find.text('All Students'), findsOneWidget);
 
-      // All 4 KPI metric cards should now be rendered
+      // All 4 KPI metric cards should now be rendered inside the modal
       expect(find.text('Class Pass Rate'), findsOneWidget);
       expect(find.text('Average Score'), findsOneWidget);
       expect(find.text('Assigned Subjects'), findsOneWidget);
       expect(find.text('Enrolled Students'), findsOneWidget);
 
-      // Tapping "Hide" collapses the card back down
-      await tester.tap(find.text('Hide'));
+      // Tapping close button dismisses the modal
+      await tester.tap(find.byTooltip('Close Analytics'));
       await tester.pumpAndSettle();
 
-      expect(find.text('Show'), findsOneWidget);
+      expect(find.byTooltip('Close Analytics'), findsNothing);
       expect(find.text('Class Pass Rate'), findsNothing);
     });
 
-    testWidgets('3. Selecting a section filter cascades to available students and updates metrics', (tester) async {
+    testWidgets('3. In Analytics Modal, selecting a section filter cascades to available students and updates metrics', (tester) async {
       await tester.pumpWidget(
         ProviderScope(
           overrides: [
@@ -201,8 +210,8 @@ void main() {
       );
       await tester.pumpAndSettle();
 
-      // Expand analytics
-      await tester.tap(find.text('Show'));
+      // Open analytics modal via top header launcher
+      await tester.tap(find.byTooltip('Class Performance & Analytics'));
       await tester.pumpAndSettle();
 
       // Open Section dropdown
@@ -223,6 +232,10 @@ void main() {
 
       expect(find.text('All Sections'), findsOneWidget);
       expect(find.byTooltip('Reset Analytics Filter'), findsNothing);
+
+      // Close modal
+      await tester.tap(find.byTooltip('Close Analytics'));
+      await tester.pumpAndSettle();
     });
   });
 
@@ -272,6 +285,105 @@ void main() {
       expect(find.text('Earth & Life Science'), findsOneWidget);
 
       expect(errorDetails, isNull);
+    });
+
+    testWidgets('5. Teacher Dashboard renders persistent sticky header with profile on left, notifications on right, and without bulky name', (tester) async {
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [
+            authProvider.overrideWith(() => MockAuthNotifier(sampleTeacher)),
+            teacherDashboardProvider.overrideWith(() => _FakeTeacherDashboardNotifier(defaultStats)),
+            teacherStudentsProvider.overrideWith(() => _FakeTeacherStudentsNotifier(sampleStudents)),
+            teacherHandledSectionsProvider.overrideWith((ref) async => ['STEM 12-A', 'STEM 12-B']),
+            teacherHandledSectionsDetailsProvider.overrideWith((ref) async => []),
+            teacherSubjectsProvider.overrideWith(() => TeacherSubjectsNotifier()),
+          ],
+          child: const MaterialApp(
+            home: TeacherDashboardScreen(),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      // Profile avatar button is present on the left
+      final profileFinder = find.byTooltip('Faculty Profile & Settings');
+      expect(profileFinder, findsOneWidget);
+
+      // Notification bell is present on the right
+      final notifFinder = find.byTooltip('Activity Notifications');
+      expect(notifFinder, findsOneWidget);
+
+      // Institutional badge is present
+      expect(find.text('FACULTY PORTAL'), findsOneWidget);
+      expect(find.text('DepEd SHS'), findsOneWidget);
+
+      // The bulky user name is NOT rendered in the header
+      expect(find.text(sampleTeacher.fullName), findsNothing);
+
+      // Verify profile is to the left of the notification button
+      final profileOffset = tester.getTopLeft(profileFinder);
+      final notifOffset = tester.getTopLeft(notifFinder);
+      expect(profileOffset.dx, lessThan(notifOffset.dx));
+
+      // Scroll down substantially
+      await tester.drag(find.byType(SingleChildScrollView).first, const Offset(0, -300));
+      await tester.pumpAndSettle();
+
+      // The header items remain pinned and visible at the exact same top position
+      expect(profileFinder, findsOneWidget);
+      expect(notifFinder, findsOneWidget);
+      expect(tester.getTopLeft(profileFinder).dy, equals(profileOffset.dy));
+      expect(tester.getTopLeft(notifFinder).dy, equals(notifOffset.dy));
+    });
+
+    testWidgets('6. Teacher Dashboard renders Analytics button beside notification at top and tapping it opens Analytics Modal', (tester) async {
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [
+            authProvider.overrideWith(() => MockAuthNotifier(sampleTeacher)),
+            teacherDashboardProvider.overrideWith(() => _FakeTeacherDashboardNotifier(defaultStats)),
+            teacherStudentsProvider.overrideWith(() => _FakeTeacherStudentsNotifier(sampleStudents)),
+            teacherHandledSectionsProvider.overrideWith((ref) async => ['STEM 12-A', 'STEM 12-B']),
+            teacherHandledSectionsDetailsProvider.overrideWith((ref) async => []),
+            teacherSubjectsProvider.overrideWith(() => TeacherSubjectsNotifier()),
+          ],
+          child: const MaterialApp(
+            home: TeacherDashboardScreen(),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      // Find analytics button in the top header beside notification
+      final analyticsButton = find.byTooltip('Class Performance & Analytics');
+      expect(analyticsButton, findsOneWidget);
+
+      final notifFinder = find.byTooltip('Activity Notifications');
+      expect(notifFinder, findsOneWidget);
+
+      // Verify Analytics button is beside notification button in header
+      final analyticsOffset = tester.getTopLeft(analyticsButton);
+      final notifOffset = tester.getTopLeft(notifFinder);
+      expect(analyticsOffset.dx, lessThan(notifOffset.dx));
+      expect(analyticsOffset.dy, closeTo(notifOffset.dy, 2.0));
+
+      // Tap the Analytics button to open modal
+      await tester.tap(analyticsButton);
+      await tester.pumpAndSettle();
+
+      // Modal is now open
+      expect(find.byTooltip('Close Analytics'), findsOneWidget);
+      expect(find.text('Real-time metrics, competency mastery & section filters'), findsOneWidget);
+      expect(find.text('Class Pass Rate'), findsOneWidget);
+      expect(find.text('Average Score'), findsOneWidget);
+      expect(find.text('Assigned Subjects'), findsOneWidget);
+      expect(find.text('Enrolled Students'), findsOneWidget);
+
+      // Close modal
+      await tester.tap(find.byTooltip('Close Analytics'));
+      await tester.pumpAndSettle();
+
+      expect(find.byTooltip('Close Analytics'), findsNothing);
     });
   });
 }
