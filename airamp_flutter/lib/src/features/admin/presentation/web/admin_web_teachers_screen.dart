@@ -1516,7 +1516,10 @@ class _AdminWebTeachersScreenState extends ConsumerState<AdminWebTeachersScreen>
             ElevatedButton(
               onPressed: () async {
                 try {
-                  await ref.read(adminTeachersProvider.notifier).deleteTeacher(teacherId);
+                  await ref
+                      .read(adminTeachersProvider.notifier)
+                      .deleteTeacher(teacherId)
+                      .timeout(const Duration(seconds: 8));
                   if (context.mounted) {
                     Navigator.of(dialogCtx).pop();
                     ScaffoldMessenger.of(context).showSnackBar(

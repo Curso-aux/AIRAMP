@@ -590,18 +590,24 @@ class FirestoreService {
     final cleanDocId = docId.trim();
     if (cleanDocId.isEmpty) return;
 
-    if (isAvailable) {
+    if (isAvailable && !_useRestPrimary) {
       try {
-        await firestore.collection(collection).doc(cleanDocId).delete();
+        await firestore
+            .collection(collection)
+            .doc(cleanDocId)
+            .delete()
+            .timeout(const Duration(seconds: 3));
         return;
       } catch (e) {
         debugPrint('[FirestoreService] SDK deleteDocument error: $e');
+        await _disableSdkNetwork(e);
       }
     }
 
     try {
       final dio = _dio;
-      final url = 'https://firestore.googleapis.com/v1/projects/$projectId/databases/(default)/documents/$collection/$cleanDocId?key=$apiKey';
+      final keyParam = apiKey.isNotEmpty ? '?key=$apiKey' : '';
+      final url = 'https://firestore.googleapis.com/v1/projects/$projectId/databases/(default)/documents/$collection/$cleanDocId$keyParam';
       await dio.delete(url);
       debugPrint('[FirestoreService] Successfully deleted document $collection/$cleanDocId via REST');
     } catch (e) {
@@ -609,9 +615,16 @@ class FirestoreService {
     }
   }
 
-  /// Deletes a user document from Cloud Firestore
-  Future<void> deleteUser(String userId) async {
-    await deleteDocument('users', userId);
+  /// Deletes a user document from Cloud Firestore, ensuring both direct ID and email matches are purged
+  Future<void> deleteUser(String userId, {String? email}) async {
+    final cleanId = userId.trim();
+    if (cleanId.isNotEmpty) {
+      await deleteDocument('users', cleanId);
+    }
+    final cleanEmail = email?.trim().toLowerCase() ?? '';
+    if (cleanEmail.isNotEmpty && cleanEmail != cleanId.toLowerCase()) {
+      await deleteDocument('users', cleanEmail);
+    }
   }
 }
 

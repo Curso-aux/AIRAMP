@@ -2809,6 +2809,14 @@ class DatabaseHelper {
   /// clears quiz and progress records, and deletes from Cloud Firestore.
   Future<void> deleteStudent(String studentId) async {
     final db = await database;
+    String? email;
+    try {
+      final userRows = await db.query('users', where: 'id = ?', whereArgs: [studentId], limit: 1);
+      if (userRows.isNotEmpty) {
+        email = userRows.first['email'] as String?;
+      }
+    } catch (_) {}
+
     // 1. Delete course enrollments
     await db.delete('enrollments', where: 'student_id = ?', whereArgs: [studentId]);
     // 2. Delete learning outcome progress
@@ -2832,7 +2840,11 @@ class DatabaseHelper {
     await db.delete('users', where: 'id = ?', whereArgs: [studentId]);
     // 7. Delete from Cloud Firestore
     try {
-      await FirestoreService().deleteUser(studentId);
+      await FirestoreService()
+          .deleteUser(studentId, email: email)
+          .timeout(const Duration(seconds: 4), onTimeout: () {
+        debugPrint('[DatabaseHelper] Firestore deleteUser timed out for $studentId');
+      });
     } catch (e) {
       debugPrint('[DatabaseHelper] Error deleting student $studentId from Firestore: $e');
     }
@@ -4414,6 +4426,14 @@ class DatabaseHelper {
 
   Future<void> deleteTeacher(String teacherId) async {
     final db = await database;
+    String? email;
+    try {
+      final userRows = await db.query('users', where: 'id = ?', whereArgs: [teacherId], limit: 1);
+      if (userRows.isNotEmpty) {
+        email = userRows.first['email'] as String?;
+      }
+    } catch (_) {}
+
     // Unassign all subjects
     await db.update(
       'subjects',
@@ -4425,7 +4445,11 @@ class DatabaseHelper {
     await db.delete('users', where: 'id = ?', whereArgs: [teacherId]);
     // Delete from Cloud Firestore
     try {
-      await FirestoreService().deleteUser(teacherId);
+      await FirestoreService()
+          .deleteUser(teacherId, email: email)
+          .timeout(const Duration(seconds: 4), onTimeout: () {
+        debugPrint('[DatabaseHelper] Firestore deleteUser timed out for $teacherId');
+      });
     } catch (e) {
       debugPrint('[DatabaseHelper] Error deleting teacher $teacherId from Firestore: $e');
     }

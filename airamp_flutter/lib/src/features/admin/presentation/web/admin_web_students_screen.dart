@@ -1827,7 +1827,10 @@ class _AdminWebStudentsScreenState extends ConsumerState<AdminWebStudentsScreen>
                       : () async {
                           setDialogState(() => isDeleting = true);
                           try {
-                            await ref.read(adminStudentsProvider.notifier).deleteStudent(studentId);
+                            await ref
+                                .read(adminStudentsProvider.notifier)
+                                .deleteStudent(studentId)
+                                .timeout(const Duration(seconds: 8));
                             if (context.mounted) {
                               Navigator.of(dialogCtx).pop();
                               ScaffoldMessenger.of(context).showSnackBar(
