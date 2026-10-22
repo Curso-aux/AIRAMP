@@ -133,9 +133,17 @@ class _AirampAppState extends ConsumerState<AirampApp> {
       routerConfig: router,
       debugShowCheckedModeBanner: false,
       builder: (context, child) {
+        final clampedChild = child != null
+            ? MediaQuery.withClampedTextScaling(
+                minScaleFactor: 0.85,
+                maxScaleFactor: 1.15,
+                child: child,
+              )
+            : const SizedBox.shrink();
+
         return Stack(
           children: [
-            ?child,
+            clampedChild,
             const GlobalAiraFloatingOverlay(),
           ],
         );

@@ -272,6 +272,7 @@ class _StudentHomeScreenState extends ConsumerState<StudentHomeScreen> {
 
     final screenWidth = MediaQuery.of(context).size.width;
     final isDesktop = screenWidth >= 1050;
+    final isCompact = screenWidth < 400;
 
     return Scaffold(
       backgroundColor: AppTheme.background,
@@ -295,7 +296,7 @@ class _StudentHomeScreenState extends ConsumerState<StudentHomeScreen> {
           color: AppTheme.primary,
           child: SingleChildScrollView(
             padding: EdgeInsets.symmetric(
-              horizontal: isDesktop ? 32 : 20,
+              horizontal: isDesktop ? 32 : (isCompact ? 14 : 20),
               vertical: isDesktop ? 20 : 10,
             ),
             physics: const AlwaysScrollableScrollPhysics(),
@@ -308,6 +309,7 @@ class _StudentHomeScreenState extends ConsumerState<StudentHomeScreen> {
                     // Header
                     Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      crossAxisAlignment: CrossAxisAlignment.center,
                       children: [
                         Expanded(
                           child: Column(
@@ -315,28 +317,35 @@ class _StudentHomeScreenState extends ConsumerState<StudentHomeScreen> {
                             children: [
                               Text(
                                 'Welcome back,',
-                                style: TextStyle(fontSize: 14, color: AppTheme.textMuted),
+                                style: TextStyle(
+                                  fontSize: isCompact ? 13 : 14,
+                                  color: AppTheme.textMuted,
+                                ),
                               ),
                               Text(
                                 currentUser.fullName,
                                 style: TextStyle(
-                                  fontSize: 24,
+                                  fontSize: isCompact ? 20 : 24,
                                   fontWeight: FontWeight.bold,
                                   color: AppTheme.text,
                                 ),
+                                maxLines: 2,
+                                overflow: TextOverflow.ellipsis,
                               ),
                             ],
                           ),
                         ),
+                        const SizedBox(width: 8),
                         Row(
+                          mainAxisSize: MainAxisSize.min,
                           children: [
-                            _buildOfflineMaterialsHeaderButton(context, currentUser),
-                            const SizedBox(width: 8),
-                            _buildScheduleHeaderButton(context, currentUser.section),
-                            const SizedBox(width: 8),
-                            _buildBellButton(studentAnnouncements),
-                            const SizedBox(width: 8),
-                            _buildProfileAvatarButton(context, currentUser),
+                            _buildOfflineMaterialsHeaderButton(context, currentUser, isCompact: isCompact),
+                            SizedBox(width: isCompact ? 6 : 8),
+                            _buildScheduleHeaderButton(context, currentUser.section, isCompact: isCompact),
+                            SizedBox(width: isCompact ? 6 : 8),
+                            _buildBellButton(studentAnnouncements, isCompact: isCompact),
+                            SizedBox(width: isCompact ? 6 : 8),
+                            _buildProfileAvatarButton(context, currentUser, isCompact: isCompact),
                           ],
                         ),
                       ],
@@ -503,10 +512,12 @@ class _StudentHomeScreenState extends ConsumerState<StudentHomeScreen> {
                         );
                       },
                       icon: const Icon(Icons.folder_special_rounded, size: 16),
-                      label: Text(
-                        count > 0 ? 'Saved ($count)' : 'Saved Materials',
-                        style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13),
-                        overflow: TextOverflow.ellipsis,
+                      label: FittedBox(
+                        fit: BoxFit.scaleDown,
+                        child: Text(
+                          count > 0 ? 'Saved ($count)' : 'Saved Materials',
+                          style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13),
+                        ),
                       ),
                       style: OutlinedButton.styleFrom(
                         foregroundColor: AppTheme.primary,
@@ -532,9 +543,12 @@ class _StudentHomeScreenState extends ConsumerState<StudentHomeScreen> {
                         );
                       },
                       icon: const Icon(Icons.qr_code_scanner, size: 16),
-                      label: const Text(
-                        'Scan QR',
-                        style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+                      label: const FittedBox(
+                        fit: BoxFit.scaleDown,
+                        child: Text(
+                          'Scan QR',
+                          style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+                        ),
                       ),
                       style: ElevatedButton.styleFrom(
                         backgroundColor: AppTheme.primary,
@@ -558,6 +572,8 @@ class _StudentHomeScreenState extends ConsumerState<StudentHomeScreen> {
     final totalLessons = lessonsDone + pending;
     final completionPct = totalLessons > 0 ? ((lessonsDone / totalLessons) * 100).round() : 0;
     final isDark = Theme.of(context).brightness == Brightness.dark;
+    final screenWidth = MediaQuery.of(context).size.width;
+    final isCompact = screenWidth < 430;
 
     if (_isAnalyticsHidden) {
       return _buildCollapsedStrip(activeCourses, lessonsDone, pending, completionPct);
@@ -584,11 +600,11 @@ class _StudentHomeScreenState extends ConsumerState<StudentHomeScreen> {
         children: [
           // Header Bar with Title, View Toggles & Hide Button
           Padding(
-            padding: const EdgeInsets.fromLTRB(16, 12, 12, 12),
+            padding: EdgeInsets.fromLTRB(isCompact ? 12 : 16, 12, isCompact ? 10 : 12, 12),
             child: Row(
               children: [
                 Container(
-                  padding: const EdgeInsets.all(7),
+                  padding: EdgeInsets.all(isCompact ? 6 : 7),
                   decoration: BoxDecoration(
                     color: AppTheme.primary.withValues(alpha: 0.12),
                     borderRadius: BorderRadius.circular(9),
@@ -596,42 +612,82 @@ class _StudentHomeScreenState extends ConsumerState<StudentHomeScreen> {
                   child: Icon(
                     Icons.insights_rounded,
                     color: AppTheme.primary,
-                    size: 17,
+                    size: isCompact ? 16 : 17,
                   ),
                 ),
-                const SizedBox(width: 10),
+                SizedBox(width: isCompact ? 8 : 10),
                 Expanded(
-                  child: Row(
-                    children: [
-                      Text(
-                        'Learning Overview',
-                        style: TextStyle(
-                          fontSize: 15,
-                          fontWeight: FontWeight.bold,
-                          color: AppTheme.text,
-                        ),
-                      ),
-                      if (totalLessons > 0) ...[
-                        const SizedBox(width: 8),
-                        Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
-                          decoration: BoxDecoration(
-                            color: AppTheme.success.withValues(alpha: 0.12),
-                            borderRadius: BorderRadius.circular(10),
-                          ),
-                          child: Text(
-                            '$completionPct% Done',
-                            style: TextStyle(
-                              fontSize: 10,
-                              fontWeight: FontWeight.bold,
-                              color: AppTheme.success,
+                  child: isCompact
+                      ? Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Text(
+                              'Learning Overview',
+                              style: TextStyle(
+                                fontSize: 14,
+                                fontWeight: FontWeight.bold,
+                                color: AppTheme.text,
+                              ),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
                             ),
-                          ),
+                            if (totalLessons > 0) ...[
+                              const SizedBox(height: 2),
+                              Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1.5),
+                                decoration: BoxDecoration(
+                                  color: AppTheme.success.withValues(alpha: 0.12),
+                                  borderRadius: BorderRadius.circular(8),
+                                ),
+                                child: Text(
+                                  '$completionPct% Done',
+                                  style: TextStyle(
+                                    fontSize: 9.5,
+                                    fontWeight: FontWeight.bold,
+                                    color: AppTheme.success,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ],
+                        )
+                      : Row(
+                          children: [
+                            Flexible(
+                              child: Text(
+                                'Learning Overview',
+                                style: TextStyle(
+                                  fontSize: 15,
+                                  fontWeight: FontWeight.bold,
+                                  color: AppTheme.text,
+                                ),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ),
+                            if (totalLessons > 0) ...[
+                              const SizedBox(width: 8),
+                              Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+                                decoration: BoxDecoration(
+                                  color: AppTheme.success.withValues(alpha: 0.12),
+                                  borderRadius: BorderRadius.circular(10),
+                                ),
+                                child: Text(
+                                  '$completionPct% Done',
+                                  style: TextStyle(
+                                    fontSize: 10,
+                                    fontWeight: FontWeight.bold,
+                                    color: AppTheme.success,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ],
                         ),
-                      ],
-                    ],
-                  ),
                 ),
+                SizedBox(width: isCompact ? 4 : 6),
 
                 // View Mode Switcher: Cards, Pie / Donut, Progress Gauge
                 Container(
@@ -644,13 +700,13 @@ class _StudentHomeScreenState extends ConsumerState<StudentHomeScreen> {
                   child: Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      _buildViewModeButton(0, Icons.grid_view_rounded, 'Cards View'),
-                      _buildViewModeButton(1, Icons.pie_chart_rounded, 'Pie / Donut View'),
-                      _buildViewModeButton(2, Icons.trending_up_rounded, 'Progress Mastery'),
+                      _buildViewModeButton(0, Icons.grid_view_rounded, 'Cards View', isCompact: isCompact),
+                      _buildViewModeButton(1, Icons.pie_chart_rounded, 'Pie / Donut View', isCompact: isCompact),
+                      _buildViewModeButton(2, Icons.trending_up_rounded, 'Progress Mastery', isCompact: isCompact),
                     ],
                   ),
                 ),
-                const SizedBox(width: 6),
+                SizedBox(width: isCompact ? 4 : 6),
 
                 // Collapse / Hide Toggle Button
                 Tooltip(
@@ -664,10 +720,10 @@ class _StudentHomeScreenState extends ConsumerState<StudentHomeScreen> {
                       _saveAnalyticsPreferences();
                     },
                     child: Padding(
-                      padding: const EdgeInsets.all(6),
+                      padding: EdgeInsets.all(isCompact ? 5 : 6),
                       child: Icon(
                         Icons.visibility_off_outlined,
-                        size: 18,
+                        size: isCompact ? 16 : 18,
                         color: AppTheme.textMuted,
                       ),
                     ),
@@ -748,7 +804,7 @@ class _StudentHomeScreenState extends ConsumerState<StudentHomeScreen> {
     );
   }
 
-  Widget _buildViewModeButton(int index, IconData icon, String tooltip) {
+  Widget _buildViewModeButton(int index, IconData icon, String tooltip, {bool isCompact = false}) {
     final isSelected = _analyticsViewIndex == index;
     final primary = Theme.of(context).colorScheme.primary;
     return Tooltip(
@@ -763,7 +819,7 @@ class _StudentHomeScreenState extends ConsumerState<StudentHomeScreen> {
         },
         child: AnimatedContainer(
           duration: const Duration(milliseconds: 200),
-          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
+          padding: EdgeInsets.symmetric(horizontal: isCompact ? 5 : 8, vertical: isCompact ? 4 : 5),
           decoration: BoxDecoration(
             color: isSelected ? primary : Colors.transparent,
             borderRadius: BorderRadius.circular(8),
@@ -779,7 +835,7 @@ class _StudentHomeScreenState extends ConsumerState<StudentHomeScreen> {
           ),
           child: Icon(
             icon,
-            size: 15,
+            size: isCompact ? 13.5 : 15,
             color: isSelected ? Colors.black : AppTheme.textMuted,
           ),
         ),
@@ -1299,53 +1355,61 @@ class _StudentHomeScreenState extends ConsumerState<StudentHomeScreen> {
 
   Widget _buildStatCard(String title, IconData icon, String value, Color color) {
     return Container(
-      padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 12),
+      padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 8),
       decoration: BoxDecoration(
         color: AppTheme.surface,
         borderRadius: BorderRadius.circular(12),
         border: Border.all(color: AppTheme.border),
       ),
       child: Column(
+        mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(icon, color: color, size: 24),
-          const SizedBox(height: 8),
-          Text(
-            value,
-            style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: AppTheme.text),
+          Icon(icon, color: color, size: 22),
+          const SizedBox(height: 6),
+          FittedBox(
+            fit: BoxFit.scaleDown,
+            child: Text(
+              value,
+              style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: AppTheme.text),
+            ),
           ),
           const SizedBox(height: 4),
           Text(
             title,
             style: TextStyle(fontSize: 11, color: AppTheme.textSecondary),
             textAlign: TextAlign.center,
+            maxLines: 2,
+            overflow: TextOverflow.ellipsis,
           ),
         ],
       ),
     );
   }
 
-  Widget _buildScheduleHeaderButton(BuildContext context, String? section) {
+  Widget _buildScheduleHeaderButton(BuildContext context, String? section, {bool isCompact = false}) {
+    final size = isCompact ? 38.0 : 44.0;
     return Tooltip(
       message: 'View Class Timetable & Teacher Schedules',
       child: GestureDetector(
         onTap: () => showStudentTimetableModal(context, initialSection: section),
         child: Container(
-          width: 44,
-          height: 44,
+          width: size,
+          height: size,
           decoration: BoxDecoration(
             color: AppTheme.surface,
             shape: BoxShape.circle,
             border: Border.all(color: AppTheme.border),
           ),
           child: Center(
-            child: Icon(Icons.calendar_month_outlined, color: AppTheme.primary, size: 20),
+            child: Icon(Icons.calendar_month_outlined, color: AppTheme.primary, size: isCompact ? 18 : 20),
           ),
         ),
       ),
     );
   }
 
-  Widget _buildOfflineMaterialsHeaderButton(BuildContext context, dynamic currentUser) {
+  Widget _buildOfflineMaterialsHeaderButton(BuildContext context, dynamic currentUser, {bool isCompact = false}) {
+    final size = isCompact ? 38.0 : 44.0;
     return ValueListenableBuilder<List<HubMaterialItem>>(
       valueListenable: SavedMaterialsService.instance.savedMaterialsNotifier,
       builder: (context, savedList, _) {
@@ -1360,8 +1424,8 @@ class _StudentHomeScreenState extends ConsumerState<StudentHomeScreen> {
               );
             },
             child: Container(
-              width: 44,
-              height: 44,
+              width: size,
+              height: size,
               decoration: BoxDecoration(
                 color: AppTheme.surface,
                 shape: BoxShape.circle,
@@ -1370,20 +1434,20 @@ class _StudentHomeScreenState extends ConsumerState<StudentHomeScreen> {
               child: Stack(
                 alignment: Alignment.center,
                 children: [
-                  Icon(Icons.folder_special_outlined, color: AppTheme.primary, size: 21),
+                  Icon(Icons.folder_special_outlined, color: AppTheme.primary, size: isCompact ? 18 : 21),
                   if (savedList.isNotEmpty)
                     Positioned(
-                      top: 4,
-                      right: 4,
+                      top: isCompact ? 2 : 4,
+                      right: isCompact ? 2 : 4,
                       child: Container(
-                        padding: const EdgeInsets.all(3.5),
+                        padding: const EdgeInsets.all(3.0),
                         decoration: BoxDecoration(
                           color: AppTheme.primary,
                           shape: BoxShape.circle,
                         ),
                         child: Text(
                           '${savedList.length}',
-                          style: const TextStyle(color: Colors.white, fontSize: 8.5, fontWeight: FontWeight.bold),
+                          style: TextStyle(color: Colors.white, fontSize: isCompact ? 7.5 : 8.5, fontWeight: FontWeight.bold),
                         ),
                       ),
                     ),
@@ -1396,12 +1460,13 @@ class _StudentHomeScreenState extends ConsumerState<StudentHomeScreen> {
     );
   }
 
-  Widget _buildBellButton(List<Map<String, dynamic>> announcements) {
+  Widget _buildBellButton(List<Map<String, dynamic>> announcements, {bool isCompact = false}) {
+    final size = isCompact ? 38.0 : 44.0;
     return GestureDetector(
       onTap: () => _showNotificationsSheet(announcements),
       child: Container(
-        width: 44,
-        height: 44,
+        width: size,
+        height: size,
         decoration: BoxDecoration(
           color: AppTheme.surface,
           shape: BoxShape.circle,
@@ -1410,14 +1475,14 @@ class _StudentHomeScreenState extends ConsumerState<StudentHomeScreen> {
         child: Stack(
           alignment: Alignment.center,
           children: [
-            Icon(Icons.notifications_none, color: AppTheme.text, size: 22),
+            Icon(Icons.notifications_none, color: AppTheme.text, size: isCompact ? 19 : 22),
             if (announcements.isNotEmpty)
               Positioned(
-                top: 10,
-                right: 12,
+                top: isCompact ? 8 : 10,
+                right: isCompact ? 10 : 12,
                 child: Container(
-                  width: 8,
-                  height: 8,
+                  width: 7,
+                  height: 7,
                   decoration: BoxDecoration(
                     color: AppTheme.error,
                     shape: BoxShape.circle,
@@ -1430,10 +1495,11 @@ class _StudentHomeScreenState extends ConsumerState<StudentHomeScreen> {
     );
   }
 
-  Widget _buildProfileAvatarButton(BuildContext context, User currentUser) {
+  Widget _buildProfileAvatarButton(BuildContext context, User currentUser, {bool isCompact = false}) {
     return _StudentHeaderAvatarButton(
       currentUser: currentUser,
       onTap: () => context.go('/student/profile'),
+      isCompact: isCompact,
     );
   }
 
@@ -1805,10 +1871,12 @@ class _StudentHomeScreenState extends ConsumerState<StudentHomeScreen> {
 class _StudentHeaderAvatarButton extends StatefulWidget {
   final User currentUser;
   final VoidCallback onTap;
+  final bool isCompact;
 
   const _StudentHeaderAvatarButton({
     required this.currentUser,
     required this.onTap,
+    this.isCompact = false,
   });
 
   @override
@@ -1828,6 +1896,7 @@ class _StudentHeaderAvatarButtonState
     final initial = widget.currentUser.fullName.isNotEmpty
         ? widget.currentUser.fullName[0].toUpperCase()
         : '?';
+    final size = widget.isCompact ? 38.0 : 44.0;
 
     return Tooltip(
       message: 'My Profile & Account Settings',
@@ -1853,8 +1922,8 @@ class _StudentHeaderAvatarButtonState
               children: [
                 // Outer interactive accent ring line with glow
                 Container(
-                  width: 44,
-                  height: 44,
+                  width: size,
+                  height: size,
                   padding: const EdgeInsets.all(2.0),
                   decoration: BoxDecoration(
                     shape: BoxShape.circle,
@@ -1899,8 +1968,8 @@ class _StudentHeaderAvatarButtonState
                   right: -2,
                   bottom: -1,
                   child: Container(
-                    width: 16,
-                    height: 16,
+                    width: widget.isCompact ? 14 : 16,
+                    height: widget.isCompact ? 14 : 16,
                     decoration: BoxDecoration(
                       color: AppTheme.primary,
                       shape: BoxShape.circle,
@@ -1916,10 +1985,10 @@ class _StudentHeaderAvatarButtonState
                         ),
                       ],
                     ),
-                    child: const Center(
+                    child: Center(
                       child: Icon(
                         Icons.chevron_right_rounded,
-                        size: 11,
+                        size: widget.isCompact ? 9 : 11,
                         color: Colors.black,
                       ),
                     ),

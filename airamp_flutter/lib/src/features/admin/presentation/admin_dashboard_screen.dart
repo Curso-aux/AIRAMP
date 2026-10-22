@@ -279,6 +279,8 @@ class _AdminDashboardScreenState extends ConsumerState<AdminDashboardScreen> {
     required int avgScore,
   }) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
+    final screenWidth = MediaQuery.of(context).size.width;
+    final isCompact = screenWidth < 430;
 
     if (_isAnalyticsHidden) {
       return _buildCollapsedStrip(
@@ -311,11 +313,11 @@ class _AdminDashboardScreenState extends ConsumerState<AdminDashboardScreen> {
         children: [
           // Header Bar with Title, View Toggles & Hide Button
           Padding(
-            padding: const EdgeInsets.fromLTRB(16, 12, 12, 12),
+            padding: EdgeInsets.fromLTRB(isCompact ? 12 : 16, 12, isCompact ? 10 : 12, 12),
             child: Row(
               children: [
                 Container(
-                  padding: const EdgeInsets.all(7),
+                  padding: EdgeInsets.all(isCompact ? 6 : 7),
                   decoration: BoxDecoration(
                     color: AppTheme.primary.withValues(alpha: 0.12),
                     borderRadius: BorderRadius.circular(9),
@@ -323,40 +325,78 @@ class _AdminDashboardScreenState extends ConsumerState<AdminDashboardScreen> {
                   child: Icon(
                     Icons.insights_rounded,
                     color: AppTheme.primary,
-                    size: 18,
+                    size: isCompact ? 16 : 18,
                   ),
                 ),
-                const SizedBox(width: 10),
+                SizedBox(width: isCompact ? 8 : 10),
                 Expanded(
-                  child: Row(
-                    children: [
-                      Text(
-                        'Institutional Overview',
-                        style: TextStyle(
-                          fontSize: 15,
-                          fontWeight: FontWeight.bold,
-                          color: AppTheme.text,
+                  child: isCompact
+                      ? Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Text(
+                              'Institutional Overview',
+                              style: TextStyle(
+                                fontSize: 14,
+                                fontWeight: FontWeight.bold,
+                                color: AppTheme.text,
+                              ),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                            const SizedBox(height: 2),
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1.5),
+                              decoration: BoxDecoration(
+                                color: (passRate >= 75 ? AppTheme.success : AppTheme.primary).withValues(alpha: 0.12),
+                                borderRadius: BorderRadius.circular(8),
+                              ),
+                              child: Text(
+                                totalAttempts > 0 ? '$passRate% Pass Rate' : '$totalStudents Students',
+                                style: TextStyle(
+                                  fontSize: 9.5,
+                                  fontWeight: FontWeight.bold,
+                                  color: passRate >= 75 ? AppTheme.success : AppTheme.primary,
+                                ),
+                              ),
+                            ),
+                          ],
+                        )
+                      : Row(
+                          children: [
+                            Flexible(
+                              child: Text(
+                                'Institutional Overview',
+                                style: TextStyle(
+                                  fontSize: 15,
+                                  fontWeight: FontWeight.bold,
+                                  color: AppTheme.text,
+                                ),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ),
+                            const SizedBox(width: 8),
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+                              decoration: BoxDecoration(
+                                color: (passRate >= 75 ? AppTheme.success : AppTheme.primary).withValues(alpha: 0.12),
+                                borderRadius: BorderRadius.circular(10),
+                              ),
+                              child: Text(
+                                totalAttempts > 0 ? '$passRate% Pass Rate' : '$totalStudents Students',
+                                style: TextStyle(
+                                  fontSize: 10,
+                                  fontWeight: FontWeight.bold,
+                                  color: passRate >= 75 ? AppTheme.success : AppTheme.primary,
+                                ),
+                              ),
+                            ),
+                          ],
                         ),
-                      ),
-                      const SizedBox(width: 8),
-                      Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
-                        decoration: BoxDecoration(
-                          color: (passRate >= 75 ? AppTheme.success : AppTheme.primary).withValues(alpha: 0.12),
-                          borderRadius: BorderRadius.circular(10),
-                        ),
-                        child: Text(
-                          totalAttempts > 0 ? '$passRate% Pass Rate' : '$totalStudents Students',
-                          style: TextStyle(
-                            fontSize: 10,
-                            fontWeight: FontWeight.bold,
-                            color: passRate >= 75 ? AppTheme.success : AppTheme.primary,
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
                 ),
+                SizedBox(width: isCompact ? 4 : 6),
 
                 // View Mode Switcher: Cards, Donut, Benchmark
                 Container(
@@ -369,13 +409,13 @@ class _AdminDashboardScreenState extends ConsumerState<AdminDashboardScreen> {
                   child: Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      _buildAnalyticsViewModeBtn(0, Icons.grid_view_rounded, 'Cards View'),
-                      _buildAnalyticsViewModeBtn(1, Icons.pie_chart_rounded, 'Donut Breakdown'),
-                      _buildAnalyticsViewModeBtn(2, Icons.trending_up_rounded, 'Campus Benchmark'),
+                      _buildAnalyticsViewModeBtn(0, Icons.grid_view_rounded, 'Cards View', isCompact: isCompact),
+                      _buildAnalyticsViewModeBtn(1, Icons.pie_chart_rounded, 'Donut Breakdown', isCompact: isCompact),
+                      _buildAnalyticsViewModeBtn(2, Icons.trending_up_rounded, 'Campus Benchmark', isCompact: isCompact),
                     ],
                   ),
                 ),
-                const SizedBox(width: 6),
+                SizedBox(width: isCompact ? 4 : 6),
 
                 // Collapse / Hide Button
                 Tooltip(
@@ -390,10 +430,10 @@ class _AdminDashboardScreenState extends ConsumerState<AdminDashboardScreen> {
                       _saveAnalyticsPreferences();
                     },
                     child: Padding(
-                      padding: const EdgeInsets.all(6),
+                      padding: EdgeInsets.all(isCompact ? 5 : 6),
                       child: Icon(
                         Icons.visibility_off_outlined,
-                        size: 18,
+                        size: isCompact ? 16 : 18,
                         color: AppTheme.textMuted,
                       ),
                     ),
@@ -491,7 +531,7 @@ class _AdminDashboardScreenState extends ConsumerState<AdminDashboardScreen> {
     );
   }
 
-  Widget _buildAnalyticsViewModeBtn(int index, IconData icon, String tooltip) {
+  Widget _buildAnalyticsViewModeBtn(int index, IconData icon, String tooltip, {bool isCompact = false}) {
     final isSelected = _analyticsViewIndex == index;
     final primary = Theme.of(context).colorScheme.primary;
     return Tooltip(
@@ -507,7 +547,7 @@ class _AdminDashboardScreenState extends ConsumerState<AdminDashboardScreen> {
         },
         child: AnimatedContainer(
           duration: const Duration(milliseconds: 200),
-          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
+          padding: EdgeInsets.symmetric(horizontal: isCompact ? 5 : 8, vertical: isCompact ? 4 : 5),
           decoration: BoxDecoration(
             color: isSelected ? primary : Colors.transparent,
             borderRadius: BorderRadius.circular(8),
@@ -523,7 +563,7 @@ class _AdminDashboardScreenState extends ConsumerState<AdminDashboardScreen> {
           ),
           child: Icon(
             icon,
-            size: 15,
+            size: isCompact ? 13.5 : 15,
             color: isSelected ? Colors.black : AppTheme.textMuted,
           ),
         ),
