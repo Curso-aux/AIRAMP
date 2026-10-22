@@ -415,6 +415,14 @@ class _TeacherDashboardScreenState extends ConsumerState<TeacherDashboardScreen>
   Widget build(BuildContext context) {
     ref.watch(themeProvider);
     final currentUser = ref.watch(authProvider);
+    if (currentUser?.mustChangePassword == true) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (context.mounted) context.go('/teacher/profile');
+      });
+      return const Scaffold(
+        body: Center(child: CircularProgressIndicator()),
+      );
+    }
     final stats = ref.watch(teacherDashboardProvider);
     final subjects = ref.watch(teacherSubjectsProvider);
     final announcements = ref.watch(teacherAnnouncementsProvider);

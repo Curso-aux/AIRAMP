@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import '../../auth/application/auth_provider.dart';
 import '../../../core/components/swipeable_nav_scaffold.dart';
 import 'web/teacher_web_scaffold.dart';
 
@@ -11,6 +12,16 @@ class TeacherScaffold extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final currentUser = ref.watch(authProvider);
+    if (currentUser?.mustChangePassword == true) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        context.go('/teacher/profile');
+      });
+      return const Scaffold(
+        body: Center(child: CircularProgressIndicator()),
+      );
+    }
+
     final screenWidth = MediaQuery.of(context).size.width;
 
     // Responsive Desktop Web layout with Collapsible Sidebar (Screens >= 900px)

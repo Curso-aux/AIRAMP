@@ -822,15 +822,19 @@ class _QuizHistoryScreenState extends ConsumerState<QuizHistoryScreen> {
           children: [
             Row(
               children: [
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                  decoration: BoxDecoration(
-                    color: AppTheme.primary.withValues(alpha: 0.12),
-                    borderRadius: BorderRadius.circular(6),
-                  ),
-                  child: Text(
-                    subject,
-                    style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: AppTheme.primary),
+                Flexible(
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                    decoration: BoxDecoration(
+                      color: AppTheme.primary.withValues(alpha: 0.12),
+                      borderRadius: BorderRadius.circular(6),
+                    ),
+                    child: Text(
+                      subject,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: AppTheme.primary),
+                    ),
                   ),
                 ),
                 const Spacer(),
@@ -873,9 +877,13 @@ class _QuizHistoryScreenState extends ConsumerState<QuizHistoryScreen> {
                   ),
                 ),
                 const Spacer(),
-                Text(
-                  '$date · $time',
-                  style: TextStyle(fontSize: 11, color: AppTheme.textMuted),
+                Flexible(
+                  child: Text(
+                    '$date · $time',
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(fontSize: 11, color: AppTheme.textMuted),
+                  ),
                 ),
               ],
             ),

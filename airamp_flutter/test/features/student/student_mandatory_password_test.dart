@@ -1,4 +1,4 @@
-﻿import 'package:flutter/material.dart';
+import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';
@@ -24,6 +24,14 @@ void main() {
         ),
       );
       await tester.pumpAndSettle();
+
+      // Verify modal dialog appears or can be acknowledged
+      final modalBtn = find.text('Okay, I Understand');
+      if (modalBtn.evaluate().isNotEmpty) {
+        expect(find.text('Action Required: Set New Password'), findsOneWidget);
+        await tester.tap(modalBtn);
+        await tester.pumpAndSettle();
+      }
 
       // Verify dedicated header and locked title
       expect(find.text('Security Requirement'), findsOneWidget);
@@ -69,6 +77,12 @@ void main() {
         ),
       );
       await tester.pumpAndSettle();
+
+      final modalBtn = find.text('Okay, I Understand');
+      if (modalBtn.evaluate().isNotEmpty) {
+        await tester.tap(modalBtn);
+        await tester.pumpAndSettle();
+      }
 
       // Find password textfields
       final textFields = find.byType(TextField);

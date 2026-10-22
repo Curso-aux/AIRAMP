@@ -6,6 +6,7 @@ import '../domain/chat_models.dart';
 import '../../auth/application/auth_provider.dart';
 import '../../../core/api/api_client.dart';
 import '../../../core/database/database_helper.dart';
+import '../../notifications/application/notification_provider.dart';
 
 final chatRepositoryProvider = Provider<ChatRepository>((ref) {
   return ChatRepository();
@@ -299,7 +300,46 @@ class ChatNotifier extends Notifier<ChatState> {
       messagesMap[msg.conversationId] = [...list, msg];
       
       state = state.copyWith(messages: messagesMap);
+      _notifyIncomingMessage(msg);
     }
+  }
+
+  void _notifyIncomingMessage(ChatMessage msg) {
+    final currentUser = ref.read(authProvider);
+    if (currentUser == null || msg.senderId == currentUser.id) return;
+
+    // Find sender details
+    final sender = state.availableUsers.cast<ChatUser?>().firstWhere(
+      (u) => u?.id == msg.senderId,
+      orElse: () => null,
+    );
+    final senderName = sender?.fullName ?? 'Classmate';
+
+    // Find conversation details
+    final convo = state.conversations.cast<ChatConversation?>().firstWhere(
+      (c) => c?.id == msg.conversationId,
+      orElse: () => null,
+    );
+
+    final isGroup = convo?.type == 'group' || !msg.conversationId.startsWith('dm_');
+    final String title;
+    if (isGroup && convo?.name != null && convo!.name!.isNotEmpty) {
+      title = '$senderName in ${convo.name}';
+    } else {
+      title = senderName;
+    }
+
+    ref.read(notificationsProvider.notifier).addNotification(
+      userId: currentUser.id,
+      type: isGroup ? 'group_chat' : 'chat',
+      title: title,
+      message: msg.text,
+      relatedId: msg.conversationId,
+      targetRoute: '/chat/${msg.conversationId}',
+      actorId: msg.senderId,
+      actorName: senderName,
+      showBanner: true,
+    );
   }
 
   void sendMessage(String conversationId, String text) {
@@ -327,6 +367,24 @@ class ChatNotifier extends Notifier<ChatState> {
       'created_at': now,
       'is_read': 0,
     }).catchError((_) {});
+
+    // For direct conversations, create a notification for recipient in local DB
+    if (conversationId.startsWith('dm_')) {
+      final parts = conversationId.replaceFirst('dm_', '').split('_');
+      final recipientId = parts.firstWhere((id) => id != user.id, orElse: () => '');
+      if (recipientId.isNotEmpty) {
+        DatabaseHelper().createNotification(
+          userId: recipientId,
+          type: 'chat',
+          title: user.fullName,
+          message: text.trim(),
+          relatedId: conversationId,
+          targetRoute: '/chat/$conversationId',
+          actorId: user.id,
+          actorName: user.fullName,
+        ).catchError((_) => '');
+      }
+    }
 
     final messagesMap = Map<String, List<ChatMessage>>.from(state.messages);
     final list = messagesMap[conversationId] ?? [];

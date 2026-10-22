@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/components/app_toast.dart';
+import '../../../core/database/database_helper.dart';
 import '../domain/esp32_hub_models.dart';
 import '../data/saved_materials_service.dart';
 import '../data/esp32_client_service.dart';
@@ -298,6 +299,16 @@ class _StudentEsp32SyncModalState extends State<StudentEsp32SyncModal>
 
     // Persist real downloaded materials to local phone storage
     await SavedMaterialsService.instance.saveMaterials(savedResults);
+
+    try {
+      await DatabaseHelper().createNotification(
+        userId: widget.studentName,
+        type: 'offline_sync',
+        title: 'Offline Sync Complete 📦',
+        message: '${savedResults.length} learning materials saved offline. Ready to study without internet.',
+        targetRoute: '/student/home',
+      );
+    } catch (_) {}
 
     if (!mounted) return;
     setState(() {

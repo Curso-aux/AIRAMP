@@ -13,6 +13,8 @@ import '../../admin/data/admin_repository.dart';
 import '../../teacher/data/teacher_schedule_repository.dart';
 import '../data/student_repository.dart';
 import 'components/student_schedule_widget.dart';
+import 'components/student_announcements_sheet.dart';
+import '../../notifications/application/notification_provider.dart';
 import '../../esp32_hub/presentation/student_esp32_sync_modal.dart';
 import '../../esp32_hub/domain/esp32_hub_models.dart';
 import '../../esp32_hub/data/saved_materials_service.dart';
@@ -74,156 +76,7 @@ class _StudentHomeScreenState extends ConsumerState<StudentHomeScreen> {
   }
 
   void _showNotificationsSheet(List<Map<String, dynamic>> announcements) {
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.transparent,
-      builder: (ctx) => Container(
-        height: MediaQuery.of(context).size.height * 0.7,
-        decoration: BoxDecoration(
-          color: AppTheme.surface,
-          borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
-        ),
-        child: Column(
-          children: [
-            Container(
-              margin: const EdgeInsets.only(top: 12, bottom: 8),
-              width: 40,
-              height: 4,
-              decoration: BoxDecoration(
-                color: AppTheme.border,
-                borderRadius: BorderRadius.circular(2),
-              ),
-            ),
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
-              child: Row(
-                children: [
-                  Icon(Icons.notifications_active, color: AppTheme.primary, size: 22),
-                  const SizedBox(width: 8),
-                  Text(
-                    'Announcements & Notifications',
-                    style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: AppTheme.text),
-                  ),
-                  const Spacer(),
-                  IconButton(
-                    icon: Icon(Icons.close, color: AppTheme.text),
-                    onPressed: () => Navigator.pop(ctx),
-                  ),
-                ],
-              ),
-            ),
-            Divider(height: 1, color: AppTheme.border),
-            Expanded(
-              child: announcements.isEmpty
-                  ? Center(
-                      child: Text('No announcements at this time.', style: TextStyle(color: AppTheme.textMuted)),
-                    )
-                  : ListView.builder(
-                      padding: const EdgeInsets.all(16),
-                      itemCount: announcements.length,
-                      itemBuilder: (context, i) {
-                        final a = announcements[i];
-                        final priority = a['priority']?.toString() ?? 'medium';
-                        final isHigh = priority.toLowerCase() == 'high';
-                        return Container(
-                          margin: const EdgeInsets.only(bottom: 12),
-                          padding: const EdgeInsets.all(16),
-                          decoration: BoxDecoration(
-                            color: AppTheme.background,
-                            borderRadius: BorderRadius.circular(12),
-                            border: Border.all(color: isHigh ? AppTheme.warning : AppTheme.border),
-                          ),
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Builder(
-                                builder: (_) {
-                                  final sec = a['section']?.toString();
-                                  final hasSpecificSec = sec != null &&
-                                      sec.isNotEmpty &&
-                                      sec != 'All Sections' &&
-                                      sec != 'All Handled Sections';
-                                  return Row(
-                                    children: [
-                                      Container(
-                                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                                        decoration: BoxDecoration(
-                                          color: isHigh
-                                              ? AppTheme.warning.withValues(alpha: 0.2)
-                                              : AppTheme.primary.withValues(alpha: 0.1),
-                                          borderRadius: BorderRadius.circular(4),
-                                        ),
-                                        child: Text(
-                                          priority.toUpperCase(),
-                                          style: TextStyle(
-                                            fontSize: 10,
-                                            fontWeight: FontWeight.bold,
-                                            color: isHigh ? AppTheme.warning : AppTheme.primary,
-                                          ),
-                                        ),
-                                      ),
-                                      if (hasSpecificSec) ...[
-                                        const SizedBox(width: 6),
-                                        Container(
-                                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                                          decoration: BoxDecoration(
-                                            color: AppTheme.surface,
-                                            borderRadius: BorderRadius.circular(4),
-                                            border: Border.all(color: AppTheme.border),
-                                          ),
-                                          child: Text(
-                                            'Section: $sec',
-                                            style: TextStyle(
-                                              fontSize: 10,
-                                              fontWeight: FontWeight.w600,
-                                              color: AppTheme.textSecondary,
-                                            ),
-                                          ),
-                                        ),
-                                      ],
-                                      const Spacer(),
-                                      Text(
-                                        a['created_at'] != null ? a['created_at'].toString().split('T').first : '',
-                                        style: TextStyle(color: AppTheme.textMuted, fontSize: 11),
-                                      ),
-                                    ],
-                                  );
-                                },
-                              ),
-                              const SizedBox(height: 8),
-                              Text(
-                                a['title']?.toString() ?? '',
-                                style: TextStyle(fontWeight: FontWeight.bold, color: AppTheme.text, fontSize: 15),
-                              ),
-                              const SizedBox(height: 6),
-                              Text(
-                                a['message']?.toString() ?? '',
-                                style: TextStyle(color: AppTheme.textSecondary, fontSize: 13, height: 1.4),
-                              ),
-                              if (a['author_name'] != null && a['author_name'].toString().isNotEmpty) ...[
-                                const SizedBox(height: 8),
-                                Row(
-                                  children: [
-                                    Icon(Icons.person_outline, size: 12, color: AppTheme.textMuted),
-                                    const SizedBox(width: 4),
-                                    Text(
-                                      'Posted by ${a['author_name']}',
-                                      style: TextStyle(fontSize: 11, color: AppTheme.textMuted, fontStyle: FontStyle.italic),
-                                    ),
-                                  ],
-                                ),
-                              ],
-                            ],
-                          ),
-                        );
-                      },
-                    ),
-            ),
-          ],
-        ),
-      ),
-    );
+    showStudentAnnouncementsSheet(context, announcements);
   }
 
   @override
@@ -233,8 +86,18 @@ class _StudentHomeScreenState extends ConsumerState<StudentHomeScreen> {
     final courses = ref.watch(studentCoursesProvider);
     final progress = ref.watch(studentProgressProvider);
     final allAnnouncements = ref.watch(announcementsProvider);
+    final unreadNotifs = ref.watch(unreadNotificationCountProvider);
 
     if (currentUser == null) return const SizedBox.shrink();
+
+    if (currentUser.mustChangePassword) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (context.mounted) context.go('/student/profile');
+      });
+      return const Scaffold(
+        body: Center(child: CircularProgressIndicator()),
+      );
+    }
 
     final activeCourses = courses.length;
     final lessonsDone = progress['completed'] ?? 0;
@@ -343,7 +206,7 @@ class _StudentHomeScreenState extends ConsumerState<StudentHomeScreen> {
                             SizedBox(width: isCompact ? 6 : 8),
                             _buildScheduleHeaderButton(context, currentUser.section, isCompact: isCompact),
                             SizedBox(width: isCompact ? 6 : 8),
-                            _buildBellButton(studentAnnouncements, isCompact: isCompact),
+                            _buildBellButton(studentAnnouncements, unreadNotifs: unreadNotifs, isCompact: isCompact),
                             SizedBox(width: isCompact ? 6 : 8),
                             _buildProfileAvatarButton(context, currentUser, isCompact: isCompact),
                           ],
@@ -986,14 +849,19 @@ class _StudentHomeScreenState extends ConsumerState<StudentHomeScreen> {
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  Text(
-                    label,
-                    style: TextStyle(
-                      fontSize: 12,
-                      fontWeight: FontWeight.w600,
-                      color: AppTheme.text,
+                  Expanded(
+                    child: Text(
+                      label,
+                      style: TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
+                        color: AppTheme.text,
+                      ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
                     ),
                   ),
+                  const SizedBox(width: 4),
                   Text(
                     value,
                     style: TextStyle(
@@ -1056,27 +924,30 @@ class _StudentHomeScreenState extends ConsumerState<StudentHomeScreen> {
         Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
-            Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  'Curriculum Mastery',
-                  style: TextStyle(
-                    fontSize: 13,
-                    fontWeight: FontWeight.bold,
-                    color: AppTheme.text,
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Curriculum Mastery',
+                    style: TextStyle(
+                      fontSize: 13,
+                      fontWeight: FontWeight.bold,
+                      color: AppTheme.text,
+                    ),
                   ),
-                ),
-                const SizedBox(height: 2),
-                Text(
-                  '$lessonsDone of $total lessons completed',
-                  style: TextStyle(
-                    fontSize: 11,
-                    color: AppTheme.textSecondary,
+                  const SizedBox(height: 2),
+                  Text(
+                    '$lessonsDone of $total lessons completed',
+                    style: TextStyle(
+                      fontSize: 11,
+                      color: AppTheme.textSecondary,
+                    ),
                   ),
-                ),
-              ],
+                ],
+              ),
             ),
+            const SizedBox(width: 8),
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 3),
               decoration: BoxDecoration(
@@ -1176,15 +1047,21 @@ class _StudentHomeScreenState extends ConsumerState<StudentHomeScreen> {
         Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
-            Row(
-              children: [
-                Icon(Icons.quiz_outlined, color: AppTheme.primary, size: 20),
-                const SizedBox(width: 8),
-                Text(
-                  'Assigned Quizzes',
-                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: AppTheme.text),
-                ),
-              ],
+            Expanded(
+              child: Row(
+                children: [
+                  Icon(Icons.quiz_outlined, color: AppTheme.primary, size: 20),
+                  const SizedBox(width: 8),
+                  Flexible(
+                    child: Text(
+                      'Assigned Quizzes',
+                      style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: AppTheme.text),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+                ],
+              ),
             ),
             if (pendingQuizzes.isNotEmpty)
               Container(
@@ -1253,15 +1130,21 @@ class _StudentHomeScreenState extends ConsumerState<StudentHomeScreen> {
         Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
-            Row(
-              children: [
-                Icon(Icons.campaign, color: AppTheme.warning, size: 20),
-                const SizedBox(width: 8),
-                Text(
-                  'Announcements',
-                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: AppTheme.text),
-                ),
-              ],
+            Expanded(
+              child: Row(
+                children: [
+                  Icon(Icons.campaign, color: AppTheme.warning, size: 20),
+                  const SizedBox(width: 8),
+                  Flexible(
+                    child: Text(
+                      'Announcements',
+                      style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: AppTheme.text),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+                ],
+              ),
             ),
             if (studentAnnouncements.isNotEmpty)
               GestureDetector(
@@ -1460,8 +1343,15 @@ class _StudentHomeScreenState extends ConsumerState<StudentHomeScreen> {
     );
   }
 
-  Widget _buildBellButton(List<Map<String, dynamic>> announcements, {bool isCompact = false}) {
+  Widget _buildBellButton(
+    List<Map<String, dynamic>> announcements, {
+    int unreadNotifs = 0,
+    bool isCompact = false,
+  }) {
     final size = isCompact ? 38.0 : 44.0;
+    final hasUnread = unreadNotifs > 0;
+    final hasAnnouncements = announcements.isNotEmpty;
+
     return GestureDetector(
       onTap: () => _showNotificationsSheet(announcements),
       child: Container(
@@ -1475,8 +1365,32 @@ class _StudentHomeScreenState extends ConsumerState<StudentHomeScreen> {
         child: Stack(
           alignment: Alignment.center,
           children: [
-            Icon(Icons.notifications_none, color: AppTheme.text, size: isCompact ? 19 : 22),
-            if (announcements.isNotEmpty)
+            Icon(Icons.notifications_none_rounded, color: AppTheme.text, size: isCompact ? 19 : 22),
+            if (hasUnread)
+              Positioned(
+                top: isCompact ? 4 : 6,
+                right: isCompact ? 4 : 6,
+                child: Container(
+                  padding: const EdgeInsets.all(3),
+                  decoration: BoxDecoration(
+                    color: AppTheme.error,
+                    shape: BoxShape.circle,
+                  ),
+                  constraints: const BoxConstraints(minWidth: 16, minHeight: 16),
+                  child: Center(
+                    child: Text(
+                      unreadNotifs > 9 ? '9+' : '$unreadNotifs',
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 9,
+                        fontWeight: FontWeight.bold,
+                        height: 1,
+                      ),
+                    ),
+                  ),
+                ),
+              )
+            else if (hasAnnouncements)
               Positioned(
                 top: isCompact ? 8 : 10,
                 right: isCompact ? 10 : 12,
@@ -1484,7 +1398,7 @@ class _StudentHomeScreenState extends ConsumerState<StudentHomeScreen> {
                   width: 7,
                   height: 7,
                   decoration: BoxDecoration(
-                    color: AppTheme.error,
+                    color: AppTheme.primary,
                     shape: BoxShape.circle,
                   ),
                 ),

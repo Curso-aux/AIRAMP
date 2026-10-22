@@ -31,7 +31,6 @@ class AdminWebAnalyticsView extends ConsumerWidget {
     final passedAttempts = analytics['passedAttempts'] as int? ?? 0;
     final passRate = analytics['passRate'] as int? ?? 0;
     final avgScore = analytics['avgScore'] as int? ?? 0;
-    final studentTeacherRatio = analytics['studentTeacherRatio'] as String? ?? (totalTeachers > 0 ? (totalStudents / totalTeachers).toStringAsFixed(1) : '0');
     final unassignedStudents = analytics['unassignedStudents'] as int? ?? 0;
     final demographics = (analytics['demographics'] as Map<dynamic, dynamic>?)?.cast<String, dynamic>() ?? {};
     final bool hasData = analytics['hasData'] as bool? ?? (totalUsers > 0 || totalAttempts > 0);

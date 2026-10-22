@@ -1134,7 +1134,6 @@ class _AdminWebStudentsScreenState extends ConsumerState<AdminWebStudentsScreen>
         final avgScore = s['avg_score'] as int? ?? 0;
 
         final hasSection = section != 'Unassigned';
-        final isSpecial = studentType.toLowerCase() != 'regular' || !hasSection;
 
         final isDark = Theme.of(context).brightness == Brightness.dark;
 

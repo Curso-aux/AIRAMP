@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:flutter/foundation.dart';
+import '../../../core/components/auth/required_change_password_dialog.dart';
 import '../../../core/components/otp_verification_dialog.dart';
 import '../../../core/components/skeleton_loader.dart';
 import '../../../core/services/otp_service.dart';
@@ -18,7 +19,8 @@ class StudentProfileScreen extends ConsumerStatefulWidget {
       _StudentProfileScreenState();
 }
 
-class _StudentProfileScreenState extends ConsumerState<StudentProfileScreen> {
+class _StudentProfileScreenState extends ConsumerState<StudentProfileScreen>
+    with WidgetsBindingObserver {
   bool _isEditing = false;
   bool _showPasswordForm = false;
   bool _obscureNewPassword = true;
@@ -37,6 +39,7 @@ class _StudentProfileScreenState extends ConsumerState<StudentProfileScreen> {
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     final user = ref.read(authProvider);
     _fullNameController = TextEditingController(text: user?.fullName ?? '');
     _usernameController = TextEditingController(text: user?.username ?? '');
@@ -47,6 +50,21 @@ class _StudentProfileScreenState extends ConsumerState<StudentProfileScreen> {
 
     if (user?.mustChangePassword == true) {
       _showPasswordForm = true;
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted && !RequiredChangePasswordDialog.hasSeenInThisSession) {
+          RequiredChangePasswordDialog.show(context, isTeacher: false);
+        }
+      });
+    }
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      final user = ref.read(authProvider);
+      if (user?.mustChangePassword == true && mounted) {
+        RequiredChangePasswordDialog.show(context, isTeacher: false);
+      }
     }
   }
 
@@ -56,6 +74,7 @@ class _StudentProfileScreenState extends ConsumerState<StudentProfileScreen> {
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     _newPasswordController.removeListener(_onPasswordFieldsChanged);
     _confirmPasswordController.removeListener(_onPasswordFieldsChanged);
     _fullNameController.dispose();
@@ -209,30 +228,19 @@ class _StudentProfileScreenState extends ConsumerState<StudentProfileScreen> {
       return;
     }
 
-    // MANDATORY FIRST-TIME PASSWORD CHANGE: INSTANT UPDATE WITHOUT OTP!
-    if (user.mustChangePassword) {
-      setState(() => _isSavingPassword = true);
+    String targetEmail = user.email.trim();
+    if (targetEmail.isEmpty) {
+      final inputEmail = await _promptForEmailDialog(context);
+      if (inputEmail == null || inputEmail.trim().isEmpty) return;
+      targetEmail = inputEmail.trim();
       try {
-        await ref.read(authProvider.notifier).updateProfile(password: newPass);
-        if (!mounted) return;
-        _newPasswordController.clear();
-        _confirmPasswordController.clear();
-        _showSuccessUnlockedDialog(isTeacher: false);
-      } catch (e) {
-        if (!mounted) return;
-        _showAlert('Error', 'Failed to update password: $e');
-      } finally {
-        if (mounted) setState(() => _isSavingPassword = false);
-      }
-      return;
+        await ref.read(authProvider.notifier).updateProfile(email: targetEmail);
+      } catch (_) {}
     }
 
-    if (user.email.isEmpty) {
-      _showAlert('Error', 'User email could not be determined.');
-      return;
-    }
+    if (!mounted) return;
 
-    // Show sending progress indicator for voluntary password change
+    // Show sending progress indicator
     showDialog(
       context: context,
       barrierDismissible: false,
@@ -247,7 +255,7 @@ class _StudentProfileScreenState extends ConsumerState<StudentProfileScreen> {
               const SizedBox(width: 20),
               Expanded(
                 child: Text(
-                  'Sending verification code to your email...',
+                  'Sending verification code via SMTP to ${OtpService.maskEmail(targetEmail)}...',
                   style: TextStyle(color: AppTheme.text, fontSize: 14),
                 ),
               ),
@@ -259,7 +267,7 @@ class _StudentProfileScreenState extends ConsumerState<StudentProfileScreen> {
 
     final otpResult = await OtpService().requestOtpDirect(
       userId: user.id,
-      email: user.email,
+      email: targetEmail,
       fullName: user.fullName,
       role: user.role,
     );
@@ -275,7 +283,7 @@ class _StudentProfileScreenState extends ConsumerState<StudentProfileScreen> {
     // Prompt user for OTP verification
     final verified = await OtpVerificationDialog.show(
       context: context,
-      email: user.email,
+      email: targetEmail,
       userId: user.id,
       fullName: user.fullName,
       role: user.role,
@@ -288,7 +296,7 @@ class _StudentProfileScreenState extends ConsumerState<StudentProfileScreen> {
       onResend: () async {
         final res = await OtpService().requestOtpDirect(
           userId: user.id,
-          email: user.email,
+          email: targetEmail,
           fullName: user.fullName,
           role: user.role,
         );
@@ -298,18 +306,88 @@ class _StudentProfileScreenState extends ConsumerState<StudentProfileScreen> {
 
     if (verified == true) {
       final wasMustChange = user.mustChangePassword;
-      await ref.read(authProvider.notifier).updateProfile(password: newPass);
-      if (!mounted) return;
-      setState(() => _showPasswordForm = false);
-      _newPasswordController.clear();
-      _confirmPasswordController.clear();
+      setState(() => _isSavingPassword = true);
+      try {
+        await ref.read(authProvider.notifier).updateProfile(password: newPass);
+        if (!mounted) return;
+        setState(() => _showPasswordForm = false);
+        _newPasswordController.clear();
+        _confirmPasswordController.clear();
 
-      if (wasMustChange) {
-        _showSuccessUnlockedDialog(isTeacher: false);
-      } else {
-        _showAlert('Success', 'Password changed successfully!');
+        if (wasMustChange) {
+          _showSuccessUnlockedDialog(isTeacher: false);
+        } else {
+          _showAlert('Success', 'Password changed successfully!');
+        }
+      } catch (e) {
+        if (!mounted) return;
+        _showAlert('Error', 'Failed to update password: $e');
+      } finally {
+        if (mounted) setState(() => _isSavingPassword = false);
       }
     }
+  }
+
+  Future<String?> _promptForEmailDialog(BuildContext context) async {
+    final emailCtrl = TextEditingController();
+    return showDialog<String>(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: AppTheme.surface,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: Text(
+          'Email Required',
+          style: TextStyle(color: AppTheme.text, fontWeight: FontWeight.bold),
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'Please enter your email address to receive your 6-digit verification code via SMTP:',
+              style: TextStyle(color: AppTheme.textSecondary, fontSize: 13),
+            ),
+            const SizedBox(height: 14),
+            TextField(
+              controller: emailCtrl,
+              keyboardType: TextInputType.emailAddress,
+              style: TextStyle(color: AppTheme.text, fontSize: 14),
+              decoration: InputDecoration(
+                hintText: 'example@gmail.com',
+                prefixIcon: Icon(Icons.email_outlined, color: AppTheme.primary, size: 20),
+                filled: true,
+                fillColor: AppTheme.inputBg,
+                border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(null),
+            child: Text('Cancel', style: TextStyle(color: AppTheme.textMuted)),
+          ),
+          ElevatedButton(
+            onPressed: () {
+              final text = emailCtrl.text.trim();
+              if (text.contains('@') && text.contains('.')) {
+                Navigator.of(ctx).pop(text);
+              } else {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text('Please enter a valid email address.')),
+                );
+              }
+            },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppTheme.primary,
+              foregroundColor: Colors.black,
+            ),
+            child: const Text('Proceed', style: TextStyle(fontWeight: FontWeight.bold)),
+          ),
+        ],
+      ),
+    );
   }
 
   void _showMustChangePasswordBackAlert({required bool isTeacher}) {
@@ -597,6 +675,16 @@ class _StudentProfileScreenState extends ConsumerState<StudentProfileScreen> {
 
   @override
   Widget build(BuildContext context) {
+    ref.listen<User?>(authProvider, (prev, next) {
+      if (next?.mustChangePassword == true && !RequiredChangePasswordDialog.hasSeenInThisSession) {
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (mounted) {
+            RequiredChangePasswordDialog.show(context, isTeacher: false);
+          }
+        });
+      }
+    });
+
     final currentUser = ref.watch(authProvider);
     final themeState = ref.watch(themeProvider);
 
@@ -796,6 +884,63 @@ class _StudentProfileScreenState extends ConsumerState<StudentProfileScreen> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
+                      // SMTP Verification Info Badge
+                      Container(
+                        margin: const EdgeInsets.only(bottom: 16),
+                        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                        decoration: BoxDecoration(
+                          color: AppTheme.primary.withValues(alpha: 0.08),
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(
+                            color: AppTheme.primary.withValues(alpha: 0.3),
+                          ),
+                        ),
+                        child: Row(
+                          children: [
+                            Container(
+                              padding: const EdgeInsets.all(8),
+                              decoration: BoxDecoration(
+                                color: AppTheme.primary.withValues(alpha: 0.15),
+                                shape: BoxShape.circle,
+                              ),
+                              child: Icon(
+                                Icons.mark_email_read_rounded,
+                                size: 18,
+                                color: AppTheme.primary,
+                              ),
+                            ),
+                            const SizedBox(width: 12),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    'SMTP Email Verification',
+                                    style: TextStyle(
+                                      fontSize: 12,
+                                      fontWeight: FontWeight.bold,
+                                      color: AppTheme.primary,
+                                      letterSpacing: 0.3,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 2),
+                                  Text(
+                                    currentUser.email.isNotEmpty
+                                        ? 'A 6-digit code will be sent to ${OtpService.maskEmail(currentUser.email)} via SMTP to verify and unlock your account.'
+                                        : 'A 6-digit verification code will be sent via SMTP to verify your account.',
+                                    style: TextStyle(
+                                      fontSize: 11.5,
+                                      color: AppTheme.textSecondary,
+                                      height: 1.3,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+
                       Text(
                         'Create New Password',
                         style: TextStyle(

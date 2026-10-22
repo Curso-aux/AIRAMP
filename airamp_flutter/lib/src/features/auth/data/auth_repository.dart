@@ -73,9 +73,18 @@ class AuthRepository {
 
     if (cloudUser != null) {
       final cloudId = cloudUser['id']?.toString() ?? 'usr_${DateTime.now().millisecondsSinceEpoch}';
-      final localCandidate = candidateRows.where((r) => r['id'] == cloudId).firstOrNull;
-      final rawMustChange = cloudUser['must_change_password'] ?? (localCandidate != null ? localCandidate['must_change_password'] : null);
-      final mustChangeVal = (rawMustChange == 1 || rawMustChange == true || rawMustChange == '1') ? 1 : 0;
+      final cloudEmail = (cloudUser['email'] as String? ?? '').toLowerCase().trim();
+      final localCandidate = candidateRows.where((r) =>
+          r['id'] == cloudId ||
+          (cloudEmail.isNotEmpty && (r['email'] as String? ?? '').toLowerCase().trim() == cloudEmail)).firstOrNull;
+      final cloudMust = cloudUser['must_change_password'] == 1 ||
+          cloudUser['must_change_password'] == true ||
+          cloudUser['must_change_password'] == '1';
+      final localMust = localCandidate != null &&
+          (localCandidate['must_change_password'] == 1 ||
+           localCandidate['must_change_password'] == true ||
+           localCandidate['must_change_password'] == '1');
+      final mustChangeVal = (cloudMust || localMust) ? 1 : 0;
 
       final cloudDbRow = <String, Object?>{
         'id': cloudId,

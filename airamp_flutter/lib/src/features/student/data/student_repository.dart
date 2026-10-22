@@ -4,6 +4,7 @@ import '../../../core/utils/cache_manager.dart';
 import '../../auth/application/auth_provider.dart';
 import '../../admin/data/admin_repository.dart';
 import '../../teacher/data/teacher_repository.dart';
+import '../../notifications/application/notification_provider.dart';
 
 // --- Student Section Details ---
 final studentSectionDetailsProvider = FutureProvider<Map<String, dynamic>?>((ref) async {
@@ -326,6 +327,17 @@ class StudentQuizAttemptsNotifier extends Notifier<List<Map<String, dynamic>>> {
       selectedAnswers: selectedAnswers,
     );
 
+    // Notify student of completed assessment
+    ref.read(notificationsProvider.notifier).addNotification(
+      userId: studentId,
+      type: 'quiz',
+      title: isPassed ? 'Assessment Passed! 🎉' : 'Assessment Submitted',
+      message: 'You scored $score / $totalQuestions (${percentage.toStringAsFixed(0)}%) on your assessment.',
+      targetRoute: '/student/history',
+      relatedId: quizId?.toString(),
+      showBanner: true,
+    );
+
     await loadAttempts(subjectId: _activeSubjectFilter);
     ref.invalidate(studentQuizAssignmentsProvider);
     ref.invalidate(studentCoursesProvider);
@@ -369,6 +381,17 @@ class StudentQuizAttemptsNotifier extends Notifier<List<Map<String, dynamic>>> {
       isPassed: isPassed,
       durationSeconds: durationSeconds,
       selectedAnswers: selectedAnswers,
+    );
+
+    // Notify student of completed assessment
+    ref.read(notificationsProvider.notifier).addNotification(
+      userId: studentId,
+      type: 'quiz',
+      title: isPassed ? 'Assessment Passed! 🎉' : 'Assessment Submitted',
+      message: 'You scored $score / $totalQuestions (${percentage.toStringAsFixed(0)}%) on your assessment.',
+      targetRoute: '/student/history',
+      relatedId: quizId?.toString(),
+      showBanner: true,
     );
 
     await loadAttempts(subjectId: _activeSubjectFilter);

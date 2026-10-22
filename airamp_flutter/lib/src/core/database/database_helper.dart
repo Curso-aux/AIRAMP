@@ -7,6 +7,7 @@ import 'package:sqflite/sqflite.dart';
 import 'package:sqflite_common_ffi_web/sqflite_ffi_web.dart';
 import '../utils/cache_manager.dart';
 import '../utils/section_key_helper.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'firestore_service.dart';
 import '../services/email_service.dart';
 import '../../features/teacher/domain/item_analysis_model.dart';
@@ -116,6 +117,9 @@ class DatabaseHelper {
           actor_name TEXT
         )
       ''');
+    } catch (_) {}
+    try {
+      await db.execute('ALTER TABLE notifications ADD COLUMN target_route TEXT');
     } catch (_) {}
     try {
       await db.execute("ALTER TABLE users ADD COLUMN school_id TEXT DEFAULT 'sch_main'");
@@ -438,6 +442,7 @@ class DatabaseHelper {
         grade TEXT,
         student_type TEXT DEFAULT 'regular',
         special_notes TEXT,
+        must_change_password INTEGER DEFAULT 0,
         created_at TEXT NOT NULL
       )
     ''');
@@ -4356,6 +4361,11 @@ class DatabaseHelper {
     };
 
     await db.update('users', updates, where: 'id = ?', whereArgs: [userId]);
+    try {
+      await db.update('sessions', {'must_change_password': 1}, where: 'user_id = ?', whereArgs: [userId]);
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setBool('must_change_password_$userId', true);
+    } catch (_) {}
 
     try {
       await FirestoreService().saveUser({'id': userId, ...updates});
@@ -4398,11 +4408,20 @@ class DatabaseHelper {
         final salt = generateSalt();
         updates['password'] = hashPassword(rawPass, salt);
         updates['password_salt'] = salt;
+        updates['must_change_password'] = 1;
+        try {
+          await db.update('sessions', {'must_change_password': 1}, where: 'user_id = ?', whereArgs: [teacherId]);
+          final prefs = await SharedPreferences.getInstance();
+          await prefs.setBool('must_change_password_$teacherId', true);
+        } catch (_) {}
       }
     }
 
     if (updates.isNotEmpty) {
       await db.update('users', updates, where: 'id = ?', whereArgs: [teacherId]);
+      try {
+        await FirestoreService().saveUser({'id': teacherId, ...updates});
+      } catch (_) {}
     }
 
     final teacherRows = await db.query('users', columns: ['full_name'], where: 'id = ?', whereArgs: [teacherId]);
@@ -6186,12 +6205,13 @@ class DatabaseHelper {
 
   // ── Notifications Management ──────────────────────────────
 
-  Future<void> createNotification({
+  Future<String> createNotification({
     required String userId,
     required String type,
     required String title,
     required String message,
     String? relatedId,
+    String? targetRoute,
     int? subjectId,
     String? actorId,
     String? actorName,
@@ -6208,10 +6228,12 @@ class DatabaseHelper {
       'is_read': 0,
       'created_at': now,
       'related_id': relatedId,
+      'target_route': targetRoute,
       'subject_id': subjectId,
       'actor_id': actorId,
       'actor_name': actorName,
     });
+    return id;
   }
 
   Future<List<Map<String, dynamic>>> getNotificationsForUser(String userId) async {
@@ -6221,7 +6243,7 @@ class DatabaseHelper {
       where: 'user_id = ?',
       whereArgs: [userId],
       orderBy: 'created_at DESC',
-      limit: 50,
+      limit: 60,
     );
   }
 
@@ -6249,6 +6271,24 @@ class DatabaseHelper {
     await db.update(
       'notifications',
       {'is_read': 1},
+      where: 'user_id = ?',
+      whereArgs: [userId],
+    );
+  }
+
+  Future<void> deleteNotification(String id) async {
+    final db = await database;
+    await db.delete(
+      'notifications',
+      where: 'id = ?',
+      whereArgs: [id],
+    );
+  }
+
+  Future<void> clearNotificationsForUser(String userId) async {
+    final db = await database;
+    await db.delete(
+      'notifications',
       where: 'user_id = ?',
       whereArgs: [userId],
     );

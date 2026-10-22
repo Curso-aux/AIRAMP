@@ -328,6 +328,15 @@ class AuthNotifier extends Notifier<User?> {
         final prefs = await SharedPreferences.getInstance();
         await prefs.remove('must_change_password_${state!.id}');
       } catch (_) {}
+
+      // Persist security notification for user without circular provider dependency
+      DatabaseHelper().createNotification(
+        userId: state!.id,
+        type: 'security',
+        title: 'Security Alert 🔐',
+        message: 'Your account password was updated successfully.',
+        targetRoute: state!.role == 'teacher' ? '/teacher/profile' : '/student/profile',
+      ).catchError((_) => '');
     }
 
     // Update local state immediately
@@ -398,7 +407,7 @@ class AuthNotifier extends Notifier<User?> {
     final userId = state?.id;
     isLoading = true;
     try {
-      if (userId != null) {
+      if (userId != null && state?.mustChangePassword != true) {
         final prefs = await SharedPreferences.getInstance();
         await prefs.remove('must_change_password_$userId');
       }

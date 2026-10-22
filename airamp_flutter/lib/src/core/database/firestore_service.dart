@@ -2,6 +2,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:dio/dio.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/foundation.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:sqflite/sqflite.dart';
 import '../../../firebase_options.dart';
 import '../api/rate_limit_interceptor.dart';
@@ -454,8 +455,25 @@ class FirestoreService {
             existing = await db.query('users', where: 'LOWER(email) = ?', whereArgs: [email]);
           }
 
-          final rawMustChange = data['must_change_password'] ?? (existing.isNotEmpty ? existing.first['must_change_password'] : null);
-          final mustChangeVal = (rawMustChange == 1 || rawMustChange == true || rawMustChange == '1') ? 1 : 0;
+          final cloudMust = data['must_change_password'] == 1 ||
+              data['must_change_password'] == true ||
+              data['must_change_password'] == '1';
+          final localMust = existing.isNotEmpty &&
+              (existing.first['must_change_password'] == 1 ||
+               existing.first['must_change_password'] == true ||
+               existing.first['must_change_password'] == '1');
+          bool prefMust = false;
+          try {
+            final prefs = await SharedPreferences.getInstance();
+            prefMust = prefs.getBool('must_change_password_$userId') == true;
+          } catch (_) {}
+          final mustChangeVal = (cloudMust || localMust || prefMust) ? 1 : 0;
+          if (mustChangeVal == 1) {
+            try {
+              await db.update('sessions', {'must_change_password': 1},
+                  where: 'user_id = ?', whereArgs: [userId]);
+            } catch (_) {}
+          }
 
           final dbRow = {
             'id': existing.isNotEmpty ? existing.first['id'] : userId,

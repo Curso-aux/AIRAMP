@@ -27,6 +27,11 @@ class GlobalAiraFloatingOverlay extends ConsumerWidget {
     final currentUser = ref.watch(authProvider);
     if (currentUser == null) return const SizedBox.shrink();
 
+    // Hide assistant during mandatory password change to prevent any bypass
+    if (currentUser.mustChangePassword) {
+      return const SizedBox.shrink();
+    }
+
     // Admins do not use AIRA
     if (currentUser.role == 'admin' || currentUser.role == 'super_admin') {
       return const SizedBox.shrink();
