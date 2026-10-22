@@ -121,10 +121,9 @@ class _TeacherScheduleScreenState extends ConsumerState<TeacherScheduleScreen> {
                   constraints: BoxConstraints(
                     minHeight: constraints.maxHeight - 40,
                   ),
-                  child: IntrinsicHeight(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
                         // Symmetrically Balanced Top Header (Title + Counter on Left, View Switcher on Right)
                 Row(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -326,11 +325,10 @@ class _TeacherScheduleScreenState extends ConsumerState<TeacherScheduleScreen> {
               ],
             ),
           ),
-        ),
-      );
-    },
+        );
+      },
+    ),
   ),
-),
 ),
 );
   }

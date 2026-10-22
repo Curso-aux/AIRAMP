@@ -111,11 +111,6 @@ class GlobalAiraFloatingOverlay extends ConsumerWidget {
       );
     }
 
-    if (assistant is SizedBox) return assistant;
-
-    return Material(
-      type: MaterialType.transparency,
-      child: assistant,
-    );
+    return assistant;
   }
 }

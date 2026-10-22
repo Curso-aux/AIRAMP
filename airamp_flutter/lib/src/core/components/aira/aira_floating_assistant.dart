@@ -387,11 +387,9 @@ class _AiraFloatingAssistantState extends State<AiraFloatingAssistant>
     final hudTop = (_position.dy + 8).clamp(topPadding, screenHeight - bottomPadding - 60);
 
     return Positioned.fill(
-      child: Material(
-        type: MaterialType.transparency,
-        child: Stack(
-          clipBehavior: Clip.none,
-          children: [
+      child: Stack(
+        clipBehavior: Clip.none,
+        children: [
           // 1. Fullscreen Scanner HUD Overlay when scan triggers
           if (_isScanning)
             AiraScannerOverlay(
@@ -568,7 +566,6 @@ class _AiraFloatingAssistantState extends State<AiraFloatingAssistant>
             ),
           ),
         ],
-        ),
       ),
     );
   }

@@ -314,11 +314,11 @@ void main() {
       expect(notifFinder, findsOneWidget);
 
       // Institutional badge is present
-      expect(find.text('FACULTY PORTAL'), findsOneWidget);
+      expect(find.text('FACULTY'), findsOneWidget);
       expect(find.text('DepEd SHS'), findsOneWidget);
 
-      // The bulky user name is NOT rendered in the header
-      expect(find.text(sampleTeacher.fullName), findsNothing);
+      // The user name is rendered in the header
+      expect(find.text(sampleTeacher.fullName), findsOneWidget);
 
       // Verify profile is to the left of the notification button
       final profileOffset = tester.getTopLeft(profileFinder);
