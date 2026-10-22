@@ -106,4 +106,48 @@ void main() {
     await tester.pumpAndSettle();
     expect(deletedSched?['id'], equals('sched_2'));
   });
+
+  testWidgets('Schedule item card renders long titles, section, room, teacher and Assigned badge without overflow', (tester) async {
+    final longSchedule = [
+      {
+        'id': 'sched_long',
+        'subject_name': 'CSS NC II - Computer Systems Servicing',
+        'section_name': 'Grade 10 - Emerald',
+        'teacher_name': 'Sir John Reyes',
+        'day_of_week': 'Thursday',
+        'start_time': '08:00',
+        'end_time': '09:30',
+        'room': 'Computer Lab 1',
+        'color_code': '#EC4899',
+      },
+    ];
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: ActualCalendarView(
+            schedules: longSchedule,
+            initialDate: DateTime(2026, 9, 24), // Thursday
+            isStudent: true,
+          ),
+        ),
+      ),
+    );
+
+    // Verify all text elements are present
+    expect(find.text('CSS NC II - Computer Systems Servicing'), findsOneWidget);
+    expect(find.text('Grade 10 - Emerald'), findsOneWidget);
+    expect(find.text('Computer Lab 1'), findsOneWidget);
+    expect(find.text('Sir John Reyes'), findsOneWidget);
+    expect(find.text('Assigned'), findsOneWidget);
+    expect(find.text('Thursday'), findsWidgets);
+
+    // Verify the subject Text widget has maxLines 2
+    final subjectText = tester.widget<Text>(find.text('CSS NC II - Computer Systems Servicing'));
+    expect(subjectText.maxLines, equals(2));
+
+    // Verify Wrap is used for metadata to prevent horizontal squishing
+    expect(find.byType(Wrap), findsWidgets);
+  });
 }
+

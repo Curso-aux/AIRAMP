@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../core/components/calendar/actual_calendar_view.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../teacher/data/teacher_schedule_repository.dart';
+import '../../../teacher/presentation/components/halftone_pattern.dart';
 
 enum StudentModalViewMode { grid, calendar, agenda }
 
@@ -31,77 +33,38 @@ void showStudentTimetableModal(
 // TIMETABLE COLOR PALETTE (Matches the university schedule matrix in user's image)
 // ─────────────────────────────────────────────────────────────────────────────
 class TimetableColorPalette {
-  static const List<Map<String, Color>> lightPalettes = [
-    // Saturated Royal Blue
-    {
-      'bg': Color(0xFFEFF6FF),
-      'border': Color(0xFF2563EB),
-      'text': Color(0xFF1E40AF),
-    },
-    // Saturated Royal Purple
-    {
-      'bg': Color(0xFFFAF5FF),
-      'border': Color(0xFF7C3AED),
-      'text': Color(0xFF581C87),
-    },
-    // Saturated Ruby Rose
-    {
-      'bg': Color(0xFFFFF1F2),
-      'border': Color(0xFFE11D48),
-      'text': Color(0xFF9F1239),
-    },
-    // Saturated Emerald Green
-    {
-      'bg': Color(0xFFECFDF5),
-      'border': Color(0xFF059669),
-      'text': Color(0xFF065F46),
-    },
-    // Saturated Golden Amber
-    {
-      'bg': Color(0xFFFFFBEB),
-      'border': Color(0xFFD97706),
-      'text': Color(0xFF92400E),
-    },
-    // Saturated Deep Teal
-    {
-      'bg': Color(0xFFF0FDFA),
-      'border': Color(0xFF0D9488),
-      'text': Color(0xFF0F766E),
-    },
+  /// Saturated 7-color fallback palette matching ActualCalendarView exactly.
+  static const List<Color> fallbackPalette = [
+    Color(0xFF10B981), // Emerald
+    Color(0xFF3B82F6), // Blue
+    Color(0xFF8B5CF6), // Purple
+    Color(0xFFF59E0B), // Amber
+    Color(0xFFEC4899), // Pink (matches 1st pic in calendar)
+    Color(0xFF06B6D4), // Cyan
+    Color(0xFFF97316), // Orange
   ];
 
-  static Map<String, Color> getColors(String subjectName, String? hexColor, bool isDark) {
+  /// Returns the canonical subject color matching the calendar card.
+  static Color getSubjectColor(String subjectName, String? hexColor, bool isDark) {
     if (hexColor != null && hexColor.isNotEmpty) {
       try {
         final hex = hexColor.replaceAll('#', '');
-        final base = Color(int.parse('FF$hex', radix: 16));
-        if (isDark) {
-          return {
-            'bg': base.withValues(alpha: 0.22),
-            'border': base,
-            'text': Colors.white,
-          };
-        } else {
-          return {
-            'bg': base.withValues(alpha: 0.14),
-            'border': base,
-            'text': Color.lerp(base, Colors.black, 0.45) ?? base,
-          };
-        }
+        return Color(int.parse('FF$hex', radix: 16));
       } catch (_) {}
     }
+    return fallbackPalette[subjectName.hashCode.abs() % fallbackPalette.length];
+  }
 
-    final index = (subjectName.hashCode.abs()) % lightPalettes.length;
-    final p = lightPalettes[index];
-    if (isDark) {
-      final border = p['border']!;
-      return {
-        'bg': border.withValues(alpha: 0.22),
-        'border': border,
-        'text': Colors.white,
-      };
-    }
-    return p;
+  /// Backward-compatible map for components accessing background and border tints.
+  static Map<String, Color> getColors(String subjectName, String? hexColor, bool isDark) {
+    final color = getSubjectColor(subjectName, hexColor, isDark);
+    return {
+      'base': color,
+      'bg': isDark ? color.withValues(alpha: 0.16) : color.withValues(alpha: 0.08),
+      'border': isDark ? color.withValues(alpha: 0.45) : color.withValues(alpha: 0.35),
+      'text': color,
+      'accent': color,
+    };
   }
 }
 
@@ -212,10 +175,10 @@ class _StudentScheduleWidgetState extends ConsumerState<StudentScheduleWidget> {
             Container(
               padding: const EdgeInsets.all(10),
               decoration: BoxDecoration(
-                color: Colors.amber.withValues(alpha: 0.12),
+                color: AppTheme.primary.withValues(alpha: 0.10),
                 borderRadius: BorderRadius.circular(10),
               ),
-              child: const Icon(Icons.school_outlined, color: Colors.amber, size: 24),
+              child: Icon(Icons.school_outlined, color: AppTheme.primary, size: 24),
             ),
             const SizedBox(width: 14),
             Expanded(
@@ -498,10 +461,10 @@ class _StudentScheduleWidgetState extends ConsumerState<StudentScheduleWidget> {
                     Container(
                       padding: const EdgeInsets.all(10),
                       decoration: BoxDecoration(
-                        color: Colors.blue.withValues(alpha: 0.12),
+                        color: AppTheme.primary.withValues(alpha: 0.10),
                         borderRadius: BorderRadius.circular(10),
                       ),
-                      child: const Icon(Icons.event_note_rounded, color: Colors.blue, size: 22),
+                      child: Icon(Icons.event_note_rounded, color: AppTheme.primary, size: 22),
                     ),
                     const SizedBox(width: 14),
                     Expanded(
@@ -854,6 +817,33 @@ class _WeeklyTimetableDialogState extends ConsumerState<WeeklyTimetableDialog> {
     super.dispose();
   }
 
+  bool _isOngoing(Map<String, dynamic> sched) {
+    final now = DateTime.now();
+    final today = getCurrentDayOfWeek();
+    final schedDay = sched['day_of_week'] as String?;
+    if (schedDay == null || schedDay.toLowerCase() != today.toLowerCase()) return false;
+
+    final nowMinutes = now.hour * 60 + now.minute;
+    final startMinutes = _parseTimeToMinutes(sched['start_time'] as String?);
+    final endMinutes = _parseTimeToMinutes(sched['end_time'] as String?);
+    return nowMinutes >= startMinutes && nowMinutes < endMinutes;
+  }
+
+  String _formatDisplayTime(String? timeStr) {
+    if (timeStr == null || !timeStr.contains(':')) return timeStr ?? '';
+    try {
+      final parts = timeStr.split(':');
+      final hour = int.parse(parts[0]);
+      final minute = int.parse(parts[1]);
+      final h = hour % 12 == 0 ? 12 : hour % 12;
+      final m = minute.toString().padLeft(2, '0');
+      final period = hour >= 12 ? 'PM' : 'AM';
+      return '$h:$m $period';
+    } catch (_) {
+      return timeStr;
+    }
+  }
+
   int _parseTimeToMinutes(String? timeStr) {
     if (timeStr == null || !timeStr.contains(':')) return _gridStartMinutes;
     try {
@@ -889,94 +879,358 @@ class _WeeklyTimetableDialogState extends ConsumerState<WeeklyTimetableDialog> {
     );
   }
 
+  String _formatTimeDisplay(String? timeStr) {
+    if (timeStr == null || timeStr.isEmpty) return 'TBA';
+    try {
+      final parts = timeStr.split(':');
+      if (parts.length >= 2) {
+        final hour = int.parse(parts[0]);
+        final minute = int.parse(parts[1]);
+        final period = hour >= 12 ? 'PM' : 'AM';
+        final h12 = hour % 12 == 0 ? 12 : hour % 12;
+        return '$h12:${minute.toString().padLeft(2, '0')} $period';
+      }
+    } catch (_) {}
+    return timeStr;
+  }
+
   void _showClassDetailModal(BuildContext context, Map<String, dynamic> c, bool isDark) {
     final subject = c['subject_name'] as String? ?? 'Subject';
-    final teacher = c['teacher_name'] as String? ?? 'Instructor';
-    final room = c['room'] as String? ?? 'N/A';
+    final teacher = c['teacher_name'] as String? ?? 'Assigned Faculty';
+    final room = c['room'] as String? ?? 'Designated Facility';
     final day = c['day_of_week'] as String? ?? '';
-    final start = c['start_time'] as String? ?? '';
-    final end = c['end_time'] as String? ?? '';
-    final hexCode = c['color_code'] as String?;
-    final colors = TimetableColorPalette.getColors(subject, hexCode, isDark);
+    final start = _formatTimeDisplay(c['start_time'] as String?);
+    final end = _formatTimeDisplay(c['end_time'] as String?);
+    final section = (widget.sectionName != null && widget.sectionName!.isNotEmpty)
+        ? widget.sectionName!
+        : (c['section_name'] as String? ?? 'Grade 10 - Emerald');
 
     showModalBottomSheet(
       context: context,
-      backgroundColor: AppTheme.surface,
-      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
-      builder: (ctx) => Padding(
-        padding: const EdgeInsets.all(24),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      barrierColor: Colors.black.withValues(alpha: 0.45),
+      builder: (ctx) => Container(
+        decoration: BoxDecoration(
+          color: AppTheme.surface,
+          borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withValues(alpha: isDark ? 0.35 : 0.08),
+              blurRadius: 20,
+              offset: const Offset(0, -4),
+            ),
+          ],
+        ),
+        child: SafeArea(
+          top: false,
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(20, 12, 20, 20),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Container(
-                  width: 14,
-                  height: 14,
-                  decoration: BoxDecoration(color: colors['border'], shape: BoxShape.circle),
-                ),
-                const SizedBox(width: 10),
-                Expanded(
-                  child: Text(
-                    subject,
-                    style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: AppTheme.text),
+                // Top drag handle
+                Center(
+                  child: Container(
+                    width: 36,
+                    height: 4,
+                    decoration: BoxDecoration(
+                      color: AppTheme.border.withValues(alpha: 0.8),
+                      borderRadius: BorderRadius.circular(2),
+                    ),
                   ),
                 ),
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                  decoration: BoxDecoration(
-                    color: colors['bg'],
-                    borderRadius: BorderRadius.circular(6),
-                    border: Border.all(color: colors['border']!),
-                  ),
-                  child: Text(
-                    day,
-                    style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: colors['text']),
+                const SizedBox(height: 16),
+
+                // Institutional Header: Neutral Identity Box + Badges + Title
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    // Neutral Subject Icon Box (Subtle Slate, no bright neon colors)
+                    Container(
+                      width: 44,
+                      height: 44,
+                      decoration: BoxDecoration(
+                        color: isDark ? const Color(0xFF1E293B) : const Color(0xFFF1F5F9),
+                        borderRadius: BorderRadius.circular(10),
+                        border: Border.all(
+                          color: isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0),
+                        ),
+                      ),
+                      child: Center(
+                        child: Icon(
+                          Icons.menu_book_rounded,
+                          color: isDark ? AppTheme.darkTextSecondary : const Color(0xFF334155),
+                          size: 20,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+
+                    // Header Details: Calm Slate Badges + Title
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          // Tag row: Clean neutral Day Badge + Official Status Badge
+                          Row(
+                            children: [
+                              if (day.isNotEmpty)
+                                Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+                                  decoration: BoxDecoration(
+                                    color: isDark ? const Color(0xFF1E293B) : const Color(0xFFF1F5F9),
+                                    borderRadius: BorderRadius.circular(5),
+                                    border: Border.all(
+                                      color: isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0),
+                                    ),
+                                  ),
+                                  child: Text(
+                                    day,
+                                    style: TextStyle(
+                                      fontSize: 10.5,
+                                      fontWeight: FontWeight.w600,
+                                      color: AppTheme.textSecondary,
+                                    ),
+                                  ),
+                                ),
+                              const SizedBox(width: 6),
+                              Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                decoration: BoxDecoration(
+                                  color: isDark ? const Color(0xFF1E293B) : const Color(0xFFF1F5F9),
+                                  borderRadius: BorderRadius.circular(5),
+                                  border: Border.all(
+                                    color: isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0),
+                                  ),
+                                ),
+                                child: Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    Icon(
+                                      Icons.check_circle_outline_rounded,
+                                      size: 10,
+                                      color: AppTheme.textSecondary,
+                                    ),
+                                    const SizedBox(width: 3),
+                                    Text(
+                                      'Official Class',
+                                      style: TextStyle(
+                                        fontSize: 9.5,
+                                        fontWeight: FontWeight.w600,
+                                        color: AppTheme.textSecondary,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 5),
+
+                          // Full Subject Title
+                          Text(
+                            subject,
+                            style: TextStyle(
+                              fontSize: 16,
+                              fontWeight: FontWeight.bold,
+                              color: AppTheme.text,
+                              height: 1.25,
+                            ),
+                          ),
+                          const SizedBox(height: 2),
+                          Text(
+                            'Academic Timetable Schedule',
+                            style: TextStyle(
+                              fontSize: 11,
+                              color: AppTheme.textMuted,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+
+                    // Top-right Close Icon Button
+                    InkWell(
+                      onTap: () {
+                        HapticFeedback.lightImpact();
+                        Navigator.of(ctx).pop();
+                      },
+                      borderRadius: BorderRadius.circular(18),
+                      child: Container(
+                        padding: const EdgeInsets.all(5),
+                        decoration: BoxDecoration(
+                          color: isDark ? const Color(0xFF1E293B) : const Color(0xFFF1F5F9),
+                          shape: BoxShape.circle,
+                          border: Border.all(
+                            color: isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0),
+                          ),
+                        ),
+                        child: Icon(Icons.close_rounded, size: 15, color: AppTheme.textMuted),
+                      ),
+                    ),
+                  ],
+                ),
+
+                const SizedBox(height: 16),
+                Divider(height: 1, thickness: 1, color: AppTheme.border.withValues(alpha: 0.5)),
+                const SizedBox(height: 14),
+
+                // Institutional Information Cards - Quiet, Monochromatic Slate
+                _buildModalInfoTile(
+                  icon: Icons.schedule_rounded,
+                  category: 'CLASS PERIOD',
+                  value: '$start - $end',
+                  caption: '$day • Designated class hours',
+                  isDark: isDark,
+                ),
+                const SizedBox(height: 8),
+
+                _buildModalInfoTile(
+                  icon: Icons.person_outline_rounded,
+                  category: 'FACULTY / INSTRUCTOR',
+                  value: teacher,
+                  caption: 'Assigned Subject Educator',
+                  isDark: isDark,
+                ),
+                const SizedBox(height: 8),
+
+                _buildModalInfoTile(
+                  icon: Icons.meeting_room_outlined,
+                  category: 'CAMPUS FACILITY & ROOM',
+                  value: room,
+                  caption: 'Physical class venue & laboratory',
+                  isDark: isDark,
+                ),
+                const SizedBox(height: 8),
+
+                _buildModalInfoTile(
+                  icon: Icons.school_outlined,
+                  category: 'ASSIGNED SECTION',
+                  value: section,
+                  caption: 'Official student cohort & class group',
+                  isDark: isDark,
+                ),
+
+                const SizedBox(height: 18),
+
+                // Neutral Executive Button (Deep Slate 900 in light, Clean Charcoal in dark)
+                SizedBox(
+                  width: double.infinity,
+                  height: 44,
+                  child: ElevatedButton(
+                    onPressed: () {
+                      HapticFeedback.lightImpact();
+                      Navigator.of(ctx).pop();
+                    },
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: isDark ? const Color(0xFF222F42) : const Color(0xFF0F172A),
+                      foregroundColor: Colors.white,
+                      elevation: 0,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                    ),
+                    child: const Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(Icons.check_rounded, size: 16),
+                        SizedBox(width: 6),
+                        Text(
+                          'Close Overview',
+                          style: TextStyle(
+                            fontSize: 13.5,
+                            fontWeight: FontWeight.w600,
+                            letterSpacing: 0.2,
+                          ),
+                        ),
+                      ],
+                    ),
                   ),
                 ),
               ],
             ),
-            const SizedBox(height: 16),
-            _buildDetailRow(Icons.access_time_rounded, 'Class Time', '$start - $end'),
-            const SizedBox(height: 10),
-            _buildDetailRow(Icons.person_pin_rounded, 'Teacher', teacher),
-            const SizedBox(height: 10),
-            _buildDetailRow(Icons.meeting_room_outlined, 'Room / Lab', room),
-            const SizedBox(height: 10),
-            _buildDetailRow(Icons.school_outlined, 'Assigned Section', widget.sectionName ?? 'N/A'),
-            const SizedBox(height: 24),
-            SizedBox(
-              width: double.infinity,
-              child: ElevatedButton(
-                onPressed: () => Navigator.of(ctx).pop(),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: AppTheme.primary,
-                  foregroundColor: Colors.black,
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                ),
-                child: const Text('Close', style: TextStyle(fontWeight: FontWeight.bold)),
-              ),
-            ),
-          ],
+          ),
         ),
       ),
     );
   }
 
-  Widget _buildDetailRow(IconData icon, String label, String value) {
-    return Row(
-      children: [
-        Icon(icon, size: 16, color: AppTheme.primary),
-        const SizedBox(width: 10),
-        Text('$label: ', style: TextStyle(fontSize: 13, color: AppTheme.textSecondary)),
-        Expanded(
-          child: Text(
-            value,
-            style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: AppTheme.text),
-          ),
+  Widget _buildModalInfoTile({
+    required IconData icon,
+    required String category,
+    required String value,
+    required String caption,
+    required bool isDark,
+  }) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+      decoration: BoxDecoration(
+        color: isDark ? const Color(0xFF141C2B) : const Color(0xFFF8FAFC),
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(
+          color: isDark ? const Color(0xFF26354A) : const Color(0xFFE2E8F0),
         ),
-      ],
+      ),
+      child: Row(
+        children: [
+          Container(
+            padding: const EdgeInsets.all(7),
+            decoration: BoxDecoration(
+              color: isDark ? const Color(0xFF1E293B) : const Color(0xFFEDF2F7),
+              borderRadius: BorderRadius.circular(8),
+              border: Border.all(
+                color: isDark ? const Color(0xFF2E3E55) : const Color(0xFFE2E8F0),
+              ),
+            ),
+            child: Icon(
+              icon,
+              size: 16,
+              color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF475569),
+            ),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  category,
+                  style: TextStyle(
+                    fontSize: 9,
+                    fontWeight: FontWeight.bold,
+                    letterSpacing: 0.6,
+                    color: AppTheme.textMuted,
+                  ),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  value,
+                  style: TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.bold,
+                    color: AppTheme.text,
+                  ),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+                const SizedBox(height: 1),
+                Text(
+                  caption,
+                  style: TextStyle(
+                    fontSize: 10,
+                    color: AppTheme.textSecondary,
+                  ),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
     );
   }
 
@@ -1876,7 +2130,8 @@ class _WeeklyTimetableDialogState extends ConsumerState<WeeklyTimetableDialog> {
                                 final teacher = c['teacher_name'] as String? ?? '';
                                 final room = c['room'] as String? ?? '';
                                 final hexCode = c['color_code'] as String?;
-                                final colors = TimetableColorPalette.getColors(subject, hexCode, isDark);
+                                final color = TimetableColorPalette.getSubjectColor(subject, hexCode, isDark);
+                                final isOngoing = _isOngoing(c);
 
                                 return Positioned(
                                   top: topPos,
@@ -1885,66 +2140,115 @@ class _WeeklyTimetableDialogState extends ConsumerState<WeeklyTimetableDialog> {
                                   height: blockHeight,
                                   child: GestureDetector(
                                     onTap: () => _showClassDetailModal(context, c, isDark),
-                                    child: Container(
-                                      padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 3),
-                                      decoration: BoxDecoration(
-                                        color: colors['bg'],
-                                        borderRadius: BorderRadius.circular(6),
-                                        border: Border.all(color: colors['border']!, width: 1.2),
-                                        boxShadow: [
-                                          BoxShadow(
-                                            color: Colors.black.withValues(alpha: 0.05),
-                                            blurRadius: 2,
-                                            offset: const Offset(0, 1),
+                                    child: ClipRRect(
+                                      borderRadius: BorderRadius.circular(8),
+                                      child: Container(
+                                        decoration: BoxDecoration(
+                                          color: AppTheme.surface,
+                                          borderRadius: BorderRadius.circular(8),
+                                          border: Border.all(
+                                            color: isOngoing
+                                                ? color
+                                                : color.withValues(alpha: isDark ? 0.40 : 0.28),
+                                            width: isOngoing ? 1.5 : 1.0,
                                           ),
-                                        ],
-                                      ),
-                                      child: Column(
-                                        mainAxisAlignment: MainAxisAlignment.center,
-                                        children: [
-                                          Text(
-                                            subject,
-                                            style: TextStyle(
-                                              fontSize: 10.5,
-                                              fontWeight: FontWeight.bold,
-                                              color: colors['text'],
-                                              height: 1.1,
-                                            ),
-                                            textAlign: TextAlign.center,
-                                            maxLines: 2,
-                                            overflow: TextOverflow.ellipsis,
-                                          ),
-                                          if (blockHeight >= 44 && teacher.isNotEmpty) ...[
-                                            const SizedBox(height: 2),
-                                            Text(
-                                              teacher,
-                                              style: TextStyle(
-                                                fontSize: 9,
-                                                fontWeight: FontWeight.w500,
-                                                color: colors['text']!.withValues(alpha: 0.85),
-                                                height: 1.1,
-                                              ),
-                                              textAlign: TextAlign.center,
-                                              maxLines: 1,
-                                              overflow: TextOverflow.ellipsis,
+                                          boxShadow: [
+                                            BoxShadow(
+                                              color: Colors.black.withValues(alpha: isDark ? 0.20 : 0.04),
+                                              blurRadius: 3,
+                                              offset: const Offset(0, 1),
                                             ),
                                           ],
-                                          if (blockHeight >= 62 && room.isNotEmpty) ...[
-                                            const SizedBox(height: 1),
-                                            Text(
-                                              room,
-                                              style: TextStyle(
-                                                fontSize: 8.5,
-                                                fontWeight: FontWeight.w500,
-                                                color: colors['text']!.withValues(alpha: 0.75),
-                                                height: 1.1,
+                                        ),
+                                        child: Stack(
+                                          children: [
+                                            // Halftone Card Decoration on top-right (matching Calendar view Image 1)
+                                            HalftoneCardDecoration(
+                                              color: color,
+                                              width: 55,
+                                              dotSpacing: 6.0,
+                                              maxRadius: 2.8,
+                                              baseOpacity: isDark ? 0.12 : 0.18,
+                                            ),
+
+                                            // Class content text
+                                            Padding(
+                                              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
+                                              child: Column(
+                                                crossAxisAlignment: CrossAxisAlignment.start,
+                                                mainAxisAlignment: MainAxisAlignment.center,
+                                                children: [
+                                                  Text(
+                                                    subject,
+                                                    style: TextStyle(
+                                                      fontSize: 10,
+                                                      fontWeight: FontWeight.bold,
+                                                      color: AppTheme.text,
+                                                      height: 1.15,
+                                                    ),
+                                                    textAlign: TextAlign.start,
+                                                    maxLines: blockHeight < 48 ? 1 : 2,
+                                                    overflow: TextOverflow.ellipsis,
+                                                  ),
+                                                  if (blockHeight >= 44 && teacher.isNotEmpty) ...[
+                                                    const SizedBox(height: 2),
+                                                    Row(
+                                                      mainAxisSize: MainAxisSize.min,
+                                                      children: [
+                                                        Icon(
+                                                          Icons.person_outline_rounded,
+                                                          size: 9.5,
+                                                          color: AppTheme.textSecondary,
+                                                        ),
+                                                        const SizedBox(width: 2.5),
+                                                        Flexible(
+                                                          child: Text(
+                                                            teacher,
+                                                            style: TextStyle(
+                                                              fontSize: 8.5,
+                                                              fontWeight: FontWeight.w500,
+                                                              color: AppTheme.textSecondary,
+                                                              height: 1.1,
+                                                            ),
+                                                            maxLines: 1,
+                                                            overflow: TextOverflow.ellipsis,
+                                                          ),
+                                                        ),
+                                                      ],
+                                                    ),
+                                                  ],
+                                                  if (blockHeight >= 64 && room.isNotEmpty) ...[
+                                                    const SizedBox(height: 1.5),
+                                                    Row(
+                                                      mainAxisSize: MainAxisSize.min,
+                                                      children: [
+                                                        Icon(
+                                                          Icons.meeting_room_outlined,
+                                                          size: 9.5,
+                                                          color: AppTheme.textSecondary,
+                                                        ),
+                                                        const SizedBox(width: 2.5),
+                                                        Flexible(
+                                                          child: Text(
+                                                            room,
+                                                            style: TextStyle(
+                                                              fontSize: 8,
+                                                              fontWeight: FontWeight.w500,
+                                                              color: AppTheme.textSecondary,
+                                                              height: 1.1,
+                                                            ),
+                                                            maxLines: 1,
+                                                            overflow: TextOverflow.ellipsis,
+                                                          ),
+                                                        ),
+                                                      ],
+                                                    ),
+                                                  ],
+                                                ],
                                               ),
-                                              textAlign: TextAlign.center,
-                                              maxLines: 1,
-                                              overflow: TextOverflow.ellipsis,
                                             ),
                                           ],
-                                        ],
+                                        ),
                                       ),
                                     ),
                                   ),
@@ -2020,71 +2324,130 @@ class _WeeklyTimetableDialogState extends ConsumerState<WeeklyTimetableDialog> {
                       final start = c['start_time'] as String? ?? '';
                       final end = c['end_time'] as String? ?? '';
                       final hexCode = c['color_code'] as String?;
-                      final colors = TimetableColorPalette.getColors(subject, hexCode, isDark);
+                      final color = TimetableColorPalette.getSubjectColor(subject, hexCode, isDark);
+                      final isOngoing = _isOngoing(c);
 
                       return GestureDetector(
                         onTap: () => _showClassDetailModal(context, c, isDark),
-                        child: Container(
-                          padding: const EdgeInsets.all(12),
-                          decoration: BoxDecoration(
-                            color: colors['bg'],
-                            borderRadius: BorderRadius.circular(12),
-                            border: Border.all(color: colors['border']!, width: 1.2),
-                          ),
-                          child: Row(
-                            children: [
-                              Container(
-                                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
-                                decoration: BoxDecoration(
-                                  color: colors['border']!.withValues(alpha: 0.15),
-                                  borderRadius: BorderRadius.circular(8),
-                                ),
-                                child: Column(
-                                  children: [
-                                    Text(
-                                      start,
-                                      style: TextStyle(
-                                        fontSize: 11,
-                                        fontWeight: FontWeight.bold,
-                                        color: colors['text'],
-                                      ),
-                                    ),
-                                    Text(
-                                      end,
-                                      style: TextStyle(
-                                        fontSize: 9.5,
-                                        color: colors['text']!.withValues(alpha: 0.8),
-                                      ),
-                                    ),
-                                  ],
-                                ),
+                        child: ClipRRect(
+                          borderRadius: BorderRadius.circular(14),
+                          child: Container(
+                            decoration: BoxDecoration(
+                              color: AppTheme.surface,
+                              borderRadius: BorderRadius.circular(14),
+                              border: Border.all(
+                                color: isOngoing
+                                    ? color
+                                    : color.withValues(alpha: isDark ? 0.35 : 0.25),
+                                width: isOngoing ? 1.5 : 1.0,
                               ),
-                              const SizedBox(width: 12),
-                              Expanded(
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    Text(
-                                      subject,
-                                      style: TextStyle(
-                                        fontWeight: FontWeight.bold,
-                                        fontSize: 13,
-                                        color: colors['text'],
-                                      ),
-                                    ),
-                                    const SizedBox(height: 2),
-                                    Text(
-                                      '$teacher • Room: $room',
-                                      style: TextStyle(
-                                        fontSize: 11,
-                                        color: colors['text']!.withValues(alpha: 0.85),
-                                      ),
-                                    ),
-                                  ],
+                              boxShadow: [
+                                BoxShadow(
+                                  color: Colors.black.withValues(alpha: isDark ? 0.20 : 0.04),
+                                  blurRadius: 4,
+                                  offset: const Offset(0, 2),
                                 ),
-                              ),
-                              Icon(Icons.arrow_forward_ios_rounded, size: 12, color: colors['border']),
-                            ],
+                              ],
+                            ),
+                            child: Stack(
+                              children: [
+                                // Halftone Card Decoration on top-right (matching Picture 1)
+                                HalftoneCardDecoration(
+                                  color: color,
+                                  width: 90,
+                                  baseOpacity: isDark ? 0.12 : 0.18,
+                                ),
+                                Padding(
+                                  padding: const EdgeInsets.all(12),
+                                  child: Row(
+                                    children: [
+                                      // Time block (matching Calendar View)
+                                      Container(
+                                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+                                        decoration: BoxDecoration(
+                                          color: color.withValues(alpha: 0.10),
+                                          borderRadius: BorderRadius.circular(8),
+                                          border: Border.all(color: color.withValues(alpha: 0.20)),
+                                        ),
+                                        child: Column(
+                                          children: [
+                                            Text(
+                                              _formatDisplayTime(start),
+                                              style: TextStyle(
+                                                fontSize: 11,
+                                                fontWeight: FontWeight.bold,
+                                                color: color,
+                                              ),
+                                            ),
+                                            Text(
+                                              'to ${_formatDisplayTime(end)}',
+                                              style: TextStyle(
+                                                fontSize: 9,
+                                                fontWeight: FontWeight.w500,
+                                                color: color.withValues(alpha: 0.8),
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+                                      ),
+                                      const SizedBox(width: 12),
+                                      Expanded(
+                                        child: Column(
+                                          crossAxisAlignment: CrossAxisAlignment.start,
+                                          children: [
+                                            Text(
+                                              subject,
+                                              style: TextStyle(
+                                                fontWeight: FontWeight.bold,
+                                                fontSize: 13,
+                                                color: AppTheme.text,
+                                              ),
+                                              maxLines: 1,
+                                              overflow: TextOverflow.ellipsis,
+                                            ),
+                                            const SizedBox(height: 3),
+                                            Row(
+                                              children: [
+                                                Icon(Icons.person_outline_rounded, size: 11, color: AppTheme.textSecondary),
+                                                const SizedBox(width: 2.5),
+                                                Flexible(
+                                                  child: Text(
+                                                    teacher,
+                                                    style: TextStyle(
+                                                      fontSize: 11,
+                                                      color: AppTheme.textSecondary,
+                                                    ),
+                                                    maxLines: 1,
+                                                    overflow: TextOverflow.ellipsis,
+                                                  ),
+                                                ),
+                                                if (room.isNotEmpty) ...[
+                                                  const SizedBox(width: 8),
+                                                  Icon(Icons.meeting_room_outlined, size: 11, color: AppTheme.textSecondary),
+                                                  const SizedBox(width: 2),
+                                                  Flexible(
+                                                    child: Text(
+                                                      room,
+                                                      style: TextStyle(
+                                                        fontSize: 11,
+                                                        color: AppTheme.textSecondary,
+                                                      ),
+                                                      maxLines: 1,
+                                                      overflow: TextOverflow.ellipsis,
+                                                    ),
+                                                  ),
+                                                ],
+                                              ],
+                                            ),
+                                          ],
+                                        ),
+                                      ),
+                                      Icon(Icons.chevron_right_rounded, size: 18, color: AppTheme.textMuted),
+                                    ],
+                                  ),
+                                ),
+                              ],
+                            ),
                           ),
                         ),
                       );

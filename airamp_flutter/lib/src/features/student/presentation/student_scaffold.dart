@@ -53,9 +53,9 @@ class StudentScaffold extends ConsumerWidget {
           label: 'Courses',
         ),
         const BottomNavigationBarItem(
-          icon: Icon(Icons.bar_chart_outlined),
-          activeIcon: Icon(Icons.bar_chart),
-          label: 'Progress',
+          icon: Icon(Icons.calendar_month_outlined),
+          activeIcon: Icon(Icons.calendar_month),
+          label: 'Calendar',
         ),
         const BottomNavigationBarItem(
           icon: Icon(Icons.assignment_outlined),

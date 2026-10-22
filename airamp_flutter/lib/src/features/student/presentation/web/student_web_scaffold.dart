@@ -50,16 +50,16 @@ class _StudentWebScaffoldState extends ConsumerState<StudentWebScaffold> {
       route: '/student/home',
     ),
     StudentNavItem(
-      label: 'Enrolled Courses',
+      label: 'Courses & Progress',
       icon: Icons.menu_book_outlined,
       activeIcon: Icons.menu_book,
       route: '/student/courses',
     ),
     StudentNavItem(
-      label: 'Academic Progress',
-      icon: Icons.bar_chart_outlined,
-      activeIcon: Icons.bar_chart,
-      route: '/student/progress',
+      label: 'Class Schedule & Calendar',
+      icon: Icons.calendar_month_outlined,
+      activeIcon: Icons.calendar_month,
+      route: '/student/schedule',
     ),
     StudentNavItem(
       label: 'Quizzes & Tasks',

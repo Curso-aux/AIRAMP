@@ -46,12 +46,7 @@ class _ChatListScreenState extends ConsumerState<ChatListScreen> {
   }
 
   void _openNewConversationModal(BuildContext context) async {
-    final conv = await showModalBottomSheet<ChatConversation>(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.transparent,
-      builder: (_) => const NewConversationModal(),
-    );
+    final conv = await showNewConversationModal(context);
 
     if (conv != null && context.mounted) {
       context.push('/chat/${conv.id}');
@@ -130,67 +125,99 @@ class _ChatListScreenState extends ConsumerState<ChatListScreen> {
 
     return Scaffold(
       backgroundColor: AppTheme.background,
-      floatingActionButton: FloatingActionButton(
-        onPressed: () => _openNewConversationModal(context),
-        backgroundColor: AppTheme.primary,
-        child: const Icon(Icons.edit, color: Colors.black),
-      ),
       body: SafeArea(
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Header with connection status
+            // Executive Header with connection status and Quick Compose Action
             Padding(
-              padding: const EdgeInsets.fromLTRB(20, 14, 20, 0),
+              padding: const EdgeInsets.fromLTRB(20, 16, 20, 0),
               child: Row(
                 children: [
                   Expanded(
                     child: Text(
                       'Messages & Contacts',
                       style: TextStyle(
-                        fontSize: 20,
+                        fontSize: 21,
                         fontWeight: FontWeight.bold,
+                        letterSpacing: -0.4,
                         color: Theme.of(context).colorScheme.onSurface,
                       ),
                       overflow: TextOverflow.ellipsis,
                     ),
                   ),
                   const SizedBox(width: 8),
-                  Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Container(
-                        width: 8,
-                        height: 8,
+                  // Connection Status Pill
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                    decoration: BoxDecoration(
+                      color: chatState.isConnected
+                          ? AppTheme.success.withValues(alpha: 0.12)
+                          : AppTheme.textMuted.withValues(alpha: 0.1),
+                      borderRadius: BorderRadius.circular(20),
+                      border: Border.all(
+                        color: chatState.isConnected
+                            ? AppTheme.success.withValues(alpha: 0.3)
+                            : AppTheme.border,
+                        width: 0.8,
+                      ),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Container(
+                          width: 6,
+                          height: 6,
+                          decoration: BoxDecoration(
+                            color: chatState.isConnected ? AppTheme.success : AppTheme.textMuted,
+                            shape: BoxShape.circle,
+                          ),
+                        ),
+                        const SizedBox(width: 5),
+                        Text(
+                          chatState.isConnected ? 'Connected' : 'Offline',
+                          style: TextStyle(
+                            color: chatState.isConnected ? AppTheme.success : AppTheme.textMuted,
+                            fontSize: 11,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  // New Conversation Compose Icon Button (eliminates bottom FAB collision)
+                  Material(
+                    color: Colors.transparent,
+                    child: InkWell(
+                      onTap: () => _openNewConversationModal(context),
+                      borderRadius: BorderRadius.circular(10),
+                      child: Container(
+                        padding: const EdgeInsets.all(7),
                         decoration: BoxDecoration(
-                          color: chatState.isConnected ? AppTheme.success : AppTheme.error,
-                          shape: BoxShape.circle,
+                          color: AppTheme.primary.withValues(alpha: 0.12),
+                          borderRadius: BorderRadius.circular(10),
+                          border: Border.all(color: AppTheme.primary.withValues(alpha: 0.25)),
                         ),
+                        child: Icon(Icons.edit_square, color: AppTheme.primary, size: 18),
                       ),
-                      const SizedBox(width: 6),
-                      Text(
-                        chatState.isConnected ? 'Connected' : 'Offline',
-                        style: TextStyle(
-                          color: chatState.isConnected ? AppTheme.success : AppTheme.error,
-                          fontSize: 12,
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
-                    ],
+                    ),
                   ),
                 ],
               ),
             ),
-            const SizedBox(height: 12),
+            const SizedBox(height: 14),
 
-            // Tab Switcher: Chats | Contacts
+            // Segmented Tab Switcher: Chats | Contacts (Institutional Slate Style)
             Container(
               margin: const EdgeInsets.symmetric(horizontal: 20),
               padding: const EdgeInsets.all(4),
               decoration: BoxDecoration(
-                color: Theme.of(context).colorScheme.surface,
-                borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: AppTheme.border),
+                color: Theme.of(context).brightness == Brightness.dark
+                    ? const Color(0xFF1E293B)
+                    : const Color(0xFFF1F5F9),
+                borderRadius: BorderRadius.circular(10),
+                border: Border.all(color: AppTheme.border.withValues(alpha: 0.5)),
               ),
               child: Row(
                 children: [
@@ -199,28 +226,74 @@ class _ChatListScreenState extends ConsumerState<ChatListScreen> {
                       key: const Key('tab_chats'),
                       onTap: () => setState(() => _selectedTab = 0),
                       borderRadius: BorderRadius.circular(8),
-                      child: Container(
+                      child: AnimatedContainer(
+                        duration: const Duration(milliseconds: 150),
                         padding: const EdgeInsets.symmetric(vertical: 8),
                         decoration: BoxDecoration(
-                          color: _selectedTab == 0 ? AppTheme.primary : Colors.transparent,
+                          color: _selectedTab == 0
+                              ? (Theme.of(context).brightness == Brightness.dark
+                                  ? const Color(0xFF334155)
+                                  : Colors.white)
+                              : Colors.transparent,
                           borderRadius: BorderRadius.circular(8),
+                          boxShadow: _selectedTab == 0
+                              ? [
+                                  BoxShadow(
+                                    color: Colors.black.withValues(alpha: 0.05),
+                                    blurRadius: 3,
+                                    offset: const Offset(0, 1),
+                                  ),
+                                ]
+                              : null,
                         ),
                         alignment: Alignment.center,
                         child: Row(
                           mainAxisAlignment: MainAxisAlignment.center,
                           children: [
                             Icon(
-                              Icons.chat_bubble_outline,
-                              size: 16,
-                              color: _selectedTab == 0 ? Colors.black : AppTheme.textMuted,
+                              Icons.chat_bubble_outline_rounded,
+                              size: 15,
+                              color: _selectedTab == 0
+                                  ? (Theme.of(context).brightness == Brightness.dark
+                                      ? Colors.white
+                                      : const Color(0xFF0F172A))
+                                  : AppTheme.textMuted,
                             ),
                             const SizedBox(width: 6),
                             Text(
-                              'Chats (${chatState.conversations.where((c) => !c.isArchived).length})',
+                              'Chats',
                               style: TextStyle(
-                                fontWeight: FontWeight.bold,
+                                fontWeight: _selectedTab == 0 ? FontWeight.w700 : FontWeight.w500,
                                 fontSize: 13,
-                                color: _selectedTab == 0 ? Colors.black : AppTheme.textSecondary,
+                                color: _selectedTab == 0
+                                  ? (Theme.of(context).brightness == Brightness.dark
+                                      ? Colors.white
+                                      : const Color(0xFF0F172A))
+                                  : AppTheme.textMuted,
+                              ),
+                            ),
+                            const SizedBox(width: 6),
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1.5),
+                              decoration: BoxDecoration(
+                                color: _selectedTab == 0
+                                    ? (Theme.of(context).brightness == Brightness.dark
+                                        ? const Color(0xFF1E293B)
+                                        : const Color(0xFFE2E8F0))
+                                    : Colors.transparent,
+                                borderRadius: BorderRadius.circular(10),
+                              ),
+                              child: Text(
+                                '${chatState.conversations.where((c) => !c.isArchived).length}',
+                                style: TextStyle(
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.w600,
+                                  color: _selectedTab == 0
+                                      ? (Theme.of(context).brightness == Brightness.dark
+                                          ? Colors.white70
+                                          : const Color(0xFF475569))
+                                      : AppTheme.textMuted,
+                                ),
                               ),
                             ),
                           ],
@@ -228,33 +301,80 @@ class _ChatListScreenState extends ConsumerState<ChatListScreen> {
                       ),
                     ),
                   ),
+                  const SizedBox(width: 4),
                   Expanded(
                     child: InkWell(
                       key: const Key('tab_contacts'),
                       onTap: () => setState(() => _selectedTab = 1),
                       borderRadius: BorderRadius.circular(8),
-                      child: Container(
+                      child: AnimatedContainer(
+                        duration: const Duration(milliseconds: 150),
                         padding: const EdgeInsets.symmetric(vertical: 8),
                         decoration: BoxDecoration(
-                          color: _selectedTab == 1 ? AppTheme.primary : Colors.transparent,
+                          color: _selectedTab == 1
+                              ? (Theme.of(context).brightness == Brightness.dark
+                                  ? const Color(0xFF334155)
+                                  : Colors.white)
+                              : Colors.transparent,
                           borderRadius: BorderRadius.circular(8),
+                          boxShadow: _selectedTab == 1
+                              ? [
+                                  BoxShadow(
+                                    color: Colors.black.withValues(alpha: 0.05),
+                                    blurRadius: 3,
+                                    offset: const Offset(0, 1),
+                                  ),
+                                ]
+                              : null,
                         ),
                         alignment: Alignment.center,
                         child: Row(
                           mainAxisAlignment: MainAxisAlignment.center,
                           children: [
                             Icon(
-                              Icons.contacts_outlined,
-                              size: 16,
-                              color: _selectedTab == 1 ? Colors.black : AppTheme.textMuted,
+                              Icons.people_alt_outlined,
+                              size: 15,
+                              color: _selectedTab == 1
+                                  ? (Theme.of(context).brightness == Brightness.dark
+                                      ? Colors.white
+                                      : const Color(0xFF0F172A))
+                                  : AppTheme.textMuted,
                             ),
                             const SizedBox(width: 6),
                             Text(
-                              'Contacts (${chatState.availableUsers.length})',
+                              'Contacts',
                               style: TextStyle(
-                                fontWeight: FontWeight.bold,
+                                fontWeight: _selectedTab == 1 ? FontWeight.w700 : FontWeight.w500,
                                 fontSize: 13,
-                                color: _selectedTab == 1 ? Colors.black : AppTheme.textSecondary,
+                                color: _selectedTab == 1
+                                  ? (Theme.of(context).brightness == Brightness.dark
+                                      ? Colors.white
+                                      : const Color(0xFF0F172A))
+                                  : AppTheme.textMuted,
+                              ),
+                            ),
+                            const SizedBox(width: 6),
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1.5),
+                              decoration: BoxDecoration(
+                                color: _selectedTab == 1
+                                    ? (Theme.of(context).brightness == Brightness.dark
+                                        ? const Color(0xFF1E293B)
+                                        : const Color(0xFFE2E8F0))
+                                    : Colors.transparent,
+                                borderRadius: BorderRadius.circular(10),
+                              ),
+                              child: Text(
+                                '${chatState.availableUsers.length}',
+                                style: TextStyle(
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.w600,
+                                  color: _selectedTab == 1
+                                      ? (Theme.of(context).brightness == Brightness.dark
+                                          ? Colors.white70
+                                          : const Color(0xFF475569))
+                                      : AppTheme.textMuted,
+                                ),
                               ),
                             ),
                           ],
@@ -490,33 +610,11 @@ class _ChatListScreenState extends ConsumerState<ChatListScreen> {
                       },
                       child: ListTile(
                         contentPadding: const EdgeInsets.symmetric(vertical: 8),
-                        leading: Stack(
-                          clipBehavior: Clip.none,
-                          children: [
-                            CircleAvatar(
-                              backgroundColor: isGroup
-                                  ? AppTheme.accent
-                                  : Theme.of(context).colorScheme.primary,
-                              child: Icon(
-                                isGroup ? Icons.groups : Icons.person,
-                                color: Colors.black,
-                                size: 22,
-                              ),
-                            ),
-                            if (isGroup)
-                              Positioned(
-                                right: -2,
-                                bottom: -2,
-                                child: Container(
-                                  padding: const EdgeInsets.all(2),
-                                  decoration: BoxDecoration(
-                                    color: AppTheme.primary,
-                                    shape: BoxShape.circle,
-                                  ),
-                                  child: const Icon(Icons.school, size: 10, color: Colors.black),
-                                ),
-                              ),
-                          ],
+                        leading: _buildAvatar(
+                          convo.name ?? 'Chat',
+                          role: isGroup ? 'group' : 'student',
+                          isGroup: isGroup,
+                          size: 44,
                         ),
                         title: Row(
                           children: [
@@ -526,6 +624,7 @@ class _ChatListScreenState extends ConsumerState<ChatListScreen> {
                                 style: TextStyle(
                                   color: Theme.of(context).colorScheme.onSurface,
                                   fontWeight: FontWeight.bold,
+                                  fontSize: 15,
                                 ),
                                 overflow: TextOverflow.ellipsis,
                               ),
@@ -533,11 +632,11 @@ class _ChatListScreenState extends ConsumerState<ChatListScreen> {
                             if (isGroup)
                               Container(
                                 margin: const EdgeInsets.only(left: 6),
-                                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
                                 decoration: BoxDecoration(
                                   color: AppTheme.primarySoft,
-                                  borderRadius: BorderRadius.circular(4),
-                                  border: Border.all(color: AppTheme.primary.withValues(alpha: 0.3)),
+                                  borderRadius: BorderRadius.circular(5),
+                                  border: Border.all(color: AppTheme.primary.withValues(alpha: 0.3), width: 0.8),
                                 ),
                                 child: Text(
                                   'Group',
@@ -550,28 +649,35 @@ class _ChatListScreenState extends ConsumerState<ChatListScreen> {
                               ),
                           ],
                         ),
-                        subtitle: Text(
-                          convo.lastMessage?.text ?? 'No messages yet',
-                          style: TextStyle(
-                            color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6),
+                        subtitle: Padding(
+                          padding: const EdgeInsets.only(top: 2),
+                          child: Text(
+                            convo.lastMessage?.text ?? 'No messages yet',
+                            style: TextStyle(
+                              color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6),
+                              fontSize: 13,
+                            ),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
                           ),
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
                         ),
                         trailing: convo.unreadCount > 0
-                            ? CircleAvatar(
-                                radius: 12,
-                                backgroundColor: Theme.of(context).colorScheme.primary,
+                            ? Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
+                                decoration: BoxDecoration(
+                                  color: AppTheme.primary,
+                                  borderRadius: BorderRadius.circular(10),
+                                ),
                                 child: Text(
                                   convo.unreadCount.toString(),
                                   style: const TextStyle(
-                                    color: Colors.black,
-                                    fontSize: 12,
+                                    color: Colors.white,
+                                    fontSize: 11,
                                     fontWeight: FontWeight.bold,
                                   ),
                                 ),
                               )
-                            : Icon(Icons.chevron_right, color: AppTheme.textMuted, size: 18),
+                            : Icon(Icons.chevron_right_rounded, color: AppTheme.textMuted, size: 20),
                         onTap: () {
                           context.push('/chat/${convo.id}');
                         },
@@ -607,7 +713,8 @@ class _ChatListScreenState extends ConsumerState<ChatListScreen> {
               counterText: '',
               prefixIcon: Icon(
                 Icons.search,
-                color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.4),
+                color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.45),
+                size: 20,
               ),
               suffixIcon: _contactSearchQuery.isNotEmpty
                   ? IconButton(
@@ -622,11 +729,15 @@ class _ChatListScreenState extends ConsumerState<ChatListScreen> {
               fillColor: Theme.of(context).colorScheme.surface,
               border: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(12),
-                borderSide: BorderSide(color: Theme.of(context).dividerColor),
+                borderSide: BorderSide(color: AppTheme.border.withValues(alpha: 0.7)),
               ),
               enabledBorder: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(12),
-                borderSide: BorderSide(color: Theme.of(context).dividerColor),
+                borderSide: BorderSide(color: AppTheme.border.withValues(alpha: 0.7)),
+              ),
+              focusedBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(12),
+                borderSide: BorderSide(color: AppTheme.primary, width: 1.2),
               ),
               contentPadding: const EdgeInsets.symmetric(vertical: 12),
             ),
@@ -634,7 +745,7 @@ class _ChatListScreenState extends ConsumerState<ChatListScreen> {
         ),
         const SizedBox(height: 10),
 
-        // Role Filter Pills: All | Teachers | Students
+        // Consolidated Single-Row Filter Toolbar: Roles, Grade, Section, Reset
         SingleChildScrollView(
           scrollDirection: Axis.horizontal,
           padding: const EdgeInsets.symmetric(horizontal: 20),
@@ -645,115 +756,41 @@ class _ChatListScreenState extends ConsumerState<ChatListScreen> {
               _buildRoleChip('teacher', 'Teachers'),
               const SizedBox(width: 8),
               _buildRoleChip('student', 'Students'),
+              if (_selectedRole != 'teacher') ...[
+                const SizedBox(width: 8),
+                Container(
+                  height: 18,
+                  width: 1,
+                  color: AppTheme.border,
+                ),
+                const SizedBox(width: 8),
+                _buildDropdownChip(
+                  label: _selectedGrade == 'All' ? 'Grade: All' : _selectedGrade,
+                  isActive: _selectedGrade != 'All',
+                  value: _selectedGrade,
+                  items: _gradeOptions,
+                  onChanged: (val) {
+                    if (val != null) setState(() => _selectedGrade = val);
+                  },
+                ),
+                const SizedBox(width: 8),
+                _buildDropdownChip(
+                  label: _selectedSection == 'All' ? 'Section: All' : 'Sec. $_selectedSection',
+                  isActive: _selectedSection != 'All',
+                  value: _selectedSection,
+                  items: _sectionOptions,
+                  onChanged: (val) {
+                    if (val != null) setState(() => _selectedSection = val);
+                  },
+                ),
+              ],
+              if (_selectedGrade != 'All' || _selectedSection != 'All' || _selectedRole != 'all') ...[
+                const SizedBox(width: 8),
+                _buildResetChip(),
+              ],
             ],
           ),
         ),
-        const SizedBox(height: 8),
-
-        // Grade and Section Filters (visible when Students or All selected)
-        if (_selectedRole != 'teacher')
-          SingleChildScrollView(
-            scrollDirection: Axis.horizontal,
-            padding: const EdgeInsets.symmetric(horizontal: 20),
-            child: Row(
-              children: [
-                // Grade Dropdown Pill
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 2),
-                  decoration: BoxDecoration(
-                    color: Theme.of(context).colorScheme.surface,
-                    borderRadius: BorderRadius.circular(8),
-                    border: Border.all(
-                      color: _selectedGrade != 'All' ? AppTheme.primary : AppTheme.border,
-                    ),
-                  ),
-                  child: DropdownButtonHideUnderline(
-                    child: DropdownButton<String>(
-                      value: _selectedGrade,
-                      isDense: true,
-                      dropdownColor: Theme.of(context).colorScheme.surface,
-                      icon: Icon(Icons.arrow_drop_down, color: AppTheme.textSecondary, size: 18),
-                      style: TextStyle(
-                        fontSize: 12,
-                        color: _selectedGrade != 'All' ? AppTheme.primary : AppTheme.text,
-                        fontWeight: _selectedGrade != 'All' ? FontWeight.bold : FontWeight.normal,
-                      ),
-                      items: _gradeOptions.map((grade) {
-                        return DropdownMenuItem(
-                          value: grade,
-                          child: Text(grade == 'All' ? 'Grade: All' : grade),
-                        );
-                      }).toList(),
-                      onChanged: (val) {
-                        if (val != null) setState(() => _selectedGrade = val);
-                      },
-                    ),
-                  ),
-                ),
-                const SizedBox(width: 8),
-
-                // Section Dropdown Pill
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 2),
-                  decoration: BoxDecoration(
-                    color: Theme.of(context).colorScheme.surface,
-                    borderRadius: BorderRadius.circular(8),
-                    border: Border.all(
-                      color: _selectedSection != 'All' ? AppTheme.primary : AppTheme.border,
-                    ),
-                  ),
-                  child: DropdownButtonHideUnderline(
-                    child: DropdownButton<String>(
-                      value: _selectedSection,
-                      isDense: true,
-                      dropdownColor: Theme.of(context).colorScheme.surface,
-                      icon: Icon(Icons.arrow_drop_down, color: AppTheme.textSecondary, size: 18),
-                      style: TextStyle(
-                        fontSize: 12,
-                        color: _selectedSection != 'All' ? AppTheme.primary : AppTheme.text,
-                        fontWeight: _selectedSection != 'All' ? FontWeight.bold : FontWeight.normal,
-                      ),
-                      items: _sectionOptions.map((sec) {
-                        return DropdownMenuItem(
-                          value: sec,
-                          child: Text(sec == 'All' ? 'Section: All' : 'Sec. $sec'),
-                        );
-                      }).toList(),
-                      onChanged: (val) {
-                        if (val != null) setState(() => _selectedSection = val);
-                      },
-                    ),
-                  ),
-                ),
-                if (_selectedGrade != 'All' || _selectedSection != 'All' || _selectedRole != 'all') ...[
-                  const SizedBox(width: 8),
-                  GestureDetector(
-                    onTap: () {
-                      setState(() {
-                        _selectedRole = 'all';
-                        _selectedGrade = 'All';
-                        _selectedSection = 'All';
-                      });
-                    },
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                      decoration: BoxDecoration(
-                        color: AppTheme.surfaceLight,
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                      child: Row(
-                        children: [
-                          Icon(Icons.refresh, size: 14, color: AppTheme.textSecondary),
-                          const SizedBox(width: 4),
-                          Text('Reset', style: TextStyle(color: AppTheme.textSecondary, fontSize: 12)),
-                        ],
-                      ),
-                    ),
-                  ),
-                ],
-              ],
-            ),
-          ),
         const SizedBox(height: 10),
 
         // Contacts list count header
@@ -764,8 +801,13 @@ class _ChatListScreenState extends ConsumerState<ChatListScreen> {
             children: [
               Flexible(
                 child: Text(
-                  'Showing ${contacts.length} contacts',
-                  style: TextStyle(fontSize: 12, color: AppTheme.textMuted),
+                  '${contacts.length} DIRECTORY CONTACTS',
+                  style: TextStyle(
+                    fontSize: 11,
+                    fontWeight: FontWeight.w700,
+                    letterSpacing: 0.7,
+                    color: AppTheme.textMuted,
+                  ),
                   overflow: TextOverflow.ellipsis,
                 ),
               ),
@@ -774,7 +816,11 @@ class _ChatListScreenState extends ConsumerState<ChatListScreen> {
                 Flexible(
                   child: Text(
                     'Tap contact to view profile',
-                    style: TextStyle(fontSize: 12, color: AppTheme.primary, fontWeight: FontWeight.w600),
+                    style: TextStyle(
+                      fontSize: 11,
+                      color: AppTheme.primary,
+                      fontWeight: FontWeight.w600,
+                    ),
                     overflow: TextOverflow.ellipsis,
                     textAlign: TextAlign.end,
                   ),
@@ -802,30 +848,31 @@ class _ChatListScreenState extends ConsumerState<ChatListScreen> {
                     ],
                   )
                 : ListView.separated(
-                  padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 6),
+                  padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 4),
                   itemCount: contacts.length,
-                  separatorBuilder: (_, _) => Divider(color: AppTheme.border, height: 1),
+                  separatorBuilder: (_, _) => Divider(color: AppTheme.border.withValues(alpha: 0.6), height: 1),
                   itemBuilder: (context, index) {
                     final user = contacts[index];
                     final isTeacher = user.role == 'teacher' || user.role == 'admin' || user.role == 'super_admin';
+                    final isDark = Theme.of(context).brightness == Brightness.dark;
+
+                    // Academic Metadata Subtitle (e.g. Grade 10 • Sec. Emerald • email@school.edu)
+                    final List<String> metaParts = [];
+                    if (user.grade != null && user.grade!.isNotEmpty) metaParts.add(user.grade!);
+                    if (user.section != null && user.section!.isNotEmpty) {
+                      metaParts.add(user.section!.startsWith('Sec') ? user.section! : 'Sec. ${user.section!}');
+                    }
+                    metaParts.add(user.email);
+                    final subtitleText = metaParts.join(' • ');
 
                     return ListTile(
-                      contentPadding: const EdgeInsets.symmetric(vertical: 8),
+                      contentPadding: const EdgeInsets.symmetric(vertical: 4, horizontal: 4),
                       leading: GestureDetector(
                         onTap: () => _showUserProfileModal(user),
-                        child: CircleAvatar(
-                          radius: 22,
-                          backgroundColor: isTeacher
-                              ? AppTheme.primary
-                              : AppTheme.accent,
-                          child: Text(
-                            user.fullName.isNotEmpty ? user.fullName[0].toUpperCase() : '?',
-                            style: const TextStyle(
-                              color: Colors.black,
-                              fontWeight: FontWeight.bold,
-                              fontSize: 16,
-                            ),
-                          ),
+                        child: _buildAvatar(
+                          user.fullName,
+                          role: user.role,
+                          size: 42,
                         ),
                       ),
                       title: Row(
@@ -841,26 +888,32 @@ class _ChatListScreenState extends ConsumerState<ChatListScreen> {
                               overflow: TextOverflow.ellipsis,
                             ),
                           ),
-                          // Role Badge
+                          const SizedBox(width: 6),
+                          // Subtle, Institutional Role Tag (No neon gaming pills)
                           Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1.5),
                             decoration: BoxDecoration(
                               color: isTeacher
-                                  ? AppTheme.primarySoft
-                                  : AppTheme.accent.withValues(alpha: 0.15),
-                              borderRadius: BorderRadius.circular(6),
+                                  ? (isDark ? const Color(0xFF1E293B) : const Color(0xFFF1F5F9))
+                                  : (isDark ? const Color(0xFF0F172A) : const Color(0xFFF8FAFC)),
+                              borderRadius: BorderRadius.circular(4),
                               border: Border.all(
                                 color: isTeacher
-                                    ? AppTheme.primary.withValues(alpha: 0.4)
-                                    : AppTheme.accent.withValues(alpha: 0.5),
+                                    ? (isDark ? const Color(0xFF334155) : const Color(0xFFCBD5E1))
+                                    : (isDark ? const Color(0xFF1E293B) : const Color(0xFFE2E8F0)),
+                                width: 0.8,
                               ),
                             ),
                             child: Text(
-                              isTeacher ? (user.role == 'super_admin' ? 'Admin' : 'Teacher') : 'Student',
+                              isTeacher
+                                  ? (user.role == 'super_admin' ? 'Admin' : (user.role == 'admin' ? 'Administrator' : 'Teacher'))
+                                  : 'Student',
                               style: TextStyle(
-                                color: isTeacher ? AppTheme.primary : AppTheme.accent,
-                                fontSize: 11,
-                                fontWeight: FontWeight.bold,
+                                color: isTeacher
+                                    ? (isDark ? const Color(0xFFCBD5E1) : const Color(0xFF334155))
+                                    : (isDark ? const Color(0xFF64748B) : const Color(0xFF64748B)),
+                                fontSize: 10,
+                                fontWeight: FontWeight.w600,
                               ),
                             ),
                           ),
@@ -870,7 +923,10 @@ class _ChatListScreenState extends ConsumerState<ChatListScreen> {
                         padding: const EdgeInsets.only(top: 4),
                         child: Text(
                           user.email,
-                          style: TextStyle(color: AppTheme.textMuted, fontSize: 13),
+                          style: TextStyle(
+                            color: AppTheme.textMuted,
+                            fontSize: 13,
+                          ),
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
                         ),
@@ -879,21 +935,22 @@ class _ChatListScreenState extends ConsumerState<ChatListScreen> {
                         mainAxisSize: MainAxisSize.min,
                         children: [
                           IconButton(
-                            icon: Icon(Icons.info_outline, size: 20, color: AppTheme.textSecondary),
+                            icon: Icon(
+                              Icons.info_outline_rounded,
+                              size: 19,
+                              color: AppTheme.textMuted,
+                            ),
+                            tooltip: 'Profile Details',
                             onPressed: () => _showUserProfileModal(user),
-                            tooltip: 'View Profile',
                           ),
                           IconButton(
-                            icon: Container(
-                              padding: const EdgeInsets.all(8),
-                              decoration: BoxDecoration(
-                                color: AppTheme.primary.withValues(alpha: 0.12),
-                                borderRadius: BorderRadius.circular(8),
-                              ),
-                              child: Icon(Icons.chat_bubble_outline, size: 18, color: AppTheme.primary),
+                            icon: Icon(
+                              Icons.chat_bubble_outline_rounded,
+                              size: 19,
+                              color: isDark ? const Color(0xFFCBD5E1) : const Color(0xFF475569),
                             ),
+                            tooltip: 'Start Direct Message',
                             onPressed: () => _startDirectChat(user),
-                            tooltip: 'Message ${user.fullName}',
                           ),
                         ],
                       ),
@@ -909,26 +966,186 @@ class _ChatListScreenState extends ConsumerState<ChatListScreen> {
 
   Widget _buildRoleChip(String roleKey, String label) {
     final isSelected = _selectedRole == roleKey;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
     return GestureDetector(
       onTap: () => setState(() => _selectedRole = roleKey),
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 150),
+        padding: const EdgeInsets.symmetric(horizontal: 13, vertical: 6.5),
         decoration: BoxDecoration(
-          color: isSelected ? AppTheme.primary : Theme.of(context).colorScheme.surface,
-          borderRadius: BorderRadius.circular(20),
+          color: isSelected
+              ? (isDark ? const Color(0xFF334155) : const Color(0xFF1E293B))
+              : Theme.of(context).colorScheme.surface,
+          borderRadius: BorderRadius.circular(8),
           border: Border.all(
-            color: isSelected ? AppTheme.primary : AppTheme.border,
+            color: isSelected
+                ? (isDark ? const Color(0xFF475569) : const Color(0xFF1E293B))
+                : (isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0)),
+            width: 1.0,
           ),
         ),
         child: Text(
           label,
           style: TextStyle(
-            fontSize: 13,
-            fontWeight: FontWeight.bold,
-            color: isSelected ? Colors.black : AppTheme.textSecondary,
+            fontSize: 12,
+            fontWeight: isSelected ? FontWeight.w600 : FontWeight.w500,
+            color: isSelected
+                ? Colors.white
+                : (isDark ? const Color(0xFF94A3B8) : const Color(0xFF475569)),
           ),
         ),
       ),
+    );
+  }
+
+  Widget _buildDropdownChip({
+    required String label,
+    required bool isActive,
+    required String value,
+    required List<String> items,
+    required ValueChanged<String?> onChanged,
+  }) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 2),
+      decoration: BoxDecoration(
+        color: isActive
+            ? (isDark ? const Color(0xFF1E293B) : const Color(0xFFF1F5F9))
+            : Theme.of(context).colorScheme.surface,
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(
+          color: isActive
+              ? (isDark ? const Color(0xFF475569) : const Color(0xFFCBD5E1))
+              : (isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0)),
+          width: 1.0,
+        ),
+      ),
+      child: DropdownButtonHideUnderline(
+        child: DropdownButton<String>(
+          value: value,
+          isDense: true,
+          dropdownColor: Theme.of(context).colorScheme.surface,
+          icon: Icon(
+            Icons.keyboard_arrow_down_rounded,
+            color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B),
+            size: 16,
+          ),
+          style: TextStyle(
+            fontSize: 12,
+            color: isActive
+                ? (isDark ? Colors.white : const Color(0xFF0F172A))
+                : (isDark ? const Color(0xFF94A3B8) : const Color(0xFF475569)),
+            fontWeight: isActive ? FontWeight.w600 : FontWeight.w500,
+          ),
+          items: items.map((opt) {
+            return DropdownMenuItem(
+              value: opt,
+              child: Text(
+                opt == 'All'
+                    ? (label.startsWith('Sec') ? 'Section: All' : 'Grade: All')
+                    : (label.startsWith('Sec') && !opt.startsWith('Sec') ? 'Sec. $opt' : opt),
+              ),
+            );
+          }).toList(),
+          onChanged: onChanged,
+        ),
+      ),
+    );
+  }
+
+  Widget _buildResetChip() {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
+    return GestureDetector(
+      onTap: () {
+        setState(() {
+          _selectedRole = 'all';
+          _selectedGrade = 'All';
+          _selectedSection = 'All';
+        });
+      },
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+        decoration: BoxDecoration(
+          color: isDark ? const Color(0xFF1E293B) : const Color(0xFFF8FAFC),
+          borderRadius: BorderRadius.circular(8),
+          border: Border.all(
+            color: isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0),
+          ),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(
+              Icons.refresh_rounded,
+              size: 13,
+              color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B),
+            ),
+            const SizedBox(width: 4),
+            Text(
+              'Reset',
+              style: TextStyle(
+                color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B),
+                fontSize: 12,
+                fontWeight: FontWeight.w500,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildAvatar(String name, {required String role, bool isGroup = false, double size = 42}) {
+    final initial = name.isNotEmpty ? name[0].toUpperCase() : '?';
+    final isTeacher = role == 'teacher' || role == 'admin' || role == 'super_admin';
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
+    // Institutional Academic Palette: Calm, dignified, and editorial (no neon glow or gaming gradients)
+    final Color bgColor;
+    final Color textColor;
+    final Color borderColor;
+
+    if (isGroup) {
+      bgColor = isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0);
+      textColor = isDark ? Colors.white : const Color(0xFF1E293B);
+      borderColor = isDark ? const Color(0xFF475569) : const Color(0xFFCBD5E1);
+    } else if (isTeacher) {
+      // Distinguished Deep Academic Slate-Navy for Faculty/Admin
+      bgColor = isDark ? const Color(0xFF1E3A8A) : const Color(0xFF1E293B);
+      textColor = Colors.white;
+      borderColor = isDark ? const Color(0xFF3B82F6) : const Color(0xFF334155);
+    } else {
+      // Understated Cool Slate for Students
+      bgColor = isDark ? const Color(0xFF1E293B) : const Color(0xFFF1F5F9);
+      textColor = isDark ? const Color(0xFFCBD5E1) : const Color(0xFF334155);
+      borderColor = isDark ? const Color(0xFF334155) : const Color(0xFFCBD5E1);
+    }
+
+    return Container(
+      width: size,
+      height: size,
+      decoration: BoxDecoration(
+        shape: BoxShape.circle,
+        color: bgColor,
+        border: Border.all(
+          color: borderColor.withValues(alpha: 0.8),
+          width: 1.0,
+        ),
+      ),
+      alignment: Alignment.center,
+      child: isGroup
+          ? Icon(Icons.groups_rounded, color: textColor, size: size * 0.5)
+          : Text(
+              initial,
+              style: TextStyle(
+                color: textColor,
+                fontWeight: FontWeight.w700,
+                fontSize: size * 0.42,
+              ),
+            ),
     );
   }
 
@@ -1060,25 +1277,19 @@ class _ChatListScreenState extends ConsumerState<ChatListScreen> {
               ),
               const SizedBox(height: 20),
               // Large Avatar
-              CircleAvatar(
-                radius: 40,
-                backgroundColor: isTeacher ? AppTheme.primary : AppTheme.accent,
-                child: Text(
-                  user.fullName.isNotEmpty ? user.fullName[0].toUpperCase() : '?',
-                  style: const TextStyle(
-                    color: Colors.black,
-                    fontWeight: FontWeight.bold,
-                    fontSize: 32,
-                  ),
-                ),
+              _buildAvatar(
+                user.fullName,
+                role: user.role,
+                size: 76,
               ),
-              const SizedBox(height: 12),
+              const SizedBox(height: 14),
               Text(
                 user.fullName,
                 style: TextStyle(
                   color: Theme.of(context).colorScheme.onSurface,
                   fontWeight: FontWeight.bold,
                   fontSize: 20,
+                  letterSpacing: -0.3,
                 ),
                 textAlign: TextAlign.center,
               ),
@@ -1088,13 +1299,13 @@ class _ChatListScreenState extends ConsumerState<ChatListScreen> {
                 padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 3),
                 decoration: BoxDecoration(
                   color: isTeacher
-                      ? AppTheme.primarySoft
-                      : AppTheme.accent.withValues(alpha: 0.15),
+                      ? AppTheme.primary.withValues(alpha: 0.12)
+                      : AppTheme.accent.withValues(alpha: 0.12),
                   borderRadius: BorderRadius.circular(12),
                   border: Border.all(
                     color: isTeacher
-                        ? AppTheme.primary.withValues(alpha: 0.4)
-                        : AppTheme.accent.withValues(alpha: 0.5),
+                        ? AppTheme.primary.withValues(alpha: 0.35)
+                        : AppTheme.accent.withValues(alpha: 0.35),
                   ),
                 ),
                 child: Text(
@@ -1114,11 +1325,11 @@ class _ChatListScreenState extends ConsumerState<ChatListScreen> {
                 decoration: BoxDecoration(
                   color: AppTheme.background,
                   borderRadius: BorderRadius.circular(16),
-                  border: Border.all(color: AppTheme.border),
+                  border: Border.all(color: AppTheme.border.withValues(alpha: 0.7)),
                 ),
                 child: Column(
                   children: [
-                    _buildProfileInfoRow(Icons.mail_outline, 'Email', user.email),
+                    _buildProfileInfoRow(Icons.mail_outline_rounded, 'Email', user.email),
                     if (user.grade != null && user.grade!.isNotEmpty) ...[
                       const Divider(height: 16),
                       _buildProfileInfoRow(Icons.school_outlined, 'Grade Level', user.grade!),
@@ -1140,16 +1351,17 @@ class _ChatListScreenState extends ConsumerState<ChatListScreen> {
                     child: ElevatedButton.icon(
                       style: ElevatedButton.styleFrom(
                         backgroundColor: AppTheme.primary,
-                        foregroundColor: Colors.black,
+                        foregroundColor: Colors.white,
                         padding: const EdgeInsets.symmetric(vertical: 14),
                         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                        elevation: 0,
                       ),
                       onPressed: () {
                         Navigator.pop(ctx);
                         _startDirectChat(user);
                       },
-                      icon: const Icon(Icons.chat_bubble_outline, size: 20, color: Colors.black),
-                      label: Text('Message ${user.fullName.split(' ').first}', style: const TextStyle(fontWeight: FontWeight.bold)),
+                      icon: const Icon(Icons.chat_bubble_outline_rounded, size: 19, color: Colors.white),
+                      label: Text('Message ${user.fullName.split(' ').first}', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
                     ),
                   ),
                 ],

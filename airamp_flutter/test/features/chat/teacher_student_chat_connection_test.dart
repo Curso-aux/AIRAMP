@@ -6,9 +6,36 @@ import 'package:airamp_flutter/src/features/auth/application/auth_provider.dart'
 import 'package:airamp_flutter/src/features/chat/application/chat_provider.dart';
 
 void main() {
-  setUpAll(() {
+  setUpAll(() async {
     sqfliteFfiInit();
     databaseFactory = databaseFactoryFfi;
+    final db = await DatabaseHelper().database;
+    final existingMaria = await db.query('users', where: "id = 'student_1'");
+    if (existingMaria.isEmpty) {
+      await db.insert('users', {
+        'id': 'student_1',
+        'email': 'maria@test.com',
+        'username': 'maria.lopez',
+        'password': 'Maria@123',
+        'role': 'student',
+        'full_name': 'Maria Lopez',
+        'section': 'Grade 10 - Emerald',
+        'grade': 'Grade 10',
+        'created_at': DateTime.now().toIso8601String(),
+      });
+    }
+    final existingTeacher = await db.query('users', where: "id = 'teacher_1'");
+    if (existingTeacher.isEmpty) {
+      await db.insert('users', {
+        'id': 'teacher_1',
+        'email': 'john.reyes@deped.gov.ph',
+        'username': 'john.reyes',
+        'password': 'Teacher@123',
+        'role': 'teacher',
+        'full_name': 'Sir John Reyes',
+        'created_at': DateTime.now().toIso8601String(),
+      });
+    }
   });
 
   tearDown(() async {

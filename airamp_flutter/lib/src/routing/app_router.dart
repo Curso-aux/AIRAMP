@@ -13,7 +13,7 @@ import '../features/auth/application/auth_provider.dart';
 import '../features/student/presentation/student_home_screen.dart';
 import '../features/student/presentation/my_courses_screen.dart';
 import '../features/student/presentation/student_course_detail_screen.dart';
-import '../features/student/presentation/my_progress_screen.dart';
+import '../features/student/presentation/student_schedule_screen.dart';
 import '../features/student/presentation/quiz_history_screen.dart';
 import '../features/student/presentation/student_profile_screen.dart';
 import '../features/admin/presentation/subjects_mgmt_screen.dart';
@@ -171,7 +171,14 @@ final routerProvider = Provider<GoRouter>((ref) {
                 path: '/student/courses',
                 pageBuilder: (context, state) => AppPageTransitions.page(
                   key: state.pageKey,
-                  child: const MyCoursesScreen(),
+                  child: const MyCoursesScreen(initialTab: 0),
+                ),
+              ),
+              GoRoute(
+                path: '/student/progress',
+                pageBuilder: (context, state) => AppPageTransitions.page(
+                  key: state.pageKey,
+                  child: const MyCoursesScreen(initialTab: 1),
                 ),
               ),
             ],
@@ -179,10 +186,10 @@ final routerProvider = Provider<GoRouter>((ref) {
           StatefulShellBranch(
             routes: [
               GoRoute(
-                path: '/student/progress',
+                path: '/student/schedule',
                 pageBuilder: (context, state) => AppPageTransitions.page(
                   key: state.pageKey,
-                  child: const MyProgressScreen(),
+                  child: const StudentScheduleScreen(),
                 ),
               ),
             ],
@@ -217,6 +224,10 @@ final routerProvider = Provider<GoRouter>((ref) {
           key: state.pageKey,
           child: const StudentProfileScreen(),
         ),
+      ),
+      GoRoute(
+        path: '/student/quizzes',
+        redirect: (context, state) => '/student/quiz-history',
       ),
       // Teacher Routes with Bottom Navigation
       StatefulShellRoute.indexedStack(

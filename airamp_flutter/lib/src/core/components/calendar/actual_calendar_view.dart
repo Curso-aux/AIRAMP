@@ -758,7 +758,7 @@ class _ActualCalendarViewState extends State<ActualCalendarView> {
                   children: [
                     // Time & Day Block (matching Agenda View / Picture 2)
                     Container(
-                      width: 82,
+                      width: 78,
                       padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 8),
                       decoration: BoxDecoration(
                         color: AppTheme.background,
@@ -796,29 +796,39 @@ class _ActualCalendarViewState extends State<ActualCalendarView> {
                     ),
                     const SizedBox(width: 10),
 
-                    // Subject & Info
+                    // Subject & Info - Full Width, No Truncation
                     Expanded(
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
+                          // Top row: Section Badge + LIVE indicator + Admin Assigned pill & Admin action buttons
                           Row(
                             children: [
-                              Expanded(
-                                child: Text(
-                                  subject,
-                                  style: TextStyle(
-                                    fontSize: 13,
-                                    fontWeight: FontWeight.bold,
-                                    color: AppTheme.text,
+                              if (section.isNotEmpty)
+                                Flexible(
+                                  child: Container(
+                                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                    decoration: BoxDecoration(
+                                      color: color.withValues(alpha: isDark ? 0.22 : 0.12),
+                                      borderRadius: BorderRadius.circular(6),
+                                      border: Border.all(color: color.withValues(alpha: isDark ? 0.35 : 0.22)),
+                                    ),
+                                    child: Text(
+                                      section,
+                                      style: TextStyle(
+                                        fontSize: 10.5,
+                                        fontWeight: FontWeight.bold,
+                                        color: isDark ? Color.lerp(color, Colors.white, 0.25) : color,
+                                      ),
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                    ),
                                   ),
-                                  maxLines: 1,
-                                  overflow: TextOverflow.ellipsis,
                                 ),
-                              ),
                               if (isOngoing) ...[
-                                const SizedBox(width: 4),
+                                const SizedBox(width: 5),
                                 Container(
-                                  padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
+                                  padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1.5),
                                   decoration: BoxDecoration(
                                     color: AppTheme.success.withValues(alpha: 0.15),
                                     borderRadius: BorderRadius.circular(4),
@@ -829,113 +839,110 @@ class _ActualCalendarViewState extends State<ActualCalendarView> {
                                   ),
                                 ),
                               ],
+                              const Spacer(),
+                              // Admin Assigned Tag
+                              Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2.5),
+                                decoration: BoxDecoration(
+                                  color: AppTheme.background,
+                                  borderRadius: BorderRadius.circular(6),
+                                  border: Border.all(color: AppTheme.border.withValues(alpha: 0.6)),
+                                ),
+                                child: Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    Icon(Icons.lock_clock_outlined, size: 10, color: AppTheme.textMuted),
+                                    const SizedBox(width: 3),
+                                    Text(
+                                      'Assigned',
+                                      style: TextStyle(fontSize: 9.5, color: AppTheme.textMuted, fontWeight: FontWeight.w500),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                              if (widget.isAdmin && (widget.onEditSchedule != null || widget.onDeleteSchedule != null)) ...[
+                                const SizedBox(width: 4),
+                                if (widget.onEditSchedule != null)
+                                  InkWell(
+                                    onTap: () => widget.onEditSchedule!(sched),
+                                    borderRadius: BorderRadius.circular(4),
+                                    child: Padding(
+                                      padding: const EdgeInsets.all(2),
+                                      child: Icon(Icons.edit_outlined, size: 15, color: AppTheme.primary),
+                                    ),
+                                  ),
+                                if (widget.onDeleteSchedule != null) ...[
+                                  const SizedBox(width: 4),
+                                  InkWell(
+                                    onTap: () => widget.onDeleteSchedule!(sched),
+                                    borderRadius: BorderRadius.circular(4),
+                                    child: Padding(
+                                      padding: const EdgeInsets.all(2),
+                                      child: Icon(Icons.delete_outline, size: 15, color: AppTheme.error),
+                                    ),
+                                  ),
+                                ],
+                              ],
                             ],
                           ),
-                          const SizedBox(height: 4),
-                          Row(
+                          const SizedBox(height: 5),
+
+                          // Full Subject Title (up to 2 lines so words are not cut off)
+                          Text(
+                            subject,
+                            style: TextStyle(
+                              fontSize: 13.5,
+                              fontWeight: FontWeight.bold,
+                              color: AppTheme.text,
+                              height: 1.25,
+                            ),
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                          const SizedBox(height: 5),
+
+                          // Metadata: Room & Teacher Chips using Wrap (avoids horizontal squeezing)
+                          Wrap(
+                            spacing: 8,
+                            runSpacing: 4,
+                            crossAxisAlignment: WrapCrossAlignment.center,
                             children: [
-                              if (section.isNotEmpty)
-                                Flexible(
-                                  child: Container(
-                                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                                    decoration: BoxDecoration(
-                                      color: color.withValues(alpha: 0.12),
-                                      borderRadius: BorderRadius.circular(6),
-                                      border: Border.all(color: color.withValues(alpha: 0.2)),
+                              if (room.isNotEmpty)
+                                Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    Icon(Icons.meeting_room_outlined, size: 12, color: AppTheme.textSecondary),
+                                    const SizedBox(width: 3),
+                                    Text(
+                                      room,
+                                      style: TextStyle(
+                                        fontSize: 11,
+                                        color: AppTheme.textSecondary,
+                                        fontWeight: FontWeight.w500,
+                                      ),
                                     ),
-                                    child: Text(
-                                      section,
-                                      style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: color),
-                                      maxLines: 1,
-                                      overflow: TextOverflow.ellipsis,
+                                  ],
+                                ),
+                              if (!widget.isTeacher && teacher.isNotEmpty && teacher != 'Assigned Faculty')
+                                Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    Icon(Icons.person_outline_rounded, size: 12, color: AppTheme.textSecondary),
+                                    const SizedBox(width: 3),
+                                    Text(
+                                      teacher,
+                                      style: TextStyle(
+                                        fontSize: 11,
+                                        color: AppTheme.textSecondary,
+                                        fontWeight: FontWeight.w500,
+                                      ),
                                     ),
-                                  ),
+                                  ],
                                 ),
-                              if (room.isNotEmpty) ...[
-                                const SizedBox(width: 6),
-                                Icon(Icons.meeting_room_outlined, size: 12, color: AppTheme.textSecondary),
-                                const SizedBox(width: 2),
-                                Flexible(
-                                  child: Text(
-                                    room,
-                                    style: TextStyle(fontSize: 11, color: AppTheme.textSecondary),
-                                    maxLines: 1,
-                                    overflow: TextOverflow.ellipsis,
-                                  ),
-                                ),
-                              ],
-                              if (!widget.isTeacher && teacher.isNotEmpty) ...[
-                                const SizedBox(width: 6),
-                                Icon(Icons.person_outline_rounded, size: 12, color: AppTheme.textSecondary),
-                                const SizedBox(width: 2),
-                                Flexible(
-                                  child: Text(
-                                    teacher,
-                                    style: TextStyle(fontSize: 11, color: AppTheme.textSecondary),
-                                    maxLines: 1,
-                                    overflow: TextOverflow.ellipsis,
-                                  ),
-                                ),
-                              ],
                             ],
                           ),
                         ],
                       ),
-                    ),
-
-                    // Right side: Assigned pill & Admin action buttons
-                    Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      crossAxisAlignment: CrossAxisAlignment.end,
-                      children: [
-                        Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
-                          decoration: BoxDecoration(
-                            color: AppTheme.background,
-                            borderRadius: BorderRadius.circular(6),
-                            border: Border.all(color: AppTheme.border.withValues(alpha: 0.6)),
-                          ),
-                          child: Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              Icon(Icons.lock_clock_outlined, size: 12, color: AppTheme.textMuted),
-                              const SizedBox(width: 4),
-                              Text(
-                                'Assigned',
-                                style: TextStyle(fontSize: 10, color: AppTheme.textMuted, fontWeight: FontWeight.w500),
-                              ),
-                            ],
-                          ),
-                        ),
-                        if (widget.isAdmin && (widget.onEditSchedule != null || widget.onDeleteSchedule != null)) ...[
-                          const SizedBox(height: 6),
-                          Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              if (widget.onEditSchedule != null)
-                                IconButton(
-                                  iconSize: 16,
-                                  padding: EdgeInsets.zero,
-                                  constraints: const BoxConstraints(),
-                                  tooltip: 'Edit Schedule',
-                                  icon: Icon(Icons.edit_outlined, color: AppTheme.primary),
-                                  onPressed: () => widget.onEditSchedule!(sched),
-                                ),
-                              if (widget.onDeleteSchedule != null) ...[
-                                const SizedBox(width: 8),
-                                IconButton(
-                                  iconSize: 16,
-                                  padding: EdgeInsets.zero,
-                                  constraints: const BoxConstraints(),
-                                  tooltip: 'Delete Schedule',
-                                  icon: Icon(Icons.delete_outline, color: AppTheme.error),
-                                  onPressed: () => widget.onDeleteSchedule!(sched),
-                                ),
-                              ],
-                            ],
-                          ),
-                        ],
-                      ],
                     ),
                   ],
                 ),

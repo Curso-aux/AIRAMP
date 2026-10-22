@@ -3,7 +3,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../routing/app_router.dart';
 import '../../../features/auth/application/auth_provider.dart';
 import '../../../features/student/presentation/components/student_assistive_touch.dart';
-import '../../../features/student/presentation/components/student_schedule_widget.dart';
 import '../../../features/student/presentation/components/student_announcements_sheet.dart';
 import '../../../features/teacher/presentation/components/teacher_assistive_touch.dart';
 import '../../../features/teacher/presentation/components/create_quiz_dialog.dart';
@@ -56,17 +55,7 @@ class GlobalAiraFloatingOverlay extends ConsumerWidget {
     if (currentUser.role == 'student' || location.startsWith('/student')) {
       assistant = StudentAssistiveTouch(
         onCourses: () => router.go('/student/courses'),
-        onSchedule: () {
-          final navContext = rootNavigatorKey.currentContext;
-          if (navContext != null) {
-            final sec = currentUser.section;
-            if (sec != null && sec.isNotEmpty) {
-              showStudentTimetableModal(navContext, initialSection: sec);
-            } else {
-              showStudentTimetableModal(navContext);
-            }
-          }
-        },
+        onSchedule: () => router.go('/student/schedule'),
         onQuizzes: () => router.go('/student/quiz-history'),
         onProgress: () => router.go('/student/progress'),
         onChat: () => router.go('/student/chat'),

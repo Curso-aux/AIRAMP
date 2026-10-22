@@ -801,29 +801,38 @@ class _TeacherScheduleScreenState extends ConsumerState<TeacherScheduleScreen> {
                       ),
                       const SizedBox(width: 10),
 
-                      // Subject & Info
+                      // Subject & Info - Full Width, No Truncation
                       Expanded(
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
+                            // Top row: Section Badge + LIVE indicator + Admin Assigned pill
                             Row(
                               children: [
-                                Expanded(
-                                  child: Text(
-                                    subject,
-                                    style: TextStyle(
-                                      fontSize: 13,
-                                      fontWeight: FontWeight.bold,
-                                      color: AppTheme.text,
+                                Flexible(
+                                  child: Container(
+                                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                    decoration: BoxDecoration(
+                                      color: color.withValues(alpha: isDark ? 0.22 : 0.12),
+                                      borderRadius: BorderRadius.circular(6),
+                                      border: Border.all(color: color.withValues(alpha: isDark ? 0.35 : 0.2)),
                                     ),
-                                    maxLines: 1,
-                                    overflow: TextOverflow.ellipsis,
+                                    child: Text(
+                                      section,
+                                      style: TextStyle(
+                                        fontSize: 10.5,
+                                        fontWeight: FontWeight.bold,
+                                        color: isDark ? Color.lerp(color, Colors.white, 0.25) : color,
+                                      ),
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                    ),
                                   ),
                                 ),
                                 if (isOngoing) ...[
-                                  const SizedBox(width: 4),
+                                  const SizedBox(width: 5),
                                   Container(
-                                    padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
+                                    padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1.5),
                                     decoration: BoxDecoration(
                                       color: AppTheme.success.withValues(alpha: 0.15),
                                       borderRadius: BorderRadius.circular(4),
@@ -834,63 +843,69 @@ class _TeacherScheduleScreenState extends ConsumerState<TeacherScheduleScreen> {
                                     ),
                                   ),
                                 ],
-                              ],
-                            ),
-                            const SizedBox(height: 4),
-                            Row(
-                              children: [
-                                Flexible(
-                                  child: Container(
-                                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                                    decoration: BoxDecoration(
-                                      color: color.withValues(alpha: 0.12),
-                                      borderRadius: BorderRadius.circular(6),
-                                      border: Border.all(color: color.withValues(alpha: 0.2)),
-                                    ),
-                                    child: Text(
-                                      section,
-                                      style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: color),
-                                      maxLines: 1,
-                                      overflow: TextOverflow.ellipsis,
-                                    ),
+                                const Spacer(),
+                                // Admin Assigned Tag
+                                Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2.5),
+                                  decoration: BoxDecoration(
+                                    color: AppTheme.background,
+                                    borderRadius: BorderRadius.circular(6),
+                                    border: Border.all(color: AppTheme.border.withValues(alpha: 0.6)),
+                                  ),
+                                  child: Row(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      Icon(Icons.lock_clock_outlined, size: 10, color: AppTheme.textMuted),
+                                      const SizedBox(width: 3),
+                                      Text(
+                                        'Assigned',
+                                        style: TextStyle(fontSize: 9.5, color: AppTheme.textMuted, fontWeight: FontWeight.w500),
+                                      ),
+                                    ],
                                   ),
                                 ),
-                                if (room != null && room.isNotEmpty) ...[
-                                  const SizedBox(width: 6),
-                                  Icon(Icons.meeting_room_outlined, size: 12, color: AppTheme.textSecondary),
-                                  const SizedBox(width: 2),
-                                  Flexible(
-                                    child: Text(
-                                      room,
-                                      style: TextStyle(fontSize: 11, color: AppTheme.textSecondary),
-                                      maxLines: 1,
-                                      overflow: TextOverflow.ellipsis,
-                                    ),
-                                  ),
-                                ],
                               ],
                             ),
-                          ],
-                        ),
-                      ),
+                            const SizedBox(height: 5),
 
-                      // Admin Assigned Tag
-                      Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
-                        decoration: BoxDecoration(
-                          color: AppTheme.background,
-                          borderRadius: BorderRadius.circular(6),
-                          border: Border.all(color: AppTheme.border.withValues(alpha: 0.6)),
-                        ),
-                        child: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Icon(Icons.lock_clock_outlined, size: 12, color: AppTheme.textMuted),
-                            const SizedBox(width: 4),
+                            // Full Subject Title (up to 2 lines so words are not cut off)
                             Text(
-                              'Assigned',
-                              style: TextStyle(fontSize: 10, color: AppTheme.textMuted, fontWeight: FontWeight.w500),
+                              subject,
+                              style: TextStyle(
+                                fontSize: 13.5,
+                                fontWeight: FontWeight.bold,
+                                color: AppTheme.text,
+                                height: 1.25,
+                              ),
+                              maxLines: 2,
+                              overflow: TextOverflow.ellipsis,
                             ),
+                            const SizedBox(height: 5),
+
+                            // Metadata: Room Chip using Wrap (avoids horizontal squeezing)
+                            if (room != null && room.isNotEmpty)
+                              Wrap(
+                                spacing: 8,
+                                runSpacing: 4,
+                                crossAxisAlignment: WrapCrossAlignment.center,
+                                children: [
+                                  Row(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      Icon(Icons.meeting_room_outlined, size: 12, color: AppTheme.textSecondary),
+                                      const SizedBox(width: 3),
+                                      Text(
+                                        room,
+                                        style: TextStyle(
+                                          fontSize: 11,
+                                          color: AppTheme.textSecondary,
+                                          fontWeight: FontWeight.w500,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ],
+                              ),
                           ],
                         ),
                       ),

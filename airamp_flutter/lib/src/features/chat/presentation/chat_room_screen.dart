@@ -52,6 +52,15 @@ class _ChatRoomScreenState extends ConsumerState<ChatRoomScreen> {
     }
   }
 
+  String _formatTime(String isoString) {
+    final dt = DateTime.tryParse(isoString);
+    if (dt == null) return '';
+    final hour = dt.hour == 0 ? 12 : (dt.hour > 12 ? dt.hour - 12 : dt.hour);
+    final minute = dt.minute.toString().padLeft(2, '0');
+    final period = dt.hour >= 12 ? 'PM' : 'AM';
+    return '$hour:$minute $period';
+  }
+
   @override
   Widget build(BuildContext context) {
     final chatState = ref.watch(chatProvider);
@@ -112,40 +121,89 @@ class _ChatRoomScreenState extends ConsumerState<ChatRoomScreen> {
         ),
         backgroundColor: Theme.of(context).colorScheme.surface,
         iconTheme: IconThemeData(color: AppTheme.text),
+        elevation: 0.5,
       ),
       body: Column(
         children: [
           Expanded(
             child: ListView.builder(
               reverse: true, // Show latest messages at bottom
-              padding: const EdgeInsets.all(16),
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
               itemCount: messages.length,
               itemBuilder: (context, index) {
                 // Since it's reversed, index 0 is the last item in the array
                 final msg = messages[messages.length - 1 - index];
                 final isMe = msg.senderId == user?.id;
+                final timeStr = _formatTime(msg.createdAt);
 
                 return Align(
                   alignment: isMe ? Alignment.centerRight : Alignment.centerLeft,
                   child: GestureDetector(
                     onLongPress: () => _showMessageOptions(msg, isMe),
                     child: Container(
-                      margin: const EdgeInsets.only(bottom: 12),
-                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                      constraints: BoxConstraints(maxWidth: MediaQuery.of(context).size.width * 0.78),
+                      margin: const EdgeInsets.only(bottom: 10),
+                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
                       decoration: BoxDecoration(
-                        color: isMe ? AppTheme.primary : Theme.of(context).colorScheme.surface,
-                        borderRadius: BorderRadius.circular(16).copyWith(
-                          bottomRight: isMe ? const Radius.circular(0) : null,
-                          bottomLeft: !isMe ? const Radius.circular(0) : null,
+                        gradient: isMe
+                            ? LinearGradient(
+                                colors: [AppTheme.primary, AppTheme.primaryDark],
+                                begin: Alignment.topLeft,
+                                end: Alignment.bottomRight,
+                              )
+                            : null,
+                        color: !isMe ? Theme.of(context).colorScheme.surface : null,
+                        borderRadius: BorderRadius.only(
+                          topLeft: const Radius.circular(16),
+                          topRight: const Radius.circular(16),
+                          bottomLeft: isMe ? const Radius.circular(16) : const Radius.circular(3),
+                          bottomRight: isMe ? const Radius.circular(3) : const Radius.circular(16),
                         ),
-                        border: !isMe ? Border.all(color: AppTheme.border) : null,
+                        border: !isMe ? Border.all(color: AppTheme.border.withValues(alpha: 0.7)) : null,
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.black.withValues(alpha: 0.04),
+                            blurRadius: 4,
+                            offset: const Offset(0, 1),
+                          ),
+                        ],
                       ),
-                      child: Text(
-                        msg.text,
-                        style: TextStyle(
-                          color: isMe ? Colors.black : AppTheme.text,
-                          fontSize: 16,
-                        ),
+                      child: Column(
+                        crossAxisAlignment: isMe ? CrossAxisAlignment.end : CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            msg.text,
+                            style: TextStyle(
+                              color: isMe ? Colors.white : AppTheme.text,
+                              fontSize: 15,
+                              height: 1.3,
+                            ),
+                          ),
+                          if (timeStr.isNotEmpty) ...[
+                            const SizedBox(height: 4),
+                            Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Text(
+                                  timeStr,
+                                  style: TextStyle(
+                                    color: isMe ? Colors.white.withValues(alpha: 0.7) : AppTheme.textMuted,
+                                    fontSize: 10,
+                                    fontWeight: FontWeight.w500,
+                                  ),
+                                ),
+                                if (isMe) ...[
+                                  const SizedBox(width: 3),
+                                  Icon(
+                                    msg.isRead ? Icons.done_all_rounded : Icons.done_rounded,
+                                    size: 13,
+                                    color: Colors.white.withValues(alpha: 0.75),
+                                  ),
+                                ],
+                              ],
+                            ),
+                          ],
+                        ],
                       ),
                     ),
                   ),
@@ -157,7 +215,7 @@ class _ChatRoomScreenState extends ConsumerState<ChatRoomScreen> {
             padding: const EdgeInsets.all(12).copyWith(bottom: MediaQuery.of(context).padding.bottom + 12),
             decoration: BoxDecoration(
               color: Theme.of(context).colorScheme.surface,
-              border: Border(top: BorderSide(color: Theme.of(context).dividerColor)),
+              border: Border(top: BorderSide(color: Theme.of(context).dividerColor.withValues(alpha: 0.6))),
             ),
             child: Row(
               children: [
@@ -175,19 +233,43 @@ class _ChatRoomScreenState extends ConsumerState<ChatRoomScreen> {
                       fillColor: AppTheme.background,
                       border: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(24),
-                        borderSide: BorderSide.none,
+                        borderSide: BorderSide(color: AppTheme.border.withValues(alpha: 0.5)),
                       ),
-                      contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                      enabledBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(24),
+                        borderSide: BorderSide(color: AppTheme.border.withValues(alpha: 0.5)),
+                      ),
+                      focusedBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(24),
+                        borderSide: BorderSide(color: AppTheme.primary, width: 1.2),
+                      ),
+                      contentPadding: const EdgeInsets.symmetric(horizontal: 18, vertical: 11),
                     ),
                     onSubmitted: (_) => _sendMessage(),
                   ),
                 ),
                 const SizedBox(width: 8),
-                CircleAvatar(
-                  backgroundColor: Theme.of(context).colorScheme.primary,
-                  child: IconButton(
-                    icon: const Icon(Icons.send, color: Colors.black, size: 20),
-                    onPressed: _sendMessage,
+                Material(
+                  color: Colors.transparent,
+                  child: InkWell(
+                    onTap: _sendMessage,
+                    borderRadius: BorderRadius.circular(22),
+                    child: Container(
+                      width: 44,
+                      height: 44,
+                      decoration: BoxDecoration(
+                        color: AppTheme.primary,
+                        shape: BoxShape.circle,
+                        boxShadow: [
+                          BoxShadow(
+                            color: AppTheme.primary.withValues(alpha: 0.28),
+                            blurRadius: 6,
+                            offset: const Offset(0, 2),
+                          ),
+                        ],
+                      ),
+                      child: const Icon(Icons.send_rounded, color: Colors.white, size: 20),
+                    ),
                   ),
                 ),
               ],

@@ -865,28 +865,37 @@ class TodayScheduleBanner extends ConsumerWidget {
                                       ),
                                       const SizedBox(width: 12),
 
-                                      // Subject & Info
+                                      // Subject & Info - Full Width, No Truncation
                                       Expanded(
                                         child: Column(
                                           crossAxisAlignment: CrossAxisAlignment.start,
                                           mainAxisSize: MainAxisSize.min,
                                           children: [
+                                            // Top row: Section Badge + LIVE indicator + Admin Assigned pill
                                             Row(
                                               children: [
-                                                Expanded(
-                                                  child: Text(
-                                                    subject,
-                                                    style: TextStyle(
-                                                      fontSize: 13.5,
-                                                      fontWeight: FontWeight.bold,
-                                                      color: AppTheme.text,
+                                                Flexible(
+                                                  child: Container(
+                                                    padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+                                                    decoration: BoxDecoration(
+                                                      color: color.withValues(alpha: isDark ? 0.20 : 0.12),
+                                                      borderRadius: BorderRadius.circular(6),
+                                                      border: Border.all(color: color.withValues(alpha: isDark ? 0.35 : 0.22)),
                                                     ),
-                                                    maxLines: 1,
-                                                    overflow: TextOverflow.ellipsis,
+                                                    child: Text(
+                                                      section,
+                                                      style: TextStyle(
+                                                        fontSize: 10.5,
+                                                        fontWeight: FontWeight.bold,
+                                                        color: isDark ? Color.lerp(color, Colors.white, 0.25) : color,
+                                                      ),
+                                                      maxLines: 1,
+                                                      overflow: TextOverflow.ellipsis,
+                                                    ),
                                                   ),
                                                 ),
                                                 if (isOngoing) ...[
-                                                  const SizedBox(width: 4),
+                                                  const SizedBox(width: 5),
                                                   Container(
                                                     padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1.5),
                                                     decoration: BoxDecoration(
@@ -917,77 +926,73 @@ class TodayScheduleBanner extends ConsumerWidget {
                                                     ),
                                                   ),
                                                 ],
+                                                const Spacer(),
+                                                // Admin Assigned Tag
+                                                Container(
+                                                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2.5),
+                                                  decoration: BoxDecoration(
+                                                    color: isDark ? AppTheme.background : const Color(0xFFF8FAFC),
+                                                    borderRadius: BorderRadius.circular(6),
+                                                    border: Border.all(color: isDark ? AppTheme.border : const Color(0xFFE2E8F0)),
+                                                  ),
+                                                  child: Row(
+                                                    mainAxisSize: MainAxisSize.min,
+                                                    children: [
+                                                      Icon(Icons.lock_clock_outlined, size: 10, color: AppTheme.textMuted),
+                                                      const SizedBox(width: 3),
+                                                      Text(
+                                                        'Assigned',
+                                                        style: TextStyle(
+                                                          fontSize: 9.5,
+                                                          color: AppTheme.textMuted,
+                                                          fontWeight: FontWeight.w500,
+                                                        ),
+                                                      ),
+                                                    ],
+                                                  ),
+                                                ),
                                               ],
                                             ),
                                             const SizedBox(height: 5),
-                                            Row(
-                                              children: [
-                                                Flexible(
-                                                  child: Container(
-                                                    padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
-                                                    decoration: BoxDecoration(
-                                                      color: color.withValues(alpha: isDark ? 0.20 : 0.12),
-                                                      borderRadius: BorderRadius.circular(6),
-                                                      border: Border.all(color: color.withValues(alpha: isDark ? 0.35 : 0.22)),
-                                                    ),
-                                                    child: Text(
-                                                      section,
-                                                      style: TextStyle(
-                                                        fontSize: 11,
-                                                        fontWeight: FontWeight.bold,
-                                                        color: isDark ? Color.lerp(color, Colors.white, 0.25) : color,
+
+                                            // Full Subject Title (up to 2 lines so words are not cut off)
+                                            Text(
+                                              subject,
+                                              style: TextStyle(
+                                                fontSize: 13.5,
+                                                fontWeight: FontWeight.bold,
+                                                color: AppTheme.text,
+                                                height: 1.25,
+                                              ),
+                                              maxLines: 2,
+                                              overflow: TextOverflow.ellipsis,
+                                            ),
+                                            const SizedBox(height: 5),
+
+                                            // Metadata: Room Chip using Wrap (avoids horizontal squeezing)
+                                            if (room != null && room.isNotEmpty)
+                                              Wrap(
+                                                spacing: 8,
+                                                runSpacing: 4,
+                                                crossAxisAlignment: WrapCrossAlignment.center,
+                                                children: [
+                                                  Row(
+                                                    mainAxisSize: MainAxisSize.min,
+                                                    children: [
+                                                      Icon(Icons.meeting_room_outlined, size: 12, color: AppTheme.textSecondary),
+                                                      const SizedBox(width: 3),
+                                                      Text(
+                                                        room,
+                                                        style: TextStyle(
+                                                          fontSize: 11,
+                                                          color: AppTheme.textSecondary,
+                                                          fontWeight: FontWeight.w500,
+                                                        ),
                                                       ),
-                                                      maxLines: 1,
-                                                      overflow: TextOverflow.ellipsis,
-                                                    ),
-                                                  ),
-                                                ),
-                                                if (room != null && room.isNotEmpty) ...[
-                                                  const SizedBox(width: 6),
-                                                  Icon(Icons.meeting_room_outlined, size: 13, color: AppTheme.textSecondary),
-                                                  const SizedBox(width: 3),
-                                                  Flexible(
-                                                    child: Text(
-                                                      room,
-                                                      style: TextStyle(
-                                                        fontSize: 11,
-                                                        color: AppTheme.textSecondary,
-                                                        fontWeight: FontWeight.w500,
-                                                      ),
-                                                      maxLines: 1,
-                                                      overflow: TextOverflow.ellipsis,
-                                                    ),
+                                                    ],
                                                   ),
                                                 ],
-                                              ],
-                                            ),
-                                          ],
-                                        ),
-                                      ),
-
-                                      const SizedBox(width: 8),
-
-                                      // Admin Assigned Tag
-                                      Container(
-                                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3.5),
-                                        decoration: BoxDecoration(
-                                          color: isDark ? AppTheme.background : const Color(0xFFF8FAFC),
-                                          borderRadius: BorderRadius.circular(6),
-                                          border: Border.all(color: isDark ? AppTheme.border : const Color(0xFFE2E8F0)),
-                                        ),
-                                        child: Row(
-                                          mainAxisSize: MainAxisSize.min,
-                                          children: [
-                                            Icon(Icons.lock_clock_outlined, size: 11, color: AppTheme.textMuted),
-                                            const SizedBox(width: 3),
-                                            Text(
-                                              'Assigned',
-                                              style: TextStyle(
-                                                fontSize: 10,
-                                                color: AppTheme.textMuted,
-                                                fontWeight: FontWeight.w500,
                                               ),
-                                            ),
                                           ],
                                         ),
                                       ),

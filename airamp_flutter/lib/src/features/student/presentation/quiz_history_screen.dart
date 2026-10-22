@@ -76,6 +76,8 @@ class _QuizHistoryScreenState extends ConsumerState<QuizHistoryScreen> {
     final enrolledCourses = ref.watch(studentCoursesProvider);
     final attempts = ref.watch(studentQuizAttemptsProvider);
     final assignedQuizzes = ref.watch(studentQuizAssignmentsProvider);
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final primary = Theme.of(context).colorScheme.primary;
 
     // Compute dynamic summary stats
     final totalAttempts = attempts.length;
@@ -114,6 +116,7 @@ class _QuizHistoryScreenState extends ConsumerState<QuizHistoryScreen> {
             await ref.read(studentQuizAttemptsProvider.notifier).loadAttempts(subjectId: subjectId);
             await ref.read(studentCoursesProvider.notifier).reload();
           },
+          color: primary,
           child: SingleChildScrollView(
             physics: const AlwaysScrollableScrollPhysics(),
             padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
@@ -126,78 +129,113 @@ class _QuizHistoryScreenState extends ConsumerState<QuizHistoryScreen> {
                     Container(
                       padding: const EdgeInsets.all(8),
                       decoration: BoxDecoration(
-                        color: AppTheme.primary.withValues(alpha: 0.15),
+                        color: isDark ? AppTheme.darkSurfaceLight : const Color(0xFFF1F5F9),
                         borderRadius: BorderRadius.circular(10),
+                        border: Border.all(
+                          color: isDark ? AppTheme.darkBorder : const Color(0xFFE2E8F0),
+                        ),
                       ),
-                      child: Icon(Icons.assignment, color: AppTheme.primary, size: 24),
+                      child: Icon(
+                        Icons.assignment_outlined,
+                        color: isDark ? AppTheme.darkTextSecondary : const Color(0xFF475569),
+                        size: 20,
+                      ),
                     ),
-                    const SizedBox(width: 10),
+                    const SizedBox(width: 12),
                     Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
                           'My Quizzes',
-                          style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold, color: AppTheme.text),
+                          style: TextStyle(
+                            fontSize: 26,
+                            fontWeight: FontWeight.bold,
+                            letterSpacing: -0.4,
+                            color: Theme.of(context).colorScheme.onSurface,
+                          ),
                         ),
+                        const SizedBox(height: 2),
                         Text(
                           'Assigned quizzes, exams & live results',
-                          style: TextStyle(fontSize: 12, color: AppTheme.textSecondary),
+                          style: TextStyle(fontSize: 13, color: AppTheme.textSecondary),
                         ),
                       ],
                     ),
                   ],
                 ),
-                const SizedBox(height: 18),
+                const SizedBox(height: 16),
 
-                // Top Segmented Tab Switcher
+                // Top Segmented Tab Switcher (Matching Courses Design System)
                 Container(
+                  height: 40,
+                  padding: const EdgeInsets.all(3),
                   decoration: BoxDecoration(
-                    color: AppTheme.surface,
-                    borderRadius: BorderRadius.circular(12),
-                    border: Border.all(color: AppTheme.border),
+                    color: isDark ? AppTheme.darkInputBg : const Color(0xFFF1F5F9),
+                    borderRadius: BorderRadius.circular(10),
+                    border: Border.all(
+                      color: isDark ? AppTheme.darkBorder : const Color(0xFFE2E8F0),
+                      width: 1,
+                    ),
                   ),
                   child: Row(
                     children: [
                       Expanded(
-                        child: GestureDetector(
+                        child: InkWell(
                           onTap: () => setState(() => _selectedTab = 0),
-                          child: Container(
-                            padding: const EdgeInsets.symmetric(vertical: 12),
+                          borderRadius: BorderRadius.circular(8),
+                          child: AnimatedContainer(
+                            duration: const Duration(milliseconds: 180),
+                            alignment: Alignment.center,
                             decoration: BoxDecoration(
-                              color: _selectedTab == 0 ? AppTheme.primary : Colors.transparent,
-                              borderRadius: BorderRadius.circular(12),
+                              color: _selectedTab == 0
+                                  ? (isDark ? AppTheme.darkSurface : Colors.white)
+                                  : Colors.transparent,
+                              borderRadius: BorderRadius.circular(8),
+                              boxShadow: _selectedTab == 0
+                                  ? [
+                                      BoxShadow(
+                                        color: Colors.black.withValues(alpha: isDark ? 0.25 : 0.05),
+                                        blurRadius: 4,
+                                        offset: const Offset(0, 1),
+                                      ),
+                                    ]
+                                  : null,
                             ),
                             child: Row(
                               mainAxisAlignment: MainAxisAlignment.center,
                               children: [
                                 Icon(
                                   Icons.assignment_turned_in_outlined,
-                                  size: 16,
-                                  color: _selectedTab == 0 ? Colors.black : AppTheme.textSecondary,
+                                  size: 14,
+                                  color: _selectedTab == 0
+                                      ? (isDark ? AppTheme.darkText : const Color(0xFF0F172A))
+                                      : AppTheme.textMuted,
                                 ),
                                 const SizedBox(width: 6),
                                 Text(
                                   'Assigned Quizzes',
                                   style: TextStyle(
-                                    color: _selectedTab == 0 ? Colors.black : AppTheme.textSecondary,
-                                    fontWeight: FontWeight.bold,
-                                    fontSize: 13,
+                                    fontSize: 12,
+                                    fontWeight: _selectedTab == 0 ? FontWeight.bold : FontWeight.w500,
+                                    color: _selectedTab == 0
+                                        ? (isDark ? AppTheme.darkText : const Color(0xFF0F172A))
+                                        : AppTheme.textMuted,
                                   ),
                                 ),
                                 if (pendingCount > 0) ...[
                                   const SizedBox(width: 6),
                                   Container(
-                                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                    padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1.5),
                                     decoration: BoxDecoration(
-                                      color: _selectedTab == 0 ? Colors.black : AppTheme.warning,
-                                      borderRadius: BorderRadius.circular(10),
+                                      color: isDark ? AppTheme.darkSurfaceLight : const Color(0xFFE2E8F0),
+                                      borderRadius: BorderRadius.circular(6),
                                     ),
                                     child: Text(
                                       '$pendingCount',
                                       style: TextStyle(
-                                        color: _selectedTab == 0 ? AppTheme.primary : Colors.white,
                                         fontSize: 10,
                                         fontWeight: FontWeight.bold,
+                                        color: isDark ? AppTheme.darkText : const Color(0xFF0F172A),
                                       ),
                                     ),
                                   ),
@@ -208,29 +246,46 @@ class _QuizHistoryScreenState extends ConsumerState<QuizHistoryScreen> {
                         ),
                       ),
                       Expanded(
-                        child: GestureDetector(
+                        child: InkWell(
                           onTap: () => setState(() => _selectedTab = 1),
-                          child: Container(
-                            padding: const EdgeInsets.symmetric(vertical: 12),
+                          borderRadius: BorderRadius.circular(8),
+                          child: AnimatedContainer(
+                            duration: const Duration(milliseconds: 180),
+                            alignment: Alignment.center,
                             decoration: BoxDecoration(
-                              color: _selectedTab == 1 ? AppTheme.primary : Colors.transparent,
-                              borderRadius: BorderRadius.circular(12),
+                              color: _selectedTab == 1
+                                  ? (isDark ? AppTheme.darkSurface : Colors.white)
+                                  : Colors.transparent,
+                              borderRadius: BorderRadius.circular(8),
+                              boxShadow: _selectedTab == 1
+                                  ? [
+                                      BoxShadow(
+                                        color: Colors.black.withValues(alpha: isDark ? 0.25 : 0.05),
+                                        blurRadius: 4,
+                                        offset: const Offset(0, 1),
+                                      ),
+                                    ]
+                                  : null,
                             ),
                             child: Row(
                               mainAxisAlignment: MainAxisAlignment.center,
                               children: [
                                 Icon(
-                                  Icons.history,
-                                  size: 16,
-                                  color: _selectedTab == 1 ? Colors.black : AppTheme.textSecondary,
+                                  Icons.history_rounded,
+                                  size: 14,
+                                  color: _selectedTab == 1
+                                      ? (isDark ? AppTheme.darkText : const Color(0xFF0F172A))
+                                      : AppTheme.textMuted,
                                 ),
                                 const SizedBox(width: 6),
                                 Text(
                                   'History & Results ($totalAttempts)',
                                   style: TextStyle(
-                                    color: _selectedTab == 1 ? Colors.black : AppTheme.textSecondary,
-                                    fontWeight: FontWeight.bold,
-                                    fontSize: 13,
+                                    fontSize: 12,
+                                    fontWeight: _selectedTab == 1 ? FontWeight.bold : FontWeight.w500,
+                                    color: _selectedTab == 1
+                                        ? (isDark ? AppTheme.darkText : const Color(0xFF0F172A))
+                                        : AppTheme.textMuted,
                                   ),
                                 ),
                               ],
@@ -266,22 +321,42 @@ class _QuizHistoryScreenState extends ConsumerState<QuizHistoryScreen> {
 
   // --- TAB 0: ASSIGNED QUIZZES VIEW ---
   Widget _buildAssignedQuizzesView(List<Map<String, dynamic>> assignedQuizzes) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final primary = Theme.of(context).colorScheme.primary;
+
     if (assignedQuizzes.isEmpty) {
       return Container(
         width: double.infinity,
         padding: const EdgeInsets.all(36),
         decoration: BoxDecoration(
-          color: AppTheme.surface,
+          color: Theme.of(context).colorScheme.surface,
           borderRadius: BorderRadius.circular(16),
-          border: Border.all(color: AppTheme.border),
+          border: Border.all(
+            color: isDark ? AppTheme.darkBorder : const Color(0xFFE2E8F0),
+          ),
         ),
         child: Column(
           children: [
-            Icon(Icons.task_alt, size: 56, color: AppTheme.success),
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: isDark ? AppTheme.darkSurfaceLight : const Color(0xFFF1F5F9),
+                shape: BoxShape.circle,
+              ),
+              child: Icon(
+                Icons.task_alt_rounded,
+                size: 36,
+                color: isDark ? AppTheme.darkTextSecondary : const Color(0xFF475569),
+              ),
+            ),
             const SizedBox(height: 14),
             Text(
               'All Caught Up!',
-              style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18, color: AppTheme.text),
+              style: TextStyle(
+                fontWeight: FontWeight.bold,
+                fontSize: 17,
+                color: Theme.of(context).colorScheme.onSurface,
+              ),
             ),
             const SizedBox(height: 6),
             Text(
@@ -299,9 +374,14 @@ class _QuizHistoryScreenState extends ConsumerState<QuizHistoryScreen> {
       children: [
         Text(
           'Your Assigned Quizzes (${assignedQuizzes.length})',
-          style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: AppTheme.text),
+          style: TextStyle(
+            fontSize: 16,
+            fontWeight: FontWeight.bold,
+            letterSpacing: -0.2,
+            color: Theme.of(context).colorScheme.onSurface,
+          ),
         ),
-        const SizedBox(height: 10),
+        const SizedBox(height: 12),
         ListView.separated(
           shrinkWrap: true,
           physics: const NeverScrollableScrollPhysics(),
@@ -318,7 +398,7 @@ class _QuizHistoryScreenState extends ConsumerState<QuizHistoryScreen> {
             final qCount = item['question_count'] ?? item['total_questions'] ?? 0;
             final timeLimit = item['time_limit_minutes'] ?? 0;
             final passingScore = item['passing_score'] ?? 70;
-                        final dueDate = item['due_date']?.toString();
+            final dueDate = item['due_date']?.toString();
             final isCompleted = item['status'] == 'completed';
             final quizStatus = item['quiz_status']?.toString();
             final score = item['score'] ?? 0;
@@ -334,16 +414,19 @@ class _QuizHistoryScreenState extends ConsumerState<QuizHistoryScreen> {
             return Container(
               padding: const EdgeInsets.all(16),
               decoration: BoxDecoration(
-                color: AppTheme.surface,
-                borderRadius: BorderRadius.circular(14),
+                color: Theme.of(context).colorScheme.surface,
+                borderRadius: BorderRadius.circular(16),
                 border: Border.all(
-                  color: isCompleted
-                      ? AppTheme.border
-                      : isMissed
-                          ? AppTheme.error.withValues(alpha: 0.5)
-                          : AppTheme.primary.withValues(alpha: 0.5),
-                  width: isCompleted ? 1 : 1.5,
+                  color: isDark ? AppTheme.darkBorder : const Color(0xFFE2E8F0),
+                  width: 1,
                 ),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withValues(alpha: isDark ? 0.2 : 0.02),
+                    blurRadius: 8,
+                    offset: const Offset(0, 2),
+                  ),
+                ],
               ),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -352,14 +435,19 @@ class _QuizHistoryScreenState extends ConsumerState<QuizHistoryScreen> {
                   Row(
                     children: [
                       Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                         decoration: BoxDecoration(
-                          color: AppTheme.primary.withValues(alpha: 0.15),
-                          borderRadius: BorderRadius.circular(6),
+                          color: isDark ? AppTheme.darkSurfaceLight : const Color(0xFFF1F5F9),
+                          borderRadius: BorderRadius.circular(4),
                         ),
                         child: Text(
                           subjectCode,
-                          style: TextStyle(color: AppTheme.primary, fontWeight: FontWeight.bold, fontSize: 11),
+                          style: TextStyle(
+                            fontSize: 11,
+                            fontWeight: FontWeight.w700,
+                            color: isDark ? AppTheme.darkText : const Color(0xFF1E293B),
+                            letterSpacing: 0.2,
+                          ),
                         ),
                       ),
                       const SizedBox(width: 8),
@@ -368,39 +456,53 @@ class _QuizHistoryScreenState extends ConsumerState<QuizHistoryScreen> {
                           subjectName,
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
-                          style: TextStyle(color: AppTheme.textSecondary, fontSize: 11),
+                          style: TextStyle(
+                            color: AppTheme.textSecondary,
+                            fontSize: 12,
+                            fontWeight: FontWeight.w500,
+                          ),
                         ),
                       ),
                       Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                        padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2.5),
                         decoration: BoxDecoration(
                           color: isCompleted
-                              ? AppTheme.success.withValues(alpha: 0.15)
+                              ? (isDark ? AppTheme.darkSurfaceLight : const Color(0xFFF1F5F9))
                               : isMissed
-                                  ? AppTheme.error.withValues(alpha: 0.15)
+                                  ? (isDark ? const Color(0xFF2C1E20) : const Color(0xFFFEE2E2))
                                   : isNotYetAvailable
-                                      ? AppTheme.info.withValues(alpha: 0.15)
-                                      : AppTheme.warning.withValues(alpha: 0.15),
+                                      ? (isDark ? AppTheme.darkSurfaceLight : const Color(0xFFF1F5F9))
+                                      : (isDark ? const Color(0xFF1E2B24) : const Color(0xFFDCFCE7)),
                           borderRadius: BorderRadius.circular(6),
+                          border: Border.all(
+                            color: isCompleted
+                                ? (isDark ? AppTheme.darkBorder : const Color(0xFFE2E8F0))
+                                : isMissed
+                                    ? (isDark ? const Color(0xFF4C282C) : const Color(0xFFFECACA))
+                                    : isNotYetAvailable
+                                        ? (isDark ? AppTheme.darkBorder : const Color(0xFFE2E8F0))
+                                        : (isDark ? const Color(0xFF234433) : const Color(0xFFBBF7D0)),
+                            width: 0.8,
+                          ),
                         ),
                         child: Text(
                           isCompleted
                               ? 'Completed · $pct%'
                               : isMissed
-                                  ? 'MISSED'
+                                  ? 'Missed'
                                   : isNotYetAvailable
                                       ? 'Upcoming'
-                                      : 'Pending',
+                                      : 'Open',
                           style: TextStyle(
                             color: isCompleted
-                                ? AppTheme.success
+                                ? AppTheme.textSecondary
                                 : isMissed
-                                    ? AppTheme.error
+                                    ? (isDark ? const Color(0xFFF87171) : const Color(0xFF991B1B))
                                     : isNotYetAvailable
-                                        ? AppTheme.info
-                                        : AppTheme.warning,
-                            fontWeight: FontWeight.bold,
-                            fontSize: 11,
+                                        ? AppTheme.textSecondary
+                                        : (isDark ? const Color(0xFF34D399) : const Color(0xFF166534)),
+                            fontWeight: FontWeight.w600,
+                            fontSize: 10.5,
                           ),
                         ),
                       ),
@@ -408,58 +510,75 @@ class _QuizHistoryScreenState extends ConsumerState<QuizHistoryScreen> {
                   ),
                   const SizedBox(height: 10),
 
-                  // Missed Quiz banner
+                  // Missed Quiz notice (Subtle & Institutional)
                   if (isMissed)
                     Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                      margin: const EdgeInsets.only(bottom: 10),
+                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
                       decoration: BoxDecoration(
-                        color: AppTheme.error.withValues(alpha: 0.12),
+                        color: isDark ? AppTheme.darkSurfaceLight : const Color(0xFFF8FAFC),
                         borderRadius: BorderRadius.circular(8),
-                        border: Border.all(color: AppTheme.error.withValues(alpha: 0.3)),
+                        border: Border.all(
+                          color: isDark ? AppTheme.darkBorder : const Color(0xFFE2E8F0),
+                        ),
                       ),
                       child: Row(
                         children: [
-                          Icon(Icons.event_busy, size: 16, color: AppTheme.error),
-                          const SizedBox(width: 8),
+                          Icon(Icons.info_outline_rounded, size: 14, color: AppTheme.textMuted),
+                          const SizedBox(width: 6),
                           Expanded(
                             child: Text(
-                              'Missed Quiz — The availability deadline has passed.',
-                              style: TextStyle(color: AppTheme.error, fontWeight: FontWeight.w600, fontSize: 12),
+                              'Submission window closed on ${_formatDate(scheduleEnd ?? dueDate)}',
+                              style: TextStyle(
+                                color: AppTheme.textSecondary,
+                                fontWeight: FontWeight.normal,
+                                fontSize: 11.5,
+                              ),
                             ),
                           ),
                         ],
                       ),
                     ),
-                  if (isMissed) const SizedBox(height: 10),
 
-                  // Not Yet Available banner
+                  // Not Yet Available notice
                   if (isNotYetAvailable)
                     Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                      margin: const EdgeInsets.only(bottom: 10),
+                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
                       decoration: BoxDecoration(
-                        color: AppTheme.info.withValues(alpha: 0.12),
+                        color: isDark ? AppTheme.darkSurfaceLight : const Color(0xFFF8FAFC),
                         borderRadius: BorderRadius.circular(8),
-                        border: Border.all(color: AppTheme.info.withValues(alpha: 0.3)),
+                        border: Border.all(
+                          color: isDark ? AppTheme.darkBorder : const Color(0xFFE2E8F0),
+                        ),
                       ),
                       child: Row(
                         children: [
-                          Icon(Icons.access_time, size: 16, color: AppTheme.info),
-                          const SizedBox(width: 8),
+                          Icon(Icons.schedule_rounded, size: 14, color: AppTheme.textMuted),
+                          const SizedBox(width: 6),
                           Expanded(
                             child: Text(
                               'Available from ${_formatDate(scheduleStart)}',
-                              style: TextStyle(color: AppTheme.info, fontWeight: FontWeight.w600, fontSize: 12),
+                              style: TextStyle(
+                                color: AppTheme.textSecondary,
+                                fontWeight: FontWeight.normal,
+                                fontSize: 11.5,
+                              ),
                             ),
                           ),
                         ],
                       ),
                     ),
-                  if (isNotYetAvailable) const SizedBox(height: 10),
 
                   // Quiz Title
                   Text(
                     title,
-                    style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: AppTheme.text),
+                    style: TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.bold,
+                      letterSpacing: -0.2,
+                      color: Theme.of(context).colorScheme.onSurface,
+                    ),
                   ),
                   if (desc.isNotEmpty) ...[
                     const SizedBox(height: 4),
@@ -477,23 +596,23 @@ class _QuizHistoryScreenState extends ConsumerState<QuizHistoryScreen> {
                     spacing: 12,
                     runSpacing: 6,
                     children: [
-                      _buildMetaChip(Icons.person_outline, teacherName),
-                      _buildMetaChip(Icons.help_outline, '$qCount Questions'),
+                      _buildMetaChip(Icons.person_outline_rounded, teacherName),
+                      _buildMetaChip(Icons.help_outline_rounded, '$qCount Questions'),
                       _buildMetaChip(Icons.timer_outlined, timeLimit > 0 ? '$timeLimit mins' : 'No limit'),
                       _buildMetaChip(Icons.verified_outlined, 'Pass: $passingScore%'),
                       if (dueDate != null && dueDate.isNotEmpty)
-                        _buildMetaChip(Icons.calendar_today, 'Due ${_formatDate(dueDate)}'),
+                        _buildMetaChip(Icons.calendar_today_outlined, 'Due ${_formatDate(dueDate)}'),
                       if (scheduleStart != null && scheduleStart.isNotEmpty)
-                        _buildMetaChip(Icons.schedule, 'Starts ${_formatDate(scheduleStart)}'),
+                        _buildMetaChip(Icons.schedule_outlined, 'Starts ${_formatDate(scheduleStart)}'),
                       if (scheduleEnd != null && scheduleEnd.isNotEmpty)
-                        _buildMetaChip(Icons.access_time, 'Until ${_formatDate(scheduleEnd)}'),
+                        _buildMetaChip(Icons.access_time_rounded, 'Until ${_formatDate(scheduleEnd)}'),
                       if (quizStatus == 'draft')
-                        _buildMetaChip(Icons.save, 'Draft'),
+                        _buildMetaChip(Icons.save_outlined, 'Draft'),
                     ],
                   ),
                   const SizedBox(height: 14),
 
-                  // Action Button
+                  // Action Buttons
                   SizedBox(
                     width: double.infinity,
                     child: isCompleted
@@ -504,8 +623,9 @@ class _QuizHistoryScreenState extends ConsumerState<QuizHistoryScreen> {
                                   Expanded(
                                     child: ElevatedButton.icon(
                                       style: ElevatedButton.styleFrom(
-                                        backgroundColor: AppTheme.primary,
-                                        foregroundColor: Colors.black,
+                                        backgroundColor: primary,
+                                        foregroundColor: Colors.white,
+                                        elevation: 0,
                                         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
                                         padding: const EdgeInsets.symmetric(vertical: 12),
                                       ),
@@ -520,7 +640,7 @@ class _QuizHistoryScreenState extends ConsumerState<QuizHistoryScreen> {
                                           ),
                                         );
                                       },
-                                      icon: const Icon(Icons.style, size: 16),
+                                      icon: const Icon(Icons.style_outlined, size: 16),
                                       label: const Text('Review Flashcards', style: TextStyle(fontWeight: FontWeight.bold)),
                                     ),
                                   ),
@@ -528,12 +648,19 @@ class _QuizHistoryScreenState extends ConsumerState<QuizHistoryScreen> {
                                   Container(
                                     padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
                                     decoration: BoxDecoration(
-                                      color: AppTheme.success.withValues(alpha: 0.1),
+                                      color: isDark ? AppTheme.darkSurfaceLight : const Color(0xFFF1F5F9),
                                       borderRadius: BorderRadius.circular(10),
+                                      border: Border.all(
+                                        color: isDark ? AppTheme.darkBorder : const Color(0xFFE2E8F0),
+                                      ),
                                     ),
                                     child: Text(
                                       'Score: $score / $qCount',
-                                      style: TextStyle(fontWeight: FontWeight.bold, color: AppTheme.success, fontSize: 13),
+                                      style: TextStyle(
+                                        fontWeight: FontWeight.bold,
+                                        color: Theme.of(context).colorScheme.onSurface,
+                                        fontSize: 12.5,
+                                      ),
                                     ),
                                   ),
                                 ],
@@ -544,36 +671,52 @@ class _QuizHistoryScreenState extends ConsumerState<QuizHistoryScreen> {
                                 child: OutlinedButton.icon(
                                   style: OutlinedButton.styleFrom(
                                     foregroundColor: AppTheme.textMuted,
-                                    side: BorderSide(color: AppTheme.border.withValues(alpha: 0.5)),
+                                    side: BorderSide(color: isDark ? AppTheme.darkBorder : const Color(0xFFE2E8F0)),
                                     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
                                     padding: const EdgeInsets.symmetric(vertical: 10),
                                   ),
                                   onPressed: null,
-                                  icon: const Icon(Icons.lock_outline, size: 16),
-                                  label: const Text('Quiz Completed (Locked)', style: TextStyle(fontWeight: FontWeight.w600)),
+                                  icon: const Icon(Icons.lock_outline_rounded, size: 15),
+                                  label: const Text('Quiz Completed', style: TextStyle(fontWeight: FontWeight.w600, fontSize: 13)),
                                 ),
                               ),
                             ],
                           )
                         : isMissed
-                            ? OutlinedButton.icon(
-                                style: OutlinedButton.styleFrom(
-                                  foregroundColor: AppTheme.error,
-                                  side: BorderSide(color: AppTheme.error.withValues(alpha: 0.4)),
-                                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                                  padding: const EdgeInsets.symmetric(vertical: 13),
+                            ? Container(
+                                width: double.infinity,
+                                padding: const EdgeInsets.symmetric(vertical: 11),
+                                decoration: BoxDecoration(
+                                  color: isDark ? AppTheme.darkSurfaceLight : const Color(0xFFF8FAFC),
+                                  borderRadius: BorderRadius.circular(10),
+                                  border: Border.all(
+                                    color: isDark ? AppTheme.darkBorder : const Color(0xFFE2E8F0),
+                                  ),
                                 ),
-                                onPressed: null,
-                                icon: Icon(Icons.event_busy, size: 18, color: AppTheme.error),
-                                label: Text('Missed Quiz (Closed)', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: AppTheme.error)),
+                                alignment: Alignment.center,
+                                child: Row(
+                                  mainAxisAlignment: MainAxisAlignment.center,
+                                  children: [
+                                    Icon(Icons.event_busy_outlined, size: 15, color: AppTheme.textMuted),
+                                    const SizedBox(width: 6),
+                                    Text(
+                                      'Submission Window Closed',
+                                      style: TextStyle(
+                                        fontWeight: FontWeight.w600,
+                                        fontSize: 13,
+                                        color: AppTheme.textMuted,
+                                      ),
+                                    ),
+                                  ],
+                                ),
                               )
                             : isNotYetAvailable
                                 ? OutlinedButton.icon(
                                     style: OutlinedButton.styleFrom(
-                                      foregroundColor: AppTheme.info,
-                                      side: BorderSide(color: AppTheme.info.withValues(alpha: 0.4)),
+                                      foregroundColor: AppTheme.textSecondary,
+                                      side: BorderSide(color: isDark ? AppTheme.darkBorder : const Color(0xFFE2E8F0)),
                                       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                                      padding: const EdgeInsets.symmetric(vertical: 13),
+                                      padding: const EdgeInsets.symmetric(vertical: 12),
                                     ),
                                     onPressed: () async {
                                       if (_isDatePassed(scheduleStart)) {
@@ -592,14 +735,15 @@ class _QuizHistoryScreenState extends ConsumerState<QuizHistoryScreen> {
                                         );
                                       }
                                     },
-                                    icon: Icon(Icons.lock_clock, size: 18, color: AppTheme.info),
-                                    label: Text('Opens ${_formatDate(scheduleStart)}', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: AppTheme.info)),
+                                    icon: const Icon(Icons.schedule_rounded, size: 16),
+                                    label: Text('Opens ${_formatDate(scheduleStart)}', style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13)),
                                   )
                                 : ElevatedButton.icon(
                                     style: ElevatedButton.styleFrom(
-                                      backgroundColor: AppTheme.primary,
-                                      foregroundColor: Colors.black,
-                                      padding: const EdgeInsets.symmetric(vertical: 13),
+                                      backgroundColor: primary,
+                                      foregroundColor: Colors.white,
+                                      elevation: 0,
+                                      padding: const EdgeInsets.symmetric(vertical: 12),
                                       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
                                     ),
                                     onPressed: () async {
@@ -610,7 +754,7 @@ class _QuizHistoryScreenState extends ConsumerState<QuizHistoryScreen> {
                                         ref.read(studentCoursesProvider.notifier).reload();
                                       }
                                     },
-                                    icon: const Icon(Icons.play_arrow, size: 18),
+                                    icon: const Icon(Icons.play_arrow_rounded, size: 18),
                                     label: const Text('Take Quiz Now', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
                                   ),
                   ),
@@ -627,9 +771,16 @@ class _QuizHistoryScreenState extends ConsumerState<QuizHistoryScreen> {
     return Row(
       mainAxisSize: MainAxisSize.min,
       children: [
-        Icon(icon, size: 13, color: AppTheme.textMuted),
+        Icon(icon, size: 12, color: AppTheme.textMuted),
         const SizedBox(width: 4),
-        Text(text, style: TextStyle(fontSize: 11, color: AppTheme.textSecondary)),
+        Text(
+          text,
+          style: TextStyle(
+            fontSize: 11,
+            color: AppTheme.textSecondary,
+            fontWeight: FontWeight.w500,
+          ),
+        ),
       ],
     );
   }
@@ -644,55 +795,111 @@ class _QuizHistoryScreenState extends ConsumerState<QuizHistoryScreen> {
     required String bestScore,
     required List<String> subjectFilters,
   }) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final primary = AppTheme.primary;
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        // Dynamic Stats Row
+        // Executive KPI Stat Cards
         Row(
           children: [
-            Expanded(child: _buildStatCard('Attempts', '$totalAttempts', Icons.assignment, AppTheme.primary)),
+            Expanded(
+              child: _buildStatCard(
+                label: 'Attempts',
+                value: '$totalAttempts',
+                icon: Icons.assignment_outlined,
+                accentColor: isDark ? const Color(0xFF94A3B8) : const Color(0xFF475569),
+                isDark: isDark,
+              ),
+            ),
             const SizedBox(width: 8),
-            Expanded(child: _buildStatCard('Passed', '$passedCount', Icons.check_circle, AppTheme.success)),
+            Expanded(
+              child: _buildStatCard(
+                label: 'Passed',
+                value: '$passedCount',
+                icon: Icons.check_circle_outline_rounded,
+                accentColor: isDark ? const Color(0xFF34D399) : const Color(0xFF16A34A),
+                isDark: isDark,
+              ),
+            ),
             const SizedBox(width: 8),
-            Expanded(child: _buildStatCard('Avg Score', avgScore, Icons.trending_up, AppTheme.accent)),
+            Expanded(
+              child: _buildStatCard(
+                label: 'Avg Score',
+                value: avgScore,
+                icon: Icons.trending_up_rounded,
+                accentColor: isDark ? const Color(0xFF60A5FA) : const Color(0xFF2563EB),
+                isDark: isDark,
+              ),
+            ),
             const SizedBox(width: 8),
-            Expanded(child: _buildStatCard('Best', bestScore, Icons.emoji_events, AppTheme.warning)),
+            Expanded(
+              child: _buildStatCard(
+                label: 'Best Score',
+                value: bestScore,
+                icon: Icons.verified_outlined,
+                accentColor: isDark ? const Color(0xFFFBBF24) : const Color(0xFFD97706),
+                isDark: isDark,
+              ),
+            ),
           ],
         ),
         const SizedBox(height: 18),
 
-        // Dynamic Subject Filter Chips
+        // Subject Filter Chips
         if (subjectFilters.isNotEmpty) ...[
           SizedBox(
-            height: 36,
+            height: 34,
             child: ListView.builder(
               scrollDirection: Axis.horizontal,
               itemCount: subjectFilters.length,
               itemBuilder: (context, index) {
                 final isActive = _selectedSubjectIndex == index;
-                return GestureDetector(
-                  onTap: () {
-                    setState(() => _selectedSubjectIndex = index);
-                    final subjectId = index == 0 || index > enrolledCourses.length
-                        ? null
-                        : (enrolledCourses[index - 1]['id'] as int?);
-                    ref.read(studentQuizAttemptsProvider.notifier).loadAttempts(subjectId: subjectId);
-                  },
-                  child: Container(
-                    margin: const EdgeInsets.only(right: 8),
-                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
-                    decoration: BoxDecoration(
-                      color: isActive ? AppTheme.primary : AppTheme.surface,
-                      borderRadius: BorderRadius.circular(20),
-                      border: Border.all(color: isActive ? AppTheme.primary : AppTheme.border),
-                    ),
-                    alignment: Alignment.center,
-                    child: Text(
-                      subjectFilters[index],
-                      style: TextStyle(
-                        color: isActive ? Colors.black : AppTheme.textSecondary,
-                        fontWeight: isActive ? FontWeight.bold : FontWeight.normal,
-                        fontSize: 12,
+                return Padding(
+                  padding: const EdgeInsets.only(right: 8),
+                  child: InkWell(
+                    onTap: () {
+                      setState(() => _selectedSubjectIndex = index);
+                      final subjectId = index == 0 || index > enrolledCourses.length
+                          ? null
+                          : (enrolledCourses[index - 1]['id'] as int?);
+                      ref.read(studentQuizAttemptsProvider.notifier).loadAttempts(subjectId: subjectId);
+                    },
+                    borderRadius: BorderRadius.circular(20),
+                    child: AnimatedContainer(
+                      duration: const Duration(milliseconds: 180),
+                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
+                      decoration: BoxDecoration(
+                        color: isActive
+                            ? primary
+                            : (isDark ? AppTheme.darkSurface : Colors.white),
+                        borderRadius: BorderRadius.circular(20),
+                        border: Border.all(
+                          color: isActive
+                              ? primary
+                              : (isDark ? AppTheme.darkBorder : const Color(0xFFE2E8F0)),
+                        ),
+                        boxShadow: isActive
+                            ? [
+                                BoxShadow(
+                                  color: primary.withValues(alpha: 0.25),
+                                  blurRadius: 4,
+                                  offset: const Offset(0, 1),
+                                ),
+                              ]
+                            : null,
+                      ),
+                      alignment: Alignment.center,
+                      child: Text(
+                        subjectFilters[index],
+                        style: TextStyle(
+                          color: isActive
+                              ? Colors.white
+                              : (isDark ? AppTheme.darkTextSecondary : const Color(0xFF64748B)),
+                          fontWeight: isActive ? FontWeight.w600 : FontWeight.w500,
+                          fontSize: 12,
+                        ),
                       ),
                     ),
                   ),
@@ -709,24 +916,45 @@ class _QuizHistoryScreenState extends ConsumerState<QuizHistoryScreen> {
             width: double.infinity,
             padding: const EdgeInsets.symmetric(vertical: 40, horizontal: 24),
             decoration: BoxDecoration(
-              color: AppTheme.surface,
+              color: Theme.of(context).colorScheme.surface,
               borderRadius: BorderRadius.circular(16),
-              border: Border.all(color: AppTheme.border),
+              border: Border.all(
+                color: isDark ? AppTheme.darkBorder : const Color(0xFFE2E8F0),
+              ),
             ),
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                Icon(Icons.history_toggle_off, size: 56, color: AppTheme.textMuted),
+                Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: isDark ? AppTheme.darkSurfaceLight : const Color(0xFFF1F5F9),
+                    shape: BoxShape.circle,
+                  ),
+                  child: Icon(
+                    Icons.history_toggle_off_rounded,
+                    size: 32,
+                    color: isDark ? AppTheme.darkTextSecondary : const Color(0xFF64748B),
+                  ),
+                ),
                 const SizedBox(height: 14),
                 Text(
                   'No Quiz Attempts Yet',
-                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: AppTheme.text),
+                  style: TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.bold,
+                    color: Theme.of(context).colorScheme.onSurface,
+                  ),
                 ),
                 const SizedBox(height: 6),
                 Text(
-                  'Take quizzes in the "Assigned Quizzes" tab to record your scores and review performance.',
+                  'Take quizzes in the "Assigned Quizzes" tab to record your scores and review performance history.',
                   textAlign: TextAlign.center,
-                  style: TextStyle(fontSize: 13, color: AppTheme.textSecondary, height: 1.4),
+                  style: TextStyle(
+                    fontSize: 13,
+                    color: AppTheme.textSecondary,
+                    height: 1.4,
+                  ),
                 ),
               ],
             ),
@@ -760,6 +988,7 @@ class _QuizHistoryScreenState extends ConsumerState<QuizHistoryScreen> {
                 time: _formatTime(rawDate),
                 duration: duration,
                 isPassed: isPassed,
+                isDark: isDark,
               );
             },
           ),
@@ -767,26 +996,56 @@ class _QuizHistoryScreenState extends ConsumerState<QuizHistoryScreen> {
     );
   }
 
-  Widget _buildStatCard(String label, String value, IconData icon, Color iconColor) {
+  Widget _buildStatCard({
+    required String label,
+    required String value,
+    required IconData icon,
+    required Color accentColor,
+    required bool isDark,
+  }) {
     return Container(
       padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 8),
       decoration: BoxDecoration(
-        color: AppTheme.surface,
+        color: isDark ? AppTheme.darkSurface : Colors.white,
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: AppTheme.border),
+        border: Border.all(
+          color: isDark ? AppTheme.darkBorder : const Color(0xFFE2E8F0),
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: isDark ? 0.2 : 0.02),
+            blurRadius: 4,
+            offset: const Offset(0, 1),
+          ),
+        ],
       ),
       child: Column(
         children: [
-          Icon(icon, color: iconColor, size: 16),
-          const SizedBox(height: 6),
+          Container(
+            padding: const EdgeInsets.all(5),
+            decoration: BoxDecoration(
+              color: accentColor.withValues(alpha: isDark ? 0.18 : 0.1),
+              borderRadius: BorderRadius.circular(6),
+            ),
+            child: Icon(icon, color: accentColor, size: 14),
+          ),
+          const SizedBox(height: 8),
           Text(
             value,
-            style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: AppTheme.text),
+            style: TextStyle(
+              fontSize: 16,
+              fontWeight: FontWeight.bold,
+              color: Theme.of(context).colorScheme.onSurface,
+            ),
           ),
           const SizedBox(height: 2),
           Text(
             label,
-            style: TextStyle(fontSize: 10, color: AppTheme.textMuted),
+            style: TextStyle(
+              fontSize: 10.5,
+              fontWeight: FontWeight.w500,
+              color: AppTheme.textMuted,
+            ),
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
           ),
@@ -806,34 +1065,50 @@ class _QuizHistoryScreenState extends ConsumerState<QuizHistoryScreen> {
     required String time,
     required String duration,
     required bool isPassed,
+    required bool isDark,
   }) {
     final double percentage = total > 0 ? (score / total) * 100 : 0;
+    final primary = AppTheme.primary;
 
     return Container(
       decoration: BoxDecoration(
-        color: AppTheme.surface,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: AppTheme.border),
+        color: isDark ? AppTheme.darkSurface : Colors.white,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(
+          color: isDark ? AppTheme.darkBorder : const Color(0xFFE2E8F0),
+          width: 1,
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: isDark ? 0.2 : 0.02),
+            blurRadius: 6,
+            offset: const Offset(0, 2),
+          ),
+        ],
       ),
       child: Padding(
         padding: const EdgeInsets.all(16),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
+            // Top Row: Subject Code Tag + Soft Status Pill
             Row(
               children: [
-                Flexible(
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                    decoration: BoxDecoration(
-                      color: AppTheme.primary.withValues(alpha: 0.12),
-                      borderRadius: BorderRadius.circular(6),
-                    ),
-                    child: Text(
-                      subject,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: AppTheme.primary),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2.5),
+                  decoration: BoxDecoration(
+                    color: isDark ? AppTheme.darkSurfaceLight : const Color(0xFFF1F5F9),
+                    borderRadius: BorderRadius.circular(4),
+                  ),
+                  child: Text(
+                    subject,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      fontSize: 11,
+                      fontWeight: FontWeight.w700,
+                      color: isDark ? AppTheme.darkText : const Color(0xFF1E293B),
+                      letterSpacing: 0.2,
                     ),
                   ),
                 ),
@@ -841,59 +1116,122 @@ class _QuizHistoryScreenState extends ConsumerState<QuizHistoryScreen> {
                 Container(
                   padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                   decoration: BoxDecoration(
-                    color: isPassed ? AppTheme.success.withValues(alpha: 0.15) : AppTheme.error.withValues(alpha: 0.15),
+                    color: isPassed
+                        ? (isDark ? const Color(0x2410B981) : const Color(0xFFDCFCE7))
+                        : (isDark ? const Color(0x24EF4444) : const Color(0xFFFEE2E2)),
                     borderRadius: BorderRadius.circular(6),
-                  ),
-                  child: Text(
-                    isPassed ? 'PASSED' : 'FAILED',
-                    style: TextStyle(
-                      fontSize: 11,
-                      fontWeight: FontWeight.bold,
-                      color: isPassed ? AppTheme.success : AppTheme.error,
+                    border: Border.all(
+                      color: isPassed
+                          ? (isDark ? const Color(0x4010B981) : const Color(0xFFBBF7D0))
+                          : (isDark ? const Color(0x40EF4444) : const Color(0xFFFECACA)),
+                      width: 0.8,
                     ),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(
+                        isPassed ? Icons.check_rounded : Icons.close_rounded,
+                        size: 11,
+                        color: isPassed
+                            ? (isDark ? const Color(0xFF34D399) : const Color(0xFF15803D))
+                            : (isDark ? const Color(0xFFF87171) : const Color(0xFFB91C1C)),
+                      ),
+                      const SizedBox(width: 3),
+                      Text(
+                        isPassed ? 'Passed' : 'Needs Review',
+                        style: TextStyle(
+                          fontSize: 11,
+                          fontWeight: FontWeight.w600,
+                          color: isPassed
+                              ? (isDark ? const Color(0xFF34D399) : const Color(0xFF15803D))
+                              : (isDark ? const Color(0xFFF87171) : const Color(0xFFB91C1C)),
+                        ),
+                      ),
+                    ],
                   ),
                 ),
               ],
             ),
-            const SizedBox(height: 8),
+            const SizedBox(height: 10),
+
+            // Quiz Title
             Text(
               quizTitle,
-              style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: AppTheme.text),
+              style: TextStyle(
+                fontSize: 15,
+                fontWeight: FontWeight.bold,
+                color: Theme.of(context).colorScheme.onSurface,
+              ),
             ),
             const SizedBox(height: 10),
+
+            // Score and Performance Row
             Row(
               children: [
                 Text(
                   '$score / $total',
-                  style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: AppTheme.text),
+                  style: TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold,
+                    color: Theme.of(context).colorScheme.onSurface,
+                  ),
                 ),
                 const SizedBox(width: 8),
-                Text(
-                  '(${percentage.toStringAsFixed(0)}%)',
-                  style: TextStyle(
-                    fontSize: 14,
-                    fontWeight: FontWeight.bold,
-                    color: isPassed ? AppTheme.success : AppTheme.error,
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                  decoration: BoxDecoration(
+                    color: isPassed
+                        ? (isDark ? const Color(0x1F10B981) : const Color(0xFFECFDF5))
+                        : (isDark ? const Color(0x1FEF4444) : const Color(0xFFFFF1F2)),
+                    borderRadius: BorderRadius.circular(4),
+                  ),
+                  child: Text(
+                    '${percentage.toStringAsFixed(0)}%',
+                    style: TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.bold,
+                      color: isPassed
+                          ? (isDark ? const Color(0xFF34D399) : const Color(0xFF15803D))
+                          : (isDark ? const Color(0xFFF87171) : const Color(0xFFDC2626)),
+                    ),
                   ),
                 ),
                 const Spacer(),
-                Flexible(
-                  child: Text(
-                    '$date · $time',
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: TextStyle(fontSize: 11, color: AppTheme.textMuted),
-                  ),
+                Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(Icons.calendar_today_outlined, size: 12, color: AppTheme.textMuted),
+                    const SizedBox(width: 4),
+                    Text(
+                      date,
+                      style: TextStyle(fontSize: 11, color: AppTheme.textMuted),
+                    ),
+                    if (duration.isNotEmpty) ...[
+                      const SizedBox(width: 8),
+                      Icon(Icons.timer_outlined, size: 12, color: AppTheme.textMuted),
+                      const SizedBox(width: 4),
+                      Text(
+                        duration,
+                        style: TextStyle(fontSize: 11, color: AppTheme.textMuted),
+                      ),
+                    ],
+                  ],
                 ),
               ],
             ),
-            const SizedBox(height: 12),
+            const SizedBox(height: 14),
+
+            // Action Button
             SizedBox(
               width: double.infinity,
               child: OutlinedButton.icon(
                 style: OutlinedButton.styleFrom(
-                  foregroundColor: AppTheme.primary,
-                  side: BorderSide(color: AppTheme.primary.withValues(alpha: 0.5)),
+                  foregroundColor: Theme.of(context).colorScheme.onSurface,
+                  backgroundColor: isDark ? AppTheme.darkSurfaceLight : const Color(0xFFF8FAFC),
+                  side: BorderSide(
+                    color: isDark ? AppTheme.darkBorder : const Color(0xFFE2E8F0),
+                  ),
                   shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
                   padding: const EdgeInsets.symmetric(vertical: 10),
                 ),
@@ -911,8 +1249,11 @@ class _QuizHistoryScreenState extends ConsumerState<QuizHistoryScreen> {
                     ),
                   );
                 },
-                icon: const Icon(Icons.style, size: 16),
-                label: const Text('Review Flashcards', style: TextStyle(fontWeight: FontWeight.bold)),
+                icon: Icon(Icons.style_outlined, size: 15, color: primary),
+                label: const Text(
+                  'Review Flashcards',
+                  style: TextStyle(fontWeight: FontWeight.w600, fontSize: 13),
+                ),
               ),
             ),
           ],

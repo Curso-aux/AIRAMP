@@ -11,7 +11,8 @@ import '../../auth/application/auth_provider.dart';
 import '../data/student_repository.dart';
 
 class MyProgressScreen extends ConsumerStatefulWidget {
-  const MyProgressScreen({super.key});
+  final bool isEmbedded;
+  const MyProgressScreen({super.key, this.isEmbedded = false});
 
   @override
   ConsumerState<MyProgressScreen> createState() => _MyProgressScreenState();
@@ -89,31 +90,21 @@ class _MyProgressScreenState extends ConsumerState<MyProgressScreen> {
       _loadSelectedHierarchy();
     });
 
-    return Scaffold(
-      backgroundColor: AppTheme.background,
-      body: SafeArea(
-        child: RefreshIndicator(
-          onRefresh: () async {
-            await ref.read(studentCoursesProvider.notifier).reload();
-            await _loadSelectedHierarchy();
-          },
-          color: AppTheme.primary,
-          child: SingleChildScrollView(
-            physics: const AlwaysScrollableScrollPhysics(),
-            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  'Progress',
-                  style: TextStyle(fontSize: 28, fontWeight: FontWeight.bold, color: AppTheme.text),
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  'Track your learning journey and quiz milestones',
-                  style: TextStyle(fontSize: 14, color: AppTheme.textSecondary),
-                ),
-                const SizedBox(height: 24),
+    final columnBody = Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        if (!widget.isEmbedded) ...[
+          Text(
+            'Progress',
+            style: TextStyle(fontSize: 28, fontWeight: FontWeight.bold, color: AppTheme.text),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            'Track your learning journey and quiz milestones',
+            style: TextStyle(fontSize: 14, color: AppTheme.textSecondary),
+          ),
+          const SizedBox(height: 24),
+        ],
 
                 if (courses.isEmpty)
                   Container(
@@ -214,7 +205,25 @@ class _MyProgressScreenState extends ConsumerState<MyProgressScreen> {
                 ],
                 const SizedBox(height: 40),
               ],
-            ),
+            );
+
+    if (widget.isEmbedded) {
+      return columnBody;
+    }
+
+    return Scaffold(
+      backgroundColor: AppTheme.background,
+      body: SafeArea(
+        child: RefreshIndicator(
+          onRefresh: () async {
+            await ref.read(studentCoursesProvider.notifier).reload();
+            await _loadSelectedHierarchy();
+          },
+          color: AppTheme.primary,
+          child: SingleChildScrollView(
+            physics: const AlwaysScrollableScrollPhysics(),
+            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+            child: columnBody,
           ),
         ),
       ),

@@ -5,12 +5,6 @@ import '../../../core/theme/app_theme.dart';
 import '../application/chat_provider.dart';
 import '../domain/chat_models.dart';
 
-/// Helper to get the first character of a name as uppercase for avatar.
-String _getAvatarText(String name) {
-  if (name.isEmpty) return '?';
-  return name[0].toUpperCase();
-}
-
 /// Helper to get a human-readable role label.
 String _getRoleLabel(String role) {
   if (role == 'super_admin') return 'Super Admin';
@@ -19,7 +13,7 @@ String _getRoleLabel(String role) {
   return 'Student';
 }
 
-/// Full-screen modal for starting a new conversation.
+/// Modern modal sheet for starting a new conversation.
 class NewConversationModal extends ConsumerStatefulWidget {
   const NewConversationModal({super.key});
 
@@ -48,6 +42,7 @@ class _NewConversationModalState extends ConsumerState<NewConversationModal>
     super.initState();
     _tabController = TabController(length: 2, vsync: this);
     _tabController.addListener(() {
+      if (_tabController.indexIsChanging) return;
       setState(() {
         _activeTab = _tabController.index == 0 ? 'users' : 'contacts';
       });
@@ -112,143 +107,279 @@ class _NewConversationModalState extends ConsumerState<NewConversationModal>
     final chatState = ref.watch(chatProvider);
     final allUsers = chatState.availableUsers;
     final filteredUsers = _filterUsers(allUsers, _searchQuery);
+    final screenHeight = MediaQuery.of(context).size.height;
 
-    return Scaffold(
-      backgroundColor: AppTheme.background,
-      body: SafeArea(
-        child: Column(
-          children: [
-            // ── Modal Header ──
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-              decoration: BoxDecoration(
-                color: AppTheme.surface,
-                border: Border(
-                  bottom: BorderSide(color: AppTheme.border, width: 1),
-                ),
-              ),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Text(
-                    'New Conversation',
-                    style: TextStyle(
-                      color: AppTheme.text,
-                      fontSize: 18,
-                      fontWeight: FontWeight.w700,
+    return Container(
+      constraints: BoxConstraints(
+        maxHeight: screenHeight * 0.90,
+      ),
+      decoration: BoxDecoration(
+        color: AppTheme.surface,
+        borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.22),
+            blurRadius: 24,
+            offset: const Offset(0, -6),
+          ),
+        ],
+      ),
+      child: ClipRRect(
+        borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+        child: Scaffold(
+          backgroundColor: AppTheme.background,
+          resizeToAvoidBottomInset: true,
+          body: SafeArea(
+            top: true,
+            bottom: true,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                // ── Drag Handle Pill ──
+                Center(
+                  child: Container(
+                    margin: const EdgeInsets.only(top: 10, bottom: 8),
+                    width: 38,
+                    height: 4,
+                    decoration: BoxDecoration(
+                      color: AppTheme.border.withValues(alpha: 0.8),
+                      borderRadius: BorderRadius.circular(2),
                     ),
                   ),
-                  GestureDetector(
-                    onTap: () => Navigator.of(context).pop(),
-                    child: Icon(
-                      Icons.close,
-                      color: AppTheme.text,
-                      size: 24,
-                    ),
-                  ),
-                ],
-              ),
-            ),
+                ),
 
-            // ── Tab Bar ──
-            Container(
-              color: AppTheme.surface,
-              child: TabBar(
-                controller: _tabController,
-                indicatorColor: AppTheme.primary,
-                indicatorWeight: 2,
-                labelColor: AppTheme.primary,
-                unselectedLabelColor: AppTheme.textMuted,
-                labelStyle: const TextStyle(
-                  fontSize: 14,
-                  fontWeight: FontWeight.w600,
-                ),
-                unselectedLabelStyle: const TextStyle(
-                  fontSize: 14,
-                  fontWeight: FontWeight.w600,
-                ),
-                tabs: const [
-                  Tab(text: 'App Users / Contacts'),
-                  Tab(text: 'Device Contacts'),
-                ],
-              ),
-            ),
-
-            // ── Search Bar ──
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-              decoration: BoxDecoration(
-                color: AppTheme.surface,
-                border: Border(
-                  bottom: BorderSide(
-                    color: Theme.of(context).dividerColor,
-                    width: 0.5,
-                  ),
-                ),
-              ),
-              child: Row(
-                children: [
-                  Icon(Icons.search, color: AppTheme.textMuted, size: 18),
-                  const SizedBox(width: 10),
-                  Expanded(
-                    child: TextField(
-                      controller: _searchController,
-                      maxLength: 60,
-                      buildCounter: (context, {required currentLength, required isFocused, maxLength}) => null,
-                      autofocus: false,
-                      style: TextStyle(
-                        color: AppTheme.text,
-                        fontSize: 15,
-                      ),
-                      decoration: InputDecoration(
-                        counterText: '',
-                        hintText: _activeTab == 'users'
-                            ? 'Search by name, email, grade, section...'
-                            : 'Search contacts...',
-                        hintStyle: TextStyle(
-                          color: AppTheme.textMuted,
-                          fontSize: 14,
+                // ── Executive Header ──
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(20, 4, 16, 12),
+                  child: Row(
+                    children: [
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              'New Conversation',
+                              style: TextStyle(
+                                color: AppTheme.text,
+                                fontSize: 20,
+                                fontWeight: FontWeight.w700,
+                                letterSpacing: -0.3,
+                              ),
+                            ),
+                            const SizedBox(height: 2),
+                            Text(
+                              'Select a contact or classmate to chat',
+                              style: TextStyle(
+                                color: AppTheme.textMuted,
+                                fontSize: 12,
+                                fontWeight: FontWeight.w500,
+                              ),
+                            ),
+                          ],
                         ),
-                        border: InputBorder.none,
-                        enabledBorder: InputBorder.none,
-                        focusedBorder: InputBorder.none,
-                        contentPadding: const EdgeInsets.symmetric(vertical: 4),
-                        isDense: true,
                       ),
-                      onChanged: (value) {
-                        setState(() => _searchQuery = value);
-                      },
+                      const SizedBox(width: 12),
+                      // Tactile, reachable circular close button with min 44x44 touch target
+                      Material(
+                        color: AppTheme.surfaceLight,
+                        shape: const CircleBorder(),
+                        child: InkWell(
+                          key: const Key('modal_close_button'),
+                          customBorder: const CircleBorder(),
+                          onTap: () => Navigator.of(context).pop(),
+                          child: Container(
+                            width: 38,
+                            height: 38,
+                            decoration: BoxDecoration(
+                              shape: BoxShape.circle,
+                              border: Border.all(
+                                color: AppTheme.border.withValues(alpha: 0.8),
+                                width: 1,
+                              ),
+                            ),
+                            alignment: Alignment.center,
+                            child: Icon(
+                              Icons.close_rounded,
+                              color: AppTheme.text,
+                              size: 20,
+                            ),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+
+                // ── Apple/Linear Segmented Pill Tabs ──
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 16),
+                  child: Container(
+                    padding: const EdgeInsets.all(4),
+                    decoration: BoxDecoration(
+                      color: AppTheme.surfaceLight,
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(color: AppTheme.border.withValues(alpha: 0.6)),
+                    ),
+                    child: Row(
+                      children: [
+                        Expanded(
+                          child: _buildSegmentedTab(
+                            title: 'App Users',
+                            count: allUsers.length,
+                            isActive: _activeTab == 'users',
+                            onTap: () {
+                              _tabController.animateTo(0);
+                              setState(() => _activeTab = 'users');
+                            },
+                          ),
+                        ),
+                        const SizedBox(width: 4),
+                        Expanded(
+                          child: _buildSegmentedTab(
+                            title: 'Device Contacts',
+                            isActive: _activeTab == 'contacts',
+                            onTap: () {
+                              _tabController.animateTo(1);
+                              setState(() => _activeTab = 'contacts');
+                            },
+                          ),
+                        ),
+                      ],
                     ),
                   ),
-                  if (_searchQuery.isNotEmpty)
-                    GestureDetector(
-                      onTap: () {
-                        _searchController.clear();
-                        setState(() => _searchQuery = '');
-                      },
-                      child: Icon(
-                        Icons.close,
-                        color: AppTheme.textMuted,
-                        size: 18,
+                ),
+                const SizedBox(height: 10),
+
+                // ── Search Input ──
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 16),
+                  child: Container(
+                    decoration: BoxDecoration(
+                      color: AppTheme.surfaceLight,
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(
+                        color: AppTheme.border.withValues(alpha: 0.7),
+                        width: 1,
                       ),
                     ),
-                ],
+                    child: Row(
+                      children: [
+                        const SizedBox(width: 12),
+                        Icon(Icons.search_rounded, color: AppTheme.textMuted, size: 20),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: TextField(
+                            controller: _searchController,
+                            maxLength: 60,
+                            buildCounter: (context, {required currentLength, required isFocused, maxLength}) => null,
+                            style: TextStyle(color: AppTheme.text, fontSize: 14),
+                            decoration: InputDecoration(
+                              hintText: _activeTab == 'users'
+                                  ? 'Search name, email, grade, or section...'
+                                  : 'Search device contacts...',
+                              hintStyle: TextStyle(
+                                color: AppTheme.textMuted,
+                                fontSize: 13,
+                              ),
+                              border: InputBorder.none,
+                              contentPadding: const EdgeInsets.symmetric(vertical: 11),
+                              isDense: true,
+                            ),
+                            onChanged: (value) => setState(() => _searchQuery = value),
+                          ),
+                        ),
+                        if (_searchQuery.isNotEmpty)
+                          IconButton(
+                            icon: Icon(Icons.clear_rounded, color: AppTheme.textMuted, size: 18),
+                            onPressed: () {
+                              _searchController.clear();
+                              setState(() => _searchQuery = '');
+                            },
+                          ),
+                      ],
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 10),
+
+                // ── Tab Content ──
+                Expanded(
+                  child: TabBarView(
+                    controller: _tabController,
+                    children: [
+                      // ── App Users Tab ──
+                      _buildUsersTab(filteredUsers),
+
+                      // ── Device Contacts Tab ──
+                      _buildContactsTab(),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildSegmentedTab({
+    required String title,
+    int? count,
+    required bool isActive,
+    required VoidCallback onTap,
+  }) {
+    return GestureDetector(
+      onTap: onTap,
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 180),
+        curve: Curves.easeInOut,
+        padding: const EdgeInsets.symmetric(vertical: 8),
+        decoration: BoxDecoration(
+          color: isActive ? AppTheme.surface : Colors.transparent,
+          borderRadius: BorderRadius.circular(8),
+          boxShadow: isActive
+              ? [
+                  BoxShadow(
+                    color: Colors.black.withValues(alpha: 0.06),
+                    blurRadius: 4,
+                    offset: const Offset(0, 1),
+                  ),
+                ]
+              : null,
+        ),
+        alignment: Alignment.center,
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Text(
+              title,
+              style: TextStyle(
+                fontSize: 13,
+                fontWeight: isActive ? FontWeight.w700 : FontWeight.w600,
+                color: isActive ? AppTheme.primary : AppTheme.textMuted,
               ),
             ),
-
-            // ── Tab Content ──
-            Expanded(
-              child: TabBarView(
-                controller: _tabController,
-                children: [
-                  // ── App Users Tab ──
-                  _buildUsersTab(filteredUsers),
-
-                  // ── Device Contacts Tab ──
-                  _buildContactsTab(),
-                ],
+            if (count != null && count > 0) ...[
+              const SizedBox(width: 6),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1.5),
+                decoration: BoxDecoration(
+                  color: isActive
+                      ? AppTheme.primary.withValues(alpha: 0.12)
+                      : AppTheme.border.withValues(alpha: 0.5),
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: Text(
+                  '$count',
+                  style: TextStyle(
+                    fontSize: 10.5,
+                    fontWeight: FontWeight.w700,
+                    color: isActive ? AppTheme.primary : AppTheme.textMuted,
+                  ),
+                ),
               ),
-            ),
+            ],
           ],
         ),
       ),
@@ -258,125 +389,86 @@ class _NewConversationModalState extends ConsumerState<NewConversationModal>
   Widget _buildUsersTab(List<ChatUser> users) {
     return Column(
       children: [
-        // Role and attribute filter bar
-        Container(
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-          color: Theme.of(context).colorScheme.surface,
-          child: Column(
+        // ── Consolidated Horizontal Filter Strip ──
+        SingleChildScrollView(
+          scrollDirection: Axis.horizontal,
+          padding: const EdgeInsets.symmetric(horizontal: 16),
+          child: Row(
             children: [
-              // Role Filter Chips
-              Row(
-                children: [
-                  _buildModalRoleChip('all', 'All'),
-                  const SizedBox(width: 6),
-                  _buildModalRoleChip('teacher', 'Teachers'),
-                  const SizedBox(width: 6),
-                  _buildModalRoleChip('student', 'Students'),
-                ],
-              ),
+              _buildRoleChip('all', 'All'),
+              const SizedBox(width: 6),
+              _buildRoleChip('teacher', 'Teachers'),
+              const SizedBox(width: 6),
+              _buildRoleChip('student', 'Students'),
               if (_selectedRole != 'teacher') ...[
-                const SizedBox(height: 8),
-                Row(
-                  children: [
-                    // Grade Dropdown
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                      decoration: BoxDecoration(
-                        color: Theme.of(context).scaffoldBackgroundColor,
-                        borderRadius: BorderRadius.circular(6),
-                        border: Border.all(
-                          color: _selectedGrade != 'All' ? AppTheme.primary : AppTheme.border,
-                        ),
-                      ),
-                      child: DropdownButtonHideUnderline(
-                        child: DropdownButton<String>(
-                          value: _selectedGrade,
-                          isDense: true,
-                          dropdownColor: Theme.of(context).colorScheme.surface,
-                          icon: Icon(Icons.arrow_drop_down, color: AppTheme.textSecondary, size: 16),
-                          style: TextStyle(
-                            fontSize: 11,
-                            color: _selectedGrade != 'All' ? AppTheme.primary : AppTheme.text,
-                            fontWeight: _selectedGrade != 'All' ? FontWeight.bold : FontWeight.normal,
-                          ),
-                          items: _gradeOptions.map((grade) {
-                            return DropdownMenuItem(
-                              value: grade,
-                              child: Text(grade == 'All' ? 'Grade: All' : grade),
-                            );
-                          }).toList(),
-                          onChanged: (val) {
-                            if (val != null) setState(() => _selectedGrade = val);
-                          },
-                        ),
-                      ),
-                    ),
-                    const SizedBox(width: 8),
-
-                    // Section Dropdown
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                      decoration: BoxDecoration(
-                        color: Theme.of(context).scaffoldBackgroundColor,
-                        borderRadius: BorderRadius.circular(6),
-                        border: Border.all(
-                          color: _selectedSection != 'All' ? AppTheme.primary : AppTheme.border,
-                        ),
-                      ),
-                      child: DropdownButtonHideUnderline(
-                        child: DropdownButton<String>(
-                          value: _selectedSection,
-                          isDense: true,
-                          dropdownColor: Theme.of(context).colorScheme.surface,
-                          icon: Icon(Icons.arrow_drop_down, color: AppTheme.textSecondary, size: 16),
-                          style: TextStyle(
-                            fontSize: 11,
-                            color: _selectedSection != 'All' ? AppTheme.primary : AppTheme.text,
-                            fontWeight: _selectedSection != 'All' ? FontWeight.bold : FontWeight.normal,
-                          ),
-                          items: _sectionOptions.map((sec) {
-                            return DropdownMenuItem(
-                              value: sec,
-                              child: Text(sec == 'All' ? 'Section: All' : 'Sec. $sec'),
-                            );
-                          }).toList(),
-                          onChanged: (val) {
-                            if (val != null) setState(() => _selectedSection = val);
-                          },
-                        ),
-                      ),
-                    ),
-                  ],
+                const SizedBox(width: 6),
+                Container(
+                  height: 16,
+                  width: 1,
+                  color: AppTheme.border,
                 ),
+                const SizedBox(width: 6),
+                _buildDropdownChip(
+                  label: _selectedGrade == 'All' ? 'Grade: All' : _selectedGrade,
+                  isActive: _selectedGrade != 'All',
+                  value: _selectedGrade,
+                  items: _gradeOptions,
+                  onChanged: (val) {
+                    if (val != null) setState(() => _selectedGrade = val);
+                  },
+                ),
+                const SizedBox(width: 6),
+                _buildDropdownChip(
+                  label: _selectedSection == 'All' ? 'Section: All' : 'Sec. $_selectedSection',
+                  isActive: _selectedSection != 'All',
+                  value: _selectedSection,
+                  items: _sectionOptions,
+                  onChanged: (val) {
+                    if (val != null) setState(() => _selectedSection = val);
+                  },
+                ),
+              ],
+              if (_selectedGrade != 'All' || _selectedSection != 'All' || _selectedRole != 'all') ...[
+                const SizedBox(width: 6),
+                _buildResetChip(),
               ],
             ],
           ),
         ),
+        const SizedBox(height: 8),
 
-        // List or Empty
+        // ── Users List or Empty ──
         Expanded(
           child: users.isEmpty
               ? Center(
                   child: Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 40, vertical: 40),
+                    padding: const EdgeInsets.symmetric(horizontal: 40, vertical: 30),
                     child: Column(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
-                        Icon(
-                          Icons.people_outline,
-                          size: 48,
-                          color: AppTheme.textMuted.withValues(alpha: 0.5),
+                        Container(
+                          width: 60,
+                          height: 60,
+                          decoration: BoxDecoration(
+                            color: AppTheme.surfaceLight,
+                            shape: BoxShape.circle,
+                          ),
+                          child: Icon(
+                            Icons.people_outline_rounded,
+                            size: 32,
+                            color: AppTheme.textMuted.withValues(alpha: 0.6),
+                          ),
                         ),
-                        const SizedBox(height: 12),
+                        const SizedBox(height: 14),
                         Text(
                           'No contacts match',
                           style: TextStyle(
-                            fontSize: 17,
+                            fontSize: 16,
                             fontWeight: FontWeight.w700,
                             color: AppTheme.text,
                           ),
                         ),
-                        const SizedBox(height: 8),
+                        const SizedBox(height: 6),
                         Text(
                           'Try adjusting your search query or filters.',
                           style: TextStyle(
@@ -389,53 +481,40 @@ class _NewConversationModalState extends ConsumerState<NewConversationModal>
                     ),
                   ),
                 )
-              : ListView.builder(
-                  padding: EdgeInsets.zero,
+              : ListView.separated(
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
                   itemCount: users.length,
+                  separatorBuilder: (_, _) => Divider(
+                    color: AppTheme.border.withValues(alpha: 0.5),
+                    height: 1,
+                  ),
                   itemBuilder: (context, index) {
                     final user = users[index];
                     final isCreating = _creatingChatUserId == user.id;
-                    final isTeacher = user.role == 'teacher';
+                    final isTeacher = user.role == 'teacher' || user.role == 'admin' || user.role == 'super_admin';
+
+                    final List<String> details = [];
+                    if (user.grade != null && user.grade!.isNotEmpty) details.add(user.grade!);
+                    if (user.section != null && user.section!.isNotEmpty) details.add('Sec. ${user.section!}');
+                    details.add(user.email);
+                    final subtitleText = details.join(' • ');
 
                     return InkWell(
+                      borderRadius: BorderRadius.circular(10),
                       onTap: isCreating ? null : () => _handleStartChat(user),
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                        decoration: BoxDecoration(
-                          border: Border(
-                            bottom: BorderSide(color: AppTheme.border, width: 0.5),
-                          ),
-                        ),
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 10),
                         child: Row(
                           children: [
-                            // Avatar
-                            Container(
-                              width: 44,
-                              height: 44,
-                              decoration: BoxDecoration(
-                                color: isTeacher ? AppTheme.primary : AppTheme.accent,
-                                shape: BoxShape.circle,
-                              ),
-                              alignment: Alignment.center,
-                              child: Text(
-                                _getAvatarText(user.fullName),
-                                style: const TextStyle(
-                                  fontSize: 17,
-                                  fontWeight: FontWeight.w700,
-                                  color: Colors.black,
-                                ),
-                              ),
-                            ),
+                            _buildAvatar(user.fullName, role: user.role, size: 42),
                             const SizedBox(width: 12),
-
-                            // Name + Role Badge + Section & Grade + Email
                             Expanded(
                               child: Column(
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
                                   Row(
                                     children: [
-                                      Expanded(
+                                      Flexible(
                                         child: Text(
                                           user.fullName,
                                           style: TextStyle(
@@ -447,36 +526,41 @@ class _NewConversationModalState extends ConsumerState<NewConversationModal>
                                           overflow: TextOverflow.ellipsis,
                                         ),
                                       ),
+                                      const SizedBox(width: 8),
+                                      // Role Tag
                                       Container(
-                                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1),
+                                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1.5),
                                         decoration: BoxDecoration(
                                           color: isTeacher
-                                              ? AppTheme.primarySoft
-                                              : AppTheme.accent.withValues(alpha: 0.15),
+                                              ? (Theme.of(context).brightness == Brightness.dark ? const Color(0xFF1E293B) : const Color(0xFFF1F5F9))
+                                              : (Theme.of(context).brightness == Brightness.dark ? const Color(0xFF0F172A) : const Color(0xFFF8FAFC)),
                                           borderRadius: BorderRadius.circular(4),
                                           border: Border.all(
                                             color: isTeacher
-                                                ? AppTheme.primary.withValues(alpha: 0.4)
-                                                : AppTheme.accent.withValues(alpha: 0.5),
+                                                ? (Theme.of(context).brightness == Brightness.dark ? const Color(0xFF334155) : const Color(0xFFCBD5E1))
+                                                : (Theme.of(context).brightness == Brightness.dark ? const Color(0xFF1E293B) : const Color(0xFFE2E8F0)),
+                                            width: 0.8,
                                           ),
                                         ),
                                         child: Text(
                                           _getRoleLabel(user.role),
                                           style: TextStyle(
-                                            color: isTeacher ? AppTheme.primary : AppTheme.accent,
+                                            color: isTeacher
+                                                ? (Theme.of(context).brightness == Brightness.dark ? const Color(0xFFCBD5E1) : const Color(0xFF334155))
+                                                : (Theme.of(context).brightness == Brightness.dark ? const Color(0xFF64748B) : const Color(0xFF64748B)),
                                             fontSize: 10,
-                                            fontWeight: FontWeight.bold,
+                                            fontWeight: FontWeight.w600,
                                           ),
                                         ),
                                       ),
                                     ],
                                   ),
-                                  const SizedBox(height: 4),
+                                  const SizedBox(height: 3),
                                   Text(
-                                    user.email,
+                                    subtitleText,
                                     style: TextStyle(
                                       color: AppTheme.textMuted,
-                                      fontSize: 13,
+                                      fontSize: 12.5,
                                     ),
                                     maxLines: 1,
                                     overflow: TextOverflow.ellipsis,
@@ -484,8 +568,7 @@ class _NewConversationModalState extends ConsumerState<NewConversationModal>
                                 ],
                               ),
                             ),
-
-                            // Chevron or loading indicator
+                            const SizedBox(width: 8),
                             if (isCreating)
                               SizedBox(
                                 width: 20,
@@ -497,8 +580,8 @@ class _NewConversationModalState extends ConsumerState<NewConversationModal>
                               )
                             else
                               Icon(
-                                Icons.chevron_right,
-                                color: AppTheme.textMuted,
+                                Icons.chevron_right_rounded,
+                                color: AppTheme.textMuted.withValues(alpha: 0.6),
                                 size: 20,
                               ),
                           ],
@@ -512,26 +595,177 @@ class _NewConversationModalState extends ConsumerState<NewConversationModal>
     );
   }
 
-  Widget _buildModalRoleChip(String roleKey, String label) {
+  Widget _buildRoleChip(String roleKey, String label) {
     final isSelected = _selectedRole == roleKey;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
     return GestureDetector(
       onTap: () => setState(() => _selectedRole = roleKey),
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 150),
+        padding: const EdgeInsets.symmetric(horizontal: 13, vertical: 6.5),
         decoration: BoxDecoration(
-          color: isSelected ? AppTheme.primary : Theme.of(context).scaffoldBackgroundColor,
-          borderRadius: BorderRadius.circular(16),
+          color: isSelected
+              ? (isDark ? const Color(0xFF334155) : const Color(0xFF1E293B))
+              : Theme.of(context).colorScheme.surface,
+          borderRadius: BorderRadius.circular(8),
           border: Border.all(
-            color: isSelected ? AppTheme.primary : AppTheme.border,
+            color: isSelected
+                ? (isDark ? const Color(0xFF475569) : const Color(0xFF1E293B))
+                : (isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0)),
+            width: 1.0,
           ),
         ),
         child: Text(
           label,
           style: TextStyle(
             fontSize: 12,
-            fontWeight: FontWeight.bold,
-            color: isSelected ? Colors.black : AppTheme.textSecondary,
+            fontWeight: isSelected ? FontWeight.w600 : FontWeight.w500,
+            color: isSelected
+                ? Colors.white
+                : (isDark ? const Color(0xFF94A3B8) : const Color(0xFF475569)),
           ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildDropdownChip({
+    required String label,
+    required bool isActive,
+    required String value,
+    required List<String> items,
+    required ValueChanged<String?> onChanged,
+  }) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 2),
+      decoration: BoxDecoration(
+        color: isActive
+            ? (isDark ? const Color(0xFF1E293B) : const Color(0xFFF1F5F9))
+            : Theme.of(context).colorScheme.surface,
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(
+          color: isActive
+              ? (isDark ? const Color(0xFF475569) : const Color(0xFFCBD5E1))
+              : (isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0)),
+          width: 1.0,
+        ),
+      ),
+      child: DropdownButtonHideUnderline(
+        child: DropdownButton<String>(
+          value: value,
+          isDense: true,
+          dropdownColor: Theme.of(context).colorScheme.surface,
+          icon: Icon(
+            Icons.keyboard_arrow_down_rounded,
+            color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B),
+            size: 16,
+          ),
+          style: TextStyle(
+            fontSize: 12,
+            color: isActive
+                ? (isDark ? Colors.white : const Color(0xFF0F172A))
+                : (isDark ? const Color(0xFF94A3B8) : const Color(0xFF475569)),
+            fontWeight: isActive ? FontWeight.w600 : FontWeight.w500,
+          ),
+          items: items.map((item) {
+            String display = item;
+            if (item == 'All') {
+              display = label.startsWith('Grade') ? 'Grade: All' : 'Section: All';
+            }
+            return DropdownMenuItem(
+              value: item,
+              child: Text(display),
+            );
+          }).toList(),
+          onChanged: onChanged,
+        ),
+      ),
+    );
+  }
+
+  Widget _buildResetChip() {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
+    return GestureDetector(
+      onTap: () {
+        setState(() {
+          _selectedRole = 'all';
+          _selectedGrade = 'All';
+          _selectedSection = 'All';
+        });
+      },
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+        decoration: BoxDecoration(
+          color: isDark ? const Color(0xFF1E293B) : const Color(0xFFF8FAFC),
+          borderRadius: BorderRadius.circular(8),
+          border: Border.all(
+            color: isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0),
+          ),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(
+              Icons.refresh_rounded,
+              size: 13,
+              color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B),
+            ),
+            const SizedBox(width: 4),
+            Text(
+              'Reset',
+              style: TextStyle(
+                color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B),
+                fontSize: 12,
+                fontWeight: FontWeight.w500,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildAvatar(String name, {required String role, double size = 42}) {
+    final initial = name.isNotEmpty ? name[0].toUpperCase() : '?';
+    final isTeacher = role == 'teacher' || role == 'admin' || role == 'super_admin';
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
+    final Color bgColor;
+    final Color textColor;
+    final Color borderColor;
+
+    if (isTeacher) {
+      bgColor = isDark ? const Color(0xFF1E3A8A) : const Color(0xFF1E293B);
+      textColor = Colors.white;
+      borderColor = isDark ? const Color(0xFF3B82F6) : const Color(0xFF334155);
+    } else {
+      bgColor = isDark ? const Color(0xFF1E293B) : const Color(0xFFF1F5F9);
+      textColor = isDark ? const Color(0xFFCBD5E1) : const Color(0xFF334155);
+      borderColor = isDark ? const Color(0xFF334155) : const Color(0xFFCBD5E1);
+    }
+
+    return Container(
+      width: size,
+      height: size,
+      decoration: BoxDecoration(
+        shape: BoxShape.circle,
+        color: bgColor,
+        border: Border.all(
+          color: borderColor.withValues(alpha: 0.8),
+          width: 1.0,
+        ),
+      ),
+      alignment: Alignment.center,
+      child: Text(
+        initial,
+        style: TextStyle(
+          color: textColor,
+          fontWeight: FontWeight.w700,
+          fontSize: size * 0.42,
         ),
       ),
     );
@@ -540,29 +774,37 @@ class _NewConversationModalState extends ConsumerState<NewConversationModal>
   Widget _buildContactsTab() {
     return Center(
       child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 40, vertical: 80),
+        padding: const EdgeInsets.symmetric(horizontal: 40, vertical: 60),
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(
-              Icons.contacts_outlined,
-              size: 48,
-              color: AppTheme.textMuted.withValues(alpha: 0.5),
+            Container(
+              width: 64,
+              height: 64,
+              decoration: BoxDecoration(
+                color: AppTheme.surfaceLight,
+                shape: BoxShape.circle,
+              ),
+              child: Icon(
+                Icons.contacts_outlined,
+                size: 32,
+                color: AppTheme.textMuted.withValues(alpha: 0.6),
+              ),
             ),
-            const SizedBox(height: 12),
+            const SizedBox(height: 16),
             Text(
               'No matched device contacts',
               style: TextStyle(
-                fontSize: 18,
+                fontSize: 17,
                 fontWeight: FontWeight.w700,
                 color: AppTheme.text,
               ),
             ),
             const SizedBox(height: 8),
             Text(
-              'Device contacts with AIRA accounts will appear here.',
+              'Device contacts with registered AIRA accounts will appear here automatically.',
               style: TextStyle(
-                fontSize: 14,
+                fontSize: 13,
                 color: AppTheme.textMuted,
               ),
               textAlign: TextAlign.center,
@@ -579,15 +821,8 @@ Future<ChatConversation?> showNewConversationModal(BuildContext context) {
   return showModalBottomSheet<ChatConversation>(
     context: context,
     isScrollControlled: true,
-    backgroundColor: AppTheme.background,
-    shape: const RoundedRectangleBorder(
-      borderRadius: BorderRadius.vertical(top: Radius.circular(0)),
-    ),
-    builder: (context) {
-      return const FractionallySizedBox(
-        heightFactor: 0.95,
-        child: NewConversationModal(),
-      );
-    },
+    useSafeArea: true,
+    backgroundColor: Colors.transparent,
+    builder: (context) => const NewConversationModal(),
   );
 }

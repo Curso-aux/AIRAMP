@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
-import 'package:flutter/foundation.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../../../core/components/auth/required_change_password_dialog.dart';
+import '../../../core/components/app_toast.dart';
 import '../../../core/components/otp_verification_dialog.dart';
 import '../../../core/components/skeleton_loader.dart';
 import '../../../core/services/otp_service.dart';
@@ -10,6 +12,9 @@ import '../../../core/services/app_update_service.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/theme/theme_provider.dart';
 import '../../auth/application/auth_provider.dart';
+import '../data/student_repository.dart';
+import '../../teacher/data/teacher_schedule_repository.dart';
+import 'components/student_schedule_widget.dart';
 
 class StudentProfileScreen extends ConsumerStatefulWidget {
   const StudentProfileScreen({super.key});
@@ -26,6 +31,9 @@ class _StudentProfileScreenState extends ConsumerState<StudentProfileScreen>
   bool _obscureNewPassword = true;
   bool _obscureConfirmPassword = true;
   bool _isSavingPassword = false;
+  bool _quizAlerts = true;
+  bool _scheduleReminders = true;
+  bool _hapticsEnabled = true;
   final GlobalKey _passwordSectionKey = GlobalKey();
   final ScrollController _scrollController = ScrollController();
 
@@ -56,6 +64,27 @@ class _StudentProfileScreenState extends ConsumerState<StudentProfileScreen>
         }
       });
     }
+    _loadPreferences();
+  }
+
+  Future<void> _loadPreferences() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      if (mounted) {
+        setState(() {
+          _quizAlerts = prefs.getBool('student_pref_quiz_alerts') ?? true;
+          _scheduleReminders = prefs.getBool('student_pref_schedule_reminders') ?? true;
+          _hapticsEnabled = prefs.getBool('student_pref_haptics') ?? true;
+        });
+      }
+    } catch (_) {}
+  }
+
+  Future<void> _savePreference(String key, bool value) async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setBool(key, value);
+    } catch (_) {}
   }
 
   @override
@@ -86,23 +115,12 @@ class _StudentProfileScreenState extends ConsumerState<StudentProfileScreen>
     super.dispose();
   }
 
-  String _getRoleLabel(String role) {
-    if (role == 'super_admin') return 'Super Administrator';
-    if (role == 'admin') return 'Administrator';
-    if (role == 'teacher') return 'Teacher';
-    return 'Student';
-  }
-
-  // ── Image Picker ──
+  // ── Image Picker / Profile Photo Info ──
   Future<void> _handlePickImage() async {
-    // TODO: Integrate image_picker package when ready
-    // For now show a snackbar
     if (!mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text('Image picker will be integrated with image_picker package'),
-        backgroundColor: AppTheme.accent,
-      ),
+    AppToast.showInfo(
+      context,
+      'Profile photo updates are managed by School Admin LIS.',
     );
   }
 
@@ -673,6 +691,38 @@ class _StudentProfileScreenState extends ConsumerState<StudentProfileScreen>
     );
   }
 
+  void _handleBackNavigation() {
+    final user = ref.read(authProvider);
+    if (user?.mustChangePassword == true) {
+      _showMustChangePasswordBackAlert(isTeacher: false);
+      return;
+    }
+
+    try {
+      if (GoRouter.maybeOf(context)?.canPop() == true) {
+        context.pop();
+        return;
+      }
+    } catch (_) {}
+
+    try {
+      if (Navigator.of(context, rootNavigator: true).canPop()) {
+        Navigator.of(context, rootNavigator: true).pop();
+        return;
+      }
+    } catch (_) {}
+
+    try {
+      if (Navigator.canPop(context)) {
+        Navigator.pop(context);
+        return;
+      }
+    } catch (_) {}
+
+    // Fallback: If stack cannot be popped, navigate directly to student home
+    context.go('/student/home');
+  }
+
   @override
   Widget build(BuildContext context) {
     ref.listen<User?>(authProvider, (prev, next) {
@@ -687,6 +737,13 @@ class _StudentProfileScreenState extends ConsumerState<StudentProfileScreen>
 
     final currentUser = ref.watch(authProvider);
     final themeState = ref.watch(themeProvider);
+    final courses = ref.watch(studentCoursesProvider);
+    final quizAssignments = ref.watch(studentQuizAssignmentsProvider);
+    final progress = ref.watch(studentProgressProvider);
+    final sectionDetails = ref.watch(studentSectionDetailsProvider).value;
+    final schedules = (currentUser?.section != null && currentUser!.section!.trim().isNotEmpty)
+        ? (ref.watch(sectionSchedulesProvider(currentUser.section!.trim())).value ?? [])
+        : <Map<String, dynamic>>[];
 
     if (currentUser == null) {
       return Scaffold(
@@ -720,29 +777,26 @@ class _StudentProfileScreenState extends ConsumerState<StudentProfileScreen>
       appBar: AppBar(
         backgroundColor: AppTheme.background,
         elevation: 0,
-        automaticallyImplyLeading: !currentUser.mustChangePassword,
+        scrolledUnderElevation: 0,
+        automaticallyImplyLeading: false,
         leading: currentUser.mustChangePassword
             ? null
-            : (Navigator.canPop(context)
-                ? IconButton(
-                    icon: Icon(Icons.arrow_back_ios_new_rounded, color: AppTheme.text, size: 20),
-                    onPressed: () => context.pop(),
-                  )
-                : IconButton(
-                    icon: Icon(Icons.arrow_back_ios_new_rounded, color: AppTheme.text, size: 20),
-                    onPressed: () => context.go('/student/home'),
-                  )),
+            : IconButton(
+                icon: Icon(Icons.arrow_back_rounded, color: AppTheme.text),
+                tooltip: 'Back to Home',
+                onPressed: _handleBackNavigation,
+              ),
         title: Text(
           currentUser.mustChangePassword ? 'Security Requirement' : 'Student Profile',
           style: TextStyle(color: AppTheme.text, fontSize: 18, fontWeight: FontWeight.bold),
         ),
-        centerTitle: true,
+        centerTitle: false,
       ),
       body: PopScope(
-        canPop: !currentUser.mustChangePassword,
+        canPop: false,
         onPopInvokedWithResult: (didPop, result) {
           if (didPop) return;
-          _showMustChangePasswordBackAlert(isTeacher: false);
+          _handleBackNavigation();
         },
         child: currentUser.mustChangePassword
             ? _buildMandatoryPasswordChangeView(currentUser)
@@ -752,29 +806,47 @@ class _StudentProfileScreenState extends ConsumerState<StudentProfileScreen>
                   padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 0),
                   child: Column(
                     children: [
+                      const SizedBox(height: 8),
+
+                      // 1. Hero Student Identity Card (Avatar, Badges & 4 Quick KPIs)
+                      _buildHeroStudentCard(
+                        context: context,
+                        currentUser: currentUser,
+                        initial: initial,
+                        courses: courses,
+                        quizAssignments: quizAssignments,
+                        progress: progress,
+                        schedules: schedules,
+                      ),
                       const SizedBox(height: 16),
 
-                      // ── Avatar Section ──
-                      _buildAvatarSection(currentUser, initial),
-                      const SizedBox(height: 20),
-
-                      // ── Appearance / Theme Card ──
-                      _buildAppearanceCard(themeState),
+                      // 2. Academic Standing & Enrolled Courses Card
+                      _buildAcademicStandingCard(
+                        context: context,
+                        courses: courses,
+                        sectionDetails: sectionDetails,
+                        schedules: schedules,
+                        currentUser: currentUser,
+                      ),
                       const SizedBox(height: 16),
 
-                      // ── Personal Information Card ──
-                      _buildPersonalInfoCard(currentUser),
+                      // 3. Personal & Institutional Information Card
+                      _buildPersonalInfoCard(currentUser, sectionDetails),
                       const SizedBox(height: 16),
 
-                      // ── Change Password Card ──
+                      // 4. Account Security & Password Management Card
                       _buildChangePasswordCard(currentUser),
                       const SizedBox(height: 16),
 
-                      // ── App Updates & Version Card ──
-                      _buildAppUpdatesCard(),
+                      // 5. Classroom Experience & Preferences Card (Theme & Notifications)
+                      _buildPreferencesCard(themeState),
                       const SizedBox(height: 16),
 
-                      // ── Sign Out Button ──
+                      // 6. Institutional Support & App Information Card
+                      _buildAboutAndSupportCard(context),
+                      const SizedBox(height: 24),
+
+                      // 7. Sign Out Button
                       _buildSignOutButton(),
                       const SizedBox(height: 40),
                     ],
@@ -1151,137 +1223,507 @@ class _StudentProfileScreenState extends ConsumerState<StudentProfileScreen>
   }
 
   // ═══════════════════════════════════════════════════════════
-  //  AVATAR SECTION
+  //  1. HERO STUDENT IDENTITY CARD (Avatar, Badges & 4 Quick KPIs)
   // ═══════════════════════════════════════════════════════════
-  Widget _buildAvatarSection(User currentUser, String initial) {
-    return Column(
-      children: [
-        GestureDetector(
-          onTap: _handlePickImage,
-          child: Stack(
-            clipBehavior: Clip.none,
-            children: [
-              // Avatar circle
-              currentUser.profileImage != null
-                  ? CircleAvatar(
-                      radius: 45,
-                      backgroundImage:
-                          NetworkImage(currentUser.profileImage!),
-                    )
-                  : CircleAvatar(
-                      radius: 45,
-                      backgroundColor: AppTheme.primary,
-                      child: Text(
-                        initial,
-                        style: const TextStyle(
-                          fontSize: 36,
-                          fontWeight: FontWeight.w700,
-                          color: Colors.black,
+  Widget _buildHeroStudentCard({
+    required BuildContext context,
+    required User currentUser,
+    required String initial,
+    required List<Map<String, dynamic>> courses,
+    required List<Map<String, dynamic>> quizAssignments,
+    required Map<String, dynamic> progress,
+    required List<Map<String, dynamic>> schedules,
+  }) {
+    final studentSection = currentUser.section;
+    final hasSection = studentSection != null && studentSection.isNotEmpty && studentSection != 'null';
+    final studentGrade = currentUser.grade;
+    final hasGrade = studentGrade != null && studentGrade.isNotEmpty && studentGrade != 'null';
+    final completedLessons = progress['completed'] ?? 0;
+
+    String placementLabel = '';
+    if (hasGrade && hasSection) {
+      placementLabel = '$studentGrade • $studentSection';
+    } else if (hasSection) {
+      placementLabel = studentSection;
+    } else if (hasGrade) {
+      placementLabel = studentGrade;
+    }
+
+    return Container(
+      width: double.infinity,
+      decoration: BoxDecoration(
+        color: AppTheme.surface,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: AppTheme.border, width: 1),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.03),
+            blurRadius: 8,
+            offset: const Offset(0, 3),
+          ),
+        ],
+      ),
+      child: Column(
+        children: [
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 20, 16, 16),
+            child: Column(
+              children: [
+                // Formal Academic Avatar with Subtle Neutral Ring
+                Stack(
+                  alignment: Alignment.bottomRight,
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(3),
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        border: Border.all(
+                          color: AppTheme.border,
+                          width: 2,
+                        ),
+                      ),
+                      child: CircleAvatar(
+                        radius: 40,
+                        backgroundColor: AppTheme.inputBg,
+                        backgroundImage: (currentUser.profileImage != null && currentUser.profileImage!.isNotEmpty)
+                            ? NetworkImage(currentUser.profileImage!)
+                            : null,
+                        child: (currentUser.profileImage == null || currentUser.profileImage!.isEmpty)
+                            ? Text(
+                                initial,
+                                style: TextStyle(
+                                  fontSize: 30,
+                                  fontWeight: FontWeight.bold,
+                                  color: AppTheme.text,
+                                ),
+                              )
+                            : null,
+                      ),
+                    ),
+                    Positioned(
+                      right: 1,
+                      bottom: 1,
+                      child: GestureDetector(
+                        onTap: _handlePickImage,
+                        child: Container(
+                          padding: const EdgeInsets.all(5),
+                          decoration: BoxDecoration(
+                            color: AppTheme.textSecondary,
+                            shape: BoxShape.circle,
+                            border: Border.all(color: AppTheme.surface, width: 2),
+                          ),
+                          child: const Icon(
+                            Icons.camera_alt_rounded,
+                            size: 12,
+                            color: Colors.white,
+                          ),
                         ),
                       ),
                     ),
-              // Camera icon overlay
-              Positioned(
-                bottom: 0,
-                right: 0,
-                child: Container(
-                  width: 30,
-                  height: 30,
-                  decoration: BoxDecoration(
-                    color: AppTheme.accent,
-                    shape: BoxShape.circle,
-                    border: Border.all(
-                        color: AppTheme.background, width: 2),
-                  ),
-                  child: const Icon(Icons.camera_alt,
-                      size: 14, color: Colors.white),
+                  ],
                 ),
-              ),
-            ],
+                const SizedBox(height: 12),
+
+                // Full Name
+                Text(
+                  currentUser.fullName.isNotEmpty ? currentUser.fullName : 'Learner',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    fontSize: 19,
+                    fontWeight: FontWeight.bold,
+                    color: AppTheme.text,
+                    letterSpacing: -0.3,
+                  ),
+                ),
+                const SizedBox(height: 3),
+
+                // Username / Handle
+                Text(
+                  '@${currentUser.username}',
+                  style: TextStyle(
+                    fontSize: 12.5,
+                    fontWeight: FontWeight.w500,
+                    color: AppTheme.textMuted,
+                  ),
+                ),
+                const SizedBox(height: 12),
+
+                // Formal Institutional Badges (Quiet & Unified)
+                Wrap(
+                  alignment: WrapAlignment.center,
+                  spacing: 6,
+                  runSpacing: 6,
+                  children: [
+                    _buildBadge(
+                      icon: Icons.verified_rounded,
+                      label: 'DepEd Verified Learner',
+                      iconColor: AppTheme.primary,
+                    ),
+                    if (placementLabel.isNotEmpty)
+                      _buildBadge(
+                        icon: Icons.school_outlined,
+                        label: placementLabel,
+                      ),
+                  ],
+                ),
+              ],
+            ),
           ),
-        ),
-        const SizedBox(height: 32),
-        // Activity Timeline
-        Text(
-          '${currentUser.role == 'teacher' ? 'Teacher' : 'Student'} Activity',
-          style: TextStyle(
-              fontSize: 18, fontWeight: FontWeight.bold, color: AppTheme.text),
-        ),
-        const SizedBox(height: 12),
-        Text(
-          currentUser.fullName,
-          style: TextStyle(
-            fontSize: 20,
-            fontWeight: FontWeight.w700,
-            color: AppTheme.text,
+
+          // Subtle Divider
+          Divider(height: 1, color: AppTheme.border),
+
+          // Clean Workload Metrics Bar (Quiet Icons & High-Contrast Typography)
+          Padding(
+            padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 8),
+            child: Row(
+              children: [
+                Expanded(
+                  child: _buildMetricStat(
+                    context: context,
+                    icon: Icons.auto_stories_outlined,
+                    count: '${courses.length}',
+                    label: 'Subjects',
+                    onTap: () => context.push('/student/courses'),
+                  ),
+                ),
+                Container(width: 1, height: 26, color: AppTheme.border),
+                Expanded(
+                  child: _buildMetricStat(
+                    context: context,
+                    icon: Icons.quiz_outlined,
+                    count: '${quizAssignments.length}',
+                    label: 'Quizzes',
+                    onTap: () => context.push('/student/quiz-history'),
+                  ),
+                ),
+                Container(width: 1, height: 26, color: AppTheme.border),
+                Expanded(
+                  child: _buildMetricStat(
+                    context: context,
+                    icon: Icons.task_alt_rounded,
+                    count: '$completedLessons',
+                    label: 'Completed',
+                    onTap: () => context.push('/student/progress'),
+                  ),
+                ),
+                Container(width: 1, height: 26, color: AppTheme.border),
+                Expanded(
+                  child: _buildMetricStat(
+                    context: context,
+                    icon: Icons.calendar_today_outlined,
+                    count: '${schedules.length}',
+                    label: 'Classes',
+                    onTap: () => showStudentTimetableModal(context, sectionName: currentUser.section),
+                  ),
+                ),
+              ],
+            ),
           ),
-        ),
-        const SizedBox(height: 2),
-        Text(
-          _getRoleLabel(currentUser.role),
-          style: TextStyle(
-            fontSize: 13,
-            color: AppTheme.textSecondary,
-          ),
-        ),
-      ],
+        ],
+      ),
     );
   }
 
+  Widget _buildMetricStat({
+    required BuildContext context,
+    required IconData icon,
+    required String count,
+    required String label,
+    required VoidCallback onTap,
+  }) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(10),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: 4),
+        child: Column(
+          children: [
+            Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(icon, size: 13, color: AppTheme.textMuted),
+                const SizedBox(width: 4),
+                Text(
+                  count,
+                  style: TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.bold,
+                    color: AppTheme.text,
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 2),
+            Text(
+              label,
+              style: TextStyle(
+                fontSize: 11,
+                fontWeight: FontWeight.w500,
+                color: AppTheme.textMuted,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
 
+  Widget _buildBadge({
+    required IconData icon,
+    required String label,
+    Color? iconColor,
+  }) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 4),
+      decoration: BoxDecoration(
+        color: AppTheme.inputBg,
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: AppTheme.border),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, size: 12, color: iconColor ?? AppTheme.textMuted),
+          const SizedBox(width: 4.5),
+          Text(
+            label,
+            style: TextStyle(
+              fontSize: 11.5,
+              fontWeight: FontWeight.w600,
+              color: AppTheme.textSecondary,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
 
   // ═══════════════════════════════════════════════════════════
-  //  APPEARANCE CARD
+  //  2. ACADEMIC STANDING & ENROLLED SUBJECTS CARD
   // ═══════════════════════════════════════════════════════════
-  Widget _buildAppearanceCard(ThemeState themeState) {
+  Widget _buildAcademicStandingCard({
+    required BuildContext context,
+    required List<Map<String, dynamic>> courses,
+    required Map<String, dynamic>? sectionDetails,
+    required List<Map<String, dynamic>> schedules,
+    required User currentUser,
+  }) {
+    final advisory = (sectionDetails?['adviser_name'] as String?) ??
+        (sectionDetails?['adviser'] as String?) ??
+        'Designated Faculty';
+    final room = (sectionDetails?['room'] as String?) ?? 'Campus Main';
+    final track = (sectionDetails?['track'] as String?) ??
+        (sectionDetails?['strand'] as String?) ??
+        'Junior High School';
+
     return _sectionCard(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(
-            'Appearance',
-            style: TextStyle(
-              fontSize: 16,
-              fontWeight: FontWeight.w600,
-              color: AppTheme.text,
-            ),
-          ),
-          const SizedBox(height: 8),
-          Text(
-            'Choose your preferred theme between Light and Dark mode.',
-            style: TextStyle(
-              fontSize: 13,
-              color: AppTheme.textMuted,
-              height: 1.4,
-            ),
-          ),
-          const SizedBox(height: 12),
-
-          // Theme toggle pills
+          // Elegant Header without Loud Colored Box
           Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              _buildThemePill(
-                icon: Icons.wb_sunny_outlined,
-                label: 'Light',
-                mode: AppThemeMode.light,
-                isActive: themeState.preference == AppThemeMode.light,
+              Row(
+                children: [
+                  Icon(Icons.auto_stories_outlined, size: 17, color: AppTheme.textSecondary),
+                  const SizedBox(width: 8),
+                  Text(
+                    'Academic Standing & Subjects',
+                    style: TextStyle(
+                      fontSize: 15.5,
+                      fontWeight: FontWeight.bold,
+                      color: AppTheme.text,
+                    ),
+                  ),
+                ],
               ),
-              const SizedBox(width: 12),
-              _buildThemePill(
-                icon: Icons.dark_mode,
-                label: 'Dark',
-                mode: AppThemeMode.dark,
-                isActive: themeState.preference == AppThemeMode.dark,
+              InkWell(
+                onTap: () => context.push('/student/courses'),
+                borderRadius: BorderRadius.circular(6),
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 4),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(
+                        'View All',
+                        style: TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w600,
+                          color: AppTheme.textSecondary,
+                        ),
+                      ),
+                      const SizedBox(width: 1),
+                      Icon(Icons.chevron_right_rounded, size: 15, color: AppTheme.textMuted),
+                    ],
+                  ),
+                ),
               ),
             ],
           ),
+          const SizedBox(height: 14),
+
+          // Enrolled Subjects Sub-section
+          Text(
+            'ENROLLED SUBJECTS (${courses.length})',
+            style: TextStyle(
+              fontSize: 10.5,
+              fontWeight: FontWeight.bold,
+              letterSpacing: 0.5,
+              color: AppTheme.textMuted,
+            ),
+          ),
+          const SizedBox(height: 8),
+
+          if (courses.isEmpty)
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: AppTheme.inputBg,
+                borderRadius: BorderRadius.circular(10),
+                border: Border.all(color: AppTheme.border),
+              ),
+              child: Text(
+                'No subjects currently enrolled. Section allocation is managed by your Class Adviser.',
+                style: TextStyle(fontSize: 12, color: AppTheme.textMuted),
+              ),
+            )
+          else
+            ...courses.take(3).map((sub) {
+              final title = (sub['title'] ?? sub['subject_name'] ?? sub['name'] ?? 'Subject') as String;
+              final teacher = (sub['teacher'] ?? sub['teacher_name'] ?? 'Assigned Faculty') as String;
+
+              return Container(
+                margin: const EdgeInsets.only(bottom: 7),
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                decoration: BoxDecoration(
+                  color: AppTheme.inputBg,
+                  borderRadius: BorderRadius.circular(10),
+                  border: Border.all(color: AppTheme.border),
+                ),
+                child: Row(
+                  children: [
+                    Icon(
+                      Icons.menu_book_rounded,
+                      size: 15,
+                      color: AppTheme.textMuted,
+                    ),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            title,
+                            style: TextStyle(
+                              fontSize: 12.5,
+                              fontWeight: FontWeight.w600,
+                              color: AppTheme.text,
+                            ),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                          const SizedBox(height: 1.5),
+                          Text(
+                            teacher,
+                            style: TextStyle(
+                              fontSize: 11,
+                              color: AppTheme.textMuted,
+                            ),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ],
+                      ),
+                    ),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2.5),
+                      decoration: BoxDecoration(
+                        color: AppTheme.background,
+                        borderRadius: BorderRadius.circular(5),
+                        border: Border.all(color: AppTheme.border),
+                      ),
+                      child: Text(
+                        'Enrolled',
+                        style: TextStyle(
+                          fontSize: 10,
+                          fontWeight: FontWeight.w600,
+                          color: AppTheme.textMuted,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              );
+            }),
+
+          const SizedBox(height: 8),
+
+          // Section & Class Adviser Detail Card (Clean Neutral Spec Table)
+          Container(
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: AppTheme.inputBg,
+              borderRadius: BorderRadius.circular(10),
+              border: Border.all(color: AppTheme.border),
+            ),
+            child: Column(
+              children: [
+                _buildSystemSpecRow(label: 'Academic Section', value: currentUser.section ?? 'Grade 10 - Emerald'),
+                const SizedBox(height: 6),
+                _buildSystemSpecRow(label: 'Class Adviser', value: advisory),
+                const SizedBox(height: 6),
+                _buildSystemSpecRow(label: 'Home Room / Building', value: room),
+                const SizedBox(height: 6),
+                _buildSystemSpecRow(label: 'Curricular Track / Strand', value: track),
+              ],
+            ),
+          ),
           const SizedBox(height: 10),
-          Center(
-            child: Text(
-              'Current: ${ref.read(themeProvider.notifier).currentModeLabel}',
-              style: TextStyle(
-                fontSize: 12,
-                color: AppTheme.textMuted,
+
+          // Open Timetable Action Tile (Subtle & Institutional)
+          InkWell(
+            onTap: () => showStudentTimetableModal(context, sectionName: currentUser.section),
+            borderRadius: BorderRadius.circular(10),
+            child: Container(
+              padding: const EdgeInsets.symmetric(vertical: 11, horizontal: 12),
+              decoration: BoxDecoration(
+                color: AppTheme.background,
+                borderRadius: BorderRadius.circular(10),
+                border: Border.all(color: AppTheme.border),
+              ),
+              child: Row(
+                children: [
+                  Icon(Icons.calendar_today_outlined, size: 16, color: AppTheme.textSecondary),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'Weekly Class Timetable Schedule',
+                          style: TextStyle(
+                            fontSize: 12.5,
+                            fontWeight: FontWeight.w600,
+                            color: AppTheme.text,
+                          ),
+                        ),
+                        Text(
+                          '${schedules.length} active periods in timetable matrix',
+                          style: TextStyle(
+                            fontSize: 11,
+                            color: AppTheme.textMuted,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  Icon(Icons.chevron_right_rounded, size: 16, color: AppTheme.textMuted),
+                ],
               ),
             ),
           ),
@@ -1290,83 +1732,52 @@ class _StudentProfileScreenState extends ConsumerState<StudentProfileScreen>
     );
   }
 
-  Widget _buildThemePill({
-    required IconData icon,
-    required String label,
-    required AppThemeMode mode,
-    required bool isActive,
-  }) {
-    return Expanded(
-      child: GestureDetector(
-        onTap: () => ref.read(themeProvider.notifier).setTheme(mode),
-        child: AnimatedContainer(
-          duration: const Duration(milliseconds: 200),
-          padding: const EdgeInsets.symmetric(vertical: 12),
-          decoration: BoxDecoration(
-            color: isActive ? AppTheme.primary : AppTheme.inputBg,
-            borderRadius: BorderRadius.circular(10),
-            border: Border.all(
-              color: isActive ? AppTheme.primary : AppTheme.border,
-              width: 1.5,
-            ),
-          ),
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Icon(icon,
-                  size: 16,
-                  color:
-                      isActive ? Colors.black : AppTheme.textSecondary),
-              const SizedBox(width: 6),
-              Text(
-                label,
-                style: TextStyle(
-                  fontSize: 13,
-                  fontWeight: FontWeight.w600,
-                  color:
-                      isActive ? Colors.black : AppTheme.textSecondary,
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
+  // ═══════════════════════════════════════════════════════════
+  //  3. PERSONAL & INSTITUTIONAL INFORMATION CARD
+  // ═══════════════════════════════════════════════════════════
+  Widget _buildPersonalInfoCard(User currentUser, Map<String, dynamic>? sectionDetails) {
+    final advisory = (sectionDetails?['adviser_name'] as String?) ??
+        (sectionDetails?['adviser'] as String?) ??
+        'Designated Faculty';
+    final schoolId = (currentUser.schoolId != null && currentUser.schoolId!.isNotEmpty)
+        ? currentUser.schoolId!
+        : 'sch_main (DepEd Central)';
+    final sectionGrade = '${currentUser.grade ?? 'Grade 10'} - ${currentUser.section ?? 'Unassigned'}';
 
-  // ═══════════════════════════════════════════════════════════
-  //  PERSONAL INFORMATION CARD
-  // ═══════════════════════════════════════════════════════════
-  Widget _buildPersonalInfoCard(User currentUser) {
     return _sectionCard(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Header with Edit/Save button
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Text(
-                'Personal Information',
-                style: TextStyle(
-                  fontSize: 16,
-                  fontWeight: FontWeight.w600,
-                  color: AppTheme.text,
-                ),
+              Row(
+                children: [
+                  Icon(Icons.badge_outlined, size: 17, color: AppTheme.textSecondary),
+                  const SizedBox(width: 8),
+                  Text(
+                    'Personal Information',
+                    style: TextStyle(
+                      fontSize: 15.5,
+                      fontWeight: FontWeight.bold,
+                      color: AppTheme.text,
+                    ),
+                  ),
+                ],
               ),
               if (!_isEditing)
                 GestureDetector(
                   onTap: () => setState(() => _isEditing = true),
                   child: Row(
                     children: [
-                      Icon(Icons.edit, size: 14, color: AppTheme.primary),
-                      SizedBox(width: 4),
+                      Icon(Icons.edit_outlined, size: 13, color: AppTheme.textSecondary),
+                      const SizedBox(width: 4),
                       Text(
                         'Edit',
                         style: TextStyle(
-                          fontSize: 13,
+                          fontSize: 12.5,
                           fontWeight: FontWeight.w500,
-                          color: AppTheme.primary,
+                          color: AppTheme.textSecondary,
                         ),
                       ),
                     ],
@@ -1376,22 +1787,21 @@ class _StudentProfileScreenState extends ConsumerState<StudentProfileScreen>
                 GestureDetector(
                   onTap: _handleSaveProfile,
                   child: Container(
-                    padding: const EdgeInsets.symmetric(
-                        horizontal: 12, vertical: 6),
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
                     decoration: BoxDecoration(
-                      color: AppTheme.primary,
-                      borderRadius: BorderRadius.circular(8),
+                      color: AppTheme.text,
+                      borderRadius: BorderRadius.circular(6),
                     ),
                     child: const Row(
                       children: [
-                        Icon(Icons.save, size: 14, color: Colors.black),
+                        Icon(Icons.check, size: 13, color: Colors.white),
                         SizedBox(width: 4),
                         Text(
                           'Save',
                           style: TextStyle(
-                            fontSize: 13,
+                            fontSize: 12,
                             fontWeight: FontWeight.w600,
-                            color: Colors.black,
+                            color: Colors.white,
                           ),
                         ),
                       ],
@@ -1400,9 +1810,7 @@ class _StudentProfileScreenState extends ConsumerState<StudentProfileScreen>
                 ),
             ],
           ),
-          const SizedBox(height: 16),
-
-          // Full Name field
+          const SizedBox(height: 14),
           _buildFieldRow(
             icon: Icons.person_outline,
             label: 'Full Name',
@@ -1411,26 +1819,113 @@ class _StudentProfileScreenState extends ConsumerState<StudentProfileScreen>
             isEditing: _isEditing,
             showBorder: true,
           ),
-
-          // Username field
           _buildFieldRow(
-            icon: Icons.person_outline,
+            icon: Icons.alternate_email_rounded,
             label: 'Username',
             value: currentUser.username,
             controller: _usernameController,
             isEditing: _isEditing,
             showBorder: true,
           ),
-
-          // Email field
           _buildFieldRow(
             icon: Icons.email_outlined,
-            label: 'Email',
+            label: 'Email Address (DepEd LIS)',
             value: currentUser.email,
             controller: _emailController,
             isEditing: _isEditing,
-            showBorder: false,
+            showBorder: true,
             keyboardType: TextInputType.emailAddress,
+          ),
+          // Institutional non-editable fields
+          _buildStaticInfoRow(
+            icon: Icons.fingerprint_rounded,
+            label: 'Student LRN / Reference ID',
+            value: currentUser.id,
+            showBorder: true,
+          ),
+          _buildStaticInfoRow(
+            icon: Icons.group_work_outlined,
+            label: 'Assigned Section & Grade Level',
+            value: sectionGrade,
+            showBorder: true,
+          ),
+          _buildStaticInfoRow(
+            icon: Icons.person_pin_rounded,
+            label: 'Official Class Adviser',
+            value: advisory,
+            showBorder: true,
+          ),
+          _buildStaticInfoRow(
+            icon: Icons.apartment_rounded,
+            label: 'Institutional Campus / Division ID',
+            value: schoolId,
+            showBorder: true,
+          ),
+          _buildStaticInfoRow(
+            icon: Icons.security_rounded,
+            label: 'System Access Tier',
+            value: 'Student / Learner (Level 1 Access)',
+            showBorder: false,
+          ),
+          if (_isEditing) ...[
+            const SizedBox(height: 10),
+            Text(
+              '* Note: Section allocation, grade level, and institutional records are managed by the School LIS Administrator.',
+              style: TextStyle(
+                fontSize: 11,
+                fontStyle: FontStyle.italic,
+                color: AppTheme.textMuted,
+              ),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
+  Widget _buildStaticInfoRow({
+    required IconData icon,
+    required String label,
+    required String value,
+    required bool showBorder,
+  }) {
+    return Container(
+      padding: const EdgeInsets.symmetric(vertical: 9),
+      decoration: BoxDecoration(
+        border: showBorder
+            ? Border(bottom: BorderSide(color: AppTheme.border, width: 1))
+            : null,
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Padding(
+            padding: const EdgeInsets.only(top: 2),
+            child: Icon(icon, size: 15, color: AppTheme.textMuted),
+          ),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  label,
+                  style: TextStyle(
+                    fontSize: 11,
+                    color: AppTheme.textMuted,
+                  ),
+                ),
+                const SizedBox(height: 1.5),
+                Text(
+                  value,
+                  style: TextStyle(
+                    color: AppTheme.text,
+                    fontSize: 13.5,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ],
+            ),
           ),
         ],
       ),
@@ -1453,7 +1948,7 @@ class _StudentProfileScreenState extends ConsumerState<StudentProfileScreen>
       label.toLowerCase().contains('email') ? 50 : 50
     );
     return Container(
-      padding: const EdgeInsets.symmetric(vertical: 10),
+      padding: const EdgeInsets.symmetric(vertical: 9),
       decoration: BoxDecoration(
         border: showBorder
             ? Border(
@@ -1465,9 +1960,9 @@ class _StudentProfileScreenState extends ConsumerState<StudentProfileScreen>
         children: [
           Padding(
             padding: const EdgeInsets.only(top: 2),
-            child: Icon(icon, size: 16, color: AppTheme.textMuted),
+            child: Icon(icon, size: 15, color: AppTheme.textMuted),
           ),
-          const SizedBox(width: 12),
+          const SizedBox(width: 10),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -1479,7 +1974,7 @@ class _StudentProfileScreenState extends ConsumerState<StudentProfileScreen>
                     color: AppTheme.textMuted,
                   ),
                 ),
-                const SizedBox(height: 2),
+                const SizedBox(height: 1.5),
                 if (isEditing)
                   TextField(
                     controller: controller,
@@ -1487,7 +1982,7 @@ class _StudentProfileScreenState extends ConsumerState<StudentProfileScreen>
                     buildCounter: (context, {required currentLength, required isFocused, maxLength}) => null,
                     keyboardType: keyboardType,
                     style: TextStyle(
-                        color: AppTheme.text, fontSize: 15),
+                        color: AppTheme.text, fontSize: 14),
                     decoration: InputDecoration(
                       counterText: '',
                       isDense: true,
@@ -1496,19 +1991,19 @@ class _StudentProfileScreenState extends ConsumerState<StudentProfileScreen>
                       filled: true,
                       fillColor: AppTheme.inputBg,
                       border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(8),
+                        borderRadius: BorderRadius.circular(7),
                         borderSide:
                             BorderSide(color: AppTheme.border),
                       ),
                       enabledBorder: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(8),
+                        borderRadius: BorderRadius.circular(7),
                         borderSide:
                             BorderSide(color: AppTheme.border),
                       ),
                       focusedBorder: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(8),
+                        borderRadius: BorderRadius.circular(7),
                         borderSide:
-                            BorderSide(color: AppTheme.primary),
+                            BorderSide(color: AppTheme.text),
                       ),
                     ),
                   )
@@ -1516,7 +2011,7 @@ class _StudentProfileScreenState extends ConsumerState<StudentProfileScreen>
                   Text(
                     value,
                     style: TextStyle(
-                        color: AppTheme.text, fontSize: 15),
+                        color: AppTheme.text, fontSize: 13.5),
                   ),
               ],
             ),
@@ -1527,10 +2022,7 @@ class _StudentProfileScreenState extends ConsumerState<StudentProfileScreen>
   }
 
   // ═══════════════════════════════════════════════════════════
-  //  CHANGE PASSWORD CARD
-  // ═══════════════════════════════════════════════════════════
-  // ═══════════════════════════════════════════════════════════
-  //  CHANGE PASSWORD CARD
+  //  4. ACCOUNT SECURITY & PASSWORD MANAGEMENT CARD
   // ═══════════════════════════════════════════════════════════
   Widget _buildChangePasswordCard(User currentUser) {
     final isRequired = currentUser.mustChangePassword;
@@ -1635,17 +2127,17 @@ class _StudentProfileScreenState extends ConsumerState<StudentProfileScreen>
               children: [
                 Icon(
                   isRequired ? Icons.lock_reset_rounded : Icons.lock_outline,
-                  size: 18,
-                  color: isRequired ? Colors.amberAccent : AppTheme.accent,
+                  size: 17,
+                  color: isRequired ? Colors.amberAccent : AppTheme.textSecondary,
                 ),
-                const SizedBox(width: 12),
+                const SizedBox(width: 10),
                 Expanded(
                   child: Row(
                     children: [
                       Text(
                         'Change Password',
                         style: TextStyle(
-                          fontSize: 15,
+                          fontSize: 14.5,
                           fontWeight: FontWeight.w600,
                           color: AppTheme.text,
                         ),
@@ -1688,7 +2180,7 @@ class _StudentProfileScreenState extends ConsumerState<StudentProfileScreen>
           if (_showPasswordForm || isRequired) ...[
             const SizedBox(height: 16),
             Padding(
-              padding: const EdgeInsets.only(left: 30),
+              padding: const EdgeInsets.only(left: 27),
               child: Column(
                 children: [
                   // New Password
@@ -1696,34 +2188,42 @@ class _StudentProfileScreenState extends ConsumerState<StudentProfileScreen>
                     controller: _newPasswordController,
                     maxLength: 16,
                     buildCounter: (context, {required currentLength, required isFocused, maxLength}) => null,
-                    obscureText: true,
-                    style: TextStyle(color: AppTheme.text, fontSize: 14),
+                    obscureText: _obscureNewPassword,
+                    style: TextStyle(color: AppTheme.text, fontSize: 13.5),
                     decoration: InputDecoration(
                       hintText: 'New Password',
                       counterText: '',
                       hintStyle: TextStyle(color: AppTheme.textMuted),
+                      suffixIcon: IconButton(
+                        icon: Icon(
+                          _obscureNewPassword ? Icons.visibility_off_outlined : Icons.visibility_outlined,
+                          color: AppTheme.textMuted,
+                          size: 17,
+                        ),
+                        onPressed: () => setState(() => _obscureNewPassword = !_obscureNewPassword),
+                      ),
                       filled: true,
                       fillColor: AppTheme.inputBg,
                       border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(10),
+                        borderRadius: BorderRadius.circular(8),
                         borderSide: BorderSide(
                           color: isRequired ? Colors.amberAccent.withValues(alpha: 0.5) : AppTheme.border,
                         ),
                       ),
                       enabledBorder: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(10),
+                        borderRadius: BorderRadius.circular(8),
                         borderSide: BorderSide(
                           color: isRequired ? Colors.amberAccent.withValues(alpha: 0.5) : AppTheme.border,
                         ),
                       ),
                       focusedBorder: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(10),
+                        borderRadius: BorderRadius.circular(8),
                         borderSide: BorderSide(
-                          color: isRequired ? Colors.amberAccent : AppTheme.primary,
+                          color: isRequired ? Colors.amberAccent : AppTheme.text,
                         ),
                       ),
                       contentPadding: const EdgeInsets.symmetric(
-                          horizontal: 14, vertical: 10),
+                          horizontal: 12, vertical: 10),
                     ),
                   ),
                   const SizedBox(height: 10),
@@ -1733,34 +2233,42 @@ class _StudentProfileScreenState extends ConsumerState<StudentProfileScreen>
                     controller: _confirmPasswordController,
                     maxLength: 16,
                     buildCounter: (context, {required currentLength, required isFocused, maxLength}) => null,
-                    obscureText: true,
-                    style: TextStyle(color: AppTheme.text, fontSize: 14),
+                    obscureText: _obscureConfirmPassword,
+                    style: TextStyle(color: AppTheme.text, fontSize: 13.5),
                     decoration: InputDecoration(
                       hintText: 'Confirm Password',
                       counterText: '',
                       hintStyle: TextStyle(color: AppTheme.textMuted),
+                      suffixIcon: IconButton(
+                        icon: Icon(
+                          _obscureConfirmPassword ? Icons.visibility_off_outlined : Icons.visibility_outlined,
+                          color: AppTheme.textMuted,
+                          size: 17,
+                        ),
+                        onPressed: () => setState(() => _obscureConfirmPassword = !_obscureConfirmPassword),
+                      ),
                       filled: true,
                       fillColor: AppTheme.inputBg,
                       border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(10),
+                        borderRadius: BorderRadius.circular(8),
                         borderSide: BorderSide(
                           color: isRequired ? Colors.amberAccent.withValues(alpha: 0.5) : AppTheme.border,
                         ),
                       ),
                       enabledBorder: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(10),
+                        borderRadius: BorderRadius.circular(8),
                         borderSide: BorderSide(
                           color: isRequired ? Colors.amberAccent.withValues(alpha: 0.5) : AppTheme.border,
                         ),
                       ),
                       focusedBorder: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(10),
+                        borderRadius: BorderRadius.circular(8),
                         borderSide: BorderSide(
-                          color: isRequired ? Colors.amberAccent : AppTheme.primary,
+                          color: isRequired ? Colors.amberAccent : AppTheme.text,
                         ),
                       ),
                       contentPadding: const EdgeInsets.symmetric(
-                          horizontal: 14, vertical: 10),
+                          horizontal: 12, vertical: 10),
                     ),
                   ),
                   const SizedBox(height: 12),
@@ -1768,36 +2276,42 @@ class _StudentProfileScreenState extends ConsumerState<StudentProfileScreen>
                   // Update Password button
                   SizedBox(
                     width: double.infinity,
-                    height: 44,
+                    height: 42,
                     child: ElevatedButton(
-                      onPressed: _handleChangePassword,
+                      onPressed: _isSavingPassword ? null : _handleChangePassword,
                       style: ElevatedButton.styleFrom(
-                        backgroundColor: isRequired ? Colors.amber.shade400 : AppTheme.primary,
-                        foregroundColor: Colors.black,
+                        backgroundColor: isRequired ? Colors.amber.shade400 : AppTheme.text,
+                        foregroundColor: isRequired ? Colors.black : AppTheme.surface,
                         shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(10),
+                          borderRadius: BorderRadius.circular(8),
                         ),
                         textStyle: const TextStyle(
-                          fontSize: 14,
+                          fontSize: 13.5,
                           fontWeight: FontWeight.w600,
                         ),
                       ),
-                      child: Row(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          Icon(
-                            isRequired ? Icons.lock_open_rounded : Icons.check_circle_outline,
-                            size: 18,
-                            color: Colors.black,
-                          ),
-                          const SizedBox(width: 8),
-                          Text(
-                            isRequired
-                                ? 'Save Password & Unlock Account'
-                                : 'Update Password',
-                          ),
-                        ],
-                      ),
+                      child: _isSavingPassword
+                          ? const SizedBox(
+                              width: 18,
+                              height: 18,
+                              child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                            )
+                          : Row(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                Icon(
+                                  isRequired ? Icons.lock_open_rounded : Icons.check_circle_outline,
+                                  size: 16,
+                                  color: isRequired ? Colors.black : AppTheme.surface,
+                                ),
+                                const SizedBox(width: 8),
+                                Text(
+                                  isRequired
+                                      ? 'Save Password & Unlock Account'
+                                      : 'Update Password',
+                                ),
+                              ],
+                            ),
                     ),
                   ),
                 ],
@@ -1810,83 +2324,190 @@ class _StudentProfileScreenState extends ConsumerState<StudentProfileScreen>
   }
 
   // ═══════════════════════════════════════════════════════════
-  //  APP UPDATES & VERSION CARD
+  //  5. CLASSROOM EXPERIENCE & PREFERENCES CARD (Appearance)
   // ═══════════════════════════════════════════════════════════
-  Widget _buildAppUpdatesCard() {
+  Widget _buildPreferencesCard(ThemeState themeState) {
     return _sectionCard(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
             children: [
-              Icon(Icons.system_update_rounded, color: AppTheme.primary, size: 20),
+              Icon(Icons.tune_rounded, size: 17, color: AppTheme.textSecondary),
               const SizedBox(width: 8),
               Text(
-                'Version & Updates',
+                'Appearance',
                 style: TextStyle(
+                  fontSize: 15.5,
+                  fontWeight: FontWeight.bold,
                   color: AppTheme.text,
-                  fontSize: 16,
-                  fontWeight: FontWeight.w700,
                 ),
               ),
-              const Spacer(),
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                decoration: BoxDecoration(
-                  color: AppTheme.primary.withValues(alpha: 0.15),
-                  borderRadius: BorderRadius.circular(6),
-                ),
-                child: Text(
-                  'v${AppUpdateService.currentVersion}',
-                  style: TextStyle(
-                    color: AppTheme.primary,
-                    fontSize: 12,
-                    fontWeight: FontWeight.w700,
-                  ),
-                ),
+            ],
+          ),
+          const SizedBox(height: 6),
+          Text(
+            'Choose your preferred theme between Light and Dark mode.',
+            style: TextStyle(
+              fontSize: 12.5,
+              color: AppTheme.textMuted,
+              height: 1.4,
+            ),
+          ),
+          const SizedBox(height: 12),
+
+          // Theme toggle pills (Neutral Segmented Control)
+          Row(
+            children: [
+              _buildThemePill(
+                icon: Icons.wb_sunny_outlined,
+                label: 'Light',
+                mode: AppThemeMode.light,
+                isActive: themeState.preference == AppThemeMode.light,
+              ),
+              const SizedBox(width: 10),
+              _buildThemePill(
+                icon: Icons.dark_mode_outlined,
+                label: 'Dark',
+                mode: AppThemeMode.dark,
+                isActive: themeState.preference == AppThemeMode.dark,
               ),
             ],
           ),
           const SizedBox(height: 10),
-          Text(
-            kIsWeb
-                ? 'Hosted on Firebase with automatic PWA synchronization across web, iOS, and Android.'
-                : 'Native Android application synchronized with Firebase Cloud infrastructure.',
-            style: TextStyle(color: AppTheme.textSecondary, fontSize: 12),
+          Center(
+            child: Text(
+              'Current: ${ref.read(themeProvider.notifier).currentModeLabel}',
+              style: TextStyle(
+                fontSize: 11.5,
+                color: AppTheme.textMuted,
+              ),
+            ),
           ),
-          const SizedBox(height: 14),
-          Row(
+          const SizedBox(height: 12),
+          Divider(height: 1, color: AppTheme.border),
+
+          // Preference Toggles (Subtle Neutral)
+          _buildToggleRow(
+            title: 'Quiz & Assignment Alerts',
+            subtitle: 'Get notified when new quizzes and activities are published',
+            value: _quizAlerts,
+            onChanged: (val) {
+              setState(() => _quizAlerts = val);
+              _savePreference('student_pref_quiz_alerts', val);
+            },
+          ),
+          Divider(height: 1, color: AppTheme.border),
+
+          _buildToggleRow(
+            title: 'Class Schedule Reminders',
+            subtitle: 'Receive timely notifications before scheduled class periods start',
+            value: _scheduleReminders,
+            onChanged: (val) {
+              setState(() => _scheduleReminders = val);
+              _savePreference('student_pref_schedule_reminders', val);
+            },
+          ),
+          Divider(height: 1, color: AppTheme.border),
+
+          _buildToggleRow(
+            title: 'Haptic Touch Feedback',
+            subtitle: 'Provide tactile vibration feedback during quiz interactions',
+            value: _hapticsEnabled,
+            onChanged: (val) {
+              setState(() => _hapticsEnabled = val);
+              _savePreference('student_pref_haptics', val);
+              if (val) HapticFeedback.selectionClick();
+            },
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildThemePill({
+    required IconData icon,
+    required String label,
+    required AppThemeMode mode,
+    required bool isActive,
+  }) {
+    return Expanded(
+      child: GestureDetector(
+        onTap: () => ref.read(themeProvider.notifier).setTheme(mode),
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 180),
+          padding: const EdgeInsets.symmetric(vertical: 10),
+          decoration: BoxDecoration(
+            color: isActive ? AppTheme.surfaceLight : AppTheme.inputBg,
+            borderRadius: BorderRadius.circular(8),
+            border: Border.all(
+              color: isActive ? AppTheme.textSecondary : AppTheme.border,
+              width: isActive ? 1.2 : 1.0,
+            ),
+          ),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              Expanded(
-                child: OutlinedButton.icon(
-                  style: OutlinedButton.styleFrom(
-                    foregroundColor: AppTheme.primary,
-                    side: BorderSide(color: AppTheme.primary.withValues(alpha: 0.5)),
-                    padding: const EdgeInsets.symmetric(vertical: 10),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                  ),
-                  onPressed: () => AppUpdateService().promptUpdateIfAvailable(context, showNoUpdateMessage: true),
-                  icon: const Icon(Icons.sync_rounded, size: 16),
-                  label: const Text('Check for Updates', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600)),
+              Icon(
+                icon,
+                size: 15,
+                color: isActive ? AppTheme.text : AppTheme.textSecondary,
+              ),
+              const SizedBox(width: 6),
+              Text(
+                label,
+                style: TextStyle(
+                  fontSize: 12.5,
+                  fontWeight: FontWeight.w600,
+                  color: isActive ? AppTheme.text : AppTheme.textSecondary,
                 ),
               ),
-              if (kIsWeb) ...[
-                const SizedBox(width: 10),
-                Expanded(
-                  child: ElevatedButton.icon(
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: AppTheme.primary,
-                      foregroundColor: Colors.white,
-                      padding: const EdgeInsets.symmetric(vertical: 10),
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                    ),
-                    onPressed: () => AppUpdateService.showInstallPwaInstructions(context),
-                    icon: const Icon(Icons.phone_iphone_rounded, size: 16),
-                    label: const Text('Install App', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600)),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildToggleRow({
+    required String title,
+    required String subtitle,
+    required bool value,
+    required ValueChanged<bool> onChanged,
+  }) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 8),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.center,
+        children: [
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  title,
+                  style: TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w600,
+                    color: AppTheme.text,
+                  ),
+                ),
+                const SizedBox(height: 1.5),
+                Text(
+                  subtitle,
+                  style: TextStyle(
+                    fontSize: 11,
+                    color: AppTheme.textMuted,
                   ),
                 ),
               ],
-            ],
+            ),
+          ),
+          Switch(
+            value: value,
+            activeThumbColor: AppTheme.text,
+            activeTrackColor: AppTheme.text.withValues(alpha: 0.3),
+            onChanged: onChanged,
           ),
         ],
       ),
@@ -1894,7 +2515,278 @@ class _StudentProfileScreenState extends ConsumerState<StudentProfileScreen>
   }
 
   // ═══════════════════════════════════════════════════════════
-  //  SIGN OUT BUTTON
+  //  6. INSTITUTIONAL SUPPORT & APP INFORMATION CARD
+  // ═══════════════════════════════════════════════════════════
+  Widget _buildAboutAndSupportCard(BuildContext context) {
+    return _sectionCard(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(Icons.shield_outlined, size: 17, color: AppTheme.textSecondary),
+              const SizedBox(width: 8),
+              Text(
+                'Institutional Support & Info',
+                style: TextStyle(
+                  fontSize: 15.5,
+                  fontWeight: FontWeight.bold,
+                  color: AppTheme.text,
+                ),
+              ),
+              const Spacer(),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2.5),
+                decoration: BoxDecoration(
+                  color: AppTheme.inputBg,
+                  borderRadius: BorderRadius.circular(5),
+                  border: Border.all(color: AppTheme.border),
+                ),
+                child: Text(
+                  'v${AppUpdateService.currentVersion}',
+                  style: TextStyle(
+                    color: AppTheme.textMuted,
+                    fontSize: 11,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+
+          Container(
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: AppTheme.inputBg,
+              borderRadius: BorderRadius.circular(10),
+              border: Border.all(color: AppTheme.border),
+            ),
+            child: Column(
+              children: [
+                _buildSystemSpecRow(
+                  label: 'Software Platform',
+                  value: 'AIRAMP DepEd Classroom Suite',
+                ),
+                const SizedBox(height: 6),
+                _buildSystemSpecRow(
+                  label: 'App Version',
+                  value: 'v${AppUpdateService.currentVersion} (Build 2026.10)',
+                ),
+                const SizedBox(height: 6),
+                _buildSystemSpecRow(
+                  label: 'Offline Engine',
+                  value: 'SQLite 3.45 + Local Mesh Client',
+                ),
+                const SizedBox(height: 6),
+                _buildSystemSpecRow(
+                  label: 'License',
+                  value: 'DepEd ICT Educational Program',
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 12),
+
+          // Check for Updates Button (Clean Neutral Outline)
+          OutlinedButton.icon(
+            style: OutlinedButton.styleFrom(
+              foregroundColor: AppTheme.text,
+              side: BorderSide(color: AppTheme.border),
+              padding: const EdgeInsets.symmetric(vertical: 9),
+              minimumSize: const Size(double.infinity, 40),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+            ),
+            onPressed: () => AppUpdateService().promptUpdateIfAvailable(context, showNoUpdateMessage: true),
+            icon: Icon(Icons.sync_rounded, size: 15, color: AppTheme.textSecondary),
+            label: const Text('Check for Updates', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600)),
+          ),
+          const SizedBox(height: 6),
+
+          InkWell(
+            onTap: _showStudentHelpDialog,
+            borderRadius: BorderRadius.circular(8),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 4),
+              child: Row(
+                children: [
+                  Icon(Icons.help_outline_rounded, size: 16, color: AppTheme.textSecondary),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      'Student Quick Help & Offline Guide',
+                      style: TextStyle(
+                        fontSize: 12.5,
+                        fontWeight: FontWeight.w600,
+                        color: AppTheme.text,
+                      ),
+                    ),
+                  ),
+                  Icon(Icons.chevron_right_rounded, size: 15, color: AppTheme.textMuted),
+                ],
+              ),
+            ),
+          ),
+          Divider(height: 1, color: AppTheme.border),
+
+          InkWell(
+            onTap: _showPrivacyDialog,
+            borderRadius: BorderRadius.circular(8),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 4),
+              child: Row(
+                children: [
+                  Icon(Icons.policy_outlined, size: 16, color: AppTheme.textSecondary),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      'Data Privacy & DepEd Compliance',
+                      style: TextStyle(
+                        fontSize: 12.5,
+                        fontWeight: FontWeight.w600,
+                        color: AppTheme.text,
+                      ),
+                    ),
+                  ),
+                  Icon(Icons.chevron_right_rounded, size: 15, color: AppTheme.textMuted),
+                ],
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildSystemSpecRow({
+    required String label,
+    required String value,
+  }) {
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          label,
+          style: TextStyle(fontSize: 11.5, color: AppTheme.textMuted),
+        ),
+        const SizedBox(width: 12),
+        Flexible(
+          child: Text(
+            value,
+            textAlign: TextAlign.end,
+            style: TextStyle(
+              fontSize: 11.5,
+              fontWeight: FontWeight.w600,
+              color: AppTheme.text,
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  void _showStudentHelpDialog() {
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: AppTheme.surface,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: Row(
+          children: [
+            Icon(Icons.help_outline_rounded, color: AppTheme.textSecondary),
+            const SizedBox(width: 8),
+            Expanded(
+              child: Text(
+                'Student Guide & Offline Help',
+                style: TextStyle(color: AppTheme.text, fontSize: 16, fontWeight: FontWeight.bold),
+              ),
+            ),
+          ],
+        ),
+        content: SingleChildScrollView(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              _buildHelpItem(
+                title: 'Offline Lesson Access',
+                desc: 'All course lessons and reading materials are stored locally on your device or streamed from the classroom ESP32 hub without internet.',
+              ),
+              const SizedBox(height: 10),
+              _buildHelpItem(
+                title: 'Taking & Submitting Quizzes',
+                desc: 'When connected to the classroom AIRAMP-HUB Wi-Fi, your quiz answers submit directly to the teacher. Your scores and attempts appear instantly in Quiz History.',
+              ),
+              const SizedBox(height: 10),
+              _buildHelpItem(
+                title: 'Class Timetable',
+                desc: 'View your weekly class schedule, subject teachers, and classroom assignments anytime using the Schedule tab on your home screen.',
+              ),
+            ],
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(),
+            child: Text('Close', style: TextStyle(color: AppTheme.text, fontWeight: FontWeight.bold)),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showPrivacyDialog() {
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: AppTheme.surface,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: Row(
+          children: [
+            Icon(Icons.policy_outlined, color: AppTheme.textSecondary),
+            const SizedBox(width: 8),
+            Expanded(
+              child: Text(
+                'Data Privacy & Compliance',
+                style: TextStyle(color: AppTheme.text, fontSize: 16, fontWeight: FontWeight.bold),
+              ),
+            ),
+          ],
+        ),
+        content: Text(
+          'AIRAMP complies with Republic Act 10173 (Data Privacy Act of 2012) and DepEd institutional student data protection policies.\n\nAll your grades, quiz responses, and learning progress remain encrypted and private on local classroom hardware.',
+          style: TextStyle(color: AppTheme.textSecondary, fontSize: 13, height: 1.4),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(),
+            child: Text('Understood', style: TextStyle(color: AppTheme.text, fontWeight: FontWeight.bold)),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildHelpItem({required String title, required String desc}) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          title,
+          style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: AppTheme.text),
+        ),
+        const SizedBox(height: 2),
+        Text(
+          desc,
+          style: TextStyle(fontSize: 12, color: AppTheme.textSecondary, height: 1.3),
+        ),
+      ],
+    );
+  }
+
+  // ═══════════════════════════════════════════════════════════
+  //  7. SIGN OUT BUTTON (Clean Neutral Outline)
   // ═══════════════════════════════════════════════════════════
   Widget _buildSignOutButton() {
     return SizedBox(
@@ -1902,24 +2794,24 @@ class _StudentProfileScreenState extends ConsumerState<StudentProfileScreen>
       child: GestureDetector(
         onTap: _handleLogout,
         child: Container(
-          padding: const EdgeInsets.symmetric(vertical: 16),
+          padding: const EdgeInsets.symmetric(vertical: 14),
           decoration: BoxDecoration(
-            color: AppTheme.errorSoft,
-            borderRadius: BorderRadius.circular(14),
+            color: AppTheme.surface,
+            borderRadius: BorderRadius.circular(12),
             border: Border.all(
-              color: AppTheme.error.withValues(alpha: 0.19),
+              color: AppTheme.border,
               width: 1,
             ),
           ),
           child: Row(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              Icon(Icons.logout, size: 18, color: AppTheme.error),
-              SizedBox(width: 8),
+              Icon(Icons.logout, size: 16, color: AppTheme.error),
+              const SizedBox(width: 8),
               Text(
                 'Sign Out',
                 style: TextStyle(
-                  fontSize: 16,
+                  fontSize: 14.5,
                   fontWeight: FontWeight.w600,
                   color: AppTheme.error,
                 ),
@@ -1940,8 +2832,15 @@ class _StudentProfileScreenState extends ConsumerState<StudentProfileScreen>
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
         color: AppTheme.surface,
-        borderRadius: BorderRadius.circular(14),
+        borderRadius: BorderRadius.circular(16),
         border: Border.all(color: AppTheme.border, width: 1),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.03),
+            blurRadius: 8,
+            offset: const Offset(0, 3),
+          ),
+        ],
       ),
       child: child,
     );

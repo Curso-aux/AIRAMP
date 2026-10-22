@@ -7,12 +7,40 @@ import 'package:airamp_flutter/src/features/auth/application/auth_provider.dart'
 import 'package:airamp_flutter/src/features/chat/application/chat_provider.dart';
 import 'package:airamp_flutter/src/features/chat/presentation/chat_list_screen.dart';
 import 'package:airamp_flutter/src/features/admin/presentation/subjects_mgmt_screen.dart';
+import 'package:airamp_flutter/src/features/chat/presentation/new_conversation_modal.dart';
 
 void main() {
   setUpAll(() async {
     sqfliteFfiInit();
     databaseFactory = databaseFactoryFfi;
-    await DatabaseHelper().database;
+    final db = await DatabaseHelper().database;
+    await db.delete('users', where: "(email = 'maria@test.com' OR full_name = 'Maria Lopez') AND id != 'student_1'");
+    final existingMaria = await db.query('users', where: "id = 'student_1'");
+    if (existingMaria.isEmpty) {
+      await db.insert('users', {
+        'id': 'student_1',
+        'email': 'maria@test.com',
+        'username': 'maria.lopez',
+        'password': 'Maria@123',
+        'role': 'student',
+        'full_name': 'Maria Lopez',
+        'section': 'Grade 10 - Emerald',
+        'grade': 'Grade 10',
+        'created_at': DateTime.now().toIso8601String(),
+      });
+    }
+    final existingTeacher = await db.query('users', where: 'id = ?', whereArgs: ['teacher_1']);
+    if (existingTeacher.isEmpty) {
+      await db.insert('users', {
+        'id': 'teacher_1',
+        'email': 'john.reyes@deped.gov.ph',
+        'username': 'john.reyes',
+        'password': 'Teacher@123',
+        'role': 'teacher',
+        'full_name': 'Sir John Reyes',
+        'created_at': DateTime.now().toIso8601String(),
+      });
+    }
   });
 
   tearDown(() async {
@@ -411,6 +439,74 @@ void main() {
       expect(find.text('Auto-create Subject Group Chat'), findsNothing);
       expect(find.text('+ Group Chat'), findsNothing);
       expect(find.byType(Switch), findsNothing);
+    });
+  });
+
+  group('NewConversationModal Reachability & Modern Design', () {
+    testWidgets('Modal opens with safe top offset and reachable close button that dismisses sheet', (tester) async {
+      tester.view.physicalSize = const Size(1080, 2400);
+      tester.view.devicePixelRatio = 2.0;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+
+      final container = ProviderContainer();
+      addTearDown(container.dispose);
+      container.read(authProvider.notifier).state = User(
+        id: 'admin_1',
+        email: 'aira@admin',
+        role: 'admin',
+        fullName: 'Aira Admin',
+      );
+
+      await tester.runAsync(() async {
+        await container.read(chatProvider.notifier).loadAvailableUsers();
+      });
+
+      await tester.pumpWidget(
+        UncontrolledProviderScope(
+          container: container,
+          child: MaterialApp(
+            home: Scaffold(
+              body: Builder(
+                builder: (context) => ElevatedButton(
+                  onPressed: () => showNewConversationModal(context),
+                  child: const Text('Open Modal'),
+                ),
+              ),
+            ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      // Open Modal
+      await tester.tap(find.text('Open Modal'));
+      await tester.pumpAndSettle();
+
+      // Verify modal header is visible and properly formatted
+      expect(find.text('New Conversation'), findsOneWidget);
+      expect(find.text('Select a contact or classmate to chat'), findsOneWidget);
+
+      // Verify close button exists with Key and is positioned safely below top edge
+      final closeBtnFinder = find.byKey(const Key('modal_close_button'));
+      expect(closeBtnFinder, findsOneWidget);
+
+      final closeBtnOffset = tester.getTopLeft(closeBtnFinder);
+      expect(closeBtnOffset.dy, greaterThan(60.0));
+
+      // Verify Segmented Tabs exist
+      expect(find.text('App Users'), findsOneWidget);
+      expect(find.text('Device Contacts'), findsOneWidget);
+
+      // Verify Maria Lopez is rendered
+      expect(find.text('Maria Lopez'), findsOneWidget);
+
+      // Tap close button to dismiss modal
+      await tester.tap(closeBtnFinder);
+      await tester.pumpAndSettle();
+
+      // Verify modal is dismissed
+      expect(find.text('New Conversation'), findsNothing);
     });
   });
 }
