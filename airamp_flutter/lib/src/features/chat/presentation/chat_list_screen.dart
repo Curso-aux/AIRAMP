@@ -922,7 +922,7 @@ class _ChatListScreenState extends ConsumerState<ChatListScreen> {
                       subtitle: Padding(
                         padding: const EdgeInsets.only(top: 4),
                         child: Text(
-                          user.email,
+                          subtitleText,
                           style: TextStyle(
                             color: AppTheme.textMuted,
                             fontSize: 13,
