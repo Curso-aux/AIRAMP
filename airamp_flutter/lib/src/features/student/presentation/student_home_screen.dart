@@ -202,6 +202,7 @@ class _StudentHomeScreenState extends ConsumerState<StudentHomeScreen> {
   }
 
   Widget _buildEsp32OfflineHubCard(BuildContext context, dynamic currentUser) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
@@ -213,7 +214,7 @@ class _StudentHomeScreenState extends ConsumerState<StudentHomeScreen> {
         ),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withValues(alpha: 0.04),
+            color: Colors.black.withValues(alpha: isDark ? 0.2 : 0.03),
             blurRadius: 10,
             offset: const Offset(0, 3),
           ),
@@ -226,60 +227,75 @@ class _StudentHomeScreenState extends ConsumerState<StudentHomeScreen> {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Container(
-                padding: const EdgeInsets.all(12),
+                width: 44,
+                height: 44,
                 decoration: BoxDecoration(
-                  color: AppTheme.primary.withValues(alpha: 0.10),
+                  color: AppTheme.primary.withValues(alpha: isDark ? 0.20 : 0.10),
                   borderRadius: BorderRadius.circular(12),
+                  border: Border.all(
+                    color: AppTheme.primary.withValues(alpha: 0.25),
+                    width: 1,
+                  ),
                 ),
-                child: Icon(Icons.qr_code_scanner, color: AppTheme.primary, size: 24),
+                child: Icon(Icons.qr_code_scanner_rounded, color: AppTheme.primary, size: 22),
               ),
               const SizedBox(width: 14),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Wrap(
-                      crossAxisAlignment: WrapCrossAlignment.center,
-                      spacing: 8,
-                      runSpacing: 4,
+                    Row(
                       children: [
-                        Text(
-                          'Classroom Offline Hub',
-                          style: TextStyle(
-                            fontSize: 15,
-                            fontWeight: FontWeight.bold,
-                            color: AppTheme.text,
+                        Expanded(
+                          child: Text(
+                            'Classroom Offline Hub',
+                            style: TextStyle(
+                              fontSize: 15.5,
+                              fontWeight: FontWeight.bold,
+                              color: AppTheme.text,
+                              letterSpacing: -0.2,
+                            ),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
                           ),
                         ),
                         Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                          padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2.5),
                           decoration: BoxDecoration(
                             color: AppTheme.primary.withValues(alpha: 0.10),
-                            borderRadius: BorderRadius.circular(4),
+                            borderRadius: BorderRadius.circular(6),
+                            border: Border.all(
+                              color: AppTheme.primary.withValues(alpha: 0.25),
+                              width: 0.8,
+                            ),
                           ),
                           child: Text(
-                            'OFFLINE HUB',
+                            'No Wi-Fi Needed',
                             style: TextStyle(
                               color: AppTheme.primary,
-                              fontSize: 9.5,
+                              fontSize: 10,
                               fontWeight: FontWeight.w700,
-                              letterSpacing: 0.3,
+                              letterSpacing: 0.2,
                             ),
                           ),
                         ),
                       ],
                     ),
-                    const SizedBox(height: 4),
+                    const SizedBox(height: 5),
                     Text(
-                      'Scan teacher\'s QR code or read and review saved modules & quizzes completely offline.',
-                      style: TextStyle(fontSize: 12, color: AppTheme.textSecondary),
+                      'Download lesson modules and sync quiz answers completely offline using your teacher\'s QR code.',
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: AppTheme.textSecondary,
+                        height: 1.35,
+                      ),
                     ),
                   ],
                 ),
               ),
             ],
           ),
-          const SizedBox(height: 14),
+          const SizedBox(height: 16),
           ValueListenableBuilder<List<HubMaterialItem>>(
             valueListenable: SavedMaterialsService.instance.savedMaterialsNotifier,
             builder: (context, savedList, _) {
@@ -299,16 +315,18 @@ class _StudentHomeScreenState extends ConsumerState<StudentHomeScreen> {
                       label: FittedBox(
                         fit: BoxFit.scaleDown,
                         child: Text(
-                          count > 0 ? 'Saved ($count)' : 'Saved Materials',
-                          style: TextStyle(fontWeight: FontWeight.w600, fontSize: 13, color: AppTheme.text),
+                          count > 0 ? 'Saved Materials ($count)' : 'Saved Materials',
+                          style: TextStyle(
+                            fontWeight: FontWeight.w600,
+                            fontSize: 12.5,
+                            color: AppTheme.text,
+                          ),
                         ),
                       ),
                       style: OutlinedButton.styleFrom(
                         foregroundColor: AppTheme.text,
-                        side: BorderSide(
-                          color: AppTheme.border,
-                        ),
-                        padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 8),
+                        side: BorderSide(color: AppTheme.border),
+                        padding: const EdgeInsets.symmetric(vertical: 11, horizontal: 10),
                         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
                       ),
                     ),
@@ -326,7 +344,7 @@ class _StudentHomeScreenState extends ConsumerState<StudentHomeScreen> {
                           },
                         );
                       },
-                      icon: const Icon(Icons.qr_code_scanner, size: 16),
+                      icon: const Icon(Icons.qr_code_scanner_rounded, size: 16),
                       label: const FittedBox(
                         fit: BoxFit.scaleDown,
                         child: Text(
@@ -337,7 +355,7 @@ class _StudentHomeScreenState extends ConsumerState<StudentHomeScreen> {
                       style: ElevatedButton.styleFrom(
                         backgroundColor: AppTheme.primary,
                         foregroundColor: Colors.white,
-                        padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 8),
+                        padding: const EdgeInsets.symmetric(vertical: 11, horizontal: 10),
                         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
                         elevation: 0,
                       ),
@@ -364,12 +382,24 @@ class _StudentHomeScreenState extends ConsumerState<StudentHomeScreen> {
             Expanded(
               child: Row(
                 children: [
-                  Icon(Icons.quiz_outlined, color: AppTheme.primary, size: 20),
-                  const SizedBox(width: 8),
+                  Container(
+                    padding: const EdgeInsets.all(7),
+                    decoration: BoxDecoration(
+                      color: AppTheme.primary.withValues(alpha: 0.15),
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: Icon(Icons.quiz_outlined, color: AppTheme.primary, size: 18),
+                  ),
+                  const SizedBox(width: 10),
                   Flexible(
                     child: Text(
                       'Assigned Quizzes',
-                      style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: AppTheme.text),
+                      style: TextStyle(
+                        fontSize: 17.5,
+                        fontWeight: FontWeight.bold,
+                        color: AppTheme.text,
+                        letterSpacing: -0.2,
+                      ),
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                     ),
@@ -386,7 +416,7 @@ class _StudentHomeScreenState extends ConsumerState<StudentHomeScreen> {
                   border: Border.all(color: AppTheme.border),
                 ),
                 child: Text(
-                  '${pendingQuizzes.length} Pending',
+                  '${pendingQuizzes.length} To Take',
                   style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: AppTheme.textSecondary),
                 ),
               ),
@@ -753,12 +783,15 @@ class _StudentHomeScreenState extends ConsumerState<StudentHomeScreen> {
             children: [
               Icon(Icons.help_outline, size: 13, color: AppTheme.textMuted),
               const SizedBox(width: 4),
-              Text('$qCount questions', style: TextStyle(fontSize: 12, color: AppTheme.textSecondary)),
+              Text(
+                '$qCount ${qCount == 1 ? 'question' : 'questions'}',
+                style: TextStyle(fontSize: 12, color: AppTheme.textSecondary),
+              ),
               const SizedBox(width: 14),
               Icon(Icons.timer_outlined, size: 13, color: AppTheme.textMuted),
               const SizedBox(width: 4),
               Text(
-                timeLimit > 0 ? '${timeLimit}m limit' : 'Untimed',
+                timeLimit > 0 ? '${timeLimit}m limit' : 'No time limit',
                 style: TextStyle(fontSize: 12, color: AppTheme.textSecondary),
               ),
               if (teacherName.isNotEmpty) ...[
@@ -779,15 +812,34 @@ class _StudentHomeScreenState extends ConsumerState<StudentHomeScreen> {
           SizedBox(
             width: double.infinity,
             child: isDeadlinePassed
-                ? OutlinedButton.icon(
-                    onPressed: null,
-                    icon: Icon(Icons.event_busy, size: 16, color: AppTheme.textMuted),
-                    label: Text('Missed Quiz (Closed)', style: TextStyle(fontWeight: FontWeight.w600, color: AppTheme.textMuted)),
-                    style: OutlinedButton.styleFrom(
-                      foregroundColor: AppTheme.textMuted,
-                      side: BorderSide(color: AppTheme.border),
-                      padding: const EdgeInsets.symmetric(vertical: 10),
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                ? Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.symmetric(vertical: 9, horizontal: 12),
+                    decoration: BoxDecoration(
+                      color: Theme.of(context).brightness == Brightness.dark
+                          ? AppTheme.darkSurfaceLight
+                          : const Color(0xFFF8FAFC),
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(
+                        color: Theme.of(context).brightness == Brightness.dark
+                            ? AppTheme.darkBorder
+                            : const Color(0xFFE2E8F0),
+                      ),
+                    ),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(Icons.event_busy_rounded, size: 15, color: AppTheme.textMuted),
+                        const SizedBox(width: 6),
+                        Text(
+                          'Submission Closed (Overdue)',
+                          style: TextStyle(
+                            fontWeight: FontWeight.w600,
+                            fontSize: 12,
+                            color: AppTheme.textMuted,
+                          ),
+                        ),
+                      ],
                     ),
                   )
                 : isNotYetAvailable

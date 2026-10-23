@@ -155,8 +155,8 @@ void main() {
     expect(find.text('STUDENT'), findsOneWidget);
     expect(find.text('Grade 10 - Emerald'), findsWidgets);
 
-    // Verify Offline Materials and Notifications Bell exist inside the header
-    expect(find.byTooltip('Saved Offline Materials (0)'), findsOneWidget);
+    // Verify Progress and Notifications Bell exist inside the header
+    expect(find.byTooltip('View My Progress (0% Completed)'), findsOneWidget);
     expect(find.byTooltip('Announcements & Notifications'), findsOneWidget);
 
     // Verify Calendar icon button is REMOVED from the sticky top header

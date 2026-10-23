@@ -529,7 +529,9 @@ class _StudentScheduleWidgetState extends ConsumerState<StudentScheduleWidget> {
                           ),
                           const SizedBox(height: 2),
                           Text(
-                            'You have ${allSchedules.length} class(es) scheduled this week for Section $studentSection.',
+                            allSchedules.length == 1
+                                ? 'You have 1 class scheduled this week for $studentSection.'
+                                : 'You have ${allSchedules.length} classes scheduled this week for $studentSection.',
                             style: TextStyle(fontSize: 11, color: AppTheme.textSecondary),
                           ),
                         ],

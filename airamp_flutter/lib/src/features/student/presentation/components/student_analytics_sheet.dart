@@ -107,7 +107,7 @@ class _StudentAnalyticsSheetState extends ConsumerState<StudentAnalyticsSheet> {
                       Row(
                         children: [
                           Text(
-                            'Learning Analytics',
+                            'My Progress',
                             style: TextStyle(
                               fontSize: 17,
                               fontWeight: FontWeight.bold,
@@ -140,7 +140,7 @@ class _StudentAnalyticsSheetState extends ConsumerState<StudentAnalyticsSheet> {
                       ),
                       const SizedBox(height: 2),
                       Text(
-                        'Academic overview, completion rate & courses',
+                        'Your courses, completed lessons & study goals',
                         style: TextStyle(
                           fontSize: 12,
                           color: AppTheme.textSecondary,
@@ -184,9 +184,9 @@ class _StudentAnalyticsSheetState extends ConsumerState<StudentAnalyticsSheet> {
                     ),
                     child: Row(
                       children: [
-                        _buildModeTab(0, 'KPI Cards', Icons.grid_view_rounded, isDark),
-                        _buildModeTab(1, 'Donut Chart', Icons.pie_chart_rounded, isDark),
-                        _buildModeTab(2, 'Mastery Gauge', Icons.trending_up_rounded, isDark),
+                        _buildModeTab(0, 'Overview', Icons.grid_view_rounded, isDark),
+                        _buildModeTab(1, 'Breakdown', Icons.pie_chart_rounded, isDark),
+                        _buildModeTab(2, 'Mastery', Icons.trending_up_rounded, isDark),
                       ],
                     ),
                   ),
@@ -211,7 +211,7 @@ class _StudentAnalyticsSheetState extends ConsumerState<StudentAnalyticsSheet> {
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
                       Text(
-                        'Enrolled Courses Breakdown',
+                        'Course Progress',
                         style: TextStyle(
                           fontSize: 14.5,
                           fontWeight: FontWeight.bold,
@@ -242,7 +242,7 @@ class _StudentAnalyticsSheetState extends ConsumerState<StudentAnalyticsSheet> {
                         ),
                       ),
                       child: Text(
-                        'No enrolled courses recorded yet.',
+                        'No enrolled courses yet.',
                         textAlign: TextAlign.center,
                         style: TextStyle(fontSize: 12.5, color: AppTheme.textMuted),
                       ),
@@ -255,8 +255,8 @@ class _StudentAnalyticsSheetState extends ConsumerState<StudentAnalyticsSheet> {
                       separatorBuilder: (_, _) => const SizedBox(height: 8),
                       itemBuilder: (context, index) {
                         final course = courses[index];
-                        final code = course['subject_code']?.toString() ?? 'SUBJ';
-                        final name = course['subject_name']?.toString() ?? 'Course';
+                        final code = (course['subject_code'] ?? course['code'] ?? 'SUBJ').toString();
+                        final name = (course['name'] ?? course['subject_name'] ?? course['title'] ?? 'Course').toString();
                         final completedLos = (course['completed_los'] as num?)?.toInt() ?? 0;
                         final totalLos = (course['total_los'] as num?)?.toInt() ?? 0;
                         final ratio = totalLos > 0 ? (completedLos / totalLos).clamp(0.0, 1.0) : 0.0;
@@ -332,7 +332,7 @@ class _StudentAnalyticsSheetState extends ConsumerState<StudentAnalyticsSheet> {
                                   ),
                                   const SizedBox(width: 10),
                                   Text(
-                                    '$completedLos / $totalLos LOs',
+                                    '$completedLos / $totalLos lessons',
                                     style: TextStyle(
                                       fontSize: 11,
                                       color: AppTheme.textMuted,
@@ -379,7 +379,7 @@ class _StudentAnalyticsSheetState extends ConsumerState<StudentAnalyticsSheet> {
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
                               Text(
-                                'Quizzes & Evaluations',
+                                'Quizzes & Activities',
                                 style: TextStyle(
                                   fontSize: 13,
                                   fontWeight: FontWeight.bold,
@@ -388,7 +388,7 @@ class _StudentAnalyticsSheetState extends ConsumerState<StudentAnalyticsSheet> {
                               ),
                               const SizedBox(height: 2),
                               Text(
-                                '$pendingQuizzes Pending  •  $completedQuizzes Completed',
+                                '$pendingQuizzes To Take  •  $completedQuizzes Completed',
                                 style: TextStyle(
                                   fontSize: 11.5,
                                   color: AppTheme.textSecondary,
@@ -484,11 +484,11 @@ class _StudentAnalyticsSheetState extends ConsumerState<StudentAnalyticsSheet> {
         return _buildProgressGaugeView(activeCourses, lessonsDone, pending, isDark);
       case 0:
       default:
-        return _buildKpiCardsView(activeCourses, lessonsDone, pending, isDark);
+        return _buildOverviewCardsView(activeCourses, lessonsDone, pending, isDark);
     }
   }
 
-  Widget _buildKpiCardsView(int activeCourses, int lessonsDone, int pending, bool isDark) {
+  Widget _buildOverviewCardsView(int activeCourses, int lessonsDone, int pending, bool isDark) {
     return Row(
       children: [
         Expanded(
@@ -513,7 +513,7 @@ class _StudentAnalyticsSheetState extends ConsumerState<StudentAnalyticsSheet> {
         const SizedBox(width: 8),
         Expanded(
           child: _buildMetricTile(
-            label: 'Pending',
+            label: 'To Do',
             value: '$pending',
             icon: Icons.schedule_rounded,
             accentColor: isDark ? const Color(0xFFFBBF24) : const Color(0xFFD97706),
@@ -631,13 +631,13 @@ class _StudentAnalyticsSheetState extends ConsumerState<StudentAnalyticsSheet> {
               _buildLegendRow('Completed Lessons', '$lessonsDone', primary, total > 0 ? '$completionPct%' : '0%'),
               const SizedBox(height: 8),
               _buildLegendRow(
-                'Pending Lessons',
+                'Remaining Lessons',
                 '$pending',
                 isDark ? const Color(0xFF64748B) : const Color(0xFF94A3B8),
                 total > 0 ? '${100 - completionPct}%' : '0%',
               ),
               const SizedBox(height: 8),
-              _buildLegendRow('Total Tracked', '$total', isDark ? const Color(0xFF94A3B8) : const Color(0xFF475569), '100%'),
+              _buildLegendRow('Total Lessons', '$total', isDark ? const Color(0xFF94A3B8) : const Color(0xFF475569), '100%'),
             ],
           ),
         ),
@@ -686,7 +686,7 @@ class _StudentAnalyticsSheetState extends ConsumerState<StudentAnalyticsSheet> {
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
             Text(
-              'Overall Curriculum Completion',
+              'Overall Course Progress',
               style: TextStyle(
                 fontSize: 13,
                 fontWeight: FontWeight.bold,

@@ -20,11 +20,13 @@ import 'aira_speech_hud.dart';
 class AiraFloatingAssistant extends StatefulWidget {
   final VoidCallback onOpenMenu;
   final Duration holdDuration;
+  final bool isVisible;
 
   const AiraFloatingAssistant({
     super.key,
     required this.onOpenMenu,
     this.holdDuration = const Duration(milliseconds: 1000),
+    this.isVisible = true,
   });
 
   @override
@@ -375,7 +377,9 @@ class _AiraFloatingAssistantState extends State<AiraFloatingAssistant>
         _isScanning ||
         isVoiceActive;
 
-    final opacity = isActivelyInteracting ? 1.0 : (_isIdle ? 0.70 : 0.95);
+    final opacity = !widget.isVisible
+        ? 0.0
+        : (isActivelyInteracting ? 1.0 : (_isIdle ? 0.70 : 0.95));
 
     // Calculate Speech HUD Position relative to AIRA
     double hudLeft;
@@ -397,7 +401,7 @@ class _AiraFloatingAssistantState extends State<AiraFloatingAssistant>
             ),
 
           // 2. Floating Speech HUD when reading aloud
-          if (isVoiceActive || isVoicePaused)
+          if (widget.isVisible && (isVoiceActive || isVoicePaused))
             Positioned(
               left: hudLeft,
               top: hudTop,
@@ -412,20 +416,26 @@ class _AiraFloatingAssistantState extends State<AiraFloatingAssistant>
           Positioned(
             left: _position.dx,
             top: _position.dy,
-            child: GestureDetector(
-              onPanDown: _onPanDown,
-              onPanStart: _onPanStart,
-              onPanUpdate: _onPanUpdate,
-              onPanEnd: _onPanEnd,
-              behavior: HitTestBehavior.opaque,
-              child: AnimatedOpacity(
-                opacity: opacity,
+            child: IgnorePointer(
+              ignoring: !widget.isVisible,
+              child: AnimatedScale(
+                scale: widget.isVisible ? 1.0 : 0.0,
                 duration: const Duration(milliseconds: 220),
-                child: AnimatedBuilder(
-                  animation: _floatAnimation,
-                  builder: (context, child) {
-                    final floatY = isActivelyInteracting ? 0.0 : _floatAnimation.value;
-                    final tiltAngle = _isDragging
+                curve: widget.isVisible ? Curves.easeOutBack : Curves.easeInBack,
+                child: GestureDetector(
+                  onPanDown: _onPanDown,
+                  onPanStart: _onPanStart,
+                  onPanUpdate: _onPanUpdate,
+                  onPanEnd: _onPanEnd,
+                  behavior: HitTestBehavior.opaque,
+                  child: AnimatedOpacity(
+                    opacity: opacity,
+                    duration: const Duration(milliseconds: 220),
+                    child: AnimatedBuilder(
+                      animation: _floatAnimation,
+                      builder: (context, child) {
+                        final floatY = isActivelyInteracting ? 0.0 : _floatAnimation.value;
+                        final tiltAngle = _isDragging
                         ? (_dragVelocityX * 0.003).clamp(-0.15, 0.15)
                         : 0.0;
 
@@ -565,8 +575,10 @@ class _AiraFloatingAssistantState extends State<AiraFloatingAssistant>
               ),
             ),
           ),
-        ],
+        ),
       ),
-    );
+    ],
+  ),
+);
   }
 }

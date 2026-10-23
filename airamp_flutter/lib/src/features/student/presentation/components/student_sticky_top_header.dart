@@ -219,10 +219,10 @@ class StudentStickyTopHeader extends ConsumerWidget {
     final primary = AppTheme.primary;
     final labelText = completionPct > 0
         ? (isCompact ? '$completionPct%' : '$completionPct% Done')
-        : (isCompact ? 'Stats' : 'Analytics');
+        : (isCompact ? 'Progress' : 'My Progress');
 
     return Tooltip(
-      message: 'View Learning Analytics ($completionPct% Completed)',
+      message: 'View My Progress ($completionPct% Completed)',
       child: Material(
         color: Colors.transparent,
         child: InkWell(

@@ -42,9 +42,42 @@ class TeacherAssistiveTouch extends ConsumerStatefulWidget {
 }
 
 class _TeacherAssistiveTouchState extends ConsumerState<TeacherAssistiveTouch> {
+  bool _isMenuOpen = false;
+  BuildContext? _activeDialogContext;
+
+  void _closeMenu() {
+    if (_activeDialogContext != null &&
+        _activeDialogContext!.mounted &&
+        Navigator.of(_activeDialogContext!).canPop()) {
+      Navigator.of(_activeDialogContext!).pop();
+    } else {
+      final targetContext = rootNavigatorKey.currentContext ?? context;
+      if (targetContext.mounted && Navigator.of(targetContext).canPop()) {
+        Navigator.of(targetContext).pop();
+      }
+    }
+    if (mounted) {
+      setState(() {
+        _isMenuOpen = false;
+        _activeDialogContext = null;
+      });
+    } else {
+      _isMenuOpen = false;
+      _activeDialogContext = null;
+    }
+  }
+
   void _openMenu() {
     HapticFeedback.mediumImpact();
+
+    // Toggle behavior: if quick actions dialog is already open, close it!
+    if (_isMenuOpen) {
+      _closeMenu();
+      return;
+    }
+
     final targetContext = rootNavigatorKey.currentContext ?? context;
+    setState(() => _isMenuOpen = true);
 
     showGeneralDialog(
       context: targetContext,
@@ -53,33 +86,34 @@ class _TeacherAssistiveTouchState extends ConsumerState<TeacherAssistiveTouch> {
       barrierColor: Colors.transparent,
       transitionDuration: const Duration(milliseconds: 240),
       pageBuilder: (dialogContext, anim1, anim2) {
+        _activeDialogContext = dialogContext;
         return _QuickActionsMenuDialog(
           onCurriculum: () {
-            Navigator.of(dialogContext).pop();
+            _closeMenu();
             widget.onCurriculum();
           },
           onSchedule: () {
-            Navigator.of(dialogContext).pop();
+            _closeMenu();
             widget.onSchedule();
           },
           onScores: () {
-            Navigator.of(dialogContext).pop();
+            _closeMenu();
             widget.onScores();
           },
           onStudents: () {
-            Navigator.of(dialogContext).pop();
+            _closeMenu();
             widget.onStudents();
           },
           onCreateQuiz: () {
-            Navigator.of(dialogContext).pop();
+            _closeMenu();
             widget.onCreateQuiz();
           },
           onAnnounce: () {
-            Navigator.of(dialogContext).pop();
+            _closeMenu();
             widget.onAnnounce();
           },
           onProfile: () {
-            Navigator.of(dialogContext).pop();
+            _closeMenu();
             widget.onProfile();
           },
         );
@@ -98,13 +132,24 @@ class _TeacherAssistiveTouchState extends ConsumerState<TeacherAssistiveTouch> {
           ),
         );
       },
-    );
+    ).whenComplete(() {
+      if (mounted) {
+        setState(() {
+          _isMenuOpen = false;
+          _activeDialogContext = null;
+        });
+      } else {
+        _isMenuOpen = false;
+        _activeDialogContext = null;
+      }
+    });
   }
 
   @override
   Widget build(BuildContext context) {
     return AiraFloatingAssistant(
       onOpenMenu: _openMenu,
+      isVisible: !_isMenuOpen,
     );
   }
 }
