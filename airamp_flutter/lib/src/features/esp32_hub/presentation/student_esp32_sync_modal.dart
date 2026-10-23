@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/components/app_toast.dart';
+import '../../../core/components/aira/aira_overlay_controller.dart';
 import '../../../core/database/database_helper.dart';
 import '../domain/esp32_hub_models.dart';
 import '../data/saved_materials_service.dart';
@@ -8,8 +9,8 @@ import '../data/esp32_client_service.dart';
 import 'components/qr_viewfinder_widget.dart';
 import 'saved_offline_materials_modal.dart';
 
-/// Modal bottom sheet for students to scan the teacher's ESP32 QR code with the real camera,
-/// discover classroom learning materials from the ESP32 Hub, and save them offline.
+/// Modal bottom sheet for students to scan the teacher's classroom QR code with the camera,
+/// discover learning materials from the offline Classroom Hub, and save them offline.
 class StudentEsp32SyncModal extends StatefulWidget {
   final String studentName;
   final String? studentSection;
@@ -27,17 +28,22 @@ class StudentEsp32SyncModal extends StatefulWidget {
     required String studentName,
     String? studentSection,
     VoidCallback? onSyncCompleted,
-  }) {
-    return showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.transparent,
-      builder: (ctx) => StudentEsp32SyncModal(
-        studentName: studentName,
-        studentSection: studentSection,
-        onSyncCompleted: onSyncCompleted,
-      ),
-    );
+  }) async {
+    AiraOverlayController.hide();
+    try {
+      await showModalBottomSheet(
+        context: context,
+        isScrollControlled: true,
+        backgroundColor: Colors.transparent,
+        builder: (ctx) => StudentEsp32SyncModal(
+          studentName: studentName,
+          studentSection: studentSection,
+          onSyncCompleted: onSyncCompleted,
+        ),
+      );
+    } finally {
+      AiraOverlayController.show();
+    }
   }
 
   @override
@@ -349,16 +355,16 @@ class _StudentEsp32SyncModalState extends State<StudentEsp32SyncModal>
 
           // Header
           Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
+            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
             child: Row(
               children: [
                 Container(
                   padding: const EdgeInsets.all(10),
                   decoration: BoxDecoration(
-                    color: AppTheme.primary.withValues(alpha: 0.15),
+                    color: AppTheme.primary.withValues(alpha: 0.12),
                     borderRadius: BorderRadius.circular(12),
                   ),
-                  child: Icon(Icons.qr_code_scanner, color: AppTheme.primary, size: 24),
+                  child: Icon(Icons.qr_code_scanner_rounded, color: AppTheme.primary, size: 24),
                 ),
                 const SizedBox(width: 12),
                 Expanded(
@@ -375,26 +381,15 @@ class _StudentEsp32SyncModalState extends State<StudentEsp32SyncModal>
                       ),
                       const SizedBox(height: 2),
                       Text(
-                        'Download modules offline with no internet or data',
+                        'Download class lessons & quizzes offline',
                         style: TextStyle(fontSize: 12, color: AppTheme.textSecondary),
                       ),
                     ],
                   ),
                 ),
                 IconButton(
-                  tooltip: 'View Saved Offline Materials',
-                  icon: Icon(Icons.folder_special_outlined, color: AppTheme.primary),
-                  onPressed: () {
-                    Navigator.pop(context);
-                    SavedOfflineMaterialsModal.show(
-                      context,
-                      studentName: widget.studentName,
-                      studentSection: widget.studentSection,
-                    );
-                  },
-                ),
-                IconButton(
-                  icon: Icon(Icons.close, color: AppTheme.textMuted),
+                  tooltip: 'Close',
+                  icon: Icon(Icons.close_rounded, color: AppTheme.textMuted),
                   onPressed: () => Navigator.pop(context),
                 ),
               ],
@@ -448,7 +443,7 @@ class _StudentEsp32SyncModalState extends State<StudentEsp32SyncModal>
                   icon: const Icon(Icons.folder_special_rounded, size: 20),
                   text: count > 0 ? 'Saved ($count)' : 'Saved Files',
                 ),
-                const Tab(icon: Icon(Icons.wifi, size: 20), text: 'Manual Connect'),
+                const Tab(icon: Icon(Icons.wifi_rounded, size: 20), text: 'Manual Connect'),
               ],
             );
           },
@@ -459,44 +454,76 @@ class _StudentEsp32SyncModalState extends State<StudentEsp32SyncModal>
             children: [
               // Tab 1: Real Camera QR Viewfinder
               SingleChildScrollView(
-                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 20),
+                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
                 child: Column(
                   children: [
                     QrViewfinderWidget(
-                      statusText: 'Point camera at Teacher\'s ESP32 screen',
+                      statusText: 'Align Teacher\'s QR Code inside frame',
                       onScanned: (qrCode) {
                         _processHubConnection(qrCode);
                       },
                     ),
-                    const SizedBox(height: 14),
+                    const SizedBox(height: 18),
                     Text(
-                      'Scan the QR code displayed on the ESP32 OLED screen or classroom projector.',
-                      textAlign: TextAlign.center,
-                      style: TextStyle(fontSize: 12, color: AppTheme.textMuted),
+                      'Scan Classroom Hub QR',
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w700,
+                        color: AppTheme.text,
+                        letterSpacing: -0.2,
+                      ),
                     ),
-                    const SizedBox(height: 16),
+                    const SizedBox(height: 4),
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 16),
+                      child: Text(
+                        'Point your camera at the QR code on the teacher\'s hub or classroom projector to sync modules offline.',
+                        textAlign: TextAlign.center,
+                        style: TextStyle(
+                          fontSize: 12.5,
+                          height: 1.35,
+                          color: AppTheme.textSecondary,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 18),
+                    _buildSyncStepsGuide(),
+                    const SizedBox(height: 14),
+                    OutlinedButton.icon(
+                      onPressed: () => _tabController.animateTo(2),
+                      icon: const Icon(Icons.wifi_find_rounded, size: 16),
+                      label: const Text('Can\'t scan? Connect via Wi-Fi manually'),
+                      style: OutlinedButton.styleFrom(
+                        foregroundColor: AppTheme.textSecondary,
+                        side: BorderSide(color: AppTheme.border),
+                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                        textStyle: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
+                      ),
+                    ),
                     ValueListenableBuilder<List<HubMaterialItem>>(
                       valueListenable: SavedMaterialsService.instance.savedMaterialsNotifier,
                       builder: (context, savedList, _) {
                         if (savedList.isEmpty) return const SizedBox.shrink();
                         return Container(
-                          padding: const EdgeInsets.all(12),
+                          margin: const EdgeInsets.only(top: 14),
+                          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
                           decoration: BoxDecoration(
-                            color: AppTheme.primary.withValues(alpha: 0.08),
+                            color: AppTheme.primary.withValues(alpha: 0.06),
                             borderRadius: BorderRadius.circular(12),
-                            border: Border.all(color: AppTheme.primary.withValues(alpha: 0.25)),
+                            border: Border.all(color: AppTheme.primary.withValues(alpha: 0.2)),
                           ),
                           child: Row(
                             children: [
                               Container(
                                 padding: const EdgeInsets.all(8),
                                 decoration: BoxDecoration(
-                                  color: AppTheme.primary.withValues(alpha: 0.15),
+                                  color: AppTheme.primary.withValues(alpha: 0.12),
                                   borderRadius: BorderRadius.circular(8),
                                 ),
                                 child: Icon(Icons.folder_special_rounded, color: AppTheme.primary, size: 20),
                               ),
-                              const SizedBox(width: 10),
+                              const SizedBox(width: 12),
                               Expanded(
                                 child: Column(
                                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -505,30 +532,34 @@ class _StudentEsp32SyncModalState extends State<StudentEsp32SyncModal>
                                       'Saved Materials (${savedList.length})',
                                       style: TextStyle(
                                         fontSize: 13,
-                                        fontWeight: FontWeight.bold,
+                                        fontWeight: FontWeight.w700,
                                         color: AppTheme.text,
                                       ),
                                     ),
+                                    const SizedBox(height: 1),
                                     Text(
-                                      'Review offline modules & quizzes',
+                                      'Review downloaded lessons and quizzes offline',
                                       style: TextStyle(fontSize: 11, color: AppTheme.textSecondary),
                                     ),
                                   ],
                                 ),
                               ),
-                              ElevatedButton(
-                                onPressed: () {
-                                  _tabController.animateTo(1);
-                                },
-                                style: ElevatedButton.styleFrom(
-                                  backgroundColor: AppTheme.primary,
-                                  foregroundColor: Colors.white,
-                                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                              TextButton(
+                                onPressed: () => _tabController.animateTo(1),
+                                style: TextButton.styleFrom(
+                                  foregroundColor: AppTheme.primary,
+                                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
                                   minimumSize: const Size(0, 32),
-                                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                                  elevation: 0,
+                                  tapTargetSize: MaterialTapTargetSize.shrinkWrap,
                                 ),
-                                child: const Text('View Files', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
+                                child: const Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    Text('Open', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
+                                    SizedBox(width: 2),
+                                    Icon(Icons.chevron_right_rounded, size: 16),
+                                  ],
+                                ),
                               ),
                             ],
                           ),
@@ -553,7 +584,7 @@ class _StudentEsp32SyncModalState extends State<StudentEsp32SyncModal>
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      'Connect Directly to ESP32 DevKit',
+                      'Manual Classroom Hub Connection',
                       style: TextStyle(
                         fontSize: 15,
                         fontWeight: FontWeight.bold,
@@ -562,15 +593,15 @@ class _StudentEsp32SyncModalState extends State<StudentEsp32SyncModal>
                     ),
                     const SizedBox(height: 4),
                     Text(
-                      'If camera is unavailable, connect your phone to the ESP32 Wi-Fi hotspot in your phone settings, then tap Connect below:',
+                      'If camera is unavailable, connect your phone to the Classroom Hub Wi-Fi hotspot in your device settings, then tap Connect below:',
                       style: TextStyle(fontSize: 12, color: AppTheme.textSecondary),
                     ),
                     const SizedBox(height: 16),
                     TextField(
                       controller: _ssidController,
                       decoration: InputDecoration(
-                        labelText: 'ESP32 Wi-Fi SSID',
-                        prefixIcon: const Icon(Icons.wifi),
+                        labelText: 'Classroom Hub Wi-Fi Name (SSID)',
+                        prefixIcon: const Icon(Icons.wifi_rounded),
                         border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
                       ),
                     ),
@@ -578,8 +609,8 @@ class _StudentEsp32SyncModalState extends State<StudentEsp32SyncModal>
                     TextField(
                       controller: _ipController,
                       decoration: InputDecoration(
-                        labelText: 'ESP32 Hub IP Gateway',
-                        prefixIcon: const Icon(Icons.language),
+                        labelText: 'Hub Gateway IP Address',
+                        prefixIcon: const Icon(Icons.language_rounded),
                         border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
                       ),
                     ),
@@ -593,7 +624,7 @@ class _StudentEsp32SyncModalState extends State<StudentEsp32SyncModal>
                             'WIFI:S:${_ssidController.text};P:aira1234;;AIRAMP:SEC=Class;IP=${_ipController.text}',
                           );
                         },
-                        icon: const Icon(Icons.link),
+                        icon: const Icon(Icons.link_rounded),
                         label: const Text('Connect & Discover Materials'),
                         style: ElevatedButton.styleFrom(
                           backgroundColor: AppTheme.primary,
@@ -612,6 +643,93 @@ class _StudentEsp32SyncModalState extends State<StudentEsp32SyncModal>
     );
   }
 
+  Widget _buildSyncStepsGuide() {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+      decoration: BoxDecoration(
+        color: AppTheme.surface,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: AppTheme.border.withValues(alpha: 0.6)),
+      ),
+      child: Row(
+        children: [
+          Expanded(
+            child: _buildSyncStepItem(
+              title: 'Frame QR',
+              subtitle: 'Teacher screen',
+              icon: Icons.qr_code_scanner_rounded,
+            ),
+          ),
+          _buildStepDivider(),
+          Expanded(
+            child: _buildSyncStepItem(
+              title: 'Auto-Sync',
+              subtitle: 'Offline Wi-Fi',
+              icon: Icons.wifi_protected_setup_rounded,
+            ),
+          ),
+          _buildStepDivider(),
+          Expanded(
+            child: _buildSyncStepItem(
+              title: 'Save & Learn',
+              subtitle: 'Access anytime',
+              icon: Icons.download_done_rounded,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildSyncStepItem({
+    required String title,
+    required String subtitle,
+    required IconData icon,
+  }) {
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Container(
+          width: 32,
+          height: 32,
+          decoration: BoxDecoration(
+            color: AppTheme.primary.withValues(alpha: 0.1),
+            shape: BoxShape.circle,
+          ),
+          child: Center(
+            child: Icon(icon, color: AppTheme.primary, size: 16),
+          ),
+        ),
+        const SizedBox(height: 6),
+        Text(
+          title,
+          textAlign: TextAlign.center,
+          style: TextStyle(
+            fontSize: 12,
+            fontWeight: FontWeight.w700,
+            color: AppTheme.text,
+          ),
+        ),
+        const SizedBox(height: 1),
+        Text(
+          subtitle,
+          textAlign: TextAlign.center,
+          style: TextStyle(
+            fontSize: 10,
+            color: AppTheme.textMuted,
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildStepDivider() {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 4),
+      child: Icon(Icons.arrow_forward_ios_rounded, size: 11, color: AppTheme.textMuted.withValues(alpha: 0.35)),
+    );
+  }
+
   Widget _buildConnectingView() {
     final ip = _scannedPayload?.ipAddress ?? _ipController.text;
     final ssid = _scannedPayload?.ssid ?? _ssidController.text;
@@ -625,7 +743,7 @@ class _StudentEsp32SyncModalState extends State<StudentEsp32SyncModal>
             const CircularProgressIndicator(strokeWidth: 3),
             const SizedBox(height: 24),
             Text(
-              'Connecting to ESP32 Station...',
+              'Connecting to Classroom Hub...',
               style: TextStyle(
                 fontSize: 16,
                 fontWeight: FontWeight.bold,
@@ -634,7 +752,7 @@ class _StudentEsp32SyncModalState extends State<StudentEsp32SyncModal>
             ),
             const SizedBox(height: 8),
             Text(
-              'Handshaking with $ssid at http://$ip/api/ping',
+              'Connecting to $ssid ($ip)...',
               textAlign: TextAlign.center,
               style: TextStyle(fontSize: 12, color: AppTheme.textMuted),
             ),
@@ -662,7 +780,7 @@ class _StudentEsp32SyncModalState extends State<StudentEsp32SyncModal>
           ),
           const SizedBox(height: 16),
           Text(
-            'Connect Phone to ESP32 Wi-Fi',
+            'Connect to Classroom Hub Wi-Fi',
             style: TextStyle(
               fontSize: 18,
               fontWeight: FontWeight.bold,
@@ -671,7 +789,7 @@ class _StudentEsp32SyncModalState extends State<StudentEsp32SyncModal>
           ),
           const SizedBox(height: 8),
           Text(
-            'QR code was recognized successfully! However, your phone is not currently connected to the ESP32\'s local Wi-Fi station.',
+            'QR code was recognized successfully! However, your phone is not currently connected to the classroom Wi-Fi hotspot.',
             textAlign: TextAlign.center,
             style: TextStyle(fontSize: 13, color: AppTheme.textSecondary, height: 1.4),
           ),

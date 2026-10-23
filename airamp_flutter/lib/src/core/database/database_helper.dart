@@ -6516,6 +6516,7 @@ class DatabaseHelper {
   // ── Class Schedules Management ──────────────────────────────
   Future<List<Map<String, dynamic>>> getClassSchedules({
     String? teacherId,
+    String? teacherName,
     int? sectionId,
     String? sectionName,
     String? schoolId,
@@ -6526,8 +6527,16 @@ class DatabaseHelper {
     final whereArgs = <dynamic>[];
 
     if (teacherId != null && teacherId.isNotEmpty) {
-      whereClauses.add('teacher_id = ?');
-      whereArgs.add(teacherId);
+      if (teacherName != null && teacherName.trim().isNotEmpty) {
+        whereClauses.add('(teacher_id = ? OR LOWER(TRIM(teacher_name)) = LOWER(TRIM(?)))');
+        whereArgs.addAll([teacherId, teacherName.trim()]);
+      } else {
+        whereClauses.add('teacher_id = ?');
+        whereArgs.add(teacherId);
+      }
+    } else if (teacherName != null && teacherName.trim().isNotEmpty) {
+      whereClauses.add('LOWER(TRIM(teacher_name)) = LOWER(TRIM(?))');
+      whereArgs.add(teacherName.trim());
     }
     if (sectionId != null) {
       whereClauses.add('section_id = ?');

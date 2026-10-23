@@ -84,7 +84,7 @@ class _TeacherAssistiveTouchState extends ConsumerState<TeacherAssistiveTouch> {
       barrierDismissible: true,
       barrierLabel: 'Quick Actions Hub',
       barrierColor: Colors.transparent,
-      transitionDuration: const Duration(milliseconds: 240),
+      transitionDuration: const Duration(milliseconds: 220),
       pageBuilder: (dialogContext, anim1, anim2) {
         _activeDialogContext = dialogContext;
         return _QuickActionsMenuDialog(
@@ -118,16 +118,12 @@ class _TeacherAssistiveTouchState extends ConsumerState<TeacherAssistiveTouch> {
           },
         );
       },
-      transitionBuilder: (dialogContext, animation, secondaryAnimation, child) {
-        final curved = CurvedAnimation(
-          parent: animation,
-          curve: Curves.easeOutBack,
-          reverseCurve: Curves.easeInCubic,
-        );
-        return FadeTransition(
-          opacity: animation,
-          child: ScaleTransition(
-            scale: Tween<double>(begin: 0.88, end: 1.0).animate(curved),
+      transitionBuilder: (dialogContext, anim, secondaryAnim, child) {
+        final curved = CurvedAnimation(parent: anim, curve: Curves.easeOutCubic);
+        return ScaleTransition(
+          scale: Tween<double>(begin: 0.94, end: 1.0).animate(curved),
+          child: FadeTransition(
+            opacity: anim,
             child: child,
           ),
         );
@@ -154,8 +150,8 @@ class _TeacherAssistiveTouchState extends ConsumerState<TeacherAssistiveTouch> {
   }
 }
 
-/// The AIRAMP-styled expanded Quick Actions dialog.
-class _QuickActionsMenuDialog extends ConsumerWidget {
+/// The AIRAMP-styled expanded Quick Actions dialog for Teachers.
+class TeacherQuickActionsMenuDialog extends ConsumerWidget {
   final VoidCallback onCurriculum;
   final VoidCallback onSchedule;
   final VoidCallback onScores;
@@ -164,7 +160,8 @@ class _QuickActionsMenuDialog extends ConsumerWidget {
   final VoidCallback onAnnounce;
   final VoidCallback onProfile;
 
-  const _QuickActionsMenuDialog({
+  const TeacherQuickActionsMenuDialog({
+    super.key,
     required this.onCurriculum,
     required this.onSchedule,
     required this.onScores,
@@ -191,267 +188,244 @@ class _QuickActionsMenuDialog extends ConsumerWidget {
             child: GestureDetector(
               onTap: () => Navigator.of(context).pop(),
               child: BackdropFilter(
-                filter: ImageFilter.blur(sigmaX: 14, sigmaY: 14),
+                filter: ImageFilter.blur(sigmaX: 12, sigmaY: 12),
                 child: Container(
-                  color: Colors.black.withValues(alpha: isDark ? 0.45 : 0.14),
+                  color: Colors.black.withValues(alpha: isDark ? 0.55 : 0.20),
                 ),
               ),
             ),
           ),
 
-          // Centered Glassmorphic AIRAMP Card
+          // Centered Institutional Dialog Card
           Center(
             child: Container(
               width: dialogWidth,
               margin: const EdgeInsets.symmetric(horizontal: 16),
               decoration: BoxDecoration(
-                borderRadius: BorderRadius.circular(28),
+                color: isDark ? const Color(0xFF1E293B) : Colors.white,
+                borderRadius: BorderRadius.circular(24),
+                border: Border.all(
+                  color: isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0),
+                  width: 1,
+                ),
                 boxShadow: [
                   BoxShadow(
-                    color: Colors.black.withValues(alpha: isDark ? 0.50 : 0.12),
-                    blurRadius: 36,
+                    color: Colors.black.withValues(alpha: isDark ? 0.40 : 0.08),
+                    blurRadius: 28,
                     spreadRadius: 0,
-                    offset: const Offset(0, 16),
+                    offset: const Offset(0, 12),
                   ),
                 ],
               ),
               child: ClipRRect(
-                borderRadius: BorderRadius.circular(28),
-                child: BackdropFilter(
-                  filter: ImageFilter.blur(sigmaX: 24, sigmaY: 24),
-                  child: Container(
-                    decoration: BoxDecoration(
-                      gradient: LinearGradient(
-                        begin: Alignment.topLeft,
-                        end: Alignment.bottomRight,
-                        colors: [
-                          isDark
-                              ? const Color(0xFF1E293B).withValues(alpha: 0.70)
-                              : Colors.white.withValues(alpha: 0.52),
-                          isDark
-                              ? const Color(0xFF0F172A).withValues(alpha: 0.55)
-                              : Colors.white.withValues(alpha: 0.30),
-                        ],
-                      ),
-                      borderRadius: BorderRadius.circular(28),
-                      border: Border.all(
-                        color: Colors.white.withValues(alpha: isDark ? 0.25 : 0.78),
-                        width: 1.5,
-                      ),
-                      boxShadow: [
-                        BoxShadow(
-                          color: Colors.white.withValues(alpha: isDark ? 0.08 : 0.65),
-                          blurRadius: 1,
-                          offset: const Offset(0, 1),
+                borderRadius: BorderRadius.circular(24),
+                child: ConstrainedBox(
+                  constraints: BoxConstraints(
+                    maxHeight: screenHeight * 0.88,
+                  ),
+                  child: SingleChildScrollView(
+                    physics: const BouncingScrollPhysics(),
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        // Top Drag Handle Pill
+                        Center(
+                          child: Container(
+                            margin: const EdgeInsets.only(top: 12, bottom: 6),
+                            width: 36,
+                            height: 4,
+                            decoration: BoxDecoration(
+                              color: isDark ? const Color(0xFF475569) : const Color(0xFFCBD5E1),
+                              borderRadius: BorderRadius.circular(10),
+                            ),
+                          ),
                         ),
-                      ],
-                    ),
-                    child: ConstrainedBox(
-                      constraints: BoxConstraints(
-                        maxHeight: screenHeight * 0.88,
-                      ),
-                      child: SingleChildScrollView(
-                        physics: const BouncingScrollPhysics(),
-                        child: Column(
-                          mainAxisSize: MainAxisSize.min,
-                          crossAxisAlignment: CrossAxisAlignment.stretch,
-                          children: [
-                            // Top Drag Handle Pill
-                            Center(
-                              child: Container(
-                                margin: const EdgeInsets.only(top: 12, bottom: 6),
+
+                        // Dialog Header
+                        Padding(
+                          padding: const EdgeInsets.fromLTRB(18, 6, 12, 10),
+                          child: Row(
+                            children: [
+                              Container(
                                 width: 38,
-                                height: 4.5,
+                                height: 38,
                                 decoration: BoxDecoration(
-                                  color: (isDark ? Colors.white : Colors.black).withValues(alpha: 0.18),
+                                  color: AppTheme.primary.withValues(alpha: isDark ? 0.16 : 0.08),
                                   borderRadius: BorderRadius.circular(10),
+                                  border: Border.all(
+                                    color: AppTheme.primary.withValues(alpha: isDark ? 0.28 : 0.15),
+                                    width: 1,
+                                  ),
+                                ),
+                                child: Center(
+                                  child: Icon(
+                                    Icons.grid_view_rounded,
+                                    size: 20,
+                                    color: AppTheme.primary,
+                                  ),
                                 ),
                               ),
-                            ),
-
-                            // Dialog Header
-                            Padding(
-                              padding: const EdgeInsets.fromLTRB(18, 4, 12, 6),
-                              child: Row(
-                                children: [
-                                  Container(
-                                    width: 38,
-                                    height: 38,
-                                    padding: const EdgeInsets.all(3),
-                                    decoration: BoxDecoration(
-                                      color: AppTheme.primary.withValues(alpha: 0.14),
-                                      borderRadius: BorderRadius.circular(12),
-                                      border: Border.all(
-                                        color: AppTheme.primary.withValues(alpha: 0.28),
-                                        width: 1.2,
+                              const SizedBox(width: 12),
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      'Quick Actions Hub',
+                                      style: TextStyle(
+                                        fontSize: 16.5,
+                                        fontWeight: FontWeight.w700,
+                                        color: AppTheme.text,
+                                        letterSpacing: -0.2,
                                       ),
                                     ),
-                                    child: Image.asset(
-                                      'assets/images/aira_avatar_active.png',
-                                      fit: BoxFit.contain,
+                                    const SizedBox(height: 2),
+                                    Text(
+                                      'Teacher shortcuts & authoring tools',
+                                      style: TextStyle(
+                                        fontSize: 11.5,
+                                        fontWeight: FontWeight.w400,
+                                        color: AppTheme.textSecondary,
+                                      ),
                                     ),
+                                  ],
+                                ),
+                              ),
+                              IconButton(
+                                icon: Container(
+                                  padding: const EdgeInsets.all(5),
+                                  decoration: BoxDecoration(
+                                    color: isDark ? Colors.white.withValues(alpha: 0.06) : const Color(0xFFF1F5F9),
+                                    shape: BoxShape.circle,
                                   ),
-                                  const SizedBox(width: 12),
+                                  child: Icon(Icons.close_rounded, size: 16, color: AppTheme.textMuted),
+                                ),
+                                tooltip: 'Close',
+                                onPressed: () => Navigator.of(context).pop(),
+                              ),
+                            ],
+                          ),
+                        ),
+
+                        // Institutional Hairline Divider
+                        Divider(
+                          height: 1,
+                          thickness: 1,
+                          color: isDark ? const Color(0xFF334155) : const Color(0xFFF1F5F9),
+                        ),
+
+                        // 2-column Grid of Action Tiles
+                        Padding(
+                          padding: const EdgeInsets.fromLTRB(16, 14, 16, 12),
+                          child: Column(
+                            children: [
+                              Row(
+                                children: [
                                   Expanded(
-                                    child: Column(
-                                      crossAxisAlignment: CrossAxisAlignment.start,
-                                      children: [
-                                        Text(
-                                          'Quick Actions Hub',
-                                          style: TextStyle(
-                                            fontSize: 16.5,
-                                            fontWeight: FontWeight.bold,
-                                            color: AppTheme.text,
-                                            letterSpacing: -0.3,
-                                          ),
-                                        ),
-                                        const SizedBox(height: 2),
-                                        Text(
-                                          'Teacher shortcuts & authoring tools',
-                                          style: TextStyle(
-                                            fontSize: 11,
-                                            color: AppTheme.textSecondary,
-                                          ),
-                                        ),
-                                      ],
+                                    child: _TeacherActionCardTile(
+                                      icon: Icons.quiz_outlined,
+                                      title: 'Create Quiz',
+                                      subtitle: 'Draft & launch',
+                                      onTap: onCreateQuiz,
                                     ),
                                   ),
-                                  IconButton(
-                                    icon: Container(
-                                      padding: const EdgeInsets.all(4),
-                                      decoration: BoxDecoration(
-                                        color: (isDark ? Colors.white : Colors.black).withValues(alpha: 0.06),
-                                        shape: BoxShape.circle,
-                                      ),
-                                      child: Icon(Icons.close_rounded, size: 18, color: AppTheme.textMuted),
+                                  const SizedBox(width: 10),
+                                  Expanded(
+                                    child: _TeacherActionCardTile(
+                                      icon: Icons.campaign_outlined,
+                                      title: 'Announce',
+                                      subtitle: 'Post updates',
+                                      onTap: onAnnounce,
                                     ),
-                                    tooltip: 'Close',
-                                    onPressed: () => Navigator.of(context).pop(),
                                   ),
                                 ],
                               ),
-                            ),
-
-                            // 2-column Grid of Squarish Action Tiles
-                            Padding(
-                              padding: const EdgeInsets.fromLTRB(16, 8, 16, 12),
-                              child: Column(
+                              const SizedBox(height: 10),
+                              Row(
                                 children: [
-                                  Row(
-                                    children: [
-                                      Expanded(
-                                        child: _ActionCardTile(
-                                          icon: Icons.quiz_outlined,
-                                          title: 'Create Quiz',
-                                          subtitle: 'Draft & launch',
-                                          color: const Color(0xFF0D9488),
-                                          onTap: onCreateQuiz,
-                                        ),
-                                      ),
-                                      const SizedBox(width: 12),
-                                      Expanded(
-                                        child: _ActionCardTile(
-                                          icon: Icons.campaign_outlined,
-                                          title: 'Announce',
-                                          subtitle: 'Post updates',
-                                          color: const Color(0xFF8B5CF6),
-                                          onTap: onAnnounce,
-                                        ),
-                                      ),
-                                    ],
+                                  Expanded(
+                                    child: _TeacherActionCardTile(
+                                      icon: Icons.menu_book_outlined,
+                                      title: 'Curriculum',
+                                      subtitle: 'Subjects & units',
+                                      onTap: onCurriculum,
+                                    ),
                                   ),
-                                  const SizedBox(height: 12),
-                                  Row(
-                                    children: [
-                                      Expanded(
-                                        child: _ActionCardTile(
-                                          icon: Icons.menu_book_outlined,
-                                          title: 'Curriculum',
-                                          subtitle: 'Subjects & units',
-                                          color: const Color(0xFF3B82F6),
-                                          onTap: onCurriculum,
-                                        ),
-                                      ),
-                                      const SizedBox(width: 12),
-                                      Expanded(
-                                        child: _ActionCardTile(
-                                          icon: Icons.calendar_month_outlined,
-                                          title: 'Schedule',
-                                          subtitle: 'Class timetable',
-                                          color: const Color(0xFF14B8A6),
-                                          onTap: onSchedule,
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                  const SizedBox(height: 12),
-                                  Row(
-                                    children: [
-                                      Expanded(
-                                        child: _ActionCardTile(
-                                          icon: Icons.assignment_turned_in_outlined,
-                                          title: 'Live Scores',
-                                          subtitle: 'Submissions health',
-                                          color: const Color(0xFF10B981),
-                                          onTap: onScores,
-                                        ),
-                                      ),
-                                      const SizedBox(width: 12),
-                                      Expanded(
-                                        child: _ActionCardTile(
-                                          icon: Icons.people_alt_outlined,
-                                          title: 'Students',
-                                          subtitle: 'Section roster',
-                                          color: const Color(0xFF0EA5E9),
-                                          onTap: onStudents,
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                  const SizedBox(height: 12),
-                                  _ActionCardTile(
-                                    icon: Icons.person_outline_rounded,
-                                    title: 'Profile & Settings',
-                                    subtitle: 'Account details, appearance & security',
-                                    color: const Color(0xFF6366F1),
-                                    isFullWidth: true,
-                                    onTap: onProfile,
+                                  const SizedBox(width: 10),
+                                  Expanded(
+                                    child: _TeacherActionCardTile(
+                                      icon: Icons.calendar_month_outlined,
+                                      title: 'Schedule',
+                                      subtitle: 'Class timetable',
+                                      onTap: onSchedule,
+                                    ),
                                   ),
                                 ],
                               ),
-                            ),
-
-                            // Bottom Repositioning Tip
-                            Padding(
-                              padding: const EdgeInsets.only(bottom: 14, top: 2),
-                              child: Row(
-                                mainAxisAlignment: MainAxisAlignment.center,
-                                mainAxisSize: MainAxisSize.min,
+                              const SizedBox(height: 10),
+                              Row(
                                 children: [
-                                  Icon(
-                                    Icons.pan_tool_alt_outlined,
-                                    size: 13,
+                                  Expanded(
+                                    child: _TeacherActionCardTile(
+                                      icon: Icons.assignment_turned_in_outlined,
+                                      title: 'Live Scores',
+                                      subtitle: 'Submissions health',
+                                      onTap: onScores,
+                                    ),
+                                  ),
+                                  const SizedBox(width: 10),
+                                  Expanded(
+                                    child: _TeacherActionCardTile(
+                                      icon: Icons.people_alt_outlined,
+                                      title: 'Students',
+                                      subtitle: 'Section roster',
+                                      onTap: onStudents,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                              const SizedBox(height: 10),
+                              _TeacherActionCardTile(
+                                icon: Icons.person_outline_rounded,
+                                title: 'Profile & Settings',
+                                subtitle: 'Account details, appearance & security',
+                                isFullWidth: true,
+                                onTap: onProfile,
+                              ),
+                            ],
+                          ),
+                        ),
+
+                        // Bottom Repositioning Tip
+                        Padding(
+                          padding: const EdgeInsets.only(bottom: 14, top: 2),
+                          child: Row(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(
+                                Icons.pan_tool_alt_outlined,
+                                size: 13,
+                                color: AppTheme.textMuted,
+                              ),
+                              const SizedBox(width: 6),
+                              Flexible(
+                                child: Text(
+                                  'Drag floating bubble anywhere to reposition',
+                                  style: TextStyle(
+                                    fontSize: 10.5,
+                                    fontWeight: FontWeight.w500,
                                     color: AppTheme.textMuted,
                                   ),
-                                  const SizedBox(width: 6),
-                                  Flexible(
-                                    child: Text(
-                                      'Drag floating bubble anywhere to reposition',
-                                      style: TextStyle(
-                                        fontSize: 10.5,
-                                        fontWeight: FontWeight.w500,
-                                        color: AppTheme.textMuted,
-                                      ),
-                                      maxLines: 1,
-                                      overflow: TextOverflow.ellipsis,
-                                    ),
-                                  ),
-                                ],
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                ),
                               ),
-                            ),
-                          ],
+                            ],
+                          ),
                         ),
-                      ),
+                      ],
                     ),
                   ),
                 ),
@@ -464,29 +438,29 @@ class _QuickActionsMenuDialog extends ConsumerWidget {
   }
 }
 
-/// An interactive glassmorphic card tile matching AIRAMP's design system.
-class _ActionCardTile extends StatefulWidget {
+typedef _QuickActionsMenuDialog = TeacherQuickActionsMenuDialog;
+
+/// An institutional card tile matching AIRAMP's academic teacher design system.
+class _TeacherActionCardTile extends StatefulWidget {
   final IconData icon;
   final String title;
   final String subtitle;
-  final Color color;
   final VoidCallback onTap;
   final bool isFullWidth;
 
-  const _ActionCardTile({
+  const _TeacherActionCardTile({
     required this.icon,
     required this.title,
     required this.subtitle,
-    required this.color,
     required this.onTap,
     this.isFullWidth = false,
   });
 
   @override
-  State<_ActionCardTile> createState() => _ActionCardTileState();
+  State<_TeacherActionCardTile> createState() => _TeacherActionCardTileState();
 }
 
-class _ActionCardTileState extends State<_ActionCardTile>
+class _TeacherActionCardTileState extends State<_TeacherActionCardTile>
     with SingleTickerProviderStateMixin {
   late AnimationController _controller;
   late Animation<double> _scaleAnimation;
@@ -497,13 +471,13 @@ class _ActionCardTileState extends State<_ActionCardTile>
     _controller = AnimationController(
       vsync: this,
       duration: const Duration(milliseconds: 90),
-      reverseDuration: const Duration(milliseconds: 160),
+      reverseDuration: const Duration(milliseconds: 140),
     );
-    _scaleAnimation = Tween<double>(begin: 1.0, end: 0.94).animate(
+    _scaleAnimation = Tween<double>(begin: 1.0, end: 0.98).animate(
       CurvedAnimation(
         parent: _controller,
         curve: Curves.easeOutCubic,
-        reverseCurve: Curves.easeOutBack,
+        reverseCurve: Curves.easeOutCubic,
       ),
     );
   }
@@ -530,6 +504,9 @@ class _ActionCardTileState extends State<_ActionCardTile>
   @override
   Widget build(BuildContext context) {
     final isDark = AppTheme.isDark;
+    final accentColor = AppTheme.primary;
+    final cardBg = isDark ? const Color(0xFF222F42) : const Color(0xFFF8FAFC);
+    final cardBorder = isDark ? const Color(0xFF33455E) : const Color(0xFFE2E8F0);
 
     if (widget.isFullWidth) {
       return ScaleTransition(
@@ -546,67 +523,37 @@ class _ActionCardTileState extends State<_ActionCardTile>
             onTapDown: _onTapDown,
             onTapUp: _onTapUp,
             onTapCancel: _onTapCancel,
-            borderRadius: BorderRadius.circular(18),
-            splashColor: widget.color.withValues(alpha: 0.14),
-            highlightColor: widget.color.withValues(alpha: 0.08),
+            borderRadius: BorderRadius.circular(14),
+            splashColor: accentColor.withValues(alpha: 0.08),
+            highlightColor: accentColor.withValues(alpha: 0.04),
             child: Ink(
               decoration: BoxDecoration(
-                gradient: LinearGradient(
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
-                  colors: [
-                    isDark
-                        ? Colors.white.withValues(alpha: 0.12)
-                        : Colors.white.withValues(alpha: 0.72),
-                    isDark
-                        ? Colors.white.withValues(alpha: 0.05)
-                        : Colors.white.withValues(alpha: 0.45),
-                  ],
-                ),
-                borderRadius: BorderRadius.circular(18),
+                color: cardBg,
+                borderRadius: BorderRadius.circular(14),
                 border: Border.all(
-                  color: Colors.white.withValues(alpha: isDark ? 0.22 : 0.88),
-                  width: 1.2,
+                  color: cardBorder,
+                  width: 1.0,
                 ),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black.withValues(alpha: isDark ? 0.25 : 0.04),
-                    blurRadius: 10,
-                    offset: const Offset(0, 3),
-                  ),
-                  BoxShadow(
-                    color: Colors.white.withValues(alpha: isDark ? 0.05 : 0.60),
-                    blurRadius: 1,
-                    offset: const Offset(0, -0.5),
-                  ),
-                ],
               ),
               padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
               child: Row(
                 children: [
                   Container(
-                    width: 42,
-                    height: 42,
+                    width: 38,
+                    height: 38,
                     decoration: BoxDecoration(
-                      gradient: LinearGradient(
-                        begin: Alignment.topLeft,
-                        end: Alignment.bottomRight,
-                        colors: [
-                          widget.color.withValues(alpha: 0.22),
-                          widget.color.withValues(alpha: 0.08),
-                        ],
-                      ),
-                      borderRadius: BorderRadius.circular(12),
+                      color: accentColor.withValues(alpha: isDark ? 0.16 : 0.09),
+                      borderRadius: BorderRadius.circular(10),
                       border: Border.all(
-                        color: widget.color.withValues(alpha: 0.32),
-                        width: 1.2,
+                        color: accentColor.withValues(alpha: isDark ? 0.28 : 0.15),
+                        width: 1.0,
                       ),
                     ),
                     child: Center(
                       child: Icon(
                         widget.icon,
-                        size: 22,
-                        color: widget.color,
+                        size: 20,
+                        color: accentColor,
                       ),
                     ),
                   ),
@@ -622,7 +569,7 @@ class _ActionCardTileState extends State<_ActionCardTile>
                           overflow: TextOverflow.ellipsis,
                           style: TextStyle(
                             fontSize: 13,
-                            fontWeight: FontWeight.w700,
+                            fontWeight: FontWeight.w600,
                             color: AppTheme.text,
                             letterSpacing: -0.2,
                           ),
@@ -633,25 +580,18 @@ class _ActionCardTileState extends State<_ActionCardTile>
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
                           style: TextStyle(
-                            fontSize: 10.5,
-                            fontWeight: FontWeight.w500,
+                            fontSize: 11,
+                            fontWeight: FontWeight.w400,
                             color: AppTheme.textSecondary,
                           ),
                         ),
                       ],
                     ),
                   ),
-                  Container(
-                    padding: const EdgeInsets.all(4),
-                    decoration: BoxDecoration(
-                      color: (isDark ? Colors.white : Colors.black).withValues(alpha: 0.05),
-                      shape: BoxShape.circle,
-                    ),
-                    child: Icon(
-                      Icons.arrow_forward_ios_rounded,
-                      size: 11,
-                      color: AppTheme.textMuted,
-                    ),
+                  Icon(
+                    Icons.chevron_right_rounded,
+                    size: 18,
+                    color: AppTheme.textMuted,
                   ),
                 ],
               ),
@@ -661,7 +601,7 @@ class _ActionCardTileState extends State<_ActionCardTile>
       );
     }
 
-    // Squarish elevated glassmorphic card
+    // Grid action card
     return ScaleTransition(
       scale: _scaleAnimation,
       child: Material(
@@ -676,74 +616,43 @@ class _ActionCardTileState extends State<_ActionCardTile>
           onTapDown: _onTapDown,
           onTapUp: _onTapUp,
           onTapCancel: _onTapCancel,
-          borderRadius: BorderRadius.circular(20),
-          splashColor: widget.color.withValues(alpha: 0.16),
-          highlightColor: widget.color.withValues(alpha: 0.08),
+          borderRadius: BorderRadius.circular(14),
+          splashColor: accentColor.withValues(alpha: 0.08),
+          highlightColor: accentColor.withValues(alpha: 0.04),
           child: Ink(
             decoration: BoxDecoration(
-              gradient: LinearGradient(
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
-                colors: [
-                  isDark
-                      ? Colors.white.withValues(alpha: 0.12)
-                      : Colors.white.withValues(alpha: 0.72),
-                  isDark
-                      ? Colors.white.withValues(alpha: 0.05)
-                      : Colors.white.withValues(alpha: 0.45),
-                ],
-              ),
-              borderRadius: BorderRadius.circular(20),
+              color: cardBg,
+              borderRadius: BorderRadius.circular(14),
               border: Border.all(
-                color: Colors.white.withValues(alpha: isDark ? 0.22 : 0.88),
-                width: 1.2,
+                color: cardBorder,
+                width: 1.0,
               ),
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.black.withValues(alpha: isDark ? 0.25 : 0.04),
-                  blurRadius: 10,
-                  offset: const Offset(0, 3),
-                ),
-                BoxShadow(
-                  color: Colors.white.withValues(alpha: isDark ? 0.05 : 0.60),
-                  blurRadius: 1,
-                  offset: const Offset(0, -0.5),
-                ),
-              ],
             ),
             padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 14),
             child: Column(
               mainAxisSize: MainAxisSize.min,
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                // Prominent icon squircle
                 Container(
-                  width: 48,
-                  height: 48,
+                  width: 44,
+                  height: 44,
                   decoration: BoxDecoration(
-                    gradient: LinearGradient(
-                      begin: Alignment.topLeft,
-                      end: Alignment.bottomRight,
-                      colors: [
-                        widget.color.withValues(alpha: 0.22),
-                        widget.color.withValues(alpha: 0.08),
-                      ],
-                    ),
-                    borderRadius: BorderRadius.circular(15),
+                    color: accentColor.withValues(alpha: isDark ? 0.16 : 0.09),
+                    borderRadius: BorderRadius.circular(12),
                     border: Border.all(
-                      color: widget.color.withValues(alpha: 0.35),
-                      width: 1.2,
+                      color: accentColor.withValues(alpha: isDark ? 0.28 : 0.15),
+                      width: 1.0,
                     ),
                   ),
                   child: Center(
                     child: Icon(
                       widget.icon,
-                      size: 26,
-                      color: widget.color,
+                      size: 22,
+                      color: accentColor,
                     ),
                   ),
                 ),
-                const SizedBox(height: 10),
+                const SizedBox(height: 9),
                 Text(
                   widget.title,
                   textAlign: TextAlign.center,
@@ -751,12 +660,12 @@ class _ActionCardTileState extends State<_ActionCardTile>
                   overflow: TextOverflow.ellipsis,
                   style: TextStyle(
                     fontSize: 12.5,
-                    fontWeight: FontWeight.w700,
+                    fontWeight: FontWeight.w600,
                     color: AppTheme.text,
                     letterSpacing: -0.2,
                   ),
                 ),
-                const SizedBox(height: 3),
+                const SizedBox(height: 2),
                 Text(
                   widget.subtitle,
                   textAlign: TextAlign.center,
@@ -764,7 +673,7 @@ class _ActionCardTileState extends State<_ActionCardTile>
                   overflow: TextOverflow.ellipsis,
                   style: TextStyle(
                     fontSize: 10.5,
-                    fontWeight: FontWeight.w500,
+                    fontWeight: FontWeight.w400,
                     color: AppTheme.textSecondary,
                   ),
                 ),

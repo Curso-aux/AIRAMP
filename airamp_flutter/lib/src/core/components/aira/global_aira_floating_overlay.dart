@@ -9,6 +9,7 @@ import '../../../features/teacher/presentation/components/create_quiz_dialog.dar
 import '../../../features/teacher/presentation/components/post_announcement_dialog.dart';
 import '../../../features/teacher/data/teacher_repository.dart';
 import '../app_toast.dart';
+import 'aira_overlay_controller.dart';
 
 /// Topmost application-level overlay that keeps AIRA floating seamlessly
 /// above ALL pages, modal sheets, dialogs, and popups.
@@ -105,6 +106,12 @@ class GlobalAiraFloatingOverlay extends ConsumerWidget {
       );
     }
 
-    return assistant;
+    return ValueListenableBuilder<bool>(
+      valueListenable: AiraOverlayController.isHidden,
+      builder: (context, isHidden, _) {
+        if (isHidden) return const SizedBox.shrink();
+        return assistant;
+      },
+    );
   }
 }

@@ -2,9 +2,10 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:airamp_flutter/src/features/teacher/presentation/components/teacher_assistive_touch.dart';
+import 'package:airamp_flutter/src/core/components/aira/aira_floating_assistant.dart';
 
 void main() {
-  testWidgets('TeacherAssistiveTouch renders floating bubble with touch icon', (tester) async {
+  testWidgets('TeacherAssistiveTouch renders floating assistant widget', (tester) async {
     await tester.pumpWidget(
       ProviderScope(
         child: MaterialApp(
@@ -28,13 +29,67 @@ void main() {
       ),
     );
 
-    expect(find.byIcon(Icons.touch_app_rounded), findsOneWidget);
+    expect(find.byType(TeacherAssistiveTouch), findsOneWidget);
+    expect(find.byType(AiraFloatingAssistant), findsOneWidget);
   });
 
-  testWidgets('TeacherAssistiveTouch expands into glassmorphic quick actions dialog on tap', (tester) async {
+  testWidgets('TeacherQuickActionsMenuDialog renders institutional academic shortcuts and triggers actions', (tester) async {
     bool createQuizTapped = false;
     bool announceTapped = false;
+    bool curriculumTapped = false;
+    bool scheduleTapped = false;
+    bool scoresTapped = false;
+    bool studentsTapped = false;
+    bool profileTapped = false;
 
+    await tester.pumpWidget(
+      ProviderScope(
+        child: MaterialApp(
+          home: TeacherQuickActionsMenuDialog(
+            onCreateQuiz: () => createQuizTapped = true,
+            onAnnounce: () => announceTapped = true,
+            onCurriculum: () => curriculumTapped = true,
+            onSchedule: () => scheduleTapped = true,
+            onScores: () => scoresTapped = true,
+            onStudents: () => studentsTapped = true,
+            onProfile: () => profileTapped = true,
+          ),
+        ),
+      ),
+    );
+
+    // Dialog elements should be visible
+    expect(find.text('Quick Actions Hub'), findsOneWidget);
+    expect(find.text('Teacher shortcuts & authoring tools'), findsOneWidget);
+    expect(find.text('Create Quiz'), findsOneWidget);
+    expect(find.text('Draft & launch'), findsOneWidget);
+    expect(find.text('Announce'), findsOneWidget);
+    expect(find.text('Post updates'), findsOneWidget);
+    expect(find.text('Curriculum'), findsOneWidget);
+    expect(find.text('Subjects & units'), findsOneWidget);
+    expect(find.text('Schedule'), findsOneWidget);
+    expect(find.text('Class timetable'), findsOneWidget);
+    expect(find.text('Live Scores'), findsOneWidget);
+    expect(find.text('Submissions health'), findsOneWidget);
+    expect(find.text('Students'), findsOneWidget);
+    expect(find.text('Section roster'), findsOneWidget);
+    expect(find.text('Profile & Settings'), findsOneWidget);
+    expect(find.text('Account details, appearance & security'), findsOneWidget);
+
+    // Tap Create Quiz tile
+    await tester.tap(find.text('Create Quiz'));
+    await tester.pumpAndSettle();
+    expect(createQuizTapped, isTrue);
+
+    // Tap Profile & Settings tile
+    await tester.ensureVisible(find.text('Profile & Settings'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Profile & Settings'));
+    await tester.pumpAndSettle();
+    expect(profileTapped, isTrue);
+  });
+
+  testWidgets('TeacherAssistiveTouch toggles quick actions dialog open and closed on repeated clicks', (tester) async {
     await tester.pumpWidget(
       ProviderScope(
         child: MaterialApp(
@@ -46,8 +101,8 @@ void main() {
                   onSchedule: () {},
                   onScores: () {},
                   onStudents: () {},
-                  onCreateQuiz: () => createQuizTapped = true,
-                  onAnnounce: () => announceTapped = true,
+                  onCreateQuiz: () {},
+                  onAnnounce: () {},
                   onProfile: () {},
                 ),
               ],
@@ -57,27 +112,27 @@ void main() {
       ),
     );
 
-    // Tap floating bubble
-    await tester.tap(find.byIcon(Icons.touch_app_rounded));
-    await tester.pumpAndSettle();
+    final initialAssistant = tester.widget<AiraFloatingAssistant>(find.byType(AiraFloatingAssistant));
+    expect(initialAssistant.isVisible, isTrue);
 
-    // Dialog header elements should be visible
-    expect(find.text('Quick Actions Hub'), findsOneWidget);
-    expect(find.text('Teacher shortcuts & authoring tools'), findsOneWidget);
+    // First click: opens Quick Actions Hub and hides floating assistant
+    initialAssistant.onOpenMenu();
+    await tester.pump(const Duration(milliseconds: 300));
+    expect(find.byType(TeacherQuickActionsMenuDialog), findsOneWidget);
+    expect(tester.widget<AiraFloatingAssistant>(find.byType(AiraFloatingAssistant)).isVisible, isFalse);
 
-    // Squarish glass action tiles should be visible
-    expect(find.text('Create Quiz'), findsOneWidget);
-    expect(find.text('Announce'), findsOneWidget);
-    expect(find.text('Curriculum'), findsOneWidget);
-    expect(find.text('Schedule'), findsOneWidget);
-    expect(find.text('Live Scores'), findsOneWidget);
-    expect(find.text('Students'), findsOneWidget);
-    expect(find.text('Profile & Settings'), findsOneWidget);
+    // Second click: closes Quick Actions Hub and reappears floating assistant
+    final openAssistant = tester.widget<AiraFloatingAssistant>(find.byType(AiraFloatingAssistant));
+    openAssistant.onOpenMenu();
+    await tester.pump(const Duration(milliseconds: 300));
+    expect(find.byType(TeacherQuickActionsMenuDialog), findsNothing);
+    expect(tester.widget<AiraFloatingAssistant>(find.byType(AiraFloatingAssistant)).isVisible, isTrue);
 
-    // Tap Create Quiz tile
-    await tester.tap(find.text('Create Quiz'));
-    await tester.pumpAndSettle();
-    expect(createQuizTapped, isTrue);
-    expect(announceTapped, isFalse);
+    // Third click: opens Quick Actions Hub again
+    final reopenedAssistant = tester.widget<AiraFloatingAssistant>(find.byType(AiraFloatingAssistant));
+    reopenedAssistant.onOpenMenu();
+    await tester.pump(const Duration(milliseconds: 300));
+    expect(find.byType(TeacherQuickActionsMenuDialog), findsOneWidget);
+    expect(tester.widget<AiraFloatingAssistant>(find.byType(AiraFloatingAssistant)).isVisible, isFalse);
   });
 }
