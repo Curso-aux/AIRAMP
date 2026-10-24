@@ -212,12 +212,12 @@ class _SavedOfflineMaterialsModalState extends State<SavedOfflineMaterialsModal>
             child: Row(
               children: [
                 Container(
-                  padding: const EdgeInsets.all(10),
+                  padding: const EdgeInsets.all(8),
                   decoration: BoxDecoration(
-                    color: AppTheme.primary.withValues(alpha: 0.15),
-                    borderRadius: BorderRadius.circular(12),
+                    color: AppTheme.primary.withValues(alpha: 0.10),
+                    borderRadius: BorderRadius.circular(8),
                   ),
-                  child: Icon(Icons.folder_special_rounded, color: AppTheme.primary, size: 24),
+                  child: Icon(Icons.folder_outlined, color: AppTheme.primary, size: 20),
                 ),
                 const SizedBox(width: 12),
                 Expanded(
@@ -230,7 +230,7 @@ class _SavedOfflineMaterialsModalState extends State<SavedOfflineMaterialsModal>
                             child: Text(
                               'Offline Learning Materials',
                               style: TextStyle(
-                                fontSize: 17,
+                                fontSize: 16,
                                 fontWeight: FontWeight.bold,
                                 color: AppTheme.text,
                               ),
@@ -241,16 +241,16 @@ class _SavedOfflineMaterialsModalState extends State<SavedOfflineMaterialsModal>
                           Container(
                             padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                             decoration: BoxDecoration(
-                              color: AppTheme.success.withValues(alpha: 0.15),
+                              color: AppTheme.surfaceLight,
                               borderRadius: BorderRadius.circular(4),
-                              border: Border.all(color: AppTheme.success.withValues(alpha: 0.3)),
+                              border: Border.all(color: AppTheme.border),
                             ),
                             child: Text(
                               '100% Offline',
                               style: TextStyle(
                                 fontSize: 10,
-                                fontWeight: FontWeight.bold,
-                                color: AppTheme.success,
+                                fontWeight: FontWeight.w700,
+                                color: AppTheme.textSecondary,
                               ),
                             ),
                           ),
@@ -382,10 +382,10 @@ class _SavedOfflineMaterialsModalState extends State<SavedOfflineMaterialsModal>
                   child: Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      Icon(Icons.qr_code_scanner, size: 14, color: AppTheme.primary),
+                      Icon(Icons.dns_outlined, size: 14, color: AppTheme.primary),
                       const SizedBox(width: 4),
                       Text(
-                        'Sync More',
+                        'Download More',
                         style: TextStyle(
                           fontSize: 11.5,
                           fontWeight: FontWeight.bold,
@@ -675,77 +675,67 @@ class _SavedOfflineMaterialsModalState extends State<SavedOfflineMaterialsModal>
   Widget _buildEmptyState() {
     return Center(
       child: SingleChildScrollView(
-        padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 20),
+        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            // Decorative Glowing Backpack Icon
             Container(
-              width: 88,
-              height: 88,
+              width: 52,
+              height: 52,
               decoration: BoxDecoration(
-                color: AppTheme.primary.withValues(alpha: 0.12),
-                shape: BoxShape.circle,
-                border: Border.all(color: AppTheme.primary.withValues(alpha: 0.25), width: 2),
-                boxShadow: [
-                  BoxShadow(
-                    color: AppTheme.primary.withValues(alpha: 0.15),
-                    blurRadius: 18,
-                    spreadRadius: 2,
-                  ),
-                ],
+                color: AppTheme.surfaceLight,
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: AppTheme.border),
               ),
-              child: Icon(Icons.school_outlined, size: 44, color: AppTheme.primary),
+              child: Icon(Icons.inventory_2_outlined, size: 26, color: AppTheme.textSecondary),
             ),
-            const SizedBox(height: 18),
+            const SizedBox(height: 14),
 
-            // Badge
+            Text(
+              'No Offline Materials Saved',
+              style: TextStyle(
+                fontSize: 16,
+                fontWeight: FontWeight.w700,
+                color: AppTheme.text,
+                letterSpacing: -0.2,
+              ),
+            ),
+            const SizedBox(height: 6),
+            Text(
+              'No learning materials are currently saved on this device. Connect to the Classroom Hub to discover and download lesson modules, PDFs, and quizzes for zero-data study.',
+              textAlign: TextAlign.center,
+              style: TextStyle(fontSize: 12, color: AppTheme.textSecondary, height: 1.4),
+            ),
+            const SizedBox(height: 16),
+
+            // Station Hotspot Reminder Strip
             Container(
-              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+              width: double.infinity,
+              padding: const EdgeInsets.all(12),
               decoration: BoxDecoration(
-                color: AppTheme.success.withValues(alpha: 0.12),
-                borderRadius: BorderRadius.circular(20),
-                border: Border.all(color: AppTheme.success.withValues(alpha: 0.3)),
+                color: AppTheme.surfaceLight,
+                borderRadius: BorderRadius.circular(10),
+                border: Border.all(color: AppTheme.border),
               ),
               child: Row(
-                mainAxisSize: MainAxisSize.min,
                 children: [
-                  Icon(Icons.offline_pin, size: 14, color: AppTheme.success),
-                  const SizedBox(width: 5),
-                  Text(
-                    'ZERO DATA · 100% OFFLINE',
-                    style: TextStyle(
-                      fontSize: 10,
-                      fontWeight: FontWeight.bold,
-                      color: AppTheme.success,
-                      letterSpacing: 0.5,
+                  Icon(Icons.info_outline, size: 16, color: AppTheme.textSecondary),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      'Scan the QR code displayed on the physical Classroom Hub screen with your camera to connect, then open below to download materials.',
+                      style: TextStyle(fontSize: 11.5, color: AppTheme.textSecondary, height: 1.35),
                     ),
                   ),
                 ],
               ),
             ),
-            const SizedBox(height: 12),
+            const SizedBox(height: 16),
 
-            Text(
-              'Your Offline Backpack is Empty',
-              style: TextStyle(
-                fontSize: 19,
-                fontWeight: FontWeight.bold,
-                color: AppTheme.text,
-              ),
-            ),
-            const SizedBox(height: 8),
-            Text(
-              'Take your lessons anywhere. Connect to your teacher\'s ESP32 station to download modules, worksheets, and interactive quizzes for zero-data study.',
-              textAlign: TextAlign.center,
-              style: TextStyle(fontSize: 13, color: AppTheme.textSecondary, height: 1.45),
-            ),
-            const SizedBox(height: 22),
-
-            // Big CTA: Scan Classroom Hub QR
+            // Big CTA: Connect & Discover Materials
             SizedBox(
               width: double.infinity,
-              height: 50,
+              height: 44,
               child: ElevatedButton.icon(
                 onPressed: () {
                   if (widget.showHeader) {
@@ -757,47 +747,47 @@ class _SavedOfflineMaterialsModalState extends State<SavedOfflineMaterialsModal>
                     studentSection: widget.studentSection,
                   );
                 },
-                icon: const Icon(Icons.qr_code_scanner, size: 20),
+                icon: const Icon(Icons.dns_outlined, size: 17),
                 label: const Text(
-                  'Scan Classroom Hub QR',
-                  style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold),
+                  'Connect & Discover Materials',
+                  style: TextStyle(fontSize: 13.5, fontWeight: FontWeight.w700),
                 ),
                 style: ElevatedButton.styleFrom(
                   backgroundColor: AppTheme.primary,
                   foregroundColor: Colors.white,
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                  elevation: 2,
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                  elevation: 0,
                 ),
               ),
             ),
-            const SizedBox(height: 20),
+            const SizedBox(height: 16),
 
             // 3-Step Visual Guide
             Container(
-              padding: const EdgeInsets.all(14),
+              padding: const EdgeInsets.all(12),
               decoration: BoxDecoration(
-                color: AppTheme.background,
-                borderRadius: BorderRadius.circular(14),
+                color: AppTheme.surfaceLight,
+                borderRadius: BorderRadius.circular(10),
                 border: Border.all(color: AppTheme.border),
               ),
               child: Column(
                 children: [
                   _buildStudentStepRow(
-                    Icons.qr_code,
-                    '1. Point Camera at Teacher\'s QR',
-                    'Scans station credentials and section info instantly',
+                    Icons.wifi_tethering_outlined,
+                    '1. Connect to Classroom Hub',
+                    'Scan physical ESP32 screen with your phone\'s camera to connect',
                   ),
-                  const Divider(height: 16),
+                  const Divider(height: 14),
                   _buildStudentStepRow(
-                    Icons.bolt,
-                    '2. Ultra-Fast Offline Transfer',
-                    'Compressed files download over Wi-Fi in seconds',
+                    Icons.cloud_download_outlined,
+                    '2. Download Offline Modules',
+                    'Select and save lessons, PDFs, and diagnostic quizzes to phone storage',
                   ),
-                  const Divider(height: 16),
+                  const Divider(height: 14),
                   _buildStudentStepRow(
-                    Icons.menu_book,
-                    '3. Read & Take Quizzes Anywhere',
-                    'Open saved materials without cell signal or data load',
+                    Icons.menu_book_outlined,
+                    '3. Study Anywhere with Zero Data',
+                    'Browse, read, and take interactive quizzes anytime without internet',
                   ),
                 ],
               ),
@@ -816,12 +806,13 @@ class _SavedOfflineMaterialsModalState extends State<SavedOfflineMaterialsModal>
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
             Container(
-              padding: const EdgeInsets.all(16),
+              padding: const EdgeInsets.all(12),
               decoration: BoxDecoration(
-                color: AppTheme.primary.withValues(alpha: 0.1),
-                shape: BoxShape.circle,
+                color: AppTheme.surfaceLight,
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: AppTheme.border),
               ),
-              child: Icon(Icons.search_off_rounded, size: 40, color: AppTheme.primary),
+              child: Icon(Icons.search_off_rounded, size: 32, color: AppTheme.textSecondary),
             ),
             const SizedBox(height: 14),
             Text(
@@ -863,10 +854,11 @@ class _SavedOfflineMaterialsModalState extends State<SavedOfflineMaterialsModal>
         Container(
           padding: const EdgeInsets.all(6),
           decoration: BoxDecoration(
-            color: AppTheme.primary.withValues(alpha: 0.15),
-            borderRadius: BorderRadius.circular(8),
+            color: AppTheme.surface,
+            borderRadius: BorderRadius.circular(6),
+            border: Border.all(color: AppTheme.border),
           ),
-          child: Icon(icon, size: 16, color: AppTheme.primary),
+          child: Icon(icon, size: 15, color: AppTheme.textSecondary),
         ),
         const SizedBox(width: 10),
         Expanded(
@@ -875,12 +867,12 @@ class _SavedOfflineMaterialsModalState extends State<SavedOfflineMaterialsModal>
             children: [
               Text(
                 title,
-                style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.bold, color: AppTheme.text),
+                style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: AppTheme.text),
               ),
-              const SizedBox(height: 2),
+              const SizedBox(height: 1),
               Text(
                 subtitle,
-                style: TextStyle(fontSize: 11, color: AppTheme.textSecondary),
+                style: TextStyle(fontSize: 11, color: AppTheme.textMuted),
               ),
             ],
           ),

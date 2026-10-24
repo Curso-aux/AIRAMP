@@ -394,11 +394,20 @@ class _TeacherScheduleScreenState extends ConsumerState<TeacherScheduleScreen> {
                 child: filtered.isEmpty
                     ? Center(child: _buildEmptyState())
                     : (_viewMode == ScheduleViewMode.calendar
-                        ? ActualCalendarView(
-                            schedules: filtered,
-                            isTeacher: true,
-                            emptySubtitle: 'No assigned class schedules found.',
-                            onScheduleTap: (sched) => _showClassDetailModal(context, sched, isDark),
+                        ? RefreshIndicator(
+                            onRefresh: () async {
+                              await ref.read(teacherSchedulesProvider.notifier).reload();
+                            },
+                            child: SingleChildScrollView(
+                              physics: const AlwaysScrollableScrollPhysics(),
+                              padding: const EdgeInsets.only(bottom: 24),
+                              child: ActualCalendarView(
+                                schedules: filtered,
+                                isTeacher: true,
+                                emptySubtitle: 'No assigned class schedules found.',
+                                onScheduleTap: (sched) => _showClassDetailModal(context, sched, isDark),
+                              ),
+                            ),
                           )
                         : (_viewMode == ScheduleViewMode.grid
                             ? _buildTimetableGridMatrix(filtered, isDark)

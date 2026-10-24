@@ -586,11 +586,21 @@ class _StudentScheduleScreenState extends ConsumerState<StudentScheduleScreen> {
               // Main Content Area: Expands to cover the full viewport below without dead white space
               Expanded(
                 child: _viewMode == StudentScheduleViewMode.calendar
-                    ? ActualCalendarView(
-                        schedules: schedules,
-                        isStudent: true,
-                        emptySubtitle: 'No scheduled class periods for this section.',
-                        onScheduleTap: (sched) => _showClassDetailModal(context, sched, isDark, studentSection),
+                    ? RefreshIndicator(
+                        onRefresh: () async {
+                          ref.invalidate(sectionSchedulesProvider(studentSection));
+                          await ref.read(sectionSchedulesProvider(studentSection).future);
+                        },
+                        child: SingleChildScrollView(
+                          physics: const AlwaysScrollableScrollPhysics(),
+                          padding: const EdgeInsets.only(bottom: 24),
+                          child: ActualCalendarView(
+                            schedules: schedules,
+                            isStudent: true,
+                            emptySubtitle: 'No scheduled class periods for this section.',
+                            onScheduleTap: (sched) => _showClassDetailModal(context, sched, isDark, studentSection),
+                          ),
+                        ),
                       )
                     : (_viewMode == StudentScheduleViewMode.grid
                         ? _buildTimetableGridMatrix(schedules, isDark, studentSection)

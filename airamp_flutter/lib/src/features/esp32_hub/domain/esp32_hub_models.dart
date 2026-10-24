@@ -217,7 +217,8 @@ class HubQrPayload {
     String sec = 'Grade 10';
     String ip = '192.168.4.1';
 
-    final ssidMatch = RegExp(r'WIFI:S:([^;]+);').firstMatch(raw);
+    final ssidMatch = RegExp(r'[;:]S:([^;]+);').firstMatch(raw) ??
+        RegExp(r'WIFI:S:([^;]+);').firstMatch(raw);
     if (ssidMatch != null && ssidMatch.group(1) != null) {
       ssid = ssidMatch.group(1)!;
     }

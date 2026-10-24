@@ -237,7 +237,7 @@ class _StudentHomeScreenState extends ConsumerState<StudentHomeScreen> {
                     width: 1,
                   ),
                 ),
-                child: Icon(Icons.qr_code_scanner_rounded, color: AppTheme.primary, size: 22),
+                child: Icon(Icons.wifi_tethering_rounded, color: AppTheme.primary, size: 22),
               ),
               const SizedBox(width: 14),
               Expanded(
@@ -270,7 +270,7 @@ class _StudentHomeScreenState extends ConsumerState<StudentHomeScreen> {
                             ),
                           ),
                           child: Text(
-                            'No Wi-Fi Needed',
+                            'Zero Mobile Data',
                             style: TextStyle(
                               color: AppTheme.primary,
                               fontSize: 10,
@@ -283,7 +283,7 @@ class _StudentHomeScreenState extends ConsumerState<StudentHomeScreen> {
                     ),
                     const SizedBox(height: 5),
                     Text(
-                      'Download lesson modules and sync quiz answers completely offline using your teacher\'s QR code.',
+                      'Scan the QR code displayed on the physical Classroom Hub screen with your camera to connect, then open here to access materials.',
                       style: TextStyle(
                         fontSize: 12,
                         color: AppTheme.textSecondary,
@@ -295,7 +295,7 @@ class _StudentHomeScreenState extends ConsumerState<StudentHomeScreen> {
               ),
             ],
           ),
-          const SizedBox(height: 16),
+          const SizedBox(height: 14),
           ValueListenableBuilder<List<HubMaterialItem>>(
             valueListenable: SavedMaterialsService.instance.savedMaterialsNotifier,
             builder: (context, savedList, _) {
@@ -311,7 +311,7 @@ class _StudentHomeScreenState extends ConsumerState<StudentHomeScreen> {
                           studentSection: currentUser.section,
                         );
                       },
-                      icon: Icon(Icons.folder_special_outlined, size: 16, color: AppTheme.primary),
+                      icon: Icon(Icons.folder_outlined, size: 16, color: AppTheme.primary),
                       label: FittedBox(
                         fit: BoxFit.scaleDown,
                         child: Text(
@@ -344,11 +344,11 @@ class _StudentHomeScreenState extends ConsumerState<StudentHomeScreen> {
                           },
                         );
                       },
-                      icon: const Icon(Icons.qr_code_scanner_rounded, size: 16),
+                      icon: const Icon(Icons.dns_outlined, size: 16),
                       label: const FittedBox(
                         fit: BoxFit.scaleDown,
                         child: Text(
-                          'Scan QR',
+                          'Access Materials',
                           style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
                         ),
                       ),

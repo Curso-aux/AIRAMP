@@ -1737,8 +1737,8 @@ class _TeacherProfileScreenState extends ConsumerState<TeacherProfileScreen>
               ),
               const SizedBox(height: 10),
               _buildHelpItem(
-                title: 'ESP32 Station Hotspot',
-                desc: 'Ensure your device is connected to the classroom AIRAMP-HUB Access Point to distribute lesson materials and activate timed quizzes.',
+                title: 'ESP32 Classroom Hub',
+                desc: 'Ensure your device is connected to the Classroom Hub Wi-Fi (scan the QR code on the physical ESP32 screen) to distribute lesson materials and activate timed quizzes.',
               ),
             ],
           ),

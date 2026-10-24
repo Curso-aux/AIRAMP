@@ -191,14 +191,24 @@ class _ActualCalendarViewState extends State<ActualCalendarView> {
         }
 
         // Mobile / Compact Layout: Stacked
-        return Column(
+        final mobileContent = Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             _buildCalendarCard(isDark),
-            const SizedBox(height: 20),
+            const SizedBox(height: 14),
             _buildDaySchedulePanel(selectedDaySchedules, isDark),
           ],
         );
+
+        if (constraints.maxHeight.isFinite) {
+          return SingleChildScrollView(
+            physics: const AlwaysScrollableScrollPhysics(),
+            padding: const EdgeInsets.only(bottom: 24),
+            child: mobileContent,
+          );
+        }
+
+        return mobileContent;
       },
     );
   }
@@ -645,9 +655,9 @@ class _ActualCalendarViewState extends State<ActualCalendarView> {
               ],
             ],
           ),
-          const SizedBox(height: 16),
+          const SizedBox(height: 10),
           const Divider(height: 1),
-          const SizedBox(height: 16),
+          const SizedBox(height: 10),
 
           // Schedules List or Empty State
           if (schedules.isEmpty)
@@ -671,21 +681,21 @@ class _ActualCalendarViewState extends State<ActualCalendarView> {
   Widget _buildDayEmptyState(String dayOfWeek) {
     return Container(
       width: double.infinity,
-      padding: const EdgeInsets.symmetric(vertical: 36, horizontal: 20),
+      padding: const EdgeInsets.symmetric(vertical: 20, horizontal: 16),
       child: Center(
         child: Column(
           children: [
-            Icon(Icons.event_busy_rounded, size: 48, color: AppTheme.textMuted),
-            const SizedBox(height: 12),
+            Icon(Icons.event_busy_rounded, size: 38, color: AppTheme.textMuted),
+            const SizedBox(height: 10),
             Text(
               'No Classes on $dayOfWeek',
               style: TextStyle(
-                fontSize: 16,
+                fontSize: 15,
                 fontWeight: FontWeight.bold,
                 color: AppTheme.text,
               ),
             ),
-            const SizedBox(height: 6),
+            const SizedBox(height: 4),
             Text(
               widget.emptySubtitle ?? 'There are no recurring class schedules assigned for this day of the week.',
               textAlign: TextAlign.center,

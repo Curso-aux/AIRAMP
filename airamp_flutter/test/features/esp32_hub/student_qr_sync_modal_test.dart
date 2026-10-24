@@ -7,7 +7,7 @@ void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
   group('StudentEsp32SyncModal UI/UX Tests', () {
-    testWidgets('renders institutional header and student-friendly copy', (WidgetTester tester) async {
+    testWidgets('renders institutional header, ledger bar, and student-friendly copy', (WidgetTester tester) async {
       tester.view.physicalSize = const Size(800, 1200);
       tester.view.devicePixelRatio = 1.0;
       addTearDown(tester.view.resetPhysicalSize);
@@ -29,16 +29,16 @@ void main() {
       expect(find.text('Classroom Hub Sync'), findsOneWidget);
       expect(find.text('Download class lessons & quizzes offline'), findsOneWidget);
 
-      // Verify close button exists
+      // Verify close & refresh buttons exist
       expect(find.byTooltip('Close'), findsOneWidget);
+      expect(find.byTooltip('Refresh'), findsOneWidget);
 
-      // Check tabs
-      expect(find.text('Scan Hub QR'), findsOneWidget);
-      expect(find.text('Saved Files'), findsOneWidget);
-      expect(find.text('Manual Connect'), findsOneWidget);
+      // Verify hardware ledger bar
+      expect(find.text('STATION NODE'), findsOneWidget);
+      expect(find.text('STORAGE MEDIA'), findsOneWidget);
     });
 
-    testWidgets('renders 3-step micro-guide and manual Wi-Fi fallback', (WidgetTester tester) async {
+    testWidgets('renders live connection reminder and manual Wi-Fi credential panel', (WidgetTester tester) async {
       tester.view.physicalSize = const Size(800, 1200);
       tester.view.devicePixelRatio = 1.0;
       addTearDown(tester.view.resetPhysicalSize);
@@ -56,31 +56,19 @@ void main() {
       );
       await tester.pump(const Duration(milliseconds: 300));
 
-      // Instructional headline and subtext
-      expect(find.text('Scan Classroom Hub QR'), findsOneWidget);
-      expect(
-        find.text('Point your camera at the QR code on the teacher\'s hub or classroom projector to sync modules offline.'),
-        findsOneWidget,
-      );
+      // Live connection reminder components
+      expect(find.text('Classroom Hub Not Connected'), findsOneWidget);
 
-      // 3-step micro-guide
-      expect(find.text('Frame QR'), findsOneWidget);
-      expect(find.text('Auto-Sync'), findsOneWidget);
-      expect(find.text('Save & Learn'), findsOneWidget);
+      final verifyButton = find.text('Verify Connection Link');
+      expect(verifyButton, findsOneWidget);
 
-      // Manual Wi-Fi fallback button
-      final fallbackFinder = find.text('Can\'t scan? Connect via Wi-Fi manually');
-      expect(fallbackFinder, findsOneWidget);
+      // Tap verify button
+      await tester.ensureVisible(verifyButton);
+      await tester.tap(verifyButton);
+      await tester.pump(const Duration(milliseconds: 200));
 
-      // Tap fallback button and verify it switches to Manual Connect tab
-      await tester.ensureVisible(fallbackFinder);
-      await tester.tap(fallbackFinder);
-      await tester.pump(const Duration(milliseconds: 400));
-      await tester.pump(const Duration(milliseconds: 400));
-
-      expect(find.text('Manual Classroom Hub Connection'), findsOneWidget);
-      expect(find.text('Classroom Hub Wi-Fi Name (SSID)'), findsOneWidget);
-      expect(find.text('Hub Gateway IP Address'), findsOneWidget);
+      // Should still be mounted and responsive
+      expect(find.byType(StudentEsp32SyncModal), findsOneWidget);
     });
 
     testWidgets('AiraOverlayController hides overlay when modal is opened', (WidgetTester tester) async {

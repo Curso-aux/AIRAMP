@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/components/app_toast.dart';
@@ -6,11 +7,10 @@ import '../../../core/database/database_helper.dart';
 import '../domain/esp32_hub_models.dart';
 import '../data/saved_materials_service.dart';
 import '../data/esp32_client_service.dart';
-import 'components/qr_viewfinder_widget.dart';
 import 'saved_offline_materials_modal.dart';
 
-/// Modal bottom sheet for students to scan the teacher's classroom QR code with the camera,
-/// discover learning materials from the offline Classroom Hub, and save them offline.
+/// Modal bottom sheet for students to discover learning materials from the offline
+/// Classroom Hub and save them offline for zero-data studying.
 class StudentEsp32SyncModal extends StatefulWidget {
   final String studentName;
   final String? studentSection;
@@ -50,16 +50,23 @@ class StudentEsp32SyncModal extends StatefulWidget {
   State<StudentEsp32SyncModal> createState() => _StudentEsp32SyncModalState();
 }
 
-enum _SyncStep { scan, connecting, wifiPrompt, manifest, downloading, done }
+enum _SyncStep { manifest, downloading, done }
 
-class _StudentEsp32SyncModalState extends State<StudentEsp32SyncModal>
-    with SingleTickerProviderStateMixin {
-  late TabController _tabController;
-  _SyncStep _currentStep = _SyncStep.scan;
-  final TextEditingController _ipController = TextEditingController(text: '192.168.4.1');
-  final TextEditingController _ssidController = TextEditingController(text: 'AIRAMP-HUB-01');
+class _StudentEsp32SyncModalState extends State<StudentEsp32SyncModal> {
+  _SyncStep _currentStep = _SyncStep.manifest;
 
-  HubQrPayload? _scannedPayload;
+  Esp32HubStatus _hubStatus = const Esp32HubStatus(
+    isDevKitConnected: false,
+    isSdCardDetected: false,
+    ssid: 'AIRAMP-HUB-01',
+    ipAddress: '192.168.4.1',
+    password: 'aira1234',
+  );
+
+  Timer? _hubPollTimer;
+  bool _isCheckingHub = false;
+  bool _isDownloading = false;
+
   HubSyncManifest? _manifest;
   List<HubMaterialItem> _itemsToDownload = [];
   Set<String> _selectedItemIds = {};
@@ -67,7 +74,6 @@ class _StudentEsp32SyncModalState extends State<StudentEsp32SyncModal>
   int _completedDownloads = 0;
   String _activeDownloadTitle = '';
   double _overallProgress = 0.0;
-  bool _isReconnecting = false;
 
   int get _selectedTotalBytes {
     if (_manifest == null) return 0;
@@ -120,127 +126,81 @@ class _StudentEsp32SyncModalState extends State<StudentEsp32SyncModal>
   IconData _getCategoryIcon(String category) {
     switch (category) {
       case 'pdf':
-        return Icons.picture_as_pdf_rounded;
+        return Icons.picture_as_pdf_outlined;
       case 'html':
-        return Icons.language_rounded;
+        return Icons.language_outlined;
       case 'quiz':
-        return Icons.assignment_turned_in_rounded;
+        return Icons.assignment_outlined;
       case 'doc':
-        return Icons.description_rounded;
+        return Icons.description_outlined;
       case 'module':
       default:
-        return Icons.menu_book_rounded;
+        return Icons.menu_book_outlined;
     }
-  }
-
-  Color _getCategoryColor(String category) {
-    switch (category) {
-      case 'pdf':
-        return const Color(0xFFEF4444);
-      case 'html':
-        return const Color(0xFF3B82F6);
-      case 'quiz':
-        return const Color(0xFFF59E0B);
-      case 'doc':
-        return const Color(0xFF6366F1);
-      case 'module':
-      default:
-        return AppTheme.primary;
-    }
-  }
-
-  Color _getFileColor(HubMaterialItem item) {
-    return _getCategoryColor(_getItemCategory(item));
-  }
-
-  IconData _getFileIcon(HubMaterialItem item) {
-    return _getCategoryIcon(_getItemCategory(item));
   }
 
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 3, vsync: this);
+    _refreshHubStatus();
+
+    // Auto-detect connection to ESP32 Wi-Fi every 3 seconds so the student
+    // automatically syncs with the hub as soon as their phone joins the hub Wi-Fi
+    _hubPollTimer = Timer.periodic(const Duration(seconds: 3), (_) {
+      if (mounted && !_isCheckingHub && !_isDownloading) {
+        _refreshHubStatus(silent: true);
+      }
+    });
   }
 
   @override
   void dispose() {
-    _tabController.dispose();
-    _ipController.dispose();
-    _ssidController.dispose();
+    _hubPollTimer?.cancel();
     super.dispose();
   }
 
-  /// Handles real connection attempt with the ESP32 Hub
-  Future<void> _processHubConnection(String sourceInfo) async {
-    final payload = HubQrPayload.parse(sourceInfo);
-    _scannedPayload = payload;
-    _ipController.text = payload.ipAddress;
-    _ssidController.text = payload.ssid;
-
-    setState(() {
-      _currentStep = _SyncStep.connecting;
-      _isReconnecting = false;
-    });
-
-    // Step 1: Ping the ESP32 Hub (Triggers buzzer chime on hardware)
-    final pingResult = await Esp32ClientService.instance.ping(payload.ipAddress);
-
-    if (!mounted) return;
-
-    if (pingResult == null) {
-      // Could not connect to ESP32 (Phone is likely not connected to the ESP32's Wi-Fi hotspot)
-      setState(() {
-        _currentStep = _SyncStep.wifiPrompt;
-      });
-      return;
+  /// Pings the ESP32 to check connection and load available classroom materials from MicroSD
+  Future<void> _refreshHubStatus({bool silent = false}) async {
+    if (!silent) {
+      setState(() => _isCheckingHub = true);
     }
 
-    // Step 2: Fetch the real curriculum manifest from the ESP32
-    final manifest = await Esp32ClientService.instance.fetchManifest(
-      payload.ipAddress,
-      qrPayload: payload.raw,
-    );
+    try {
+      final wasConnected = _hubStatus.isDevKitConnected;
+      final status = await Esp32ClientService.instance.checkHubStatus('192.168.4.1');
 
-    if (!mounted) return;
-
-    if (manifest != null && manifest.items.isNotEmpty) {
-      setState(() {
-        _manifest = manifest;
-        _itemsToDownload = List.from(manifest.items);
-        _selectedItemIds = manifest.items.map((e) => e.id).toSet();
-        _selectedTypeFilter = 'all';
-        _currentStep = _SyncStep.manifest;
-      });
-
-      AppToast.showSuccess(
-        context,
-        'Connected to ${manifest.hubName}! ${manifest.items.length} materials ready.',
-      );
-    } else {
-      // Manifest returned empty or SD card had no files
-      final fallbackManifest = HubSyncManifest(
-        hubId: 'AIRAMP-HUB-01',
-        hubName: 'AIRA Offline Classroom Hub',
-        teacherName: 'Classroom Instructor',
-        sectionName: payload.sectionName,
-        generatedAt: DateTime.now().toIso8601String(),
-        items: [],
-        qrPayload: payload.raw,
-      );
+      if (!mounted) return;
 
       setState(() {
-        _manifest = fallbackManifest;
-        _itemsToDownload = [];
-        _selectedItemIds = {};
-        _selectedTypeFilter = 'all';
-        _currentStep = _SyncStep.manifest;
+        _hubStatus = status;
+        if (!silent) _isCheckingHub = false;
       });
 
-      AppToast.showInfo(
-        context,
-        'Connected to ESP32 Hub! No files currently in manifest.',
-      );
+      if (status.isDevKitConnected) {
+        final manifest = await Esp32ClientService.instance.fetchManifest(status.ipAddress);
+        if (!mounted) return;
+        if (manifest != null) {
+          setState(() {
+            _manifest = manifest;
+            if (_selectedItemIds.isEmpty && manifest.items.isNotEmpty) {
+              _selectedItemIds = manifest.items.map((e) => e.id).toSet();
+            }
+          });
+        }
+
+        if (!wasConnected && mounted) {
+          AppToast.showSuccess(
+            context,
+            'Connected to Classroom Hub! ${manifest?.items.length ?? 0} materials ready.',
+          );
+        }
+      }
+    } catch (e) {
+      debugPrint('[StudentEsp32SyncModal] _refreshHubStatus error: $e');
+    } finally {
+      if (mounted && !silent && _isCheckingHub) {
+        setState(() => _isCheckingHub = false);
+      }
     }
   }
 
@@ -257,11 +217,12 @@ class _StudentEsp32SyncModalState extends State<StudentEsp32SyncModal>
       return;
     }
 
-    final ip = _scannedPayload?.ipAddress ?? _ipController.text;
+    final ip = _hubStatus.ipAddress;
 
     setState(() {
       _itemsToDownload = List.from(targets);
       _currentStep = _SyncStep.downloading;
+      _isDownloading = true;
       _completedDownloads = 0;
       _overallProgress = 0.0;
     });
@@ -310,7 +271,7 @@ class _StudentEsp32SyncModalState extends State<StudentEsp32SyncModal>
       await DatabaseHelper().createNotification(
         userId: widget.studentName,
         type: 'offline_sync',
-        title: 'Offline Sync Complete 📦',
+        title: 'Offline Sync Complete',
         message: '${savedResults.length} learning materials saved offline. Ready to study without internet.',
         targetRoute: '/student/home',
       );
@@ -319,6 +280,7 @@ class _StudentEsp32SyncModalState extends State<StudentEsp32SyncModal>
     if (!mounted) return;
     setState(() {
       _currentStep = _SyncStep.done;
+      _isDownloading = false;
       _overallProgress = 1.0;
     });
 
@@ -329,6 +291,15 @@ class _StudentEsp32SyncModalState extends State<StudentEsp32SyncModal>
     widget.onSyncCompleted?.call();
   }
 
+  /// Opens the offline material reader dialog for quick viewing
+  void _openReader(HubMaterialItem item) {
+    showDialog(
+      context: context,
+      barrierDismissible: true,
+      builder: (ctx) => OfflineMaterialReaderDialog(item: item),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final size = MediaQuery.of(context).size;
@@ -337,34 +308,34 @@ class _StudentEsp32SyncModalState extends State<StudentEsp32SyncModal>
       height: size.height * 0.90,
       decoration: BoxDecoration(
         color: AppTheme.surface,
-        borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+        borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
         border: Border.all(color: AppTheme.border),
       ),
       child: Column(
         children: [
           // Drag Handle
           Container(
-            margin: const EdgeInsets.only(top: 12, bottom: 8),
-            width: 44,
-            height: 4.5,
+            margin: const EdgeInsets.only(top: 10, bottom: 6),
+            width: 36,
+            height: 4,
             decoration: BoxDecoration(
               color: AppTheme.border,
-              borderRadius: BorderRadius.circular(3),
+              borderRadius: BorderRadius.circular(2),
             ),
           ),
 
           // Header
           Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+            padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 8),
             child: Row(
               children: [
                 Container(
-                  padding: const EdgeInsets.all(10),
+                  padding: const EdgeInsets.all(8),
                   decoration: BoxDecoration(
-                    color: AppTheme.primary.withValues(alpha: 0.12),
-                    borderRadius: BorderRadius.circular(12),
+                    color: AppTheme.primary.withValues(alpha: 0.1),
+                    borderRadius: BorderRadius.circular(8),
                   ),
-                  child: Icon(Icons.qr_code_scanner_rounded, color: AppTheme.primary, size: 24),
+                  child: Icon(Icons.dns_outlined, color: AppTheme.primary, size: 20),
                 ),
                 const SizedBox(width: 12),
                 Expanded(
@@ -374,22 +345,74 @@ class _StudentEsp32SyncModalState extends State<StudentEsp32SyncModal>
                       Text(
                         'Classroom Hub Sync',
                         style: TextStyle(
-                          fontSize: 18,
-                          fontWeight: FontWeight.bold,
+                          fontSize: 16,
+                          fontWeight: FontWeight.w700,
                           color: AppTheme.text,
+                          letterSpacing: -0.2,
                         ),
                       ),
-                      const SizedBox(height: 2),
+                      const SizedBox(height: 1),
                       Text(
                         'Download class lessons & quizzes offline',
-                        style: TextStyle(fontSize: 12, color: AppTheme.textSecondary),
+                        style: TextStyle(fontSize: 11.5, color: AppTheme.textSecondary),
                       ),
                     ],
                   ),
                 ),
+                // Saved Files Shortcut Pill
+                ValueListenableBuilder<List<HubMaterialItem>>(
+                  valueListenable: SavedMaterialsService.instance.savedMaterialsNotifier,
+                  builder: (context, savedList, _) {
+                    return InkWell(
+                      onTap: () {
+                        SavedOfflineMaterialsModal.show(
+                          context,
+                          studentName: widget.studentName,
+                          studentSection: widget.studentSection,
+                        );
+                      },
+                      borderRadius: BorderRadius.circular(6),
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
+                        decoration: BoxDecoration(
+                          color: AppTheme.surfaceLight,
+                          borderRadius: BorderRadius.circular(6),
+                          border: Border.all(color: AppTheme.border),
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(Icons.folder_outlined, size: 14, color: AppTheme.textSecondary),
+                            const SizedBox(width: 4),
+                            Text(
+                              'Saved (${savedList.length})',
+                              style: TextStyle(
+                                fontSize: 11,
+                                fontWeight: FontWeight.w600,
+                                color: AppTheme.textSecondary,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    );
+                  },
+                ),
+                const SizedBox(width: 6),
+                IconButton(
+                  tooltip: 'Refresh',
+                  icon: _isCheckingHub
+                      ? const SizedBox(
+                          width: 16,
+                          height: 16,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        )
+                      : Icon(Icons.refresh, color: AppTheme.textMuted, size: 20),
+                  onPressed: _isCheckingHub ? null : () => _refreshHubStatus(silent: false),
+                ),
                 IconButton(
                   tooltip: 'Close',
-                  icon: Icon(Icons.close_rounded, color: AppTheme.textMuted),
+                  icon: Icon(Icons.close, color: AppTheme.textMuted, size: 20),
                   onPressed: () => Navigator.pop(context),
                 ),
               ],
@@ -398,7 +421,137 @@ class _StudentEsp32SyncModalState extends State<StudentEsp32SyncModal>
 
           const Divider(height: 1),
 
-          // Content based on step
+          // Live Hardware Ledger Bar
+          Container(
+            margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+            decoration: BoxDecoration(
+              color: AppTheme.surfaceLight,
+              borderRadius: BorderRadius.circular(10),
+              border: Border.all(color: AppTheme.border),
+            ),
+            child: Row(
+              children: [
+                // Station Node
+                Container(
+                  width: 8,
+                  height: 8,
+                  decoration: BoxDecoration(
+                    color: _hubStatus.isDevKitConnected ? AppTheme.success : AppTheme.textMuted,
+                    shape: BoxShape.circle,
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'STATION NODE',
+                        style: TextStyle(
+                          fontSize: 9.5,
+                          fontWeight: FontWeight.w700,
+                          color: AppTheme.textMuted,
+                          letterSpacing: 0.5,
+                        ),
+                      ),
+                      const SizedBox(height: 1),
+                      Text(
+                        _hubStatus.isDevKitConnected
+                            ? 'Online'
+                            : 'Standby',
+                        style: TextStyle(
+                          fontSize: 11.5,
+                          fontWeight: FontWeight.w600,
+                          color: _hubStatus.isDevKitConnected ? AppTheme.success : AppTheme.text,
+                        ),
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ],
+                  ),
+                ),
+                Container(height: 22, width: 1, color: AppTheme.border),
+                const SizedBox(width: 12),
+                // Storage Media
+                Container(
+                  width: 8,
+                  height: 8,
+                  decoration: BoxDecoration(
+                    color: _hubStatus.isSdCardDetected
+                        ? AppTheme.success
+                        : (_hubStatus.isDevKitConnected ? AppTheme.warning : AppTheme.textMuted),
+                    shape: BoxShape.circle,
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'STORAGE MEDIA',
+                        style: TextStyle(
+                          fontSize: 9.5,
+                          fontWeight: FontWeight.w700,
+                          color: AppTheme.textMuted,
+                          letterSpacing: 0.5,
+                        ),
+                      ),
+                      const SizedBox(height: 1),
+                      Text(
+                        _hubStatus.isSdCardDetected
+                            ? (_hubStatus.totalStorageBytes > 0 ? _hubStatus.formattedTotalStorage : 'Mounted & Ready')
+                            : (_hubStatus.isDevKitConnected ? 'Card Standby' : 'Standby'),
+                        style: TextStyle(
+                          fontSize: 11.5,
+                          fontWeight: FontWeight.w600,
+                          color: _hubStatus.isSdCardDetected ? AppTheme.text : AppTheme.textMuted,
+                        ),
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ],
+                  ),
+                ),
+                if (_hubStatus.isDevKitConnected) ...[
+                  const SizedBox(width: 6),
+                  InkWell(
+                    onTap: () async {
+                      AppToast.showInfo(context, 'Pinging hub...');
+                      final ping = await Esp32ClientService.instance.ping(_hubStatus.ipAddress);
+                      if (!context.mounted) return;
+                      if (ping != null) {
+                        AppToast.showSuccess(context, '192.168.4.1 online');
+                      } else {
+                        AppToast.showError(context, 'No response from ${_hubStatus.ipAddress}');
+                      }
+                    },
+                    borderRadius: BorderRadius.circular(6),
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 4),
+                      decoration: BoxDecoration(
+                        color: AppTheme.surface,
+                        borderRadius: BorderRadius.circular(6),
+                        border: Border.all(color: AppTheme.border),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(Icons.flash_on, size: 12, color: AppTheme.primary),
+                          const SizedBox(width: 2),
+                          Text(
+                            'Ping',
+                            style: TextStyle(fontSize: 10, fontWeight: FontWeight.w700, color: AppTheme.primary),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ],
+              ],
+            ),
+          ),
+
+          // Content body based on current step
           Expanded(
             child: _buildBody(),
           ),
@@ -409,12 +562,6 @@ class _StudentEsp32SyncModalState extends State<StudentEsp32SyncModal>
 
   Widget _buildBody() {
     switch (_currentStep) {
-      case _SyncStep.scan:
-        return _buildScanView();
-      case _SyncStep.connecting:
-        return _buildConnectingView();
-      case _SyncStep.wifiPrompt:
-        return _buildWifiPromptView();
       case _SyncStep.manifest:
         return _buildManifestView();
       case _SyncStep.downloading:
@@ -424,466 +571,130 @@ class _StudentEsp32SyncModalState extends State<StudentEsp32SyncModal>
     }
   }
 
-  Widget _buildScanView() {
-    return Column(
-      children: [
-        ValueListenableBuilder<List<HubMaterialItem>>(
-          valueListenable: SavedMaterialsService.instance.savedMaterialsNotifier,
-          builder: (context, savedList, _) {
-            final count = savedList.length;
-            return TabBar(
-              controller: _tabController,
-              labelColor: AppTheme.primary,
-              unselectedLabelColor: AppTheme.textMuted,
-              indicatorColor: AppTheme.primary,
-              indicatorWeight: 3,
-              tabs: [
-                const Tab(icon: Icon(Icons.camera_alt_outlined, size: 20), text: 'Scan Hub QR'),
-                Tab(
-                  icon: const Icon(Icons.folder_special_rounded, size: 20),
-                  text: count > 0 ? 'Saved ($count)' : 'Saved Files',
-                ),
-                const Tab(icon: Icon(Icons.wifi_rounded, size: 20), text: 'Manual Connect'),
-              ],
-            );
-          },
+  /// Live connection reminder card shown at the top of the material view
+  Widget _buildLiveConnectionReminder() {
+    if (_hubStatus.isDevKitConnected) {
+      return Container(
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+        decoration: BoxDecoration(
+          color: AppTheme.surfaceLight,
+          borderRadius: BorderRadius.circular(10),
+          border: Border.all(color: AppTheme.border),
         ),
-        Expanded(
-          child: TabBarView(
-            controller: _tabController,
-            children: [
-              // Tab 1: Real Camera QR Viewfinder
-              SingleChildScrollView(
-                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
-                child: Column(
-                  children: [
-                    QrViewfinderWidget(
-                      statusText: 'Align Teacher\'s QR Code inside frame',
-                      onScanned: (qrCode) {
-                        _processHubConnection(qrCode);
-                      },
-                    ),
-                    const SizedBox(height: 18),
-                    Text(
-                      'Scan Classroom Hub QR',
-                      style: TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.w700,
-                        color: AppTheme.text,
-                        letterSpacing: -0.2,
-                      ),
-                    ),
-                    const SizedBox(height: 4),
-                    Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 16),
-                      child: Text(
-                        'Point your camera at the QR code on the teacher\'s hub or classroom projector to sync modules offline.',
-                        textAlign: TextAlign.center,
+        child: Row(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(7),
+              decoration: BoxDecoration(
+                color: AppTheme.success.withValues(alpha: 0.12),
+                shape: BoxShape.circle,
+              ),
+              child: Icon(Icons.check_circle_outline, size: 16, color: AppTheme.success),
+            ),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Text(
+                        'Hub Connected',
                         style: TextStyle(
                           fontSize: 12.5,
-                          height: 1.35,
-                          color: AppTheme.textSecondary,
+                          fontWeight: FontWeight.w700,
+                          color: AppTheme.text,
                         ),
                       ),
-                    ),
-                    const SizedBox(height: 18),
-                    _buildSyncStepsGuide(),
-                    const SizedBox(height: 14),
-                    OutlinedButton.icon(
-                      onPressed: () => _tabController.animateTo(2),
-                      icon: const Icon(Icons.wifi_find_rounded, size: 16),
-                      label: const Text('Can\'t scan? Connect via Wi-Fi manually'),
-                      style: OutlinedButton.styleFrom(
-                        foregroundColor: AppTheme.textSecondary,
-                        side: BorderSide(color: AppTheme.border),
-                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                        textStyle: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
+                      const SizedBox(width: 6),
+                      Text(
+                        '(${_hubStatus.ipAddress})',
+                        style: TextStyle(fontSize: 11, color: AppTheme.textMuted),
                       ),
-                    ),
-                    ValueListenableBuilder<List<HubMaterialItem>>(
-                      valueListenable: SavedMaterialsService.instance.savedMaterialsNotifier,
-                      builder: (context, savedList, _) {
-                        if (savedList.isEmpty) return const SizedBox.shrink();
-                        return Container(
-                          margin: const EdgeInsets.only(top: 14),
-                          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-                          decoration: BoxDecoration(
-                            color: AppTheme.primary.withValues(alpha: 0.06),
-                            borderRadius: BorderRadius.circular(12),
-                            border: Border.all(color: AppTheme.primary.withValues(alpha: 0.2)),
-                          ),
-                          child: Row(
-                            children: [
-                              Container(
-                                padding: const EdgeInsets.all(8),
-                                decoration: BoxDecoration(
-                                  color: AppTheme.primary.withValues(alpha: 0.12),
-                                  borderRadius: BorderRadius.circular(8),
-                                ),
-                                child: Icon(Icons.folder_special_rounded, color: AppTheme.primary, size: 20),
-                              ),
-                              const SizedBox(width: 12),
-                              Expanded(
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    Text(
-                                      'Saved Materials (${savedList.length})',
-                                      style: TextStyle(
-                                        fontSize: 13,
-                                        fontWeight: FontWeight.w700,
-                                        color: AppTheme.text,
-                                      ),
-                                    ),
-                                    const SizedBox(height: 1),
-                                    Text(
-                                      'Review downloaded lessons and quizzes offline',
-                                      style: TextStyle(fontSize: 11, color: AppTheme.textSecondary),
-                                    ),
-                                  ],
-                                ),
-                              ),
-                              TextButton(
-                                onPressed: () => _tabController.animateTo(1),
-                                style: TextButton.styleFrom(
-                                  foregroundColor: AppTheme.primary,
-                                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                                  minimumSize: const Size(0, 32),
-                                  tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                                ),
-                                child: const Row(
-                                  mainAxisSize: MainAxisSize.min,
-                                  children: [
-                                    Text('Open', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
-                                    SizedBox(width: 2),
-                                    Icon(Icons.chevron_right_rounded, size: 16),
-                                  ],
-                                ),
-                              ),
-                            ],
-                          ),
-                        );
-                      },
-                    ),
-                  ],
+                    ],
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    'Station reachable. Select materials below to download directly to your device.',
+                    style: TextStyle(fontSize: 11, color: AppTheme.textSecondary),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+
+    return Container(
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: AppTheme.surfaceLight,
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: AppTheme.border),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                width: 7,
+                height: 7,
+                decoration: BoxDecoration(
+                  color: AppTheme.warning,
+                  shape: BoxShape.circle,
                 ),
               ),
-
-              // Tab 2: Saved Learning Materials Embedded View
-              SavedOfflineMaterialsModal(
-                studentName: widget.studentName,
-                studentSection: widget.studentSection,
-                showHeader: false,
-              ),
-
-              // Tab 3: Manual Wi-Fi Connect
-              SingleChildScrollView(
-                padding: const EdgeInsets.all(20),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      'Manual Classroom Hub Connection',
-                      style: TextStyle(
-                        fontSize: 15,
-                        fontWeight: FontWeight.bold,
-                        color: AppTheme.text,
-                      ),
-                    ),
-                    const SizedBox(height: 4),
-                    Text(
-                      'If camera is unavailable, connect your phone to the Classroom Hub Wi-Fi hotspot in your device settings, then tap Connect below:',
-                      style: TextStyle(fontSize: 12, color: AppTheme.textSecondary),
-                    ),
-                    const SizedBox(height: 16),
-                    TextField(
-                      controller: _ssidController,
-                      decoration: InputDecoration(
-                        labelText: 'Classroom Hub Wi-Fi Name (SSID)',
-                        prefixIcon: const Icon(Icons.wifi_rounded),
-                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
-                      ),
-                    ),
-                    const SizedBox(height: 12),
-                    TextField(
-                      controller: _ipController,
-                      decoration: InputDecoration(
-                        labelText: 'Hub Gateway IP Address',
-                        prefixIcon: const Icon(Icons.language_rounded),
-                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
-                      ),
-                    ),
-                    const SizedBox(height: 20),
-                    SizedBox(
-                      width: double.infinity,
-                      height: 48,
-                      child: ElevatedButton.icon(
-                        onPressed: () {
-                          _processHubConnection(
-                            'WIFI:S:${_ssidController.text};P:aira1234;;AIRAMP:SEC=Class;IP=${_ipController.text}',
-                          );
-                        },
-                        icon: const Icon(Icons.link_rounded),
-                        label: const Text('Connect & Discover Materials'),
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: AppTheme.primary,
-                          foregroundColor: Colors.white,
-                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                        ),
-                      ),
-                    ),
-                  ],
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  'Classroom Hub Not Connected',
+                  style: TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w700,
+                    color: AppTheme.text,
+                  ),
                 ),
               ),
             ],
           ),
-        ),
-      ],
-    );
-  }
-
-  Widget _buildSyncStepsGuide() {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-      decoration: BoxDecoration(
-        color: AppTheme.surface,
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: AppTheme.border.withValues(alpha: 0.6)),
-      ),
-      child: Row(
-        children: [
-          Expanded(
-            child: _buildSyncStepItem(
-              title: 'Frame QR',
-              subtitle: 'Teacher screen',
-              icon: Icons.qr_code_scanner_rounded,
-            ),
-          ),
-          _buildStepDivider(),
-          Expanded(
-            child: _buildSyncStepItem(
-              title: 'Auto-Sync',
-              subtitle: 'Offline Wi-Fi',
-              icon: Icons.wifi_protected_setup_rounded,
-            ),
-          ),
-          _buildStepDivider(),
-          Expanded(
-            child: _buildSyncStepItem(
-              title: 'Save & Learn',
-              subtitle: 'Access anytime',
-              icon: Icons.download_done_rounded,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildSyncStepItem({
-    required String title,
-    required String subtitle,
-    required IconData icon,
-  }) {
-    return Column(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        Container(
-          width: 32,
-          height: 32,
-          decoration: BoxDecoration(
-            color: AppTheme.primary.withValues(alpha: 0.1),
-            shape: BoxShape.circle,
-          ),
-          child: Center(
-            child: Icon(icon, color: AppTheme.primary, size: 16),
-          ),
-        ),
-        const SizedBox(height: 6),
-        Text(
-          title,
-          textAlign: TextAlign.center,
-          style: TextStyle(
-            fontSize: 12,
-            fontWeight: FontWeight.w700,
-            color: AppTheme.text,
-          ),
-        ),
-        const SizedBox(height: 1),
-        Text(
-          subtitle,
-          textAlign: TextAlign.center,
-          style: TextStyle(
-            fontSize: 10,
-            color: AppTheme.textMuted,
-          ),
-        ),
-      ],
-    );
-  }
-
-  Widget _buildStepDivider() {
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 4),
-      child: Icon(Icons.arrow_forward_ios_rounded, size: 11, color: AppTheme.textMuted.withValues(alpha: 0.35)),
-    );
-  }
-
-  Widget _buildConnectingView() {
-    final ip = _scannedPayload?.ipAddress ?? _ipController.text;
-    final ssid = _scannedPayload?.ssid ?? _ssidController.text;
-
-    return Center(
-      child: Padding(
-        padding: const EdgeInsets.all(32),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            const CircularProgressIndicator(strokeWidth: 3),
-            const SizedBox(height: 24),
-            Text(
-              'Connecting to Classroom Hub...',
-              style: TextStyle(
-                fontSize: 16,
-                fontWeight: FontWeight.bold,
-                color: AppTheme.text,
-              ),
-            ),
-            const SizedBox(height: 8),
-            Text(
-              'Connecting to $ssid ($ip)...',
-              textAlign: TextAlign.center,
-              style: TextStyle(fontSize: 12, color: AppTheme.textMuted),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  /// Displays clear Wi-Fi instructions when phone cannot reach the ESP32 IP
-  Widget _buildWifiPromptView() {
-    final payload = _scannedPayload ?? HubQrPayload.parse('');
-
-    return SingleChildScrollView(
-      padding: const EdgeInsets.all(24),
-      child: Column(
-        children: [
-          Container(
-            padding: const EdgeInsets.all(16),
-            decoration: BoxDecoration(
-              color: AppTheme.warning.withValues(alpha: 0.15),
-              shape: BoxShape.circle,
-            ),
-            child: Icon(Icons.wifi_off_rounded, color: AppTheme.warning, size: 40),
-          ),
-          const SizedBox(height: 16),
-          Text(
-            'Connect to Classroom Hub Wi-Fi',
-            style: TextStyle(
-              fontSize: 18,
-              fontWeight: FontWeight.bold,
-              color: AppTheme.text,
-            ),
-          ),
           const SizedBox(height: 8),
           Text(
-            'QR code was recognized successfully! However, your phone is not currently connected to the classroom Wi-Fi hotspot.',
-            textAlign: TextAlign.center,
-            style: TextStyle(fontSize: 13, color: AppTheme.textSecondary, height: 1.4),
+            'Scan the QR code displayed on the physical ESP32 Hub screen with your phone\'s camera to connect, then tap Verify Connection Link below.',
+            style: TextStyle(fontSize: 11.5, color: AppTheme.textSecondary, height: 1.35),
           ),
-          const SizedBox(height: 20),
-
-          // Wi-Fi Credentials Card
-          Container(
-            padding: const EdgeInsets.all(16),
-            decoration: BoxDecoration(
-              color: AppTheme.background,
-              borderRadius: BorderRadius.circular(14),
-              border: Border.all(color: AppTheme.primary.withValues(alpha: 0.3)),
-            ),
-            child: Column(
-              children: [
-                _buildWifiCredentialRow(Icons.wifi, 'Wi-Fi Name (SSID)', payload.ssid),
-                const Divider(height: 16),
-                _buildWifiCredentialRow(Icons.lock_outline, 'Password', payload.password),
-                const Divider(height: 16),
-                _buildWifiCredentialRow(Icons.language, 'Gateway IP', payload.ipAddress),
-              ],
-            ),
-          ),
-          const SizedBox(height: 16),
-
-          Text(
-            '👉 Open your phone Wi-Fi settings, connect to "${payload.ssid}" using password "${payload.password}", then tap Retry below.',
-            textAlign: TextAlign.center,
-            style: TextStyle(fontSize: 12, color: AppTheme.textMuted, fontStyle: FontStyle.italic),
-          ),
-          const SizedBox(height: 24),
-
-          // Retry Button
+          const SizedBox(height: 10),
           SizedBox(
             width: double.infinity,
-            height: 48,
-            child: ElevatedButton.icon(
-              onPressed: _isReconnecting
-                  ? null
-                  : () async {
-                      setState(() => _isReconnecting = true);
-                      await _processHubConnection(payload.raw);
-                    },
-              icon: _isReconnecting
+            height: 36,
+            child: OutlinedButton.icon(
+              onPressed: _isCheckingHub ? null : () => _refreshHubStatus(silent: false),
+              icon: _isCheckingHub
                   ? const SizedBox(
-                      width: 18,
-                      height: 18,
-                      child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2),
+                      width: 13,
+                      height: 13,
+                      child: CircularProgressIndicator(strokeWidth: 2),
                     )
-                  : const Icon(Icons.refresh, size: 20),
-              label: Text(_isReconnecting ? 'Connecting...' : 'I\'m Connected · Retry Handshake'),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: AppTheme.primary,
-                foregroundColor: Colors.white,
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                  : const Icon(Icons.refresh, size: 15),
+              label: Text(
+                _isCheckingHub ? 'Verifying Link...' : 'Verify Connection Link',
+                style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
+              ),
+              style: OutlinedButton.styleFrom(
+                foregroundColor: AppTheme.text,
+                side: BorderSide(color: AppTheme.border),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                padding: EdgeInsets.zero,
               ),
             ),
-          ),
-          const SizedBox(height: 12),
-
-          TextButton.icon(
-            onPressed: () {
-              setState(() {
-                _currentStep = _SyncStep.scan;
-              });
-            },
-            icon: const Icon(Icons.qr_code_scanner, size: 18),
-            label: const Text('Back to Camera Scanner'),
           ),
         ],
       ),
     );
   }
 
-  Widget _buildWifiCredentialRow(IconData icon, String label, String value) {
-    return Row(
-      children: [
-        Icon(icon, size: 18, color: AppTheme.primary),
-        const SizedBox(width: 10),
-        Text(label, style: TextStyle(fontSize: 12, color: AppTheme.textSecondary)),
-        const Spacer(),
-        SelectableText(
-          value,
-          style: TextStyle(
-            fontSize: 13,
-            fontWeight: FontWeight.bold,
-            color: AppTheme.text,
-          ),
-        ),
-      ],
-    );
-  }
-
-  Widget _buildTypeFilterChip(String key, String label, IconData icon, Color color) {
+  Widget _buildTypeFilterChip(String key, String label, IconData icon) {
     final isSelected = _selectedTypeFilter == key;
     return InkWell(
       onTap: () {
@@ -891,15 +702,15 @@ class _StudentEsp32SyncModalState extends State<StudentEsp32SyncModal>
           _selectedTypeFilter = key;
         });
       },
-      borderRadius: BorderRadius.circular(10),
+      borderRadius: BorderRadius.circular(8),
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 150),
         padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
         decoration: BoxDecoration(
-          color: isSelected ? color.withValues(alpha: 0.15) : AppTheme.background,
-          borderRadius: BorderRadius.circular(10),
+          color: isSelected ? AppTheme.primary.withValues(alpha: 0.12) : AppTheme.surfaceLight,
+          borderRadius: BorderRadius.circular(8),
           border: Border.all(
-            color: isSelected ? color : AppTheme.border,
+            color: isSelected ? AppTheme.primary : AppTheme.border,
             width: isSelected ? 1.5 : 1.0,
           ),
         ),
@@ -908,16 +719,16 @@ class _StudentEsp32SyncModalState extends State<StudentEsp32SyncModal>
           children: [
             Icon(
               icon,
-              size: 14,
-              color: isSelected ? color : AppTheme.textMuted,
+              size: 13,
+              color: isSelected ? AppTheme.primary : AppTheme.textMuted,
             ),
-            const SizedBox(width: 6),
+            const SizedBox(width: 5),
             Text(
               label,
               style: TextStyle(
                 fontSize: 11.5,
-                fontWeight: isSelected ? FontWeight.bold : FontWeight.w500,
-                color: isSelected ? color : AppTheme.textSecondary,
+                fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
+                color: isSelected ? AppTheme.primary : AppTheme.textSecondary,
               ),
             ),
           ],
@@ -927,7 +738,6 @@ class _StudentEsp32SyncModalState extends State<StudentEsp32SyncModal>
   }
 
   Widget _buildCategorySectionHeader(String category, List<HubMaterialItem> items) {
-    final color = _getCategoryColor(category);
     final icon = _getCategoryIcon(category);
     final title = _getCategoryTitle(category);
     final allCategorySelected = items.isNotEmpty && items.every((i) => _selectedItemIds.contains(i.id));
@@ -936,20 +746,13 @@ class _StudentEsp32SyncModalState extends State<StudentEsp32SyncModal>
       padding: const EdgeInsets.only(top: 10, bottom: 8),
       child: Row(
         children: [
-          Container(
-            padding: const EdgeInsets.all(5),
-            decoration: BoxDecoration(
-              color: color.withValues(alpha: 0.12),
-              borderRadius: BorderRadius.circular(6),
-            ),
-            child: Icon(icon, size: 14, color: color),
-          ),
-          const SizedBox(width: 8),
+          Icon(icon, size: 14, color: AppTheme.textMuted),
+          const SizedBox(width: 6),
           Text(
             title,
             style: TextStyle(
-              fontSize: 13,
-              fontWeight: FontWeight.bold,
+              fontSize: 12.5,
+              fontWeight: FontWeight.w700,
               color: AppTheme.text,
             ),
           ),
@@ -957,15 +760,16 @@ class _StudentEsp32SyncModalState extends State<StudentEsp32SyncModal>
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1.5),
             decoration: BoxDecoration(
-              color: color.withValues(alpha: 0.15),
-              borderRadius: BorderRadius.circular(10),
+              color: AppTheme.surfaceLight,
+              borderRadius: BorderRadius.circular(6),
+              border: Border.all(color: AppTheme.border),
             ),
             child: Text(
               '${items.length}',
               style: TextStyle(
                 fontSize: 10,
-                fontWeight: FontWeight.bold,
-                color: color,
+                fontWeight: FontWeight.w700,
+                color: AppTheme.textMuted,
               ),
             ),
           ),
@@ -992,8 +796,8 @@ class _StudentEsp32SyncModalState extends State<StudentEsp32SyncModal>
               allCategorySelected ? 'Deselect Category' : 'Select Category',
               style: TextStyle(
                 fontSize: 11,
-                fontWeight: FontWeight.bold,
-                color: color,
+                fontWeight: FontWeight.w600,
+                color: AppTheme.primary,
               ),
             ),
           ),
@@ -1005,8 +809,8 @@ class _StudentEsp32SyncModalState extends State<StudentEsp32SyncModal>
   Widget _buildMaterialItemCard(HubMaterialItem item, Set<String> savedItemIds) {
     final isSelected = _selectedItemIds.contains(item.id);
     final isSaved = savedItemIds.contains(item.id);
-    final fileColor = _getFileColor(item);
-    final fileIcon = _getFileIcon(item);
+    final fileCategory = _getItemCategory(item);
+    final fileIcon = _getCategoryIcon(fileCategory);
 
     return InkWell(
       onTap: () {
@@ -1018,32 +822,30 @@ class _StudentEsp32SyncModalState extends State<StudentEsp32SyncModal>
           }
         });
       },
-      borderRadius: BorderRadius.circular(12),
+      borderRadius: BorderRadius.circular(10),
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 150),
         margin: const EdgeInsets.only(bottom: 8),
-        padding: const EdgeInsets.all(12),
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
         decoration: BoxDecoration(
-          color: isSelected
-              ? AppTheme.primarySoft.withValues(alpha: 0.3)
-              : AppTheme.background,
-          borderRadius: BorderRadius.circular(12),
+          color: AppTheme.surfaceLight,
+          borderRadius: BorderRadius.circular(10),
           border: Border.all(
-            color: isSelected
-                ? AppTheme.primary.withValues(alpha: 0.7)
-                : AppTheme.border,
+            color: isSelected ? AppTheme.primary : AppTheme.border,
             width: isSelected ? 1.5 : 1.0,
           ),
         ),
         child: Row(
           children: [
-            // Selection Checkbox
+            // Checkbox
             SizedBox(
-              width: 24,
-              height: 24,
+              width: 22,
+              height: 22,
               child: Checkbox(
                 value: isSelected,
                 activeColor: AppTheme.primary,
+                visualDensity: VisualDensity.compact,
+                materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
                 shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(4)),
                 onChanged: (val) {
                   setState(() {
@@ -1056,24 +858,21 @@ class _StudentEsp32SyncModalState extends State<StudentEsp32SyncModal>
                 },
               ),
             ),
+            const SizedBox(width: 8),
+
+            // File Icon
+            Container(
+              padding: const EdgeInsets.all(7),
+              decoration: BoxDecoration(
+                color: AppTheme.surface,
+                borderRadius: BorderRadius.circular(6),
+                border: Border.all(color: AppTheme.border),
+              ),
+              child: Icon(fileIcon, size: 16, color: AppTheme.textSecondary),
+            ),
             const SizedBox(width: 10),
 
-            // File Type Icon
-            Container(
-              padding: const EdgeInsets.all(8),
-              decoration: BoxDecoration(
-                color: fileColor.withValues(alpha: 0.12),
-                borderRadius: BorderRadius.circular(8),
-              ),
-              child: Icon(
-                fileIcon,
-                size: 20,
-                color: fileColor,
-              ),
-            ),
-            const SizedBox(width: 12),
-
-            // Title & Subject/Size
+            // Title & Meta
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -1081,8 +880,8 @@ class _StudentEsp32SyncModalState extends State<StudentEsp32SyncModal>
                   Text(
                     item.title,
                     style: TextStyle(
-                      fontSize: 13,
-                      fontWeight: isSelected ? FontWeight.bold : FontWeight.w600,
+                      fontSize: 12.5,
+                      fontWeight: isSelected ? FontWeight.w700 : FontWeight.w600,
                       color: AppTheme.text,
                     ),
                     maxLines: 1,
@@ -1093,26 +892,26 @@ class _StudentEsp32SyncModalState extends State<StudentEsp32SyncModal>
                     children: [
                       Text(
                         '${item.subjectName} • ${item.formattedSize}',
-                        style: TextStyle(fontSize: 11, color: AppTheme.textSecondary),
+                        style: TextStyle(fontSize: 11, color: AppTheme.textMuted),
                       ),
                       if (isSaved) ...[
                         const SizedBox(width: 6),
                         Container(
                           padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
                           decoration: BoxDecoration(
-                            color: AppTheme.success.withValues(alpha: 0.15),
+                            color: AppTheme.success.withValues(alpha: 0.12),
                             borderRadius: BorderRadius.circular(4),
                           ),
                           child: Row(
                             mainAxisSize: MainAxisSize.min,
                             children: [
-                              Icon(Icons.check_circle, size: 10, color: AppTheme.success),
+                              Icon(Icons.check_circle_outline, size: 10, color: AppTheme.success),
                               const SizedBox(width: 2),
                               Text(
                                 'Saved',
                                 style: TextStyle(
                                   fontSize: 9.5,
-                                  fontWeight: FontWeight.bold,
+                                  fontWeight: FontWeight.w700,
                                   color: AppTheme.success,
                                 ),
                               ),
@@ -1126,44 +925,45 @@ class _StudentEsp32SyncModalState extends State<StudentEsp32SyncModal>
               ),
             ),
 
-            // Quick Download Button for this specific file
-            Tooltip(
-              message: isSaved ? 'Re-download this file' : 'Download this file only',
-              child: InkWell(
-                onTap: () => _startOfflineDownload(targetItems: [item]),
-                borderRadius: BorderRadius.circular(8),
-                child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                  decoration: BoxDecoration(
-                    color: isSaved
-                        ? AppTheme.surfaceLight
-                        : AppTheme.primarySoft,
-                    borderRadius: BorderRadius.circular(8),
-                    border: Border.all(
-                      color: isSaved
-                          ? AppTheme.border
-                          : AppTheme.primary.withValues(alpha: 0.3),
+            // Quick actions
+            if (isSaved) ...[
+              IconButton(
+                icon: const Icon(Icons.visibility_outlined, size: 16),
+                tooltip: 'Read Offline',
+                visualDensity: VisualDensity.compact,
+                color: AppTheme.textMuted,
+                onPressed: () => _openReader(item),
+              ),
+            ],
+            // Quick Download button
+            InkWell(
+              onTap: () => _startOfflineDownload(targetItems: [item]),
+              borderRadius: BorderRadius.circular(6),
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 5),
+                decoration: BoxDecoration(
+                  color: AppTheme.surface,
+                  borderRadius: BorderRadius.circular(6),
+                  border: Border.all(color: AppTheme.border),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(
+                      isSaved ? Icons.sync : Icons.download_outlined,
+                      size: 13,
+                      color: AppTheme.primary,
                     ),
-                  ),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Icon(
-                        isSaved ? Icons.check : Icons.download_rounded,
-                        size: 14,
-                        color: isSaved ? AppTheme.success : AppTheme.primary,
+                    const SizedBox(width: 4),
+                    Text(
+                      isSaved ? 'Sync' : 'Get',
+                      style: TextStyle(
+                        fontSize: 11,
+                        fontWeight: FontWeight.w700,
+                        color: AppTheme.primary,
                       ),
-                      const SizedBox(width: 4),
-                      Text(
-                        isSaved ? 'Sync' : 'Get',
-                        style: TextStyle(
-                          fontSize: 11,
-                          fontWeight: FontWeight.bold,
-                          color: isSaved ? AppTheme.success : AppTheme.primary,
-                        ),
-                      ),
-                    ],
-                  ),
+                    ),
+                  ],
                 ),
               ),
             ),
@@ -1174,19 +974,20 @@ class _StudentEsp32SyncModalState extends State<StudentEsp32SyncModal>
   }
 
   Widget _buildManifestView() {
-    final manifest = _manifest!;
+    final manifest = _manifest;
     final savedItemIds = SavedMaterialsService.instance.savedMaterialsNotifier.value
         .map((e) => e.id)
         .toSet();
 
-    // Group items by category to segregate them cleanly
+    // Group items by category
     final grouped = <String, List<HubMaterialItem>>{};
-    for (final item in manifest.items) {
-      final cat = _getItemCategory(item);
-      grouped.putIfAbsent(cat, () => []).add(item);
+    if (manifest != null) {
+      for (final item in manifest.items) {
+        final cat = _getItemCategory(item);
+        grouped.putIfAbsent(cat, () => []).add(item);
+      }
     }
 
-    // Determine filtered groups
     final filteredGroups = _selectedTypeFilter == 'all'
         ? grouped
         : {
@@ -1198,6 +999,7 @@ class _StudentEsp32SyncModalState extends State<StudentEsp32SyncModal>
     final allVisibleSelected = visibleItems.isNotEmpty &&
         visibleItems.every((item) => _selectedItemIds.contains(item.id));
 
+    final totalItemsCount = manifest?.items.length ?? 0;
     final pdfCount = grouped['pdf']?.length ?? 0;
     final htmlCount = grouped['html']?.length ?? 0;
     final quizCount = grouped['quiz']?.length ?? 0;
@@ -1205,262 +1007,243 @@ class _StudentEsp32SyncModalState extends State<StudentEsp32SyncModal>
     final docCount = grouped['doc']?.length ?? 0;
 
     return SingleChildScrollView(
-      padding: const EdgeInsets.all(20),
+      padding: const EdgeInsets.all(16),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Station Info Card
-          Container(
-            padding: const EdgeInsets.all(14),
-            decoration: BoxDecoration(
-              color: AppTheme.primarySoft,
-              borderRadius: BorderRadius.circular(12),
-              border: Border.all(color: AppTheme.primary.withValues(alpha: 0.3)),
-            ),
-            child: Row(
-              children: [
-                Icon(Icons.check_circle, color: AppTheme.primary, size: 22),
-                const SizedBox(width: 10),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        manifest.hubName,
-                        style: TextStyle(
-                          fontSize: 14,
-                          fontWeight: FontWeight.bold,
-                          color: AppTheme.text,
-                        ),
-                      ),
-                      Text(
-                        'Section: ${manifest.sectionName} • Teacher: ${manifest.teacherName}',
-                        style: TextStyle(fontSize: 11, color: AppTheme.textSecondary),
-                      ),
-                    ],
-                  ),
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(height: 18),
+          // Live Connection Reminder
+          _buildLiveConnectionReminder(),
+          const SizedBox(height: 14),
 
-          // Header with Select All / Deselect All
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            crossAxisAlignment: CrossAxisAlignment.center,
-            children: [
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      'Available Classroom Materials (${manifest.items.length})',
-                      style: TextStyle(
-                        fontSize: 15,
-                        fontWeight: FontWeight.bold,
-                        color: AppTheme.text,
-                      ),
-                    ),
-                    const SizedBox(height: 2),
-                    Text(
-                      _selectedItemIds.isEmpty
-                          ? 'Tap materials or categories to select'
-                          : '${_selectedItemIds.length} of ${manifest.items.length} selected (${_formatSize(_selectedTotalBytes)})',
-                      style: TextStyle(
-                        fontSize: 11,
-                        color: _selectedItemIds.isEmpty ? AppTheme.textMuted : AppTheme.primary,
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              if (visibleItems.isNotEmpty)
-                TextButton.icon(
-                  onPressed: () {
-                    setState(() {
-                      if (allVisibleSelected) {
-                        for (final item in visibleItems) {
-                          _selectedItemIds.remove(item.id);
-                        }
-                      } else {
-                        for (final item in visibleItems) {
-                          _selectedItemIds.add(item.id);
-                        }
-                      }
-                    });
-                  },
-                  icon: Icon(
-                    allVisibleSelected
-                        ? Icons.remove_done_rounded
-                        : Icons.done_all_rounded,
-                    size: 16,
-                    color: AppTheme.primary,
-                  ),
-                  label: Text(
-                    allVisibleSelected
-                        ? (_selectedTypeFilter == 'all' ? 'Deselect All' : 'Deselect Category')
-                        : (_selectedTypeFilter == 'all' ? 'Select All' : 'Select Category'),
-                    style: TextStyle(
-                      fontSize: 12,
-                      fontWeight: FontWeight.bold,
-                      color: AppTheme.primary,
-                    ),
-                  ),
-                  style: TextButton.styleFrom(
-                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                    visualDensity: VisualDensity.compact,
-                  ),
-                ),
-            ],
-          ),
-          const SizedBox(height: 12),
-
-          // Filter of specific type of files
-          if (manifest.items.isNotEmpty) ...[
-            SingleChildScrollView(
-              scrollDirection: Axis.horizontal,
-              child: Row(
-                children: [
-                  _buildTypeFilterChip(
-                    'all',
-                    'All (${manifest.items.length})',
-                    Icons.grid_view_rounded,
-                    AppTheme.primary,
-                  ),
-                  if (pdfCount > 0) ...[
-                    const SizedBox(width: 8),
-                    _buildTypeFilterChip(
-                      'pdf',
-                      'PDFs ($pdfCount)',
-                      Icons.picture_as_pdf_rounded,
-                      const Color(0xFFEF4444),
-                    ),
-                  ],
-                  if (htmlCount > 0) ...[
-                    const SizedBox(width: 8),
-                    _buildTypeFilterChip(
-                      'html',
-                      'HTML / Web ($htmlCount)',
-                      Icons.language_rounded,
-                      const Color(0xFF3B82F6),
-                    ),
-                  ],
-                  if (quizCount > 0) ...[
-                    const SizedBox(width: 8),
-                    _buildTypeFilterChip(
-                      'quiz',
-                      'Quizzes ($quizCount)',
-                      Icons.assignment_turned_in_rounded,
-                      const Color(0xFFF59E0B),
-                    ),
-                  ],
-                  if (moduleCount > 0) ...[
-                    const SizedBox(width: 8),
-                    _buildTypeFilterChip(
-                      'module',
-                      'Modules ($moduleCount)',
-                      Icons.menu_book_rounded,
-                      AppTheme.primary,
-                    ),
-                  ],
-                  if (docCount > 0) ...[
-                    const SizedBox(width: 8),
-                    _buildTypeFilterChip(
-                      'doc',
-                      'Docs ($docCount)',
-                      Icons.description_rounded,
-                      const Color(0xFF6366F1),
-                    ),
-                  ],
-                ],
-              ),
-            ),
-            const SizedBox(height: 14),
-          ],
-
-          if (manifest.items.isEmpty)
+          // If disconnected and no manifest, show calm instructions
+          if (manifest == null && !_hubStatus.isDevKitConnected) ...[
             Container(
-              padding: const EdgeInsets.all(24),
-              alignment: Alignment.center,
-              child: Text(
-                'No curriculum files found on this hub yet.',
-                style: TextStyle(color: AppTheme.textMuted, fontSize: 13),
-              ),
-            )
-          else if (filteredGroups.isEmpty)
-            Container(
-              padding: const EdgeInsets.all(28),
-              alignment: Alignment.center,
+              width: double.infinity,
+              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 28),
               decoration: BoxDecoration(
-                color: AppTheme.background,
+                color: AppTheme.surfaceLight,
                 borderRadius: BorderRadius.circular(12),
                 border: Border.all(color: AppTheme.border),
               ),
               child: Column(
                 children: [
-                  Icon(Icons.filter_list_off_rounded, size: 36, color: AppTheme.textMuted),
-                  const SizedBox(height: 8),
+                  Icon(Icons.wifi_tethering_outlined, size: 36, color: AppTheme.textMuted),
+                  const SizedBox(height: 12),
                   Text(
-                    'No files found for this filter.',
-                    style: TextStyle(color: AppTheme.textSecondary, fontSize: 13),
+                    'Offline Classroom Hub Distribution',
+                    style: TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w700,
+                      color: AppTheme.text,
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    'Scan the QR code on the physical ESP32 screen to connect this device and download learning modules, quizzes, and lesson PDFs without internet.',
+                    textAlign: TextAlign.center,
+                    style: TextStyle(fontSize: 11.5, color: AppTheme.textSecondary, height: 1.4),
+                  ),
+                  const SizedBox(height: 16),
+                  OutlinedButton.icon(
+                    onPressed: _isCheckingHub ? null : () => _refreshHubStatus(silent: false),
+                    icon: const Icon(Icons.refresh, size: 14),
+                    label: const Text('Check Connection Link', style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.w600)),
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: AppTheme.primary,
+                      side: BorderSide(color: AppTheme.primary.withValues(alpha: 0.4)),
+                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                    ),
                   ),
                 ],
               ),
-            )
-          else
-            ...filteredGroups.entries.expand((entry) {
-              final cat = entry.key;
-              final catItems = entry.value;
-
-              return [
-                _buildCategorySectionHeader(cat, catItems),
-                ...catItems.map((item) => _buildMaterialItemCard(item, savedItemIds)),
-                const SizedBox(height: 8),
-              ];
-            }),
-
-          const SizedBox(height: 12),
-
-          // Download CTA
-          if (manifest.items.isNotEmpty) ...[
-            SizedBox(
-              width: double.infinity,
-              height: 48,
-              child: ElevatedButton.icon(
-                onPressed: _selectedItemIds.isEmpty ? null : () => _startOfflineDownload(),
-                icon: Icon(
-                  _selectedItemIds.isEmpty
-                      ? Icons.file_download_off_outlined
-                      : Icons.download_rounded,
-                  size: 20,
-                ),
-                label: Text(
-                  _selectedItemIds.isEmpty
-                      ? 'Select Files to Download'
-                      : _selectedItemIds.length == manifest.items.length
-                          ? 'Download All Offline (${manifest.items.length})'
-                          : 'Download Selected (${_selectedItemIds.length})',
-                  style: const TextStyle(fontSize: 15, fontWeight: FontWeight.bold),
-                ),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: AppTheme.primary,
-                  foregroundColor: Colors.white,
-                  disabledBackgroundColor: AppTheme.border,
-                  disabledForegroundColor: AppTheme.textMuted,
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                ),
-              ),
             ),
-            if (_selectedItemIds.isNotEmpty) ...[
-              const SizedBox(height: 8),
-              Center(
-                child: Text(
-                  '${_selectedItemIds.length} of ${manifest.items.length} files selected (${_formatSize(_selectedTotalBytes)}) · Zero mobile data needed',
-                  style: TextStyle(fontSize: 11, color: AppTheme.textMuted),
+          ] else ...[
+            // Header with Selection summary & Select All
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Available Classroom Materials ($totalItemsCount)',
+                        style: TextStyle(
+                          fontSize: 13.5,
+                          fontWeight: FontWeight.w700,
+                          color: AppTheme.text,
+                        ),
+                      ),
+                      const SizedBox(height: 1),
+                      Text(
+                        _selectedItemIds.isEmpty
+                            ? 'Tap materials to select for offline download'
+                            : '${_selectedItemIds.length} of $totalItemsCount selected (${_formatSize(_selectedTotalBytes)})',
+                        style: TextStyle(
+                          fontSize: 11,
+                          fontWeight: FontWeight.w500,
+                          color: _selectedItemIds.isEmpty ? AppTheme.textMuted : AppTheme.primary,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                if (visibleItems.isNotEmpty)
+                  TextButton.icon(
+                    onPressed: () {
+                      setState(() {
+                        if (allVisibleSelected) {
+                          for (final item in visibleItems) {
+                            _selectedItemIds.remove(item.id);
+                          }
+                        } else {
+                          for (final item in visibleItems) {
+                            _selectedItemIds.add(item.id);
+                          }
+                        }
+                      });
+                    },
+                    icon: Icon(
+                      allVisibleSelected ? Icons.remove_done : Icons.done_all,
+                      size: 15,
+                      color: AppTheme.primary,
+                    ),
+                    label: Text(
+                      allVisibleSelected ? 'Deselect All' : 'Select All',
+                      style: TextStyle(
+                        fontSize: 11.5,
+                        fontWeight: FontWeight.w700,
+                        color: AppTheme.primary,
+                      ),
+                    ),
+                    style: TextButton.styleFrom(
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                      visualDensity: VisualDensity.compact,
+                    ),
+                  ),
+              ],
+            ),
+            const SizedBox(height: 10),
+
+            // Category filter chips
+            if (totalItemsCount > 0) ...[
+              SingleChildScrollView(
+                scrollDirection: Axis.horizontal,
+                child: Row(
+                  children: [
+                    _buildTypeFilterChip('all', 'All ($totalItemsCount)', Icons.grid_view_outlined),
+                    if (pdfCount > 0) ...[
+                      const SizedBox(width: 6),
+                      _buildTypeFilterChip('pdf', 'PDFs ($pdfCount)', Icons.picture_as_pdf_outlined),
+                    ],
+                    if (quizCount > 0) ...[
+                      const SizedBox(width: 6),
+                      _buildTypeFilterChip('quiz', 'Quizzes ($quizCount)', Icons.assignment_outlined),
+                    ],
+                    if (moduleCount > 0) ...[
+                      const SizedBox(width: 6),
+                      _buildTypeFilterChip('module', 'Modules ($moduleCount)', Icons.menu_book_outlined),
+                    ],
+                    if (htmlCount > 0) ...[
+                      const SizedBox(width: 6),
+                      _buildTypeFilterChip('html', 'HTML / Web ($htmlCount)', Icons.language_outlined),
+                    ],
+                    if (docCount > 0) ...[
+                      const SizedBox(width: 6),
+                      _buildTypeFilterChip('doc', 'Docs ($docCount)', Icons.description_outlined),
+                    ],
+                  ],
                 ),
               ),
+              const SizedBox(height: 12),
+            ],
+
+            if (manifest != null && manifest.items.isEmpty)
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.symmetric(vertical: 24),
+                alignment: Alignment.center,
+                child: Text(
+                  'No materials currently published to this hub.',
+                  style: TextStyle(color: AppTheme.textMuted, fontSize: 12),
+                ),
+              )
+            else if (filteredGroups.isEmpty)
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.symmetric(vertical: 24),
+                alignment: Alignment.center,
+                decoration: BoxDecoration(
+                  color: AppTheme.surfaceLight,
+                  borderRadius: BorderRadius.circular(10),
+                  border: Border.all(color: AppTheme.border),
+                ),
+                child: Column(
+                  children: [
+                    Icon(Icons.filter_list_off, size: 28, color: AppTheme.textMuted),
+                    const SizedBox(height: 6),
+                    Text(
+                      'No files found for this category filter.',
+                      style: TextStyle(color: AppTheme.textSecondary, fontSize: 12),
+                    ),
+                  ],
+                ),
+              )
+            else
+              ...filteredGroups.entries.expand((entry) {
+                final cat = entry.key;
+                final catItems = entry.value;
+
+                return [
+                  _buildCategorySectionHeader(cat, catItems),
+                  ...catItems.map((item) => _buildMaterialItemCard(item, savedItemIds)),
+                  const SizedBox(height: 4),
+                ];
+              }),
+
+            const SizedBox(height: 12),
+
+            // Download Action CTA
+            if (totalItemsCount > 0) ...[
+              SizedBox(
+                width: double.infinity,
+                height: 44,
+                child: ElevatedButton.icon(
+                  onPressed: _selectedItemIds.isEmpty ? null : () => _startOfflineDownload(),
+                  icon: Icon(
+                    _selectedItemIds.isEmpty
+                        ? Icons.file_download_off_outlined
+                        : Icons.download_outlined,
+                    size: 18,
+                  ),
+                  label: Text(
+                    _selectedItemIds.isEmpty
+                        ? 'Select Files to Download'
+                        : _selectedItemIds.length == totalItemsCount
+                            ? 'Download All Offline ($totalItemsCount)'
+                            : 'Download Selected (${_selectedItemIds.length})',
+                    style: const TextStyle(fontSize: 13.5, fontWeight: FontWeight.w700),
+                  ),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: AppTheme.primary,
+                    foregroundColor: Colors.white,
+                    disabledBackgroundColor: AppTheme.surfaceLight,
+                    disabledForegroundColor: AppTheme.textMuted,
+                    elevation: 0,
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                  ),
+                ),
+              ),
+              if (_selectedItemIds.isNotEmpty) ...[
+                const SizedBox(height: 6),
+                Center(
+                  child: Text(
+                    '${_selectedItemIds.length} files (${_formatSize(_selectedTotalBytes)}) · Zero mobile data needed',
+                    style: TextStyle(fontSize: 10.5, color: AppTheme.textMuted),
+                  ),
+                ),
+              ],
             ],
           ],
           const SizedBox(height: 20),
@@ -1471,34 +1254,43 @@ class _StudentEsp32SyncModalState extends State<StudentEsp32SyncModal>
 
   Widget _buildDownloadingView() {
     return Padding(
-      padding: const EdgeInsets.all(24),
+      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 32),
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Icon(Icons.downloading, size: 48, color: AppTheme.primary),
+          Container(
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: AppTheme.primary.withValues(alpha: 0.1),
+              shape: BoxShape.circle,
+            ),
+            child: Icon(Icons.downloading, size: 36, color: AppTheme.primary),
+          ),
           const SizedBox(height: 16),
           Text(
             'Downloading Classroom Materials...',
             style: TextStyle(
-              fontSize: 17,
-              fontWeight: FontWeight.bold,
+              fontSize: 16,
+              fontWeight: FontWeight.w700,
               color: AppTheme.text,
             ),
           ),
-          const SizedBox(height: 6),
+          const SizedBox(height: 4),
           Text(
-            'Saving: $_activeDownloadTitle',
+            'Transferring: $_activeDownloadTitle',
             textAlign: TextAlign.center,
             style: TextStyle(fontSize: 12, color: AppTheme.textSecondary),
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
           ),
-          const SizedBox(height: 24),
+          const SizedBox(height: 20),
 
           // Progress Bar
           ClipRRect(
-            borderRadius: BorderRadius.circular(6),
+            borderRadius: BorderRadius.circular(4),
             child: LinearProgressIndicator(
               value: _overallProgress,
-              minHeight: 8,
+              minHeight: 6,
               backgroundColor: AppTheme.border,
               valueColor: AlwaysStoppedAnimation(AppTheme.primary),
             ),
@@ -1514,8 +1306,8 @@ class _StudentEsp32SyncModalState extends State<StudentEsp32SyncModal>
               Text(
                 '${(_overallProgress * 100).toInt()}%',
                 style: TextStyle(
-                  fontSize: 12,
-                  fontWeight: FontWeight.bold,
+                  fontSize: 11.5,
+                  fontWeight: FontWeight.w700,
                   color: AppTheme.primary,
                 ),
               ),
@@ -1532,51 +1324,51 @@ class _StudentEsp32SyncModalState extends State<StudentEsp32SyncModal>
       child: Column(
         children: [
           Container(
-            padding: const EdgeInsets.all(16),
+            padding: const EdgeInsets.all(14),
             decoration: BoxDecoration(
-              color: AppTheme.success.withValues(alpha: 0.15),
+              color: AppTheme.success.withValues(alpha: 0.12),
               shape: BoxShape.circle,
             ),
-            child: Icon(Icons.check, size: 48, color: AppTheme.success),
+            child: Icon(Icons.check_circle_outline, size: 40, color: AppTheme.success),
           ),
-          const SizedBox(height: 18),
+          const SizedBox(height: 16),
           Text(
-            'Offline Sync Complete!',
+            'Offline Sync Complete',
             style: TextStyle(
-              fontSize: 20,
-              fontWeight: FontWeight.bold,
+              fontSize: 18,
+              fontWeight: FontWeight.w700,
               color: AppTheme.text,
             ),
           ),
           const SizedBox(height: 6),
           Text(
-            '${_itemsToDownload.length} ${_itemsToDownload.length == 1 ? 'material' : 'materials'} from your teacher ${(_itemsToDownload.length == 1 ? 'has' : 'have')} been safely stored on your device. You can browse, read, and take quizzes offline anytime.',
+            '${_itemsToDownload.length} ${_itemsToDownload.length == 1 ? 'material' : 'materials'} successfully saved to your device. Ready to read and take quizzes offline anytime.',
             textAlign: TextAlign.center,
-            style: TextStyle(fontSize: 13, color: AppTheme.textSecondary, height: 1.4),
+            style: TextStyle(fontSize: 12.5, color: AppTheme.textSecondary, height: 1.4),
           ),
-          const SizedBox(height: 24),
+          const SizedBox(height: 20),
 
-          // Saved Summary Box
+          // Summary Ledger Box
           Container(
             width: double.infinity,
-            padding: const EdgeInsets.all(16),
+            padding: const EdgeInsets.all(14),
             decoration: BoxDecoration(
-              color: AppTheme.background,
-              borderRadius: BorderRadius.circular(14),
+              color: AppTheme.surfaceLight,
+              borderRadius: BorderRadius.circular(10),
               border: Border.all(color: AppTheme.border),
             ),
             child: Column(
               children: [
-                _buildDoneSummaryRow(Icons.offline_pin, 'Storage Status', 'Cached on Device'),
-                const Divider(height: 16),
-                _buildDoneSummaryRow(Icons.data_usage, 'Data Used', '0 MB (Free Local AP)'),
-                const Divider(height: 16),
-                _buildDoneSummaryRow(Icons.assignment_turned_in, 'Offline Quizzes', 'Ready to take'),
+                _buildDoneSummaryRow(Icons.offline_pin_outlined, 'Storage Status', 'Cached on Device'),
+                const Divider(height: 14),
+                _buildDoneSummaryRow(Icons.data_usage_outlined, 'Mobile Data Used', '0 MB (Direct Wi-Fi Hub)'),
+                const Divider(height: 14),
+                _buildDoneSummaryRow(Icons.assignment_outlined, 'Offline Access', 'Ready to study'),
               ],
             ),
           ),
 
-          const SizedBox(height: 24),
+          const SizedBox(height: 20),
 
           Row(
             children: [
@@ -1591,26 +1383,17 @@ class _StudentEsp32SyncModalState extends State<StudentEsp32SyncModal>
                       Navigator.pop(context);
                     }
                   },
-                  icon: Icon(
-                    _manifest != null && _manifest!.items.isNotEmpty
-                        ? Icons.arrow_back_rounded
-                        : Icons.close,
-                    size: 16,
-                  ),
-                  label: Text(
-                    _manifest != null && _manifest!.items.isNotEmpty
-                        ? 'Download More'
-                        : 'Close',
-                  ),
+                  icon: const Icon(Icons.arrow_back, size: 15),
+                  label: const Text('Download More', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600)),
                   style: OutlinedButton.styleFrom(
-                    foregroundColor: AppTheme.textSecondary,
+                    foregroundColor: AppTheme.text,
                     side: BorderSide(color: AppTheme.border),
-                    padding: const EdgeInsets.symmetric(vertical: 12),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                    padding: const EdgeInsets.symmetric(vertical: 11),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
                   ),
                 ),
               ),
-              const SizedBox(width: 12),
+              const SizedBox(width: 10),
               Expanded(
                 flex: 2,
                 child: ElevatedButton.icon(
@@ -1622,13 +1405,14 @@ class _StudentEsp32SyncModalState extends State<StudentEsp32SyncModal>
                       studentSection: widget.studentSection,
                     );
                   },
-                  icon: const Icon(Icons.folder_special_rounded, size: 18),
-                  label: const Text('View Saved Materials'),
+                  icon: const Icon(Icons.folder_outlined, size: 16),
+                  label: const Text('View Saved Materials', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700)),
                   style: ElevatedButton.styleFrom(
                     backgroundColor: AppTheme.primary,
                     foregroundColor: Colors.white,
-                    padding: const EdgeInsets.symmetric(vertical: 12),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                    elevation: 0,
+                    padding: const EdgeInsets.symmetric(vertical: 11),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
                   ),
                 ),
               ),
@@ -1642,15 +1426,15 @@ class _StudentEsp32SyncModalState extends State<StudentEsp32SyncModal>
   Widget _buildDoneSummaryRow(IconData icon, String label, String value) {
     return Row(
       children: [
-        Icon(icon, size: 18, color: AppTheme.success),
-        const SizedBox(width: 10),
-        Text(label, style: TextStyle(fontSize: 12, color: AppTheme.textSecondary)),
+        Icon(icon, size: 16, color: AppTheme.textSecondary),
+        const SizedBox(width: 8),
+        Text(label, style: TextStyle(fontSize: 11.5, color: AppTheme.textSecondary)),
         const Spacer(),
         Text(
           value,
           style: TextStyle(
-            fontSize: 12,
-            fontWeight: FontWeight.bold,
+            fontSize: 11.5,
+            fontWeight: FontWeight.w700,
             color: AppTheme.text,
           ),
         ),

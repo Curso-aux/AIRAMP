@@ -2716,7 +2716,7 @@ class _StudentProfileScreenState extends ConsumerState<StudentProfileScreen>
               const SizedBox(height: 10),
               _buildHelpItem(
                 title: 'Taking & Submitting Quizzes',
-                desc: 'When connected to the classroom AIRAMP-HUB Wi-Fi, your quiz answers submit directly to the teacher. Your scores and attempts appear instantly in Quiz History.',
+                desc: 'When connected to the classroom ESP32 Hub Wi-Fi, your quiz answers submit directly to the teacher. Your scores and attempts appear instantly in Quiz History.',
               ),
               const SizedBox(height: 10),
               _buildHelpItem(
