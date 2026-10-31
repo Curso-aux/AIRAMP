@@ -14,6 +14,7 @@ import '../../../core/database/database_helper.dart';
 import '../../../core/components/app_toast.dart';
 import '../../../core/components/empty_state.dart';
 import '../../../core/components/skeleton_loader.dart';
+import '../../../core/components/user_avatar_widget.dart';
 import '../../../core/animations/app_transitions.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../../../core/components/analytics_donut_chart.dart';
@@ -984,16 +985,35 @@ class _TeacherDashboardScreenState extends ConsumerState<TeacherDashboardScreen>
               ),
               child: Row(
                 children: [
-                  CircleAvatar(
-                    radius: 18,
-                    backgroundColor: isPassed
-                        ? AppTheme.success.withValues(alpha: 0.15)
-                        : AppTheme.error.withValues(alpha: 0.15),
-                    child: Icon(
-                      isPassed ? Icons.check_circle : Icons.cancel,
-                      color: isPassed ? AppTheme.success : AppTheme.error,
-                      size: 20,
-                    ),
+                  Stack(
+                    children: [
+                      UserAvatarWidget(
+                        imageSource: (attempt['student_profile_image'] ?? attempt['profile_image'] ?? attempt['profileImage']) as String?,
+                        fallbackInitial: studentName.isNotEmpty ? studentName[0].toUpperCase() : 'S',
+                        size: 38,
+                        backgroundColor: isPassed
+                            ? AppTheme.success.withValues(alpha: 0.15)
+                            : AppTheme.error.withValues(alpha: 0.15),
+                        textColor: isPassed ? AppTheme.success : AppTheme.error,
+                      ),
+                      Positioned(
+                        right: 0,
+                        bottom: 0,
+                        child: Container(
+                          padding: const EdgeInsets.all(2),
+                          decoration: BoxDecoration(
+                            color: isPassed ? AppTheme.success : AppTheme.error,
+                            shape: BoxShape.circle,
+                            border: Border.all(color: AppTheme.surface, width: 1.5),
+                          ),
+                          child: Icon(
+                            isPassed ? Icons.check : Icons.close,
+                            size: 9,
+                            color: Colors.white,
+                          ),
+                        ),
+                      ),
+                    ],
                   ),
                   const SizedBox(width: 12),
                   Expanded(
@@ -3070,15 +3090,10 @@ class _TeacherHeaderAvatarButtonState
                       shape: BoxShape.circle,
                       color: AppTheme.surface,
                     ),
-                    child: ClipOval(
-                      child: hasImage
-                          ? Image.network(
-                              widget.currentUser!.profileImage!,
-                              fit: BoxFit.cover,
-                              errorBuilder: (context, error, stackTrace) =>
-                                  _buildFallbackInitial(initial),
-                            )
-                          : _buildFallbackInitial(initial),
+                    child: UserAvatarWidget(
+                      imageSource: widget.currentUser?.profileImage,
+                      fallbackInitial: initial,
+                      size: 40,
                     ),
                   ),
                 ),

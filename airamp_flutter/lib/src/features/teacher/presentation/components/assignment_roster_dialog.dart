@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../../../../core/components/user_avatar_widget.dart';
 import '../../../../core/database/database_helper.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../../core/theme/theme_provider.dart';
@@ -551,22 +552,11 @@ class _AssignmentRosterDialogState extends ConsumerState<AssignmentRosterDialog>
                                   // Top row: Student Avatar + Name + Section + Status Badge
                                   Row(
                                     children: [
-                                      CircleAvatar(
-                                        radius: 18,
-                                        backgroundColor: isGraded
-                                            ? AppTheme.success.withValues(alpha: 0.2)
-                                            : (status == 'late'
-                                                ? Colors.amber.withValues(alpha: 0.2)
-                                                : AppTheme.primary.withValues(alpha: 0.2)),
-                                        child: Text(
-                                          studentName.isNotEmpty ? studentName[0].toUpperCase() : 'S',
-                                          style: TextStyle(
-                                            color: isGraded
-                                                ? AppTheme.success
-                                                : (status == 'late' ? Colors.amber.shade400 : AppTheme.primary),
-                                            fontWeight: FontWeight.bold,
-                                          ),
-                                        ),
+                                      UserAvatarWidget(
+                                        imageSource: (student['profile_image'] ?? student['profileImage']) as String?,
+                                        fallbackInitial: studentName,
+                                        size: 36,
+                                        fontSize: 14,
                                       ),
                                       const SizedBox(width: 12),
                                       Expanded(

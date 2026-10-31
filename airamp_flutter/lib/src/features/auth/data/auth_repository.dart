@@ -1,6 +1,7 @@
 import 'dart:math';
 import 'package:dio/dio.dart';
 import 'package:flutter/foundation.dart';
+import 'package:sqflite/sqflite.dart';
 import '../../../core/database/database_helper.dart';
 import '../../../core/database/firestore_service.dart';
 import '../../../core/services/otp_service.dart';
@@ -62,58 +63,7 @@ class AuthRepository {
       );
     }
 
-    // 2. Query Cloud Firestore with fast timeout so fresh credentials take precedence without stalling
-    Map<String, dynamic>? cloudUser;
-    try {
-      final cloudTimeout = candidateRows.isNotEmpty ? const Duration(seconds: 2) : const Duration(seconds: 4);
-      cloudUser = await FirestoreService().findUserByIdentifier(identifier).timeout(cloudTimeout, onTimeout: () => null);
-    } catch (e) {
-      debugPrint('[AuthRepository] Cloud lookup note: $e');
-    }
-
-    if (cloudUser != null) {
-      final cloudId = cloudUser['id']?.toString() ?? 'usr_${DateTime.now().millisecondsSinceEpoch}';
-      final cloudEmail = (cloudUser['email'] as String? ?? '').toLowerCase().trim();
-      final localCandidate = candidateRows.where((r) =>
-          r['id'] == cloudId ||
-          (cloudEmail.isNotEmpty && (r['email'] as String? ?? '').toLowerCase().trim() == cloudEmail)).firstOrNull;
-      final cloudMust = cloudUser['must_change_password'] == 1 ||
-          cloudUser['must_change_password'] == true ||
-          cloudUser['must_change_password'] == '1';
-      final localMust = localCandidate != null &&
-          (localCandidate['must_change_password'] == 1 ||
-           localCandidate['must_change_password'] == true ||
-           localCandidate['must_change_password'] == '1');
-      final mustChangeVal = (cloudMust || localMust) ? 1 : 0;
-
-      final cloudDbRow = <String, Object?>{
-        'id': cloudId,
-        'email': cloudUser['email'] ?? '',
-        'username': cloudUser['username'] ?? '',
-        'password': cloudUser['password'] ?? '',
-        'password_salt': cloudUser['password_salt'],
-        'role': cloudUser['role'] ?? 'student',
-        'full_name': cloudUser['full_name'] ?? '',
-        'section': cloudUser['section'],
-        'grade': cloudUser['grade'],
-        'student_type': cloudUser['student_type'] ?? 'regular',
-        'special_notes': cloudUser['special_notes'],
-        'school_id': cloudUser['school_id'] ?? 'sch_main',
-        'must_change_password': mustChangeVal,
-        'created_at': cloudUser['created_at'] ?? DateTime.now().toIso8601String(),
-      };
-      // Place cloud user first so latest cloud password/salt is verified first
-      candidateRows = [
-        cloudDbRow,
-        ...candidateRows.where((r) => r['id'] != cloudId),
-      ];
-    }
-
-    if (candidateRows.isEmpty) {
-      throw Exception('Invalid email/username or password.');
-    }
-
-    // Verify password with salted hash or verify & auto-upgrade legacy plaintext
+    // 2. First verify credentials against local SQLite candidates (instant 0ms execution)
     final List<Map<String, Object?>> verifiedUsers = [];
     for (final candidate in candidateRows) {
       final storedHash = candidate['password'] as String? ?? '';
@@ -130,6 +80,55 @@ class AuthRepository {
           }, where: 'id = ?', whereArgs: [candidate['id']]);
         }
         verifiedUsers.add(candidate);
+      }
+    }
+
+    // 3. If local verification failed (e.g. newly created on Web Admin, or password was updated),
+    // query Cloud Firestore with an 8-second window to authenticate against latest cloud credentials
+    if (verifiedUsers.isEmpty) {
+      Map<String, dynamic>? cloudUser;
+      try {
+        cloudUser = await FirestoreService()
+            .findUserByIdentifier(identifier)
+            .timeout(const Duration(seconds: 8), onTimeout: () => null);
+      } catch (e) {
+        debugPrint('[AuthRepository] Cloud lookup note: $e');
+      }
+
+      if (cloudUser != null) {
+        final cloudHash = cloudUser['password'] as String? ?? '';
+        final cloudSalt = cloudUser['password_salt'] as String?;
+
+        if (DatabaseHelper.verifyPassword(password, cloudHash, cloudSalt)) {
+          final cloudId = cloudUser['id']?.toString() ?? 'usr_${DateTime.now().millisecondsSinceEpoch}';
+          final cloudMust = cloudUser['must_change_password'] == 1 ||
+              cloudUser['must_change_password'] == true ||
+              cloudUser['must_change_password'] == '1';
+
+          final cloudDbRow = <String, Object?>{
+            'id': cloudId,
+            'email': cloudUser['email'] ?? '',
+            'username': cloudUser['username'] ?? '',
+            'password': cloudHash,
+            'password_salt': cloudSalt,
+            'role': cloudUser['role'] ?? 'student',
+            'full_name': cloudUser['full_name'] ?? '',
+            'section': cloudUser['section'],
+            'grade': cloudUser['grade'],
+            'student_type': cloudUser['student_type'] ?? 'regular',
+            'special_notes': cloudUser['special_notes'],
+            'school_id': cloudUser['school_id'] ?? 'sch_main',
+            'must_change_password': cloudMust ? 1 : 0,
+            'created_at': cloudUser['created_at'] ?? DateTime.now().toIso8601String(),
+          };
+
+          // Synchronize verified credentials to local SQLite cache so future logins are instant
+          try {
+            await db.insert('users', cloudDbRow, conflictAlgorithm: ConflictAlgorithm.replace);
+          } catch (_) {}
+
+          verifiedUsers.add(cloudDbRow);
+        }
       }
     }
 
@@ -222,6 +221,7 @@ class AuthRepository {
         'section': user['section'],
         'grade': user['grade'],
         'schoolId': user['school_id'] ?? 'sch_main',
+        'profileImage': user['profile_image'] ?? user['profileImage'],
         'must_change_password': user['must_change_password'] == 1 || user['must_change_password'] == true || user['must_change_password'] == '1',
         'mustChangePassword': user['must_change_password'] == 1 || user['must_change_password'] == true || user['must_change_password'] == '1',
       },
@@ -389,6 +389,7 @@ class AuthRepository {
     if (fullName != null) updates['full_name'] = fullName;
     if (username != null) updates['username'] = username;
     if (email != null) updates['email'] = email;
+    if (profileImage != null) updates['profile_image'] = profileImage;
     if (password != null && password.isNotEmpty) {
       final salt = DatabaseHelper.generateSalt();
       updates['password'] = DatabaseHelper.hashPassword(password, salt);
@@ -403,7 +404,10 @@ class AuthRepository {
         await db.update('users', updates, where: 'id = ?', whereArgs: [userId]);
       } catch (_) {}
       try {
-        await FirestoreService().saveUser({'id': userId, ...updates});
+        final cloudUpdates = Map<String, dynamic>.from(updates);
+        if (fullName != null) cloudUpdates['fullName'] = fullName;
+        if (profileImage != null) cloudUpdates['profileImage'] = profileImage;
+        await FirestoreService().saveUser({'id': userId, ...cloudUpdates});
       } catch (_) {}
     }
 

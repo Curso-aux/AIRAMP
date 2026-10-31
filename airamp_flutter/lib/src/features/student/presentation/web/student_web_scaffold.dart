@@ -8,6 +8,7 @@ import '../../../auth/application/auth_provider.dart';
 import '../components/student_announcements_sheet.dart';
 import '../components/student_schedule_widget.dart';
 import '../../../../core/components/offline_sync_status_pill.dart';
+import '../../../../core/components/user_avatar_widget.dart';
 
 class StudentNavItem {
   final String label;
@@ -507,13 +508,12 @@ class _StudentWebScaffoldState extends ConsumerState<StudentWebScaffold> {
                         SizedBox(
                           width: 48,
                           child: Center(
-                            child: CircleAvatar(
-                              radius: 18,
+                            child: UserAvatarWidget(
+                              imageSource: currentUser?.profileImage,
+                              fallbackInitial: currentUser?.fullName.isNotEmpty == true ? currentUser!.fullName[0].toUpperCase() : 'S',
+                              size: 36,
                               backgroundColor: _studentAccent.withValues(alpha: 0.15),
-                              child: Text(
-                                currentUser?.fullName.isNotEmpty == true ? currentUser!.fullName[0].toUpperCase() : 'S',
-                                style: const TextStyle(fontWeight: FontWeight.bold, color: _studentAccent),
-                              ),
+                              textColor: _studentAccent,
                             ),
                           ),
                         ),

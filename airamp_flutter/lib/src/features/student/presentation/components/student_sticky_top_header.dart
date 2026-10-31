@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../../../core/theme/app_theme.dart';
+import '../../../../core/components/user_avatar_widget.dart';
 import '../../../admin/data/admin_repository.dart';
 import '../../../auth/application/auth_provider.dart';
 import '../../data/student_repository.dart';
@@ -419,15 +420,10 @@ class _StudentHeaderAvatarButtonState extends State<_StudentHeaderAvatarButton> 
                   ),
                 ],
               ),
-              child: ClipOval(
-                child: hasImage
-                    ? Image.network(
-                        widget.currentUser.profileImage!,
-                        fit: BoxFit.cover,
-                        errorBuilder: (context, error, stackTrace) =>
-                            _buildFallbackInitial(initial),
-                      )
-                    : _buildFallbackInitial(initial),
+              child: UserAvatarWidget(
+                imageSource: widget.currentUser.profileImage,
+                fallbackInitial: initial,
+                size: size,
               ),
             ),
           ),

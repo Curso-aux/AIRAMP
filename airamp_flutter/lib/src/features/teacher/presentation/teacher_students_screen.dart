@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../../core/animations/animated_pressable.dart';
 import '../../../core/components/empty_state.dart';
+import '../../../core/components/user_avatar_widget.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/theme/theme_provider.dart';
 import '../../admin/data/admin_repository.dart';
@@ -512,17 +513,11 @@ class _TeacherStudentsScreenState extends ConsumerState<TeacherStudentsScreen> {
                             child: Row(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
-                                CircleAvatar(
-                                  radius: 22,
-                                  backgroundColor: AppTheme.primary.withValues(alpha: 0.12),
-                                  child: Text(
-                                    initial,
-                                    style: TextStyle(
-                                      color: AppTheme.primary,
-                                      fontWeight: FontWeight.bold,
-                                      fontSize: 16,
-                                    ),
-                                  ),
+                                UserAvatarWidget(
+                                  imageSource: (student['profile_image'] ?? student['profileImage']) as String?,
+                                  fallbackInitial: initial,
+                                  size: 44,
+                                  fontSize: 16,
                                 ),
                                 const SizedBox(width: 14),
                                 Expanded(

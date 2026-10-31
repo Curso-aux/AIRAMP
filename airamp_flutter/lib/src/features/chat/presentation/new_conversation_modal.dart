@@ -4,6 +4,7 @@ import '../../../core/theme/app_theme.dart';
 
 import '../application/chat_provider.dart';
 import '../domain/chat_models.dart';
+import '../../../core/components/user_avatar_widget.dart';
 
 /// Helper to get a human-readable role label.
 String _getRoleLabel(String role) {
@@ -506,7 +507,7 @@ class _NewConversationModalState extends ConsumerState<NewConversationModal>
                         padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 10),
                         child: Row(
                           children: [
-                            _buildAvatar(user.fullName, role: user.role, size: 42),
+                            _buildAvatar(user.fullName, role: user.role, size: 42, imageSource: user.profileImage),
                             const SizedBox(width: 12),
                             Expanded(
                               child: Column(
@@ -729,7 +730,7 @@ class _NewConversationModalState extends ConsumerState<NewConversationModal>
     );
   }
 
-  Widget _buildAvatar(String name, {required String role, double size = 42}) {
+  Widget _buildAvatar(String name, {required String role, double size = 42, String? imageSource}) {
     final initial = name.isNotEmpty ? name[0].toUpperCase() : '?';
     final isTeacher = role == 'teacher' || role == 'admin' || role == 'super_admin';
     final isDark = Theme.of(context).brightness == Brightness.dark;
@@ -746,6 +747,16 @@ class _NewConversationModalState extends ConsumerState<NewConversationModal>
       bgColor = isDark ? const Color(0xFF1E293B) : const Color(0xFFF1F5F9);
       textColor = isDark ? const Color(0xFFCBD5E1) : const Color(0xFF334155);
       borderColor = isDark ? const Color(0xFF334155) : const Color(0xFFCBD5E1);
+    }
+
+    if (imageSource != null && imageSource.isNotEmpty) {
+      return UserAvatarWidget(
+        imageSource: imageSource,
+        fallbackInitial: initial,
+        size: size,
+        backgroundColor: bgColor,
+        textColor: textColor,
+      );
     }
 
     return Container(

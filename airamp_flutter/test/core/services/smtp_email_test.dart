@@ -65,5 +65,20 @@ void main() {
       expect(result.success, isTrue);
       expect(result.message, contains('evangelistachristian88@gmail.com'));
     });
+
+    test('EmailService can send Inquiry Response via Gmail SMTP', () async {
+      final result = await EmailService().sendInquiryReply(
+        toEmail: 'evangelistachristian88@gmail.com',
+        fullName: 'Juan Dela Cruz',
+        userId: 'student_test_smtp_1',
+        role: 'student',
+        inquiryQuestion: 'How do I access my laboratory schedule?',
+        adminReply: 'Your laboratory schedule has been posted under the Schedule tab.',
+        adminName: 'School Administrator',
+      );
+
+      expect(result.success, isTrue);
+      expect(result.message, contains('evangelistachristian88@gmail.com'));
+    });
   });
 }

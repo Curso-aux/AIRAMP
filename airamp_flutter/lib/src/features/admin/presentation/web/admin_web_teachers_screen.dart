@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import '../../../../core/components/user_avatar_widget.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../../core/theme/theme_provider.dart';
 import '../../../../core/database/database_helper.dart';
@@ -351,17 +352,11 @@ class _AdminWebTeachersScreenState extends ConsumerState<AdminWebTeachersScreen>
                                   Row(
                                     mainAxisSize: MainAxisSize.min,
                                     children: [
-                                      CircleAvatar(
-                                        radius: 20,
-                                        backgroundColor: AppTheme.primary.withValues(alpha: 0.15),
-                                        child: Text(
-                                          name.isNotEmpty ? name[0].toUpperCase() : 'T',
-                                          style: TextStyle(
-                                            color: AppTheme.primary,
-                                            fontWeight: FontWeight.bold,
-                                            fontSize: 16,
-                                          ),
-                                        ),
+                                      UserAvatarWidget(
+                                        imageSource: (teacher['profile_image'] ?? teacher['profileImage']) as String?,
+                                        fallbackInitial: name,
+                                        size: 40,
+                                        fontSize: 16,
                                       ),
                                       const SizedBox(width: 12),
                                       Column(
@@ -892,7 +887,7 @@ class _AdminWebTeachersScreenState extends ConsumerState<AdminWebTeachersScreen>
                   onPressed: () async {
                     if (!formKey.currentState!.validate()) return;
                     try {
-                      await ref.read(adminTeachersProvider.notifier).addTeacher(
+                      final createdTid = await ref.read(adminTeachersProvider.notifier).addTeacher(
                             id: teacherIdCtrl.text.trim().isNotEmpty ? teacherIdCtrl.text.trim() : null,
                             fullName: nameCtrl.text.trim(),
                             email: emailCtrl.text.trim(),
@@ -902,6 +897,8 @@ class _AdminWebTeachersScreenState extends ConsumerState<AdminWebTeachersScreen>
                           );
                       final emailResult = EmailService.lastResult;
                       final emailSent = emailResult?.success ?? false;
+                      final isQueued = emailResult?.channel == 'cloud_queue_pending';
+                      final finalTeacherId = createdTid.isNotEmpty ? createdTid : teacherIdCtrl.text.trim();
 
                       if (context.mounted) {
                         Navigator.of(dialogCtx).pop();
@@ -917,12 +914,27 @@ class _AdminWebTeachersScreenState extends ConsumerState<AdminWebTeachersScreen>
                                 Expanded(
                                   child: Text(
                                     emailSent
-                                        ? 'Faculty "${nameCtrl.text.trim()}" onboarded! Credentials sent to ${emailCtrl.text.trim()} via Gmail SMTP!'
-                                        : 'Faculty "${nameCtrl.text.trim()}" created! Note: SMTP email could not be delivered (${emailResult?.message ?? "SMTP bridge error"}). You can resend anytime using the Resend button.',
+                                        ? (isQueued
+                                            ? 'Faculty "${nameCtrl.text.trim()}" ($finalTeacherId) onboarded! Credentials queued for delivery to ${emailCtrl.text.trim()} via Gmail SMTP.'
+                                            : 'Faculty "${nameCtrl.text.trim()}" ($finalTeacherId) onboarded! Credentials sent to ${emailCtrl.text.trim()} via Gmail SMTP!')
+                                        : 'Faculty "${nameCtrl.text.trim()}" ($finalTeacherId) created! Note: SMTP email could not be delivered (${emailResult?.message ?? "SMTP bridge error"}). You can resend anytime using the Resend button.',
                                   ),
                                 ),
                               ],
                             ),
+                            action: !emailSent
+                                ? SnackBarAction(
+                                    label: 'Resend',
+                                    textColor: Colors.white,
+                                    onPressed: () {
+                                      _resendTeacherCredentialsDialog(context, {
+                                        'id': teacherIdCtrl.text.trim(),
+                                        'full_name': nameCtrl.text.trim(),
+                                        'email': emailCtrl.text.trim(),
+                                      });
+                                    },
+                                  )
+                                : null,
                             backgroundColor: emailSent ? AppTheme.success : AppTheme.warning,
                             duration: Duration(seconds: emailSent ? 4 : 8),
                             behavior: SnackBarBehavior.floating,

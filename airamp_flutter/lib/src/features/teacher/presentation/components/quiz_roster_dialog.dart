@@ -6,6 +6,7 @@ import '../../data/teacher_repository.dart';
 import '../../../student/data/student_repository.dart';
 import '../../../admin/data/admin_repository.dart';
 import 'quiz_item_analysis_dialog.dart';
+import '../../../../core/components/user_avatar_widget.dart';
 
 class QuizRosterDialog extends ConsumerWidget {
   final int quizId;
@@ -153,14 +154,33 @@ class QuizRosterDialog extends ConsumerWidget {
                               ),
                               child: Row(
                                 children: [
-                                  CircleAvatar(
-                                    radius: 18,
-                                    backgroundColor: isCompleted ? AppTheme.success.withValues(alpha: 0.15) : AppTheme.primary.withValues(alpha: 0.15),
-                                    child: Icon(
-                                      isCompleted ? Icons.check : Icons.hourglass_empty,
-                                      color: isCompleted ? AppTheme.success : Colors.orange,
-                                      size: 18,
-                                    ),
+                                  Stack(
+                                    children: [
+                                      UserAvatarWidget(
+                                        imageSource: (row['student_profile_image'] ?? row['profile_image'] ?? row['profileImage']) as String?,
+                                        fallbackInitial: name.isNotEmpty ? name[0].toUpperCase() : 'S',
+                                        size: 38,
+                                        backgroundColor: isCompleted ? AppTheme.success.withValues(alpha: 0.15) : AppTheme.primary.withValues(alpha: 0.15),
+                                        textColor: isCompleted ? AppTheme.success : AppTheme.primary,
+                                      ),
+                                      Positioned(
+                                        right: 0,
+                                        bottom: 0,
+                                        child: Container(
+                                          padding: const EdgeInsets.all(2),
+                                          decoration: BoxDecoration(
+                                            color: isCompleted ? AppTheme.success : Colors.orange,
+                                            shape: BoxShape.circle,
+                                            border: Border.all(color: AppTheme.surface, width: 1.5),
+                                          ),
+                                          child: Icon(
+                                            isCompleted ? Icons.check : Icons.hourglass_empty,
+                                            size: 9,
+                                            color: Colors.white,
+                                          ),
+                                        ),
+                                      ),
+                                    ],
                                   ),
                                   const SizedBox(width: 12),
                                   Expanded(

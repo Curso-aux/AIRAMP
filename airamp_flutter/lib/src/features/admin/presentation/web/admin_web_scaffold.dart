@@ -9,6 +9,7 @@ import '../../../auth/application/auth_provider.dart';
 import '../../data/admin_repository.dart';
 import 'components/admin_command_palette.dart';
 import '../../../../core/components/offline_sync_status_pill.dart';
+import '../../../../core/components/user_avatar_widget.dart';
 
 class AdminWebScaffold extends ConsumerStatefulWidget {
   final StatefulNavigationShell navigationShell;
@@ -786,13 +787,12 @@ class _AdminWebScaffoldState extends ConsumerState<AdminWebScaffold> {
                                   SizedBox(
                                     width: 48,
                                     child: Center(
-                                      child: CircleAvatar(
-                                        radius: 18,
+                                      child: UserAvatarWidget(
+                                        imageSource: currentUser?.profileImage,
+                                        fallbackInitial: currentUser?.fullName.isNotEmpty == true ? currentUser!.fullName[0].toUpperCase() : 'A',
+                                        size: 36,
                                         backgroundColor: AppTheme.primarySoft,
-                                        child: Text(
-                                          currentUser?.fullName.isNotEmpty == true ? currentUser.fullName[0].toUpperCase() : 'A',
-                                          style: TextStyle(fontWeight: FontWeight.bold, color: AppTheme.primary),
-                                        ),
+                                        textColor: AppTheme.primary,
                                       ),
                                     ),
                                   ),

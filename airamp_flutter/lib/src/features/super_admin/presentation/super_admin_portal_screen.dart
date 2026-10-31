@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../../core/components/offline_sync_status_pill.dart';
+import '../../../core/components/user_avatar_widget.dart';
 import '../../../core/theme/theme_provider.dart';
 import '../../admin/data/admin_repository.dart';
 import '../../auth/application/auth_provider.dart';
@@ -865,10 +866,12 @@ class _SuperAdminPortalScreenState extends ConsumerState<SuperAdminPortalScreen>
                     SizedBox(
                       width: 44,
                       child: Center(
-                        child: CircleAvatar(
-                          radius: 16,
+                        child: UserAvatarWidget(
+                          imageSource: currentUser?.profileImage,
+                          fallbackInitial: currentUser?.fullName.isNotEmpty == true ? currentUser!.fullName[0].toUpperCase() : 'S',
+                          size: 32,
                           backgroundColor: gTheme.surfaceSubtle,
-                          child: Icon(Icons.person_outline_rounded, color: gTheme.textSecondary, size: 18),
+                          textColor: gTheme.textSecondary,
                         ),
                       ),
                     ),

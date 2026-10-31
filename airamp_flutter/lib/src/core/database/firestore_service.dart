@@ -170,31 +170,66 @@ class FirestoreService {
     return null;
   }
 
-  /// REST fallback to fetch all users from Cloud Firestore
+  /// REST fallback to fetch all users from Cloud Firestore with pagination
   Future<List<Map<String, dynamic>>> _fetchAllRest() async {
+    final list = <Map<String, dynamic>>[];
     try {
       final dio = _dio;
-      final url = 'https://firestore.googleapis.com/v1/projects/$projectId/databases/(default)/documents/users?key=$apiKey&pageSize=100';
-      final response = await dio.get(url);
-      final list = <Map<String, dynamic>>[];
-      if (response.data is Map && response.data.containsKey('documents')) {
-        final docs = response.data['documents'] as List? ?? [];
-        for (final d in docs) {
-          if (d is Map && d.containsKey('fields')) {
-            final fields = d['fields'] as Map<String, dynamic>? ?? {};
-            final parsed = _parseFirestoreFields(fields);
-            if (!parsed.containsKey('id') && d.containsKey('name')) {
-              parsed['id'] = (d['name'] as String).split('/').last;
+      String? pageToken;
+      final keyParam = apiKey.isNotEmpty ? '&key=$apiKey' : '';
+
+      do {
+        final tokenParam = pageToken != null && pageToken.isNotEmpty ? '&pageToken=$pageToken' : '';
+        final url = 'https://firestore.googleapis.com/v1/projects/$projectId/databases/(default)/documents/users?pageSize=300$tokenParam$keyParam';
+        final response = await dio.get(url);
+
+        if (response.data is Map && response.data.containsKey('documents')) {
+          final docs = response.data['documents'] as List? ?? [];
+          for (final d in docs) {
+            if (d is Map && d.containsKey('fields')) {
+              final fields = d['fields'] as Map<String, dynamic>? ?? {};
+              final parsed = _parseFirestoreFields(fields);
+              if (!parsed.containsKey('id') && d.containsKey('name')) {
+                parsed['id'] = (d['name'] as String).split('/').last;
+              }
+              list.add(parsed);
             }
-            list.add(parsed);
           }
         }
-      }
+
+        pageToken = (response.data is Map && response.data.containsKey('nextPageToken'))
+            ? response.data['nextPageToken'] as String?
+            : null;
+      } while (pageToken != null && pageToken.isNotEmpty);
+
       return list;
     } catch (e) {
       debugPrint('[FirestoreService] REST fetchAll error: $e');
-      return [];
+      return list;
     }
+  }
+
+  /// Calculates the highest numeric sequence for a given ID prefix (e.g. '001-' or '002-')
+  Future<int> getHighestSequence(String prefix) async {
+    int maxSeq = 0;
+    try {
+      final allUsers = await fetchAllUsers();
+      for (final u in allUsers) {
+        final uid = u['id']?.toString() ?? '';
+        if (uid.startsWith(prefix)) {
+          final parts = uid.split('-');
+          if (parts.length == 2) {
+            final num = int.tryParse(parts[1]);
+            if (num != null && num > maxSeq) {
+              maxSeq = num;
+            }
+          }
+        }
+      }
+    } catch (e) {
+      debugPrint('[FirestoreService] getHighestSequence note: $e');
+    }
+    return maxSeq;
   }
 
   /// Saves or updates a user document in Cloud Firestore
@@ -259,7 +294,7 @@ class FirestoreService {
 
     try {
       return await _findUserInternal(idLower, rawTrimmed)
-          .timeout(const Duration(seconds: 4), onTimeout: () => null);
+          .timeout(const Duration(seconds: 8), onTimeout: () => null);
     } catch (e) {
       debugPrint('[FirestoreService] findUserByIdentifier note: $e');
       return null;
@@ -273,11 +308,11 @@ class FirestoreService {
     if (isAvailable && !_useRestPrimary) {
       try {
         if (isEmail) {
-          // Parallel search targeted to email fields
+          // Parallel search targeted to email fields with snappy timeout
           final results = await Future.wait([
-            usersCollection.where('email_lower', isEqualTo: idLower).limit(1).get().timeout(const Duration(seconds: 3)),
-            usersCollection.where('email', isEqualTo: rawTrimmed).limit(1).get().timeout(const Duration(seconds: 3)),
-            usersCollection.doc(idLower).get().timeout(const Duration(seconds: 3)),
+            usersCollection.where('email_lower', isEqualTo: idLower).limit(1).get().timeout(const Duration(milliseconds: 1500)),
+            usersCollection.where('email', isEqualTo: rawTrimmed).limit(1).get().timeout(const Duration(milliseconds: 1500)),
+            usersCollection.doc(idLower).get().timeout(const Duration(milliseconds: 1500)),
           ]);
           for (final snap in results) {
             if (snap is QuerySnapshot<Map<String, dynamic>> && snap.docs.isNotEmpty) {
@@ -293,10 +328,10 @@ class FirestoreService {
         } else {
           // Parallel search targeted to user ID and username
           final results = await Future.wait([
-            usersCollection.doc(rawTrimmed).get().timeout(const Duration(seconds: 3)),
-            usersCollection.where('id', isEqualTo: rawTrimmed).limit(1).get().timeout(const Duration(seconds: 3)),
-            usersCollection.where('username_lower', isEqualTo: idLower).limit(1).get().timeout(const Duration(seconds: 3)),
-            usersCollection.where('username', isEqualTo: rawTrimmed).limit(1).get().timeout(const Duration(seconds: 3)),
+            usersCollection.doc(rawTrimmed).get().timeout(const Duration(milliseconds: 1500)),
+            usersCollection.where('id', isEqualTo: rawTrimmed).limit(1).get().timeout(const Duration(milliseconds: 1500)),
+            usersCollection.where('username_lower', isEqualTo: idLower).limit(1).get().timeout(const Duration(milliseconds: 1500)),
+            usersCollection.where('username', isEqualTo: rawTrimmed).limit(1).get().timeout(const Duration(milliseconds: 1500)),
           ]);
           for (final snap in results) {
             if (snap is DocumentSnapshot<Map<String, dynamic>> && snap.exists && snap.data() != null) {
@@ -330,7 +365,8 @@ class FirestoreService {
         // Direct document fetch by ID
         try {
           final dio = _dio;
-          final docUrl = 'https://firestore.googleapis.com/v1/projects/$projectId/databases/(default)/documents/users/$rawTrimmed?key=$apiKey';
+          final keyParam = apiKey.isNotEmpty ? '?key=$apiKey' : '';
+          final docUrl = 'https://firestore.googleapis.com/v1/projects/$projectId/databases/(default)/documents/users/$rawTrimmed$keyParam';
           final docResp = await dio.get(docUrl);
           if (docResp.statusCode == 200 && docResp.data is Map && docResp.data['fields'] is Map) {
             final parsed = _parseFirestoreFields(docResp.data['fields'] as Map<String, dynamic>);
@@ -383,7 +419,7 @@ class FirestoreService {
     return user != null;
   }
 
-  /// Syncs all existing local SQLite users to Cloud Firestore so no authentic accounts are lost
+  /// Syncs all existing local SQLite users to Cloud Firestore without overwriting existing cloud data
   Future<void> syncLocalUsersToCloud() async {
     try {
       final db = await DatabaseHelper().database;
@@ -392,6 +428,7 @@ class FirestoreService {
       for (final user in localUsers) {
         final email = (user['email'] as String? ?? '').toLowerCase().trim();
         final id = (user['id'] as String? ?? '').toLowerCase().trim();
+        if (id.isEmpty) continue;
         final isTestDummy = email.contains('newstudent_') ||
             email.contains('dup_student_') ||
             email.contains('newteacher_') ||
@@ -403,6 +440,13 @@ class FirestoreService {
             id.startsWith('student_test_') ||
             id.startsWith('teacher_test_');
         if (isTestDummy) continue;
+
+        // CRITICAL GUARD: Never overwrite an existing Cloud Firestore user with local SQLite data!
+        // Cloud Firestore is the primary source of truth for user passwords and account data.
+        final existingInCloud = await findUserByIdentifier(id);
+        if (existingInCloud != null && existingInCloud.isNotEmpty) {
+          continue;
+        }
 
         await saveUser(user);
         pushedCount++;
@@ -483,6 +527,7 @@ class FirestoreService {
             'password_salt': data['password_salt'],
             'role': data['role'] ?? 'student',
             'full_name': data['full_name'] ?? data['name'] ?? '',
+            'profile_image': data['profile_image'] ?? data['profileImage'] ?? (existing.isNotEmpty ? existing.first['profile_image'] : null),
             'section': data['section'],
             'grade': data['grade'],
             'student_type': data['student_type'] ?? 'regular',

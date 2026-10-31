@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import '../../../core/components/user_avatar_widget.dart';
 import '../../../core/database/database_helper.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/theme/theme_provider.dart';
@@ -1296,10 +1297,11 @@ class _SectionCardState extends ConsumerState<_SectionCard> {
           children: [
             Row(
               children: [
-                CircleAvatar(
-                  radius: 18,
-                  backgroundColor: AppTheme.primary.withValues(alpha: 0.2),
-                  child: Text(initials, style: TextStyle(color: AppTheme.primary, fontWeight: FontWeight.bold, fontSize: 14)),
+                UserAvatarWidget(
+                  imageSource: (student['profile_image'] ?? student['profileImage']) as String?,
+                  fallbackInitial: initials,
+                  size: 36,
+                  fontSize: 14,
                 ),
                 const SizedBox(width: 12),
                 Expanded(

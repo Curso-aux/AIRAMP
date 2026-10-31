@@ -9,6 +9,7 @@ import '../../../../core/services/session_draft_service.dart';
 import '../../../auth/application/auth_provider.dart';
 import '../../../student/data/student_repository.dart';
 import '../../data/teacher_repository.dart';
+import '../../../../core/components/user_avatar_widget.dart';
 import 'quiz_parser.dart';
 
 class CreateQuizDialog extends ConsumerStatefulWidget {
@@ -1611,13 +1612,12 @@ Answer: B''';
                           '$email · Section: $sec',
                           style: TextStyle(fontSize: 11, color: AppTheme.textSecondary),
                         ),
-                        secondary: CircleAvatar(
-                          radius: 16,
+                        secondary: UserAvatarWidget(
+                          imageSource: (s['profile_image'] ?? s['profileImage']) as String?,
+                          fallbackInitial: name.isNotEmpty ? name[0].toUpperCase() : 'S',
+                          size: 32,
                           backgroundColor: AppTheme.primary.withValues(alpha: 0.2),
-                          child: Text(
-                            name.isNotEmpty ? name[0].toUpperCase() : 'S',
-                            style: TextStyle(color: AppTheme.primary, fontWeight: FontWeight.bold, fontSize: 12),
-                          ),
+                          textColor: AppTheme.primary,
                         ),
                         onChanged: (bool? val) {
                           setState(() {

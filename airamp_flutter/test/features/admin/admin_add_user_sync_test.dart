@@ -113,5 +113,34 @@ void main() {
       expect(rows.first['grade'], equals('Grade 12'));
       expect(rows.first['section'], equals('Ruby'));
     });
+
+    test('generateNextStudentId accurately inspects Firestore sequence and does not produce 001-0001', () async {
+      final dbHelper = DatabaseHelper();
+      final nextStudentId = await dbHelper.generateNextStudentId();
+      expect(nextStudentId.startsWith('001-'), isTrue);
+      final seqNum = int.parse(nextStudentId.split('-')[1]);
+      expect(seqNum, greaterThan(63));
+    });
+
+    test('Student KING KHEVIN L. CURSO logs in with email luyahan007@gmail.com, username dasu, and ID 001-0064 with password khev@123', () async {
+      final authRepo = AuthRepository();
+
+      // Test 1: Login by Email
+      final loginByEmail = await authRepo.login('luyahan007@gmail.com', 'khev@123');
+      expect(loginByEmail['user']['email'], equals('luyahan007@gmail.com'));
+      expect(loginByEmail['user']['username'], equals('dasu'));
+      expect(loginByEmail['user']['id'], equals('001-0064'));
+      expect(loginByEmail['user']['role'], equals('student'));
+
+      // Test 2: Login by Username
+      final loginByUsername = await authRepo.login('dasu', 'khev@123');
+      expect(loginByUsername['user']['id'], equals('001-0064'));
+      expect(loginByUsername['user']['email'], equals('luyahan007@gmail.com'));
+
+      // Test 3: Login by Student ID
+      final loginById = await authRepo.login('001-0064', 'khev@123');
+      expect(loginById['user']['id'], equals('001-0064'));
+      expect(loginById['user']['role'], equals('student'));
+    });
   });
 }

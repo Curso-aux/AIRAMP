@@ -84,6 +84,9 @@ class DatabaseHelper {
       await db.execute("ALTER TABLE users ADD COLUMN category TEXT");
     } catch (_) {}
     try {
+      await db.execute('ALTER TABLE users ADD COLUMN profile_image TEXT');
+    } catch (_) {}
+    try {
       await db.execute("ALTER TABLE users ADD COLUMN must_change_password INTEGER DEFAULT 0");
     } catch (_) {}
     try {
@@ -442,6 +445,7 @@ class DatabaseHelper {
         grade TEXT,
         student_type TEXT DEFAULT 'regular',
         special_notes TEXT,
+        profile_image TEXT,
         must_change_password INTEGER DEFAULT 0,
         created_at TEXT NOT NULL
       )
@@ -2066,6 +2070,8 @@ class DatabaseHelper {
         qa.*,
         u.full_name as student_name,
         u.email as student_email,
+        u.profile_image as student_profile_image,
+        u.profile_image,
         CASE
           WHEN qa.score >= q.passing_score THEN 'Passed'
           ELSE 'Failed'
@@ -2481,6 +2487,8 @@ class DatabaseHelper {
              u.email as student_email, 
              u.section as student_section, 
              u.grade as student_grade,
+             u.profile_image as student_profile_image,
+             u.profile_image,
              s.name as subject_name, 
              s.subject_code, 
              COALESCE(qz.title, lo.title, 'Quiz Assessment') as lo_title, 
@@ -4053,6 +4061,22 @@ class DatabaseHelper {
     return enriched;
   }
 
+  /// Checks whether a given user ID is already registered in local SQLite or Cloud Firestore
+  Future<bool> isUserIdTaken(String id) async {
+    final cleanId = id.trim();
+    if (cleanId.isEmpty) return false;
+    try {
+      final db = await database;
+      final local = await db.query('users', where: 'id = ?', whereArgs: [cleanId], limit: 1);
+      if (local.isNotEmpty) return true;
+    } catch (_) {}
+    try {
+      final cloud = await FirestoreService().findUserByIdentifier(cleanId);
+      if (cloud != null && cloud.isNotEmpty) return true;
+    } catch (_) {}
+    return false;
+  }
+
   /// Generates the next sequential Student ID using the 001-XXXX pattern (e.g. 001-0001, 001-0002)
   Future<String> generateNextStudentId() async {
     int maxSequence = 0;
@@ -4074,18 +4098,9 @@ class DatabaseHelper {
     } catch (_) {}
 
     try {
-      final cloudUsers = await FirestoreService().fetchAllUsers();
-      for (final user in cloudUsers) {
-        final idStr = user['id']?.toString() ?? '';
-        if (idStr.startsWith('001-')) {
-          final parts = idStr.split('-');
-          if (parts.length == 2) {
-            final num = int.tryParse(parts[1]);
-            if (num != null && num > maxSequence) {
-              maxSequence = num;
-            }
-          }
-        }
+      final cloudMax = await FirestoreService().getHighestSequence('001-');
+      if (cloudMax > maxSequence) {
+        maxSequence = cloudMax;
       }
     } catch (_) {}
 
@@ -4114,18 +4129,9 @@ class DatabaseHelper {
     } catch (_) {}
 
     try {
-      final cloudUsers = await FirestoreService().fetchAllUsers();
-      for (final user in cloudUsers) {
-        final idStr = user['id']?.toString() ?? '';
-        if (idStr.startsWith('002-')) {
-          final parts = idStr.split('-');
-          if (parts.length == 2) {
-            final num = int.tryParse(parts[1]);
-            if (num != null && num > maxSequence) {
-              maxSequence = num;
-            }
-          }
-        }
+      final cloudMax = await FirestoreService().getHighestSequence('002-');
+      if (cloudMax > maxSequence) {
+        maxSequence = cloudMax;
       }
     } catch (_) {}
 
@@ -4144,15 +4150,48 @@ class DatabaseHelper {
     final db = await database;
     final salt = generateSalt();
     final hashedPassword = hashPassword(password, salt);
-    final teacherId = (id != null && id.trim().isNotEmpty)
-        ? id.trim()
-        : await generateNextTeacherId();
+    final cleanEmail = email.trim().toLowerCase();
+
+    // Check if teacher already exists in local SQLite or Cloud Firestore
+    String? existingId;
+    final existingUsers = await db.query(
+      'users',
+      where: 'LOWER(email) = ?',
+      whereArgs: [cleanEmail],
+      limit: 1,
+    );
+    if (existingUsers.isNotEmpty) {
+      existingId = existingUsers.first['id'] as String?;
+    } else {
+      try {
+        final cloudMatch = await FirestoreService().findUserByIdentifier(cleanEmail);
+        if (cloudMatch != null && cloudMatch.containsKey('id')) {
+          existingId = cloudMatch['id']?.toString();
+        }
+      } catch (_) {}
+    }
+
+    String finalTeacherId;
+    if (existingId != null && existingId.isNotEmpty) {
+      finalTeacherId = existingId;
+    } else if (id != null && id.trim().isNotEmpty) {
+      final proposedId = id.trim();
+      final taken = await isUserIdTaken(proposedId);
+      if (taken) {
+        finalTeacherId = await generateNextTeacherId();
+      } else {
+        finalTeacherId = proposedId;
+      }
+    } else {
+      finalTeacherId = await generateNextTeacherId();
+    }
+
     final resolvedUsername = (username != null && username.trim().isNotEmpty)
         ? username.trim()
         : (email.contains('@') ? email.split('@').first : fullName.trim().toLowerCase().replaceAll(' ', '.'));
 
     final teacherData = {
-      'id': teacherId,
+      'id': finalTeacherId,
       'email': email.trim(),
       'username': resolvedUsername,
       'password': hashedPassword,
@@ -4165,30 +4204,13 @@ class DatabaseHelper {
       'created_at': DateTime.now().toIso8601String(),
     };
 
-    final cleanEmail = email.trim().toLowerCase();
-    final existingUsers = await db.query(
-      'users',
-      where: 'LOWER(email) = ?',
-      whereArgs: [cleanEmail],
-      limit: 1,
-    );
-
-    String finalTeacherId = teacherId;
-
-    if (existingUsers.isNotEmpty) {
-      final existingUser = existingUsers.first;
-      finalTeacherId = existingUser['id'] as String;
-
-      final updateData = Map<String, dynamic>.from(teacherData);
-      updateData['id'] = finalTeacherId;
-
+    if (existingId != null && existingId.isNotEmpty) {
       try {
-        await db.update('users', updateData, where: 'id = ?', whereArgs: [finalTeacherId]);
+        await db.update('users', teacherData, where: 'id = ?', whereArgs: [finalTeacherId]);
       } catch (_) {
-        final fallback = Map<String, dynamic>.from(updateData)..remove('category');
+        final fallback = Map<String, dynamic>.from(teacherData)..remove('category');
         await db.update('users', fallback, where: 'id = ?', whereArgs: [finalTeacherId]);
       }
-      teacherData['id'] = finalTeacherId;
     } else {
       try {
         await db.insert('users', teacherData, conflictAlgorithm: ConflictAlgorithm.replace);
@@ -4241,15 +4263,50 @@ class DatabaseHelper {
     final db = await database;
     final salt = generateSalt();
     final hashedPassword = hashPassword(password, salt);
-    final studentId = (id != null && id.trim().isNotEmpty)
-        ? id.trim()
-        : await generateNextStudentId();
+    final cleanEmail = email.trim().toLowerCase();
+
+    // Check if student already exists in local SQLite or Cloud Firestore
+    String? existingId;
+    final existingUsers = await db.query(
+      'users',
+      where: 'LOWER(email) = ?',
+      whereArgs: [cleanEmail],
+      limit: 1,
+    );
+    if (existingUsers.isNotEmpty) {
+      existingId = existingUsers.first['id'] as String?;
+    } else {
+      try {
+        final cloudMatch = await FirestoreService().findUserByIdentifier(cleanEmail);
+        if (cloudMatch != null && cloudMatch.containsKey('id')) {
+          existingId = cloudMatch['id']?.toString();
+        }
+      } catch (_) {}
+    }
+
+    String finalStudentId;
+    if (existingId != null && existingId.isNotEmpty) {
+      // Retain the existing authentic student ID when updating an existing account
+      finalStudentId = existingId;
+    } else if (id != null && id.trim().isNotEmpty) {
+      final proposedId = id.trim();
+      final taken = await isUserIdTaken(proposedId);
+      if (taken) {
+        // Proposed ID is already taken by another account! Generate next valid sequence to prevent collision
+        finalStudentId = await generateNextStudentId();
+      } else {
+        finalStudentId = proposedId;
+      }
+    } else {
+      finalStudentId = await generateNextStudentId();
+    }
+
     final resolvedUsername = (username != null && username.trim().isNotEmpty)
         ? username.trim()
         : (email.contains('@') ? email.split('@').first : fullName.trim().toLowerCase().replaceAll(' ', '.'));
 
     final studentData = {
-      'id': studentId,
+      'id': finalStudentId,
       'email': email.trim(),
       'username': resolvedUsername,
       'password': hashedPassword,
@@ -4266,30 +4323,13 @@ class DatabaseHelper {
       'created_at': DateTime.now().toIso8601String(),
     };
 
-    final cleanEmail = email.trim().toLowerCase();
-    final existingUsers = await db.query(
-      'users',
-      where: 'LOWER(email) = ?',
-      whereArgs: [cleanEmail],
-      limit: 1,
-    );
-
-    String finalStudentId = studentId;
-
-    if (existingUsers.isNotEmpty) {
-      final existingUser = existingUsers.first;
-      finalStudentId = existingUser['id'] as String;
-
-      final updateData = Map<String, dynamic>.from(studentData);
-      updateData['id'] = finalStudentId;
-
+    if (existingId != null && existingId.isNotEmpty) {
       try {
-        await db.update('users', updateData, where: 'id = ?', whereArgs: [finalStudentId]);
+        await db.update('users', studentData, where: 'id = ?', whereArgs: [finalStudentId]);
       } catch (_) {
-        final fallback = Map<String, dynamic>.from(updateData)..remove('category');
+        final fallback = Map<String, dynamic>.from(studentData)..remove('category');
         await db.update('users', fallback, where: 'id = ?', whereArgs: [finalStudentId]);
       }
-      studentData['id'] = finalStudentId;
     } else {
       try {
         await db.insert('users', studentData, conflictAlgorithm: ConflictAlgorithm.replace);
@@ -4606,7 +4646,7 @@ class DatabaseHelper {
 
     // Recent attempts with section/student filtering
     String recentQuery = '''
-      SELECT qa.*, u.full_name as student_name, s.name as subject_name
+      SELECT qa.*, u.full_name as student_name, u.profile_image as student_profile_image, u.profile_image, s.name as subject_name
       FROM quiz_attempts qa
       JOIN users u ON qa.student_id = u.id
       JOIN subjects s ON qa.subject_id = s.id
@@ -5378,6 +5418,8 @@ class DatabaseHelper {
              u.email as student_email,
              u.section as student_section,
              u.grade as student_grade,
+             u.profile_image as student_profile_image,
+             u.profile_image,
              CASE
                WHEN qa.status = 'completed' AND qa.percentage >= (
                  SELECT passing_score FROM quizzes WHERE id = qa.quiz_id
@@ -5952,7 +5994,7 @@ class DatabaseHelper {
   Future<List<Map<String, dynamic>>> getSubmissionsForAssignment(int assignmentId) async {
     final db = await database;
     return await db.rawQuery('''
-      SELECT sub.*, u.full_name, u.email, u.section, u.grade as student_grade_level
+      SELECT sub.*, u.full_name, u.email, u.section, u.grade as student_grade_level, u.profile_image
       FROM submissions sub
       LEFT JOIN users u ON sub.student_id = u.id
       WHERE sub.assignment_id = ?
@@ -5985,6 +6027,7 @@ class DatabaseHelper {
         u.email,
         u.section,
         u.grade as student_grade_level,
+        u.profile_image,
         sub.id as submission_id,
         sub.submission_type,
         sub.content_link,
@@ -6016,6 +6059,7 @@ class DatabaseHelper {
         u.email,
         u.section,
         u.grade as student_grade_level,
+        u.profile_image,
         sub.id as submission_id,
         sub.submission_type,
         sub.content_link,
@@ -6337,7 +6381,7 @@ class DatabaseHelper {
         ? username.trim()
         : (email.contains('@') ? email.split('@').first : fullName.trim().toLowerCase().replaceAll(' ', '.'));
 
-    await db.insert('users', {
+    final adminData = {
       'id': adminId,
       'email': email.trim().toLowerCase(),
       'username': resolvedUsername,
@@ -6347,7 +6391,13 @@ class DatabaseHelper {
       'full_name': fullName.trim(),
       'school_id': schoolId ?? 'sch_main',
       'created_at': DateTime.now().toIso8601String(),
-    });
+    };
+
+    await db.insert('users', adminData);
+
+    try {
+      await FirestoreService().saveUser(adminData);
+    } catch (_) {}
 
     return adminId;
   }

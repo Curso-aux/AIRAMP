@@ -7,6 +7,7 @@ import '../../../../core/theme/theme_provider.dart';
 import '../../../auth/application/auth_provider.dart';
 import '../../data/teacher_repository.dart';
 import '../../../../core/components/offline_sync_status_pill.dart';
+import '../../../../core/components/user_avatar_widget.dart';
 
 class TeacherNavItem {
   final String label;
@@ -469,13 +470,12 @@ class _TeacherWebScaffoldState extends ConsumerState<TeacherWebScaffold> {
                         SizedBox(
                           width: 48,
                           child: Center(
-                            child: CircleAvatar(
-                              radius: 18,
+                            child: UserAvatarWidget(
+                              imageSource: currentUser?.profileImage,
+                              fallbackInitial: currentUser?.fullName.isNotEmpty == true ? currentUser!.fullName[0].toUpperCase() : 'T',
+                              size: 36,
                               backgroundColor: Colors.teal.withValues(alpha: 0.15),
-                              child: Text(
-                                currentUser?.fullName.isNotEmpty == true ? currentUser.fullName[0].toUpperCase() : 'T',
-                                style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.teal),
-                              ),
+                              textColor: Colors.teal,
                             ),
                           ),
                         ),

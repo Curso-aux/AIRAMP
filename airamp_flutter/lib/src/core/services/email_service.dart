@@ -498,11 +498,12 @@ Evangelista Christian School & Institutional Assessment Platform
       }
     }
 
-    // 2. HTTP SMTP Bridge Delivery (For Web & fallback on emulator/desktop)
-    if (!sent) {
+    // 2. HTTP SMTP Bridge Delivery (For Local Web & fallback on emulator/desktop)
+    final isHttpsWeb = kIsWeb && Uri.base.scheme == 'https';
+    if (!sent && (!isHttpsWeb || EmailConfig.cloudBridgeUrl.startsWith('https://'))) {
       final dio = Dio(BaseOptions(
-        connectTimeout: const Duration(seconds: 10),
-        receiveTimeout: const Duration(seconds: 35),
+        connectTimeout: const Duration(milliseconds: 2500),
+        receiveTimeout: const Duration(seconds: 15),
       ))..interceptors.add(RateLimitInterceptor());
 
       final List<String> bridgeCandidates = [];
@@ -511,28 +512,30 @@ Evangelista Christian School & Institutional Assessment Platform
       }
 
       if (kIsWeb) {
-        final host = Uri.base.host;
-        if (host == 'localhost') {
-          bridgeCandidates.addAll([
-            'http://localhost:8088/send-email',
-            'http://127.0.0.1:8088/send-email',
-          ]);
-        } else if (host == '127.0.0.1') {
-          bridgeCandidates.addAll([
-            'http://127.0.0.1:8088/send-email',
-            'http://localhost:8088/send-email',
-          ]);
-        } else if (host.isNotEmpty) {
-          bridgeCandidates.addAll([
-            'http://$host:8088/send-email',
-            'http://localhost:8088/send-email',
-            'http://127.0.0.1:8088/send-email',
-          ]);
-        } else {
-          bridgeCandidates.addAll([
-            'http://localhost:8088/send-email',
-            'http://127.0.0.1:8088/send-email',
-          ]);
+        if (!isHttpsWeb) {
+          final host = Uri.base.host;
+          if (host == 'localhost') {
+            bridgeCandidates.addAll([
+              'http://localhost:8088/send-email',
+              'http://127.0.0.1:8088/send-email',
+            ]);
+          } else if (host == '127.0.0.1') {
+            bridgeCandidates.addAll([
+              'http://127.0.0.1:8088/send-email',
+              'http://localhost:8088/send-email',
+            ]);
+          } else if (host.isNotEmpty) {
+            bridgeCandidates.addAll([
+              'http://$host:8088/send-email',
+              'http://localhost:8088/send-email',
+              'http://127.0.0.1:8088/send-email',
+            ]);
+          } else {
+            bridgeCandidates.addAll([
+              'http://localhost:8088/send-email',
+              'http://127.0.0.1:8088/send-email',
+            ]);
+          }
         }
       } else {
         bridgeCandidates.addAll([
@@ -569,43 +572,110 @@ Evangelista Christian School & Institutional Assessment Platform
       }
     }
 
-    // 3. Always log to Cloud Firestore `mail` collection for auditing & persistence
-    try {
-      final docId = 'mail_${DateTime.now().millisecondsSinceEpoch}';
-      final dio = Dio(BaseOptions(
-        connectTimeout: const Duration(seconds: 4),
-        receiveTimeout: const Duration(seconds: 4),
-      ))..interceptors.add(RateLimitInterceptor());
-      final url = 'https://firestore.googleapis.com/v1/projects/${FirestoreService.projectId}/databases/(default)/documents/mail/$docId?key=${FirestoreService.apiKey}';
+    // 3. Cloud Firestore Queue Delivery & Audit
+    // Enables Deployed Web (Firebase Hosting) to dispatch emails reliably
+    // without Mixed Content blocks or needing a local open port on client devices.
+    final docId = 'mail_${DateTime.now().millisecondsSinceEpoch}_${DateTime.now().microsecond}';
+    final firestoreDio = Dio(BaseOptions(
+      connectTimeout: const Duration(seconds: 5),
+      receiveTimeout: const Duration(seconds: 8),
+    ))..interceptors.add(RateLimitInterceptor());
 
-      final fields = <String, dynamic>{
-        'to': {'stringValue': toEmail},
-        'subject': {'stringValue': subject},
-        'user_id': {'stringValue': userId},
-        'role': {'stringValue': role},
-        'mail_type': {'stringValue': mailType},
-        'created_at': {'stringValue': DateTime.now().toIso8601String()},
-        'status': {'stringValue': sent ? 'sent_via_$channel' : 'delivery_failed'},
-      };
-      if (username != null && username.isNotEmpty) {
-        fields['username'] = {'stringValue': username};
+    final docUrl = 'https://firestore.googleapis.com/v1/projects/${FirestoreService.projectId}/databases/(default)/documents/mail/$docId?key=${FirestoreService.apiKey}';
+
+    if (!sent) {
+      try {
+        debugPrint('[EmailService] Enqueuing email into Cloud Firestore queue: $docId');
+        final fields = <String, dynamic>{
+          'to': {'stringValue': toEmail},
+          'subject': {'stringValue': subject},
+          'text': {'stringValue': textContent},
+          'html': {'stringValue': htmlContent},
+          'user_id': {'stringValue': userId},
+          'role': {'stringValue': role},
+          'mail_type': {'stringValue': mailType},
+          'created_at': {'stringValue': DateTime.now().toIso8601String()},
+          'status': {'stringValue': 'pending'},
+        };
+        if (username != null && username.isNotEmpty) {
+          fields['username'] = {'stringValue': username};
+        }
+
+        final putResp = await firestoreDio.patch(docUrl, data: {'fields': fields});
+
+        if (putResp.statusCode == 200 || putResp.statusCode == 201) {
+          // Poll Firestore up to 6 seconds to see if our daemon dispatched it immediately
+          bool pickedUp = false;
+          for (int attempt = 0; attempt < 6; attempt++) {
+            await Future.delayed(const Duration(milliseconds: 1000));
+            try {
+              final checkResp = await firestoreDio.get(docUrl);
+              if (checkResp.statusCode == 200) {
+                final checkData = checkResp.data as Map<String, dynamic>?;
+                final checkFields = checkData?['fields'] as Map<String, dynamic>?;
+                final checkStatus = checkFields?['status']?['stringValue'] as String?;
+                if (checkStatus == 'sent_via_smtp') {
+                  sent = true;
+                  channel = 'smtp_cloud_bridge';
+                  pickedUp = true;
+                  debugPrint('[EmailService] Cloud Queue confirmed dispatch via SMTP for $docId');
+                  break;
+                } else if (checkStatus == 'failed') {
+                  final err = checkFields?['error']?['stringValue'] as String? ?? 'Delivery failed in cloud bridge';
+                  debugPrint('[EmailService] Cloud Queue dispatch failed: $err');
+                  break;
+                }
+              }
+            } catch (_) {}
+          }
+
+          if (!pickedUp) {
+            // Still in queue - daemon will deliver it as soon as ready!
+            sent = true;
+            channel = 'cloud_queue_pending';
+            debugPrint('[EmailService] Email safely enqueued in Cloud Firestore (awaiting daemon sync)');
+          }
+        }
+      } catch (queueErr) {
+        debugPrint('[EmailService] Cloud Firestore queue error: $queueErr');
       }
-      await dio.patch(url, data: {'fields': fields});
-    } catch (e) {
-      debugPrint('[EmailService] Cloud mail audit note: $e');
+    } else {
+      // Record audit record in Firestore if sent natively or via local bridge
+      try {
+        final fields = <String, dynamic>{
+          'to': {'stringValue': toEmail},
+          'subject': {'stringValue': subject},
+          'user_id': {'stringValue': userId},
+          'role': {'stringValue': role},
+          'mail_type': {'stringValue': mailType},
+          'created_at': {'stringValue': DateTime.now().toIso8601String()},
+          'status': {'stringValue': 'sent_via_$channel'},
+        };
+        if (username != null && username.isNotEmpty) {
+          fields['username'] = {'stringValue': username};
+        }
+        await firestoreDio.patch(docUrl, data: {'fields': fields});
+      } catch (e) {
+        debugPrint('[EmailService] Cloud mail audit note: $e');
+      }
     }
 
-    final result = sent
-        ? EmailResult(
-            success: true,
-            message: successMessage,
-            channel: channel,
-          )
-        : EmailResult(
-            success: false,
-            message: 'Could not deliver email to $toEmail. Please ensure the SMTP bridge daemon (start_smtp_bridge.bat) is running on port 8088.',
-            channel: 'failed',
-          );
+    final String finalMessage;
+    if (sent) {
+      if (channel == 'cloud_queue_pending') {
+        finalMessage = 'Credentials email enqueued for delivery to $toEmail. It will be dispatched automatically via Gmail SMTP.';
+      } else {
+        finalMessage = successMessage;
+      }
+    } else {
+      finalMessage = 'Could not deliver email to $toEmail. Please ensure the SMTP bridge daemon (start_smtp_bridge.bat) is running or internet connectivity is active.';
+    }
+
+    final result = EmailResult(
+      success: sent,
+      message: finalMessage,
+      channel: channel,
+    );
 
     lastResult = result;
     return result;

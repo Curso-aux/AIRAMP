@@ -6,7 +6,9 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../../../core/components/auth/required_change_password_dialog.dart';
 import '../../../core/components/app_toast.dart';
 import '../../../core/components/otp_verification_dialog.dart';
+import '../../../core/components/profile_photo_sheet.dart';
 import '../../../core/components/skeleton_loader.dart';
+import '../../../core/components/user_avatar_widget.dart';
 import '../../../core/services/otp_service.dart';
 import '../../../core/services/app_update_service.dart';
 import '../../../core/theme/app_theme.dart';
@@ -115,12 +117,15 @@ class _StudentProfileScreenState extends ConsumerState<StudentProfileScreen>
     super.dispose();
   }
 
-  // ── Image Picker / Profile Photo Info ──
+  // ── Image Picker / Profile Photo Customization ──
   Future<void> _handlePickImage() async {
-    if (!mounted) return;
-    AppToast.showInfo(
-      context,
-      'Profile photo updates are managed by School Admin LIS.',
+    final user = ref.read(authProvider);
+    if (user == null || !mounted) return;
+    await ProfilePhotoSheet.show(
+      context: context,
+      ref: ref,
+      currentPhoto: user.profileImage ?? '',
+      fullName: user.fullName,
     );
   }
 
@@ -1273,31 +1278,23 @@ class _StudentProfileScreenState extends ConsumerState<StudentProfileScreen>
                 Stack(
                   alignment: Alignment.bottomRight,
                   children: [
-                    Container(
-                      padding: const EdgeInsets.all(3),
-                      decoration: BoxDecoration(
-                        shape: BoxShape.circle,
-                        border: Border.all(
-                          color: AppTheme.border,
-                          width: 2,
+                    GestureDetector(
+                      onTap: _handlePickImage,
+                      child: Container(
+                        padding: const EdgeInsets.all(3),
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          border: Border.all(
+                            color: AppTheme.border,
+                            width: 2,
+                          ),
                         ),
-                      ),
-                      child: CircleAvatar(
-                        radius: 40,
-                        backgroundColor: AppTheme.inputBg,
-                        backgroundImage: (currentUser.profileImage != null && currentUser.profileImage!.isNotEmpty)
-                            ? NetworkImage(currentUser.profileImage!)
-                            : null,
-                        child: (currentUser.profileImage == null || currentUser.profileImage!.isEmpty)
-                            ? Text(
-                                initial,
-                                style: TextStyle(
-                                  fontSize: 30,
-                                  fontWeight: FontWeight.bold,
-                                  color: AppTheme.text,
-                                ),
-                              )
-                            : null,
+                        child: UserAvatarWidget(
+                          imageSource: currentUser.profileImage,
+                          fallbackInitial: initial,
+                          size: 80,
+                          fontSize: 30,
+                        ),
                       ),
                     ),
                     Positioned(
@@ -1306,16 +1303,23 @@ class _StudentProfileScreenState extends ConsumerState<StudentProfileScreen>
                       child: GestureDetector(
                         onTap: _handlePickImage,
                         child: Container(
-                          padding: const EdgeInsets.all(5),
+                          padding: const EdgeInsets.all(6),
                           decoration: BoxDecoration(
-                            color: AppTheme.textSecondary,
+                            color: AppTheme.primary,
                             shape: BoxShape.circle,
                             border: Border.all(color: AppTheme.surface, width: 2),
+                            boxShadow: [
+                              BoxShadow(
+                                color: Colors.black.withValues(alpha: 0.15),
+                                blurRadius: 4,
+                                offset: const Offset(0, 2),
+                              ),
+                            ],
                           ),
                           child: const Icon(
                             Icons.camera_alt_rounded,
-                            size: 12,
-                            color: Colors.white,
+                            size: 13,
+                            color: Colors.black,
                           ),
                         ),
                       ),

@@ -6,7 +6,9 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../../../core/components/auth/required_change_password_dialog.dart';
 import '../../../core/components/app_toast.dart';
 import '../../../core/components/otp_verification_dialog.dart';
+import '../../../core/components/profile_photo_sheet.dart';
 import '../../../core/components/skeleton_loader.dart';
+import '../../../core/components/user_avatar_widget.dart';
 import '../../../core/services/otp_service.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/theme/theme_provider.dart';
@@ -328,31 +330,30 @@ class _TeacherProfileScreenState extends ConsumerState<TeacherProfileScreen>
                 Stack(
                   alignment: Alignment.bottomRight,
                   children: [
-                    Container(
-                      padding: const EdgeInsets.all(3),
-                      decoration: BoxDecoration(
-                        shape: BoxShape.circle,
-                        border: Border.all(
-                          color: AppTheme.primary.withValues(alpha: 0.35),
-                          width: 2.5,
+                    GestureDetector(
+                      onTap: () {
+                        ProfilePhotoSheet.show(
+                          context: context,
+                          ref: ref,
+                          currentPhoto: currentUser.profileImage ?? '',
+                          fullName: currentUser.fullName,
+                        );
+                      },
+                      child: Container(
+                        padding: const EdgeInsets.all(4),
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          border: Border.all(
+                            color: AppTheme.primary.withValues(alpha: 0.35),
+                            width: 2.5,
+                          ),
                         ),
-                      ),
-                      child: CircleAvatar(
-                        radius: 42,
-                        backgroundColor: AppTheme.primary.withValues(alpha: 0.15),
-                        backgroundImage: (currentUser.profileImage != null && currentUser.profileImage!.isNotEmpty)
-                            ? NetworkImage(currentUser.profileImage!)
-                            : null,
-                        child: (currentUser.profileImage == null || currentUser.profileImage!.isEmpty)
-                            ? Text(
-                                initial,
-                                style: TextStyle(
-                                  fontSize: 32,
-                                  fontWeight: FontWeight.bold,
-                                  color: AppTheme.primary,
-                                ),
-                              )
-                            : null,
+                        child: UserAvatarWidget(
+                          imageSource: currentUser.profileImage,
+                          fallbackInitial: initial,
+                          size: 84,
+                          fontSize: 32,
+                        ),
                       ),
                     ),
                     Positioned(
@@ -360,9 +361,11 @@ class _TeacherProfileScreenState extends ConsumerState<TeacherProfileScreen>
                       bottom: 2,
                       child: GestureDetector(
                         onTap: () {
-                          AppToast.showInfo(
-                            context,
-                            'Profile photo updates are managed by School Admin LIS.',
+                          ProfilePhotoSheet.show(
+                            context: context,
+                            ref: ref,
+                            currentPhoto: currentUser.profileImage ?? '',
+                            fullName: currentUser.fullName,
                           );
                         },
                         child: Container(

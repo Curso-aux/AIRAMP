@@ -84,8 +84,6 @@ class _AirampAppState extends ConsumerState<AirampApp> {
     try {
       FirestoreService().probeConnectivity().then((_) {
         return FirestoreService().syncCloudUsersToLocal();
-      }).then((_) {
-        FirestoreService().syncLocalUsersToCloud();
       });
     } catch (_) {}
 

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import '../../../core/components/user_avatar_widget.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/theme/theme_provider.dart';
 import '../../../core/components/analytics_donut_chart.dart';
@@ -92,13 +93,11 @@ class _AdminDashboardScreenState extends ConsumerState<AdminDashboardScreen> {
                       ),
                     ],
                   ),
-                  CircleAvatar(
-                    radius: 24,
-                    backgroundColor: Theme.of(context).colorScheme.primary,
-                    child: Text(
-                      initial,
-                      style: const TextStyle(fontSize: 24, color: Colors.black, fontWeight: FontWeight.bold),
-                    ),
+                  UserAvatarWidget(
+                    imageSource: currentUser?.profileImage,
+                    fallbackInitial: initial,
+                    size: 48,
+                    fontSize: 22,
                   ),
                 ],
               ),

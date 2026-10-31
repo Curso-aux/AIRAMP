@@ -5,7 +5,9 @@ import '../../../core/theme/app_theme.dart';
 import '../../../core/theme/theme_provider.dart';
 import '../application/chat_provider.dart';
 import '../domain/chat_models.dart';
+import '../../auth/application/auth_provider.dart';
 import 'new_conversation_modal.dart';
+import '../../../core/components/user_avatar_widget.dart';
 
 class ChatListScreen extends ConsumerStatefulWidget {
   const ChatListScreen({super.key});
@@ -561,6 +563,10 @@ class _ChatListScreenState extends ConsumerState<ChatListScreen> {
                   itemBuilder: (context, index) {
                     final convo = conversations[index];
                     final isGroup = convo.type == 'group';
+                    final currentUserId = ref.read(authProvider)?.id;
+                    final otherUser = isGroup
+                        ? null
+                        : (convo.participants.where((p) => p.id != currentUserId).firstOrNull ?? convo.participants.firstOrNull);
 
                     return Dismissible(
                       key: Key('convo_${convo.id}'),
@@ -612,9 +618,10 @@ class _ChatListScreenState extends ConsumerState<ChatListScreen> {
                         contentPadding: const EdgeInsets.symmetric(vertical: 8),
                         leading: _buildAvatar(
                           convo.name ?? 'Chat',
-                          role: isGroup ? 'group' : 'student',
+                          role: isGroup ? 'group' : (otherUser?.role ?? 'student'),
                           isGroup: isGroup,
                           size: 44,
+                          imageSource: otherUser?.profileImage,
                         ),
                         title: Row(
                           children: [
@@ -873,6 +880,7 @@ class _ChatListScreenState extends ConsumerState<ChatListScreen> {
                           user.fullName,
                           role: user.role,
                           size: 42,
+                          imageSource: user.profileImage,
                         ),
                       ),
                       title: Row(
@@ -1098,7 +1106,7 @@ class _ChatListScreenState extends ConsumerState<ChatListScreen> {
     );
   }
 
-  Widget _buildAvatar(String name, {required String role, bool isGroup = false, double size = 42}) {
+  Widget _buildAvatar(String name, {required String role, bool isGroup = false, double size = 42, String? imageSource}) {
     final initial = name.isNotEmpty ? name[0].toUpperCase() : '?';
     final isTeacher = role == 'teacher' || role == 'admin' || role == 'super_admin';
     final isDark = Theme.of(context).brightness == Brightness.dark;
@@ -1122,6 +1130,16 @@ class _ChatListScreenState extends ConsumerState<ChatListScreen> {
       bgColor = isDark ? const Color(0xFF1E293B) : const Color(0xFFF1F5F9);
       textColor = isDark ? const Color(0xFFCBD5E1) : const Color(0xFF334155);
       borderColor = isDark ? const Color(0xFF334155) : const Color(0xFFCBD5E1);
+    }
+
+    if (!isGroup && imageSource != null && imageSource.isNotEmpty) {
+      return UserAvatarWidget(
+        imageSource: imageSource,
+        fallbackInitial: initial,
+        size: size,
+        backgroundColor: bgColor,
+        textColor: textColor,
+      );
     }
 
     return Container(
@@ -1281,6 +1299,7 @@ class _ChatListScreenState extends ConsumerState<ChatListScreen> {
                 user.fullName,
                 role: user.role,
                 size: 76,
+                imageSource: user.profileImage,
               ),
               const SizedBox(height: 14),
               Text(

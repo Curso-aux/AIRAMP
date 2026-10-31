@@ -5,6 +5,7 @@ import '../../../../../core/theme/app_theme.dart';
 import '../../../../teacher/data/teacher_schedule_repository.dart';
 import '../../../../teacher/presentation/components/create_edit_schedule_dialog.dart';
 import '../../../../teacher/presentation/components/halftone_pattern.dart';
+import '../../../../../core/components/user_avatar_widget.dart';
 
 class TeacherScheduleModal extends ConsumerStatefulWidget {
   final Map<String, dynamic> teacher;
@@ -178,13 +179,12 @@ class _TeacherScheduleModalState extends ConsumerState<TeacherScheduleModal> {
               Row(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  CircleAvatar(
-                    radius: 24,
+                  UserAvatarWidget(
+                    imageSource: (widget.teacher['profile_image'] ?? widget.teacher['profileImage']) as String?,
+                    fallbackInitial: teacherName.isNotEmpty ? teacherName[0].toUpperCase() : 'T',
+                    size: 48,
                     backgroundColor: AppTheme.primary.withValues(alpha: 0.15),
-                    child: Text(
-                      teacherName.isNotEmpty ? teacherName[0].toUpperCase() : 'T',
-                      style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: AppTheme.primary),
-                    ),
+                    textColor: AppTheme.primary,
                   ),
                   const SizedBox(width: 14),
                   Expanded(

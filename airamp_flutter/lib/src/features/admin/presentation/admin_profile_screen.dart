@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/components/otp_verification_dialog.dart';
+import '../../../core/components/profile_photo_sheet.dart';
+import '../../../core/components/user_avatar_widget.dart';
 import '../../../core/services/otp_service.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/theme/theme_provider.dart';
@@ -52,14 +54,13 @@ class _AdminProfileScreenState extends ConsumerState<AdminProfileScreen> {
 
   // ── Image Picker ──
   Future<void> _handlePickImage() async {
-    // TODO: Integrate image_picker package when ready
-    // For now show a snackbar
-    if (!mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text('Image picker will be integrated with image_picker package'),
-        backgroundColor: AppTheme.accent,
-      ),
+    final user = ref.read(authProvider);
+    if (user == null || !mounted) return;
+    await ProfilePhotoSheet.show(
+      context: context,
+      ref: ref,
+      currentPhoto: user.profileImage ?? '',
+      fullName: user.fullName,
     );
   }
 
@@ -472,24 +473,12 @@ class _AdminProfileScreenState extends ConsumerState<AdminProfileScreen> {
             clipBehavior: Clip.none,
             children: [
               // Avatar circle
-              currentUser.profileImage != null
-                  ? CircleAvatar(
-                      radius: 45,
-                      backgroundImage:
-                          NetworkImage(currentUser.profileImage!),
-                    )
-                  : CircleAvatar(
-                      radius: 45,
-                      backgroundColor: AppTheme.primary,
-                      child: Text(
-                        initial,
-                        style: const TextStyle(
-                          fontSize: 36,
-                          fontWeight: FontWeight.w700,
-                          color: Colors.black,
-                        ),
-                      ),
-                    ),
+              UserAvatarWidget(
+                imageSource: currentUser.profileImage,
+                fallbackInitial: initial,
+                size: 90,
+                fontSize: 36,
+              ),
               // Camera icon overlay
               Positioned(
                 bottom: 0,

@@ -445,7 +445,7 @@ class ChatNotifier extends Notifier<ChatState> {
     if (user == null) {
       throw StateError('User must be logged in to create subject group chat.');
     }
-    final creatorUser = ChatUser(id: user.id, fullName: user.fullName, email: user.email, role: user.role);
+    final creatorUser = ChatUser(id: user.id, fullName: user.fullName, email: user.email, role: user.role, profileImage: user.profileImage);
 
     final now = DateTime.now().toIso8601String();
     final welcomeMsgId = 'msg_${DateTime.now().millisecondsSinceEpoch}';

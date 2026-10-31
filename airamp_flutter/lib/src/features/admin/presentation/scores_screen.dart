@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/animations/app_transitions.dart';
 import '../../../core/animations/animated_pressable.dart';
 import '../../../core/components/empty_state.dart';
+import '../../../core/components/user_avatar_widget.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/theme/theme_provider.dart';
 import '../../admin/data/admin_repository.dart';
@@ -688,19 +689,11 @@ class _ScoresScreenState extends ConsumerState<ScoresScreen> {
                 // Top student info row
                 Row(
                   children: [
-                    CircleAvatar(
-                      radius: 19,
-                      backgroundColor: isDark
-                          ? Colors.white.withValues(alpha: 0.08)
-                          : const Color(0xFFF1F5F9),
-                      child: Text(
-                        studentName.isNotEmpty ? studentName[0].toUpperCase() : 'S',
-                        style: TextStyle(
-                          fontSize: 14,
-                          fontWeight: FontWeight.w700,
-                          color: isDark ? Colors.white70 : const Color(0xFF475569),
-                        ),
-                      ),
+                    UserAvatarWidget(
+                      imageSource: (item['profile_image'] ?? item['profileImage']) as String?,
+                      fallbackInitial: studentName,
+                      size: 38,
+                      fontSize: 14,
                     ),
                     const SizedBox(width: 12),
                     Expanded(
@@ -974,19 +967,11 @@ class _ScoresScreenState extends ConsumerState<ScoresScreen> {
                 // Student Identity Row with Status Badge
                 Row(
                   children: [
-                    CircleAvatar(
-                      radius: 22,
-                      backgroundColor: isDark
-                          ? Colors.white.withValues(alpha: 0.08)
-                          : const Color(0xFFF1F5F9),
-                      child: Text(
-                        studentName.isNotEmpty ? studentName[0].toUpperCase() : 'S',
-                        style: TextStyle(
-                          fontSize: 16,
-                          fontWeight: FontWeight.w700,
-                          color: isDark ? Colors.white70 : const Color(0xFF475569),
-                        ),
-                      ),
+                    UserAvatarWidget(
+                      imageSource: (item['profile_image'] ?? item['profileImage']) as String?,
+                      fallbackInitial: studentName,
+                      size: 44,
+                      fontSize: 16,
                     ),
                     const SizedBox(width: 12),
                     Expanded(

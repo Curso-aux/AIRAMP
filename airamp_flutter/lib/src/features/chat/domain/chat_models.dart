@@ -5,6 +5,7 @@ class ChatUser {
   final String role;
   final String? section;
   final String? grade;
+  final String? profileImage;
   
   ChatUser({
     required this.id,
@@ -13,6 +14,7 @@ class ChatUser {
     required this.role,
     this.section,
     this.grade,
+    this.profileImage,
   });
 
   factory ChatUser.fromJson(Map<String, dynamic> json) {
@@ -23,6 +25,7 @@ class ChatUser {
       role: json['role'] ?? 'student',
       section: json['section'],
       grade: json['grade'],
+      profileImage: json['profileImage'] ?? json['profile_image'],
     );
   }
 
@@ -34,6 +37,7 @@ class ChatUser {
       'role': role,
       'section': section,
       'grade': grade,
+      'profile_image': profileImage,
     };
   }
 }

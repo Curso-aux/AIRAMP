@@ -2,6 +2,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../core/theme/app_theme.dart';
+import '../../../../core/components/user_avatar_widget.dart';
 import '../../data/admin_repository.dart';
 
 /// Form field and debounced searchable modal/dialog for assigning a faculty/teacher to a subject.
@@ -417,17 +418,12 @@ class _TeacherSearchModalState extends State<_TeacherSearchModal> {
         ),
         child: Row(
           children: [
-            CircleAvatar(
-              radius: 18,
+            UserAvatarWidget(
+              imageSource: (teacher['profile_image'] ?? teacher['profileImage']) as String?,
+              fallbackInitial: initial,
+              size: 36,
               backgroundColor: isSelected ? AppTheme.primary : AppTheme.primary.withValues(alpha: 0.15),
-              child: Text(
-                initial,
-                style: TextStyle(
-                  fontSize: 14,
-                  fontWeight: FontWeight.bold,
-                  color: isSelected ? Colors.white : AppTheme.primary,
-                ),
-              ),
+              textColor: isSelected ? Colors.white : AppTheme.primary,
             ),
             const SizedBox(width: 12),
             Expanded(

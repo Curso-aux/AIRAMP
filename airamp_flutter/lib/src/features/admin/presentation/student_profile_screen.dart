@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../../../core/theme/app_theme.dart';
+import '../../../core/components/user_avatar_widget.dart';
 
 class StudentProfileScreen extends StatelessWidget {
   final Map<String, dynamic> student;
@@ -40,17 +41,12 @@ class StudentProfileScreen extends StatelessWidget {
                 ),
                 child: Column(
                   children: [
-                    CircleAvatar(
-                      radius: 40,
-                      backgroundColor: const Color(0xFF63B3ED), // Light blue
-                      child: Text(
-                        student['name'][0].toUpperCase(),
-                        style: const TextStyle(
-                          color: Colors.white,
-                          fontWeight: FontWeight.bold,
-                          fontSize: 32,
-                        ),
-                      ),
+                    UserAvatarWidget(
+                      imageSource: (student['profile_image'] ?? student['profileImage']) as String?,
+                      fallbackInitial: (student['name']?.isNotEmpty == true ? student['name'][0] : 'S').toUpperCase(),
+                      size: 80,
+                      backgroundColor: const Color(0xFF63B3ED),
+                      textColor: Colors.white,
                     ),
                     const SizedBox(height: 16),
                     Text(

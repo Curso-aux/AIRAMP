@@ -9,6 +9,7 @@ import 'components/analytics_filter_bar.dart';
 import '../../../../core/components/global_dashboard_filter_bar.dart';
 import '../../../../core/components/kpi_summary_card.dart';
 import '../../../../core/components/lo_mastery_matrix.dart';
+import '../../../../core/components/user_avatar_widget.dart';
 
 class AdminWebAnalyticsView extends ConsumerWidget {
   const AdminWebAnalyticsView({super.key});
@@ -1136,14 +1137,36 @@ class AdminWebAnalyticsView extends ConsumerWidget {
 
                 return Row(
                   children: [
-                    CircleAvatar(
-                      radius: 14,
-                      backgroundColor: (isPassed ? AppTheme.success : AppTheme.error).withValues(alpha: isDark ? 0.18 : 0.12),
-                      child: Icon(
-                        isPassed ? Icons.check : Icons.close,
-                        size: 14,
-                        color: isPassed ? AppTheme.success : AppTheme.error,
-                      ),
+                    Stack(
+                      children: [
+                        UserAvatarWidget(
+                          imageSource: (a['student_profile_image'] ?? a['profile_image'] ?? a['profileImage']) as String?,
+                          fallbackInitial: student.isNotEmpty ? student[0].toUpperCase() : 'S',
+                          size: 32,
+                          backgroundColor: (isPassed ? AppTheme.success : AppTheme.error).withValues(alpha: isDark ? 0.18 : 0.12),
+                          textColor: isPassed ? AppTheme.success : AppTheme.error,
+                        ),
+                        Positioned(
+                          right: 0,
+                          bottom: 0,
+                          child: Container(
+                            padding: const EdgeInsets.all(1.5),
+                            decoration: BoxDecoration(
+                              color: isPassed ? AppTheme.success : AppTheme.error,
+                              shape: BoxShape.circle,
+                              border: Border.all(
+                                color: isDark ? AppTheme.darkSurface : Colors.white,
+                                width: 1.5,
+                              ),
+                            ),
+                            child: Icon(
+                              isPassed ? Icons.check : Icons.close,
+                              size: 8,
+                              color: Colors.white,
+                            ),
+                          ),
+                        ),
+                      ],
                     ),
                     const SizedBox(width: 12),
                     Expanded(

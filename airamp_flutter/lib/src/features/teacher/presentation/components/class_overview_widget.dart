@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import '../../../../core/components/user_avatar_widget.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../../core/theme/theme_provider.dart';
 import '../../data/teacher_repository.dart';
@@ -479,13 +480,11 @@ class _ClassOverviewWidgetState extends ConsumerState<ClassOverviewWidget> {
             // Row 1: Avatar, Name & Section, Status Badge
             Row(
               children: [
-                CircleAvatar(
-                  radius: 16,
-                  backgroundColor: statusColor.withValues(alpha: 0.15),
-                  child: Text(
-                    name.isNotEmpty ? name[0].toUpperCase() : 'S',
-                    style: TextStyle(color: statusColor, fontWeight: FontWeight.bold, fontSize: 13),
-                  ),
+                UserAvatarWidget(
+                  imageSource: (student['profile_image'] ?? student['profileImage']) as String?,
+                  fallbackInitial: name,
+                  size: 32,
+                  fontSize: 13,
                 ),
                 const SizedBox(width: 10),
                 Expanded(

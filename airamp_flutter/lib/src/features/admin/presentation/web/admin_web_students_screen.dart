@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../../../../core/components/user_avatar_widget.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../../core/theme/theme_provider.dart';
 import '../../../../core/database/database_helper.dart';
@@ -936,17 +937,11 @@ class _AdminWebStudentsScreenState extends ConsumerState<AdminWebStudentsScreen>
                     DataCell(
                       Row(
                         children: [
-                          CircleAvatar(
-                            radius: 17,
-                            backgroundColor: isDark ? Colors.white.withValues(alpha: 0.06) : const Color(0xFFF1F5F9),
-                            child: Text(
-                              name.isNotEmpty ? name[0].toUpperCase() : 'S',
-                              style: TextStyle(
-                                fontSize: 13,
-                                fontWeight: FontWeight.w600,
-                                color: AppTheme.primary,
-                              ),
-                            ),
+                          UserAvatarWidget(
+                            imageSource: (s['profile_image'] ?? s['profileImage']) as String?,
+                            fallbackInitial: name,
+                            size: 34,
+                            fontSize: 13,
                           ),
                           const SizedBox(width: 12),
                           Column(
@@ -1149,13 +1144,11 @@ class _AdminWebStudentsScreenState extends ConsumerState<AdminWebStudentsScreen>
             children: [
               Row(
                 children: [
-                  CircleAvatar(
-                    radius: 20,
-                    backgroundColor: isDark ? Colors.white.withValues(alpha: 0.06) : const Color(0xFFF1F5F9),
-                    child: Text(
-                      name.isNotEmpty ? name[0].toUpperCase() : 'S',
-                      style: TextStyle(fontWeight: FontWeight.w600, color: AppTheme.primary),
-                    ),
+                  UserAvatarWidget(
+                    imageSource: (s['profile_image'] ?? s['profileImage']) as String?,
+                    fallbackInitial: name,
+                    size: 40,
+                    fontSize: 15,
                   ),
                   const SizedBox(width: 12),
                   Expanded(
@@ -2526,7 +2519,7 @@ class _AdminWebStudentsScreenState extends ConsumerState<AdminWebStudentsScreen>
                               : selectedSection;
 
                           try {
-                            await ref.read(adminStudentsProvider.notifier).addStudent(
+                            final createdSid = await ref.read(adminStudentsProvider.notifier).addStudent(
                                   id: studentIdCtrl.text.trim().isNotEmpty ? studentIdCtrl.text.trim() : null,
                                   fullName: nameCtrl.text.trim(),
                                   email: emailCtrl.text.trim(),
@@ -2540,6 +2533,8 @@ class _AdminWebStudentsScreenState extends ConsumerState<AdminWebStudentsScreen>
                                 );
                             final emailResult = EmailService.lastResult;
                             final emailSent = emailResult?.success ?? false;
+                            final isQueued = emailResult?.channel == 'cloud_queue_pending';
+                            final finalStudentId = createdSid.isNotEmpty ? createdSid : studentIdCtrl.text.trim();
 
                             if (context.mounted) {
                               Navigator.of(dialogCtx).pop();
@@ -2555,12 +2550,27 @@ class _AdminWebStudentsScreenState extends ConsumerState<AdminWebStudentsScreen>
                                       Expanded(
                                         child: Text(
                                           emailSent
-                                              ? 'Student "${nameCtrl.text.trim()}" onboarded! Credentials sent to ${emailCtrl.text.trim()} via Gmail SMTP!'
-                                              : 'Student "${nameCtrl.text.trim()}" created! Note: SMTP email could not be delivered (${emailResult?.message ?? "SMTP bridge error"}). You can resend anytime using the Resend button.',
+                                              ? (isQueued
+                                                  ? 'Student "${nameCtrl.text.trim()}" ($finalStudentId) onboarded! Credentials queued for delivery to ${emailCtrl.text.trim()} via Gmail SMTP.'
+                                                  : 'Student "${nameCtrl.text.trim()}" ($finalStudentId) onboarded! Credentials sent to ${emailCtrl.text.trim()} via Gmail SMTP!')
+                                              : 'Student "${nameCtrl.text.trim()}" ($finalStudentId) created! Note: SMTP email could not be delivered (${emailResult?.message ?? "SMTP bridge error"}). You can resend anytime using the Resend button.',
                                         ),
                                       ),
                                     ],
                                   ),
+                                  action: !emailSent
+                                      ? SnackBarAction(
+                                          label: 'Resend',
+                                          textColor: Colors.white,
+                                          onPressed: () {
+                                            _resendStudentCredentialsDialog(context, {
+                                              'id': finalStudentId,
+                                              'full_name': nameCtrl.text.trim(),
+                                              'email': emailCtrl.text.trim(),
+                                            });
+                                          },
+                                        )
+                                      : null,
                                   backgroundColor: emailSent ? AppTheme.success : AppTheme.warning,
                                   duration: Duration(seconds: emailSent ? 4 : 8),
                                   behavior: SnackBarBehavior.floating,
