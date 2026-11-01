@@ -1082,21 +1082,51 @@ class _MyCoursesScreenState extends ConsumerState<MyCoursesScreen> {
                     ),
                   )
                 else
-                  ...courses.map((c) => Padding(
-                        padding: const EdgeInsets.only(bottom: 14),
-                        child: _buildCurriculumCourseCard(
-                          id: c['id'] as int,
-                          title: c['name']?.toString() ?? '',
-                          code: c['subject_code']?.toString() ?? '',
-                          teacherName: c['teacher_name']?.toString() ?? 'Sir John Reyes',
-                          room: currentRoom,
-                          progress: (c['progress'] as int?) ?? 0,
-                          unlockType: c['unlock_type']?.toString() ?? 'Flexible',
-                          completedLos: (c['completed_los'] as int?) ?? 0,
-                          totalLos: (c['total_los'] as int?) ?? 0,
-                          cocs: (c['cocs'] as int?) ?? 0,
-                        ),
-                      )),
+                  LayoutBuilder(
+                    builder: (context, constraints) {
+                      final isWebTwoCol = constraints.maxWidth >= 768;
+                      if (!isWebTwoCol) {
+                        return Column(
+                          children: courses.map((c) => Padding(
+                            padding: const EdgeInsets.only(bottom: 14),
+                            child: _buildCurriculumCourseCard(
+                              id: c['id'] as int,
+                              title: c['name']?.toString() ?? '',
+                              code: c['subject_code']?.toString() ?? '',
+                              teacherName: c['teacher_name']?.toString() ?? 'Sir John Reyes',
+                              room: currentRoom,
+                              progress: (c['progress'] as int?) ?? 0,
+                              unlockType: c['unlock_type']?.toString() ?? 'Flexible',
+                              completedLos: (c['completed_los'] as int?) ?? 0,
+                              totalLos: (c['total_los'] as int?) ?? 0,
+                              cocs: (c['cocs'] as int?) ?? 0,
+                            ),
+                          )).toList(),
+                        );
+                      }
+
+                      final cardWidth = (constraints.maxWidth - 16) / 2;
+                      return Wrap(
+                        spacing: 16,
+                        runSpacing: 14,
+                        children: courses.map((c) => SizedBox(
+                          width: cardWidth,
+                          child: _buildCurriculumCourseCard(
+                            id: c['id'] as int,
+                            title: c['name']?.toString() ?? '',
+                            code: c['subject_code']?.toString() ?? '',
+                            teacherName: c['teacher_name']?.toString() ?? 'Sir John Reyes',
+                            room: currentRoom,
+                            progress: (c['progress'] as int?) ?? 0,
+                            unlockType: c['unlock_type']?.toString() ?? 'Flexible',
+                            completedLos: (c['completed_los'] as int?) ?? 0,
+                            totalLos: (c['total_los'] as int?) ?? 0,
+                            cocs: (c['cocs'] as int?) ?? 0,
+                          ),
+                        )).toList(),
+                      );
+                    },
+                  ),
 
                 const SizedBox(height: 20),
 

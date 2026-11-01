@@ -4,7 +4,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../../../core/components/auth/required_change_password_dialog.dart';
-import '../../../core/components/app_toast.dart';
 import '../../../core/components/otp_verification_dialog.dart';
 import '../../../core/components/profile_photo_sheet.dart';
 import '../../../core/components/skeleton_loader.dart';
@@ -161,68 +160,127 @@ class _TeacherProfileScreenState extends ConsumerState<TeacherProfileScreen>
         ? currentUser.fullName[0].toUpperCase()
         : '?';
 
+    final screenWidth = MediaQuery.of(context).size.width;
+    final isDesktopWeb = screenWidth >= 960;
+
     return Scaffold(
       backgroundColor: AppTheme.background,
       body: PopScope(
-        canPop: false,
+        canPop: !currentUser.mustChangePassword,
         onPopInvokedWithResult: (didPop, result) {
           if (didPop) return;
-          _handleBackNavigation();
+          _showMustChangePasswordBackAlert(isTeacher: true);
         },
         child: currentUser.mustChangePassword
             ? _buildMandatoryPasswordChangeView(currentUser)
             : SafeArea(
           child: SingleChildScrollView(
             controller: _scrollController,
-            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 0),
-            child: Column(
-              children: [
-                // 1. App Bar Header with Back navigation & Active Faculty pill
-                _buildHeaderBar(context, currentUser),
-                const SizedBox(height: 12),
+            padding: EdgeInsets.symmetric(
+              horizontal: isDesktopWeb ? 24 : 20,
+              vertical: isDesktopWeb ? 10 : 0,
+            ),
+            child: Center(
+              child: ConstrainedBox(
+                constraints: BoxConstraints(maxWidth: isDesktopWeb ? 1400 : 960),
+                child: Column(
+                  children: [
+                    // 1. App Bar Header with Back navigation & Active Faculty pill
+                    _buildHeaderBar(context, currentUser, isWeb: isDesktopWeb),
+                    SizedBox(height: isDesktopWeb ? 16 : 12),
 
-                // 2. Hero Faculty Identity Card (Avatar, Badges & 4 Quick KPIs)
-                _buildHeroFacultyCard(
-                  context: context,
-                  currentUser: currentUser,
-                  initial: initial,
-                  subjects: subjects,
-                  handledSections: handledSections,
-                  students: students,
-                  schedules: schedules,
+                    if (isDesktopWeb) ...[
+                      // Desktop Web 2-Column Responsive Dashboard Layout
+                      Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          // Left Identity & Security Column (380-400px)
+                          SizedBox(
+                            width: screenWidth >= 1200 ? 400 : 360,
+                            child: Column(
+                              children: [
+                                _buildHeroFacultyCard(
+                                  context: context,
+                                  currentUser: currentUser,
+                                  initial: initial,
+                                  subjects: subjects,
+                                  handledSections: handledSections,
+                                  students: students,
+                                  schedules: schedules,
+                                ),
+                                const SizedBox(height: 16),
+                                _buildChangePasswordCard(currentUser),
+                                const SizedBox(height: 16),
+                                _buildAboutAndSupportCard(context),
+                                const SizedBox(height: 16),
+                                _buildSignOutButton(),
+                                const SizedBox(height: 32),
+                              ],
+                            ),
+                          ),
+                          const SizedBox(width: 20),
+
+                          // Right Main Academic Portfolio & Institutional Management Column
+                          Expanded(
+                            child: Column(
+                              children: [
+                                _buildAcademicPortfolioCard(
+                                  context: context,
+                                  subjects: subjects,
+                                  handledSections: handledSections,
+                                  sectionDetails: handledSectionsDetails,
+                                  schedules: schedules,
+                                ),
+                                const SizedBox(height: 16),
+                                _buildPersonalInfoCard(currentUser),
+                                const SizedBox(height: 16),
+                                _buildPreferencesCard(themeState),
+                                const SizedBox(height: 32),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ),
+                    ] else ...[
+                      // Mobile / Narrow View Single Column Stack
+                      _buildHeroFacultyCard(
+                        context: context,
+                        currentUser: currentUser,
+                        initial: initial,
+                        subjects: subjects,
+                        handledSections: handledSections,
+                        students: students,
+                        schedules: schedules,
+                      ),
+                      const SizedBox(height: 16),
+
+                      _buildAcademicPortfolioCard(
+                        context: context,
+                        subjects: subjects,
+                        handledSections: handledSections,
+                        sectionDetails: handledSectionsDetails,
+                        schedules: schedules,
+                      ),
+                      const SizedBox(height: 16),
+
+                      _buildPersonalInfoCard(currentUser),
+                      const SizedBox(height: 16),
+
+                      _buildChangePasswordCard(currentUser),
+                      const SizedBox(height: 16),
+
+                      _buildPreferencesCard(themeState),
+                      const SizedBox(height: 16),
+
+                      _buildAboutAndSupportCard(context),
+                      const SizedBox(height: 24),
+
+                      _buildSignOutButton(),
+                      const SizedBox(height: 40),
+                    ],
+                  ],
                 ),
-                const SizedBox(height: 16),
-
-                // 3. Academic Portfolio & Teaching Load Card
-                _buildAcademicPortfolioCard(
-                  context: context,
-                  subjects: subjects,
-                  handledSections: handledSections,
-                  sectionDetails: handledSectionsDetails,
-                  schedules: schedules,
-                ),
-                const SizedBox(height: 16),
-
-                // 4. Personal & Institutional Information Card
-                _buildPersonalInfoCard(currentUser),
-                const SizedBox(height: 16),
-
-                // 6. Account Security & Password Management Card
-                _buildChangePasswordCard(currentUser),
-                const SizedBox(height: 16),
-
-                // 7. Classroom Experience & Preferences Card (Theme & Notifications)
-                _buildPreferencesCard(themeState),
-                const SizedBox(height: 16),
-
-                // 8. Institutional App & Support Information Card
-                _buildAboutAndSupportCard(context),
-                const SizedBox(height: 24),
-
-                // 9. Sign Out Button
-                _buildSignOutButton(),
-                const SizedBox(height: 40),
-              ],
+              ),
             ),
           ),
         ),
@@ -237,6 +295,13 @@ class _TeacherProfileScreenState extends ConsumerState<TeacherProfileScreen>
       return;
     }
 
+    // 1. If pushed on Navigator stack (e.g. from context.push), pop cleanly
+    if (Navigator.of(context).canPop()) {
+      Navigator.of(context).pop();
+      return;
+    }
+
+    // 2. If GoRouter has history to pop, pop it
     try {
       if (GoRouter.maybeOf(context)?.canPop() == true) {
         context.pop();
@@ -244,26 +309,92 @@ class _TeacherProfileScreenState extends ConsumerState<TeacherProfileScreen>
       }
     } catch (_) {}
 
-    try {
-      if (Navigator.of(context, rootNavigator: true).canPop()) {
-        Navigator.of(context, rootNavigator: true).pop();
-        return;
-      }
-    } catch (_) {}
-
-    try {
-      if (Navigator.canPop(context)) {
-        Navigator.pop(context);
-        return;
-      }
-    } catch (_) {}
-
-    // Fallback: If stack cannot be popped, navigate directly to teacher dashboard
+    // 3. Fallback: Guaranteed direct transition to teacher dashboard
     context.go('/teacher/dashboard');
   }
 
-  Widget _buildHeaderBar(BuildContext context, User currentUser) {
+  Widget _buildHeaderBar(BuildContext context, User currentUser, {bool isWeb = false}) {
     if (currentUser.mustChangePassword) return const SizedBox.shrink();
+
+    if (isWeb) {
+      return Container(
+        margin: const EdgeInsets.only(top: 8, bottom: 4),
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+        decoration: BoxDecoration(
+          color: AppTheme.surface,
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(color: AppTheme.border, width: 1),
+        ),
+        child: Row(
+          children: [
+            InkWell(
+              onTap: _handleBackNavigation,
+              borderRadius: BorderRadius.circular(8),
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                decoration: BoxDecoration(
+                  color: AppTheme.primary.withValues(alpha: 0.1),
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(color: AppTheme.primary.withValues(alpha: 0.2)),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(Icons.arrow_back_rounded, color: AppTheme.primary, size: 18),
+                    const SizedBox(width: 8),
+                    Text(
+                      'Back to Dashboard',
+                      style: TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.bold,
+                        color: AppTheme.primary,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+            const SizedBox(width: 16),
+            Container(width: 1, height: 22, color: AppTheme.border),
+            const SizedBox(width: 16),
+            Icon(Icons.badge_outlined, size: 20, color: AppTheme.textSecondary),
+            const SizedBox(width: 8),
+            Text(
+              'Faculty Profile & Settings',
+              style: TextStyle(
+                fontSize: 16,
+                fontWeight: FontWeight.bold,
+                color: AppTheme.text,
+              ),
+            ),
+            const Spacer(),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+              decoration: BoxDecoration(
+                color: AppTheme.primary.withValues(alpha: 0.1),
+                borderRadius: BorderRadius.circular(20),
+                border: Border.all(color: AppTheme.primary.withValues(alpha: 0.25)),
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(Icons.school_rounded, size: 13, color: AppTheme.primary),
+                  const SizedBox(width: 6),
+                  Text(
+                    'Faculty Workspace',
+                    style: TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w600,
+                      color: AppTheme.primary,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      );
+    }
 
     return Padding(
       padding: const EdgeInsets.only(top: 10, bottom: 4),
@@ -453,7 +584,7 @@ class _TeacherProfileScreenState extends ConsumerState<TeacherProfileScreen>
                     icon: Icons.auto_stories_rounded,
                     count: '${subjects.length}',
                     label: 'Subjects',
-                    onTap: () => context.push('/teacher/subjects'),
+                    onTap: () => context.go('/teacher/subjects'),
                   ),
                 ),
                 Container(width: 1, height: 32, color: AppTheme.border),
@@ -463,7 +594,7 @@ class _TeacherProfileScreenState extends ConsumerState<TeacherProfileScreen>
                     icon: Icons.grid_view_rounded,
                     count: '${handledSections.length}',
                     label: 'Sections',
-                    onTap: () => context.push('/teacher/dashboard'),
+                    onTap: () => context.go('/teacher/dashboard'),
                   ),
                 ),
                 Container(width: 1, height: 32, color: AppTheme.border),
@@ -473,7 +604,7 @@ class _TeacherProfileScreenState extends ConsumerState<TeacherProfileScreen>
                     icon: Icons.people_alt_rounded,
                     count: '${students.length}',
                     label: 'Students',
-                    onTap: () => context.push('/teacher/students'),
+                    onTap: () => context.go('/teacher/students'),
                   ),
                 ),
                 Container(width: 1, height: 32, color: AppTheme.border),
@@ -483,7 +614,7 @@ class _TeacherProfileScreenState extends ConsumerState<TeacherProfileScreen>
                     icon: Icons.calendar_month_rounded,
                     count: '${schedules.length}',
                     label: 'Classes',
-                    onTap: () => context.push('/teacher/schedule'),
+                    onTap: () => context.go('/teacher/schedule'),
                   ),
                 ),
               ],
@@ -613,7 +744,7 @@ class _TeacherProfileScreenState extends ConsumerState<TeacherProfileScreen>
               ),
               const SizedBox(width: 8),
               InkWell(
-                onTap: () => context.push('/teacher/subjects'),
+                onTap: () => context.go('/teacher/subjects'),
                 borderRadius: BorderRadius.circular(6),
                 child: Padding(
                   padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
@@ -684,9 +815,9 @@ class _TeacherProfileScreenState extends ConsumerState<TeacherProfileScreen>
                 return InkWell(
                   onTap: () {
                     if (id != null) {
-                      context.push('/teacher/subjects/$id');
+                      context.go('/teacher/subjects/$id');
                     } else {
-                      context.push('/teacher/subjects');
+                      context.go('/teacher/subjects');
                     }
                   },
                   borderRadius: BorderRadius.circular(10),
@@ -821,7 +952,7 @@ class _TeacherProfileScreenState extends ConsumerState<TeacherProfileScreen>
 
           // Weekly Schedule Quick Link
           InkWell(
-            onTap: () => context.push('/teacher/schedule'),
+            onTap: () => context.go('/teacher/schedule'),
             borderRadius: BorderRadius.circular(10),
             child: Container(
               padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),

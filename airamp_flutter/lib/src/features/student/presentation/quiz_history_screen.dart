@@ -382,15 +382,37 @@ class _QuizHistoryScreenState extends ConsumerState<QuizHistoryScreen> {
           ),
         ),
         const SizedBox(height: 12),
-        ListView.separated(
-          shrinkWrap: true,
-          physics: const NeverScrollableScrollPhysics(),
-          itemCount: assignedQuizzes.length,
-          separatorBuilder: (_, _) => const SizedBox(height: 12),
-          itemBuilder: (context, index) {
-            final item = assignedQuizzes[index];
-            final quizId = item['quiz_id'] as int;
-            final title = item['title']?.toString() ?? 'Quiz';
+        LayoutBuilder(
+          builder: (context, constraints) {
+            final isWebTwoCol = constraints.maxWidth >= 850;
+            if (!isWebTwoCol) {
+              return ListView.separated(
+                shrinkWrap: true,
+                physics: const NeverScrollableScrollPhysics(),
+                itemCount: assignedQuizzes.length,
+                separatorBuilder: (_, _) => const SizedBox(height: 12),
+                itemBuilder: (context, index) => _buildAssignedQuizCard(context, assignedQuizzes[index], isDark, primary),
+              );
+            }
+
+            final cardWidth = (constraints.maxWidth - 16) / 2;
+            return Wrap(
+              spacing: 16,
+              runSpacing: 14,
+              children: assignedQuizzes.map((item) => SizedBox(
+                width: cardWidth,
+                child: _buildAssignedQuizCard(context, item, isDark, primary),
+              )).toList(),
+            );
+          },
+        ),
+      ],
+    );
+  }
+
+  Widget _buildAssignedQuizCard(BuildContext context, Map<String, dynamic> item, bool isDark, Color primary) {
+    final quizId = item['quiz_id'] as int;
+    final title = item['title']?.toString() ?? 'Quiz';
             final desc = item['description']?.toString() ?? '';
             final subjectCode = item['subject_code']?.toString() ?? 'CS';
             final subjectName = item['subject_name']?.toString() ?? 'Subject';
@@ -761,10 +783,6 @@ class _QuizHistoryScreenState extends ConsumerState<QuizHistoryScreen> {
                 ],
               ),
             );
-          },
-        ),
-      ],
-    );
   }
 
   Widget _buildMetaChip(IconData icon, String text) {

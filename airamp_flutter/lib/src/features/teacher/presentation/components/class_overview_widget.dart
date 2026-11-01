@@ -672,7 +672,7 @@ class TodayScheduleBanner extends ConsumerWidget {
                       ),
                       const SizedBox(height: 2),
                       Text(
-                        'You have no assigned class hours for today. Tap below to view the full timetable.',
+                        'You have no assigned class hours for today. View timetable to check your weekly schedule.',
                         style: TextStyle(
                           fontSize: 12,
                           color: AppTheme.textSecondary,

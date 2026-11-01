@@ -258,51 +258,54 @@ class _TeacherDashboardScreenState extends ConsumerState<TeacherDashboardScreen>
     );
   }
 
-  /// Opens the complete Class Performance & Analytics view in a dedicated, distraction-free modal sheet.
+  /// Opens the complete Class Performance & Analytics view in a dedicated, distraction-free modal sheet or desktop dialog.
   void _showAnalyticsModal(BuildContext context) {
-    AppModalTransitions.showSmoothBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.transparent,
-      builder: (modalCtx) {
-        final screenHeight = MediaQuery.of(context).size.height;
-        final screenWidth = MediaQuery.of(context).size.width;
-        final isDesktop = screenWidth >= 1050;
-        final isDark = Theme.of(context).brightness == Brightness.dark;
+    final screenHeight = MediaQuery.of(context).size.height;
+    final screenWidth = MediaQuery.of(context).size.width;
+    final isDesktop = screenWidth >= 900;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
 
-        return StatefulBuilder(
-          builder: (modalContext, setModalState) {
-            return Consumer(
-              builder: (consumerCtx, ref, _) {
-                final stats = ref.watch(teacherDashboardProvider);
-                final handledSectionsAsync = ref.watch(teacherHandledSectionsProvider);
-                final handledSections = handledSectionsAsync.value ?? [];
-                final allStudents = ref.watch(teacherStudentsProvider);
+    Widget buildModalContent(BuildContext modalCtx) {
+      return StatefulBuilder(
+        builder: (modalContext, setModalState) {
+          return Consumer(
+            builder: (consumerCtx, ref, _) {
+              final stats = ref.watch(teacherDashboardProvider);
+              final handledSectionsAsync = ref.watch(teacherHandledSectionsProvider);
+              final handledSections = handledSectionsAsync.value ?? [];
+              final allStudents = ref.watch(teacherStudentsProvider);
 
-                final totalSubjects = stats['totalSubjects'] as int? ?? 0;
-                final totalStudents = stats['totalStudents'] as int? ?? 0;
-                final totalAttempts = stats['totalAttempts'] as int? ?? 0;
-                final passedAttempts = stats['passedAttempts'] as int? ?? 0;
-                final passRate = stats['passRate'] as int? ?? 0;
-                final avgScore = stats['avgScore'] as int? ?? 0;
+              final totalSubjects = stats['totalSubjects'] as int? ?? 0;
+              final totalStudents = stats['totalStudents'] as int? ?? 0;
+              final totalAttempts = stats['totalAttempts'] as int? ?? 0;
+              final passedAttempts = stats['passedAttempts'] as int? ?? 0;
+              final passRate = stats['passRate'] as int? ?? 0;
+              final avgScore = stats['avgScore'] as int? ?? 0;
 
-                return Container(
-                  height: screenHeight * 0.90,
-                  decoration: BoxDecoration(
-                    color: AppTheme.surface,
-                    borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
-                    border: Border.all(color: AppTheme.border.withValues(alpha: 0.8)),
-                    boxShadow: [
-                      BoxShadow(
-                        color: Colors.black.withValues(alpha: 0.15),
-                        blurRadius: 20,
-                        offset: const Offset(0, -4),
-                      ),
-                    ],
-                  ),
-                  child: Column(
-                    children: [
-                      // Modal Drag Handle
+              return Container(
+                constraints: isDesktop
+                    ? BoxConstraints(
+                        maxWidth: 1180,
+                        maxHeight: screenHeight * 0.90,
+                      )
+                    : null,
+                height: screenHeight * 0.90,
+                decoration: BoxDecoration(
+                  color: AppTheme.surface,
+                  borderRadius: isDesktop ? BorderRadius.circular(20) : const BorderRadius.vertical(top: Radius.circular(24)),
+                  border: Border.all(color: AppTheme.border.withValues(alpha: 0.8)),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withValues(alpha: isDark ? 0.4 : 0.15),
+                      blurRadius: isDesktop ? 28 : 20,
+                      offset: Offset(0, isDesktop ? 8 : -4),
+                    ),
+                  ],
+                ),
+                child: Column(
+                  children: [
+                    // Modal Drag Handle (Only on mobile)
+                    if (!isDesktop) ...[
                       const SizedBox(height: 10),
                       Container(
                         width: 44,
@@ -313,103 +316,126 @@ class _TeacherDashboardScreenState extends ConsumerState<TeacherDashboardScreen>
                         ),
                       ),
                       const SizedBox(height: 10),
+                    ] else
+                      const SizedBox(height: 6),
 
-                      // Modal Header
-                      Padding(
-                        padding: const EdgeInsets.symmetric(horizontal: 20),
-                        child: Row(
-                          children: [
-                            Container(
-                              padding: const EdgeInsets.all(8),
-                              decoration: BoxDecoration(
-                                color: AppTheme.primary.withValues(alpha: 0.12),
-                                borderRadius: BorderRadius.circular(10),
-                              ),
-                              child: Icon(Icons.analytics_outlined, size: 22, color: AppTheme.primary),
+                    // Modal Header
+                    Padding(
+                      padding: EdgeInsets.symmetric(horizontal: isDesktop ? 24 : 20, vertical: isDesktop ? 12 : 0),
+                      child: Row(
+                        children: [
+                          Container(
+                            padding: const EdgeInsets.all(8),
+                            decoration: BoxDecoration(
+                              color: AppTheme.primary.withValues(alpha: 0.12),
+                              borderRadius: BorderRadius.circular(10),
                             ),
-                            const SizedBox(width: 12),
-                            Expanded(
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Row(
-                                    children: [
-                                      Text(
-                                        'Class Performance',
-                                        style: TextStyle(
-                                          fontSize: 16,
-                                          fontWeight: FontWeight.bold,
-                                          color: AppTheme.text,
+                            child: Icon(Icons.analytics_outlined, size: isDesktop ? 24 : 22, color: AppTheme.primary),
+                          ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Row(
+                                  children: [
+                                    Text(
+                                      isDesktop ? 'Class Performance & Analytics' : 'Class Performance',
+                                      style: TextStyle(
+                                        fontSize: isDesktop ? 17 : 16,
+                                        fontWeight: FontWeight.bold,
+                                        color: AppTheme.text,
+                                      ),
+                                    ),
+                                    if (totalAttempts > 0) ...[
+                                      const SizedBox(width: 8),
+                                      Container(
+                                        padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+                                        decoration: BoxDecoration(
+                                          color: (passRate >= 75 ? AppTheme.success : AppTheme.warning).withValues(alpha: 0.12),
+                                          borderRadius: BorderRadius.circular(10),
+                                        ),
+                                        child: Text(
+                                          '$passRate% Pass Rate',
+                                          style: TextStyle(
+                                            fontSize: 10,
+                                            fontWeight: FontWeight.bold,
+                                            color: passRate >= 75 ? AppTheme.success : AppTheme.warning,
+                                          ),
                                         ),
                                       ),
-                                      if (totalAttempts > 0) ...[
-                                        const SizedBox(width: 8),
-                                        Container(
-                                          padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
-                                          decoration: BoxDecoration(
-                                            color: (passRate >= 75 ? AppTheme.success : AppTheme.warning).withValues(alpha: 0.12),
-                                            borderRadius: BorderRadius.circular(10),
-                                          ),
-                                          child: Text(
-                                            '$passRate% Pass Rate',
-                                            style: TextStyle(
-                                              fontSize: 10,
-                                              fontWeight: FontWeight.bold,
-                                              color: passRate >= 75 ? AppTheme.success : AppTheme.warning,
-                                            ),
-                                          ),
-                                        ),
-                                      ],
                                     ],
-                                  ),
-                                  const SizedBox(height: 2),
-                                  Text(
-                                    'Real-time metrics, competency mastery & section filters',
-                                    style: TextStyle(fontSize: 11, color: AppTheme.textSecondary),
-                                  ),
-                                ],
-                              ),
+                                  ],
+                                ),
+                                const SizedBox(height: 2),
+                                Text(
+                                  'Real-time metrics, competency mastery & section filters',
+                                  style: TextStyle(fontSize: 11, color: AppTheme.textSecondary),
+                                ),
+                              ],
                             ),
-                            IconButton(
-                              icon: Icon(Icons.close_rounded, color: AppTheme.textSecondary, size: 22),
-                              tooltip: 'Close Analytics',
-                              onPressed: () => Navigator.of(modalCtx).pop(),
-                            ),
-                          ],
-                        ),
-                      ),
-                      const SizedBox(height: 10),
-                      Divider(height: 1, color: AppTheme.border.withValues(alpha: 0.6)),
-
-                      // Scrollable Analytics Body
-                      Expanded(
-                        child: SingleChildScrollView(
-                          padding: const EdgeInsets.all(20),
-                          child: _buildAnalyticsExpandedBody(
-                            isDesktop: isDesktop,
-                            totalSubjects: totalSubjects,
-                            totalStudents: totalStudents,
-                            totalAttempts: totalAttempts,
-                            passedAttempts: passedAttempts,
-                            passRate: passRate,
-                            avgScore: avgScore,
-                            handledSections: handledSections,
-                            allStudents: allStudents,
-                            isDark: isDark,
-                            recentAttempts: (stats['recentAttempts'] as List<dynamic>?)?.cast<Map<String, dynamic>>() ?? [],
-                            onStateChanged: () => setModalState(() {}),
                           ),
+                          IconButton(
+                            icon: Icon(Icons.close_rounded, color: AppTheme.textSecondary, size: isDesktop ? 24 : 22),
+                            tooltip: 'Close Analytics',
+                            onPressed: () => Navigator.of(modalCtx).pop(),
+                          ),
+                        ],
+                      ),
+                    ),
+                    if (isDesktop) const SizedBox(height: 6),
+                    Divider(height: 1, color: AppTheme.border.withValues(alpha: 0.6)),
+
+                    // Scrollable Analytics Body
+                    Expanded(
+                      child: SingleChildScrollView(
+                        padding: EdgeInsets.all(isDesktop ? 24 : 20),
+                        child: _buildAnalyticsExpandedBody(
+                          isDesktop: isDesktop,
+                          totalSubjects: totalSubjects,
+                          totalStudents: totalStudents,
+                          totalAttempts: totalAttempts,
+                          passedAttempts: passedAttempts,
+                          passRate: passRate,
+                          avgScore: avgScore,
+                          handledSections: handledSections,
+                          allStudents: allStudents,
+                          isDark: isDark,
+                          recentAttempts: (stats['recentAttempts'] as List<dynamic>?)?.cast<Map<String, dynamic>>() ?? [],
+                          onStateChanged: () => setModalState(() {}),
                         ),
                       ),
-                    ],
-                  ),
-                );
-              },
-            );
-          },
-        );
-      },
-    );
+                    ),
+                  ],
+                ),
+              );
+            },
+          );
+        },
+      );
+    }
+
+    if (isDesktop) {
+      AppModalTransitions.showSmoothDialog(
+        context: context,
+        barrierDismissible: true,
+        builder: (modalCtx) {
+          return Dialog(
+            backgroundColor: Colors.transparent,
+            elevation: 0,
+            insetPadding: const EdgeInsets.symmetric(horizontal: 32, vertical: 24),
+            child: buildModalContent(modalCtx),
+          );
+        },
+      );
+    } else {
+      AppModalTransitions.showSmoothBottomSheet(
+        context: context,
+        isScrollControlled: true,
+        backgroundColor: Colors.transparent,
+        builder: (modalCtx) => buildModalContent(modalCtx),
+      );
+    }
   }
 
   @override
@@ -436,15 +462,18 @@ class _TeacherDashboardScreenState extends ConsumerState<TeacherDashboardScreen>
 
     final teacherName = currentUser?.fullName ?? 'Faculty Instructor';
     final screenWidth = MediaQuery.of(context).size.width;
-    final isDesktop = screenWidth >= 1050;
+    final isDesktop = screenWidth >= 900;
 
     return Scaffold(
       backgroundColor: AppTheme.background,
       body: SafeArea(
         child: Column(
           children: [
-            // Persistent Sticky Top Header (Profile on Left, Notifications on Right)
-            _buildStickyTopHeader(context, currentUser, teacherName),
+            // Top Header: On mobile, show personal card; on desktop, show executive workspace header
+            if (!isDesktop)
+              _buildStickyTopHeader(context, currentUser, teacherName)
+            else
+              _buildDesktopTopBar(context, currentUser),
 
             // Scrollable Dashboard Body
             Expanded(
@@ -523,7 +552,7 @@ class _TeacherDashboardScreenState extends ConsumerState<TeacherDashboardScreen>
                       _buildAssignedSubjectsSection(context, subjects),
                     ],
                   ),
-                    const SizedBox(height: 110),
+                    SizedBox(height: isDesktop ? 28 : 110),
                   ],
                 ),
               ),
@@ -534,6 +563,119 @@ class _TeacherDashboardScreenState extends ConsumerState<TeacherDashboardScreen>
     ),
   );
 }
+
+  /// Executive Top Bar rendered exclusively on desktop web viewports.
+  Widget _buildDesktopTopBar(BuildContext context, dynamic currentUser) {
+    final now = DateTime.now();
+    const dayNames = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
+    const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+    final dateStr = '${dayNames[now.weekday - 1]}, ${monthNames[now.month - 1]} ${now.day}, ${now.year}';
+
+    return Container(
+      margin: const EdgeInsets.fromLTRB(20, 10, 20, 2),
+      padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 10),
+      decoration: BoxDecoration(
+        color: AppTheme.surface,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: AppTheme.border),
+      ),
+      child: Row(
+        children: [
+          Container(
+            padding: const EdgeInsets.all(7),
+            decoration: BoxDecoration(
+              color: AppTheme.primary.withValues(alpha: 0.12),
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: Icon(Icons.school_rounded, color: AppTheme.primary, size: 20),
+          ),
+          const SizedBox(width: 12),
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(
+                'Faculty Workspace',
+                style: TextStyle(
+                  fontSize: 15,
+                  fontWeight: FontWeight.bold,
+                  color: AppTheme.text,
+                ),
+              ),
+              Text(
+                dateStr,
+                style: TextStyle(fontSize: 11.5, color: AppTheme.textSecondary),
+              ),
+            ],
+          ),
+          const Spacer(),
+          ElevatedButton.icon(
+            onPressed: () => _showAnalyticsModal(context),
+            icon: const Icon(Icons.bar_chart_rounded, size: 16),
+            label: const Text('Performance & Analytics', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600)),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppTheme.primary.withValues(alpha: 0.12),
+              foregroundColor: AppTheme.primary,
+              elevation: 0,
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(9),
+                side: BorderSide(color: AppTheme.primary.withValues(alpha: 0.25)),
+              ),
+            ),
+          ),
+          const SizedBox(width: 10),
+          Consumer(
+            builder: (context, ref, _) {
+              final unreadCount = ref.watch(unreadNotificationsCountProvider(currentUser?.id ?? '')).value ?? 0;
+              return Stack(
+                clipBehavior: Clip.none,
+                children: [
+                  Container(
+                    decoration: BoxDecoration(
+                      color: AppTheme.inputBg,
+                      borderRadius: BorderRadius.circular(9),
+                      border: Border.all(color: AppTheme.border),
+                    ),
+                    child: IconButton(
+                      icon: Icon(Icons.notifications_outlined, color: AppTheme.text, size: 18),
+                      tooltip: 'Activity Notifications',
+                      constraints: const BoxConstraints(minWidth: 34, minHeight: 34),
+                      padding: const EdgeInsets.all(6),
+                      onPressed: () => _showNotificationsDialog(context, currentUser?.id ?? ''),
+                    ),
+                  ),
+                  if (unreadCount > 0)
+                    Positioned(
+                      right: -3,
+                      top: -3,
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
+                        decoration: BoxDecoration(
+                          color: AppTheme.error,
+                          borderRadius: BorderRadius.circular(8),
+                          border: Border.all(color: AppTheme.surface, width: 1.5),
+                        ),
+                        constraints: const BoxConstraints(minWidth: 16, minHeight: 16),
+                        child: Text(
+                          unreadCount > 9 ? '9+' : '$unreadCount',
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 9,
+                            fontWeight: FontWeight.bold,
+                          ),
+                          textAlign: TextAlign.center,
+                        ),
+                      ),
+                    ),
+                ],
+              );
+            },
+          ),
+        ],
+      ),
+    );
+  }
 
   /// Persistent Sticky Header pinned to the top of the Teacher Dashboard.
   /// Displays the formal faculty identity, institutional accreditation, and executive quick controls.
@@ -572,7 +714,7 @@ class _TeacherDashboardScreenState extends ConsumerState<TeacherDashboardScreen>
             child: InkWell(
               onTap: () {
                 HapticFeedback.lightImpact();
-                context.push('/teacher/profile');
+                context.go('/teacher/profile');
               },
               borderRadius: BorderRadius.circular(12),
               child: Padding(
@@ -1249,161 +1391,109 @@ class _TeacherDashboardScreenState extends ConsumerState<TeacherDashboardScreen>
       crossAxisAlignment: CrossAxisAlignment.start,
       mainAxisSize: MainAxisSize.min,
       children: [
-        // View switcher as a clean segmented pill bar
+        // View switcher and filter controls
         const SizedBox(height: 12),
-        Container(
-          height: 38,
-          padding: const EdgeInsets.all(3),
-          decoration: BoxDecoration(
-            color: isDark ? AppTheme.darkSurfaceLight : const Color(0xFFF1F5F9),
-            borderRadius: BorderRadius.circular(10),
-            border: Border.all(color: AppTheme.border.withValues(alpha: 0.5)),
-          ),
-          child: Row(
+        if (isDesktop) ...[
+          Row(
             children: [
-              _buildMobileViewSegment(0, Icons.grid_view_rounded, 'Cards', onStateChanged: onStateChanged),
-              _buildMobileViewSegment(1, Icons.pie_chart_rounded, 'Donut', onStateChanged: onStateChanged),
-              _buildMobileViewSegment(2, Icons.trending_up_rounded, 'Mastery', onStateChanged: onStateChanged),
-              _buildMobileViewSegment(3, Icons.grid_on_rounded, 'Heatmap', onStateChanged: onStateChanged),
+              // Constrained Segmented Switcher
+              SizedBox(
+                width: 440,
+                height: 38,
+                child: Container(
+                  padding: const EdgeInsets.all(3),
+                  decoration: BoxDecoration(
+                    color: isDark ? AppTheme.darkSurfaceLight : const Color(0xFFF1F5F9),
+                    borderRadius: BorderRadius.circular(10),
+                    border: Border.all(color: AppTheme.border.withValues(alpha: 0.5)),
+                  ),
+                  child: Row(
+                    children: [
+                      _buildMobileViewSegment(0, Icons.grid_view_rounded, 'Cards', onStateChanged: onStateChanged),
+                      _buildMobileViewSegment(1, Icons.pie_chart_rounded, 'Donut', onStateChanged: onStateChanged),
+                      _buildMobileViewSegment(2, Icons.trending_up_rounded, 'Mastery', onStateChanged: onStateChanged),
+                      _buildMobileViewSegment(3, Icons.grid_on_rounded, 'Heatmap', onStateChanged: onStateChanged),
+                    ],
+                  ),
+                ),
+              ),
+              const Spacer(),
+              // Section Filter Dropdown
+              SizedBox(
+                width: 220,
+                height: 38,
+                child: _buildSectionDropdownWidget(
+                  effectiveSection: effectiveSection,
+                  sectionOptions: sectionOptions,
+                  allStudents: allStudents,
+                  onStateChanged: onStateChanged,
+                ),
+              ),
+              const SizedBox(width: 8),
+              // Student Filter Dropdown
+              SizedBox(
+                width: 220,
+                height: 38,
+                child: _buildStudentDropdownWidget(
+                  effectiveStudentId: effectiveStudentId,
+                  effectiveSection: effectiveSection,
+                  availableStudents: availableStudents,
+                  onStateChanged: onStateChanged,
+                ),
+              ),
+              if (hasActiveFilter) ...[
+                const SizedBox(width: 6),
+                _buildResetFilterBtnWidget(onStateChanged),
+              ],
             ],
           ),
-        ),
-        const SizedBox(height: 14),
-
-        // Filters: Section Dropdown & Student Dropdown
-        Row(
-          children: [
-            // Section Filter Dropdown
-            Expanded(
-              flex: 5,
-              child: Container(
-                height: 40,
-                padding: const EdgeInsets.symmetric(horizontal: 10),
-                decoration: BoxDecoration(
-                  color: AppTheme.background,
-                  borderRadius: BorderRadius.circular(10),
-                  border: Border.all(color: AppTheme.border),
-                ),
-                child: DropdownButtonHideUnderline(
-                  child: DropdownButton<String>(
-                    isExpanded: true,
-                    value: effectiveSection,
-                    borderRadius: BorderRadius.circular(12),
-                    elevation: 3,
-                    icon: Icon(Icons.keyboard_arrow_down, size: 18, color: AppTheme.textSecondary),
-                    style: TextStyle(fontSize: 12, color: AppTheme.text, fontWeight: FontWeight.w500),
-                    dropdownColor: AppTheme.surface,
-                    items: sectionOptions.map((sec) {
-                      return DropdownMenuItem(
-                        value: sec,
-                        child: Text(
-                          sec == 'All Handled Sections' ? 'All Sections' : sec,
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                      );
-                    }).toList(),
-                    onChanged: (val) {
-                      if (val != null) {
-                        setState(() {
-                          _analyticsSectionFilter = val;
-                          if (val != 'All Handled Sections' && _analyticsStudentFilter != 'All') {
-                            final inSec = allStudents.any((s) =>
-                                s['id'] == _analyticsStudentFilter &&
-                                (s['section'] as String?)?.toLowerCase().trim() == val.toLowerCase().trim());
-                            if (!inSec) _analyticsStudentFilter = 'All';
-                          }
-                        });
-                        ref.read(teacherDashboardProvider.notifier).reload(
-                          section: _analyticsSectionFilter,
-                          studentId: _analyticsStudentFilter,
-                        );
-                        onStateChanged?.call();
-                      }
-                    },
-                  ),
-                ),
-              ),
+        ] else ...[
+          Container(
+            height: 38,
+            padding: const EdgeInsets.all(3),
+            decoration: BoxDecoration(
+              color: isDark ? AppTheme.darkSurfaceLight : const Color(0xFFF1F5F9),
+              borderRadius: BorderRadius.circular(10),
+              border: Border.all(color: AppTheme.border.withValues(alpha: 0.5)),
             ),
-            const SizedBox(width: 8),
-
-            // Student Filter Dropdown
-            Expanded(
-              flex: 5,
-              child: Container(
-                height: 40,
-                padding: const EdgeInsets.symmetric(horizontal: 10),
-                decoration: BoxDecoration(
-                  color: AppTheme.background,
-                  borderRadius: BorderRadius.circular(10),
-                  border: Border.all(color: AppTheme.border),
-                ),
-                child: DropdownButtonHideUnderline(
-                  child: DropdownButton<String>(
-                    isExpanded: true,
-                    value: effectiveStudentId,
-                    borderRadius: BorderRadius.circular(12),
-                    elevation: 3,
-                    icon: Icon(Icons.keyboard_arrow_down, size: 18, color: AppTheme.textSecondary),
-                    style: TextStyle(fontSize: 12, color: AppTheme.text, fontWeight: FontWeight.w500),
-                    dropdownColor: AppTheme.surface,
-                    items: [
-                      const DropdownMenuItem(
-                        value: 'All',
-                        child: Text('All Students', overflow: TextOverflow.ellipsis),
-                      ),
-                      ...availableStudents.map((st) {
-                        final name = st['full_name'] as String? ?? 'Student';
-                        final sec = st['section'] as String? ?? '';
-                        final label = effectiveSection == 'All Handled Sections' && sec.isNotEmpty
-                            ? '$name ($sec)'
-                            : name;
-                        return DropdownMenuItem(
-                          value: st['id'] as String,
-                          child: Text(label, overflow: TextOverflow.ellipsis),
-                        );
-                      }),
-                    ],
-                    onChanged: (val) {
-                      if (val != null) {
-                        setState(() => _analyticsStudentFilter = val);
-                        ref.read(teacherDashboardProvider.notifier).reload(
-                          section: _analyticsSectionFilter,
-                          studentId: _analyticsStudentFilter,
-                        );
-                        onStateChanged?.call();
-                      }
-                    },
-                  ),
-                ),
-              ),
+            child: Row(
+              children: [
+                _buildMobileViewSegment(0, Icons.grid_view_rounded, 'Cards', onStateChanged: onStateChanged),
+                _buildMobileViewSegment(1, Icons.pie_chart_rounded, 'Donut', onStateChanged: onStateChanged),
+                _buildMobileViewSegment(2, Icons.trending_up_rounded, 'Mastery', onStateChanged: onStateChanged),
+                _buildMobileViewSegment(3, Icons.grid_on_rounded, 'Heatmap', onStateChanged: onStateChanged),
+              ],
             ),
-
-            // Reset Filter Button if active
-            if (hasActiveFilter) ...[
-              const SizedBox(width: 6),
-              IconButton(
-                icon: const Icon(Icons.close, size: 18),
-                tooltip: 'Reset Analytics Filter',
-                constraints: const BoxConstraints(minWidth: 36, minHeight: 36),
-                style: IconButton.styleFrom(
-                  backgroundColor: AppTheme.background,
-                  padding: EdgeInsets.zero,
+          ),
+          const SizedBox(height: 14),
+          Row(
+            children: [
+              Expanded(
+                flex: 5,
+                child: _buildSectionDropdownWidget(
+                  effectiveSection: effectiveSection,
+                  sectionOptions: sectionOptions,
+                  allStudents: allStudents,
+                  onStateChanged: onStateChanged,
                 ),
-                onPressed: () {
-                  setState(() {
-                    _analyticsSectionFilter = 'All Handled Sections';
-                    _analyticsStudentFilter = 'All';
-                  });
-                  ref.read(teacherDashboardProvider.notifier).reload(
-                    section: 'All Handled Sections',
-                    studentId: 'All',
-                  );
-                  onStateChanged?.call();
-                },
               ),
+              const SizedBox(width: 8),
+              Expanded(
+                flex: 5,
+                child: _buildStudentDropdownWidget(
+                  effectiveStudentId: effectiveStudentId,
+                  effectiveSection: effectiveSection,
+                  availableStudents: availableStudents,
+                  onStateChanged: onStateChanged,
+                ),
+              ),
+              if (hasActiveFilter) ...[
+                const SizedBox(width: 6),
+                _buildResetFilterBtnWidget(onStateChanged),
+              ],
             ],
-          ],
-        ),
+          ),
+        ],
 
         // Active filter indicator badge
         if (hasActiveFilter)
@@ -1485,6 +1575,139 @@ class _TeacherDashboardScreenState extends ConsumerState<TeacherDashboardScreen>
             effectiveSection: effectiveSection,
           ),
       ],
+    );
+  }
+
+  Widget _buildSectionDropdownWidget({
+    required String effectiveSection,
+    required List<String> sectionOptions,
+    required List<Map<String, dynamic>> allStudents,
+    VoidCallback? onStateChanged,
+  }) {
+    return Container(
+      height: 38,
+      padding: const EdgeInsets.symmetric(horizontal: 10),
+      decoration: BoxDecoration(
+        color: AppTheme.background,
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: AppTheme.border),
+      ),
+      child: DropdownButtonHideUnderline(
+        child: DropdownButton<String>(
+          isExpanded: true,
+          value: effectiveSection,
+          borderRadius: BorderRadius.circular(12),
+          elevation: 3,
+          icon: Icon(Icons.keyboard_arrow_down, size: 18, color: AppTheme.textSecondary),
+          style: TextStyle(fontSize: 12, color: AppTheme.text, fontWeight: FontWeight.w500),
+          dropdownColor: AppTheme.surface,
+          items: sectionOptions.map((sec) {
+            return DropdownMenuItem(
+              value: sec,
+              child: Text(
+                sec == 'All Handled Sections' ? 'All Sections' : sec,
+                overflow: TextOverflow.ellipsis,
+              ),
+            );
+          }).toList(),
+          onChanged: (val) {
+            if (val != null) {
+              setState(() {
+                _analyticsSectionFilter = val;
+                if (val != 'All Handled Sections' && _analyticsStudentFilter != 'All') {
+                  final inSec = allStudents.any((s) =>
+                      s['id'] == _analyticsStudentFilter &&
+                      (s['section'] as String?)?.toLowerCase().trim() == val.toLowerCase().trim());
+                  if (!inSec) _analyticsStudentFilter = 'All';
+                }
+              });
+              ref.read(teacherDashboardProvider.notifier).reload(
+                section: _analyticsSectionFilter,
+                studentId: _analyticsStudentFilter,
+              );
+              onStateChanged?.call();
+            }
+          },
+        ),
+      ),
+    );
+  }
+
+  Widget _buildStudentDropdownWidget({
+    required String effectiveStudentId,
+    required String effectiveSection,
+    required List<Map<String, dynamic>> availableStudents,
+    VoidCallback? onStateChanged,
+  }) {
+    return Container(
+      height: 38,
+      padding: const EdgeInsets.symmetric(horizontal: 10),
+      decoration: BoxDecoration(
+        color: AppTheme.background,
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: AppTheme.border),
+      ),
+      child: DropdownButtonHideUnderline(
+        child: DropdownButton<String>(
+          isExpanded: true,
+          value: effectiveStudentId,
+          borderRadius: BorderRadius.circular(12),
+          elevation: 3,
+          icon: Icon(Icons.keyboard_arrow_down, size: 18, color: AppTheme.textSecondary),
+          style: TextStyle(fontSize: 12, color: AppTheme.text, fontWeight: FontWeight.w500),
+          dropdownColor: AppTheme.surface,
+          items: [
+            const DropdownMenuItem(
+              value: 'All',
+              child: Text('All Students', overflow: TextOverflow.ellipsis),
+            ),
+            ...availableStudents.map((st) {
+              final name = st['full_name'] as String? ?? 'Student';
+              final sec = st['section'] as String? ?? '';
+              final label = effectiveSection == 'All Handled Sections' && sec.isNotEmpty
+                  ? '$name ($sec)'
+                  : name;
+              return DropdownMenuItem(
+                value: st['id'] as String,
+                child: Text(label, overflow: TextOverflow.ellipsis),
+              );
+            }),
+          ],
+          onChanged: (val) {
+            if (val != null) {
+              setState(() => _analyticsStudentFilter = val);
+              ref.read(teacherDashboardProvider.notifier).reload(
+                section: _analyticsSectionFilter,
+                studentId: _analyticsStudentFilter,
+              );
+              onStateChanged?.call();
+            }
+          },
+        ),
+      ),
+    );
+  }
+
+  Widget _buildResetFilterBtnWidget(VoidCallback? onStateChanged) {
+    return IconButton(
+      icon: const Icon(Icons.close, size: 18),
+      tooltip: 'Reset Analytics Filter',
+      constraints: const BoxConstraints(minWidth: 36, minHeight: 36),
+      style: IconButton.styleFrom(
+        backgroundColor: AppTheme.background,
+        padding: EdgeInsets.zero,
+      ),
+      onPressed: () {
+        setState(() {
+          _analyticsSectionFilter = 'All Handled Sections';
+          _analyticsStudentFilter = 'All';
+        });
+        ref.read(teacherDashboardProvider.notifier).reload(
+          section: 'All Handled Sections',
+          studentId: 'All',
+        );
+        onStateChanged?.call();
+      },
     );
   }
 
@@ -2997,7 +3220,7 @@ class _TeacherDashboardScreenState extends ConsumerState<TeacherDashboardScreen>
     return _TeacherHeaderAvatarButton(
       currentUser: currentUser,
       teacherName: teacherName,
-      onTap: () => context.push('/teacher/profile'),
+      onTap: () => context.go('/teacher/profile'),
     );
   }
 }
@@ -3032,8 +3255,6 @@ class _TeacherHeaderAvatarButtonState
 
   @override
   Widget build(BuildContext context) {
-    final hasImage = widget.currentUser?.profileImage != null &&
-        (widget.currentUser!.profileImage as String).isNotEmpty;
     final initial = widget.teacherName.isNotEmpty
         ? widget.teacherName[0].toUpperCase()
         : 'T';
@@ -3124,32 +3345,6 @@ class _TeacherHeaderAvatarButtonState
                 ),
               ],
             ),
-          ),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildFallbackInitial(String initial) {
-    return Container(
-      decoration: BoxDecoration(
-        gradient: LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: [
-            AppTheme.primary,
-            AppTheme.primaryDark,
-          ],
-        ),
-      ),
-      child: Center(
-        child: Text(
-          initial,
-          style: const TextStyle(
-            fontSize: 16,
-            fontWeight: FontWeight.w700,
-            color: Colors.white,
-            letterSpacing: -0.3,
           ),
         ),
       ),

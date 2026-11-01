@@ -16,10 +16,13 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('AIRAMP Portal'), findsOneWidget);
-    expect(find.text('SINGLE SIGN-IN · INSTITUTIONAL ACCESS'), findsOneWidget);
+    expect(find.text('Sign in with your institutional account to continue'), findsOneWidget);
     expect(find.text('Student ID, Email, or Username'), findsOneWidget);
     expect(find.text('Sign In to Portal'), findsOneWidget);
-    expect(find.text('Unified Authentication · Automatic Role Routing'), findsOneWidget);
+
+    // Verify verbose boilerplate and redundant tags have been cleanly removed
+    expect(find.text('SINGLE SIGN-IN · INSTITUTIONAL ACCESS'), findsNothing);
+    expect(find.text('Unified Authentication · Automatic Role Routing'), findsNothing);
 
     // Verify role-specific headers and segmented tabs are NOT present
     expect(find.text('Teacher Portal'), findsNothing);
@@ -40,7 +43,7 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('AIRAMP Portal'), findsOneWidget);
-    expect(find.text('SINGLE SIGN-IN · INSTITUTIONAL ACCESS'), findsOneWidget);
+    expect(find.text('Sign in with your institutional account to continue'), findsOneWidget);
     expect(find.text('Teacher Portal'), findsNothing);
     expect(find.text('FACULTY ACCESS'), findsNothing);
   });

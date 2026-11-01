@@ -10,6 +10,7 @@ import '../../data/admin_repository.dart';
 import 'components/admin_command_palette.dart';
 import '../../../../core/components/offline_sync_status_pill.dart';
 import '../../../../core/components/user_avatar_widget.dart';
+import '../../../../core/components/app_logo.dart';
 
 class AdminWebScaffold extends ConsumerStatefulWidget {
   final StatefulNavigationShell navigationShell;
@@ -316,6 +317,10 @@ class _AdminWebScaffoldState extends ConsumerState<AdminWebScaffold> {
             },
           ),
           const SizedBox(width: 8),
+          if (_isSidebarCollapsed || !isDesktop) ...[
+            AppLogo.mark(size: 32, isDark: isDark),
+            const SizedBox(width: 10),
+          ],
 
           // Breadcrumb Title (scrollable/flexible so it never overflows when space is tight)
           Flexible(
@@ -639,19 +644,10 @@ class _AdminWebScaffoldState extends ConsumerState<AdminWebScaffold> {
           ),
           child: Row(
             children: [
-              // Logo: 38px width. With 19px left margin, center is at 19 + 19 = 38px (precisely 76 / 2)
-              Container(
-                width: 38,
-                height: 38,
-                decoration: BoxDecoration(
-                  color: AppTheme.primary,
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                alignment: Alignment.center,
-                child: const Text(
-                  'A',
-                  style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold),
-                ),
+              // Logo: 38px width
+              AppLogo.mark(
+                size: 38,
+                isDark: isDark,
               ),
               const SizedBox(width: 14),
               Expanded(

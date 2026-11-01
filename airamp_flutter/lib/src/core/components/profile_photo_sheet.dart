@@ -13,12 +13,14 @@ class ProfilePhotoSheet extends StatefulWidget {
   final String currentPhoto;
   final String fullName;
   final ValueChanged<String> onPhotoSelected;
+  final bool isDialog;
 
   const ProfilePhotoSheet({
     super.key,
     required this.currentPhoto,
     required this.fullName,
     required this.onPhotoSelected,
+    this.isDialog = false,
   });
 
   static Future<void> show({
@@ -27,35 +29,61 @@ class ProfilePhotoSheet extends StatefulWidget {
     required String currentPhoto,
     required String fullName,
   }) async {
-    await showModalBottomSheet<void>(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.transparent,
-      builder: (ctx) => ProfilePhotoSheet(
-        currentPhoto: currentPhoto,
-        fullName: fullName,
-        onPhotoSelected: (newPhoto) async {
-          Navigator.of(ctx).pop();
-          try {
-            await ref.read(authProvider.notifier).updateProfile(
-                  profileImage: newPhoto,
-                );
-            if (context.mounted) {
-              AppToast.showSuccess(
-                context,
-                newPhoto.isEmpty
-                    ? 'Profile photo reset to default initial.'
-                    : 'Profile photo updated successfully!',
-              );
-            }
-          } catch (e) {
-            if (context.mounted) {
-              AppToast.showError(context, 'Failed to update profile photo: $e');
-            }
-          }
-        },
-      ),
-    );
+    final screenWidth = MediaQuery.of(context).size.width;
+    final isDesktop = screenWidth >= 768;
+
+    Future<void> onPhotoSelected(BuildContext ctx, String newPhoto) async {
+      Navigator.of(ctx).pop();
+      try {
+        await ref.read(authProvider.notifier).updateProfile(
+              profileImage: newPhoto,
+            );
+        if (context.mounted) {
+          AppToast.showSuccess(
+            context,
+            newPhoto.isEmpty
+                ? 'Profile photo reset to default initial.'
+                : 'Profile photo updated successfully!',
+          );
+        }
+      } catch (e) {
+        if (context.mounted) {
+          AppToast.showError(context, 'Failed to update profile photo: $e');
+        }
+      }
+    }
+
+    if (isDesktop) {
+      await showDialog<void>(
+        context: context,
+        builder: (ctx) => Dialog(
+          backgroundColor: Colors.transparent,
+          elevation: 0,
+          insetPadding: const EdgeInsets.symmetric(horizontal: 24, vertical: 24),
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 520),
+            child: ProfilePhotoSheet(
+              currentPhoto: currentPhoto,
+              fullName: fullName,
+              isDialog: true,
+              onPhotoSelected: (newPhoto) => onPhotoSelected(ctx, newPhoto),
+            ),
+          ),
+        ),
+      );
+    } else {
+      await showModalBottomSheet<void>(
+        context: context,
+        isScrollControlled: true,
+        backgroundColor: Colors.transparent,
+        builder: (ctx) => ProfilePhotoSheet(
+          currentPhoto: currentPhoto,
+          fullName: fullName,
+          isDialog: false,
+          onPhotoSelected: (newPhoto) => onPhotoSelected(ctx, newPhoto),
+        ),
+      );
+    }
   }
 
   @override
@@ -139,24 +167,28 @@ class _ProfilePhotoSheetState extends State<ProfilePhotoSheet> {
 
     return Container(
       padding: EdgeInsets.only(
-        top: 12,
+        top: widget.isDialog ? 20 : 12,
         left: 20,
         right: 20,
         bottom: MediaQuery.of(context).viewInsets.bottom + 24,
       ),
       decoration: BoxDecoration(
         color: AppTheme.surface,
-        borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
-        border: Border(
-          top: BorderSide(color: AppTheme.border, width: 1),
-          left: BorderSide(color: AppTheme.border, width: 1),
-          right: BorderSide(color: AppTheme.border, width: 1),
-        ),
+        borderRadius: widget.isDialog
+            ? BorderRadius.circular(20)
+            : const BorderRadius.vertical(top: Radius.circular(24)),
+        border: widget.isDialog
+            ? Border.all(color: AppTheme.border, width: 1)
+            : Border(
+                top: BorderSide(color: AppTheme.border, width: 1),
+                left: BorderSide(color: AppTheme.border, width: 1),
+                right: BorderSide(color: AppTheme.border, width: 1),
+              ),
         boxShadow: [
           BoxShadow(
             color: Colors.black.withValues(alpha: isDark ? 0.4 : 0.08),
             blurRadius: 20,
-            offset: const Offset(0, -4),
+            offset: Offset(0, widget.isDialog ? 6 : -4),
           ),
         ],
       ),
@@ -165,16 +197,18 @@ class _ProfilePhotoSheetState extends State<ProfilePhotoSheet> {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            // Handle bar
-            Container(
-              width: 38,
-              height: 4,
-              margin: const EdgeInsets.only(bottom: 18),
-              decoration: BoxDecoration(
-                color: AppTheme.border,
-                borderRadius: BorderRadius.circular(2),
+            // Handle bar (Only for mobile bottom sheet)
+            if (!widget.isDialog) ...[
+              Container(
+                width: 38,
+                height: 4,
+                margin: const EdgeInsets.only(bottom: 18),
+                decoration: BoxDecoration(
+                  color: AppTheme.border,
+                  borderRadius: BorderRadius.circular(2),
+                ),
               ),
-            ),
+            ],
 
             // Header title
             Row(
@@ -292,69 +326,76 @@ class _ProfilePhotoSheetState extends State<ProfilePhotoSheet> {
             ),
             const SizedBox(height: 12),
 
-            // Grid of Presets
-            SizedBox(
-              height: 104,
-              child: ListView.separated(
-                scrollDirection: Axis.horizontal,
-                itemCount: kAvatarPresets.length,
-                separatorBuilder: (_, __) => const SizedBox(width: 14),
-                itemBuilder: (context, index) {
-                  final preset = kAvatarPresets[index];
-                  final isSelected = _previewPhoto == preset.id;
+            // Complete Grid of Presets (All 10 presets displayed in 2 balanced rows; none cut in half!)
+            GridView.builder(
+              shrinkWrap: true,
+              physics: const NeverScrollableScrollPhysics(),
+              gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                crossAxisCount: 5,
+                mainAxisSpacing: 10,
+                crossAxisSpacing: 8,
+                mainAxisExtent: 82,
+              ),
+              itemCount: kAvatarPresets.length,
+              itemBuilder: (context, index) {
+                final preset = kAvatarPresets[index];
+                final isSelected = _previewPhoto == preset.id;
 
-                  return GestureDetector(
-                    onTap: _isProcessing
-                        ? null
-                        : () {
-                            setState(() => _previewPhoto = preset.id);
-                            widget.onPhotoSelected(preset.id);
-                          },
-                    child: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        AnimatedContainer(
-                          duration: const Duration(milliseconds: 180),
-                          padding: const EdgeInsets.all(3),
+                return InkWell(
+                  onTap: _isProcessing
+                      ? null
+                      : () {
+                          setState(() => _previewPhoto = preset.id);
+                          widget.onPhotoSelected(preset.id);
+                        },
+                  borderRadius: BorderRadius.circular(12),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      AnimatedContainer(
+                        duration: const Duration(milliseconds: 180),
+                        padding: const EdgeInsets.all(2.5),
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          border: Border.all(
+                            color: isSelected ? AppTheme.primary : Colors.transparent,
+                            width: 2.5,
+                          ),
+                        ),
+                        child: Container(
+                          width: 46,
+                          height: 46,
                           decoration: BoxDecoration(
                             shape: BoxShape.circle,
-                            border: Border.all(
-                              color: isSelected ? AppTheme.primary : Colors.transparent,
-                              width: 2.5,
+                            gradient: LinearGradient(
+                              begin: Alignment.topLeft,
+                              end: Alignment.bottomRight,
+                              colors: preset.gradientColors,
                             ),
                           ),
-                          child: Container(
-                            width: 52,
-                            height: 52,
-                            decoration: BoxDecoration(
-                              shape: BoxShape.circle,
-                              gradient: LinearGradient(
-                                begin: Alignment.topLeft,
-                                end: Alignment.bottomRight,
-                                colors: preset.gradientColors,
-                              ),
-                            ),
-                            child: Icon(
-                              preset.icon,
-                              size: 26,
-                              color: preset.iconColor,
-                            ),
+                          child: Icon(
+                            preset.icon,
+                            size: 22,
+                            color: preset.iconColor,
                           ),
                         ),
-                        const SizedBox(height: 6),
-                        Text(
-                          preset.label,
-                          style: TextStyle(
-                            fontSize: 11,
-                            fontWeight: isSelected ? FontWeight.bold : FontWeight.w500,
-                            color: isSelected ? AppTheme.text : AppTheme.textSecondary,
-                          ),
+                      ),
+                      const SizedBox(height: 5),
+                      Text(
+                        preset.label,
+                        style: TextStyle(
+                          fontSize: 10.5,
+                          fontWeight: isSelected ? FontWeight.bold : FontWeight.w500,
+                          color: isSelected ? AppTheme.text : AppTheme.textSecondary,
                         ),
-                      ],
-                    ),
-                  );
-                },
-              ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        textAlign: TextAlign.center,
+                      ),
+                    ],
+                  ),
+                );
+              },
             ),
             const SizedBox(height: 8),
 

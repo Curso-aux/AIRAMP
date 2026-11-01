@@ -160,11 +160,12 @@ class _TeacherScheduleScreenState extends ConsumerState<TeacherScheduleScreen> {
     return nowMinutes >= startMinutes && nowMinutes < endMinutes;
   }
 
+  double _currentColWidth = 110.0;
+
   void _scrollToDay(String dayName) {
     final idx = _days.indexWhere((d) => d.toLowerCase() == dayName.toLowerCase());
     if (idx >= 0 && _bodyHorizontalController.hasClients) {
-      const colWidth = 110.0;
-      final target = idx * colWidth;
+      final target = idx * _currentColWidth;
       _bodyHorizontalController.animateTo(
         target.clamp(0.0, _bodyHorizontalController.position.maxScrollExtent),
         duration: const Duration(milliseconds: 320),
@@ -540,129 +541,136 @@ class _TeacherScheduleScreenState extends ConsumerState<TeacherScheduleScreen> {
 
   /// Weekly Timetable Matrix with Clean Card Surface & Soft Halftone (matching Student schedule matrix)
   Widget _buildTimetableGridMatrix(List<Map<String, dynamic>> schedules, bool isDark) {
-    const double colWidth = 110.0;
-    const double timeColWidth = 54.0;
-    const double headerHeight = 36.0;
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        const double timeColWidth = 54.0;
+        const double headerHeight = 36.0;
+        final availableWidth = constraints.maxWidth;
+        // Dynamically compute column width to fill available width on web
+        final dynamicColWidth = (availableWidth - timeColWidth) / _days.length;
+        final colWidth = dynamicColWidth > 110.0 ? dynamicColWidth : 110.0;
+        _currentColWidth = colWidth;
+        final isScrollable = colWidth == 110.0;
 
-    return Container(
-      decoration: BoxDecoration(
-        color: AppTheme.surface,
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: AppTheme.border),
-      ),
-      child: Column(
-        children: [
-          // Header Row with Time anchor + Day columns
-          Row(
-            children: [
-              Container(
-                width: timeColWidth,
-                height: headerHeight,
-                alignment: Alignment.center,
-                decoration: BoxDecoration(
-                  color: AppTheme.inputBg,
-                  borderRadius: const BorderRadius.only(topLeft: Radius.circular(13)),
-                  border: Border(
-                    right: BorderSide(color: AppTheme.border),
-                    bottom: BorderSide(color: AppTheme.border),
-                  ),
-                ),
-                child: Text(
-                  'TIME',
-                  style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: AppTheme.textMuted),
-                ),
-              ),
-              Expanded(
-                child: SingleChildScrollView(
-                  controller: _headerHorizontalController,
-                  physics: const ClampingScrollPhysics(),
-                  scrollDirection: Axis.horizontal,
-                  child: Row(
-                    children: _dayLabels.map((lbl) {
-                      final dayIndex = _dayLabels.indexOf(lbl);
-                      final fullDay = _days[dayIndex];
-                      final isToday = fullDay.toLowerCase() == getCurrentDayOfWeek().toLowerCase();
-                      final isHighlighted = _selectedDay == fullDay;
-
-                      return Container(
-                        width: colWidth,
-                        height: headerHeight,
-                        alignment: Alignment.center,
-                        decoration: BoxDecoration(
-                          color: isHighlighted
-                              ? AppTheme.primary.withValues(alpha: 0.12)
-                              : (isToday ? AppTheme.primary.withValues(alpha: 0.05) : AppTheme.inputBg),
-                          border: Border(
-                            right: BorderSide(color: AppTheme.border),
-                            bottom: BorderSide(color: AppTheme.border),
-                          ),
-                        ),
-                        child: Text(
-                          lbl,
-                          style: TextStyle(
-                            fontSize: 11,
-                            fontWeight: FontWeight.bold,
-                            color: isHighlighted || isToday ? AppTheme.primary : AppTheme.text,
-                          ),
-                        ),
-                      );
-                    }).toList(),
-                  ),
-                ),
-              ),
-            ],
+        return Container(
+          decoration: BoxDecoration(
+            color: AppTheme.surface,
+            borderRadius: BorderRadius.circular(14),
+            border: Border.all(color: AppTheme.border),
           ),
-
-          // Scrollable Grid Body
-          Expanded(
-            child: Row(
-              children: [
-                // Synchronized Time Column
-                SizedBox(
-                  width: timeColWidth,
-                  child: ListView.builder(
-                    controller: _timeColVerticalController,
-                    physics: const ClampingScrollPhysics(),
-                    itemCount: _totalSlots,
-                    itemBuilder: (context, idx) {
-                      final slotMinute = _gridStartMinutes + (idx * _slotMinutes);
-                      final hour = (slotMinute ~/ 60);
-                      final minute = (slotMinute % 60);
-                      final h = hour % 12 == 0 ? 12 : hour % 12;
-                      final m = minute.toString().padLeft(2, '0');
-                      final ampm = hour >= 12 ? 'P' : 'A';
-
-                      return Container(
-                        height: _slotHeight,
-                        alignment: Alignment.center,
-                        decoration: BoxDecoration(
-                          border: Border(
-                            right: BorderSide(color: AppTheme.border),
-                            bottom: BorderSide(color: AppTheme.border.withValues(alpha: 0.5)),
-                          ),
-                        ),
-                        child: Text(
-                          '$h:$m$ampm',
-                          style: TextStyle(fontSize: 9.5, color: AppTheme.textMuted),
-                        ),
-                      );
-                    },
+          child: Column(
+            children: [
+              // Header Row with Time anchor + Day columns
+              Row(
+                children: [
+                  Container(
+                    width: timeColWidth,
+                    height: headerHeight,
+                    alignment: Alignment.center,
+                    decoration: BoxDecoration(
+                      color: AppTheme.inputBg,
+                      borderRadius: const BorderRadius.only(topLeft: Radius.circular(13)),
+                      border: Border(
+                        right: BorderSide(color: AppTheme.border),
+                        bottom: BorderSide(color: AppTheme.border),
+                      ),
+                    ),
+                    child: Text(
+                      'TIME',
+                      style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: AppTheme.textMuted),
+                    ),
                   ),
-                ),
+                  Expanded(
+                    child: SingleChildScrollView(
+                      controller: _headerHorizontalController,
+                      physics: isScrollable ? const ClampingScrollPhysics() : const NeverScrollableScrollPhysics(),
+                      scrollDirection: Axis.horizontal,
+                      child: Row(
+                        children: _dayLabels.map((lbl) {
+                          final dayIndex = _dayLabels.indexOf(lbl);
+                          final fullDay = _days[dayIndex];
+                          final isToday = fullDay.toLowerCase() == getCurrentDayOfWeek().toLowerCase();
+                          final isHighlighted = _selectedDay == fullDay;
 
-                // Horizontal & Vertical Scrollable Days Grid
-                Expanded(
-                  child: SingleChildScrollView(
-                    scrollDirection: Axis.horizontal,
-                    controller: _bodyHorizontalController,
-                    physics: const ClampingScrollPhysics(),
-                    child: SizedBox(
-                      width: colWidth * _days.length,
-                      child: SingleChildScrollView(
-                        controller: _verticalGridController,
+                          return Container(
+                            width: colWidth,
+                            height: headerHeight,
+                            alignment: Alignment.center,
+                            decoration: BoxDecoration(
+                              color: isHighlighted
+                                  ? AppTheme.primary.withValues(alpha: 0.12)
+                                  : (isToday ? AppTheme.primary.withValues(alpha: 0.05) : AppTheme.inputBg),
+                              border: Border(
+                                right: BorderSide(color: AppTheme.border),
+                                bottom: BorderSide(color: AppTheme.border),
+                              ),
+                            ),
+                            child: Text(
+                              lbl,
+                              style: TextStyle(
+                                fontSize: 11,
+                                fontWeight: FontWeight.bold,
+                                color: isHighlighted || isToday ? AppTheme.primary : AppTheme.text,
+                              ),
+                            ),
+                          );
+                        }).toList(),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+
+              // Scrollable Grid Body
+              Expanded(
+                child: Row(
+                  children: [
+                    // Synchronized Time Column
+                    SizedBox(
+                      width: timeColWidth,
+                      child: ListView.builder(
+                        controller: _timeColVerticalController,
                         physics: const ClampingScrollPhysics(),
+                        itemCount: _totalSlots,
+                        itemBuilder: (context, idx) {
+                          final slotMinute = _gridStartMinutes + (idx * _slotMinutes);
+                          final hour = (slotMinute ~/ 60);
+                          final minute = (slotMinute % 60);
+                          final h = hour % 12 == 0 ? 12 : hour % 12;
+                          final m = minute.toString().padLeft(2, '0');
+                          final ampm = hour >= 12 ? 'P' : 'A';
+
+                          return Container(
+                            height: _slotHeight,
+                            alignment: Alignment.center,
+                            decoration: BoxDecoration(
+                              border: Border(
+                                right: BorderSide(color: AppTheme.border),
+                                bottom: BorderSide(color: AppTheme.border.withValues(alpha: 0.5)),
+                              ),
+                            ),
+                            child: Text(
+                              '$h:$m$ampm',
+                              style: TextStyle(fontSize: 9.5, color: AppTheme.textMuted),
+                            ),
+                          );
+                        },
+                      ),
+                    ),
+
+                    // Horizontal & Vertical Scrollable Days Grid
+                    Expanded(
+                      child: SingleChildScrollView(
+                        scrollDirection: Axis.horizontal,
+                        controller: _bodyHorizontalController,
+                        physics: isScrollable ? const ClampingScrollPhysics() : const NeverScrollableScrollPhysics(),
                         child: SizedBox(
-                          height: _slotHeight * _totalSlots,
+                          width: colWidth * _days.length,
+                          child: SingleChildScrollView(
+                            controller: _verticalGridController,
+                            physics: const ClampingScrollPhysics(),
+                            child: SizedBox(
+                              height: _slotHeight * _totalSlots,
                           child: Stack(
                             children: [
                               // Background grid lines
@@ -878,16 +886,28 @@ class _TeacherScheduleScreenState extends ConsumerState<TeacherScheduleScreen> {
         ],
       ),
     );
+    });
   }
 
   void _showClassDetailModal(BuildContext context, Map<String, dynamic> c, bool isDark) {
-    final subject = c['subject_name'] as String? ?? 'Subject';
-    final section = c['section_name'] as String? ?? 'Section';
-    final room = c['room'] as String? ?? 'Designated Facility';
-    final day = c['day_of_week'] as String? ?? '';
-    final start = _formatDisplayTime(c['start_time'] as String?);
-    final end = _formatDisplayTime(c['end_time'] as String?);
-    final color = _parseColor(c['color_code'] as String?, AppTheme.primary);
+    final isDesktop = MediaQuery.of(context).size.width >= 900;
+    if (isDesktop) {
+      showDialog(
+        context: context,
+        builder: (ctx) => Dialog(
+          backgroundColor: AppTheme.surface,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 480),
+            child: Padding(
+              padding: const EdgeInsets.all(24),
+              child: _buildClassDetailContent(ctx, c, isDark, isDesktop: true),
+            ),
+          ),
+        ),
+      );
+      return;
+    }
 
     showModalBottomSheet(
       context: context,
@@ -910,22 +930,40 @@ class _TeacherScheduleScreenState extends ConsumerState<TeacherScheduleScreen> {
           top: false,
           child: Padding(
             padding: const EdgeInsets.fromLTRB(20, 12, 20, 20),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                // Top drag handle
-                Center(
-                  child: Container(
-                    width: 36,
-                    height: 4,
-                    decoration: BoxDecoration(
-                      color: AppTheme.border.withValues(alpha: 0.8),
-                      borderRadius: BorderRadius.circular(2),
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 16),
+            child: _buildClassDetailContent(ctx, c, isDark, isDesktop: false),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildClassDetailContent(BuildContext ctx, Map<String, dynamic> c, bool isDark, {required bool isDesktop}) {
+    final subject = c['subject_name'] as String? ?? 'Subject';
+    final section = c['section_name'] as String? ?? 'Section';
+    final room = c['room'] as String? ?? 'Designated Facility';
+    final day = c['day_of_week'] as String? ?? '';
+    final start = _formatDisplayTime(c['start_time'] as String?);
+    final end = _formatDisplayTime(c['end_time'] as String?);
+    final color = _parseColor(c['color_code'] as String?, AppTheme.primary);
+
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        if (!isDesktop) ...[
+          // Top drag handle
+          Center(
+            child: Container(
+              width: 36,
+              height: 4,
+              decoration: BoxDecoration(
+                color: AppTheme.border.withValues(alpha: 0.8),
+                borderRadius: BorderRadius.circular(2),
+              ),
+            ),
+          ),
+          const SizedBox(height: 16),
+        ],
 
                 // Institutional Header: Neutral Subject Box + Badges + Title
                 Row(
@@ -1114,209 +1152,233 @@ class _TeacherScheduleScreenState extends ConsumerState<TeacherScheduleScreen> {
                   ),
                 ),
               ],
-            ),
-          ),
-        ),
-      ),
-    );
+            );
   }
 
   /// Agenda Timeline View
   Widget _buildAgendaList(List<Map<String, dynamic>> list) {
     final isDark = AppTheme.isDark;
 
-    return Column(
-      children: list.map((sched) {
-        final subject = sched['subject_name'] as String? ?? 'Subject';
-        final section = sched['section_name'] as String? ?? 'Section';
-        final room = sched['room'] as String?;
-        final startTime = _formatDisplayTime(sched['start_time'] as String?);
-        final endTime = _formatDisplayTime(sched['end_time'] as String?);
-        final color = _parseColor(sched['color_code'] as String?, AppTheme.primary);
-        final isOngoing = _isClassOngoing(sched);
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final isDesktop = constraints.maxWidth >= 768;
 
-        return ClipRRect(
-          borderRadius: BorderRadius.circular(14),
-          child: Container(
-            margin: const EdgeInsets.only(bottom: 12),
-            decoration: BoxDecoration(
-              color: AppTheme.surface,
-              borderRadius: BorderRadius.circular(14),
-              border: Border.all(
-                color: isOngoing ? color : color.withValues(alpha: isDark ? 0.35 : 0.25),
-                width: isOngoing ? 1.5 : 1,
-              ),
+        if (isDesktop) {
+          return GridView.builder(
+            shrinkWrap: true,
+            physics: const NeverScrollableScrollPhysics(),
+            gridDelegate: const SliverGridDelegateWithMaxCrossAxisExtent(
+              maxCrossAxisExtent: 520,
+              mainAxisExtent: 116,
+              crossAxisSpacing: 14,
+              mainAxisSpacing: 12,
             ),
-            child: Stack(
-              children: [
-                // Subtle Halftone Accent on Agenda card
-                HalftoneCardDecoration(
-                  color: color,
-                  width: 90,
-                  baseOpacity: isDark ? 0.12 : 0.18,
-                ),
-                Padding(
-                  padding: const EdgeInsets.all(16),
-                  child: Row(
-                    children: [
-                      // Time & Day Block
-                      Container(
-                        width: 82,
-                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 8),
-                        decoration: BoxDecoration(
-                          color: AppTheme.background,
-                          borderRadius: BorderRadius.circular(10),
-                          border: Border.all(color: AppTheme.border.withValues(alpha: 0.6)),
-                        ),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              sched['day_of_week'] as String? ?? '',
-                              style: TextStyle(
-                                fontSize: 11,
-                                fontWeight: FontWeight.bold,
-                                color: (sched['day_of_week'] as String?)?.toLowerCase() == getCurrentDayOfWeek().toLowerCase()
-                                    ? AppTheme.primary
-                                    : AppTheme.text,
-                              ),
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                            ),
-                            const SizedBox(height: 3),
-                            Text(
-                              startTime,
-                              style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: AppTheme.text),
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                            ),
-                            Text(
-                              'to $endTime',
-                              style: TextStyle(fontSize: 9, color: AppTheme.textSecondary),
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                            ),
-                          ],
-                        ),
-                      ),
-                      const SizedBox(width: 10),
+            itemCount: list.length,
+            itemBuilder: (context, index) {
+              return _buildAgendaCard(list[index], isDark, isDesktop: true);
+            },
+          );
+        }
 
-                      // Subject & Info - Full Width, No Truncation
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            // Top row: Section Badge + LIVE indicator + Admin Assigned pill
-                            Row(
-                              children: [
-                                Flexible(
-                                  child: Container(
-                                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                                    decoration: BoxDecoration(
-                                      color: color.withValues(alpha: isDark ? 0.22 : 0.12),
-                                      borderRadius: BorderRadius.circular(6),
-                                      border: Border.all(color: color.withValues(alpha: isDark ? 0.35 : 0.2)),
+        return Column(
+          children: list.map((sched) {
+            return _buildAgendaCard(sched, isDark, isDesktop: false);
+          }).toList(),
+        );
+      },
+    );
+  }
+
+  Widget _buildAgendaCard(Map<String, dynamic> sched, bool isDark, {required bool isDesktop}) {
+    final subject = sched['subject_name'] as String? ?? 'Subject';
+    final section = sched['section_name'] as String? ?? 'Section';
+    final room = sched['room'] as String?;
+    final startTime = _formatDisplayTime(sched['start_time'] as String?);
+    final endTime = _formatDisplayTime(sched['end_time'] as String?);
+    final color = _parseColor(sched['color_code'] as String?, AppTheme.primary);
+    final isOngoing = _isClassOngoing(sched);
+
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: () => _showClassDetailModal(context, sched, isDark),
+        borderRadius: BorderRadius.circular(14),
+        hoverColor: color.withValues(alpha: isDark ? 0.08 : 0.04),
+        child: Container(
+          margin: EdgeInsets.only(bottom: isDesktop ? 0 : 12),
+          decoration: BoxDecoration(
+            color: AppTheme.surface,
+            borderRadius: BorderRadius.circular(14),
+            border: Border.all(
+              color: isOngoing ? color : color.withValues(alpha: isDark ? 0.35 : 0.25),
+              width: isOngoing ? 1.5 : 1,
+            ),
+          ),
+          clipBehavior: Clip.antiAlias,
+          child: Stack(
+            children: [
+              // Subtle Halftone Accent on Agenda card
+              HalftoneCardDecoration(
+                color: color,
+                width: 90,
+                baseOpacity: isDark ? 0.12 : 0.18,
+              ),
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                child: Row(
+                  children: [
+                    // Time & Day Block
+                    Container(
+                      width: 80,
+                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 8),
+                      decoration: BoxDecoration(
+                        color: AppTheme.background,
+                        borderRadius: BorderRadius.circular(10),
+                        border: Border.all(color: AppTheme.border.withValues(alpha: 0.6)),
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Text(
+                            sched['day_of_week'] as String? ?? '',
+                            style: TextStyle(
+                              fontSize: 10.5,
+                              fontWeight: FontWeight.bold,
+                              color: (sched['day_of_week'] as String?)?.toLowerCase() == getCurrentDayOfWeek().toLowerCase()
+                                  ? AppTheme.primary
+                                  : AppTheme.text,
+                            ),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                          const SizedBox(height: 3),
+                          Text(
+                            startTime,
+                            style: TextStyle(fontSize: 10.5, fontWeight: FontWeight.bold, color: AppTheme.text),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                          Text(
+                            'to $endTime',
+                            style: TextStyle(fontSize: 9, color: AppTheme.textSecondary),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+
+                    // Subject & Info
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          // Top row: Section Badge + LIVE indicator + Admin Assigned pill
+                          Row(
+                            children: [
+                              Flexible(
+                                child: Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                  decoration: BoxDecoration(
+                                    color: color.withValues(alpha: isDark ? 0.22 : 0.12),
+                                    borderRadius: BorderRadius.circular(6),
+                                    border: Border.all(color: color.withValues(alpha: isDark ? 0.35 : 0.2)),
+                                  ),
+                                  child: Text(
+                                    section,
+                                    style: TextStyle(
+                                      fontSize: 10.5,
+                                      fontWeight: FontWeight.bold,
+                                      color: isDark ? Color.lerp(color, Colors.white, 0.25) : color,
                                     ),
-                                    child: Text(
-                                      section,
-                                      style: TextStyle(
-                                        fontSize: 10.5,
-                                        fontWeight: FontWeight.bold,
-                                        color: isDark ? Color.lerp(color, Colors.white, 0.25) : color,
-                                      ),
-                                      maxLines: 1,
-                                      overflow: TextOverflow.ellipsis,
-                                    ),
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
                                   ),
                                 ),
-                                if (isOngoing) ...[
-                                  const SizedBox(width: 5),
-                                  Container(
-                                    padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1.5),
-                                    decoration: BoxDecoration(
-                                      color: AppTheme.success.withValues(alpha: 0.15),
-                                      borderRadius: BorderRadius.circular(4),
-                                    ),
-                                    child: Text(
-                                      'LIVE',
-                                      style: TextStyle(fontSize: 8, fontWeight: FontWeight.bold, color: AppTheme.success),
-                                    ),
-                                  ),
-                                ],
-                                const Spacer(),
-                                // Admin Assigned Tag
+                              ),
+                              if (isOngoing) ...[
+                                const SizedBox(width: 5),
                                 Container(
-                                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2.5),
+                                  padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1.5),
                                   decoration: BoxDecoration(
-                                    color: AppTheme.background,
-                                    borderRadius: BorderRadius.circular(6),
-                                    border: Border.all(color: AppTheme.border.withValues(alpha: 0.6)),
+                                    color: AppTheme.success.withValues(alpha: 0.15),
+                                    borderRadius: BorderRadius.circular(4),
                                   ),
-                                  child: Row(
-                                    mainAxisSize: MainAxisSize.min,
-                                    children: [
-                                      Icon(Icons.lock_clock_outlined, size: 10, color: AppTheme.textMuted),
-                                      const SizedBox(width: 3),
-                                      Text(
-                                        'Assigned',
-                                        style: TextStyle(fontSize: 9.5, color: AppTheme.textMuted, fontWeight: FontWeight.w500),
-                                      ),
-                                    ],
+                                  child: Text(
+                                    'LIVE',
+                                    style: TextStyle(fontSize: 8, fontWeight: FontWeight.bold, color: AppTheme.success),
+                                  ),
+                                ),
+                              ],
+                              const Spacer(),
+                              // Admin Assigned Tag
+                              Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2.5),
+                                decoration: BoxDecoration(
+                                  color: AppTheme.background,
+                                  borderRadius: BorderRadius.circular(6),
+                                  border: Border.all(color: AppTheme.border.withValues(alpha: 0.6)),
+                                ),
+                                child: Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    Icon(Icons.lock_clock_outlined, size: 10, color: AppTheme.textMuted),
+                                    const SizedBox(width: 3),
+                                    Text(
+                                      'Assigned',
+                                      style: TextStyle(fontSize: 9.5, color: AppTheme.textMuted, fontWeight: FontWeight.w500),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 5),
+
+                          // Full Subject Title
+                          Text(
+                            subject,
+                            style: TextStyle(
+                              fontSize: 13,
+                              fontWeight: FontWeight.bold,
+                              color: AppTheme.text,
+                              height: 1.2,
+                            ),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                          const SizedBox(height: 4),
+
+                          // Metadata: Room Chip
+                          if (room != null && room.isNotEmpty)
+                            Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Icon(Icons.meeting_room_outlined, size: 12, color: AppTheme.textSecondary),
+                                const SizedBox(width: 3),
+                                Text(
+                                  room,
+                                  style: TextStyle(
+                                    fontSize: 11,
+                                    color: AppTheme.textSecondary,
+                                    fontWeight: FontWeight.w500,
                                   ),
                                 ),
                               ],
                             ),
-                            const SizedBox(height: 5),
-
-                            // Full Subject Title
-                            Text(
-                              subject,
-                              style: TextStyle(
-                                fontSize: 13.5,
-                                fontWeight: FontWeight.bold,
-                                color: AppTheme.text,
-                                height: 1.25,
-                              ),
-                              maxLines: 2,
-                              overflow: TextOverflow.ellipsis,
-                            ),
-                            const SizedBox(height: 5),
-
-                            // Metadata: Room Chip
-                            if (room != null && room.isNotEmpty)
-                              Wrap(
-                                spacing: 8,
-                                runSpacing: 4,
-                                crossAxisAlignment: WrapCrossAlignment.center,
-                                children: [
-                                  Row(
-                                    mainAxisSize: MainAxisSize.min,
-                                    children: [
-                                      Icon(Icons.meeting_room_outlined, size: 12, color: AppTheme.textSecondary),
-                                      const SizedBox(width: 3),
-                                      Text(
-                                        room,
-                                        style: TextStyle(
-                                          fontSize: 11,
-                                          color: AppTheme.textSecondary,
-                                          fontWeight: FontWeight.w500,
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                ],
-                              ),
-                          ],
-                        ),
+                        ],
                       ),
-                    ],
-                  ),
+                    ),
+                  ],
                 ),
-              ],
-            ),
+              ),
+            ],
           ),
-        );
-      }).toList(),
+        ),
+      ),
     );
   }
 }

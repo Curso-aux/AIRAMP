@@ -62,6 +62,7 @@ class _StudentScheduleScreenState extends ConsumerState<StudentScheduleScreen> {
   final ScrollController _bodyHorizontalController = ScrollController();
   final ScrollController _verticalGridController = ScrollController();
   final ScrollController _timeColVerticalController = ScrollController();
+  double _currentColWidth = 110.0;
 
   @override
   void initState() {
@@ -156,7 +157,7 @@ class _StudentScheduleScreenState extends ConsumerState<StudentScheduleScreen> {
   void _scrollToDay(String dayName) {
     final idx = _days.indexWhere((d) => d.toLowerCase() == dayName.toLowerCase());
     if (idx >= 0 && _bodyHorizontalController.hasClients) {
-      const colWidth = 110.0;
+      final colWidth = _currentColWidth;
       final target = idx * colWidth;
       _bodyHorizontalController.animateTo(
         target.clamp(0.0, _bodyHorizontalController.position.maxScrollExtent),
@@ -923,17 +924,23 @@ class _StudentScheduleScreenState extends ConsumerState<StudentScheduleScreen> {
 
   /// Weekly Timetable Matrix with Clean Card Surface & Soft Halftone (Full Viewport Coverage)
   Widget _buildTimetableGridMatrix(List<Map<String, dynamic>> schedules, bool isDark, String? section) {
-    const double colWidth = 110.0;
-    const double timeColWidth = 54.0;
-    const double headerHeight = 36.0;
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        const double timeColWidth = 54.0;
+        const double headerHeight = 36.0;
+        final availableWidth = constraints.maxWidth;
+        // Dynamically compute column width to fill available width on web
+        final dynamicColWidth = (availableWidth - timeColWidth) / _days.length;
+        final colWidth = dynamicColWidth > 110.0 ? dynamicColWidth : 110.0;
+        _currentColWidth = colWidth;
 
-    return Container(
-      decoration: BoxDecoration(
-        color: AppTheme.surface,
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: AppTheme.border),
-      ),
-      child: Column(
+        return Container(
+          decoration: BoxDecoration(
+            color: AppTheme.surface,
+            borderRadius: BorderRadius.circular(14),
+            border: Border.all(color: AppTheme.border),
+          ),
+          child: Column(
         children: [
           // Header Row with Time anchor + Day columns
           Row(
@@ -1252,6 +1259,8 @@ class _StudentScheduleScreenState extends ConsumerState<StudentScheduleScreen> {
           ),
         ],
       ),
+    );
+      },
     );
   }
 

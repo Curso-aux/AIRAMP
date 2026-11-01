@@ -7,7 +7,9 @@ import '../application/chat_provider.dart';
 import '../domain/chat_models.dart';
 import '../../auth/application/auth_provider.dart';
 import 'new_conversation_modal.dart';
+import 'chat_room_screen.dart';
 import '../../../core/components/user_avatar_widget.dart';
+import '../../../core/animations/app_transitions.dart';
 
 class ChatListScreen extends ConsumerStatefulWidget {
   const ChatListScreen({super.key});
@@ -18,6 +20,7 @@ class ChatListScreen extends ConsumerStatefulWidget {
 
 class _ChatListScreenState extends ConsumerState<ChatListScreen> {
   int _selectedTab = 0; // 0 = Chats, 1 = Contacts
+  String? _activeConversationId;
   final TextEditingController _convoSearchController = TextEditingController();
   final TextEditingController _contactSearchController = TextEditingController();
 
@@ -51,14 +54,28 @@ class _ChatListScreenState extends ConsumerState<ChatListScreen> {
     final conv = await showNewConversationModal(context);
 
     if (conv != null && context.mounted) {
-      context.push('/chat/${conv.id}');
+      if (MediaQuery.of(context).size.width >= 900) {
+        setState(() {
+          _activeConversationId = conv.id;
+          _selectedTab = 0;
+        });
+      } else {
+        context.push('/chat/${conv.id}');
+      }
     }
   }
 
   Future<void> _startDirectChat(ChatUser user) async {
     final conv = await ref.read(chatProvider.notifier).getOrCreateConversation(user.id);
     if (conv != null && mounted) {
-      context.push('/chat/${conv.id}');
+      if (MediaQuery.of(context).size.width >= 900) {
+        setState(() {
+          _activeConversationId = conv.id;
+          _selectedTab = 0;
+        });
+      } else {
+        context.push('/chat/${conv.id}');
+      }
     }
   }
 
@@ -124,13 +141,96 @@ class _ChatListScreenState extends ConsumerState<ChatListScreen> {
 
     final filteredConversations = _getFilteredConversations(chatState.conversations);
     final filteredContacts = _getFilteredContacts(chatState.availableUsers);
+    final screenWidth = MediaQuery.of(context).size.width;
+    final isDesktop = screenWidth >= 900;
+
+    final listPane = _buildListPane(context, filteredConversations, filteredContacts, chatState, isDesktop: isDesktop);
+
+    if (isDesktop) {
+      return Scaffold(
+        backgroundColor: AppTheme.background,
+        body: SafeArea(
+          child: Row(
+            children: [
+              SizedBox(
+                width: 380,
+                child: Container(
+                  decoration: BoxDecoration(
+                    color: AppTheme.surface,
+                    border: Border(
+                      right: BorderSide(color: AppTheme.border),
+                    ),
+                  ),
+                  child: listPane,
+                ),
+              ),
+              Expanded(
+                child: _activeConversationId != null
+                    ? ChatRoomScreen(
+                        key: ValueKey(_activeConversationId),
+                        conversationId: _activeConversationId!,
+                        isEmbedded: true,
+                      )
+                    : _buildDesktopChatPlaceholder(context),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
 
     return Scaffold(
       backgroundColor: AppTheme.background,
-      body: SafeArea(
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
+      body: SafeArea(child: listPane),
+    );
+  }
+
+  Widget _buildDesktopChatPlaceholder(BuildContext context) {
+    return Center(
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Container(
+            padding: const EdgeInsets.all(22),
+            decoration: BoxDecoration(
+              color: AppTheme.primary.withValues(alpha: 0.1),
+              shape: BoxShape.circle,
+            ),
+            child: Icon(Icons.forum_outlined, size: 52, color: AppTheme.primary),
+          ),
+          const SizedBox(height: 20),
+          Text(
+            'Select a Conversation',
+            style: TextStyle(
+              fontSize: 19,
+              fontWeight: FontWeight.bold,
+              color: AppTheme.text,
+            ),
+          ),
+          const SizedBox(height: 8),
+          ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 380),
+            child: Text(
+              'Choose a message thread from the left or select a contact to start consulting with students or colleagues.',
+              textAlign: TextAlign.center,
+              style: TextStyle(fontSize: 13.5, color: AppTheme.textSecondary, height: 1.45),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildListPane(
+    BuildContext context,
+    List<ChatConversation> filteredConversations,
+    List<ChatUser> filteredContacts,
+    dynamic chatState, {
+    required bool isDesktop,
+  }) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
             // Executive Header with connection status and Quick Compose Action
             Padding(
               padding: const EdgeInsets.fromLTRB(20, 16, 20, 0),
@@ -396,9 +496,7 @@ class _ChatListScreenState extends ConsumerState<ChatListScreen> {
                   : _buildContactsView(filteredContacts),
             ),
           ],
-        ),
-      ),
-    );
+        );
   }
 
   // ── Chats View ─────────────────────────────────────────────
@@ -520,7 +618,11 @@ class _ChatListScreenState extends ConsumerState<ChatListScreen> {
             children: [
               Expanded(
                 child: Text(
-                  _showArchived ? 'Showing archived conversations' : 'Slide right to edit · Slide left to archive',
+                  _showArchived
+                      ? 'Showing archived conversations'
+                      : (MediaQuery.of(context).size.width >= 900
+                          ? 'Click to open · Long-press for options'
+                          : 'Slide right to edit · Slide left to archive'),
                   style: TextStyle(fontSize: 11, color: AppTheme.textMuted),
                   overflow: TextOverflow.ellipsis,
                 ),
@@ -614,83 +716,95 @@ class _ChatListScreenState extends ConsumerState<ChatListScreen> {
                           return false;
                         }
                       },
-                      child: ListTile(
-                        contentPadding: const EdgeInsets.symmetric(vertical: 8),
-                        leading: _buildAvatar(
-                          convo.name ?? 'Chat',
-                          role: isGroup ? 'group' : (otherUser?.role ?? 'student'),
-                          isGroup: isGroup,
-                          size: 44,
-                          imageSource: otherUser?.profileImage,
+                      child: Container(
+                        decoration: BoxDecoration(
+                          color: (MediaQuery.of(context).size.width >= 900 && _activeConversationId == convo.id)
+                              ? AppTheme.primary.withValues(alpha: 0.12)
+                              : Colors.transparent,
+                          borderRadius: BorderRadius.circular(10),
                         ),
-                        title: Row(
-                          children: [
-                            Expanded(
-                              child: Text(
-                                convo.name ?? 'Chat',
-                                style: TextStyle(
-                                  color: Theme.of(context).colorScheme.onSurface,
-                                  fontWeight: FontWeight.bold,
-                                  fontSize: 15,
-                                ),
-                                overflow: TextOverflow.ellipsis,
-                              ),
-                            ),
-                            if (isGroup)
-                              Container(
-                                margin: const EdgeInsets.only(left: 6),
-                                padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
-                                decoration: BoxDecoration(
-                                  color: AppTheme.primarySoft,
-                                  borderRadius: BorderRadius.circular(5),
-                                  border: Border.all(color: AppTheme.primary.withValues(alpha: 0.3), width: 0.8),
-                                ),
-                                child: Text(
-                                  'Group',
-                                  style: TextStyle(
-                                    color: AppTheme.primary,
-                                    fontSize: 10,
-                                    fontWeight: FontWeight.bold,
-                                  ),
-                                ),
-                              ),
-                          ],
-                        ),
-                        subtitle: Padding(
-                          padding: const EdgeInsets.only(top: 2),
-                          child: Text(
-                            convo.lastMessage?.text ?? 'No messages yet',
-                            style: TextStyle(
-                              color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6),
-                              fontSize: 13,
-                            ),
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
+                        child: ListTile(
+                          contentPadding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                          leading: _buildAvatar(
+                            convo.name ?? 'Chat',
+                            role: isGroup ? 'group' : (otherUser?.role ?? 'student'),
+                            isGroup: isGroup,
+                            size: 44,
+                            imageSource: otherUser?.profileImage,
                           ),
-                        ),
-                        trailing: convo.unreadCount > 0
-                            ? Container(
-                                padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
-                                decoration: BoxDecoration(
-                                  color: AppTheme.primary,
-                                  borderRadius: BorderRadius.circular(10),
-                                ),
+                          title: Row(
+                            children: [
+                              Expanded(
                                 child: Text(
-                                  convo.unreadCount.toString(),
-                                  style: const TextStyle(
-                                    color: Colors.white,
-                                    fontSize: 11,
+                                  convo.name ?? 'Chat',
+                                  style: TextStyle(
+                                    color: Theme.of(context).colorScheme.onSurface,
                                     fontWeight: FontWeight.bold,
+                                    fontSize: 15,
+                                  ),
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                              ),
+                              if (isGroup)
+                                Container(
+                                  margin: const EdgeInsets.only(left: 6),
+                                  padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+                                  decoration: BoxDecoration(
+                                    color: AppTheme.primarySoft,
+                                    borderRadius: BorderRadius.circular(5),
+                                    border: Border.all(color: AppTheme.primary.withValues(alpha: 0.3), width: 0.8),
+                                  ),
+                                  child: Text(
+                                    'Group',
+                                    style: TextStyle(
+                                      color: AppTheme.primary,
+                                      fontSize: 10,
+                                      fontWeight: FontWeight.bold,
+                                    ),
                                   ),
                                 ),
-                              )
-                            : Icon(Icons.chevron_right_rounded, color: AppTheme.textMuted, size: 20),
-                        onTap: () {
-                          context.push('/chat/${convo.id}');
-                        },
-                        onLongPress: () {
-                          _showChatOptionsSheet(convo);
-                        },
+                            ],
+                          ),
+                          subtitle: Padding(
+                            padding: const EdgeInsets.only(top: 2),
+                            child: Text(
+                              convo.lastMessage?.text ?? 'No messages yet',
+                              style: TextStyle(
+                                color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6),
+                                fontSize: 13,
+                              ),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
+                          trailing: convo.unreadCount > 0
+                              ? Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
+                                  decoration: BoxDecoration(
+                                    color: AppTheme.primary,
+                                    borderRadius: BorderRadius.circular(10),
+                                  ),
+                                  child: Text(
+                                    convo.unreadCount.toString(),
+                                    style: const TextStyle(
+                                      color: Colors.white,
+                                      fontSize: 11,
+                                      fontWeight: FontWeight.bold,
+                                    ),
+                                  ),
+                                )
+                              : Icon(Icons.chevron_right_rounded, color: AppTheme.textMuted, size: 20),
+                          onTap: () {
+                            if (MediaQuery.of(context).size.width >= 900) {
+                              setState(() => _activeConversationId = convo.id);
+                            } else {
+                              context.push('/chat/${convo.id}');
+                            }
+                          },
+                          onLongPress: () {
+                            _showChatOptionsSheet(convo);
+                          },
+                        ),
                       ),
                     );
                   },
@@ -1408,36 +1522,64 @@ class _ChatListScreenState extends ConsumerState<ChatListScreen> {
   }
 
   void _showChatOptionsSheet(ChatConversation convo) {
-    showModalBottomSheet(
-      context: context,
-      backgroundColor: Theme.of(context).colorScheme.surface,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-      ),
-      builder: (ctx) {
-        final isArchived = convo.isArchived;
-        return SafeArea(
-          child: Padding(
-            padding: const EdgeInsets.symmetric(vertical: 16),
+    final isDesktop = MediaQuery.of(context).size.width >= 900;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
+    Widget buildOptionsContent(BuildContext ctx) {
+      final isArchived = convo.isArchived;
+
+      return Material(
+        color: AppTheme.surface,
+        borderRadius: isDesktop ? BorderRadius.circular(16) : const BorderRadius.vertical(top: Radius.circular(20)),
+        clipBehavior: Clip.antiAlias,
+        child: Container(
+          decoration: isDesktop
+              ? BoxDecoration(
+                  borderRadius: BorderRadius.circular(16),
+                  border: Border.all(color: AppTheme.border.withValues(alpha: 0.8)),
+                )
+              : null,
+          child: SafeArea(
+            child: Padding(
+              padding: const EdgeInsets.symmetric(vertical: 14),
             child: Column(
               mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Container(
-                  width: 36,
-                  height: 4,
-                  decoration: BoxDecoration(
-                    color: AppTheme.border,
-                    borderRadius: BorderRadius.circular(2),
+                if (!isDesktop) ...[
+                  Center(
+                    child: Container(
+                      width: 36,
+                      height: 4,
+                      decoration: BoxDecoration(
+                        color: AppTheme.border,
+                        borderRadius: BorderRadius.circular(2),
+                      ),
+                    ),
                   ),
-                ),
-                const SizedBox(height: 16),
+                  const SizedBox(height: 12),
+                ],
+
+                // Conversation Header
                 Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 20),
+                  padding: const EdgeInsets.symmetric(horizontal: 18),
                   child: Row(
                     children: [
-                      CircleAvatar(
-                        backgroundColor: convo.type == 'group' ? AppTheme.accent : Theme.of(context).colorScheme.primary,
-                        child: Icon(convo.type == 'group' ? Icons.groups : Icons.person, color: Colors.black, size: 20),
+                      Container(
+                        width: 38,
+                        height: 38,
+                        decoration: BoxDecoration(
+                          color: AppTheme.primary.withValues(alpha: isDark ? 0.2 : 0.1),
+                          shape: BoxShape.circle,
+                          border: Border.all(color: AppTheme.primary.withValues(alpha: 0.25)),
+                        ),
+                        child: Center(
+                          child: Icon(
+                            convo.type == 'group' ? Icons.groups_rounded : Icons.person_rounded,
+                            color: AppTheme.primary,
+                            size: 20,
+                          ),
+                        ),
                       ),
                       const SizedBox(width: 12),
                       Expanded(
@@ -1447,65 +1589,86 @@ class _ChatListScreenState extends ConsumerState<ChatListScreen> {
                             Text(
                               convo.name ?? 'Chat',
                               style: TextStyle(
-                                color: Theme.of(context).colorScheme.onSurface,
+                                color: AppTheme.text,
                                 fontWeight: FontWeight.bold,
-                                fontSize: 16,
+                                fontSize: 15,
                               ),
                               maxLines: 1,
                               overflow: TextOverflow.ellipsis,
                             ),
+                            const SizedBox(height: 1),
                             Text(
                               convo.type == 'group' ? 'Group Chat' : 'Direct Message',
-                              style: TextStyle(color: AppTheme.textMuted, fontSize: 12),
+                              style: TextStyle(color: AppTheme.textMuted, fontSize: 11.5),
                             ),
                           ],
                         ),
                       ),
+                      if (isDesktop)
+                        IconButton(
+                          icon: Icon(Icons.close_rounded, size: 20, color: AppTheme.textSecondary),
+                          onPressed: () => Navigator.pop(ctx),
+                          padding: EdgeInsets.zero,
+                          constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
+                        ),
                     ],
                   ),
                 ),
-                const SizedBox(height: 12),
-                const Divider(),
+                const SizedBox(height: 10),
+                Divider(height: 1, color: AppTheme.border.withValues(alpha: 0.6)),
+                const SizedBox(height: 4),
 
-                // Option 1: Edit Name
+                // Option 1: Edit Name (Clean Neutral)
                 ListTile(
+                  contentPadding: const EdgeInsets.symmetric(horizontal: 18, vertical: 2),
                   leading: Container(
-                    padding: const EdgeInsets.all(8),
+                    width: 34,
+                    height: 34,
                     decoration: BoxDecoration(
-                      color: Colors.blue.withValues(alpha: 0.15),
+                      color: AppTheme.background,
                       borderRadius: BorderRadius.circular(8),
+                      border: Border.all(color: AppTheme.border.withValues(alpha: 0.7)),
                     ),
-                    child: const Icon(Icons.edit_outlined, color: Colors.blue, size: 20),
+                    child: Icon(Icons.edit_outlined, color: AppTheme.textSecondary, size: 17),
                   ),
-                  title: const Text('Edit Name', style: TextStyle(fontWeight: FontWeight.w600)),
-                  subtitle: const Text('Rename this conversation', style: TextStyle(fontSize: 12)),
+                  title: Text(
+                    'Edit Name',
+                    style: TextStyle(color: AppTheme.text, fontWeight: FontWeight.w600, fontSize: 13.5),
+                  ),
+                  subtitle: Text(
+                    'Rename this conversation',
+                    style: TextStyle(color: AppTheme.textMuted, fontSize: 11.5),
+                  ),
                   onTap: () {
                     Navigator.pop(ctx);
                     _showEditChatDialog(convo);
                   },
                 ),
 
-                // Option 2: Archive / Unarchive
+                // Option 2: Archive / Unarchive (Clean Neutral)
                 ListTile(
+                  contentPadding: const EdgeInsets.symmetric(horizontal: 18, vertical: 2),
                   leading: Container(
-                    padding: const EdgeInsets.all(8),
+                    width: 34,
+                    height: 34,
                     decoration: BoxDecoration(
-                      color: Colors.amber.withValues(alpha: 0.15),
+                      color: AppTheme.background,
                       borderRadius: BorderRadius.circular(8),
+                      border: Border.all(color: AppTheme.border.withValues(alpha: 0.7)),
                     ),
                     child: Icon(
                       isArchived ? Icons.unarchive_outlined : Icons.archive_outlined,
-                      color: Colors.amber.shade800,
-                      size: 20,
+                      color: AppTheme.textSecondary,
+                      size: 17,
                     ),
                   ),
                   title: Text(
                     isArchived ? 'Unarchive Chat' : 'Archive Chat',
-                    style: const TextStyle(fontWeight: FontWeight.w600),
+                    style: TextStyle(color: AppTheme.text, fontWeight: FontWeight.w600, fontSize: 13.5),
                   ),
                   subtitle: Text(
                     isArchived ? 'Move back to active chats' : 'Hide from active chat list',
-                    style: const TextStyle(fontSize: 12),
+                    style: TextStyle(color: AppTheme.textMuted, fontSize: 11.5),
                   ),
                   onTap: () async {
                     Navigator.pop(ctx);
@@ -1526,18 +1689,27 @@ class _ChatListScreenState extends ConsumerState<ChatListScreen> {
                   },
                 ),
 
-                // Option 3: Delete
+                // Option 3: Delete (Restrained Destructive)
                 ListTile(
+                  contentPadding: const EdgeInsets.symmetric(horizontal: 18, vertical: 2),
                   leading: Container(
-                    padding: const EdgeInsets.all(8),
+                    width: 34,
+                    height: 34,
                     decoration: BoxDecoration(
-                      color: AppTheme.error.withValues(alpha: 0.15),
+                      color: AppTheme.error.withValues(alpha: 0.08),
                       borderRadius: BorderRadius.circular(8),
+                      border: Border.all(color: AppTheme.error.withValues(alpha: 0.2)),
                     ),
-                    child: Icon(Icons.delete_outline, color: AppTheme.error, size: 20),
+                    child: Icon(Icons.delete_outline_rounded, color: AppTheme.error, size: 17),
                   ),
-                  title: Text('Delete Chat', style: TextStyle(color: AppTheme.error, fontWeight: FontWeight.w600)),
-                  subtitle: const Text('Delete conversation and message history', style: TextStyle(fontSize: 12)),
+                  title: Text(
+                    'Delete Chat',
+                    style: TextStyle(color: AppTheme.error, fontWeight: FontWeight.w600, fontSize: 13.5),
+                  ),
+                  subtitle: Text(
+                    'Delete conversation and message history',
+                    style: TextStyle(color: AppTheme.textMuted, fontSize: 11.5),
+                  ),
                   onTap: () {
                     Navigator.pop(ctx);
                     _showDeleteChatConfirm(convo);
@@ -1546,9 +1718,32 @@ class _ChatListScreenState extends ConsumerState<ChatListScreen> {
               ],
             ),
           ),
-        );
-      },
+        ),
+      ),
     );
+  }
+
+    if (isDesktop) {
+      AppModalTransitions.showSmoothDialog(
+        context: context,
+        barrierDismissible: true,
+        builder: (dialogCtx) => Dialog(
+          backgroundColor: Colors.transparent,
+          elevation: 0,
+          insetPadding: const EdgeInsets.all(24),
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 380),
+            child: buildOptionsContent(dialogCtx),
+          ),
+        ),
+      );
+    } else {
+      showModalBottomSheet(
+        context: context,
+        backgroundColor: Colors.transparent,
+        builder: (sheetCtx) => buildOptionsContent(sheetCtx),
+      );
+    }
   }
 
   void _showEditChatDialog(ChatConversation convo) {

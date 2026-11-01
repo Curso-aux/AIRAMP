@@ -8,8 +8,13 @@ import '../../auth/application/auth_provider.dart';
 
 class ChatRoomScreen extends ConsumerStatefulWidget {
   final String conversationId;
+  final bool isEmbedded;
 
-  const ChatRoomScreen({super.key, required this.conversationId});
+  const ChatRoomScreen({
+    super.key,
+    required this.conversationId,
+    this.isEmbedded = false,
+  });
 
   @override
   ConsumerState<ChatRoomScreen> createState() => _ChatRoomScreenState();
@@ -104,6 +109,7 @@ class _ChatRoomScreenState extends ConsumerState<ChatRoomScreen> {
 
     return Scaffold(
       appBar: AppBar(
+        automaticallyImplyLeading: !widget.isEmbedded,
         title: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           mainAxisSize: MainAxisSize.min,
@@ -303,8 +309,8 @@ class _ChatRoomScreenState extends ConsumerState<ChatRoomScreen> {
               ),
               const SizedBox(height: 12),
               ListTile(
-                leading: const Icon(Icons.copy_outlined),
-                title: const Text('Copy Message'),
+                leading: Icon(Icons.copy_outlined, color: AppTheme.textSecondary, size: 20),
+                title: Text('Copy Message', style: TextStyle(color: AppTheme.text, fontWeight: FontWeight.w500)),
                 onTap: () {
                   Navigator.pop(ctx);
                   ScaffoldMessenger.of(context).showSnackBar(
@@ -314,16 +320,16 @@ class _ChatRoomScreenState extends ConsumerState<ChatRoomScreen> {
               ),
               if (isMe) ...[
                 ListTile(
-                  leading: const Icon(Icons.edit_outlined, color: Colors.blue),
-                  title: const Text('Edit Message'),
+                  leading: Icon(Icons.edit_outlined, color: AppTheme.textSecondary, size: 20),
+                  title: Text('Edit Message', style: TextStyle(color: AppTheme.text, fontWeight: FontWeight.w500)),
                   onTap: () {
                     Navigator.pop(ctx);
                     _showEditMessageDialog(msg);
                   },
                 ),
                 ListTile(
-                  leading: const Icon(Icons.delete_outline, color: Colors.red),
-                  title: const Text('Delete Message', style: TextStyle(color: Colors.red)),
+                  leading: Icon(Icons.delete_outline_rounded, color: AppTheme.error, size: 20),
+                  title: Text('Delete Message', style: TextStyle(color: AppTheme.error, fontWeight: FontWeight.w500)),
                   onTap: () {
                     Navigator.pop(ctx);
                     _showDeleteMessageConfirm(msg);

@@ -6,6 +6,7 @@ import 'package:go_router/go_router.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/theme/theme_provider.dart';
 import '../../auth/application/auth_provider.dart';
+import '../../../core/components/app_logo.dart';
 
 import 'components/halftone_background.dart';
 import 'components/placeholders_and_vanish_input_demo.dart';
@@ -20,18 +21,32 @@ class WebLandingScreen extends ConsumerStatefulWidget {
 
 class _WebLandingScreenState extends ConsumerState<WebLandingScreen> {
   final GlobalKey _ecosystemKey = GlobalKey();
+  final GlobalKey _assistantKey = GlobalKey();
+  final GlobalKey _cloudKey = GlobalKey();
   final ScrollController _scrollController = ScrollController();
+  final ValueNotifier<double> _scrollProgress = ValueNotifier<double>(0.0);
   bool _showExplorePrompt = true;
 
   @override
   void initState() {
     super.initState();
     _scrollController.addListener(_onScroll);
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (_scrollController.hasClients) {
+        final initialProgress = (_scrollController.offset / 36.0).clamp(0.0, 1.0);
+        _scrollProgress.value = initialProgress;
+      }
+    });
   }
 
   void _onScroll() {
     if (!_scrollController.hasClients) return;
-    if (_scrollController.offset > 20) {
+    final offset = _scrollController.offset;
+    final progress = (offset / 36.0).clamp(0.0, 1.0);
+    if ((progress - _scrollProgress.value).abs() > 0.005) {
+      _scrollProgress.value = progress;
+    }
+    if (offset > 20) {
       if (_showExplorePrompt) {
         setState(() => _showExplorePrompt = false);
       }
@@ -46,21 +61,39 @@ class _WebLandingScreenState extends ConsumerState<WebLandingScreen> {
   void dispose() {
     _scrollController.removeListener(_onScroll);
     _scrollController.dispose();
+    _scrollProgress.dispose();
     super.dispose();
+  }
+
+  void _scrollToKey(GlobalKey key) {
+    if (key.currentContext != null) {
+      Scrollable.ensureVisible(
+        key.currentContext!,
+        duration: const Duration(milliseconds: 650),
+        curve: Curves.easeInOutCubic,
+      );
+    }
+  }
+
+  void _scrollToTop() {
+    if (_scrollController.hasClients) {
+      _scrollController.animateTo(
+        0,
+        duration: const Duration(milliseconds: 500),
+        curve: Curves.easeInOutCubic,
+      );
+    }
   }
 
   void _scrollToEcosystem() {
     if (_showExplorePrompt) {
       setState(() => _showExplorePrompt = false);
     }
-    if (_ecosystemKey.currentContext != null) {
-      Scrollable.ensureVisible(
-        _ecosystemKey.currentContext!,
-        duration: const Duration(milliseconds: 700),
-        curve: Curves.easeInOutCubic,
-      );
-    }
+    _scrollToKey(_ecosystemKey);
   }
+
+  void _scrollToAssistant() => _scrollToKey(_assistantKey);
+  void _scrollToCloud() => _scrollToKey(_cloudKey);
 
   @override
   Widget build(BuildContext context) {
@@ -281,6 +314,7 @@ class _WebLandingScreenState extends ConsumerState<WebLandingScreen> {
                         child: Padding(
                           padding: EdgeInsets.symmetric(horizontal: contentPadding),
                           child: Container(
+                            key: _assistantKey,
                             margin: const EdgeInsets.symmetric(vertical: 20),
                             decoration: BoxDecoration(
                               color: isDark
@@ -316,6 +350,7 @@ class _WebLandingScreenState extends ConsumerState<WebLandingScreen> {
                         child: Padding(
                           padding: EdgeInsets.symmetric(horizontal: contentPadding),
                           child: Container(
+                            key: _cloudKey,
                             margin: const EdgeInsets.symmetric(vertical: 16),
                             child: CrossPlatformEcosystemCloud(
                               isDark: isDark,
@@ -402,6 +437,11 @@ class _WebLandingScreenState extends ConsumerState<WebLandingScreen> {
                             padding: EdgeInsets.symmetric(horizontal: contentPadding),
                             child: Column(
                               children: [
+                                AppLogo.mark(
+                                  size: 32,
+                                  isDark: isDark,
+                                ),
+                                const SizedBox(height: 12),
                                 Text(
                                   'AIRAMP © 2026 Academic Integrated Review & Assessment Management Platform',
                                   textAlign: TextAlign.center,
@@ -739,191 +779,330 @@ class _WebLandingScreenState extends ConsumerState<WebLandingScreen> {
     required bool isMobile,
     bool? isTablet,
   }) {
-    return ClipRect(
-      child: BackdropFilter(
-        filter: ImageFilter.blur(sigmaX: 18, sigmaY: 18),
-        child: Container(
-          decoration: BoxDecoration(
-            color: isDark
-                ? AppTheme.darkBackground.withValues(alpha: 0.35)
-                : Colors.white.withValues(alpha: 0.22),
-            border: Border(
-              bottom: BorderSide(
-                color: isDark
-                    ? Colors.white.withValues(alpha: 0.12)
-                    : Colors.black.withValues(alpha: 0.08),
-                width: 1,
-              ),
-            ),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black.withValues(alpha: isDark ? 0.35 : 0.05),
-                blurRadius: 16,
-                offset: const Offset(0, 4),
-              ),
-            ],
-          ),
-          child: SafeArea(
-            bottom: false,
-            child: Padding(
-              padding: EdgeInsets.symmetric(
-                horizontal: isMobile ? 14 : 48,
-                vertical: isMobile ? 10 : 14,
-              ),
-              child: Row(
-                children: [
-                  // Logo & Brand
-                  Container(
-                    width: isMobile ? 38 : 44,
-                    height: isMobile ? 38 : 44,
-                    decoration: BoxDecoration(
-                      color: AppTheme.primary.withValues(alpha: 0.15),
-                      borderRadius: BorderRadius.circular(10),
-                      border: Border.all(color: AppTheme.primary.withValues(alpha: 0.3)),
+    return ValueListenableBuilder<double>(
+      valueListenable: _scrollProgress,
+      builder: (context, progress, _) {
+        final screenWidth = size.width;
+        final isDesktop = screenWidth >= 960;
+        final showNavLinks = screenWidth >= 860;
+
+        // Dynamic height and styling driven by scroll progress
+        final utilityHeight = isDesktop ? (28.0 * (1.0 - progress)).clamp(0.0, 28.0) : 0.0;
+        final utilityOpacity = isDesktop ? (1.0 - progress).clamp(0.0, 1.0) : 0.0;
+        final mainBarHeight = isMobile ? 58.0 : (64.0 - (8.0 * progress)).clamp(56.0, 64.0);
+        final totalHeight = utilityHeight + mainBarHeight;
+
+        final blurSigma = (10.0 + (12.0 * progress)).clamp(10.0, 22.0);
+        final bgOpacity = isDark
+            ? (0.40 + (0.48 * progress)).clamp(0.40, 0.88)
+            : (0.50 + (0.40 * progress)).clamp(0.50, 0.90);
+        final shadowAlpha = (0.02 + ((isDark ? 0.33 : 0.06) * progress)).clamp(0.02, 0.35);
+        final borderAlpha = (0.06 + (0.08 * progress)).clamp(0.06, 0.14);
+
+        return RepaintBoundary(
+          child: ClipRect(
+            child: BackdropFilter(
+              filter: ImageFilter.blur(sigmaX: blurSigma, sigmaY: blurSigma),
+              child: AnimatedContainer(
+                duration: const Duration(milliseconds: 140),
+                height: totalHeight,
+                decoration: BoxDecoration(
+                  color: (isDark ? const Color(0xFF0B111A) : Colors.white)
+                      .withValues(alpha: bgOpacity),
+                  border: Border(
+                    bottom: BorderSide(
+                      color: (isDark ? Colors.white : Colors.black)
+                          .withValues(alpha: borderAlpha),
+                      width: 1,
                     ),
-                    child: Icon(Icons.school_rounded, color: AppTheme.primary, size: isMobile ? 22 : 26),
                   ),
-                  const SizedBox(width: 10),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        FittedBox(
-                          fit: BoxFit.scaleDown,
-                          alignment: Alignment.centerLeft,
-                          child: Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              Text(
-                                'AIRA',
-                                style: TextStyle(
-                                  color: AppTheme.text,
-                                  fontWeight: FontWeight.w900,
-                                  fontSize: isMobile ? 18 : 20,
-                                  letterSpacing: 1.1,
-                                ),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withValues(alpha: shadowAlpha),
+                      blurRadius: 6.0 + (10.0 * progress),
+                      offset: Offset(0, 1.0 + (3.0 * progress)),
+                    ),
+                  ],
+                ),
+                child: SafeArea(
+                  bottom: false,
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      // Tier 1: Institutional Utility Strip (Desktops only, smoothly collapses on scroll)
+                      if (utilityHeight > 2)
+                        SizedBox(
+                          height: utilityHeight,
+                          child: Opacity(
+                            opacity: utilityOpacity,
+                            child: Container(
+                              padding: EdgeInsets.symmetric(
+                                horizontal: isMobile ? 16 : 40,
                               ),
-                              Text(
-                                'MP',
-                                style: TextStyle(
-                                  color: AppTheme.text,
-                                  fontWeight: FontWeight.w900,
-                                  fontSize: isMobile ? 18 : 20,
-                                  letterSpacing: 1.1,
-                                ),
-                              ),
-                              const SizedBox(width: 5),
-                              Container(
-                                padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
-                                decoration: BoxDecoration(
-                                  color: AppTheme.primary.withValues(alpha: 0.15),
-                                  borderRadius: BorderRadius.circular(5),
-                                ),
-                                child: Text(
-                                  'PORTAL',
-                                  style: TextStyle(
-                                    color: AppTheme.primary,
-                                    fontSize: 9,
-                                    fontWeight: FontWeight.w800,
-                                    letterSpacing: 0.8,
+                              decoration: BoxDecoration(
+                                border: Border(
+                                  bottom: BorderSide(
+                                    color: (isDark ? Colors.white : Colors.black)
+                                        .withValues(alpha: 0.06),
+                                    width: 1,
                                   ),
                                 ),
                               ),
+                              child: Row(
+                                children: [
+                                  Icon(
+                                    Icons.verified_rounded,
+                                    size: 13,
+                                    color: AppTheme.primary,
+                                  ),
+                                  const SizedBox(width: 6),
+                                  Text(
+                                    'DepEd K-12 Aligned • Institutional Learning & Assessment Infrastructure',
+                                    style: TextStyle(
+                                      fontSize: 11,
+                                      fontWeight: FontWeight.w600,
+                                      color: isDark
+                                          ? const Color(0xFF94A3B8)
+                                          : const Color(0xFF64748B),
+                                      letterSpacing: 0.2,
+                                    ),
+                                  ),
+                                  const Spacer(),
+                                  _buildUtilityRoleLink(
+                                    'Student Portal',
+                                    () => _navigateToLogin(context, role: 'student'),
+                                    isDark,
+                                  ),
+                                  _buildUtilityDivider(isDark),
+                                  _buildUtilityRoleLink(
+                                    'Teacher Workspace',
+                                    () => _navigateToLogin(context, role: 'teacher'),
+                                    isDark,
+                                  ),
+                                  _buildUtilityDivider(isDark),
+                                  _buildUtilityRoleLink(
+                                    'Admin Governance',
+                                    () => _navigateToLogin(context, role: 'admin'),
+                                    isDark,
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
+                        ),
+
+                      // Tier 2: Primary Brand & Navigation Action Row
+                      Expanded(
+                        child: Padding(
+                          padding: EdgeInsets.symmetric(
+                            horizontal: isMobile ? 14 : 40,
+                          ),
+                          child: Row(
+                            children: [
+                              // Brand Section (Tapping smoothly scrolls to top)
+                              InkWell(
+                                onTap: _scrollToTop,
+                                borderRadius: BorderRadius.circular(8),
+                                child: Padding(
+                                  padding: const EdgeInsets.symmetric(vertical: 4, horizontal: 2),
+                                  child: Row(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      AppLogo.mark(
+                                        size: isMobile ? 32 : 36,
+                                        isDark: isDark,
+                                      ),
+                                      const SizedBox(width: 10),
+                                      Row(
+                                        mainAxisSize: MainAxisSize.min,
+                                        children: [
+                                          Text(
+                                            'AIRA',
+                                            style: TextStyle(
+                                              color: isDark ? Colors.white : Colors.black,
+                                              fontWeight: FontWeight.w900,
+                                              fontSize: isMobile ? 18 : 20,
+                                              letterSpacing: 1.1,
+                                            ),
+                                          ),
+                                          Text(
+                                            'MP',
+                                            style: TextStyle(
+                                              color: AppTheme.primary,
+                                              fontWeight: FontWeight.w900,
+                                              fontSize: isMobile ? 18 : 20,
+                                              letterSpacing: 1.1,
+                                            ),
+                                          ),
+                                          const SizedBox(width: 6),
+                                          Container(
+                                            padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
+                                            decoration: BoxDecoration(
+                                              color: AppTheme.primary.withValues(alpha: 0.15),
+                                              borderRadius: BorderRadius.circular(5),
+                                            ),
+                                            child: Text(
+                                              'PORTAL',
+                                              style: TextStyle(
+                                                color: AppTheme.primary,
+                                                fontSize: 9,
+                                                fontWeight: FontWeight.w800,
+                                                letterSpacing: 0.8,
+                                              ),
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ),
+
+                              const Spacer(),
+
+                              // Center: Balanced Anchor Links (Role Ecosystem, AI Assistant, Cloud, About)
+                              if (showNavLinks) ...[
+                                _HeaderNavLink(
+                                  label: 'Role Ecosystem',
+                                  onTap: _scrollToEcosystem,
+                                  isDark: isDark,
+                                ),
+                                const SizedBox(width: 4),
+                                _HeaderNavLink(
+                                  label: 'School Assistant',
+                                  onTap: _scrollToAssistant,
+                                  isDark: isDark,
+                                ),
+                                const SizedBox(width: 4),
+                                _HeaderNavLink(
+                                  label: 'Ecosystem Cloud',
+                                  onTap: _scrollToCloud,
+                                  isDark: isDark,
+                                ),
+                                const SizedBox(width: 4),
+                                _HeaderNavLink(
+                                  label: 'Platform Info',
+                                  onTap: () => _showAppInfoDialog(context, isDark),
+                                  isDark: isDark,
+                                ),
+                                const SizedBox(width: 16),
+                              ],
+
+                              // Right Actions: Theme Mode Switcher + Sign In CTA
+                              IconButton(
+                                tooltip: isDark ? 'Switch to Light Mode' : 'Switch to Dark Mode',
+                                padding: isMobile ? EdgeInsets.zero : const EdgeInsets.all(8),
+                                constraints: isMobile ? const BoxConstraints(minWidth: 36, minHeight: 36) : null,
+                                onPressed: () => ref.read(themeProvider.notifier).toggleTheme(),
+                                icon: Icon(
+                                  isDark ? Icons.light_mode_rounded : Icons.dark_mode_rounded,
+                                  color: isDark ? AppTheme.warning : AppTheme.primary,
+                                  size: isMobile ? 20 : 22,
+                                ),
+                              ),
+                              const SizedBox(width: 8),
+
+                              // Login / Dashboard CTA
+                              if (user != null && user.role == 'super_admin')
+                                ElevatedButton.icon(
+                                  onPressed: () => context.go('/super-admin'),
+                                  icon: const Icon(Icons.admin_panel_settings_rounded, size: 16),
+                                  label: Text(isMobile ? 'Super Admin' : 'Super Admin Hub'),
+                                  style: ElevatedButton.styleFrom(
+                                    backgroundColor: const Color(0xFF6366F1),
+                                    foregroundColor: Colors.white,
+                                    minimumSize: Size(0, isMobile ? 36 : 40),
+                                    padding: EdgeInsets.symmetric(horizontal: isMobile ? 12 : 18),
+                                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                                    elevation: 0,
+                                  ),
+                                )
+                              else if (user != null && user.role == 'admin')
+                                ElevatedButton.icon(
+                                  onPressed: () => context.go('/admin/dashboard'),
+                                  icon: const Icon(Icons.dashboard_rounded, size: 16),
+                                  label: Text(isMobile ? 'Admin' : 'Admin Console'),
+                                  style: ElevatedButton.styleFrom(
+                                    backgroundColor: AppTheme.primary,
+                                    foregroundColor: Colors.white,
+                                    minimumSize: Size(0, isMobile ? 36 : 40),
+                                    padding: EdgeInsets.symmetric(horizontal: isMobile ? 12 : 18),
+                                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                                    elevation: 0,
+                                  ),
+                                )
+                              else if (user != null && user.role == 'teacher')
+                                ElevatedButton.icon(
+                                  onPressed: () => context.go('/teacher/dashboard'),
+                                  icon: const Icon(Icons.school_rounded, size: 16),
+                                  label: Text(isMobile ? 'Faculty' : 'Teacher Portal'),
+                                  style: ElevatedButton.styleFrom(
+                                    backgroundColor: AppTheme.primary,
+                                    foregroundColor: Colors.white,
+                                    minimumSize: Size(0, isMobile ? 36 : 40),
+                                    padding: EdgeInsets.symmetric(horizontal: isMobile ? 12 : 18),
+                                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                                    elevation: 0,
+                                  ),
+                                )
+                              else if (user != null)
+                                ElevatedButton.icon(
+                                  onPressed: () => context.go('/student/home'),
+                                  icon: const Icon(Icons.auto_stories_rounded, size: 16),
+                                  label: Text(isMobile ? 'Student' : 'Student Portal'),
+                                  style: ElevatedButton.styleFrom(
+                                    backgroundColor: AppTheme.primary,
+                                    foregroundColor: Colors.white,
+                                    minimumSize: Size(0, isMobile ? 36 : 40),
+                                    padding: EdgeInsets.symmetric(horizontal: isMobile ? 12 : 18),
+                                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                                    elevation: 0,
+                                  ),
+                                )
+                              else
+                                _buildSignInButton(context, isDark, isMobile: isMobile),
                             ],
                           ),
                         ),
-                        if (size.width >= 460) ...[
-                          Text(
-                            isMobile
-                                ? 'Academic Review & Assessment'
-                                : 'Academic Integrated Review & Assessment Management Platform',
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: TextStyle(
-                              color: AppTheme.textSecondary,
-                              fontSize: 11,
-                              fontWeight: FontWeight.w500,
-                            ),
-                          ),
-                        ],
-                      ],
-                    ),
+                      ),
+                    ],
                   ),
-                  const SizedBox(width: 8),
-
-                  // Theme Mode Switcher
-                  IconButton(
-                    tooltip: isDark ? 'Switch to Light Mode' : 'Switch to Dark Mode',
-                    padding: isMobile ? EdgeInsets.zero : const EdgeInsets.all(8),
-                    constraints: isMobile ? const BoxConstraints(minWidth: 36, minHeight: 36) : null,
-                    onPressed: () => ref.read(themeProvider.notifier).toggleTheme(),
-                    icon: Icon(
-                      isDark ? Icons.light_mode_rounded : Icons.dark_mode_rounded,
-                      color: isDark ? AppTheme.warning : AppTheme.primary,
-                      size: isMobile ? 20 : 24,
-                    ),
-                  ),
-                  const SizedBox(width: 4),
-
-                  // Login / Dashboard CTA
-                  if (user != null && user.role == 'super_admin')
-                    ElevatedButton.icon(
-                      onPressed: () => context.go('/super-admin'),
-                      icon: const Icon(Icons.admin_panel_settings_rounded, size: 16),
-                      label: Text(isMobile ? 'Super Admin' : 'Super Admin Hub'),
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: const Color(0xFF6366F1),
-                        foregroundColor: Colors.white,
-                        minimumSize: Size(0, isMobile ? 38 : 42),
-                        padding: EdgeInsets.symmetric(horizontal: isMobile ? 12 : 20),
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                      ),
-                    )
-                  else if (user != null && user.role == 'admin')
-                    ElevatedButton.icon(
-                      onPressed: () => context.go('/admin/dashboard'),
-                      icon: const Icon(Icons.dashboard_rounded, size: 16),
-                      label: Text(isMobile ? 'Admin' : 'Admin Console'),
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: AppTheme.primary,
-                        foregroundColor: Colors.black,
-                        minimumSize: Size(0, isMobile ? 38 : 42),
-                        padding: EdgeInsets.symmetric(horizontal: isMobile ? 12 : 20),
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                      ),
-                    )
-                  else if (user != null && user.role == 'teacher')
-                    ElevatedButton.icon(
-                      onPressed: () => context.go('/teacher/dashboard'),
-                      icon: const Icon(Icons.school_rounded, size: 16),
-                      label: Text(isMobile ? 'Faculty' : 'Teacher Portal'),
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: AppTheme.primary,
-                        foregroundColor: Colors.black,
-                        minimumSize: Size(0, isMobile ? 38 : 42),
-                        padding: EdgeInsets.symmetric(horizontal: isMobile ? 12 : 20),
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                      ),
-                    )
-                  else if (user != null)
-                    ElevatedButton.icon(
-                      onPressed: () => context.go('/student/home'),
-                      icon: const Icon(Icons.auto_stories_rounded, size: 16),
-                      label: Text(isMobile ? 'Student' : 'Student Portal'),
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: AppTheme.primary,
-                        foregroundColor: Colors.black,
-                        minimumSize: Size(0, isMobile ? 38 : 42),
-                        padding: EdgeInsets.symmetric(horizontal: isMobile ? 12 : 20),
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                      ),
-                    )
-                  else
-                    _buildSignInButton(context, isDark, isMobile: isMobile),
-                ],
+                ),
               ),
             ),
           ),
+        );
+      },
+    );
+  }
+
+  Widget _buildUtilityRoleLink(String label, VoidCallback onTap, bool isDark) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(4),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+        child: Text(
+          label,
+          style: TextStyle(
+            fontSize: 11,
+            fontWeight: FontWeight.w600,
+            color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF475569),
+            letterSpacing: 0.2,
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildUtilityDivider(bool isDark) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 4),
+      child: Text(
+        '|',
+        style: TextStyle(
+          fontSize: 10,
+          color: (isDark ? Colors.white : Colors.black).withValues(alpha: 0.2),
         ),
       ),
     );
@@ -1214,6 +1393,61 @@ class _WebLandingScreenState extends ConsumerState<WebLandingScreen> {
             child: const Text('Close'),
           ),
         ],
+      ),
+    );
+  }
+}
+
+
+class _HeaderNavLink extends StatefulWidget {
+  final String label;
+  final VoidCallback onTap;
+  final bool isDark;
+
+  const _HeaderNavLink({
+    required this.label,
+    required this.onTap,
+    required this.isDark,
+  });
+
+  @override
+  State<_HeaderNavLink> createState() => _HeaderNavLinkState();
+}
+
+class _HeaderNavLinkState extends State<_HeaderNavLink> {
+  bool _isHovered = false;
+
+  @override
+  Widget build(BuildContext context) {
+    final textColor = widget.isDark
+        ? (_isHovered ? AppTheme.darkPrimaryLight : const Color(0xFFCBD5E1))
+        : (_isHovered ? AppTheme.lightPrimary : const Color(0xFF334155));
+
+    return MouseRegion(
+      onEnter: (_) => setState(() => _isHovered = true),
+      onExit: (_) => setState(() => _isHovered = false),
+      cursor: SystemMouseCursors.click,
+      child: GestureDetector(
+        onTap: widget.onTap,
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 140),
+          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+          decoration: BoxDecoration(
+            color: _isHovered
+                ? AppTheme.primary.withValues(alpha: widget.isDark ? 0.14 : 0.08)
+                : Colors.transparent,
+            borderRadius: BorderRadius.circular(6),
+          ),
+          child: Text(
+            widget.label,
+            style: TextStyle(
+              fontSize: 13,
+              fontWeight: _isHovered ? FontWeight.w700 : FontWeight.w600,
+              color: textColor,
+              letterSpacing: 0.2,
+            ),
+          ),
+        ),
       ),
     );
   }

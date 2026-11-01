@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 import '../../../../core/animations/app_page_transitions.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../../core/theme/theme_provider.dart';
+import '../../../../core/components/app_logo.dart';
 import '../../../auth/application/auth_provider.dart';
 import '../../data/teacher_repository.dart';
 import '../../../../core/components/offline_sync_status_pill.dart';
@@ -150,10 +151,12 @@ class _TeacherWebScaffoldState extends ConsumerState<TeacherWebScaffold> {
             child: Material(
               color: AppTheme.surface,
               elevation: 0,
+              clipBehavior: Clip.hardEdge,
               child: Container(
                 decoration: BoxDecoration(
                   border: Border(right: BorderSide(color: AppTheme.border, width: 1)),
                 ),
+                clipBehavior: Clip.hardEdge,
                 child: _buildSidebarContent(
                   isCollapsed: effectiveCollapsed,
                   currentUser: currentUser,
@@ -221,6 +224,10 @@ class _TeacherWebScaffoldState extends ConsumerState<TeacherWebScaffold> {
             },
           ),
           const SizedBox(width: 8),
+          if (_isSidebarCollapsed || !isDesktop) ...[
+            AppLogo.mark(size: 32, isDark: isDark),
+            const SizedBox(width: 10),
+          ],
 
           // Breadcrumbs
           Row(
@@ -330,54 +337,49 @@ class _TeacherWebScaffoldState extends ConsumerState<TeacherWebScaffold> {
         // App Brand Header
         Container(
           height: 72,
-          padding: const EdgeInsets.symmetric(horizontal: 19),
+          padding: isCollapsed
+              ? EdgeInsets.zero
+              : const EdgeInsets.symmetric(horizontal: 19),
           alignment: Alignment.centerLeft,
           decoration: BoxDecoration(
             border: Border(bottom: BorderSide(color: AppTheme.border, width: 1)),
           ),
-          child: Row(
-            children: [
-              Container(
-                width: 38,
-                height: 38,
-                decoration: BoxDecoration(
-                  gradient: LinearGradient(
-                    colors: [Colors.teal.shade600, AppTheme.primary],
-                    begin: Alignment.topLeft,
-                    end: Alignment.bottomRight,
+          child: isCollapsed
+              ? Center(
+                  child: AppLogo.mark(
+                    size: 36,
+                    isDark: isDark,
                   ),
-                  borderRadius: BorderRadius.circular(10),
-                ),
-                alignment: Alignment.center,
-                child: const Text(
-                  'A',
-                  style: TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.bold),
-                ),
-              ),
-              const SizedBox(width: 14),
-              Expanded(
-                child: Opacity(
-                  opacity: isCollapsed ? 0.0 : 1.0,
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        'AIRAMP',
-                        style: TextStyle(fontSize: 16, fontWeight: FontWeight.w900, color: AppTheme.text, letterSpacing: 0.5),
-                        maxLines: 1,
+                )
+              : Row(
+                  children: [
+                    AppLogo.mark(
+                      size: 38,
+                      isDark: isDark,
+                    ),
+                    const SizedBox(width: 14),
+                    Expanded(
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'AIRAMP',
+                            style: TextStyle(fontSize: 16, fontWeight: FontWeight.w900, color: AppTheme.text, letterSpacing: 0.5),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                          Text(
+                            'Teacher Workspace',
+                            style: TextStyle(fontSize: 11, color: AppTheme.textMuted),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ],
                       ),
-                      Text(
-                        'Teacher Workspace',
-                        style: TextStyle(fontSize: 11, color: AppTheme.textMuted),
-                        maxLines: 1,
-                      ),
-                    ],
-                  ),
+                    ),
+                  ],
                 ),
-              ),
-            ],
-          ),
         ),
 
         // Navigation Items
@@ -395,7 +397,9 @@ class _TeacherWebScaffoldState extends ConsumerState<TeacherWebScaffold> {
                   borderRadius: BorderRadius.circular(10),
                   child: Container(
                     height: 44,
-                    padding: const EdgeInsets.symmetric(horizontal: 14),
+                    padding: isCollapsed
+                        ? EdgeInsets.zero
+                        : const EdgeInsets.symmetric(horizontal: 14),
                     decoration: BoxDecoration(
                       color: isSelected ? AppTheme.primary.withValues(alpha: 0.12) : Colors.transparent,
                       borderRadius: BorderRadius.circular(10),
@@ -403,31 +407,36 @@ class _TeacherWebScaffoldState extends ConsumerState<TeacherWebScaffold> {
                           ? Border.all(color: AppTheme.primary.withValues(alpha: 0.3), width: 1)
                           : null,
                     ),
-                    child: Row(
-                      children: [
-                        Icon(
-                          isSelected ? item.activeIcon : item.icon,
-                          size: 20,
-                          color: isSelected ? AppTheme.primary : AppTheme.textSecondary,
-                        ),
-                        const SizedBox(width: 14),
-                        Expanded(
-                          child: Opacity(
-                            opacity: isCollapsed ? 0.0 : 1.0,
-                            child: Text(
-                              item.label,
-                              style: TextStyle(
-                                fontSize: 13,
-                                fontWeight: isSelected ? FontWeight.bold : FontWeight.w500,
-                                color: isSelected ? AppTheme.primary : AppTheme.text,
-                              ),
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
+                    child: isCollapsed
+                        ? Center(
+                            child: Icon(
+                              isSelected ? item.activeIcon : item.icon,
+                              size: 20,
+                              color: isSelected ? AppTheme.primary : AppTheme.textSecondary,
                             ),
+                          )
+                        : Row(
+                            children: [
+                              Icon(
+                                isSelected ? item.activeIcon : item.icon,
+                                size: 20,
+                                color: isSelected ? AppTheme.primary : AppTheme.textSecondary,
+                              ),
+                              const SizedBox(width: 14),
+                              Expanded(
+                                child: Text(
+                                  item.label,
+                                  style: TextStyle(
+                                    fontSize: 13,
+                                    fontWeight: isSelected ? FontWeight.bold : FontWeight.w500,
+                                    color: isSelected ? AppTheme.primary : AppTheme.text,
+                                  ),
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                              ),
+                            ],
                           ),
-                        ),
-                      ],
-                    ),
                   ),
                 );
 
@@ -458,57 +467,65 @@ class _TeacherWebScaffoldState extends ConsumerState<TeacherWebScaffold> {
             mainAxisSize: MainAxisSize.min,
             children: [
               InkWell(
-                onTap: () => context.push('/teacher/profile'),
+                onTap: () => context.go('/teacher/profile'),
                 borderRadius: BorderRadius.circular(10),
                 child: Tooltip(
                   message: 'View & Edit Profile',
                   child: Container(
                     height: 44,
-                    padding: const EdgeInsets.symmetric(horizontal: 4),
-                    child: Row(
-                      children: [
-                        SizedBox(
-                          width: 48,
-                          child: Center(
+                    padding: isCollapsed
+                        ? EdgeInsets.zero
+                        : const EdgeInsets.symmetric(horizontal: 4),
+                    child: isCollapsed
+                        ? Center(
                             child: UserAvatarWidget(
                               imageSource: currentUser?.profileImage,
                               fallbackInitial: currentUser?.fullName.isNotEmpty == true ? currentUser!.fullName[0].toUpperCase() : 'T',
-                              size: 36,
+                              size: 34,
                               backgroundColor: Colors.teal.withValues(alpha: 0.15),
                               textColor: Colors.teal,
                             ),
-                          ),
-                        ),
-                        Expanded(
-                          child: Opacity(
-                            opacity: isCollapsed ? 0.0 : 1.0,
-                            child: Padding(
-                              padding: const EdgeInsets.only(left: 8),
-                              child: Column(
-                                mainAxisAlignment: MainAxisAlignment.center,
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Text(
-                                    currentUser?.fullName ?? 'Faculty Instructor',
-                                    style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: AppTheme.text),
-                                    maxLines: 1,
-                                    overflow: TextOverflow.ellipsis,
+                          )
+                        : Row(
+                            children: [
+                              SizedBox(
+                                width: 44,
+                                child: Center(
+                                  child: UserAvatarWidget(
+                                    imageSource: currentUser?.profileImage,
+                                    fallbackInitial: currentUser?.fullName.isNotEmpty == true ? currentUser!.fullName[0].toUpperCase() : 'T',
+                                    size: 36,
+                                    backgroundColor: Colors.teal.withValues(alpha: 0.15),
+                                    textColor: Colors.teal,
                                   ),
-                                  Text(
-                                    currentUser?.email ?? 'teacher@school.edu',
-                                    style: TextStyle(fontSize: 11, color: AppTheme.textMuted),
-                                    maxLines: 1,
-                                    overflow: TextOverflow.ellipsis,
-                                  ),
-                                ],
+                                ),
                               ),
-                            ),
+                              Expanded(
+                                child: Padding(
+                                  padding: const EdgeInsets.only(left: 8),
+                                  child: Column(
+                                    mainAxisAlignment: MainAxisAlignment.center,
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      Text(
+                                        currentUser?.fullName ?? 'Faculty Instructor',
+                                        style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: AppTheme.text),
+                                        maxLines: 1,
+                                        overflow: TextOverflow.ellipsis,
+                                      ),
+                                      Text(
+                                        currentUser?.email ?? 'teacher@school.edu',
+                                        style: TextStyle(fontSize: 11, color: AppTheme.textMuted),
+                                        maxLines: 1,
+                                        overflow: TextOverflow.ellipsis,
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ),
+                              Icon(Icons.chevron_right, size: 16, color: AppTheme.textMuted),
+                            ],
                           ),
-                        ),
-                        if (!isCollapsed)
-                          Icon(Icons.chevron_right, size: 16, color: AppTheme.textMuted),
-                      ],
-                    ),
                   ),
                 ),
               ),

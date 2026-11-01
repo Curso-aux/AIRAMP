@@ -4,7 +4,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../../../core/components/auth/required_change_password_dialog.dart';
-import '../../../core/components/app_toast.dart';
 import '../../../core/components/otp_verification_dialog.dart';
 import '../../../core/components/profile_photo_sheet.dart';
 import '../../../core/components/skeleton_loader.dart';
@@ -703,6 +702,13 @@ class _StudentProfileScreenState extends ConsumerState<StudentProfileScreen>
       return;
     }
 
+    // 1. If pushed on Navigator stack (e.g. from context.push), pop cleanly
+    if (Navigator.of(context).canPop()) {
+      Navigator.of(context).pop();
+      return;
+    }
+
+    // 2. If GoRouter has history to pop, pop it
     try {
       if (GoRouter.maybeOf(context)?.canPop() == true) {
         context.pop();
@@ -710,21 +716,7 @@ class _StudentProfileScreenState extends ConsumerState<StudentProfileScreen>
       }
     } catch (_) {}
 
-    try {
-      if (Navigator.of(context, rootNavigator: true).canPop()) {
-        Navigator.of(context, rootNavigator: true).pop();
-        return;
-      }
-    } catch (_) {}
-
-    try {
-      if (Navigator.canPop(context)) {
-        Navigator.pop(context);
-        return;
-      }
-    } catch (_) {}
-
-    // Fallback: If stack cannot be popped, navigate directly to student home
+    // 3. Fallback: Guaranteed direct transition to student home
     context.go('/student/home');
   }
 
@@ -777,87 +769,262 @@ class _StudentProfileScreenState extends ConsumerState<StudentProfileScreen>
         ? currentUser.fullName[0].toUpperCase()
         : '?';
 
+    final screenWidth = MediaQuery.of(context).size.width;
+    final isDesktopWeb = screenWidth >= 960;
+
     return Scaffold(
       backgroundColor: AppTheme.background,
-      appBar: AppBar(
-        backgroundColor: AppTheme.background,
-        elevation: 0,
-        scrolledUnderElevation: 0,
-        automaticallyImplyLeading: false,
-        leading: currentUser.mustChangePassword
-            ? null
-            : IconButton(
-                icon: Icon(Icons.arrow_back_rounded, color: AppTheme.text),
-                tooltip: 'Back to Home',
-                onPressed: _handleBackNavigation,
+      appBar: isDesktopWeb
+          ? null
+          : AppBar(
+              backgroundColor: AppTheme.background,
+              elevation: 0,
+              scrolledUnderElevation: 0,
+              automaticallyImplyLeading: false,
+              leading: currentUser.mustChangePassword
+                  ? null
+                  : IconButton(
+                      icon: Icon(Icons.arrow_back_rounded, color: AppTheme.text),
+                      tooltip: 'Back to Home',
+                      onPressed: _handleBackNavigation,
+                    ),
+              title: Text(
+                currentUser.mustChangePassword ? 'Security Requirement' : 'Student Profile',
+                style: TextStyle(color: AppTheme.text, fontSize: 18, fontWeight: FontWeight.bold),
               ),
-        title: Text(
-          currentUser.mustChangePassword ? 'Security Requirement' : 'Student Profile',
-          style: TextStyle(color: AppTheme.text, fontSize: 18, fontWeight: FontWeight.bold),
-        ),
-        centerTitle: false,
-      ),
+              centerTitle: false,
+            ),
       body: PopScope(
-        canPop: false,
+        canPop: !currentUser.mustChangePassword,
         onPopInvokedWithResult: (didPop, result) {
           if (didPop) return;
-          _handleBackNavigation();
+          _showMustChangePasswordBackAlert(isTeacher: false);
         },
         child: currentUser.mustChangePassword
             ? _buildMandatoryPasswordChangeView(currentUser)
             : SafeArea(
                 child: SingleChildScrollView(
                   controller: _scrollController,
-                  padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 0),
-                  child: Column(
-                    children: [
-                      const SizedBox(height: 8),
+                  padding: EdgeInsets.symmetric(
+                    horizontal: isDesktopWeb ? 24 : 20,
+                    vertical: isDesktopWeb ? 10 : 0,
+                  ),
+                  child: Center(
+                    child: ConstrainedBox(
+                      constraints: BoxConstraints(maxWidth: isDesktopWeb ? 1400 : 960),
+                      child: Column(
+                        children: [
+                          if (isDesktopWeb) ...[
+                            _buildHeaderBar(context, currentUser, isWeb: true),
+                            const SizedBox(height: 16),
+                            // Desktop Web 2-Column Responsive Dashboard Layout
+                            Row(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                // Left Identity & Security Column (360-400px)
+                                SizedBox(
+                                  width: screenWidth >= 1200 ? 400 : 360,
+                                  child: Column(
+                                    children: [
+                                      _buildHeroStudentCard(
+                                        context: context,
+                                        currentUser: currentUser,
+                                        initial: initial,
+                                        courses: courses,
+                                        quizAssignments: quizAssignments,
+                                        progress: progress,
+                                        schedules: schedules,
+                                      ),
+                                      const SizedBox(height: 16),
+                                      _buildChangePasswordCard(currentUser),
+                                      const SizedBox(height: 16),
+                                      _buildAboutAndSupportCard(context),
+                                      const SizedBox(height: 16),
+                                      _buildSignOutButton(),
+                                      const SizedBox(height: 32),
+                                    ],
+                                  ),
+                                ),
+                                const SizedBox(width: 20),
 
-                      // 1. Hero Student Identity Card (Avatar, Badges & 4 Quick KPIs)
-                      _buildHeroStudentCard(
-                        context: context,
-                        currentUser: currentUser,
-                        initial: initial,
-                        courses: courses,
-                        quizAssignments: quizAssignments,
-                        progress: progress,
-                        schedules: schedules,
+                                // Right Main Academic Standing & Settings Column
+                                Expanded(
+                                  child: Column(
+                                    children: [
+                                      _buildAcademicStandingCard(
+                                        context: context,
+                                        courses: courses,
+                                        sectionDetails: sectionDetails,
+                                        schedules: schedules,
+                                        currentUser: currentUser,
+                                      ),
+                                      const SizedBox(height: 16),
+                                      _buildPersonalInfoCard(currentUser, sectionDetails),
+                                      const SizedBox(height: 16),
+                                      _buildPreferencesCard(themeState),
+                                      const SizedBox(height: 32),
+                                    ],
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ] else ...[
+                            const SizedBox(height: 8),
+
+                            // Mobile Single-Column Stack
+                            _buildHeroStudentCard(
+                              context: context,
+                              currentUser: currentUser,
+                              initial: initial,
+                              courses: courses,
+                              quizAssignments: quizAssignments,
+                              progress: progress,
+                              schedules: schedules,
+                            ),
+                            const SizedBox(height: 16),
+
+                            _buildAcademicStandingCard(
+                              context: context,
+                              courses: courses,
+                              sectionDetails: sectionDetails,
+                              schedules: schedules,
+                              currentUser: currentUser,
+                            ),
+                            const SizedBox(height: 16),
+
+                            _buildPersonalInfoCard(currentUser, sectionDetails),
+                            const SizedBox(height: 16),
+
+                            _buildChangePasswordCard(currentUser),
+                            const SizedBox(height: 16),
+
+                            _buildPreferencesCard(themeState),
+                            const SizedBox(height: 16),
+
+                            _buildAboutAndSupportCard(context),
+                            const SizedBox(height: 24),
+
+                            _buildSignOutButton(),
+                            const SizedBox(height: 40),
+                          ],
+                        ],
                       ),
-                      const SizedBox(height: 16),
-
-                      // 2. Academic Standing & Enrolled Courses Card
-                      _buildAcademicStandingCard(
-                        context: context,
-                        courses: courses,
-                        sectionDetails: sectionDetails,
-                        schedules: schedules,
-                        currentUser: currentUser,
-                      ),
-                      const SizedBox(height: 16),
-
-                      // 3. Personal & Institutional Information Card
-                      _buildPersonalInfoCard(currentUser, sectionDetails),
-                      const SizedBox(height: 16),
-
-                      // 4. Account Security & Password Management Card
-                      _buildChangePasswordCard(currentUser),
-                      const SizedBox(height: 16),
-
-                      // 5. Classroom Experience & Preferences Card (Theme & Notifications)
-                      _buildPreferencesCard(themeState),
-                      const SizedBox(height: 16),
-
-                      // 6. Institutional Support & App Information Card
-                      _buildAboutAndSupportCard(context),
-                      const SizedBox(height: 24),
-
-                      // 7. Sign Out Button
-                      _buildSignOutButton(),
-                      const SizedBox(height: 40),
-                    ],
+                    ),
                   ),
                 ),
               ),
+      ),
+    );
+  }
+
+  Widget _buildHeaderBar(BuildContext context, User currentUser, {bool isWeb = false}) {
+    if (currentUser.mustChangePassword) return const SizedBox.shrink();
+
+    if (isWeb) {
+      return Container(
+        margin: const EdgeInsets.only(top: 8, bottom: 4),
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+        decoration: BoxDecoration(
+          color: AppTheme.surface,
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(color: AppTheme.border, width: 1),
+        ),
+        child: Row(
+          children: [
+            InkWell(
+              onTap: _handleBackNavigation,
+              borderRadius: BorderRadius.circular(8),
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                decoration: BoxDecoration(
+                  color: AppTheme.primary.withValues(alpha: 0.1),
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(color: AppTheme.primary.withValues(alpha: 0.2)),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(Icons.arrow_back_rounded, color: AppTheme.primary, size: 18),
+                    const SizedBox(width: 8),
+                    Text(
+                      'Back to Dashboard',
+                      style: TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.bold,
+                        color: AppTheme.primary,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+            const SizedBox(width: 16),
+            Container(width: 1, height: 22, color: AppTheme.border),
+            const SizedBox(width: 16),
+            Icon(Icons.school_outlined, size: 20, color: AppTheme.textSecondary),
+            const SizedBox(width: 8),
+            Text(
+              'Student Profile & Academic Settings',
+              style: TextStyle(
+                fontSize: 16,
+                fontWeight: FontWeight.bold,
+                color: AppTheme.text,
+              ),
+            ),
+            const Spacer(),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+              decoration: BoxDecoration(
+                color: AppTheme.primary.withValues(alpha: 0.1),
+                borderRadius: BorderRadius.circular(20),
+                border: Border.all(color: AppTheme.primary.withValues(alpha: 0.25)),
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(Icons.verified_user_rounded, size: 13, color: AppTheme.primary),
+                  const SizedBox(width: 6),
+                  Text(
+                    'Learner Access',
+                    style: TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w600,
+                      color: AppTheme.primary,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+
+    return Padding(
+      padding: const EdgeInsets.only(top: 10, bottom: 4),
+      child: Row(
+        children: [
+          IconButton(
+            icon: Icon(Icons.arrow_back_rounded, color: AppTheme.text),
+            tooltip: 'Back to Home',
+            padding: EdgeInsets.zero,
+            constraints: const BoxConstraints(minWidth: 36, minHeight: 36),
+            onPressed: _handleBackNavigation,
+          ),
+          const SizedBox(width: 4),
+          Expanded(
+            child: Text(
+              'Student Profile',
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(
+                fontSize: 18,
+                fontWeight: FontWeight.bold,
+                color: AppTheme.text,
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -1388,7 +1555,7 @@ class _StudentProfileScreenState extends ConsumerState<StudentProfileScreen>
                     icon: Icons.auto_stories_outlined,
                     count: '${courses.length}',
                     label: 'Subjects',
-                    onTap: () => context.push('/student/courses'),
+                    onTap: () => context.go('/student/courses'),
                   ),
                 ),
                 Container(width: 1, height: 26, color: AppTheme.border),
@@ -1398,7 +1565,7 @@ class _StudentProfileScreenState extends ConsumerState<StudentProfileScreen>
                     icon: Icons.quiz_outlined,
                     count: '${quizAssignments.length}',
                     label: 'Quizzes',
-                    onTap: () => context.push('/student/quiz-history'),
+                    onTap: () => context.go('/student/quiz-history'),
                   ),
                 ),
                 Container(width: 1, height: 26, color: AppTheme.border),
@@ -1408,7 +1575,7 @@ class _StudentProfileScreenState extends ConsumerState<StudentProfileScreen>
                     icon: Icons.task_alt_rounded,
                     count: '$completedLessons',
                     label: 'Completed',
-                    onTap: () => context.push('/student/progress'),
+                    onTap: () => context.go('/student/progress'),
                   ),
                 ),
                 Container(width: 1, height: 26, color: AppTheme.border),
@@ -1545,7 +1712,7 @@ class _StudentProfileScreenState extends ConsumerState<StudentProfileScreen>
                 ],
               ),
               InkWell(
-                onTap: () => context.push('/student/courses'),
+                onTap: () => context.go('/student/courses'),
                 borderRadius: BorderRadius.circular(6),
                 child: Padding(
                   padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 4),

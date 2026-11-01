@@ -377,8 +377,6 @@ class _StudentHeaderAvatarButtonState extends State<_StudentHeaderAvatarButton> 
 
   @override
   Widget build(BuildContext context) {
-    final hasImage = widget.currentUser.profileImage != null &&
-        widget.currentUser.profileImage!.isNotEmpty;
     final initial = widget.currentUser.fullName.isNotEmpty
         ? widget.currentUser.fullName[0].toUpperCase()
         : 'S';
@@ -426,23 +424,6 @@ class _StudentHeaderAvatarButtonState extends State<_StudentHeaderAvatarButton> 
                 size: size,
               ),
             ),
-          ),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildFallbackInitial(String initial) {
-    return Container(
-      color: AppTheme.primary,
-      child: Center(
-        child: Text(
-          initial,
-          style: const TextStyle(
-            fontSize: 16,
-            fontWeight: FontWeight.w700,
-            color: Colors.white,
-            letterSpacing: -0.5,
           ),
         ),
       ),

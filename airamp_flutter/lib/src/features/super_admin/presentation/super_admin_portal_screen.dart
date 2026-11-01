@@ -8,6 +8,7 @@ import '../../admin/data/admin_repository.dart';
 import '../../auth/application/auth_provider.dart';
 import '../data/super_admin_repository.dart';
 import 'super_admin_theme.dart';
+import '../../../core/components/app_logo.dart';
 import 'tabs/super_admin_overview_tab.dart';
 import 'tabs/super_admin_campuses_tab.dart';
 import 'tabs/super_admin_admins_tab.dart';
@@ -646,6 +647,10 @@ class _SuperAdminPortalScreenState extends ConsumerState<SuperAdminPortalScreen>
             onPressed: () => setState(() => _isSidebarCollapsed = !_isSidebarCollapsed),
           ),
           const SizedBox(width: 8),
+          if (_isSidebarCollapsed || MediaQuery.of(context).size.width < 1024) ...[
+            AppLogo.mark(size: 30, isDark: gTheme.isDark),
+            const SizedBox(width: 8),
+          ],
 
           // Breadcrumb Title
           Row(
@@ -735,16 +740,9 @@ class _SuperAdminPortalScreenState extends ConsumerState<SuperAdminPortalScreen>
           ),
           child: Row(
             children: [
-              Container(
-                width: 36,
-                height: 36,
-                decoration: BoxDecoration(
-                  color: gTheme.primarySubtle,
-                  borderRadius: BorderRadius.circular(8),
-                  border: Border.all(color: gTheme.primaryBorder),
-                ),
-                alignment: Alignment.center,
-                child: Icon(Icons.shield_outlined, color: gTheme.primary, size: 20),
+              AppLogo.mark(
+                size: 36,
+                isDark: gTheme.isDark,
               ),
               const SizedBox(width: 12),
               Expanded(

@@ -124,41 +124,47 @@ class _TeacherStudentsScreenState extends ConsumerState<TeacherStudentsScreen> {
             // Top Segmented Pill Toggle: Students vs Quiz Scores
             Padding(
               padding: const EdgeInsets.fromLTRB(20, 10, 20, 4),
-              child: Container(
-                height: 48,
-                padding: const EdgeInsets.all(4),
-                decoration: BoxDecoration(
-                  color: AppTheme.surface,
-                  borderRadius: BorderRadius.circular(14),
-                  border: Border.all(color: AppTheme.border),
-                  boxShadow: [
-                    BoxShadow(
-                      color: Colors.black.withValues(alpha: 0.04),
-                      blurRadius: 8,
-                      offset: const Offset(0, 2),
+              child: Align(
+                alignment: Alignment.centerLeft,
+                child: ConstrainedBox(
+                  constraints: const BoxConstraints(maxWidth: 380),
+                  child: Container(
+                    height: 48,
+                    padding: const EdgeInsets.all(4),
+                    decoration: BoxDecoration(
+                      color: AppTheme.surface,
+                      borderRadius: BorderRadius.circular(14),
+                      border: Border.all(color: AppTheme.border),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withValues(alpha: 0.04),
+                          blurRadius: 8,
+                          offset: const Offset(0, 2),
+                        ),
+                      ],
                     ),
-                  ],
-                ),
-                child: Row(
-                  children: [
-                    Expanded(
-                      child: _buildSegmentTab(
-                        label: 'Students',
-                        icon: Icons.people_alt_rounded,
-                        isActive: _activeTab == 0,
-                        onTap: () => setState(() => _activeTab = 0),
-                      ),
+                    child: Row(
+                      children: [
+                        Expanded(
+                          child: _buildSegmentTab(
+                            label: 'Students',
+                            icon: Icons.people_alt_rounded,
+                            isActive: _activeTab == 0,
+                            onTap: () => setState(() => _activeTab = 0),
+                          ),
+                        ),
+                        const SizedBox(width: 6),
+                        Expanded(
+                          child: _buildSegmentTab(
+                            label: 'Quiz Scores',
+                            icon: Icons.assignment_turned_in_rounded,
+                            isActive: _activeTab == 1,
+                            onTap: () => setState(() => _activeTab = 1),
+                          ),
+                        ),
+                      ],
                     ),
-                    const SizedBox(width: 6),
-                    Expanded(
-                      child: _buildSegmentTab(
-                        label: 'Quiz Scores',
-                        icon: Icons.assignment_turned_in_rounded,
-                        isActive: _activeTab == 1,
-                        onTap: () => setState(() => _activeTab = 1),
-                      ),
-                    ),
-                  ],
+                  ),
                 ),
               ),
             ),
@@ -292,40 +298,43 @@ class _TeacherStudentsScreenState extends ConsumerState<TeacherStudentsScreen> {
                     ],
 
                     // Search input
-                    TextField(
-                      controller: _searchController,
-                      maxLength: 60,
-                      buildCounter: (context, {required currentLength, required isFocused, maxLength}) => null,
-                      style: TextStyle(color: AppTheme.text, fontSize: 14),
-                      decoration: InputDecoration(
-                        hintText: _selectedSection == 'All Sections'
-                            ? 'Search students across all sections...'
-                            : 'Search students in $_selectedSection...',
-                        counterText: '',
-                        hintStyle: TextStyle(color: AppTheme.textMuted, fontSize: 13),
-                        prefixIcon: Icon(Icons.search, color: AppTheme.textMuted, size: 20),
-                        suffixIcon: _searchController.text.isNotEmpty
-                            ? IconButton(
-                                icon: Icon(Icons.clear, color: AppTheme.textMuted, size: 18),
-                                onPressed: () {
-                                  _searchController.clear();
-                                },
-                              )
-                            : null,
-                        filled: true,
-                        fillColor: AppTheme.surface,
-                        contentPadding: const EdgeInsets.symmetric(vertical: 0, horizontal: 16),
-                        border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(12),
-                          borderSide: BorderSide(color: AppTheme.border),
-                        ),
-                        enabledBorder: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(12),
-                          borderSide: BorderSide(color: AppTheme.border),
-                        ),
-                        focusedBorder: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(12),
-                          borderSide: BorderSide(color: AppTheme.primary),
+                    ConstrainedBox(
+                      constraints: const BoxConstraints(maxWidth: 520),
+                      child: TextField(
+                        controller: _searchController,
+                        maxLength: 60,
+                        buildCounter: (context, {required currentLength, required isFocused, maxLength}) => null,
+                        style: TextStyle(color: AppTheme.text, fontSize: 14),
+                        decoration: InputDecoration(
+                          hintText: _selectedSection == 'All Sections'
+                              ? 'Search students across all sections...'
+                              : 'Search students in $_selectedSection...',
+                          counterText: '',
+                          hintStyle: TextStyle(color: AppTheme.textMuted, fontSize: 13),
+                          prefixIcon: Icon(Icons.search, color: AppTheme.textMuted, size: 20),
+                          suffixIcon: _searchController.text.isNotEmpty
+                              ? IconButton(
+                                  icon: Icon(Icons.clear, color: AppTheme.textMuted, size: 18),
+                                  onPressed: () {
+                                    _searchController.clear();
+                                  },
+                                )
+                              : null,
+                          filled: true,
+                          fillColor: AppTheme.surface,
+                          contentPadding: const EdgeInsets.symmetric(vertical: 0, horizontal: 16),
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(12),
+                            borderSide: BorderSide(color: AppTheme.border),
+                          ),
+                          enabledBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(12),
+                            borderSide: BorderSide(color: AppTheme.border),
+                          ),
+                          focusedBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(12),
+                            borderSide: BorderSide(color: AppTheme.primary),
+                          ),
                         ),
                       ),
                     ),
@@ -416,7 +425,7 @@ class _TeacherStudentsScreenState extends ConsumerState<TeacherStudentsScreen> {
                             ? AppEmptyState(
                                 icon: Icons.group_off_outlined,
                                 title: 'No Students in Section $_selectedSection',
-                                message: 'No students are currently enrolled in section "$_selectedSection". Tap below to view all sections.',
+                                message: 'No students are currently enrolled in section "$_selectedSection". Select below to view all sections.',
                                 actionLabel: 'View All Sections',
                                 actionIcon: Icons.groups_outlined,
                                 onAction: () => _onSelectSection('All Sections'),
@@ -424,7 +433,7 @@ class _TeacherStudentsScreenState extends ConsumerState<TeacherStudentsScreen> {
                             : AppEmptyState(
                                 icon: Icons.people_outline,
                                 title: 'No Students Found',
-                                message: 'No students have been assigned to your classes yet. Tap below to refresh your student list.',
+                                message: 'No students have been assigned to your classes yet. Select below to refresh your student list.',
                                 actionLabel: 'Refresh Students',
                                 actionIcon: Icons.refresh_rounded,
                                 onAction: () {
@@ -434,179 +443,32 @@ class _TeacherStudentsScreenState extends ConsumerState<TeacherStudentsScreen> {
                                       );
                                 },
                               )
-                    : ListView.builder(
-                        padding: const EdgeInsets.fromLTRB(20, 12, 20, 100),
-                        itemCount: students.length > _displayLimit
-                            ? _displayLimit + 1
-                            : students.length,
-                        itemBuilder: (context, index) {
-                          if (index == _displayLimit && students.length > _displayLimit) {
-                            final remaining = students.length - _displayLimit;
-                            return Padding(
-                              padding: const EdgeInsets.only(top: 8, bottom: 20),
-                              child: Center(
-                                child: AnimatedPressable(
-                                  onTap: () {
-                                    setState(() {
-                                      _displayLimit += _pageSize;
-                                    });
-                                  },
-                                  child: Container(
-                                    padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 11),
-                                    decoration: BoxDecoration(
-                                      color: AppTheme.surface,
-                                      borderRadius: BorderRadius.circular(12),
-                                      border: Border.all(color: AppTheme.border),
-                                      boxShadow: [
-                                        BoxShadow(
-                                          color: Colors.black.withValues(alpha: 0.04),
-                                          blurRadius: 8,
-                                          offset: const Offset(0, 2),
-                                        ),
-                                      ],
-                                    ),
-                                    child: Row(
-                                      mainAxisSize: MainAxisSize.min,
-                                      children: [
-                                        Icon(Icons.expand_more_rounded, size: 18, color: AppTheme.primary),
-                                        const SizedBox(width: 8),
-                                        Text(
-                                          'Load More Students ($remaining remaining)',
-                                          style: TextStyle(
-                                            color: AppTheme.text,
-                                            fontWeight: FontWeight.w600,
-                                            fontSize: 13,
-                                          ),
-                                        ),
-                                      ],
-                                    ),
-                                  ),
-                                ),
+                    : LayoutBuilder(
+                        builder: (context, constraints) {
+                          final isDesktop = constraints.maxWidth >= 768;
+                          final bottomPad = isDesktop ? 24.0 : 100.0;
+                          final itemCount = students.length > _displayLimit
+                              ? _displayLimit + 1
+                              : students.length;
+
+                          if (isDesktop) {
+                            return GridView.builder(
+                              padding: EdgeInsets.fromLTRB(20, 12, 20, bottomPad),
+                              gridDelegate: const SliverGridDelegateWithMaxCrossAxisExtent(
+                                maxCrossAxisExtent: 540,
+                                mainAxisExtent: 114,
+                                crossAxisSpacing: 14,
+                                mainAxisSpacing: 12,
                               ),
+                              itemCount: itemCount,
+                              itemBuilder: (context, index) => _buildStudentListItem(context, index, students),
                             );
                           }
 
-                          final student = students[index];
-                          final studentId = student['id'] as String? ?? '';
-                          final name = student['full_name']?.toString() ?? 'Student';
-                          final email = student['email']?.toString() ?? '';
-                          final section = student['section']?.toString() ?? 'Unassigned';
-                          final grade = student['grade']?.toString() ?? '';
-                          final completedLos = student['completed_los'] as int? ?? 0;
-                          final enrolledSubjects = student['enrolled_subjects'] as int? ?? 0;
-                          final isEnrolled = student['is_enrolled'] == true || (student['is_enrolled'] == 1);
-
-                          final initial = name.isNotEmpty ? name[0].toUpperCase() : 'S';
-
-                          return Container(
-                            margin: const EdgeInsets.only(bottom: 12),
-                            padding: const EdgeInsets.all(16),
-                            decoration: BoxDecoration(
-                              color: AppTheme.surface,
-                              borderRadius: BorderRadius.circular(14),
-                              border: Border.all(
-                                color: isEnrolled
-                                    ? AppTheme.primary.withValues(alpha: 0.2)
-                                    : AppTheme.border,
-                              ),
-                            ),
-                            child: Row(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                UserAvatarWidget(
-                                  imageSource: (student['profile_image'] ?? student['profileImage']) as String?,
-                                  fallbackInitial: initial,
-                                  size: 44,
-                                  fontSize: 16,
-                                ),
-                                const SizedBox(width: 14),
-                                Expanded(
-                                  child: Column(
-                                    crossAxisAlignment: CrossAxisAlignment.start,
-                                    children: [
-                                      Row(
-                                        children: [
-                                          Expanded(
-                                            child: Text(
-                                              name,
-                                              style: TextStyle(
-                                                fontWeight: FontWeight.bold,
-                                                fontSize: 15,
-                                                color: AppTheme.text,
-                                              ),
-                                            ),
-                                          ),
-                                          Container(
-                                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                                            decoration: BoxDecoration(
-                                              color: AppTheme.border.withValues(alpha: 0.5),
-                                              borderRadius: BorderRadius.circular(6),
-                                            ),
-                                            child: Text(
-                                              grade.isNotEmpty ? '$section · $grade' : section,
-                                              style: TextStyle(
-                                                fontSize: 11,
-                                                fontWeight: FontWeight.w600,
-                                                color: AppTheme.text,
-                                              ),
-                                            ),
-                                          ),
-                                        ],
-                                      ),
-                                      const SizedBox(height: 3),
-                                      Text(
-                                        email,
-                                        style: TextStyle(fontSize: 12, color: AppTheme.textSecondary),
-                                      ),
-                                      const SizedBox(height: 10),
-                                      Wrap(
-                                        spacing: 12,
-                                        runSpacing: 4,
-                                        children: [
-                                          Row(
-                                            mainAxisSize: MainAxisSize.min,
-                                            children: [
-                                              Icon(Icons.check_circle_outline, size: 14, color: AppTheme.success),
-                                              const SizedBox(width: 4),
-                                              Text(
-                                                '$completedLos LOs Completed',
-                                                style: TextStyle(fontSize: 11, color: AppTheme.text),
-                                              ),
-                                            ],
-                                          ),
-                                          Row(
-                                            mainAxisSize: MainAxisSize.min,
-                                            children: [
-                                              Icon(Icons.book_outlined, size: 14, color: AppTheme.primary),
-                                              const SizedBox(width: 4),
-                                              Text(
-                                                '$enrolledSubjects Subjects',
-                                                style: TextStyle(fontSize: 11, color: AppTheme.text),
-                                              ),
-                                            ],
-                                          ),
-                                        ],
-                                      ),
-                                    ],
-                                  ),
-                                ),
-                                const SizedBox(width: 8),
-                                IconButton(
-                                  icon: Icon(Icons.chat_bubble_outline, color: AppTheme.primary, size: 20),
-                                  tooltip: 'Consult / Message',
-                                  onPressed: () async {
-                                    if (studentId.isNotEmpty) {
-                                      final conv = await ref
-                                          .read(chatProvider.notifier)
-                                          .getOrCreateConversation(studentId);
-                                      if (conv != null && context.mounted) {
-                                        context.push('/chat/${conv.id}');
-                                      }
-                                    }
-                                  },
-                                ),
-                              ],
-                            ),
+                          return ListView.builder(
+                            padding: EdgeInsets.fromLTRB(20, 12, 20, bottomPad),
+                            itemCount: itemCount,
+                            itemBuilder: (context, index) => _buildStudentListItem(context, index, students),
                           );
                         },
                       ),
@@ -622,6 +484,178 @@ class _TeacherStudentsScreenState extends ConsumerState<TeacherStudentsScreen> {
             ),
           ],
         ),
+      ),
+    );
+  }
+
+  Widget _buildStudentListItem(BuildContext context, int index, List<Map<String, dynamic>> students) {
+    if (index == _displayLimit && students.length > _displayLimit) {
+      final remaining = students.length - _displayLimit;
+      return Center(
+        child: AnimatedPressable(
+          onTap: () {
+            setState(() {
+              _displayLimit += _pageSize;
+            });
+          },
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 11),
+            decoration: BoxDecoration(
+              color: AppTheme.surface,
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: AppTheme.border),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withValues(alpha: 0.04),
+                  blurRadius: 8,
+                  offset: const Offset(0, 2),
+                ),
+              ],
+            ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(Icons.expand_more_rounded, size: 18, color: AppTheme.primary),
+                const SizedBox(width: 8),
+                Text(
+                  'Load More Students ($remaining remaining)',
+                  style: TextStyle(
+                    color: AppTheme.text,
+                    fontWeight: FontWeight.w600,
+                    fontSize: 13,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      );
+    }
+
+    final student = students[index];
+    final studentId = student['id'] as String? ?? '';
+    final name = student['full_name']?.toString() ?? 'Student';
+    final email = student['email']?.toString() ?? '';
+    final section = student['section']?.toString() ?? 'Unassigned';
+    final grade = student['grade']?.toString() ?? '';
+    final completedLos = student['completed_los'] as int? ?? 0;
+    final enrolledSubjects = student['enrolled_subjects'] as int? ?? 0;
+    final isEnrolled = student['is_enrolled'] == true || (student['is_enrolled'] == 1);
+
+    final initial = name.isNotEmpty ? name[0].toUpperCase() : 'S';
+
+    return Container(
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: AppTheme.surface,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(
+          color: isEnrolled
+              ? AppTheme.primary.withValues(alpha: 0.2)
+              : AppTheme.border,
+        ),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          UserAvatarWidget(
+            imageSource: (student['profile_image'] ?? student['profileImage']) as String?,
+            fallbackInitial: initial,
+            size: 42,
+            fontSize: 15,
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Expanded(
+                      child: Text(
+                        name,
+                        style: TextStyle(
+                          fontWeight: FontWeight.bold,
+                          fontSize: 14,
+                          color: AppTheme.text,
+                        ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                    const SizedBox(width: 6),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+                      decoration: BoxDecoration(
+                        color: AppTheme.border.withValues(alpha: 0.5),
+                        borderRadius: BorderRadius.circular(6),
+                      ),
+                      child: Text(
+                        grade.isNotEmpty ? '$section · $grade' : section,
+                        style: TextStyle(
+                          fontSize: 10.5,
+                          fontWeight: FontWeight.w600,
+                          color: AppTheme.text,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  email,
+                  style: TextStyle(fontSize: 11.5, color: AppTheme.textSecondary),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+                const SizedBox(height: 8),
+                Wrap(
+                  spacing: 12,
+                  runSpacing: 4,
+                  children: [
+                    Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(Icons.check_circle_outline, size: 13, color: AppTheme.success),
+                        const SizedBox(width: 4),
+                        Text(
+                          '$completedLos LOs Completed',
+                          style: TextStyle(fontSize: 10.5, color: AppTheme.text),
+                        ),
+                      ],
+                    ),
+                    Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(Icons.book_outlined, size: 13, color: AppTheme.primary),
+                        const SizedBox(width: 4),
+                        Text(
+                          '$enrolledSubjects Subjects',
+                          style: TextStyle(fontSize: 10.5, color: AppTheme.text),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(width: 6),
+          IconButton(
+            icon: Icon(Icons.chat_bubble_outline, color: AppTheme.primary, size: 19),
+            tooltip: 'Consult / Message',
+            onPressed: () async {
+              if (studentId.isNotEmpty) {
+                final conv = await ref
+                    .read(chatProvider.notifier)
+                    .getOrCreateConversation(studentId);
+                if (conv != null && context.mounted) {
+                  context.push('/chat/${conv.id}');
+                }
+              }
+            },
+          ),
+        ],
       ),
     );
   }
