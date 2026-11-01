@@ -99,7 +99,13 @@ class _TeacherWebScaffoldState extends ConsumerState<TeacherWebScaffold> {
           children: [
             Icon(Icons.logout_rounded, color: AppTheme.error, size: 22),
             const SizedBox(width: 10),
-            Text('Sign Out', style: TextStyle(color: AppTheme.text, fontWeight: FontWeight.bold)),
+            Text(
+              'Sign Out',
+              style: TextStyle(
+                color: AppTheme.text,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
           ],
         ),
         content: Text(
@@ -137,7 +143,8 @@ class _TeacherWebScaffoldState extends ConsumerState<TeacherWebScaffold> {
     final currentUser = ref.watch(authProvider);
     final screenWidth = MediaQuery.of(context).size.width;
     final isDesktop = screenWidth >= 1100;
-    final effectiveCollapsed = _isSidebarCollapsed || (!isDesktop && screenWidth >= 800);
+    final effectiveCollapsed =
+        _isSidebarCollapsed || (!isDesktop && screenWidth >= 800);
 
     return Scaffold(
       backgroundColor: AppTheme.background,
@@ -154,7 +161,9 @@ class _TeacherWebScaffoldState extends ConsumerState<TeacherWebScaffold> {
               clipBehavior: Clip.hardEdge,
               child: Container(
                 decoration: BoxDecoration(
-                  border: Border(right: BorderSide(color: AppTheme.border, width: 1)),
+                  border: Border(
+                    right: BorderSide(color: AppTheme.border, width: 1),
+                  ),
                 ),
                 clipBehavior: Clip.hardEdge,
                 child: _buildSidebarContent(
@@ -186,7 +195,8 @@ class _TeacherWebScaffoldState extends ConsumerState<TeacherWebScaffold> {
                         currentIndex: widget.navigationShell.currentIndex,
                         child: widget.navigationShell,
                       ),
-                      if (widget.floatingOverlay != null) widget.floatingOverlay!,
+                      if (widget.floatingOverlay != null)
+                        widget.floatingOverlay!,
                     ],
                   ),
                 ),
@@ -218,7 +228,9 @@ class _TeacherWebScaffoldState extends ConsumerState<TeacherWebScaffold> {
               _isSidebarCollapsed ? Icons.menu_open : Icons.menu,
               color: AppTheme.textSecondary,
             ),
-            tooltip: _isSidebarCollapsed ? 'Expand Sidebar' : 'Collapse Sidebar',
+            tooltip: _isSidebarCollapsed
+                ? 'Expand Sidebar'
+                : 'Collapse Sidebar',
             onPressed: () {
               setState(() => _isSidebarCollapsed = !_isSidebarCollapsed);
             },
@@ -239,11 +251,19 @@ class _TeacherWebScaffoldState extends ConsumerState<TeacherWebScaffold> {
               ),
               Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 8),
-                child: Icon(Icons.chevron_right, size: 16, color: AppTheme.textMuted),
+                child: Icon(
+                  Icons.chevron_right,
+                  size: 16,
+                  color: AppTheme.textMuted,
+                ),
               ),
               Text(
                 _getPageTitle(),
-                style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: AppTheme.text),
+                style: TextStyle(
+                  fontSize: 15,
+                  fontWeight: FontWeight.bold,
+                  color: AppTheme.text,
+                ),
               ),
             ],
           ),
@@ -262,7 +282,10 @@ class _TeacherWebScaffoldState extends ConsumerState<TeacherWebScaffold> {
               if (sections.isEmpty) return const SizedBox.shrink();
 
               return Container(
-                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 12,
+                  vertical: 6,
+                ),
                 decoration: BoxDecoration(
                   color: AppTheme.background,
                   borderRadius: BorderRadius.circular(8),
@@ -271,11 +294,19 @@ class _TeacherWebScaffoldState extends ConsumerState<TeacherWebScaffold> {
                 child: Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    Icon(Icons.groups_outlined, size: 16, color: AppTheme.primary),
+                    Icon(
+                      Icons.groups_outlined,
+                      size: 16,
+                      color: AppTheme.primary,
+                    ),
                     const SizedBox(width: 6),
                     Text(
                       '${sections.length} Handled Sections',
-                      style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: AppTheme.text),
+                      style: TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
+                        color: AppTheme.text,
+                      ),
                     ),
                   ],
                 ),
@@ -294,7 +325,10 @@ class _TeacherWebScaffoldState extends ConsumerState<TeacherWebScaffold> {
             child: IconButton(
               iconSize: 20,
               tooltip: isDark ? 'Switch to Light Mode' : 'Switch to Dark Mode',
-              icon: Icon(isDark ? Icons.light_mode : Icons.dark_mode, color: isDark ? AppTheme.warning : AppTheme.primary),
+              icon: Icon(
+                isDark ? Icons.light_mode : Icons.dark_mode,
+                color: isDark ? AppTheme.warning : AppTheme.primary,
+              ),
               onPressed: () => ref.read(themeProvider.notifier).toggleTheme(),
             ),
           ),
@@ -315,7 +349,12 @@ class _TeacherWebScaffoldState extends ConsumerState<TeacherWebScaffold> {
                 SizedBox(width: 6),
                 Text(
                   'FACULTY',
-                  style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Colors.teal, letterSpacing: 0.5),
+                  style: TextStyle(
+                    fontSize: 11,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.teal,
+                    letterSpacing: 0.5,
+                  ),
                 ),
               ],
             ),
@@ -342,21 +381,15 @@ class _TeacherWebScaffoldState extends ConsumerState<TeacherWebScaffold> {
               : const EdgeInsets.symmetric(horizontal: 19),
           alignment: Alignment.centerLeft,
           decoration: BoxDecoration(
-            border: Border(bottom: BorderSide(color: AppTheme.border, width: 1)),
+            border: Border(
+              bottom: BorderSide(color: AppTheme.border, width: 1),
+            ),
           ),
           child: isCollapsed
-              ? Center(
-                  child: AppLogo.mark(
-                    size: 36,
-                    isDark: isDark,
-                  ),
-                )
+              ? Center(child: AppLogo.mark(size: 36, isDark: isDark))
               : Row(
                   children: [
-                    AppLogo.mark(
-                      size: 38,
-                      isDark: isDark,
-                    ),
+                    AppLogo.mark(size: 38, isDark: isDark),
                     const SizedBox(width: 14),
                     Expanded(
                       child: Column(
@@ -365,13 +398,21 @@ class _TeacherWebScaffoldState extends ConsumerState<TeacherWebScaffold> {
                         children: [
                           Text(
                             'AIRAMP',
-                            style: TextStyle(fontSize: 16, fontWeight: FontWeight.w900, color: AppTheme.text, letterSpacing: 0.5),
+                            style: TextStyle(
+                              fontSize: 16,
+                              fontWeight: FontWeight.w900,
+                              color: AppTheme.text,
+                              letterSpacing: 0.5,
+                            ),
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
                           ),
                           Text(
                             'Teacher Workspace',
-                            style: TextStyle(fontSize: 11, color: AppTheme.textMuted),
+                            style: TextStyle(
+                              fontSize: 11,
+                              color: AppTheme.textMuted,
+                            ),
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
                           ),
@@ -401,10 +442,15 @@ class _TeacherWebScaffoldState extends ConsumerState<TeacherWebScaffold> {
                         ? EdgeInsets.zero
                         : const EdgeInsets.symmetric(horizontal: 14),
                     decoration: BoxDecoration(
-                      color: isSelected ? AppTheme.primary.withValues(alpha: 0.12) : Colors.transparent,
+                      color: isSelected
+                          ? AppTheme.primary.withValues(alpha: 0.12)
+                          : Colors.transparent,
                       borderRadius: BorderRadius.circular(10),
                       border: isSelected
-                          ? Border.all(color: AppTheme.primary.withValues(alpha: 0.3), width: 1)
+                          ? Border.all(
+                              color: AppTheme.primary.withValues(alpha: 0.3),
+                              width: 1,
+                            )
                           : null,
                     ),
                     child: isCollapsed
@@ -412,7 +458,9 @@ class _TeacherWebScaffoldState extends ConsumerState<TeacherWebScaffold> {
                             child: Icon(
                               isSelected ? item.activeIcon : item.icon,
                               size: 20,
-                              color: isSelected ? AppTheme.primary : AppTheme.textSecondary,
+                              color: isSelected
+                                  ? AppTheme.primary
+                                  : AppTheme.textSecondary,
                             ),
                           )
                         : Row(
@@ -420,7 +468,9 @@ class _TeacherWebScaffoldState extends ConsumerState<TeacherWebScaffold> {
                               Icon(
                                 isSelected ? item.activeIcon : item.icon,
                                 size: 20,
-                                color: isSelected ? AppTheme.primary : AppTheme.textSecondary,
+                                color: isSelected
+                                    ? AppTheme.primary
+                                    : AppTheme.textSecondary,
                               ),
                               const SizedBox(width: 14),
                               Expanded(
@@ -428,8 +478,12 @@ class _TeacherWebScaffoldState extends ConsumerState<TeacherWebScaffold> {
                                   item.label,
                                   style: TextStyle(
                                     fontSize: 13,
-                                    fontWeight: isSelected ? FontWeight.bold : FontWeight.w500,
-                                    color: isSelected ? AppTheme.primary : AppTheme.text,
+                                    fontWeight: isSelected
+                                        ? FontWeight.bold
+                                        : FontWeight.w500,
+                                    color: isSelected
+                                        ? AppTheme.primary
+                                        : AppTheme.text,
                                   ),
                                   maxLines: 1,
                                   overflow: TextOverflow.ellipsis,
@@ -480,9 +534,14 @@ class _TeacherWebScaffoldState extends ConsumerState<TeacherWebScaffold> {
                         ? Center(
                             child: UserAvatarWidget(
                               imageSource: currentUser?.profileImage,
-                              fallbackInitial: currentUser?.fullName.isNotEmpty == true ? currentUser!.fullName[0].toUpperCase() : 'T',
+                              fallbackInitial:
+                                  currentUser?.fullName.isNotEmpty == true
+                                  ? currentUser!.fullName[0].toUpperCase()
+                                  : 'T',
                               size: 34,
-                              backgroundColor: Colors.teal.withValues(alpha: 0.15),
+                              backgroundColor: Colors.teal.withValues(
+                                alpha: 0.15,
+                              ),
                               textColor: Colors.teal,
                             ),
                           )
@@ -493,9 +552,14 @@ class _TeacherWebScaffoldState extends ConsumerState<TeacherWebScaffold> {
                                 child: Center(
                                   child: UserAvatarWidget(
                                     imageSource: currentUser?.profileImage,
-                                    fallbackInitial: currentUser?.fullName.isNotEmpty == true ? currentUser!.fullName[0].toUpperCase() : 'T',
+                                    fallbackInitial:
+                                        currentUser?.fullName.isNotEmpty == true
+                                        ? currentUser!.fullName[0].toUpperCase()
+                                        : 'T',
                                     size: 36,
-                                    backgroundColor: Colors.teal.withValues(alpha: 0.15),
+                                    backgroundColor: Colors.teal.withValues(
+                                      alpha: 0.15,
+                                    ),
                                     textColor: Colors.teal,
                                   ),
                                 ),
@@ -505,17 +569,27 @@ class _TeacherWebScaffoldState extends ConsumerState<TeacherWebScaffold> {
                                   padding: const EdgeInsets.only(left: 8),
                                   child: Column(
                                     mainAxisAlignment: MainAxisAlignment.center,
-                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
                                     children: [
                                       Text(
-                                        currentUser?.fullName ?? 'Faculty Instructor',
-                                        style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: AppTheme.text),
+                                        currentUser?.fullName ??
+                                            'Faculty Instructor',
+                                        style: TextStyle(
+                                          fontSize: 13,
+                                          fontWeight: FontWeight.bold,
+                                          color: AppTheme.text,
+                                        ),
                                         maxLines: 1,
                                         overflow: TextOverflow.ellipsis,
                                       ),
                                       Text(
-                                        currentUser?.email ?? 'teacher@school.edu',
-                                        style: TextStyle(fontSize: 11, color: AppTheme.textMuted),
+                                        currentUser?.email ??
+                                            'teacher@school.edu',
+                                        style: TextStyle(
+                                          fontSize: 11,
+                                          color: AppTheme.textMuted,
+                                        ),
                                         maxLines: 1,
                                         overflow: TextOverflow.ellipsis,
                                       ),
@@ -523,7 +597,11 @@ class _TeacherWebScaffoldState extends ConsumerState<TeacherWebScaffold> {
                                   ),
                                 ),
                               ),
-                              Icon(Icons.chevron_right, size: 16, color: AppTheme.textMuted),
+                              Icon(
+                                Icons.chevron_right,
+                                size: 16,
+                                color: AppTheme.textMuted,
+                              ),
                             ],
                           ),
                   ),
@@ -544,7 +622,13 @@ class _TeacherWebScaffoldState extends ConsumerState<TeacherWebScaffold> {
                           message: 'Sign Out',
                           preferBelow: false,
                           waitDuration: const Duration(milliseconds: 250),
-                          child: Center(child: Icon(Icons.logout, size: 18, color: AppTheme.error)),
+                          child: Center(
+                            child: Icon(
+                              Icons.logout,
+                              size: 18,
+                              color: AppTheme.error,
+                            ),
+                          ),
                         )
                       : Row(
                           mainAxisAlignment: MainAxisAlignment.center,
@@ -553,7 +637,11 @@ class _TeacherWebScaffoldState extends ConsumerState<TeacherWebScaffold> {
                             const SizedBox(width: 8),
                             Text(
                               'Sign Out',
-                              style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: AppTheme.error),
+                              style: TextStyle(
+                                fontSize: 12,
+                                fontWeight: FontWeight.bold,
+                                color: AppTheme.error,
+                              ),
                             ),
                           ],
                         ),

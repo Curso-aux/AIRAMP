@@ -74,7 +74,8 @@ class _StudentProfileScreenState extends ConsumerState<StudentProfileScreen>
       if (mounted) {
         setState(() {
           _quizAlerts = prefs.getBool('student_pref_quiz_alerts') ?? true;
-          _scheduleReminders = prefs.getBool('student_pref_schedule_reminders') ?? true;
+          _scheduleReminders =
+              prefs.getBool('student_pref_schedule_reminders') ?? true;
           _hapticsEnabled = prefs.getBool('student_pref_haptics') ?? true;
         });
       }
@@ -151,7 +152,9 @@ class _StudentProfileScreenState extends ConsumerState<StudentProfileScreen>
         barrierDismissible: false,
         builder: (ctx) => AlertDialog(
           backgroundColor: AppTheme.surface,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(14),
+          ),
           content: Padding(
             padding: const EdgeInsets.symmetric(vertical: 16),
             child: Row(
@@ -216,17 +219,17 @@ class _StudentProfileScreenState extends ConsumerState<StudentProfileScreen>
       }
     }
 
-    await ref.read(authProvider.notifier).updateProfile(
-          fullName: fullName,
-          username: username,
-          email: email,
-        );
+    await ref
+        .read(authProvider.notifier)
+        .updateProfile(fullName: fullName, username: username, email: email);
 
     setState(() => _isEditing = false);
     if (!mounted) return;
     _showAlert(
       'Success',
-      isEmailChanged ? 'Email verified and profile updated successfully!' : 'Profile updated successfully!',
+      isEmailChanged
+          ? 'Email verified and profile updated successfully!'
+          : 'Profile updated successfully!',
     );
   }
 
@@ -377,10 +380,16 @@ class _StudentProfileScreenState extends ConsumerState<StudentProfileScreen>
               style: TextStyle(color: AppTheme.text, fontSize: 14),
               decoration: InputDecoration(
                 hintText: 'example@gmail.com',
-                prefixIcon: Icon(Icons.email_outlined, color: AppTheme.primary, size: 20),
+                prefixIcon: Icon(
+                  Icons.email_outlined,
+                  color: AppTheme.primary,
+                  size: 20,
+                ),
                 filled: true,
                 fillColor: AppTheme.inputBg,
-                border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(10),
+                ),
               ),
             ),
           ],
@@ -397,7 +406,9 @@ class _StudentProfileScreenState extends ConsumerState<StudentProfileScreen>
                 Navigator.of(ctx).pop(text);
               } else {
                 ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('Please enter a valid email address.')),
+                  const SnackBar(
+                    content: Text('Please enter a valid email address.'),
+                  ),
                 );
               }
             },
@@ -405,7 +416,10 @@ class _StudentProfileScreenState extends ConsumerState<StudentProfileScreen>
               backgroundColor: AppTheme.primary,
               foregroundColor: Colors.black,
             ),
-            child: const Text('Proceed', style: TextStyle(fontWeight: FontWeight.bold)),
+            child: const Text(
+              'Proceed',
+              style: TextStyle(fontWeight: FontWeight.bold),
+            ),
           ),
         ],
       ),
@@ -427,7 +441,11 @@ class _StudentProfileScreenState extends ConsumerState<StudentProfileScreen>
                 color: Colors.amber.withValues(alpha: 0.15),
                 shape: BoxShape.circle,
               ),
-              child: const Icon(Icons.warning_amber_rounded, color: Colors.amberAccent, size: 24),
+              child: const Icon(
+                Icons.warning_amber_rounded,
+                color: Colors.amberAccent,
+                size: 24,
+              ),
             ),
             const SizedBox(width: 12),
             Expanded(
@@ -458,7 +476,10 @@ class _StudentProfileScreenState extends ConsumerState<StudentProfileScreen>
             },
             child: Text(
               'Sign Out',
-              style: TextStyle(color: AppTheme.error, fontWeight: FontWeight.w600),
+              style: TextStyle(
+                color: AppTheme.error,
+                fontWeight: FontWeight.w600,
+              ),
             ),
           ),
           ElevatedButton(
@@ -466,9 +487,14 @@ class _StudentProfileScreenState extends ConsumerState<StudentProfileScreen>
             style: ElevatedButton.styleFrom(
               backgroundColor: AppTheme.primary,
               foregroundColor: Colors.black,
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(10),
+              ),
             ),
-            child: const Text('Set Password Now', style: TextStyle(fontWeight: FontWeight.bold)),
+            child: const Text(
+              'Set Password Now',
+              style: TextStyle(fontWeight: FontWeight.bold),
+            ),
           ),
         ],
       ),
@@ -483,7 +509,9 @@ class _StudentProfileScreenState extends ConsumerState<StudentProfileScreen>
         canPop: false,
         child: AlertDialog(
           backgroundColor: AppTheme.surface,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(18),
+          ),
           content: Padding(
             padding: const EdgeInsets.symmetric(vertical: 8),
             child: Column(
@@ -497,7 +525,11 @@ class _StudentProfileScreenState extends ConsumerState<StudentProfileScreen>
                     color: Colors.green.withValues(alpha: 0.15),
                     border: Border.all(color: Colors.greenAccent, width: 2),
                   ),
-                  child: const Icon(Icons.check_circle_rounded, color: Colors.greenAccent, size: 38),
+                  child: const Icon(
+                    Icons.check_circle_rounded,
+                    color: Colors.greenAccent,
+                    size: 38,
+                  ),
                 ),
                 const SizedBox(height: 16),
                 Text(
@@ -524,17 +556,24 @@ class _StudentProfileScreenState extends ConsumerState<StudentProfileScreen>
                   child: ElevatedButton(
                     onPressed: () {
                       Navigator.of(ctx).pop();
-                      context.go(isTeacher ? '/teacher/dashboard' : '/student/home');
+                      context.go(
+                        isTeacher ? '/teacher/dashboard' : '/student/home',
+                      );
                     },
                     style: ElevatedButton.styleFrom(
                       backgroundColor: AppTheme.primary,
                       foregroundColor: Colors.black,
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
                       padding: const EdgeInsets.symmetric(vertical: 12),
                     ),
                     child: Text(
                       isTeacher ? 'Proceed to Dashboard' : 'Proceed to Home',
-                      style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
+                      style: const TextStyle(
+                        fontWeight: FontWeight.bold,
+                        fontSize: 14,
+                      ),
                     ),
                   ),
                 ),
@@ -614,14 +653,13 @@ class _StudentProfileScreenState extends ConsumerState<StudentProfileScreen>
                         onPressed: () => Navigator.of(ctx).pop(),
                         style: OutlinedButton.styleFrom(
                           padding: const EdgeInsets.symmetric(vertical: 12),
-                          side: BorderSide(
-                            color: AppTheme.border,
-                            width: 1.2,
-                          ),
+                          side: BorderSide(color: AppTheme.border, width: 1.2),
                           shape: RoundedRectangleBorder(
                             borderRadius: BorderRadius.circular(12),
                           ),
-                          backgroundColor: AppTheme.background.withValues(alpha: 0.5),
+                          backgroundColor: AppTheme.background.withValues(
+                            alpha: 0.5,
+                          ),
                         ),
                         child: Text(
                           'Cancel',
@@ -679,16 +717,15 @@ class _StudentProfileScreenState extends ConsumerState<StudentProfileScreen>
       builder: (ctx) => AlertDialog(
         backgroundColor: AppTheme.surface,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-        title: Text(title,
-            style: TextStyle(
-                color: AppTheme.text, fontWeight: FontWeight.bold)),
-        content:
-            Text(message, style: TextStyle(color: AppTheme.textSecondary)),
+        title: Text(
+          title,
+          style: TextStyle(color: AppTheme.text, fontWeight: FontWeight.bold),
+        ),
+        content: Text(message, style: TextStyle(color: AppTheme.textSecondary)),
         actions: [
           TextButton(
             onPressed: () => Navigator.of(ctx).pop(),
-            child:
-                Text('OK', style: TextStyle(color: AppTheme.primary)),
+            child: Text('OK', style: TextStyle(color: AppTheme.primary)),
           ),
         ],
       ),
@@ -723,7 +760,8 @@ class _StudentProfileScreenState extends ConsumerState<StudentProfileScreen>
   @override
   Widget build(BuildContext context) {
     ref.listen<User?>(authProvider, (prev, next) {
-      if (next?.mustChangePassword == true && !RequiredChangePasswordDialog.hasSeenInThisSession) {
+      if (next?.mustChangePassword == true &&
+          !RequiredChangePasswordDialog.hasSeenInThisSession) {
         WidgetsBinding.instance.addPostFrameCallback((_) {
           if (mounted) {
             RequiredChangePasswordDialog.show(context, isTeacher: false);
@@ -738,8 +776,13 @@ class _StudentProfileScreenState extends ConsumerState<StudentProfileScreen>
     final quizAssignments = ref.watch(studentQuizAssignmentsProvider);
     final progress = ref.watch(studentProgressProvider);
     final sectionDetails = ref.watch(studentSectionDetailsProvider).value;
-    final schedules = (currentUser?.section != null && currentUser!.section!.trim().isNotEmpty)
-        ? (ref.watch(sectionSchedulesProvider(currentUser.section!.trim())).value ?? [])
+    final schedules =
+        (currentUser?.section != null &&
+            currentUser!.section!.trim().isNotEmpty)
+        ? (ref
+                  .watch(sectionSchedulesProvider(currentUser.section!.trim()))
+                  .value ??
+              [])
         : <Map<String, dynamic>>[];
 
     if (currentUser == null) {
@@ -784,13 +827,22 @@ class _StudentProfileScreenState extends ConsumerState<StudentProfileScreen>
               leading: currentUser.mustChangePassword
                   ? null
                   : IconButton(
-                      icon: Icon(Icons.arrow_back_rounded, color: AppTheme.text),
+                      icon: Icon(
+                        Icons.arrow_back_rounded,
+                        color: AppTheme.text,
+                      ),
                       tooltip: 'Back to Home',
                       onPressed: _handleBackNavigation,
                     ),
               title: Text(
-                currentUser.mustChangePassword ? 'Security Requirement' : 'Student Profile',
-                style: TextStyle(color: AppTheme.text, fontSize: 18, fontWeight: FontWeight.bold),
+                currentUser.mustChangePassword
+                    ? 'Security Requirement'
+                    : 'Student Profile',
+                style: TextStyle(
+                  color: AppTheme.text,
+                  fontSize: 18,
+                  fontWeight: FontWeight.bold,
+                ),
               ),
               centerTitle: false,
             ),
@@ -811,7 +863,9 @@ class _StudentProfileScreenState extends ConsumerState<StudentProfileScreen>
                   ),
                   child: Center(
                     child: ConstrainedBox(
-                      constraints: BoxConstraints(maxWidth: isDesktopWeb ? 1400 : 960),
+                      constraints: BoxConstraints(
+                        maxWidth: isDesktopWeb ? 1400 : 960,
+                      ),
                       child: Column(
                         children: [
                           if (isDesktopWeb) ...[
@@ -859,7 +913,10 @@ class _StudentProfileScreenState extends ConsumerState<StudentProfileScreen>
                                         currentUser: currentUser,
                                       ),
                                       const SizedBox(height: 16),
-                                      _buildPersonalInfoCard(currentUser, sectionDetails),
+                                      _buildPersonalInfoCard(
+                                        currentUser,
+                                        sectionDetails,
+                                      ),
                                       const SizedBox(height: 16),
                                       _buildPreferencesCard(themeState),
                                       const SizedBox(height: 32),
@@ -917,7 +974,11 @@ class _StudentProfileScreenState extends ConsumerState<StudentProfileScreen>
     );
   }
 
-  Widget _buildHeaderBar(BuildContext context, User currentUser, {bool isWeb = false}) {
+  Widget _buildHeaderBar(
+    BuildContext context,
+    User currentUser, {
+    bool isWeb = false,
+  }) {
     if (currentUser.mustChangePassword) return const SizedBox.shrink();
 
     if (isWeb) {
@@ -935,16 +996,25 @@ class _StudentProfileScreenState extends ConsumerState<StudentProfileScreen>
               onTap: _handleBackNavigation,
               borderRadius: BorderRadius.circular(8),
               child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 12,
+                  vertical: 8,
+                ),
                 decoration: BoxDecoration(
                   color: AppTheme.primary.withValues(alpha: 0.1),
                   borderRadius: BorderRadius.circular(8),
-                  border: Border.all(color: AppTheme.primary.withValues(alpha: 0.2)),
+                  border: Border.all(
+                    color: AppTheme.primary.withValues(alpha: 0.2),
+                  ),
                 ),
                 child: Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    Icon(Icons.arrow_back_rounded, color: AppTheme.primary, size: 18),
+                    Icon(
+                      Icons.arrow_back_rounded,
+                      color: AppTheme.primary,
+                      size: 18,
+                    ),
                     const SizedBox(width: 8),
                     Text(
                       'Back to Dashboard',
@@ -961,7 +1031,11 @@ class _StudentProfileScreenState extends ConsumerState<StudentProfileScreen>
             const SizedBox(width: 16),
             Container(width: 1, height: 22, color: AppTheme.border),
             const SizedBox(width: 16),
-            Icon(Icons.school_outlined, size: 20, color: AppTheme.textSecondary),
+            Icon(
+              Icons.school_outlined,
+              size: 20,
+              color: AppTheme.textSecondary,
+            ),
             const SizedBox(width: 8),
             Text(
               'Student Profile & Academic Settings',
@@ -977,12 +1051,18 @@ class _StudentProfileScreenState extends ConsumerState<StudentProfileScreen>
               decoration: BoxDecoration(
                 color: AppTheme.primary.withValues(alpha: 0.1),
                 borderRadius: BorderRadius.circular(20),
-                border: Border.all(color: AppTheme.primary.withValues(alpha: 0.25)),
+                border: Border.all(
+                  color: AppTheme.primary.withValues(alpha: 0.25),
+                ),
               ),
               child: Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  Icon(Icons.verified_user_rounded, size: 13, color: AppTheme.primary),
+                  Icon(
+                    Icons.verified_user_rounded,
+                    size: 13,
+                    color: AppTheme.primary,
+                  ),
                   const SizedBox(width: 6),
                   Text(
                     'Learner Access',
@@ -1058,10 +1138,7 @@ class _StudentProfileScreenState extends ConsumerState<StudentProfileScreen>
                     gradient: LinearGradient(
                       begin: Alignment.topLeft,
                       end: Alignment.bottomRight,
-                      colors: [
-                        Colors.amber.shade400,
-                        const Color(0xFFFF8F00),
-                      ],
+                      colors: [Colors.amber.shade400, const Color(0xFFFF8F00)],
                     ),
                     boxShadow: [
                       BoxShadow(
@@ -1131,7 +1208,10 @@ class _StudentProfileScreenState extends ConsumerState<StudentProfileScreen>
                       // SMTP Verification Info Badge
                       Container(
                         margin: const EdgeInsets.only(bottom: 16),
-                        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 14,
+                          vertical: 12,
+                        ),
                         decoration: BoxDecoration(
                           color: AppTheme.primary.withValues(alpha: 0.08),
                           borderRadius: BorderRadius.circular(12),
@@ -1203,14 +1283,22 @@ class _StudentProfileScreenState extends ConsumerState<StudentProfileScreen>
                         decoration: InputDecoration(
                           hintText: 'Enter new password',
                           hintStyle: TextStyle(color: AppTheme.textMuted),
-                          prefixIcon: Icon(Icons.lock_outline_rounded, color: AppTheme.accent, size: 20),
+                          prefixIcon: Icon(
+                            Icons.lock_outline_rounded,
+                            color: AppTheme.accent,
+                            size: 20,
+                          ),
                           suffixIcon: IconButton(
                             icon: Icon(
-                              _obscureNewPassword ? Icons.visibility_off_outlined : Icons.visibility_outlined,
+                              _obscureNewPassword
+                                  ? Icons.visibility_off_outlined
+                                  : Icons.visibility_outlined,
                               color: AppTheme.textMuted,
                               size: 20,
                             ),
-                            onPressed: () => setState(() => _obscureNewPassword = !_obscureNewPassword),
+                            onPressed: () => setState(
+                              () => _obscureNewPassword = !_obscureNewPassword,
+                            ),
                           ),
                           filled: true,
                           fillColor: AppTheme.inputBg,
@@ -1224,9 +1312,15 @@ class _StudentProfileScreenState extends ConsumerState<StudentProfileScreen>
                           ),
                           focusedBorder: OutlineInputBorder(
                             borderRadius: BorderRadius.circular(12),
-                            borderSide: BorderSide(color: AppTheme.primary, width: 1.5),
+                            borderSide: BorderSide(
+                              color: AppTheme.primary,
+                              width: 1.5,
+                            ),
                           ),
-                          contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
+                          contentPadding: const EdgeInsets.symmetric(
+                            horizontal: 14,
+                            vertical: 14,
+                          ),
                         ),
                       ),
                       const SizedBox(height: 14),
@@ -1249,14 +1343,23 @@ class _StudentProfileScreenState extends ConsumerState<StudentProfileScreen>
                         decoration: InputDecoration(
                           hintText: 'Re-enter new password',
                           hintStyle: TextStyle(color: AppTheme.textMuted),
-                          prefixIcon: Icon(Icons.lock_clock_outlined, color: AppTheme.accent, size: 20),
+                          prefixIcon: Icon(
+                            Icons.lock_clock_outlined,
+                            color: AppTheme.accent,
+                            size: 20,
+                          ),
                           suffixIcon: IconButton(
                             icon: Icon(
-                              _obscureConfirmPassword ? Icons.visibility_off_outlined : Icons.visibility_outlined,
+                              _obscureConfirmPassword
+                                  ? Icons.visibility_off_outlined
+                                  : Icons.visibility_outlined,
                               color: AppTheme.textMuted,
                               size: 20,
                             ),
-                            onPressed: () => setState(() => _obscureConfirmPassword = !_obscureConfirmPassword),
+                            onPressed: () => setState(
+                              () => _obscureConfirmPassword =
+                                  !_obscureConfirmPassword,
+                            ),
                           ),
                           filled: true,
                           fillColor: AppTheme.inputBg,
@@ -1270,9 +1373,15 @@ class _StudentProfileScreenState extends ConsumerState<StudentProfileScreen>
                           ),
                           focusedBorder: OutlineInputBorder(
                             borderRadius: BorderRadius.circular(12),
-                            borderSide: BorderSide(color: AppTheme.primary, width: 1.5),
+                            borderSide: BorderSide(
+                              color: AppTheme.primary,
+                              width: 1.5,
+                            ),
                           ),
-                          contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
+                          contentPadding: const EdgeInsets.symmetric(
+                            horizontal: 14,
+                            vertical: 14,
+                          ),
                         ),
                       ),
                       const SizedBox(height: 16),
@@ -1281,10 +1390,14 @@ class _StudentProfileScreenState extends ConsumerState<StudentProfileScreen>
                       Container(
                         padding: const EdgeInsets.all(12),
                         decoration: BoxDecoration(
-                          color: isDark ? Colors.white.withValues(alpha: 0.03) : Colors.grey.shade100,
+                          color: isDark
+                              ? Colors.white.withValues(alpha: 0.03)
+                              : Colors.grey.shade100,
                           borderRadius: BorderRadius.circular(10),
                           border: Border.all(
-                            color: isDark ? Colors.white10 : Colors.grey.shade300,
+                            color: isDark
+                                ? Colors.white10
+                                : Colors.grey.shade300,
                           ),
                         ),
                         child: Column(
@@ -1308,7 +1421,9 @@ class _StudentProfileScreenState extends ConsumerState<StudentProfileScreen>
                         width: double.infinity,
                         height: 48,
                         child: ElevatedButton(
-                          onPressed: _isSavingPassword ? null : _handleChangePassword,
+                          onPressed: _isSavingPassword
+                              ? null
+                              : _handleChangePassword,
                           style: ElevatedButton.styleFrom(
                             backgroundColor: Colors.amber.shade400,
                             foregroundColor: Colors.black,
@@ -1330,7 +1445,11 @@ class _StudentProfileScreenState extends ConsumerState<StudentProfileScreen>
                                   mainAxisAlignment: MainAxisAlignment.center,
                                   mainAxisSize: MainAxisSize.min,
                                   children: [
-                                    Icon(Icons.check_circle_outline_rounded, size: 18, color: Colors.black),
+                                    Icon(
+                                      Icons.check_circle_outline_rounded,
+                                      size: 18,
+                                      color: Colors.black,
+                                    ),
                                     SizedBox(width: 8),
                                     Flexible(
                                       child: Text(
@@ -1355,7 +1474,11 @@ class _StudentProfileScreenState extends ConsumerState<StudentProfileScreen>
                 // Sign Out Option
                 TextButton.icon(
                   onPressed: _handleLogout,
-                  icon: Icon(Icons.logout_rounded, size: 18, color: AppTheme.error),
+                  icon: Icon(
+                    Icons.logout_rounded,
+                    size: 18,
+                    color: AppTheme.error,
+                  ),
                   label: Text(
                     'Sign out to switch account',
                     style: TextStyle(
@@ -1377,7 +1500,9 @@ class _StudentProfileScreenState extends ConsumerState<StudentProfileScreen>
     return Row(
       children: [
         Icon(
-          isMet ? Icons.check_circle_rounded : Icons.radio_button_unchecked_rounded,
+          isMet
+              ? Icons.check_circle_rounded
+              : Icons.radio_button_unchecked_rounded,
           size: 16,
           color: isMet ? Colors.greenAccent : AppTheme.textMuted,
         ),
@@ -1407,9 +1532,15 @@ class _StudentProfileScreenState extends ConsumerState<StudentProfileScreen>
     required List<Map<String, dynamic>> schedules,
   }) {
     final studentSection = currentUser.section;
-    final hasSection = studentSection != null && studentSection.isNotEmpty && studentSection != 'null';
+    final hasSection =
+        studentSection != null &&
+        studentSection.isNotEmpty &&
+        studentSection != 'null';
     final studentGrade = currentUser.grade;
-    final hasGrade = studentGrade != null && studentGrade.isNotEmpty && studentGrade != 'null';
+    final hasGrade =
+        studentGrade != null &&
+        studentGrade.isNotEmpty &&
+        studentGrade != 'null';
     final completedLessons = progress['completed'] ?? 0;
 
     String placementLabel = '';
@@ -1451,10 +1582,7 @@ class _StudentProfileScreenState extends ConsumerState<StudentProfileScreen>
                         padding: const EdgeInsets.all(3),
                         decoration: BoxDecoration(
                           shape: BoxShape.circle,
-                          border: Border.all(
-                            color: AppTheme.border,
-                            width: 2,
-                          ),
+                          border: Border.all(color: AppTheme.border, width: 2),
                         ),
                         child: UserAvatarWidget(
                           imageSource: currentUser.profileImage,
@@ -1474,7 +1602,10 @@ class _StudentProfileScreenState extends ConsumerState<StudentProfileScreen>
                           decoration: BoxDecoration(
                             color: AppTheme.primary,
                             shape: BoxShape.circle,
-                            border: Border.all(color: AppTheme.surface, width: 2),
+                            border: Border.all(
+                              color: AppTheme.surface,
+                              width: 2,
+                            ),
                             boxShadow: [
                               BoxShadow(
                                 color: Colors.black.withValues(alpha: 0.15),
@@ -1497,7 +1628,9 @@ class _StudentProfileScreenState extends ConsumerState<StudentProfileScreen>
 
                 // Full Name
                 Text(
-                  currentUser.fullName.isNotEmpty ? currentUser.fullName : 'Learner',
+                  currentUser.fullName.isNotEmpty
+                      ? currentUser.fullName
+                      : 'Learner',
                   textAlign: TextAlign.center,
                   style: TextStyle(
                     fontSize: 19,
@@ -1585,7 +1718,10 @@ class _StudentProfileScreenState extends ConsumerState<StudentProfileScreen>
                     icon: Icons.calendar_today_outlined,
                     count: '${schedules.length}',
                     label: 'Classes',
-                    onTap: () => showStudentTimetableModal(context, sectionName: currentUser.section),
+                    onTap: () => showStudentTimetableModal(
+                      context,
+                      sectionName: currentUser.section,
+                    ),
                   ),
                 ),
               ],
@@ -1681,11 +1817,13 @@ class _StudentProfileScreenState extends ConsumerState<StudentProfileScreen>
     required List<Map<String, dynamic>> schedules,
     required User currentUser,
   }) {
-    final advisory = (sectionDetails?['adviser_name'] as String?) ??
+    final advisory =
+        (sectionDetails?['adviser_name'] as String?) ??
         (sectionDetails?['adviser'] as String?) ??
         'Designated Faculty';
     final room = (sectionDetails?['room'] as String?) ?? 'Campus Main';
-    final track = (sectionDetails?['track'] as String?) ??
+    final track =
+        (sectionDetails?['track'] as String?) ??
         (sectionDetails?['strand'] as String?) ??
         'Junior High School';
 
@@ -1699,7 +1837,11 @@ class _StudentProfileScreenState extends ConsumerState<StudentProfileScreen>
             children: [
               Row(
                 children: [
-                  Icon(Icons.auto_stories_outlined, size: 17, color: AppTheme.textSecondary),
+                  Icon(
+                    Icons.auto_stories_outlined,
+                    size: 17,
+                    color: AppTheme.textSecondary,
+                  ),
                   const SizedBox(width: 8),
                   Text(
                     'Academic Standing & Subjects',
@@ -1715,7 +1857,10 @@ class _StudentProfileScreenState extends ConsumerState<StudentProfileScreen>
                 onTap: () => context.go('/student/courses'),
                 borderRadius: BorderRadius.circular(6),
                 child: Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 4),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 4,
+                    vertical: 4,
+                  ),
                   child: Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
@@ -1728,7 +1873,11 @@ class _StudentProfileScreenState extends ConsumerState<StudentProfileScreen>
                         ),
                       ),
                       const SizedBox(width: 1),
-                      Icon(Icons.chevron_right_rounded, size: 15, color: AppTheme.textMuted),
+                      Icon(
+                        Icons.chevron_right_rounded,
+                        size: 15,
+                        color: AppTheme.textMuted,
+                      ),
                     ],
                   ),
                 ),
@@ -1765,12 +1914,22 @@ class _StudentProfileScreenState extends ConsumerState<StudentProfileScreen>
             )
           else
             ...courses.take(3).map((sub) {
-              final title = (sub['title'] ?? sub['subject_name'] ?? sub['name'] ?? 'Subject') as String;
-              final teacher = (sub['teacher'] ?? sub['teacher_name'] ?? 'Assigned Faculty') as String;
+              final title =
+                  (sub['title'] ??
+                          sub['subject_name'] ??
+                          sub['name'] ??
+                          'Subject')
+                      as String;
+              final teacher =
+                  (sub['teacher'] ?? sub['teacher_name'] ?? 'Assigned Faculty')
+                      as String;
 
               return Container(
                 margin: const EdgeInsets.only(bottom: 7),
-                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 12,
+                  vertical: 10,
+                ),
                 decoration: BoxDecoration(
                   color: AppTheme.inputBg,
                   borderRadius: BorderRadius.circular(10),
@@ -1812,7 +1971,10 @@ class _StudentProfileScreenState extends ConsumerState<StudentProfileScreen>
                       ),
                     ),
                     Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2.5),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 7,
+                        vertical: 2.5,
+                      ),
                       decoration: BoxDecoration(
                         color: AppTheme.background,
                         borderRadius: BorderRadius.circular(5),
@@ -1844,13 +2006,19 @@ class _StudentProfileScreenState extends ConsumerState<StudentProfileScreen>
             ),
             child: Column(
               children: [
-                _buildSystemSpecRow(label: 'Academic Section', value: currentUser.section ?? 'Grade 10 - Emerald'),
+                _buildSystemSpecRow(
+                  label: 'Academic Section',
+                  value: currentUser.section ?? 'Grade 10 - Emerald',
+                ),
                 const SizedBox(height: 6),
                 _buildSystemSpecRow(label: 'Class Adviser', value: advisory),
                 const SizedBox(height: 6),
                 _buildSystemSpecRow(label: 'Home Room / Building', value: room),
                 const SizedBox(height: 6),
-                _buildSystemSpecRow(label: 'Curricular Track / Strand', value: track),
+                _buildSystemSpecRow(
+                  label: 'Curricular Track / Strand',
+                  value: track,
+                ),
               ],
             ),
           ),
@@ -1858,7 +2026,10 @@ class _StudentProfileScreenState extends ConsumerState<StudentProfileScreen>
 
           // Open Timetable Action Tile (Subtle & Institutional)
           InkWell(
-            onTap: () => showStudentTimetableModal(context, sectionName: currentUser.section),
+            onTap: () => showStudentTimetableModal(
+              context,
+              sectionName: currentUser.section,
+            ),
             borderRadius: BorderRadius.circular(10),
             child: Container(
               padding: const EdgeInsets.symmetric(vertical: 11, horizontal: 12),
@@ -1869,7 +2040,11 @@ class _StudentProfileScreenState extends ConsumerState<StudentProfileScreen>
               ),
               child: Row(
                 children: [
-                  Icon(Icons.calendar_today_outlined, size: 16, color: AppTheme.textSecondary),
+                  Icon(
+                    Icons.calendar_today_outlined,
+                    size: 16,
+                    color: AppTheme.textSecondary,
+                  ),
                   const SizedBox(width: 10),
                   Expanded(
                     child: Column(
@@ -1893,7 +2068,11 @@ class _StudentProfileScreenState extends ConsumerState<StudentProfileScreen>
                       ],
                     ),
                   ),
-                  Icon(Icons.chevron_right_rounded, size: 16, color: AppTheme.textMuted),
+                  Icon(
+                    Icons.chevron_right_rounded,
+                    size: 16,
+                    color: AppTheme.textMuted,
+                  ),
                 ],
               ),
             ),
@@ -1906,14 +2085,20 @@ class _StudentProfileScreenState extends ConsumerState<StudentProfileScreen>
   // ═══════════════════════════════════════════════════════════
   //  3. PERSONAL & INSTITUTIONAL INFORMATION CARD
   // ═══════════════════════════════════════════════════════════
-  Widget _buildPersonalInfoCard(User currentUser, Map<String, dynamic>? sectionDetails) {
-    final advisory = (sectionDetails?['adviser_name'] as String?) ??
+  Widget _buildPersonalInfoCard(
+    User currentUser,
+    Map<String, dynamic>? sectionDetails,
+  ) {
+    final advisory =
+        (sectionDetails?['adviser_name'] as String?) ??
         (sectionDetails?['adviser'] as String?) ??
         'Designated Faculty';
-    final schoolId = (currentUser.schoolId != null && currentUser.schoolId!.isNotEmpty)
+    final schoolId =
+        (currentUser.schoolId != null && currentUser.schoolId!.isNotEmpty)
         ? currentUser.schoolId!
         : 'sch_main (DepEd Central)';
-    final sectionGrade = '${currentUser.grade ?? 'Grade 10'} - ${currentUser.section ?? 'Unassigned'}';
+    final sectionGrade =
+        '${currentUser.grade ?? 'Grade 10'} - ${currentUser.section ?? 'Unassigned'}';
 
     return _sectionCard(
       child: Column(
@@ -1924,7 +2109,11 @@ class _StudentProfileScreenState extends ConsumerState<StudentProfileScreen>
             children: [
               Row(
                 children: [
-                  Icon(Icons.badge_outlined, size: 17, color: AppTheme.textSecondary),
+                  Icon(
+                    Icons.badge_outlined,
+                    size: 17,
+                    color: AppTheme.textSecondary,
+                  ),
                   const SizedBox(width: 8),
                   Text(
                     'Personal Information',
@@ -1941,7 +2130,11 @@ class _StudentProfileScreenState extends ConsumerState<StudentProfileScreen>
                   onTap: () => setState(() => _isEditing = true),
                   child: Row(
                     children: [
-                      Icon(Icons.edit_outlined, size: 13, color: AppTheme.textSecondary),
+                      Icon(
+                        Icons.edit_outlined,
+                        size: 13,
+                        color: AppTheme.textSecondary,
+                      ),
                       const SizedBox(width: 4),
                       Text(
                         'Edit',
@@ -1958,7 +2151,10 @@ class _StudentProfileScreenState extends ConsumerState<StudentProfileScreen>
                 GestureDetector(
                   onTap: _handleSaveProfile,
                   child: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 10,
+                      vertical: 5,
+                    ),
                     decoration: BoxDecoration(
                       color: AppTheme.text,
                       borderRadius: BorderRadius.circular(6),
@@ -2081,10 +2277,7 @@ class _StudentProfileScreenState extends ConsumerState<StudentProfileScreen>
               children: [
                 Text(
                   label,
-                  style: TextStyle(
-                    fontSize: 11,
-                    color: AppTheme.textMuted,
-                  ),
+                  style: TextStyle(fontSize: 11, color: AppTheme.textMuted),
                 ),
                 const SizedBox(height: 1.5),
                 Text(
@@ -2113,17 +2306,20 @@ class _StudentProfileScreenState extends ConsumerState<StudentProfileScreen>
     TextInputType keyboardType = TextInputType.text,
     int? maxLength,
   }) {
-    final int effectiveLimit = maxLength ?? (
-      label.toLowerCase().contains('phone') ? 15 :
-      label.toLowerCase().contains('user') ? 30 :
-      label.toLowerCase().contains('email') ? 50 : 50
-    );
+    final int effectiveLimit =
+        maxLength ??
+        (label.toLowerCase().contains('phone')
+            ? 15
+            : label.toLowerCase().contains('user')
+            ? 30
+            : label.toLowerCase().contains('email')
+            ? 50
+            : 50);
     return Container(
       padding: const EdgeInsets.symmetric(vertical: 9),
       decoration: BoxDecoration(
         border: showBorder
-            ? Border(
-                bottom: BorderSide(color: AppTheme.border, width: 1))
+            ? Border(bottom: BorderSide(color: AppTheme.border, width: 1))
             : null,
       ),
       child: Row(
@@ -2140,49 +2336,49 @@ class _StudentProfileScreenState extends ConsumerState<StudentProfileScreen>
               children: [
                 Text(
                   label,
-                  style: TextStyle(
-                    fontSize: 11,
-                    color: AppTheme.textMuted,
-                  ),
+                  style: TextStyle(fontSize: 11, color: AppTheme.textMuted),
                 ),
                 const SizedBox(height: 1.5),
                 if (isEditing)
                   TextField(
                     controller: controller,
                     maxLength: effectiveLimit,
-                    buildCounter: (context, {required currentLength, required isFocused, maxLength}) => null,
+                    buildCounter:
+                        (
+                          context, {
+                          required currentLength,
+                          required isFocused,
+                          maxLength,
+                        }) => null,
                     keyboardType: keyboardType,
-                    style: TextStyle(
-                        color: AppTheme.text, fontSize: 14),
+                    style: TextStyle(color: AppTheme.text, fontSize: 14),
                     decoration: InputDecoration(
                       counterText: '',
                       isDense: true,
                       contentPadding: const EdgeInsets.symmetric(
-                          horizontal: 10, vertical: 6),
+                        horizontal: 10,
+                        vertical: 6,
+                      ),
                       filled: true,
                       fillColor: AppTheme.inputBg,
                       border: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(7),
-                        borderSide:
-                            BorderSide(color: AppTheme.border),
+                        borderSide: BorderSide(color: AppTheme.border),
                       ),
                       enabledBorder: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(7),
-                        borderSide:
-                            BorderSide(color: AppTheme.border),
+                        borderSide: BorderSide(color: AppTheme.border),
                       ),
                       focusedBorder: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(7),
-                        borderSide:
-                            BorderSide(color: AppTheme.text),
+                        borderSide: BorderSide(color: AppTheme.text),
                       ),
                     ),
                   )
                 else
                   Text(
                     value,
-                    style: TextStyle(
-                        color: AppTheme.text, fontSize: 13.5),
+                    style: TextStyle(color: AppTheme.text, fontSize: 13.5),
                   ),
               ],
             ),
@@ -2286,7 +2482,9 @@ class _StudentProfileScreenState extends ConsumerState<StudentProfileScreen>
               if (isRequired) {
                 ScaffoldMessenger.of(context).showSnackBar(
                   const SnackBar(
-                    content: Text('Password change is required to unlock your account.'),
+                    content: Text(
+                      'Password change is required to unlock your account.',
+                    ),
                     duration: Duration(seconds: 2),
                   ),
                 );
@@ -2299,7 +2497,9 @@ class _StudentProfileScreenState extends ConsumerState<StudentProfileScreen>
                 Icon(
                   isRequired ? Icons.lock_reset_rounded : Icons.lock_outline,
                   size: 17,
-                  color: isRequired ? Colors.amberAccent : AppTheme.textSecondary,
+                  color: isRequired
+                      ? Colors.amberAccent
+                      : AppTheme.textSecondary,
                 ),
                 const SizedBox(width: 10),
                 Expanded(
@@ -2316,11 +2516,16 @@ class _StudentProfileScreenState extends ConsumerState<StudentProfileScreen>
                       if (isRequired) ...[
                         const SizedBox(width: 8),
                         Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 7,
+                            vertical: 2,
+                          ),
                           decoration: BoxDecoration(
                             color: Colors.amber.withValues(alpha: 0.2),
                             borderRadius: BorderRadius.circular(6),
-                            border: Border.all(color: Colors.amberAccent.withValues(alpha: 0.5)),
+                            border: Border.all(
+                              color: Colors.amberAccent.withValues(alpha: 0.5),
+                            ),
                           ),
                           child: const Text(
                             'Required',
@@ -2358,7 +2563,13 @@ class _StudentProfileScreenState extends ConsumerState<StudentProfileScreen>
                   TextField(
                     controller: _newPasswordController,
                     maxLength: 16,
-                    buildCounter: (context, {required currentLength, required isFocused, maxLength}) => null,
+                    buildCounter:
+                        (
+                          context, {
+                          required currentLength,
+                          required isFocused,
+                          maxLength,
+                        }) => null,
                     obscureText: _obscureNewPassword,
                     style: TextStyle(color: AppTheme.text, fontSize: 13.5),
                     decoration: InputDecoration(
@@ -2367,34 +2578,46 @@ class _StudentProfileScreenState extends ConsumerState<StudentProfileScreen>
                       hintStyle: TextStyle(color: AppTheme.textMuted),
                       suffixIcon: IconButton(
                         icon: Icon(
-                          _obscureNewPassword ? Icons.visibility_off_outlined : Icons.visibility_outlined,
+                          _obscureNewPassword
+                              ? Icons.visibility_off_outlined
+                              : Icons.visibility_outlined,
                           color: AppTheme.textMuted,
                           size: 17,
                         ),
-                        onPressed: () => setState(() => _obscureNewPassword = !_obscureNewPassword),
+                        onPressed: () => setState(
+                          () => _obscureNewPassword = !_obscureNewPassword,
+                        ),
                       ),
                       filled: true,
                       fillColor: AppTheme.inputBg,
                       border: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(8),
                         borderSide: BorderSide(
-                          color: isRequired ? Colors.amberAccent.withValues(alpha: 0.5) : AppTheme.border,
+                          color: isRequired
+                              ? Colors.amberAccent.withValues(alpha: 0.5)
+                              : AppTheme.border,
                         ),
                       ),
                       enabledBorder: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(8),
                         borderSide: BorderSide(
-                          color: isRequired ? Colors.amberAccent.withValues(alpha: 0.5) : AppTheme.border,
+                          color: isRequired
+                              ? Colors.amberAccent.withValues(alpha: 0.5)
+                              : AppTheme.border,
                         ),
                       ),
                       focusedBorder: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(8),
                         borderSide: BorderSide(
-                          color: isRequired ? Colors.amberAccent : AppTheme.text,
+                          color: isRequired
+                              ? Colors.amberAccent
+                              : AppTheme.text,
                         ),
                       ),
                       contentPadding: const EdgeInsets.symmetric(
-                          horizontal: 12, vertical: 10),
+                        horizontal: 12,
+                        vertical: 10,
+                      ),
                     ),
                   ),
                   const SizedBox(height: 10),
@@ -2403,7 +2626,13 @@ class _StudentProfileScreenState extends ConsumerState<StudentProfileScreen>
                   TextField(
                     controller: _confirmPasswordController,
                     maxLength: 16,
-                    buildCounter: (context, {required currentLength, required isFocused, maxLength}) => null,
+                    buildCounter:
+                        (
+                          context, {
+                          required currentLength,
+                          required isFocused,
+                          maxLength,
+                        }) => null,
                     obscureText: _obscureConfirmPassword,
                     style: TextStyle(color: AppTheme.text, fontSize: 13.5),
                     decoration: InputDecoration(
@@ -2412,34 +2641,47 @@ class _StudentProfileScreenState extends ConsumerState<StudentProfileScreen>
                       hintStyle: TextStyle(color: AppTheme.textMuted),
                       suffixIcon: IconButton(
                         icon: Icon(
-                          _obscureConfirmPassword ? Icons.visibility_off_outlined : Icons.visibility_outlined,
+                          _obscureConfirmPassword
+                              ? Icons.visibility_off_outlined
+                              : Icons.visibility_outlined,
                           color: AppTheme.textMuted,
                           size: 17,
                         ),
-                        onPressed: () => setState(() => _obscureConfirmPassword = !_obscureConfirmPassword),
+                        onPressed: () => setState(
+                          () => _obscureConfirmPassword =
+                              !_obscureConfirmPassword,
+                        ),
                       ),
                       filled: true,
                       fillColor: AppTheme.inputBg,
                       border: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(8),
                         borderSide: BorderSide(
-                          color: isRequired ? Colors.amberAccent.withValues(alpha: 0.5) : AppTheme.border,
+                          color: isRequired
+                              ? Colors.amberAccent.withValues(alpha: 0.5)
+                              : AppTheme.border,
                         ),
                       ),
                       enabledBorder: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(8),
                         borderSide: BorderSide(
-                          color: isRequired ? Colors.amberAccent.withValues(alpha: 0.5) : AppTheme.border,
+                          color: isRequired
+                              ? Colors.amberAccent.withValues(alpha: 0.5)
+                              : AppTheme.border,
                         ),
                       ),
                       focusedBorder: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(8),
                         borderSide: BorderSide(
-                          color: isRequired ? Colors.amberAccent : AppTheme.text,
+                          color: isRequired
+                              ? Colors.amberAccent
+                              : AppTheme.text,
                         ),
                       ),
                       contentPadding: const EdgeInsets.symmetric(
-                          horizontal: 12, vertical: 10),
+                        horizontal: 12,
+                        vertical: 10,
+                      ),
                     ),
                   ),
                   const SizedBox(height: 12),
@@ -2449,10 +2691,16 @@ class _StudentProfileScreenState extends ConsumerState<StudentProfileScreen>
                     width: double.infinity,
                     height: 42,
                     child: ElevatedButton(
-                      onPressed: _isSavingPassword ? null : _handleChangePassword,
+                      onPressed: _isSavingPassword
+                          ? null
+                          : _handleChangePassword,
                       style: ElevatedButton.styleFrom(
-                        backgroundColor: isRequired ? Colors.amber.shade400 : AppTheme.text,
-                        foregroundColor: isRequired ? Colors.black : AppTheme.surface,
+                        backgroundColor: isRequired
+                            ? Colors.amber.shade400
+                            : AppTheme.text,
+                        foregroundColor: isRequired
+                            ? Colors.black
+                            : AppTheme.surface,
                         shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(8),
                         ),
@@ -2465,15 +2713,22 @@ class _StudentProfileScreenState extends ConsumerState<StudentProfileScreen>
                           ? const SizedBox(
                               width: 18,
                               height: 18,
-                              child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                              child: CircularProgressIndicator(
+                                strokeWidth: 2,
+                                color: Colors.white,
+                              ),
                             )
                           : Row(
                               mainAxisAlignment: MainAxisAlignment.center,
                               children: [
                                 Icon(
-                                  isRequired ? Icons.lock_open_rounded : Icons.check_circle_outline,
+                                  isRequired
+                                      ? Icons.lock_open_rounded
+                                      : Icons.check_circle_outline,
                                   size: 16,
-                                  color: isRequired ? Colors.black : AppTheme.surface,
+                                  color: isRequired
+                                      ? Colors.black
+                                      : AppTheme.surface,
                                 ),
                                 const SizedBox(width: 8),
                                 Text(
@@ -2549,10 +2804,7 @@ class _StudentProfileScreenState extends ConsumerState<StudentProfileScreen>
           Center(
             child: Text(
               'Current: ${ref.read(themeProvider.notifier).currentModeLabel}',
-              style: TextStyle(
-                fontSize: 11.5,
-                color: AppTheme.textMuted,
-              ),
+              style: TextStyle(fontSize: 11.5, color: AppTheme.textMuted),
             ),
           ),
           const SizedBox(height: 12),
@@ -2561,7 +2813,8 @@ class _StudentProfileScreenState extends ConsumerState<StudentProfileScreen>
           // Preference Toggles (Subtle Neutral)
           _buildToggleRow(
             title: 'Quiz & Assignment Alerts',
-            subtitle: 'Get notified when new quizzes and activities are published',
+            subtitle:
+                'Get notified when new quizzes and activities are published',
             value: _quizAlerts,
             onChanged: (val) {
               setState(() => _quizAlerts = val);
@@ -2572,7 +2825,8 @@ class _StudentProfileScreenState extends ConsumerState<StudentProfileScreen>
 
           _buildToggleRow(
             title: 'Class Schedule Reminders',
-            subtitle: 'Receive timely notifications before scheduled class periods start',
+            subtitle:
+                'Receive timely notifications before scheduled class periods start',
             value: _scheduleReminders,
             onChanged: (val) {
               setState(() => _scheduleReminders = val);
@@ -2583,7 +2837,8 @@ class _StudentProfileScreenState extends ConsumerState<StudentProfileScreen>
 
           _buildToggleRow(
             title: 'Haptic Touch Feedback',
-            subtitle: 'Provide tactile vibration feedback during quiz interactions',
+            subtitle:
+                'Provide tactile vibration feedback during quiz interactions',
             value: _hapticsEnabled,
             onChanged: (val) {
               setState(() => _hapticsEnabled = val);
@@ -2666,10 +2921,7 @@ class _StudentProfileScreenState extends ConsumerState<StudentProfileScreen>
                 const SizedBox(height: 1.5),
                 Text(
                   subtitle,
-                  style: TextStyle(
-                    fontSize: 11,
-                    color: AppTheme.textMuted,
-                  ),
+                  style: TextStyle(fontSize: 11, color: AppTheme.textMuted),
                 ),
               ],
             ),
@@ -2695,7 +2947,11 @@ class _StudentProfileScreenState extends ConsumerState<StudentProfileScreen>
         children: [
           Row(
             children: [
-              Icon(Icons.shield_outlined, size: 17, color: AppTheme.textSecondary),
+              Icon(
+                Icons.shield_outlined,
+                size: 17,
+                color: AppTheme.textSecondary,
+              ),
               const SizedBox(width: 8),
               Text(
                 'Institutional Support & Info',
@@ -2707,7 +2963,10 @@ class _StudentProfileScreenState extends ConsumerState<StudentProfileScreen>
               ),
               const Spacer(),
               Container(
-                padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2.5),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 7,
+                  vertical: 2.5,
+                ),
                 decoration: BoxDecoration(
                   color: AppTheme.inputBg,
                   borderRadius: BorderRadius.circular(5),
@@ -2766,11 +3025,23 @@ class _StudentProfileScreenState extends ConsumerState<StudentProfileScreen>
               side: BorderSide(color: AppTheme.border),
               padding: const EdgeInsets.symmetric(vertical: 9),
               minimumSize: const Size(double.infinity, 40),
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(8),
+              ),
             ),
-            onPressed: () => AppUpdateService().promptUpdateIfAvailable(context, showNoUpdateMessage: true),
-            icon: Icon(Icons.sync_rounded, size: 15, color: AppTheme.textSecondary),
-            label: const Text('Check for Updates', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600)),
+            onPressed: () => AppUpdateService().promptUpdateIfAvailable(
+              context,
+              showNoUpdateMessage: true,
+            ),
+            icon: Icon(
+              Icons.sync_rounded,
+              size: 15,
+              color: AppTheme.textSecondary,
+            ),
+            label: const Text(
+              'Check for Updates',
+              style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
+            ),
           ),
           const SizedBox(height: 6),
 
@@ -2781,7 +3052,11 @@ class _StudentProfileScreenState extends ConsumerState<StudentProfileScreen>
               padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 4),
               child: Row(
                 children: [
-                  Icon(Icons.help_outline_rounded, size: 16, color: AppTheme.textSecondary),
+                  Icon(
+                    Icons.help_outline_rounded,
+                    size: 16,
+                    color: AppTheme.textSecondary,
+                  ),
                   const SizedBox(width: 8),
                   Expanded(
                     child: Text(
@@ -2793,7 +3068,11 @@ class _StudentProfileScreenState extends ConsumerState<StudentProfileScreen>
                       ),
                     ),
                   ),
-                  Icon(Icons.chevron_right_rounded, size: 15, color: AppTheme.textMuted),
+                  Icon(
+                    Icons.chevron_right_rounded,
+                    size: 15,
+                    color: AppTheme.textMuted,
+                  ),
                 ],
               ),
             ),
@@ -2807,7 +3086,11 @@ class _StudentProfileScreenState extends ConsumerState<StudentProfileScreen>
               padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 4),
               child: Row(
                 children: [
-                  Icon(Icons.policy_outlined, size: 16, color: AppTheme.textSecondary),
+                  Icon(
+                    Icons.policy_outlined,
+                    size: 16,
+                    color: AppTheme.textSecondary,
+                  ),
                   const SizedBox(width: 8),
                   Expanded(
                     child: Text(
@@ -2819,7 +3102,11 @@ class _StudentProfileScreenState extends ConsumerState<StudentProfileScreen>
                       ),
                     ),
                   ),
-                  Icon(Icons.chevron_right_rounded, size: 15, color: AppTheme.textMuted),
+                  Icon(
+                    Icons.chevron_right_rounded,
+                    size: 15,
+                    color: AppTheme.textMuted,
+                  ),
                 ],
               ),
             ),
@@ -2829,10 +3116,7 @@ class _StudentProfileScreenState extends ConsumerState<StudentProfileScreen>
     );
   }
 
-  Widget _buildSystemSpecRow({
-    required String label,
-    required String value,
-  }) {
+  Widget _buildSystemSpecRow({required String label, required String value}) {
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -2870,7 +3154,11 @@ class _StudentProfileScreenState extends ConsumerState<StudentProfileScreen>
             Expanded(
               child: Text(
                 'Student Guide & Offline Help',
-                style: TextStyle(color: AppTheme.text, fontSize: 16, fontWeight: FontWeight.bold),
+                style: TextStyle(
+                  color: AppTheme.text,
+                  fontSize: 16,
+                  fontWeight: FontWeight.bold,
+                ),
               ),
             ),
           ],
@@ -2882,17 +3170,20 @@ class _StudentProfileScreenState extends ConsumerState<StudentProfileScreen>
             children: [
               _buildHelpItem(
                 title: 'Offline Lesson Access',
-                desc: 'All course lessons and reading materials are stored locally on your device or streamed from the classroom ESP32 hub without internet.',
+                desc:
+                    'All course lessons and reading materials are stored locally on your device or streamed from the classroom ESP32 hub without internet.',
               ),
               const SizedBox(height: 10),
               _buildHelpItem(
                 title: 'Taking & Submitting Quizzes',
-                desc: 'When connected to the classroom ESP32 Hub Wi-Fi, your quiz answers submit directly to the teacher. Your scores and attempts appear instantly in Quiz History.',
+                desc:
+                    'When connected to the classroom ESP32 Hub Wi-Fi, your quiz answers submit directly to the teacher. Your scores and attempts appear instantly in Quiz History.',
               ),
               const SizedBox(height: 10),
               _buildHelpItem(
                 title: 'Class Timetable',
-                desc: 'View your weekly class schedule, subject teachers, and classroom assignments anytime using the Schedule tab on your home screen.',
+                desc:
+                    'View your weekly class schedule, subject teachers, and classroom assignments anytime using the Schedule tab on your home screen.',
               ),
             ],
           ),
@@ -2900,7 +3191,13 @@ class _StudentProfileScreenState extends ConsumerState<StudentProfileScreen>
         actions: [
           TextButton(
             onPressed: () => Navigator.of(ctx).pop(),
-            child: Text('Close', style: TextStyle(color: AppTheme.text, fontWeight: FontWeight.bold)),
+            child: Text(
+              'Close',
+              style: TextStyle(
+                color: AppTheme.text,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
           ),
         ],
       ),
@@ -2920,19 +3217,33 @@ class _StudentProfileScreenState extends ConsumerState<StudentProfileScreen>
             Expanded(
               child: Text(
                 'Data Privacy & Compliance',
-                style: TextStyle(color: AppTheme.text, fontSize: 16, fontWeight: FontWeight.bold),
+                style: TextStyle(
+                  color: AppTheme.text,
+                  fontSize: 16,
+                  fontWeight: FontWeight.bold,
+                ),
               ),
             ),
           ],
         ),
         content: Text(
           'AIRAMP complies with Republic Act 10173 (Data Privacy Act of 2012) and DepEd institutional student data protection policies.\n\nAll your grades, quiz responses, and learning progress remain encrypted and private on local classroom hardware.',
-          style: TextStyle(color: AppTheme.textSecondary, fontSize: 13, height: 1.4),
+          style: TextStyle(
+            color: AppTheme.textSecondary,
+            fontSize: 13,
+            height: 1.4,
+          ),
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.of(ctx).pop(),
-            child: Text('Understood', style: TextStyle(color: AppTheme.text, fontWeight: FontWeight.bold)),
+            child: Text(
+              'Understood',
+              style: TextStyle(
+                color: AppTheme.text,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
           ),
         ],
       ),
@@ -2945,12 +3256,20 @@ class _StudentProfileScreenState extends ConsumerState<StudentProfileScreen>
       children: [
         Text(
           title,
-          style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: AppTheme.text),
+          style: TextStyle(
+            fontSize: 13,
+            fontWeight: FontWeight.bold,
+            color: AppTheme.text,
+          ),
         ),
         const SizedBox(height: 2),
         Text(
           desc,
-          style: TextStyle(fontSize: 12, color: AppTheme.textSecondary, height: 1.3),
+          style: TextStyle(
+            fontSize: 12,
+            color: AppTheme.textSecondary,
+            height: 1.3,
+          ),
         ),
       ],
     );
@@ -2969,10 +3288,7 @@ class _StudentProfileScreenState extends ConsumerState<StudentProfileScreen>
           decoration: BoxDecoration(
             color: AppTheme.surface,
             borderRadius: BorderRadius.circular(12),
-            border: Border.all(
-              color: AppTheme.border,
-              width: 1,
-            ),
+            border: Border.all(color: AppTheme.border, width: 1),
           ),
           child: Row(
             mainAxisAlignment: MainAxisAlignment.center,
