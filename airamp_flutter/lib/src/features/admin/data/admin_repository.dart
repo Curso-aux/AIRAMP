@@ -606,18 +606,22 @@ class AdminAnalyticsNotifier extends Notifier<Map<String, dynamic>> {
     };
   }
 
-  Future<void> loadAnalytics({AnalyticsFilter? filter}) async {
+  Future<void> loadAnalytics({AnalyticsFilter? filter, bool syncCloud = false}) async {
     if (filter != null) {
       _currentFilter = filter;
     }
-    try {
-      await FirestoreService().syncCloudUsersToLocal();
-    } catch (_) {}
+    if (syncCloud) {
+      try {
+        await FirestoreService().syncCloudUsersToLocal();
+      } catch (_) {}
+    }
     final summary = await DatabaseHelper().getAdminAnalyticsSummary(
       subjectId: _currentFilter.subjectId,
       section: _currentFilter.section,
       timeframe: _currentFilter.timeframe,
       studentCategory: _currentFilter.category,
+      academicYear: _currentFilter.academicYear,
+      departmentGradeLevel: _currentFilter.departmentGradeLevel,
     );
     if (!ref.mounted) return;
     state = summary;

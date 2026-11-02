@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../routing/app_router.dart';
@@ -24,6 +25,9 @@ class GlobalAiraFloatingOverlay extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    // Hide floating assistant overlay on Web for both student and teacher portals
+    if (kIsWeb) return const SizedBox.shrink();
+
     final currentUser = ref.watch(authProvider);
     if (currentUser == null) return const SizedBox.shrink();
 

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import '../../../../core/components/aira_action_toast.dart';
 import '../../../../core/components/user_avatar_widget.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../../core/theme/theme_provider.dart';
@@ -1500,11 +1501,12 @@ class _AdminWebTeachersScreenState extends ConsumerState<AdminWebTeachersScreen>
 
   // ── Confirm Delete Teacher Dialog ──────────────────────────
   void _confirmDeleteTeacher(BuildContext context, Map<String, dynamic> teacher) {
+    final rootContext = context;
     final teacherId = teacher['id'] as String;
     final teacherName = teacher['full_name'] as String? ?? 'Teacher';
 
     showDialog(
-      context: context,
+      context: rootContext,
       builder: (dialogCtx) {
         return AlertDialog(
           backgroundColor: AppTheme.surface,
@@ -1532,16 +1534,22 @@ class _AdminWebTeachersScreenState extends ConsumerState<AdminWebTeachersScreen>
                       .read(adminTeachersProvider.notifier)
                       .deleteTeacher(teacherId)
                       .timeout(const Duration(seconds: 8));
-                  if (context.mounted) {
+                  if (mounted) {
                     Navigator.of(dialogCtx).pop();
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(content: Text('Faculty member "$teacherName" deleted'), backgroundColor: Colors.red),
+                    AiraActionToast.showSuccess(
+                      rootContext,
+                      title: 'Faculty account deleted',
+                      message: 'Faculty member "$teacherName" ($teacherId) was permanently removed. All assigned courses will be unassigned safely.',
+                      duration: const Duration(seconds: 8),
                     );
                   }
                 } catch (e) {
-                  if (context.mounted) {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(content: Text('Error: $e'), backgroundColor: Colors.red),
+                  if (mounted) {
+                    AiraActionToast.showError(
+                      rootContext,
+                      title: 'Failed to delete faculty member',
+                      message: 'An unexpected error occurred while deleting "$teacherName": $e',
+                      duration: const Duration(seconds: 8),
                     );
                   }
                 }

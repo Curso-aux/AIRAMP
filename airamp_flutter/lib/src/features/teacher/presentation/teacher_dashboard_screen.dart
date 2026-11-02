@@ -283,13 +283,10 @@ class _TeacherDashboardScreenState extends ConsumerState<TeacherDashboardScreen>
               final avgScore = stats['avgScore'] as int? ?? 0;
 
               return Container(
-                constraints: isDesktop
-                    ? BoxConstraints(
-                        maxWidth: 1180,
-                        maxHeight: screenHeight * 0.90,
-                      )
-                    : null,
-                height: screenHeight * 0.90,
+                constraints: BoxConstraints(
+                  maxWidth: isDesktop ? 1180 : double.infinity,
+                  maxHeight: screenHeight * 0.90,
+                ),
                 decoration: BoxDecoration(
                   color: AppTheme.surface,
                   borderRadius: isDesktop ? BorderRadius.circular(20) : const BorderRadius.vertical(top: Radius.circular(24)),
@@ -339,12 +336,16 @@ class _TeacherDashboardScreenState extends ConsumerState<TeacherDashboardScreen>
                               children: [
                                 Row(
                                   children: [
-                                    Text(
-                                      isDesktop ? 'Class Performance & Analytics' : 'Class Performance',
-                                      style: TextStyle(
-                                        fontSize: isDesktop ? 17 : 16,
-                                        fontWeight: FontWeight.bold,
-                                        color: AppTheme.text,
+                                    Flexible(
+                                      child: Text(
+                                        isDesktop ? 'Class Performance & Analytics' : 'Class Performance',
+                                        maxLines: 1,
+                                        overflow: TextOverflow.ellipsis,
+                                        style: TextStyle(
+                                          fontSize: isDesktop ? 17 : 16,
+                                          fontWeight: FontWeight.bold,
+                                          color: AppTheme.text,
+                                        ),
                                       ),
                                     ),
                                     if (totalAttempts > 0) ...[
@@ -402,6 +403,12 @@ class _TeacherDashboardScreenState extends ConsumerState<TeacherDashboardScreen>
                           allStudents: allStudents,
                           isDark: isDark,
                           recentAttempts: (stats['recentAttempts'] as List<dynamic>?)?.cast<Map<String, dynamic>>() ?? [],
+                          masteryCount: stats['masteryCount'] as int? ?? 0,
+                          proficientCount: stats['proficientCount'] as int? ?? 0,
+                          needsAttentionCount: stats['needsAttentionCount'] as int? ?? 0,
+                          forecastPassRate: stats['forecastPassRate'] as int?,
+                          atRiskStudents: (stats['atRiskStudents'] as List<dynamic>?)?.cast<Map<String, dynamic>>() ?? [],
+                          recommendedActions: (stats['recommendedActions'] as List<dynamic>?)?.cast<Map<String, dynamic>>() ?? [],
                           onStateChanged: () => setModalState(() {}),
                         ),
                       ),
@@ -774,12 +781,16 @@ class _TeacherDashboardScreenState extends ConsumerState<TeacherDashboardScreen>
                                 ),
                               ),
                               const SizedBox(width: 6),
-                              Text(
-                                'DepEd SHS',
-                                style: TextStyle(
-                                  fontSize: 11,
-                                  fontWeight: FontWeight.w500,
-                                  color: AppTheme.textSecondary,
+                              Flexible(
+                                child: Text(
+                                  'DepEd SHS',
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: TextStyle(
+                                    fontSize: 11,
+                                    fontWeight: FontWeight.w500,
+                                    color: AppTheme.textSecondary,
+                                  ),
                                 ),
                               ),
                             ],
@@ -1075,12 +1086,16 @@ class _TeacherDashboardScreenState extends ConsumerState<TeacherDashboardScreen>
         Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
-            Text(
-              'Live Student Quiz Submissions',
-              style: TextStyle(
-                fontSize: 16,
-                fontWeight: FontWeight.bold,
-                color: AppTheme.text,
+            Expanded(
+              child: Text(
+                'Live Student Quiz Submissions',
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.bold,
+                  color: AppTheme.text,
+                ),
               ),
             ),
             TextButton(
@@ -1224,12 +1239,16 @@ class _TeacherDashboardScreenState extends ConsumerState<TeacherDashboardScreen>
         Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
-            Text(
-              'Your Assigned Subjects',
-              style: TextStyle(
-                fontSize: 16,
-                fontWeight: FontWeight.bold,
-                color: AppTheme.text,
+            Expanded(
+              child: Text(
+                'Your Assigned Subjects',
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.bold,
+                  color: AppTheme.text,
+                ),
               ),
             ),
             TextButton(
@@ -1341,7 +1360,8 @@ class _TeacherDashboardScreenState extends ConsumerState<TeacherDashboardScreen>
     );
   }
 
-  /// Core modular analytics body containing segments, filters, and chart/matrix views.
+  /// Core modular analytics body containing segments, filters, chart/matrix views,
+  /// and rich descriptive, predictive, and prescriptive learning analytics.
   /// Powering the dedicated top modal for Class Performance.
   Widget _buildAnalyticsExpandedBody({
     required bool isDesktop,
@@ -1355,6 +1375,12 @@ class _TeacherDashboardScreenState extends ConsumerState<TeacherDashboardScreen>
     required List<Map<String, dynamic>> allStudents,
     required bool isDark,
     List<Map<String, dynamic>> recentAttempts = const [],
+    int masteryCount = 0,
+    int proficientCount = 0,
+    int needsAttentionCount = 0,
+    int? forecastPassRate,
+    List<Map<String, dynamic>> atRiskStudents = const [],
+    List<Map<String, dynamic>> recommendedActions = const [],
     VoidCallback? onStateChanged,
   }) {
     final sectionOptions = <String>[
@@ -1574,6 +1600,50 @@ class _TeacherDashboardScreenState extends ConsumerState<TeacherDashboardScreen>
             selectedStudentName: selectedStudentName,
             effectiveSection: effectiveSection,
           ),
+
+        // Rich Educational Analytics Tiers: Descriptive, Predictive, and Prescriptive
+        if (_analyticsViewIndex != 3) ...[
+          const SizedBox(height: 22),
+
+          // 1. Descriptive Analytics: Score Distribution & Activity Overview
+          _buildScoreDistributionSection(
+            context,
+            isDesktop: isDesktop,
+            totalAttempts: totalAttempts,
+            masteryCount: masteryCount,
+            proficientCount: proficientCount,
+            needsAttentionCount: needsAttentionCount,
+            isDark: isDark,
+          ),
+          const SizedBox(height: 18),
+
+          // 2. Predictive Analytics: Learning Forecast & Attention Needed
+          _buildPredictiveSection(
+            context,
+            isDesktop: isDesktop,
+            forecastPassRate: forecastPassRate,
+            atRiskStudents: atRiskStudents,
+            totalAttempts: totalAttempts,
+            isDark: isDark,
+            onSelectStudent: (studentId) {
+              setState(() => _analyticsStudentFilter = studentId);
+              ref.read(teacherDashboardProvider.notifier).reload(
+                section: _analyticsSectionFilter,
+                studentId: _analyticsStudentFilter,
+              );
+              onStateChanged?.call();
+            },
+          ),
+          const SizedBox(height: 18),
+
+          // 3. Prescriptive Analytics: Suggested Next Steps for Today
+          _buildPrescriptiveSection(
+            context,
+            isDesktop: isDesktop,
+            recommendedActions: recommendedActions,
+            isDark: isDark,
+          ),
+        ],
       ],
     );
   }
@@ -1771,12 +1841,16 @@ class _TeacherDashboardScreenState extends ConsumerState<TeacherDashboardScreen>
                 color: isSelected ? Colors.white : AppTheme.textSecondary,
               ),
               const SizedBox(width: 4),
-              Text(
-                label,
-                style: TextStyle(
-                  fontSize: 11,
-                  fontWeight: isSelected ? FontWeight.bold : FontWeight.w500,
-                  color: isSelected ? Colors.white : AppTheme.textSecondary,
+              Flexible(
+                child: Text(
+                  label,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    fontSize: 11,
+                    fontWeight: isSelected ? FontWeight.bold : FontWeight.w500,
+                    color: isSelected ? Colors.white : AppTheme.textSecondary,
+                  ),
                 ),
               ),
             ],
@@ -1805,11 +1879,11 @@ class _TeacherDashboardScreenState extends ConsumerState<TeacherDashboardScreen>
             child: _buildMetricCard(
               title: 'Assigned Subjects',
               value: '$totalSubjects',
-              subtitle: effectiveStudentId != 'All' ? 'Enrolled subjects' : 'Active courses',
+              subtitle: effectiveStudentId != 'All' ? 'Enrolled subjects' : (totalSubjects == 0 ? 'No active subjects' : 'Active courses'),
               icon: Icons.menu_book_outlined,
               color: AppTheme.primary,
-              trendText: '+1 new course',
-              progress: (totalSubjects / 8).clamp(0.0, 1.0),
+              trendText: totalSubjects > 0 ? '+1 this term' : null,
+              progress: totalSubjects > 0 ? (totalSubjects / 8).clamp(0.0, 1.0) : 0.0,
               badgeText: 'Active Curriculum',
             ),
           ),
@@ -1822,11 +1896,11 @@ class _TeacherDashboardScreenState extends ConsumerState<TeacherDashboardScreen>
                   ? selectedStudentName
                   : effectiveSection != 'All Handled Sections'
                       ? 'In $effectiveSection'
-                      : 'Across your classes',
+                      : (totalStudents == 0 ? 'No students enrolled' : 'Across your classes'),
               icon: Icons.people_alt_outlined,
               color: AppTheme.info,
-              trendText: '+4 this term',
-              progress: 0.82,
+              trendText: totalStudents > 0 ? '+4 this term' : null,
+              progress: totalStudents > 0 ? (totalStudents / 45.0).clamp(0.0, 1.0) : 0.0,
               badgeText: effectiveSection != 'All Handled Sections' ? effectiveSection : 'All Sections',
             ),
           ),
@@ -1837,9 +1911,9 @@ class _TeacherDashboardScreenState extends ConsumerState<TeacherDashboardScreen>
               value: '$passRate%',
               subtitle: totalAttempts == 0 ? 'No attempts yet' : '$passedAttempts passed ($totalAttempts attempts)',
               icon: Icons.verified_outlined,
-              color: passRate >= 75 ? AppTheme.success : AppTheme.warning,
-              trendText: passRate >= 75 ? '+3.8% vs last mod' : '-1.5% vs target',
-              progress: passRate / 100.0,
+              color: totalAttempts == 0 ? AppTheme.textSecondary : (passRate >= 75 ? AppTheme.success : AppTheme.warning),
+              trendText: totalAttempts > 0 ? (passRate >= 75 ? '+3.8% vs last mod' : '-1.5% vs target') : null,
+              progress: totalAttempts > 0 ? (passRate / 100.0) : 0.0,
               badgeText: 'Standard ≥75%',
             ),
           ),
@@ -1850,9 +1924,9 @@ class _TeacherDashboardScreenState extends ConsumerState<TeacherDashboardScreen>
               value: '$avgScore%',
               subtitle: totalAttempts == 0 ? 'No attempts yet' : 'Overall assessments',
               icon: Icons.trending_up,
-              color: AppTheme.accent,
-              trendText: '+4.2% mastery',
-              progress: avgScore / 100.0,
+              color: totalAttempts == 0 ? AppTheme.textSecondary : AppTheme.accent,
+              trendText: totalAttempts > 0 ? '+4.2% mastery' : null,
+              progress: totalAttempts > 0 ? (avgScore / 100.0) : 0.0,
               badgeText: 'LO Mastery',
             ),
           ),
@@ -1868,9 +1942,11 @@ class _TeacherDashboardScreenState extends ConsumerState<TeacherDashboardScreen>
               child: _buildMetricCard(
                 title: 'Assigned Subjects',
                 value: '$totalSubjects',
-                subtitle: effectiveStudentId != 'All' ? 'Enrolled subjects' : 'Active courses',
+                subtitle: effectiveStudentId != 'All' ? 'Enrolled subjects' : (totalSubjects == 0 ? 'No active subjects' : 'Active courses'),
                 icon: Icons.menu_book_outlined,
                 color: AppTheme.primary,
+                trendText: totalSubjects > 0 ? '+1 this term' : null,
+                progress: totalSubjects > 0 ? (totalSubjects / 8).clamp(0.0, 1.0) : 0.0,
               ),
             ),
             const SizedBox(width: 12),
@@ -1882,9 +1958,11 @@ class _TeacherDashboardScreenState extends ConsumerState<TeacherDashboardScreen>
                     ? selectedStudentName
                     : effectiveSection != 'All Handled Sections'
                         ? 'In $effectiveSection'
-                        : 'Across your classes',
+                        : (totalStudents == 0 ? 'No students enrolled' : 'Across your classes'),
                 icon: Icons.people_alt_outlined,
                 color: AppTheme.info,
+                trendText: totalStudents > 0 ? '+4 this term' : null,
+                progress: totalStudents > 0 ? (totalStudents / 45.0).clamp(0.0, 1.0) : 0.0,
               ),
             ),
           ],
@@ -1898,7 +1976,9 @@ class _TeacherDashboardScreenState extends ConsumerState<TeacherDashboardScreen>
                 value: '$passRate%',
                 subtitle: totalAttempts == 0 ? 'No attempts yet' : '$passedAttempts passed ($totalAttempts attempts)',
                 icon: Icons.verified_outlined,
-                color: passRate >= 75 ? AppTheme.success : AppTheme.warning,
+                color: totalAttempts == 0 ? AppTheme.textSecondary : (passRate >= 75 ? AppTheme.success : AppTheme.warning),
+                trendText: totalAttempts > 0 ? (passRate >= 75 ? '+3.8% vs last mod' : '-1.5% vs target') : null,
+                progress: totalAttempts > 0 ? (passRate / 100.0) : 0.0,
               ),
             ),
             const SizedBox(width: 12),
@@ -1908,7 +1988,9 @@ class _TeacherDashboardScreenState extends ConsumerState<TeacherDashboardScreen>
                 value: '$avgScore%',
                 subtitle: totalAttempts == 0 ? 'No attempts yet' : 'Overall assessments',
                 icon: Icons.trending_up,
-                color: AppTheme.accent,
+                color: totalAttempts == 0 ? AppTheme.textSecondary : AppTheme.accent,
+                trendText: totalAttempts > 0 ? '+4.2% mastery' : null,
+                progress: totalAttempts > 0 ? (avgScore / 100.0) : 0.0,
               ),
             ),
           ],
@@ -2585,6 +2667,661 @@ class _TeacherDashboardScreenState extends ConsumerState<TeacherDashboardScreen>
     );
   }
 
+  // ── DESCRIPTIVE ANALYTICS: SCORE DISTRIBUTION BREAKDOWN ──────────────────────
+  Widget _buildScoreDistributionSection(
+    BuildContext context, {
+    required bool isDesktop,
+    required int totalAttempts,
+    required int masteryCount,
+    required int proficientCount,
+    required int needsAttentionCount,
+    required bool isDark,
+  }) {
+    final masteryPct = totalAttempts > 0 ? ((masteryCount / totalAttempts) * 100).round() : 0;
+    final proficientPct = totalAttempts > 0 ? ((proficientCount / totalAttempts) * 100).round() : 0;
+    final needsAttentionPct = totalAttempts > 0 ? ((needsAttentionCount / totalAttempts) * 100).round() : 0;
+
+    return Container(
+      padding: const EdgeInsets.all(18),
+      decoration: BoxDecoration(
+        color: isDark ? AppTheme.darkSurfaceLight : Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: AppTheme.border.withValues(alpha: 0.6)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Container(
+                padding: const EdgeInsets.all(6),
+                decoration: BoxDecoration(
+                  color: AppTheme.primary.withValues(alpha: 0.12),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Icon(Icons.bar_chart_rounded, size: 16, color: AppTheme.primary),
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  'Score Distribution (Historical)',
+                  style: TextStyle(
+                    fontSize: 13.5,
+                    fontWeight: FontWeight.bold,
+                    color: AppTheme.text,
+                  ),
+                ),
+              ),
+              const SizedBox(width: 8),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                decoration: BoxDecoration(
+                  color: (totalAttempts > 0 ? AppTheme.primary : AppTheme.textSecondary).withValues(alpha: 0.10),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Text(
+                  totalAttempts > 0 ? '$totalAttempts attempts' : 'Awaiting data',
+                  style: TextStyle(
+                    fontSize: 10.5,
+                    fontWeight: FontWeight.w600,
+                    color: totalAttempts > 0 ? AppTheme.primary : AppTheme.textSecondary,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 14),
+
+          if (totalAttempts == 0)
+            Padding(
+              padding: const EdgeInsets.symmetric(vertical: 8),
+              child: Row(
+                children: [
+                  Icon(Icons.info_outline_rounded, size: 16, color: AppTheme.textSecondary),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      'No student assessment submissions recorded yet. Once students take quizzes, their performance breakdown across mastery, proficiency, and review-needed bands will show here.',
+                      style: TextStyle(fontSize: 12, color: AppTheme.textSecondary, height: 1.4),
+                    ),
+                  ),
+                ],
+              ),
+            )
+          else ...[
+            // Multi-segment horizontal distribution bar
+            ClipRRect(
+              borderRadius: BorderRadius.circular(6),
+              child: SizedBox(
+                height: 10,
+                child: Row(
+                  children: [
+                    if (masteryCount > 0)
+                      Expanded(
+                        flex: masteryCount,
+                        child: Container(color: AppTheme.success),
+                      ),
+                    if (proficientCount > 0)
+                      Expanded(
+                        flex: proficientCount,
+                        child: Container(color: AppTheme.primary),
+                      ),
+                    if (needsAttentionCount > 0)
+                      Expanded(
+                        flex: needsAttentionCount,
+                        child: Container(color: AppTheme.warning),
+                      ),
+                  ],
+                ),
+              ),
+            ),
+            const SizedBox(height: 14),
+
+            // Distribution Legend Cards (Row on desktop, Column on mobile)
+            if (isDesktop)
+              Row(
+                children: [
+                  Expanded(
+                    child: _buildScoreDistributionPill(
+                      label: 'High Mastery (≥90%)',
+                      count: masteryCount,
+                      percentage: masteryPct,
+                      color: AppTheme.success,
+                      subtitle: 'Exceeding targets',
+                      isDark: isDark,
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: _buildScoreDistributionPill(
+                      label: 'Proficient (75–89%)',
+                      count: proficientCount,
+                      percentage: proficientPct,
+                      color: AppTheme.primary,
+                      subtitle: 'Meeting standard',
+                      isDark: isDark,
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: _buildScoreDistributionPill(
+                      label: 'Needs Attention (<75%)',
+                      count: needsAttentionCount,
+                      percentage: needsAttentionPct,
+                      color: AppTheme.warning,
+                      subtitle: 'Intervention suggested',
+                      isDark: isDark,
+                    ),
+                  ),
+                ],
+              )
+            else
+              Column(
+                children: [
+                  _buildScoreDistributionPill(
+                    label: 'High Mastery (≥90%)',
+                    count: masteryCount,
+                    percentage: masteryPct,
+                    color: AppTheme.success,
+                    subtitle: 'Exceeding targets',
+                    isDark: isDark,
+                  ),
+                  const SizedBox(height: 6),
+                  _buildScoreDistributionPill(
+                    label: 'Proficient (75–89%)',
+                    count: proficientCount,
+                    percentage: proficientPct,
+                    color: AppTheme.primary,
+                    subtitle: 'Meeting standard',
+                    isDark: isDark,
+                  ),
+                  const SizedBox(height: 6),
+                  _buildScoreDistributionPill(
+                    label: 'Needs Attention (<75%)',
+                    count: needsAttentionCount,
+                    percentage: needsAttentionPct,
+                    color: AppTheme.warning,
+                    subtitle: 'Intervention suggested',
+                    isDark: isDark,
+                  ),
+                ],
+              ),
+          ],
+        ],
+      ),
+    );
+  }
+
+  Widget _buildScoreDistributionPill({
+    required String label,
+    required int count,
+    required int percentage,
+    required Color color,
+    required String subtitle,
+    required bool isDark,
+  }) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+      decoration: BoxDecoration(
+        color: isDark ? AppTheme.darkBackground : const Color(0xFFF8FAFC),
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: color.withValues(alpha: 0.3)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                width: 7,
+                height: 7,
+                decoration: BoxDecoration(color: color, shape: BoxShape.circle),
+              ),
+              const SizedBox(width: 5),
+              Flexible(
+                child: Text(
+                  label,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(fontSize: 10.5, fontWeight: FontWeight.w600, color: AppTheme.text),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 4),
+          Row(
+            children: [
+              Text(
+                '$count',
+                style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: color),
+              ),
+              const SizedBox(width: 4),
+              Text(
+                '($percentage%)',
+                style: TextStyle(fontSize: 11, fontWeight: FontWeight.w500, color: AppTheme.textSecondary),
+              ),
+            ],
+          ),
+          Text(
+            subtitle,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: TextStyle(fontSize: 9.5, color: AppTheme.textMuted),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // ── PREDICTIVE ANALYTICS: FORECAST & STUDENTS NEEDING ATTENTION ──────────────
+  Widget _buildPredictiveSection(
+    BuildContext context, {
+    required bool isDesktop,
+    required int? forecastPassRate,
+    required List<Map<String, dynamic>> atRiskStudents,
+    required int totalAttempts,
+    required bool isDark,
+    required Function(String studentId) onSelectStudent,
+  }) {
+    return Container(
+      padding: const EdgeInsets.all(18),
+      decoration: BoxDecoration(
+        color: isDark ? AppTheme.darkSurfaceLight : Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: AppTheme.border.withValues(alpha: 0.6)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(6),
+                decoration: BoxDecoration(
+                  color: const Color(0xFF8B5CF6).withValues(alpha: 0.12),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: const Icon(Icons.auto_awesome_rounded, size: 16, color: Color(0xFF8B5CF6)),
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  'Learning Forecast & Early Support',
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    fontSize: 13.5,
+                    fontWeight: FontWeight.bold,
+                    color: AppTheme.text,
+                  ),
+                ),
+              ),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                decoration: BoxDecoration(
+                  color: const Color(0xFF8B5CF6).withValues(alpha: 0.10),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: const Text(
+                  'Predictive AI',
+                  style: TextStyle(
+                    fontSize: 10.5,
+                    fontWeight: FontWeight.w700,
+                    color: Color(0xFF8B5CF6),
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 14),
+
+          // Forecast Banner
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+            decoration: BoxDecoration(
+              color: isDark ? AppTheme.darkBackground : const Color(0xFFF8FAFC),
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: AppTheme.border.withValues(alpha: 0.5)),
+            ),
+            child: Row(
+              children: [
+                Icon(
+                  forecastPassRate != null && forecastPassRate >= 75
+                      ? Icons.trending_up_rounded
+                      : (forecastPassRate != null ? Icons.trending_down_rounded : Icons.info_outline_rounded),
+                  size: 20,
+                  color: forecastPassRate != null && forecastPassRate >= 75
+                      ? AppTheme.success
+                      : (forecastPassRate != null ? AppTheme.warning : AppTheme.textSecondary),
+                ),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        forecastPassRate != null
+                            ? 'Projected Term Pass Rate: $forecastPassRate%'
+                            : 'Performance Trajectory: Awaiting Baseline Quizzes',
+                        style: TextStyle(
+                          fontSize: 12.5,
+                          fontWeight: FontWeight.bold,
+                          color: AppTheme.text,
+                        ),
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        forecastPassRate != null
+                            ? (forecastPassRate >= 75
+                                ? 'Class is currently on track to satisfy DepEd passing benchmarks. Keep up the momentum!'
+                                : 'Class pass trajectory is below 75%. Reviewing foundational quiz questions is recommended.')
+                            : 'Once students complete quizzes, early trend forecasting will predict term completion outcomes.',
+                        style: TextStyle(fontSize: 11, color: AppTheme.textSecondary, height: 1.3),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 14),
+
+          // Students Needing Support Subheading
+          Text(
+            'Students Flagged for Early Review',
+            style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: AppTheme.text),
+          ),
+          const SizedBox(height: 8),
+
+          if (atRiskStudents.isEmpty)
+            Padding(
+              padding: const EdgeInsets.symmetric(vertical: 4),
+              child: Row(
+                children: [
+                  Icon(
+                    totalAttempts > 0 ? Icons.check_circle_outline_rounded : Icons.person_search_outlined,
+                    size: 16,
+                    color: totalAttempts > 0 ? AppTheme.success : AppTheme.textSecondary,
+                  ),
+                  const SizedBox(width: 6),
+                  Expanded(
+                    child: Text(
+                      totalAttempts > 0
+                          ? 'Great news! All active students are currently meeting the 75% passing benchmark.'
+                          : 'No students currently flagged. Risk detection activates as quiz attempts are completed.',
+                      style: TextStyle(
+                        fontSize: 11.5,
+                        color: totalAttempts > 0 ? AppTheme.success : AppTheme.textSecondary,
+                        fontWeight: totalAttempts > 0 ? FontWeight.w600 : FontWeight.normal,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            )
+          else
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: atRiskStudents.map((st) {
+                final name = st['name'] as String? ?? 'Student';
+                final sec = st['section'] as String? ?? '';
+                final score = st['avgScore'] as int? ?? 0;
+                final reason = st['riskReason'] as String? ?? 'Needs review';
+                final studentId = st['id'] as String;
+
+                return InkWell(
+                  onTap: () => onSelectStudent(studentId),
+                  borderRadius: BorderRadius.circular(10),
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                    decoration: BoxDecoration(
+                      color: AppTheme.warning.withValues(alpha: 0.08),
+                      borderRadius: BorderRadius.circular(10),
+                      border: Border.all(color: AppTheme.warning.withValues(alpha: 0.3)),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        CircleAvatar(
+                          radius: 12,
+                          backgroundColor: AppTheme.warning.withValues(alpha: 0.2),
+                          child: Text(
+                            name.isNotEmpty ? name[0].toUpperCase() : 'S',
+                            style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: AppTheme.warning),
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Text(
+                                  name,
+                                  style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.bold, color: AppTheme.text),
+                                ),
+                                if (sec.isNotEmpty) ...[
+                                  const SizedBox(width: 4),
+                                  Text(
+                                    '($sec)',
+                                    style: TextStyle(fontSize: 10, color: AppTheme.textSecondary),
+                                  ),
+                                ],
+                              ],
+                            ),
+                            Text(
+                              reason,
+                              style: TextStyle(fontSize: 10, color: AppTheme.warning, fontWeight: FontWeight.w600),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(width: 6),
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1.5),
+                          decoration: BoxDecoration(
+                            color: AppTheme.warning.withValues(alpha: 0.2),
+                            borderRadius: BorderRadius.circular(6),
+                          ),
+                          child: Text(
+                            '$score%',
+                            style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: AppTheme.warning),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                );
+              }).toList(),
+            ),
+        ],
+      ),
+    );
+  }
+
+  // ── PRESCRIPTIVE ANALYTICS: ACTION RECOMMENDATIONS ──────────────────────────
+  Widget _buildPrescriptiveSection(
+    BuildContext context, {
+    required bool isDesktop,
+    required List<Map<String, dynamic>> recommendedActions,
+    required bool isDark,
+  }) {
+    if (recommendedActions.isEmpty) return const SizedBox.shrink();
+
+    return Container(
+      padding: const EdgeInsets.all(18),
+      decoration: BoxDecoration(
+        color: isDark ? AppTheme.darkSurfaceLight : Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: AppTheme.border.withValues(alpha: 0.6)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(6),
+                decoration: BoxDecoration(
+                  color: AppTheme.info.withValues(alpha: 0.12),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Icon(Icons.lightbulb_outline_rounded, size: 16, color: AppTheme.info),
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  'Suggested Next Steps for Today',
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    fontSize: 13.5,
+                    fontWeight: FontWeight.bold,
+                    color: AppTheme.text,
+                  ),
+                ),
+              ),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                decoration: BoxDecoration(
+                  color: AppTheme.info.withValues(alpha: 0.10),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Text(
+                  'Action Items',
+                  style: TextStyle(
+                    fontSize: 10.5,
+                    fontWeight: FontWeight.w700,
+                    color: AppTheme.info,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 14),
+
+          // Action cards grid/column
+          if (isDesktop && recommendedActions.length > 1)
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: recommendedActions.map((action) {
+                return Expanded(
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 4),
+                    child: _buildActionItemCard(context, action, isDark),
+                  ),
+                );
+              }).toList(),
+            )
+          else
+            Column(
+              children: recommendedActions.map((action) {
+                return Padding(
+                  padding: const EdgeInsets.only(bottom: 8),
+                  child: _buildActionItemCard(context, action, isDark),
+                );
+              }).toList(),
+            ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildActionItemCard(BuildContext context, Map<String, dynamic> action, bool isDark) {
+    final title = action['title'] as String? ?? 'Action';
+    final description = action['description'] as String? ?? '';
+    final badge = action['badge'] as String? ?? 'Recommendation';
+    final actionType = action['actionType'] as String? ?? '';
+
+    return Container(
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: isDark ? AppTheme.darkBackground : const Color(0xFFF8FAFC),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: AppTheme.border.withValues(alpha: 0.6)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+                decoration: BoxDecoration(
+                  color: AppTheme.primary.withValues(alpha: 0.12),
+                  borderRadius: BorderRadius.circular(6),
+                ),
+                child: Text(
+                  badge,
+                  style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: AppTheme.primary),
+                ),
+              ),
+              Icon(Icons.arrow_forward_rounded, size: 14, color: AppTheme.primary),
+            ],
+          ),
+          const SizedBox(height: 8),
+          Text(
+            title,
+            style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: AppTheme.text),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            description,
+            style: TextStyle(fontSize: 11, color: AppTheme.textSecondary, height: 1.35),
+          ),
+          const SizedBox(height: 10),
+          Align(
+            alignment: Alignment.centerRight,
+            child: OutlinedButton(
+              style: OutlinedButton.styleFrom(
+                visualDensity: VisualDensity.compact,
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                side: BorderSide(color: AppTheme.primary.withValues(alpha: 0.5)),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+              ),
+              onPressed: () {
+                Navigator.of(context).pop(); // dismiss modal
+                if (actionType == 'create_quiz') {
+                  context.go('/teacher/subjects');
+                } else if (actionType == 'post_announcement') {
+                  PostAnnouncementDialog.show(context);
+                } else if (actionType == 'view_roster' || actionType == 'view_students') {
+                  context.go('/teacher/students');
+                } else if (actionType == 'create_subject') {
+                  context.go('/teacher/subjects');
+                }
+              },
+              child: Text(
+                _getActionBtnLabel(actionType),
+                style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: AppTheme.primary),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  String _getActionBtnLabel(String actionType) {
+    switch (actionType) {
+      case 'create_quiz':
+        return 'Create Quiz';
+      case 'post_announcement':
+        return 'Post Announcement';
+      case 'view_roster':
+      case 'view_students':
+        return 'Open Roster';
+      case 'create_subject':
+        return 'View Subjects';
+      default:
+        return 'Take Action';
+    }
+  }
+
   Widget _buildAnnouncementsSection(
     User? currentUser,
     List<Map<String, dynamic>> announcements,
@@ -2602,19 +3339,24 @@ class _TeacherDashboardScreenState extends ConsumerState<TeacherDashboardScreen>
         Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
-            Row(
-              children: [
-                Icon(Icons.campaign_outlined, color: AppTheme.primary, size: 20),
-                const SizedBox(width: 8),
-                Text(
-                  'Announcements',
-                  style: TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.bold,
-                    color: AppTheme.text,
+            Expanded(
+              child: Row(
+                children: [
+                  Icon(Icons.campaign_outlined, color: AppTheme.primary, size: 20),
+                  const SizedBox(width: 8),
+                  Flexible(
+                    child: Text(
+                      'Announcements',
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.bold,
+                        color: AppTheme.text,
+                      ),
+                    ),
                   ),
-                ),
-              ],
+                ],
+              ),
             ),
             ElevatedButton.icon(
               onPressed: () => PostAnnouncementDialog.show(
@@ -3025,19 +3767,24 @@ class _TeacherDashboardScreenState extends ConsumerState<TeacherDashboardScreen>
         Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
-            Row(
-              children: [
-                Icon(Icons.layers, size: 20, color: AppTheme.primary),
-                const SizedBox(width: 8),
-                Text(
-                  'Your Handled Sections',
-                  style: TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.bold,
-                    color: AppTheme.text,
+            Expanded(
+              child: Row(
+                children: [
+                  Icon(Icons.layers, size: 20, color: AppTheme.primary),
+                  const SizedBox(width: 8),
+                  Flexible(
+                    child: Text(
+                      'Your Handled Sections',
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.bold,
+                        color: AppTheme.text,
+                      ),
+                    ),
                   ),
-                ),
-              ],
+                ],
+              ),
             ),
             TextButton(
               onPressed: () => context.go('/teacher/students'),

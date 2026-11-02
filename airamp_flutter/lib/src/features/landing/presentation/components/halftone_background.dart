@@ -148,12 +148,12 @@ class _HalftoneBackgroundState extends State<HalftoneBackground>
     return Image.asset(
       assetPath,
       fit: BoxFit.cover,
-      alignment: Alignment.center,
+      alignment: Alignment.topCenter,
       errorBuilder: (context, error, stackTrace) {
         return Image.network(
           filename,
           fit: BoxFit.cover,
-          alignment: Alignment.center,
+          alignment: Alignment.topCenter,
           errorBuilder: (c, e, s) => const SizedBox.shrink(),
         );
       },
@@ -249,17 +249,17 @@ class _HalftoneBackgroundState extends State<HalftoneBackground>
             child: Container(
               decoration: BoxDecoration(
                 gradient: RadialGradient(
-                  center: const Alignment(0, -0.35),
-                  radius: 0.85,
+                  center: const Alignment(0, -0.10),
+                  radius: 0.90,
                   colors: isDark
                       ? [
-                          AppTheme.darkBackground.withValues(alpha: 0.40),
-                          AppTheme.darkBackground.withValues(alpha: 0.10),
+                          AppTheme.darkBackground.withValues(alpha: 0.35),
+                          AppTheme.darkBackground.withValues(alpha: 0.08),
                           Colors.transparent,
                         ]
                       : [
-                          AppTheme.lightBackground.withValues(alpha: 0.30),
-                          AppTheme.lightBackground.withValues(alpha: 0.08),
+                          AppTheme.lightBackground.withValues(alpha: 0.16),
+                          AppTheme.lightBackground.withValues(alpha: 0.04),
                           Colors.transparent,
                         ],
                   stops: const [0.0, 0.55, 1.0],

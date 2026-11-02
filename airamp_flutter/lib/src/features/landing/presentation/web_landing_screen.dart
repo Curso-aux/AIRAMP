@@ -109,6 +109,7 @@ class _WebLandingScreenState extends ConsumerState<WebLandingScreen> {
     return Scaffold(
       backgroundColor: theme.scaffoldBackgroundColor,
       body: HalftoneBackground(
+        opacity: isDark ? 0.20 : 0.40,
         enableBottomFade: false,
         child: Stack(
           children: [
@@ -784,7 +785,7 @@ class _WebLandingScreenState extends ConsumerState<WebLandingScreen> {
       builder: (context, progress, _) {
         final screenWidth = size.width;
         final isDesktop = screenWidth >= 960;
-        final showNavLinks = screenWidth >= 860;
+        final showNavLinks = screenWidth >= 960;
 
         // Dynamic height and styling driven by scroll progress
         final utilityHeight = isDesktop ? (28.0 * (1.0 - progress)).clamp(0.0, 28.0) : 0.0;
@@ -792,18 +793,15 @@ class _WebLandingScreenState extends ConsumerState<WebLandingScreen> {
         final mainBarHeight = isMobile ? 58.0 : (64.0 - (8.0 * progress)).clamp(56.0, 64.0);
         final totalHeight = utilityHeight + mainBarHeight;
 
-        final blurSigma = (10.0 + (12.0 * progress)).clamp(10.0, 22.0);
+        // Translucent frosted glass: see through the background slightly both at rest and when scrolled
+        final blurSigma = (8.0 + (6.0 * progress)).clamp(8.0, 14.0);
         final bgOpacity = isDark
-            ? (0.40 + (0.48 * progress)).clamp(0.40, 0.88)
-            : (0.50 + (0.40 * progress)).clamp(0.50, 0.90);
-        final shadowAlpha = (0.02 + ((isDark ? 0.33 : 0.06) * progress)).clamp(0.02, 0.35);
-        final borderAlpha = (0.06 + (0.08 * progress)).clamp(0.06, 0.14);
+            ? (0.42 + (0.28 * progress)).clamp(0.42, 0.70)
+            : (0.35 + (0.28 * progress)).clamp(0.35, 0.63);
+        final shadowAlpha = (0.01 + ((isDark ? 0.25 : 0.05) * progress)).clamp(0.01, 0.26);
+        final borderAlpha = (0.04 + (0.06 * progress)).clamp(0.04, 0.10);
 
-        return RepaintBoundary(
-          child: ClipRect(
-            child: BackdropFilter(
-              filter: ImageFilter.blur(sigmaX: blurSigma, sigmaY: blurSigma),
-              child: AnimatedContainer(
+        Widget navContent = AnimatedContainer(
                 duration: const Duration(milliseconds: 140),
                 height: totalHeight,
                 decoration: BoxDecoration(
@@ -819,8 +817,8 @@ class _WebLandingScreenState extends ConsumerState<WebLandingScreen> {
                   boxShadow: [
                     BoxShadow(
                       color: Colors.black.withValues(alpha: shadowAlpha),
-                      blurRadius: 6.0 + (10.0 * progress),
-                      offset: Offset(0, 1.0 + (3.0 * progress)),
+                      blurRadius: 6.0 + (8.0 * progress),
+                      offset: Offset(0, 1.0 + (2.0 * progress)),
                     ),
                   ],
                 ),
@@ -843,7 +841,7 @@ class _WebLandingScreenState extends ConsumerState<WebLandingScreen> {
                                 border: Border(
                                   bottom: BorderSide(
                                     color: (isDark ? Colors.white : Colors.black)
-                                        .withValues(alpha: 0.06),
+                                        .withValues(alpha: (0.04 * (1.0 - progress)).clamp(0.0, 0.04)),
                                     width: 1,
                                   ),
                                 ),
@@ -856,20 +854,24 @@ class _WebLandingScreenState extends ConsumerState<WebLandingScreen> {
                                     color: AppTheme.primary,
                                   ),
                                   const SizedBox(width: 6),
-                                  Text(
-                                    'DepEd K-12 Aligned • Institutional Learning & Assessment Infrastructure',
-                                    style: TextStyle(
-                                      fontSize: 11,
-                                      fontWeight: FontWeight.w600,
-                                      color: isDark
-                                          ? const Color(0xFF94A3B8)
-                                          : const Color(0xFF64748B),
-                                      letterSpacing: 0.2,
+                                  Flexible(
+                                    child: Text(
+                                      'DepEd K-12 Aligned • Institutional Learning & Assessment Infrastructure',
+                                      style: TextStyle(
+                                        fontSize: 11,
+                                        fontWeight: FontWeight.w600,
+                                        color: isDark
+                                            ? const Color(0xFF94A3B8)
+                                            : const Color(0xFF64748B),
+                                        letterSpacing: 0.2,
+                                      ),
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
                                     ),
                                   ),
                                   const Spacer(),
                                   _buildUtilityRoleLink(
-                                    'Student Portal',
+                                    'Student Access',
                                     () => _navigateToLogin(context, role: 'student'),
                                     isDark,
                                   ),
@@ -895,7 +897,7 @@ class _WebLandingScreenState extends ConsumerState<WebLandingScreen> {
                       Expanded(
                         child: Padding(
                           padding: EdgeInsets.symmetric(
-                            horizontal: isMobile ? 14 : 40,
+                            horizontal: isMobile ? 6 : 40,
                           ),
                           child: Row(
                             children: [
@@ -909,10 +911,10 @@ class _WebLandingScreenState extends ConsumerState<WebLandingScreen> {
                                     mainAxisSize: MainAxisSize.min,
                                     children: [
                                       AppLogo.mark(
-                                        size: isMobile ? 32 : 36,
+                                        size: isMobile ? 20 : 36,
                                         isDark: isDark,
                                       ),
-                                      const SizedBox(width: 10),
+                                      SizedBox(width: isMobile ? 4 : 10),
                                       Row(
                                         mainAxisSize: MainAxisSize.min,
                                         children: [
@@ -921,8 +923,8 @@ class _WebLandingScreenState extends ConsumerState<WebLandingScreen> {
                                             style: TextStyle(
                                               color: isDark ? Colors.white : Colors.black,
                                               fontWeight: FontWeight.w900,
-                                              fontSize: isMobile ? 18 : 20,
-                                              letterSpacing: 1.1,
+                                              fontSize: isMobile ? 13 : 20,
+                                              letterSpacing: isMobile ? 0.4 : 1.1,
                                             ),
                                           ),
                                           Text(
@@ -930,24 +932,27 @@ class _WebLandingScreenState extends ConsumerState<WebLandingScreen> {
                                             style: TextStyle(
                                               color: AppTheme.primary,
                                               fontWeight: FontWeight.w900,
-                                              fontSize: isMobile ? 18 : 20,
-                                              letterSpacing: 1.1,
+                                              fontSize: isMobile ? 13 : 20,
+                                              letterSpacing: isMobile ? 0.4 : 1.1,
                                             ),
                                           ),
-                                          const SizedBox(width: 6),
+                                          SizedBox(width: isMobile ? 4 : 6),
                                           Container(
-                                            padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
+                                            padding: EdgeInsets.symmetric(
+                                              horizontal: isMobile ? 3 : 5,
+                                              vertical: isMobile ? 1 : 2,
+                                            ),
                                             decoration: BoxDecoration(
                                               color: AppTheme.primary.withValues(alpha: 0.15),
-                                              borderRadius: BorderRadius.circular(5),
+                                              borderRadius: BorderRadius.circular(4),
                                             ),
                                             child: Text(
                                               'PORTAL',
                                               style: TextStyle(
                                                 color: AppTheme.primary,
-                                                fontSize: 9,
+                                                fontSize: isMobile ? 8 : 9,
                                                 fontWeight: FontWeight.w800,
-                                                letterSpacing: 0.8,
+                                                letterSpacing: 0.6,
                                               ),
                                             ),
                                           ),
@@ -961,46 +966,55 @@ class _WebLandingScreenState extends ConsumerState<WebLandingScreen> {
                               const Spacer(),
 
                               // Center: Balanced Anchor Links (Role Ecosystem, AI Assistant, Cloud, About)
-                              if (showNavLinks) ...[
-                                _HeaderNavLink(
-                                  label: 'Role Ecosystem',
-                                  onTap: _scrollToEcosystem,
-                                  isDark: isDark,
+                              if (showNavLinks)
+                                Flexible(
+                                  child: SingleChildScrollView(
+                                    scrollDirection: Axis.horizontal,
+                                    child: Row(
+                                      mainAxisSize: MainAxisSize.min,
+                                      children: [
+                                        _HeaderNavLink(
+                                          label: 'Role Ecosystem',
+                                          onTap: _scrollToEcosystem,
+                                          isDark: isDark,
+                                        ),
+                                        const SizedBox(width: 4),
+                                        _HeaderNavLink(
+                                          label: 'School Assistant',
+                                          onTap: _scrollToAssistant,
+                                          isDark: isDark,
+                                        ),
+                                        const SizedBox(width: 4),
+                                        _HeaderNavLink(
+                                          label: 'Ecosystem Cloud',
+                                          onTap: _scrollToCloud,
+                                          isDark: isDark,
+                                        ),
+                                        const SizedBox(width: 4),
+                                        _HeaderNavLink(
+                                          label: 'Platform Info',
+                                          onTap: () => _showAppInfoDialog(context, isDark),
+                                          isDark: isDark,
+                                        ),
+                                        const SizedBox(width: 16),
+                                      ],
+                                    ),
+                                  ),
                                 ),
-                                const SizedBox(width: 4),
-                                _HeaderNavLink(
-                                  label: 'School Assistant',
-                                  onTap: _scrollToAssistant,
-                                  isDark: isDark,
-                                ),
-                                const SizedBox(width: 4),
-                                _HeaderNavLink(
-                                  label: 'Ecosystem Cloud',
-                                  onTap: _scrollToCloud,
-                                  isDark: isDark,
-                                ),
-                                const SizedBox(width: 4),
-                                _HeaderNavLink(
-                                  label: 'Platform Info',
-                                  onTap: () => _showAppInfoDialog(context, isDark),
-                                  isDark: isDark,
-                                ),
-                                const SizedBox(width: 16),
-                              ],
 
                               // Right Actions: Theme Mode Switcher + Sign In CTA
                               IconButton(
                                 tooltip: isDark ? 'Switch to Light Mode' : 'Switch to Dark Mode',
                                 padding: isMobile ? EdgeInsets.zero : const EdgeInsets.all(8),
-                                constraints: isMobile ? const BoxConstraints(minWidth: 36, minHeight: 36) : null,
+                                constraints: isMobile ? const BoxConstraints(minWidth: 28, minHeight: 28) : null,
                                 onPressed: () => ref.read(themeProvider.notifier).toggleTheme(),
                                 icon: Icon(
                                   isDark ? Icons.light_mode_rounded : Icons.dark_mode_rounded,
                                   color: isDark ? AppTheme.warning : AppTheme.primary,
-                                  size: isMobile ? 20 : 22,
+                                  size: isMobile ? 18 : 22,
                                 ),
                               ),
-                              const SizedBox(width: 8),
+                              SizedBox(width: isMobile ? 4 : 8),
 
                               // Login / Dashboard CTA
                               if (user != null && user.role == 'super_admin')
@@ -1068,10 +1082,18 @@ class _WebLandingScreenState extends ConsumerState<WebLandingScreen> {
                     ],
                   ),
                 ),
-              ),
+              );
+
+        if (blurSigma > 0.01) {
+          navContent = ClipRect(
+            child: BackdropFilter(
+              filter: ImageFilter.blur(sigmaX: blurSigma, sigmaY: blurSigma),
+              child: navContent,
             ),
-          ),
-        );
+          );
+        }
+
+        return RepaintBoundary(child: navContent);
       },
     );
   }
@@ -1299,14 +1321,14 @@ class _WebLandingScreenState extends ConsumerState<WebLandingScreen> {
   Widget _buildSignInButton(BuildContext context, bool isDark, {bool isMobile = false}) {
     return ElevatedButton.icon(
       onPressed: () => _navigateToLogin(context),
-      icon: Icon(Icons.login_rounded, size: isMobile ? 15 : 18, color: Colors.black),
+      icon: Icon(Icons.login_rounded, size: isMobile ? 14 : 18, color: Colors.black),
       label: Text(
         'Sign In',
         style: TextStyle(
           color: Colors.black,
           fontWeight: FontWeight.w800,
-          fontSize: isMobile ? 13 : 14,
-          letterSpacing: 0.3,
+          fontSize: isMobile ? 12 : 14,
+          letterSpacing: 0.2,
         ),
       ),
       style: ElevatedButton.styleFrom(
@@ -1314,8 +1336,8 @@ class _WebLandingScreenState extends ConsumerState<WebLandingScreen> {
         foregroundColor: Colors.black,
         elevation: 3,
         shadowColor: AppTheme.primary.withValues(alpha: 0.45),
-        minimumSize: Size(0, isMobile ? 38 : 42),
-        padding: EdgeInsets.symmetric(horizontal: isMobile ? 14 : 20),
+        minimumSize: Size(0, isMobile ? 32 : 42),
+        padding: EdgeInsets.symmetric(horizontal: isMobile ? 6 : 20),
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
       ),
     );

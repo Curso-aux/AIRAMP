@@ -11,23 +11,35 @@ service cloud.firestore {
       return isAuthenticated() && request.auth.uid == userId;
     }
 
+    function isSuperAdmin() {
+      return isAuthenticated() && (
+        request.auth.token.email == 'evangelistachristian88@gmail.com' ||
+        request.auth.token.role == 'super_admin'
+      );
+    }
+
+    function isAdmin() {
+      return isSuperAdmin() || (isAuthenticated() && request.auth.token.role == 'admin');
+    }
+
     // ── USERS COLLECTION ──────────────────────────────────────
     match /users/{userId} {
-      // Allow reading user documents for authenticated users or for login verification queries
+      // Allow reading user documents for authenticated users or for login queries
       allow read: if true;
       
       // Allow user creation on signup with required fields
       allow create: if request.resource.data.keys().hasAll(['email', 'role', 'full_name'])
                     && request.resource.data.role in ['student', 'teacher', 'admin', 'super_admin'];
                     
-      // Allow updating own user profile or faculty updating student records
+      // Allow updating own user profile, or admin updating records
       allow update: if isAuthenticated() && (
         request.auth.uid == userId ||
-        request.auth.token.role in ['admin', 'teacher']
-      ) || true; // Permissive for custom salted hash auth migration
+        isAdmin() ||
+        request.auth.token.role == 'teacher'
+      );
       
-      // Allow admin / migration deletion of user records
-      allow delete: if true;
+      // Allow admin / super admin deletion of user records
+      allow delete: if isAdmin();
     }
 
     // ── SECTIONS & SUBJECTS ──────────────────────────────────
@@ -59,12 +71,13 @@ service cloud.firestore {
     }
 
     match /quiz_attempts/{attemptId} {
-      allow read, write: if true;
+      allow read: if true;
+      allow write: if isAuthenticated();
     }
 
     // ── SUBMISSIONS & ASSIGNMENTS ─────────────────────────────
     match /submissions/{submissionId} {
-      allow read, write: if true;
+      allow read, write: if isAuthenticated();
     }
 
     // ── FLASHCARDS & GIZMOS ───────────────────────────────────
@@ -75,30 +88,30 @@ service cloud.firestore {
 
     // ── NOTIFICATIONS ─────────────────────────────────────────
     match /notifications/{notificationId} {
-      allow read, write: if true;
+      allow read, write: if isAuthenticated();
     }
 
     // ── CHAT CONVERSATIONS & MESSAGES ─────────────────────────
     match /conversations/{conversationId} {
-      allow read, write: if true;
+      allow read, write: if isAuthenticated();
       
       match /messages/{messageId} {
-        allow read, write: if true;
+        allow read, write: if isAuthenticated();
       }
     }
 
     // ── MAIL & EMAIL DISPATCH AUDIT ──────────────────────────
     match /mail/{mailId} {
-      allow read, write: if true;
+      allow read, write: if isAuthenticated();
     }
 
     // ── SECURITY & PASSWORD OTPS ──────────────────────────────
     match /security_otps/{otpId} {
-      allow read, write: if true;
+      allow read, write: if isAuthenticated();
     }
 
     match /password_otps/{otpId} {
-      allow read, write: if true;
+      allow read, write: if true; // required for unauthenticated forgot password flow
     }
 
     // ── DEFAULT FALLBACK ──────────────────────────────────────

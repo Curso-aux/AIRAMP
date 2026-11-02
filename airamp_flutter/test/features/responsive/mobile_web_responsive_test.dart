@@ -31,13 +31,20 @@ class _TestAnalyticsNotifier extends AdminAnalyticsNotifier {
   }
 
   @override
-  Future<void> loadAnalytics({AnalyticsFilter? filter}) async {}
+  Future<void> loadAnalytics({
+    AnalyticsFilter? filter,
+    bool syncCloud = false,
+  }) async {}
 }
 
 class _TestSubjectsNotifier extends SubjectsNotifier {
   @override
   List<Map<String, dynamic>> build() => [
-    {'id': 1, 'name': 'Computer Systems Servicing', 'subject_code': 'CSS-NC-II'},
+    {
+      'id': 1,
+      'name': 'Computer Systems Servicing',
+      'subject_code': 'CSS-NC-II',
+    },
   ];
 }
 
@@ -50,111 +57,114 @@ class _TestSectionsNotifier extends SectionsNotifier {
 
 void main() {
   group('Mobile Web Responsiveness Tests (iOS & Android)', () {
-    testWidgets('WebLandingScreen renders cleanly on Android viewport (360x740) without overflow', (tester) async {
-      tester.view.physicalSize = const Size(360, 740);
-      tester.view.devicePixelRatio = 1.0;
-      addTearDown(() => tester.view.resetPhysicalSize());
+    testWidgets(
+      'WebLandingScreen renders cleanly on Android viewport (360x740) without overflow',
+      (tester) async {
+        tester.view.physicalSize = const Size(360, 740);
+        tester.view.devicePixelRatio = 1.0;
+        addTearDown(() => tester.view.resetPhysicalSize());
 
-      await tester.pumpWidget(
-        const ProviderScope(
-          child: MaterialApp(
-            home: WebLandingScreen(),
+        await tester.pumpWidget(
+          const ProviderScope(child: MaterialApp(home: WebLandingScreen())),
+        );
+
+        await tester.pumpAndSettle();
+
+        expect(find.text('AIRA'), findsOneWidget);
+        expect(find.text('PORTAL'), findsOneWidget);
+        expect(tester.takeException(), isNull);
+      },
+    );
+
+    testWidgets(
+      'WebLandingScreen renders cleanly on iPhone viewport (390x844) without overflow',
+      (tester) async {
+        tester.view.physicalSize = const Size(390, 844);
+        tester.view.devicePixelRatio = 1.0;
+        addTearDown(() => tester.view.resetPhysicalSize());
+
+        await tester.pumpWidget(
+          const ProviderScope(child: MaterialApp(home: WebLandingScreen())),
+        );
+
+        await tester.pumpAndSettle();
+
+        expect(find.text('AIRA'), findsOneWidget);
+        expect(find.text('PORTAL'), findsOneWidget);
+        expect(tester.takeException(), isNull);
+      },
+    );
+
+    testWidgets(
+      'AdminWebLoginScreen renders cleanly on Android viewport (360x740) without overflow',
+      (tester) async {
+        tester.view.physicalSize = const Size(360, 740);
+        tester.view.devicePixelRatio = 1.0;
+        addTearDown(() => tester.view.resetPhysicalSize());
+
+        await tester.pumpWidget(
+          const ProviderScope(
+            child: MaterialApp(home: AdminWebLoginScreen(initialRole: 'admin')),
           ),
-        ),
-      );
+        );
 
-      await tester.pumpAndSettle();
+        await tester.pumpAndSettle();
 
-      expect(find.text('AIRA'), findsOneWidget);
-      expect(find.text('PORTAL'), findsOneWidget);
-      expect(tester.takeException(), isNull);
-    });
+        expect(find.text('AIRAMP Portal'), findsOneWidget);
+        expect(find.text('Sign In to Portal'), findsOneWidget);
+        expect(tester.takeException(), isNull);
+      },
+    );
 
-    testWidgets('WebLandingScreen renders cleanly on iPhone viewport (390x844) without overflow', (tester) async {
-      tester.view.physicalSize = const Size(390, 844);
-      tester.view.devicePixelRatio = 1.0;
-      addTearDown(() => tester.view.resetPhysicalSize());
+    testWidgets(
+      'AdminWebLoginScreen renders cleanly on iPhone viewport (390x844) without overflow',
+      (tester) async {
+        tester.view.physicalSize = const Size(390, 844);
+        tester.view.devicePixelRatio = 1.0;
+        addTearDown(() => tester.view.resetPhysicalSize());
 
-      await tester.pumpWidget(
-        const ProviderScope(
-          child: MaterialApp(
-            home: WebLandingScreen(),
+        await tester.pumpWidget(
+          const ProviderScope(
+            child: MaterialApp(home: AdminWebLoginScreen(initialRole: 'admin')),
           ),
-        ),
-      );
+        );
 
-      await tester.pumpAndSettle();
+        await tester.pumpAndSettle();
 
-      expect(find.text('AIRA'), findsOneWidget);
-      expect(find.text('PORTAL'), findsOneWidget);
-      expect(tester.takeException(), isNull);
-    });
+        expect(find.text('AIRAMP Portal'), findsOneWidget);
+        expect(find.text('Sign In to Portal'), findsOneWidget);
+        expect(tester.takeException(), isNull);
+      },
+    );
 
-    testWidgets('AdminWebLoginScreen renders cleanly on Android viewport (360x740) without overflow', (tester) async {
-      tester.view.physicalSize = const Size(360, 740);
-      tester.view.devicePixelRatio = 1.0;
-      addTearDown(() => tester.view.resetPhysicalSize());
+    testWidgets(
+      'AdminWebAnalyticsView renders cleanly on mobile screen (360x740) without overflow',
+      (tester) async {
+        tester.view.physicalSize = const Size(360, 740);
+        tester.view.devicePixelRatio = 1.0;
+        addTearDown(() => tester.view.resetPhysicalSize());
 
-      await tester.pumpWidget(
-        const ProviderScope(
-          child: MaterialApp(
-            home: AdminWebLoginScreen(initialRole: 'admin'),
-          ),
-        ),
-      );
-
-      await tester.pumpAndSettle();
-
-      expect(find.text('AIRAMP Portal'), findsOneWidget);
-      expect(find.text('Sign In to Portal'), findsOneWidget);
-      expect(tester.takeException(), isNull);
-    });
-
-    testWidgets('AdminWebLoginScreen renders cleanly on iPhone viewport (390x844) without overflow', (tester) async {
-      tester.view.physicalSize = const Size(390, 844);
-      tester.view.devicePixelRatio = 1.0;
-      addTearDown(() => tester.view.resetPhysicalSize());
-
-      await tester.pumpWidget(
-        const ProviderScope(
-          child: MaterialApp(
-            home: AdminWebLoginScreen(initialRole: 'admin'),
-          ),
-        ),
-      );
-
-      await tester.pumpAndSettle();
-
-      expect(find.text('AIRAMP Portal'), findsOneWidget);
-      expect(find.text('Sign In to Portal'), findsOneWidget);
-      expect(tester.takeException(), isNull);
-    });
-
-    testWidgets('AdminWebAnalyticsView renders cleanly on mobile screen (360x740) without overflow', (tester) async {
-      tester.view.physicalSize = const Size(360, 740);
-      tester.view.devicePixelRatio = 1.0;
-      addTearDown(() => tester.view.resetPhysicalSize());
-
-      await tester.pumpWidget(
-        ProviderScope(
-          overrides: [
-            adminAnalyticsProvider.overrideWith(() => _TestAnalyticsNotifier()),
-            subjectsProvider.overrideWith(() => _TestSubjectsNotifier()),
-            sectionsProvider.overrideWith(() => _TestSectionsNotifier()),
-          ],
-          child: const MaterialApp(
-            home: Scaffold(
-              body: AdminWebAnalyticsView(),
+        await tester.pumpWidget(
+          ProviderScope(
+            overrides: [
+              adminAnalyticsProvider.overrideWith(
+                () => _TestAnalyticsNotifier(),
+              ),
+              subjectsProvider.overrideWith(() => _TestSubjectsNotifier()),
+              sectionsProvider.overrideWith(() => _TestSectionsNotifier()),
+            ],
+            child: const MaterialApp(
+              home: Scaffold(body: AdminWebAnalyticsView()),
             ),
           ),
-        ),
-      );
+        );
 
-      await tester.pumpAndSettle();
+        await tester.pumpAndSettle();
 
-      expect(find.text('School Analytics & Operations'), findsOneWidget);
-      expect(find.text('Refresh Data'), findsOneWidget);
-      expect(tester.takeException(), isNull);
-    });
+        expect(find.text('School Analytics & Operations'), findsOneWidget);
+        expect(find.text('Refresh Data'), findsOneWidget);
+        expect(tester.takeException(), isNull);
+      },
+    );
   });
 }

@@ -465,7 +465,7 @@ class _TestAnalyticsNotifier extends AdminAnalyticsNotifier {
   }
 
   @override
-  Future<void> loadAnalytics({AnalyticsFilter? filter}) async {}
+  Future<void> loadAnalytics({AnalyticsFilter? filter, bool syncCloud = false}) async {}
 }
 
 class _TestSubjectsNotifier extends SubjectsNotifier {

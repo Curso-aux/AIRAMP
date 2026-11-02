@@ -243,7 +243,10 @@ void main() {
     testWidgets('4. Schedule agenda list view renders without RenderFlex overflow on narrow 360px viewport', (tester) async {
       tester.view.physicalSize = const Size(360, 640);
       tester.view.devicePixelRatio = 1.0;
-      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(() {
+        tester.view.resetPhysicalSize();
+        tester.view.resetDevicePixelRatio();
+      });
 
       FlutterErrorDetails? errorDetails;
       final originalOnError = FlutterError.onError;
@@ -288,6 +291,12 @@ void main() {
     });
 
     testWidgets('5. Teacher Dashboard renders persistent sticky header with profile on left, notifications on right, and without bulky name', (tester) async {
+      tester.view.physicalSize = const Size(390, 844);
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(() {
+        tester.view.resetPhysicalSize();
+        tester.view.resetDevicePixelRatio();
+      });
       await tester.pumpWidget(
         ProviderScope(
           overrides: [
@@ -337,6 +346,12 @@ void main() {
     });
 
     testWidgets('6. Teacher Dashboard renders Analytics button beside notification at top and tapping it opens Analytics Modal', (tester) async {
+      tester.view.physicalSize = const Size(390, 844);
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(() {
+        tester.view.resetPhysicalSize();
+        tester.view.resetDevicePixelRatio();
+      });
       await tester.pumpWidget(
         ProviderScope(
           overrides: [

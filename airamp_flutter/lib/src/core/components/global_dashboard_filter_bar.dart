@@ -63,17 +63,51 @@ class GlobalDashboardFilterBar extends ConsumerWidget {
     final effectiveSubject = selectedSubject ?? adminFilter.subjectName ?? 'All Subjects';
     final effectiveSection = selectedSection ?? adminFilter.section ?? 'All Sections';
 
-    // Build subject options
+    // Build cascaded subject options based on effectiveGrade
+    final Iterable<Map<String, dynamic>> filteredSubjects = subjectsAsync.where((s) {
+      if (effectiveGrade == 'All Levels') return true;
+      final subGrade = (s['grade'] as String? ?? s['grade_level'] as String? ?? '').toLowerCase();
+      final gradeLower = effectiveGrade.toLowerCase();
+      if (gradeLower.contains('senior high') || gradeLower.contains('grade 11-12')) {
+        return subGrade.contains('11') || subGrade.contains('12') || subGrade.isEmpty;
+      }
+      if (gradeLower.contains('junior high') || gradeLower.contains('grade 7-10')) {
+        return subGrade.contains('7') || subGrade.contains('8') || subGrade.contains('9') || subGrade.contains('10') || subGrade.isEmpty;
+      }
+      if (gradeLower.contains('stem')) return subGrade.contains('stem') || subGrade.isEmpty;
+      if (gradeLower.contains('abm')) return subGrade.contains('abm') || subGrade.isEmpty;
+      if (gradeLower.contains('humss')) return subGrade.contains('humss') || subGrade.isEmpty;
+      if (gradeLower.contains('tvl')) return subGrade.contains('tvl') || subGrade.isEmpty;
+      return true;
+    });
+
     final List<String> subjectOptions = customSubjects ?? [
       'All Subjects',
-      ...subjectsAsync.map((s) => (s['name'] as String?) ?? (s['title'] as String?) ?? '').where((s) => s.isNotEmpty),
+      ...filteredSubjects.map((s) => (s['name'] as String?) ?? (s['title'] as String?) ?? '').where((s) => s.isNotEmpty),
     ];
     if (!subjectOptions.contains('All Subjects')) subjectOptions.insert(0, 'All Subjects');
 
-    // Build section options
+    // Build cascaded section options based on effectiveGrade
+    final Iterable<Map<String, dynamic>> filteredSections = sectionsAsync.where((sec) {
+      if (effectiveGrade == 'All Levels') return true;
+      final secGrade = (sec['grade'] as String? ?? sec['grade_level'] as String? ?? sec['name'] as String? ?? '').toLowerCase();
+      final gradeLower = effectiveGrade.toLowerCase();
+      if (gradeLower.contains('senior high') || gradeLower.contains('grade 11-12')) {
+        return secGrade.contains('11') || secGrade.contains('12');
+      }
+      if (gradeLower.contains('junior high') || gradeLower.contains('grade 7-10')) {
+        return secGrade.contains('7') || secGrade.contains('8') || secGrade.contains('9') || secGrade.contains('10');
+      }
+      if (gradeLower.contains('stem')) return secGrade.contains('stem');
+      if (gradeLower.contains('abm')) return secGrade.contains('abm');
+      if (gradeLower.contains('humss')) return secGrade.contains('humss');
+      if (gradeLower.contains('tvl')) return secGrade.contains('tvl');
+      return true;
+    });
+
     final List<String> sectionOptions = customSections ?? [
       'All Sections',
-      ...sectionsAsync.map((s) => (s['name'] as String?) ?? '').where((s) => s.isNotEmpty),
+      ...filteredSections.map((s) => (s['name'] as String?) ?? '').where((s) => s.isNotEmpty),
     ];
     if (!sectionOptions.contains('All Sections')) sectionOptions.insert(0, 'All Sections');
 
@@ -248,7 +282,12 @@ class GlobalDashboardFilterBar extends ConsumerWidget {
                       if (val == 'All Subjects') {
                         ref.read(analyticsFilterProvider.notifier).updateSubject(null, null);
                       } else {
-                        ref.read(analyticsFilterProvider.notifier).updateSubject(null, val);
+                        final match = subjectsAsync.firstWhere(
+                          (s) => ((s['name'] as String?) ?? (s['title'] as String?) ?? '') == val,
+                          orElse: () => <String, dynamic>{},
+                        );
+                        final subId = match['id'] as int?;
+                        ref.read(analyticsFilterProvider.notifier).updateSubject(subId, val);
                       }
                     }
                   }

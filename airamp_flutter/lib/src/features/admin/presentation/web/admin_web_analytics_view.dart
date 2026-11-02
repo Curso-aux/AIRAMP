@@ -53,7 +53,7 @@ class AdminWebAnalyticsView extends ConsumerWidget {
       backgroundColor: isDark ? AppTheme.darkBackground : const Color(0xFFF8FAFC),
       body: RefreshIndicator(
         onRefresh: () async {
-          await ref.read(adminAnalyticsProvider.notifier).loadAnalytics();
+          await ref.read(adminAnalyticsProvider.notifier).loadAnalytics(syncCloud: true);
         },
         child: SingleChildScrollView(
           physics: const AlwaysScrollableScrollPhysics(),
@@ -90,7 +90,7 @@ class AdminWebAnalyticsView extends ConsumerWidget {
                   );
 
                   final refreshBtn = OutlinedButton.icon(
-                    onPressed: () => ref.read(adminAnalyticsProvider.notifier).loadAnalytics(),
+                    onPressed: () => ref.read(adminAnalyticsProvider.notifier).loadAnalytics(syncCloud: true),
                     icon: Icon(Icons.refresh, size: 16, color: isDark ? AppTheme.darkPrimary : AppTheme.lightPrimary),
                     label: Text(
                       'Refresh Data',
@@ -329,7 +329,7 @@ class AdminWebAnalyticsView extends ConsumerWidget {
                         children: [
                           Expanded(
                             flex: 6,
-                            child: _buildSubjectEnrollmentsCard(subjectEnrollments, totalEnrollments, isDark),
+                            child: _buildSubjectEnrollmentsCard(subjectEnrollments, totalEnrollments, context, isDark),
                           ),
                           const SizedBox(width: 20),
                           Expanded(
@@ -342,7 +342,7 @@ class AdminWebAnalyticsView extends ConsumerWidget {
 
                     return Column(
                       children: [
-                        _buildSubjectEnrollmentsCard(subjectEnrollments, totalEnrollments, isDark),
+                        _buildSubjectEnrollmentsCard(subjectEnrollments, totalEnrollments, context, isDark),
                         const SizedBox(height: 20),
                         _buildSectionDistributionCard(sectionDistribution, context, isDark),
                       ],
@@ -710,7 +710,7 @@ class AdminWebAnalyticsView extends ConsumerWidget {
                     ),
                   ),
                   InkWell(
-                    onTap: () => context.go('/admin/students'),
+                    onTap: () => context.go('/admin/students?filter=unassigned'),
                     child: Text(
                       'Assign Section',
                       style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: AppTheme.warning, decoration: TextDecoration.underline),
@@ -792,7 +792,7 @@ class AdminWebAnalyticsView extends ConsumerWidget {
   }
 
   // ── Course Academic & Enrollment Registry ───────────────────────────
-  Widget _buildSubjectEnrollmentsCard(List<Map<String, dynamic>> list, int totalEnrollments, bool isDark) {
+  Widget _buildSubjectEnrollmentsCard(List<Map<String, dynamic>> list, int totalEnrollments, BuildContext context, bool isDark) {
     return Container(
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
@@ -834,11 +834,14 @@ class AdminWebAnalyticsView extends ConsumerWidget {
                 ),
               ),
               const SizedBox(width: 8),
-              Text(
-                '$totalEnrollments total enrollments',
-                style: TextStyle(
-                  fontSize: 12,
-                  color: isDark ? AppTheme.darkTextSecondary : AppTheme.lightTextSecondary,
+              TextButton(
+                onPressed: () => context.go('/admin/subjects'),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text('Manage', style: TextStyle(fontSize: 12, color: AppTheme.primary, fontWeight: FontWeight.w600)),
+                    Icon(Icons.chevron_right, size: 16, color: AppTheme.primary),
+                  ],
                 ),
               ),
             ],
@@ -871,70 +874,86 @@ class AdminWebAnalyticsView extends ConsumerWidget {
                         ? AppTheme.success
                         : (subPassRate >= 50 ? AppTheme.warning : AppTheme.error);
 
-                return Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                return InkWell(
+                  onTap: () {
+                    final subId = sub['id'];
+                    if (subId != null) {
+                      context.go('/admin/subjects/$subId');
+                    } else {
+                      context.go('/admin/subjects');
+                    }
+                  },
+                  borderRadius: BorderRadius.circular(8),
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 4, horizontal: 2),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Expanded(
-                          child: Row(
-                            children: [
-                              Container(
-                                padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
-                                decoration: BoxDecoration(
-                                  color: isDark ? AppTheme.darkSurfaceLight : const Color(0xFFF1F5F9),
-                                  borderRadius: BorderRadius.circular(6),
-                                  border: Border.all(color: isDark ? AppTheme.darkBorder : AppTheme.lightBorder),
-                                ),
-                                child: Text(
-                                  sub['code'] as String? ?? 'CRS',
-                                  style: TextStyle(
-                                    fontSize: 11,
-                                    fontWeight: FontWeight.bold,
-                                    color: isDark ? AppTheme.darkText : AppTheme.lightText,
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            Expanded(
+                              child: Row(
+                                children: [
+                                  Container(
+                                    padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+                                    decoration: BoxDecoration(
+                                      color: isDark ? AppTheme.darkSurfaceLight : const Color(0xFFF1F5F9),
+                                      borderRadius: BorderRadius.circular(6),
+                                      border: Border.all(color: isDark ? AppTheme.darkBorder : AppTheme.lightBorder),
+                                    ),
+                                    child: Text(
+                                      sub['code'] as String? ?? 'CRS',
+                                      style: TextStyle(
+                                        fontSize: 11,
+                                        fontWeight: FontWeight.bold,
+                                        color: isDark ? AppTheme.darkText : AppTheme.lightText,
+                                      ),
+                                    ),
                                   ),
-                                ),
-                              ),
-                              const SizedBox(width: 8),
-                              Expanded(
-                                child: Text(
-                                  sub['name'] as String? ?? '',
-                                  style: TextStyle(
-                                    fontSize: 13,
-                                    fontWeight: FontWeight.w600,
-                                    color: isDark ? AppTheme.darkText : AppTheme.lightText,
+                                  const SizedBox(width: 8),
+                                  Expanded(
+                                    child: Text(
+                                      sub['name'] as String? ?? '',
+                                      style: TextStyle(
+                                        fontSize: 13,
+                                        fontWeight: FontWeight.w600,
+                                        color: isDark ? AppTheme.darkText : AppTheme.lightText,
+                                      ),
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                    ),
                                   ),
-                                  maxLines: 1,
-                                  overflow: TextOverflow.ellipsis,
-                                ),
+                                ],
                               ),
-                            ],
-                          ),
+                            ),
+                            const SizedBox(width: 8),
+                            Text(
+                              '$count students (${(percent * 100).toStringAsFixed(0)}%)'
+                              '${subAttempts > 0 ? ' · $subPassRate% Pass' : ''}',
+                              style: TextStyle(
+                                fontSize: 12,
+                                fontWeight: FontWeight.w600,
+                                color: isDark ? AppTheme.darkTextSecondary : AppTheme.lightTextSecondary,
+                              ),
+                            ),
+                            const SizedBox(width: 4),
+                            Icon(Icons.chevron_right, size: 14, color: isDark ? AppTheme.darkTextSecondary : AppTheme.lightTextSecondary),
+                          ],
                         ),
-                        const SizedBox(width: 8),
-                        Text(
-                          '$count students (${(percent * 100).toStringAsFixed(0)}%)'
-                          '${subAttempts > 0 ? ' · $subPassRate% Pass' : ''}',
-                          style: TextStyle(
-                            fontSize: 12,
-                            fontWeight: FontWeight.w600,
-                            color: isDark ? AppTheme.darkTextSecondary : AppTheme.lightTextSecondary,
+                        const SizedBox(height: 6),
+                        ClipRRect(
+                          borderRadius: BorderRadius.circular(4),
+                          child: LinearProgressIndicator(
+                            value: percent.clamp(0.04, 1.0),
+                            backgroundColor: isDark ? AppTheme.darkSurfaceLight : const Color(0xFFF1F5F9),
+                            valueColor: AlwaysStoppedAnimation<Color>(progressColor),
+                            minHeight: 6,
                           ),
                         ),
                       ],
                     ),
-                    const SizedBox(height: 6),
-                    ClipRRect(
-                      borderRadius: BorderRadius.circular(4),
-                      child: LinearProgressIndicator(
-                        value: percent.clamp(0.04, 1.0),
-                        backgroundColor: isDark ? AppTheme.darkSurfaceLight : const Color(0xFFF1F5F9),
-                        valueColor: AlwaysStoppedAnimation<Color>(progressColor),
-                        minHeight: 6,
-                      ),
-                    ),
-                  ],
+                  ),
                 );
               },
             ),
@@ -986,10 +1005,10 @@ class AdminWebAnalyticsView extends ConsumerWidget {
                 ),
               ),
               TextButton(
-                onPressed: () => context.go('/admin/students'),
+                onPressed: () => context.go('/admin/sections'),
                 child: Row(
                   children: [
-                    Text('Manage', style: TextStyle(fontSize: 12, color: AppTheme.primary, fontWeight: FontWeight.w600)),
+                    Text('Manage Sections', style: TextStyle(fontSize: 12, color: AppTheme.primary, fontWeight: FontWeight.w600)),
                     Icon(Icons.chevron_right, size: 16, color: AppTheme.primary),
                   ],
                 ),
@@ -1013,41 +1032,60 @@ class AdminWebAnalyticsView extends ConsumerWidget {
                 final count = sec['count'] as int? ?? 0;
                 final isUnassigned = sectionName.toLowerCase() == 'unassigned';
 
-                return Container(
-                  width: 140,
-                  padding: const EdgeInsets.all(12),
-                  decoration: BoxDecoration(
-                    color: isDark ? AppTheme.darkSurfaceLight : const Color(0xFFF8FAFC),
-                    borderRadius: BorderRadius.circular(8),
-                    border: Border.all(
-                      color: isUnassigned && count > 0
-                          ? AppTheme.warning.withValues(alpha: 0.5)
-                          : (isDark ? AppTheme.darkBorder : AppTheme.lightBorder),
+                return InkWell(
+                  onTap: () {
+                    if (isUnassigned) {
+                      context.go('/admin/students?filter=unassigned');
+                    } else {
+                      context.go('/admin/students?section=${Uri.encodeComponent(sectionName)}');
+                    }
+                  },
+                  borderRadius: BorderRadius.circular(8),
+                  child: Container(
+                    width: 140,
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: isDark ? AppTheme.darkSurfaceLight : const Color(0xFFF8FAFC),
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(
+                        color: isUnassigned && count > 0
+                            ? AppTheme.warning.withValues(alpha: 0.5)
+                            : (isDark ? AppTheme.darkBorder : AppTheme.lightBorder),
+                      ),
                     ),
-                  ),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        sectionName,
-                        style: TextStyle(
-                          fontSize: 12.5,
-                          fontWeight: FontWeight.bold,
-                          color: isUnassigned && count > 0 ? AppTheme.warning : (isDark ? AppTheme.darkText : AppTheme.lightText),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          sectionName,
+                          style: TextStyle(
+                            fontSize: 12.5,
+                            fontWeight: FontWeight.bold,
+                            color: isUnassigned && count > 0 ? AppTheme.warning : (isDark ? AppTheme.darkText : AppTheme.lightText),
+                          ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
                         ),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                      const SizedBox(height: 4),
-                      Text(
-                        '$count Students',
-                        style: TextStyle(
-                          fontSize: 12,
-                          color: isUnassigned && count > 0 ? AppTheme.warning : AppTheme.primary,
-                          fontWeight: FontWeight.w600,
+                        const SizedBox(height: 4),
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            Expanded(
+                              child: Text(
+                                '$count Students',
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  color: isUnassigned && count > 0 ? AppTheme.warning : AppTheme.primary,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ),
+                            Icon(Icons.chevron_right, size: 13, color: isDark ? AppTheme.darkTextMuted : AppTheme.lightTextMuted),
+                          ],
                         ),
-                      ),
-                    ],
+                      ],
+                    ),
                   ),
                 );
               }).toList(),

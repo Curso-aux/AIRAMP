@@ -181,6 +181,20 @@ void main() {
       await tester.tap(find.text('Cancel'));
       await tester.pump(const Duration(milliseconds: 100));
 
+      // Re-open dialog and click Delete Student to test full deletion toast flow
+      await tester.ensureVisible(deleteButtons.first);
+      await tester.tap(deleteButtons.first);
+      await tester.pump(const Duration(milliseconds: 100));
+
+      expect(find.text('Delete Student Record'), findsOneWidget);
+      await tester.tap(find.text('Delete Student'));
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 200));
+
+      // Verify the toast is showing!
+      expect(find.text('Student record deleted'), findsOneWidget);
+      expect(find.text('Okay'), findsOneWidget);
+
       // Fast-forward past sqflite internal warning timer
       await tester.pump(const Duration(seconds: 12));
     });

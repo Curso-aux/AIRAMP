@@ -102,6 +102,9 @@ class _AdminWebScaffoldState extends ConsumerState<AdminWebScaffold> {
     if (currentIndex >= 0 && currentIndex < _navItems.length) {
       return _navItems[currentIndex].label;
     }
+    if (currentIndex == 9) {
+      return 'Admin Profile & Settings';
+    }
     return 'Admin Management';
   }
 
@@ -436,33 +439,49 @@ class _AdminWebScaffoldState extends ConsumerState<AdminWebScaffold> {
             const SizedBox(width: 12),
           ],
 
-          // Role Badge
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-            decoration: BoxDecoration(
-              color: isDark ? AppTheme.darkSurfaceLight : const Color(0xFFF1F5F9),
+          // Role & Profile Badge (Clickable to jump to /admin/profile)
+          Tooltip(
+            message: 'View & Edit Profile (${currentUser?.fullName ?? "Admin"})',
+            child: InkWell(
+              onTap: () => context.go('/admin/profile'),
               borderRadius: BorderRadius.circular(8),
-              border: Border.all(color: isDark ? AppTheme.darkBorder : AppTheme.lightBorder),
-            ),
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Icon(
-                  Icons.admin_panel_settings_outlined,
-                  size: 14,
-                  color: isDark ? AppTheme.darkTextSecondary : AppTheme.lightTextSecondary,
-                ),
-                const SizedBox(width: 6),
-                Text(
-                  currentUser?.role == 'super_admin' ? 'SUPER ADMIN' : 'ADMINISTRATOR',
-                  style: TextStyle(
-                    fontSize: 11.5,
-                    fontWeight: FontWeight.w600,
-                    letterSpacing: 0.6,
-                    color: isDark ? AppTheme.darkText : AppTheme.lightText,
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                decoration: BoxDecoration(
+                  color: isDark ? AppTheme.darkSurfaceLight : const Color(0xFFF1F5F9),
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(
+                    color: widget.navigationShell.currentIndex == 9
+                        ? AppTheme.primary
+                        : (isDark ? AppTheme.darkBorder : AppTheme.lightBorder),
+                    width: widget.navigationShell.currentIndex == 9 ? 1.5 : 1.0,
                   ),
                 ),
-              ],
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    UserAvatarWidget(
+                      imageSource: currentUser?.profileImage,
+                      fallbackInitial: (currentUser?.fullName.isNotEmpty == true) ? currentUser!.fullName[0].toUpperCase() : 'A',
+                      size: 18,
+                      backgroundColor: AppTheme.primarySoft,
+                      textColor: AppTheme.primary,
+                    ),
+                    const SizedBox(width: 8),
+                    Text(
+                      currentUser?.role == 'super_admin' ? 'SUPER ADMIN' : 'ADMINISTRATOR',
+                      style: TextStyle(
+                        fontSize: 11.5,
+                        fontWeight: FontWeight.w600,
+                        letterSpacing: 0.6,
+                        color: widget.navigationShell.currentIndex == 9
+                            ? AppTheme.primary
+                            : (isDark ? AppTheme.darkText : AppTheme.lightText),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
             ),
           ),
         ],
@@ -774,51 +793,83 @@ class _AdminWebScaffoldState extends ConsumerState<AdminWebScaffold> {
                         child: Column(
                           mainAxisSize: MainAxisSize.min,
                           children: [
-                            // User Profile Section
-                            Container(
-                              height: 44,
-                              padding: const EdgeInsets.symmetric(horizontal: 4),
-                              child: Row(
-                                children: [
-                                  SizedBox(
-                                    width: 48,
-                                    child: Center(
-                                      child: UserAvatarWidget(
-                                        imageSource: currentUser?.profileImage,
-                                        fallbackInitial: currentUser?.fullName.isNotEmpty == true ? currentUser!.fullName[0].toUpperCase() : 'A',
-                                        size: 36,
-                                        backgroundColor: AppTheme.primarySoft,
-                                        textColor: AppTheme.primary,
-                                      ),
+                            // User Profile Section (Clickable to /admin/profile)
+                            Tooltip(
+                              message: isCollapsed ? 'Profile & Settings (${currentUser?.fullName ?? "Admin"})' : 'Click to view & edit profile',
+                              child: InkWell(
+                                onTap: () {
+                                  if (isDrawer) Navigator.pop(context);
+                                  context.go('/admin/profile');
+                                },
+                                borderRadius: BorderRadius.circular(10),
+                                child: Container(
+                                  height: 48,
+                                  padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 4),
+                                  decoration: BoxDecoration(
+                                    color: activeIndex == 9
+                                        ? (isDark ? AppTheme.darkSurfaceLight : const Color(0xFFF1F5F9))
+                                        : Colors.transparent,
+                                    borderRadius: BorderRadius.circular(10),
+                                    border: Border.all(
+                                      color: activeIndex == 9
+                                          ? (isDark ? AppTheme.darkBorder : const Color(0xFFE2E8F0))
+                                          : Colors.transparent,
                                     ),
                                   ),
-                                  Expanded(
-                                    child: Opacity(
-                                      opacity: isCollapsed ? 0.0 : 1.0,
-                                      child: Padding(
-                                        padding: const EdgeInsets.only(left: 8),
-                                        child: Column(
-                                          mainAxisAlignment: MainAxisAlignment.center,
-                                          crossAxisAlignment: CrossAxisAlignment.start,
-                                          children: [
-                                            Text(
-                                              currentUser?.fullName ?? 'Administrator',
-                                              style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: AppTheme.text),
-                                              maxLines: 1,
-                                              overflow: TextOverflow.ellipsis,
-                                            ),
-                                            Text(
-                                              currentUser?.email ?? 'admin@airamp.edu',
-                                              style: TextStyle(fontSize: 11, color: AppTheme.textMuted),
-                                              maxLines: 1,
-                                              overflow: TextOverflow.ellipsis,
-                                            ),
-                                          ],
+                                  child: Row(
+                                    children: [
+                                      SizedBox(
+                                        width: 48,
+                                        child: Center(
+                                          child: UserAvatarWidget(
+                                            imageSource: currentUser?.profileImage,
+                                            fallbackInitial: currentUser?.fullName.isNotEmpty == true ? currentUser!.fullName[0].toUpperCase() : 'A',
+                                            size: 36,
+                                            backgroundColor: AppTheme.primarySoft,
+                                            textColor: AppTheme.primary,
+                                          ),
                                         ),
                                       ),
-                                    ),
+                                      Expanded(
+                                        child: Opacity(
+                                          opacity: isCollapsed ? 0.0 : 1.0,
+                                          child: Padding(
+                                            padding: const EdgeInsets.only(left: 8),
+                                            child: Column(
+                                              mainAxisAlignment: MainAxisAlignment.center,
+                                              crossAxisAlignment: CrossAxisAlignment.start,
+                                              children: [
+                                                Row(
+                                                  children: [
+                                                    Expanded(
+                                                      child: Text(
+                                                        currentUser?.fullName ?? 'Administrator',
+                                                        style: TextStyle(
+                                                          fontSize: 13,
+                                                          fontWeight: FontWeight.bold,
+                                                          color: activeIndex == 9 ? AppTheme.primary : AppTheme.text,
+                                                        ),
+                                                        maxLines: 1,
+                                                        overflow: TextOverflow.ellipsis,
+                                                      ),
+                                                    ),
+                                                    Icon(Icons.edit_outlined, size: 13, color: activeIndex == 9 ? AppTheme.primary : AppTheme.textMuted),
+                                                  ],
+                                                ),
+                                                Text(
+                                                  currentUser?.email ?? 'admin@airamp.edu',
+                                                  style: TextStyle(fontSize: 11, color: AppTheme.textMuted),
+                                                  maxLines: 1,
+                                                  overflow: TextOverflow.ellipsis,
+                                                ),
+                                              ],
+                                            ),
+                                          ),
+                                        ),
+                                      ),
+                                    ],
                                   ),
-                                ],
+                                ),
                               ),
                             ),
                             const SizedBox(height: 10),

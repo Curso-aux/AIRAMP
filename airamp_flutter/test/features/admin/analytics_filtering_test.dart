@@ -53,7 +53,7 @@ class _MockAnalyticsNotifier extends AdminAnalyticsNotifier {
   }
 
   @override
-  Future<void> loadAnalytics({AnalyticsFilter? filter}) async {}
+  Future<void> loadAnalytics({AnalyticsFilter? filter, bool syncCloud = false}) async {}
 }
 
 void main() {

@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
+import '../../../../core/components/aira_action_toast.dart';
 import '../../../../core/components/user_avatar_widget.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../../core/theme/theme_provider.dart';
@@ -34,6 +36,41 @@ class _AdminWebStudentsScreenState extends ConsumerState<AdminWebStudentsScreen>
     'Grade 11',
     'Grade 12',
   ];
+
+  String? _lastProcessedQuery;
+
+  void _syncWithRouteParams() {
+    try {
+      final uri = GoRouterState.of(context).uri;
+      final currentQuery = uri.query;
+      if (currentQuery != _lastProcessedQuery) {
+        _lastProcessedQuery = currentQuery;
+        final filter = uri.queryParameters['filter'];
+        final section = uri.queryParameters['section'];
+        final grade = uri.queryParameters['grade'];
+
+        if (filter == 'unassigned') {
+          _isSpecialView = true;
+          _isAllDirectoryView = false;
+          _specialSubFilter = 'Unassigned';
+        } else if (filter == 'special') {
+          _isSpecialView = true;
+          _isAllDirectoryView = false;
+          _specialSubFilter = 'All';
+        } else if (filter == 'all') {
+          _isAllDirectoryView = true;
+          _isSpecialView = false;
+        }
+
+        if (grade != null && grade.isNotEmpty) {
+          _selectedGrade = grade;
+        }
+        if (section != null && section.isNotEmpty) {
+          _selectedSection = section;
+        }
+      }
+    } catch (_) {}
+  }
 
   @override
   void initState() {
@@ -203,6 +240,7 @@ class _AdminWebStudentsScreenState extends ConsumerState<AdminWebStudentsScreen>
 
   @override
   Widget build(BuildContext context) {
+    _syncWithRouteParams();
     ref.watch(themeProvider);
     final allStudents = ref.watch(adminStudentsProvider);
     final availableSectionsAsync = ref.watch(availableSectionsProvider);
@@ -1669,6 +1707,7 @@ class _AdminWebStudentsScreenState extends ConsumerState<AdminWebStudentsScreen>
   }
 
   void _confirmDeleteStudent(BuildContext context, Map<String, dynamic> student) {
+    final rootContext = context;
     final studentId = student['id'] as String? ?? '';
     final studentName = student['full_name'] as String? ?? 'Student';
     final studentEmail = student['email'] as String? ?? '';
@@ -1676,11 +1715,11 @@ class _AdminWebStudentsScreenState extends ConsumerState<AdminWebStudentsScreen>
     final studentSection = student['section'] as String? ?? 'Unassigned';
 
     showDialog(
-      context: context,
+      context: rootContext,
       builder: (dialogCtx) {
         bool isDeleting = false;
         return StatefulBuilder(
-          builder: (context, setDialogState) {
+          builder: (dialogStateCtx, setDialogState) {
             return AlertDialog(
               backgroundColor: AppTheme.surface,
               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
@@ -1785,21 +1824,21 @@ class _AdminWebStudentsScreenState extends ConsumerState<AdminWebStudentsScreen>
                     ),
                     const SizedBox(height: 14),
                     Container(
-                      padding: const EdgeInsets.all(10),
+                      padding: const EdgeInsets.all(12),
                       decoration: BoxDecoration(
-                        color: Colors.red.withValues(alpha: 0.08),
-                        borderRadius: BorderRadius.circular(8),
-                        border: Border.all(color: Colors.red.withValues(alpha: 0.25)),
+                        color: Colors.amber.withValues(alpha: 0.08),
+                        borderRadius: BorderRadius.circular(10),
+                        border: Border.all(color: Colors.amber.withValues(alpha: 0.28)),
                       ),
                       child: Row(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          const Icon(Icons.info_outline, size: 16, color: Colors.red),
-                          const SizedBox(width: 8),
+                          Icon(Icons.warning_amber_rounded, size: 18, color: Colors.amber.shade700),
+                          const SizedBox(width: 10),
                           Expanded(
                             child: Text(
                               'Warning: This action permanently deletes the student account from local and cloud databases. All subject enrollments, quiz scores, and submission records will be removed. This cannot be undone.',
-                              style: TextStyle(fontSize: 11.5, color: Colors.red.shade700, height: 1.35),
+                              style: TextStyle(fontSize: 12, color: AppTheme.textSecondary, height: 1.35),
                             ),
                           ),
                         ],
@@ -1823,29 +1862,23 @@ class _AdminWebStudentsScreenState extends ConsumerState<AdminWebStudentsScreen>
                                 .read(adminStudentsProvider.notifier)
                                 .deleteStudent(studentId)
                                 .timeout(const Duration(seconds: 8));
-                            if (context.mounted) {
+                            if (mounted) {
                               Navigator.of(dialogCtx).pop();
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                SnackBar(
-                                  content: Row(
-                                    children: [
-                                      const Icon(Icons.delete_sweep_rounded, color: Colors.white),
-                                      const SizedBox(width: 10),
-                                      Expanded(
-                                        child: Text('Student "$studentName" ($studentId) was permanently deleted.'),
-                                      ),
-                                    ],
-                                  ),
-                                  backgroundColor: Colors.red.shade700,
-                                  behavior: SnackBarBehavior.floating,
-                                ),
+                              AiraActionToast.showSuccess(
+                                rootContext,
+                                title: 'Student record deleted',
+                                message: 'Student "$studentName" ($studentId) was permanently removed. All course enrollments and records have been cleaned up.',
+                                duration: const Duration(seconds: 8),
                               );
                             }
                           } catch (e) {
                             setDialogState(() => isDeleting = false);
-                            if (context.mounted) {
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                SnackBar(content: Text('Failed to delete student: $e'), backgroundColor: Colors.red),
+                            if (mounted) {
+                              AiraActionToast.showError(
+                                rootContext,
+                                title: 'Failed to delete student',
+                                message: 'An unexpected error occurred while deleting "$studentName": $e',
+                                duration: const Duration(seconds: 8),
                               );
                             }
                           }

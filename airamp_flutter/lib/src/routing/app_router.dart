@@ -20,6 +20,7 @@ import '../features/admin/presentation/subjects_mgmt_screen.dart';
 import '../features/admin/presentation/subject_detail_screen.dart';
 import '../features/admin/presentation/sections_mgmt_screen.dart';
 import '../features/admin/presentation/scores_screen.dart';
+import '../features/admin/presentation/admin_profile_screen.dart';
 import '../features/super_admin/presentation/super_admin_portal_screen.dart';
 import '../features/admin/presentation/web/admin_web_scaffold.dart';
 import '../features/admin/presentation/web/admin_web_analytics_view.dart';
@@ -77,7 +78,9 @@ final routerProvider = Provider<GoRouter>((ref) {
 
   final initialAuth = ref.read(authProvider);
   final initialLoc = (initialAuth != null && initialAuth.mustChangePassword)
-      ? (initialAuth.role == 'teacher' ? '/teacher/profile' : '/student/profile')
+      ? ((initialAuth.role == 'admin' || initialAuth.role == 'super_admin')
+          ? '/admin/profile'
+          : (initialAuth.role == 'teacher' ? '/teacher/profile' : '/student/profile'))
       : (initialAuth != null && initialAuth.role == 'super_admin')
           ? '/super-admin'
           : (initialAuth != null && initialAuth.role == 'admin')
@@ -440,6 +443,17 @@ final routerProvider = Provider<GoRouter>((ref) {
               ),
             ],
           ),
+          StatefulShellBranch(
+            routes: [
+              GoRoute(
+                path: '/admin/profile',
+                pageBuilder: (context, state) => AppPageTransitions.page(
+                  key: state.pageKey,
+                  child: const AdminProfileScreen(),
+                ),
+              ),
+            ],
+          ),
         ],
       ),
       GoRoute(
@@ -552,7 +566,9 @@ final routerProvider = Provider<GoRouter>((ref) {
       // Mandatory First-Login Password Change Guard:
       // If user must change password, strictly lock navigation to only their profile page.
       if (isAuth && authState.mustChangePassword) {
-        final profilePath = authState.role == 'teacher' ? '/teacher/profile' : '/student/profile';
+        final profilePath = (authState.role == 'admin' || authState.role == 'super_admin')
+            ? '/admin/profile'
+            : (authState.role == 'teacher' ? '/teacher/profile' : '/student/profile');
         if (matched != profilePath) {
           return profilePath;
         }
