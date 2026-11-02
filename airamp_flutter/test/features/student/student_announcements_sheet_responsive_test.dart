@@ -60,7 +60,7 @@ void main() {
     await tester.tap(find.text('Announcements'));
     await tester.pumpAndSettle();
 
-    expect(find.text('HIGH'), findsOneWidget);
+    expect(find.text('URGENT'), findsOneWidget);
 
     // If an overflow occurs, tester.takeException() returns a FlutterError
     expect(tester.takeException(), isNull);

@@ -17,6 +17,7 @@ class HalftoneBackground extends StatefulWidget {
   final Duration transitionDuration;
   final bool enableBottomFade;
   final double bottomFadeStart;
+  final ScrollController? scrollController;
   static bool enableAnimation = true;
 
   const HalftoneBackground({
@@ -28,6 +29,7 @@ class HalftoneBackground extends StatefulWidget {
     this.transitionDuration = const Duration(milliseconds: 1800),
     this.enableBottomFade = false,
     this.bottomFadeStart = 0.82,
+    this.scrollController,
   });
 
   @override
@@ -215,7 +217,7 @@ class _HalftoneBackgroundState extends State<HalftoneBackground>
             ),
           ),
 
-          // 2. Dynamic transitioning academic photos with subtle Ken Burns motion
+          // 2. Dynamic transitioning academic photos
           Positioned.fill(
             child: Opacity(
               opacity: isDark ? 0.18 : widget.opacity,
@@ -230,17 +232,19 @@ class _HalftoneBackgroundState extends State<HalftoneBackground>
 
           // 3. Animated monochrome halftone screen layer (dots/pixels rippling & gliding)
           Positioned.fill(
-            child: AnimatedBuilder(
-              animation: Listenable.merge([_halftoneController, _mouseNotifier]),
-              builder: (context, _) {
-                return CustomPaint(
-                  painter: AnimatedHalftoneScreenPainter(
-                    progress: _halftoneController.value,
-                    mousePos: _mouseNotifier.value,
-                    isDark: isDark,
-                  ),
-                );
-              },
+            child: RepaintBoundary(
+              child: AnimatedBuilder(
+                animation: Listenable.merge([_halftoneController, _mouseNotifier]),
+                builder: (context, _) {
+                  return CustomPaint(
+                    painter: AnimatedHalftoneScreenPainter(
+                      progress: _halftoneController.value,
+                      mousePos: _mouseNotifier.value,
+                      isDark: isDark,
+                    ),
+                  );
+                },
+              ),
             ),
           ),
 
@@ -263,6 +267,36 @@ class _HalftoneBackgroundState extends State<HalftoneBackground>
                           Colors.transparent,
                         ],
                   stops: const [0.0, 0.55, 1.0],
+                ),
+              ),
+            ),
+          ),
+
+          // 4b. Atmospheric top scrim: ensures top navigation & status elements are always 100% legible
+          Positioned(
+            top: 0,
+            left: 0,
+            right: 0,
+            height: 160,
+            child: IgnorePointer(
+              child: Container(
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    begin: Alignment.topCenter,
+                    end: Alignment.bottomCenter,
+                    colors: isDark
+                        ? [
+                            AppTheme.darkBackground.withValues(alpha: 0.70),
+                            AppTheme.darkBackground.withValues(alpha: 0.30),
+                            Colors.transparent,
+                          ]
+                        : [
+                            AppTheme.lightBackground.withValues(alpha: 0.75),
+                            AppTheme.lightBackground.withValues(alpha: 0.35),
+                            Colors.transparent,
+                          ],
+                    stops: const [0.0, 0.45, 1.0],
+                  ),
                 ),
               ),
             ),

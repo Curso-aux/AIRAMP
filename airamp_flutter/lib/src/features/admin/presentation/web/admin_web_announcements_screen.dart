@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../../core/theme/theme_provider.dart';
 import '../../../../core/services/session_draft_service.dart';
+import '../../../../core/utils/announcement_helper.dart';
 import '../../../auth/application/auth_provider.dart';
 import '../../data/admin_repository.dart';
 
@@ -950,11 +951,10 @@ class _AdminWebAnnouncementsScreenState extends ConsumerState<AdminWebAnnounceme
         final title = a['title'] as String? ?? '';
         final message = a['message'] as String? ?? '';
         final priority = a['priority'] as String? ?? 'normal';
+        final priorityUpper = AnnouncementPriorityHelper.formatUpper(priority);
+        final priorityColor = AnnouncementPriorityHelper.getColor(priority);
         final audience = a['target_audience'] as String? ?? 'all';
         final date = _formatDate(a['created_at'] as String?);
-
-        final isHigh = priority.toLowerCase() == 'high';
-        final isMedium = priority.toLowerCase() == 'medium';
 
         return Container(
           padding: const EdgeInsets.all(20),
@@ -974,20 +974,15 @@ class _AdminWebAnnouncementsScreenState extends ConsumerState<AdminWebAnnounceme
                       Container(
                         padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                         decoration: BoxDecoration(
-                          color: (isHigh
-                                  ? AppTheme.error
-                                  : (isMedium ? AppTheme.warning : AppTheme.primary))
-                              .withValues(alpha: 0.15),
+                          color: priorityColor.withValues(alpha: 0.15),
                           borderRadius: BorderRadius.circular(6),
                         ),
                         child: Text(
-                          priority.toUpperCase(),
+                          priorityUpper,
                           style: TextStyle(
                             fontSize: 10,
                             fontWeight: FontWeight.bold,
-                            color: isHigh
-                                ? AppTheme.error
-                                : (isMedium ? AppTheme.warning : AppTheme.primary),
+                            color: priorityColor,
                           ),
                         ),
                       ),
@@ -1187,9 +1182,9 @@ class _AdminWebAnnouncementsScreenState extends ConsumerState<AdminWebAnnounceme
                                   contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
                                 ),
                                 items: const [
-                                  DropdownMenuItem(value: 'normal', child: Text('Normal')),
-                                  DropdownMenuItem(value: 'medium', child: Text('Medium')),
-                                  DropdownMenuItem(value: 'high', child: Text('High / Urgent')),
+                                  DropdownMenuItem(value: 'normal', child: Text('Standard')),
+                                  DropdownMenuItem(value: 'medium', child: Text('Important')),
+                                  DropdownMenuItem(value: 'high', child: Text('Urgent')),
                                 ],
                                 onChanged: (v) {
                                   if (v != null) {

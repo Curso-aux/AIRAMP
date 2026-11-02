@@ -5,6 +5,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../../../core/components/user_avatar_widget.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/theme/theme_provider.dart';
+import '../../../core/utils/announcement_helper.dart';
 import '../../../core/components/analytics_donut_chart.dart';
 import '../../auth/application/auth_provider.dart';
 import '../data/admin_repository.dart';
@@ -163,8 +164,10 @@ class _AdminDashboardScreenState extends ConsumerState<AdminDashboardScreen> {
                     color: Theme.of(context).colorScheme.surface,
                     borderRadius: BorderRadius.circular(12),
                     border: Border.all(
-                      color: a['priority'] == 'Important' ? AppTheme.error : AppTheme.border,
-                      width: a['priority'] == 'Important' ? 1.5 : 1.0,
+                      color: AnnouncementPriorityHelper.formatUpper(a['priority']?.toString()) != 'STANDARD'
+                          ? AnnouncementPriorityHelper.getColor(a['priority']?.toString())
+                          : AppTheme.border,
+                      width: AnnouncementPriorityHelper.formatUpper(a['priority']?.toString()) != 'STANDARD' ? 1.5 : 1.0,
                     ),
                   ),
                   child: Column(
@@ -183,16 +186,20 @@ class _AdminDashboardScreenState extends ConsumerState<AdminDashboardScreen> {
                               ),
                             ),
                           ),
-                          if (a['priority'] == 'Important')
+                          if (AnnouncementPriorityHelper.formatUpper(a['priority']?.toString()) != 'STANDARD')
                             Container(
                               padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                               decoration: BoxDecoration(
-                                color: AppTheme.errorSoft,
+                                color: AnnouncementPriorityHelper.getColor(a['priority']?.toString()).withValues(alpha: 0.12),
                                 borderRadius: BorderRadius.circular(8),
                               ),
                               child: Text(
-                                'Important',
-                                style: TextStyle(color: AppTheme.error, fontSize: 10, fontWeight: FontWeight.bold),
+                                AnnouncementPriorityHelper.formatTitle(a['priority']?.toString()),
+                                style: TextStyle(
+                                  color: AnnouncementPriorityHelper.getColor(a['priority']?.toString()),
+                                  fontSize: 10,
+                                  fontWeight: FontWeight.bold,
+                                ),
                               ),
                             ),
                           PopupMenuButton<String>(
@@ -1043,7 +1050,7 @@ class _PostAnnouncementSheet extends StatefulWidget {
 class _PostAnnouncementSheetState extends State<_PostAnnouncementSheet> {
   final _titleController = TextEditingController();
   final _messageController = TextEditingController();
-  String _priority = 'Normal';
+  String _priority = 'Standard';
   String _targetAudience = 'All My Students';
 
   @override
@@ -1052,12 +1059,12 @@ class _PostAnnouncementSheetState extends State<_PostAnnouncementSheet> {
     if (widget.initialAnnouncement != null) {
       _titleController.text = widget.initialAnnouncement!['title'];
       _messageController.text = widget.initialAnnouncement!['message'];
-      _priority = widget.initialAnnouncement!['priority'];
+      _priority = AnnouncementPriorityHelper.formatTitle(widget.initialAnnouncement!['priority']?.toString());
       _targetAudience = widget.initialAnnouncement!['target_audience'];
     }
   }
 
-  final List<String> _priorities = ['Normal', 'Important'];
+  final List<String> _priorities = ['Standard', 'Important', 'Urgent'];
   final List<Map<String, dynamic>> _audiences = [
     {'label': 'All My Students', 'icon': Icons.people_outline},
     {'label': 'By Grade Level', 'icon': Icons.public},
@@ -1151,7 +1158,7 @@ class _PostAnnouncementSheetState extends State<_PostAnnouncementSheet> {
                     widget.onPost({
                       'title': _titleController.text,
                       'message': _messageController.text,
-                      'priority': _priority,
+                      'priority': AnnouncementPriorityHelper.normalize(_priority),
                       'target_audience': _targetAudience,
                       'created_at': DateTime.now().toIso8601String(),
                     });

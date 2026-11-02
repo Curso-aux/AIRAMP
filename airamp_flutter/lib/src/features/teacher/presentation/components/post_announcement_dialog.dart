@@ -5,6 +5,7 @@ import '../../../../core/components/app_toast.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../../core/theme/theme_provider.dart';
 import '../../../../core/services/session_draft_service.dart';
+import '../../../../core/utils/announcement_helper.dart';
 import '../../data/teacher_repository.dart';
 
 class PostAnnouncementDialog extends ConsumerStatefulWidget {
@@ -61,10 +62,8 @@ class _PostAnnouncementDialogState extends ConsumerState<PostAnnouncementDialog>
       _draftDisposer.add(_messageController.bindSessionDraft(formId: _formId, fieldKey: 'message'));
     }
 
-    final extPriority = ext?['priority']?.toString().toLowerCase();
-    _selectedPriority = (extPriority == 'high' || extPriority == 'medium' || extPriority == 'normal')
-        ? extPriority!
-        : 'normal';
+    final extPriority = ext?['priority']?.toString();
+    _selectedPriority = AnnouncementPriorityHelper.normalize(extPriority);
 
     final extAudience = ext?['target_audience']?.toString().toLowerCase();
     _selectedAudience = (extAudience == 'all' || extAudience == 'students') ? extAudience! : 'students';

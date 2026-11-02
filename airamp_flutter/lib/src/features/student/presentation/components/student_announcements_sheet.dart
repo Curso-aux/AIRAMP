@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../../../core/theme/app_theme.dart';
+import '../../../../core/utils/announcement_helper.dart';
 import '../../../admin/data/admin_repository.dart';
 import '../../../auth/application/auth_provider.dart';
 import '../../../notifications/application/notification_provider.dart';
@@ -500,8 +501,10 @@ class _NotificationsAndAnnouncementsSheetState
       itemCount: announcements.length,
       itemBuilder: (context, i) {
         final a = announcements[i];
-        final priority = a['priority']?.toString() ?? 'medium';
-        final isHigh = priority.toLowerCase() == 'high';
+        final priority = a['priority']?.toString();
+        final priorityUpper = AnnouncementPriorityHelper.formatUpper(priority);
+        final priorityColor = AnnouncementPriorityHelper.getColor(priority);
+        final isHigh = priorityUpper == 'URGENT';
 
         return Container(
           margin: const EdgeInsets.only(bottom: 12),
@@ -509,7 +512,7 @@ class _NotificationsAndAnnouncementsSheetState
           decoration: BoxDecoration(
             color: AppTheme.background,
             borderRadius: BorderRadius.circular(12),
-            border: Border.all(color: isHigh ? AppTheme.warning : AppTheme.border),
+            border: Border.all(color: isHigh ? AppTheme.error : AppTheme.border),
           ),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -526,17 +529,15 @@ class _NotificationsAndAnnouncementsSheetState
                       Container(
                         padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                         decoration: BoxDecoration(
-                          color: isHigh
-                              ? AppTheme.warning.withValues(alpha: 0.2)
-                              : AppTheme.primary.withValues(alpha: 0.1),
+                          color: priorityColor.withValues(alpha: 0.12),
                           borderRadius: BorderRadius.circular(4),
                         ),
                         child: Text(
-                          priority.toUpperCase(),
+                          priorityUpper,
                           style: TextStyle(
                             fontSize: 10,
                             fontWeight: FontWeight.bold,
-                            color: isHigh ? AppTheme.warning : AppTheme.primary,
+                            color: priorityColor,
                           ),
                         ),
                       ),

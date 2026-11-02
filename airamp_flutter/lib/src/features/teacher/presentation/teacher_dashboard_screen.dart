@@ -11,6 +11,7 @@ import 'components/post_announcement_dialog.dart';
 import 'components/assignment_roster_dialog.dart';
 import 'components/class_overview_widget.dart';
 import '../../../core/database/database_helper.dart';
+import '../../../core/utils/announcement_helper.dart';
 import '../../../core/components/app_toast.dart';
 import '../../../core/components/empty_state.dart';
 import '../../../core/components/skeleton_loader.dart';
@@ -3478,18 +3479,14 @@ class _TeacherDashboardScreenState extends ConsumerState<TeacherDashboardScreen>
             final id = a['id'] as int? ?? 0;
             final title = a['title']?.toString() ?? '';
             final message = a['message']?.toString() ?? '';
-            final priority = (a['priority']?.toString() ?? 'normal').toLowerCase();
+            final priority = a['priority']?.toString();
+            final priorityUpper = AnnouncementPriorityHelper.formatUpper(priority);
+            final priorityColor = AnnouncementPriorityHelper.getColor(priority);
             final section = a['section']?.toString() ?? 'All Handled Sections';
             final authorId = a['author_id']?.toString() ?? '';
             final authorName = a['author_name']?.toString() ?? 'Faculty';
             final date = _formatDate(a['created_at']?.toString());
             final isAuthor = currentUser != null && (authorId == currentUser.id || authorId.isEmpty);
-
-            final isHigh = priority == 'high';
-            final isMedium = priority == 'medium';
-            final priorityColor = isHigh
-                ? AppTheme.error
-                : (isMedium ? AppTheme.warning : AppTheme.primary);
 
             return Container(
               margin: const EdgeInsets.only(bottom: 10),
@@ -3528,7 +3525,7 @@ class _TeacherDashboardScreenState extends ConsumerState<TeacherDashboardScreen>
                             ),
                             const SizedBox(width: 5),
                             Text(
-                              priority.toUpperCase(),
+                              priorityUpper,
                               style: TextStyle(
                                 fontSize: 9.5,
                                 fontWeight: FontWeight.bold,

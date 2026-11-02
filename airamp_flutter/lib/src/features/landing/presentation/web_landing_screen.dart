@@ -41,9 +41,9 @@ class _WebLandingScreenState extends ConsumerState<WebLandingScreen> {
 
   void _onScroll() {
     if (!_scrollController.hasClients) return;
-    final offset = _scrollController.offset;
-    final progress = (offset / 36.0).clamp(0.0, 1.0);
-    if ((progress - _scrollProgress.value).abs() > 0.005) {
+    final offset = math.max(0.0, _scrollController.offset);
+    final progress = (offset / 48.0).clamp(0.0, 1.0);
+    if ((progress - _scrollProgress.value).abs() > 0.003) {
       _scrollProgress.value = progress;
     }
     if (offset > 20) {
@@ -111,6 +111,7 @@ class _WebLandingScreenState extends ConsumerState<WebLandingScreen> {
       body: HalftoneBackground(
         opacity: isDark ? 0.20 : 0.40,
         enableBottomFade: false,
+        scrollController: _scrollController,
         child: Stack(
           children: [
             // ── Scrollable Body Content (flows under sticky navbar) ──
@@ -527,31 +528,68 @@ class _WebLandingScreenState extends ConsumerState<WebLandingScreen> {
             Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                // DepEd & Institutional Pill
+                // DepEd & Institutional Pill (High-contrast neutral frosted glass, eye-strain free)
                 Container(
-                  padding: EdgeInsets.symmetric(horizontal: isMobile ? 10 : 16, vertical: 8),
+                  padding: EdgeInsets.symmetric(
+                    horizontal: isMobile ? 12 : 16,
+                    vertical: isMobile ? 7 : 8,
+                  ),
                   decoration: BoxDecoration(
-                    color: AppTheme.primary.withValues(alpha: 0.12),
+                    color: isDark
+                        ? const Color(0xFF1E293B).withValues(alpha: 0.88)
+                        : Colors.white.withValues(alpha: 0.94),
                     borderRadius: BorderRadius.circular(30),
-                    border: Border.all(color: AppTheme.primary.withValues(alpha: 0.25)),
+                    border: Border.all(
+                      color: isDark
+                          ? Colors.white.withValues(alpha: 0.14)
+                          : const Color(0xFFCBD5E1),
+                      width: 1.1,
+                    ),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withValues(alpha: isDark ? 0.35 : 0.06),
+                        blurRadius: 12,
+                        offset: const Offset(0, 3),
+                      ),
+                    ],
                   ),
                   child: Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      Icon(Icons.verified_rounded, color: AppTheme.primary, size: 16),
+                      Icon(
+                        Icons.verified_rounded,
+                        color: isDark ? const Color(0xFF34D399) : const Color(0xFF0F766E),
+                        size: isMobile ? 15 : 17,
+                      ),
                       SizedBox(width: isMobile ? 6 : 8),
                       Flexible(
-                        child: Text(
-                          isMobile
-                              ? 'Institutional Learning Infrastructure'
-                              : 'Institutional Learning & Assessment Infrastructure • DepEd K-12 Aligned',
-                          style: TextStyle(
-                            color: AppTheme.primary,
-                            fontSize: isMobile ? 11 : 13,
-                            fontWeight: FontWeight.w700,
-                          ),
+                        child: RichText(
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
+                          text: TextSpan(
+                            style: TextStyle(
+                              fontSize: isMobile ? 11 : 13,
+                              letterSpacing: 0.2,
+                            ),
+                            children: [
+                              TextSpan(
+                                text: isMobile
+                                    ? 'Institutional Infrastructure'
+                                    : 'Institutional Learning & Assessment Infrastructure',
+                                style: TextStyle(
+                                  color: isDark ? const Color(0xFFF8FAFC) : const Color(0xFF0F172A),
+                                  fontWeight: FontWeight.w700,
+                                ),
+                              ),
+                              TextSpan(
+                                text: ' • DepEd K-12 Aligned',
+                                style: TextStyle(
+                                  color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B),
+                                  fontWeight: FontWeight.w500,
+                                ),
+                              ),
+                            ],
+                          ),
                         ),
                       ),
                     ],
@@ -793,39 +831,66 @@ class _WebLandingScreenState extends ConsumerState<WebLandingScreen> {
         final mainBarHeight = isMobile ? 58.0 : (64.0 - (8.0 * progress)).clamp(56.0, 64.0);
         final totalHeight = utilityHeight + mainBarHeight;
 
-        // Translucent frosted glass: see through the background slightly both at rest and when scrolled
-        final blurSigma = (8.0 + (6.0 * progress)).clamp(8.0, 14.0);
+        // Fully transparent at full scroll up (progress == 0.0), slightly transparent on scroll down
+        final blurSigma = (12.0 * progress).clamp(0.0, 12.0);
         final bgOpacity = isDark
-            ? (0.42 + (0.28 * progress)).clamp(0.42, 0.70)
-            : (0.35 + (0.28 * progress)).clamp(0.35, 0.63);
-        final shadowAlpha = (0.01 + ((isDark ? 0.25 : 0.05) * progress)).clamp(0.01, 0.26);
-        final borderAlpha = (0.04 + (0.06 * progress)).clamp(0.04, 0.10);
+            ? (0.65 * progress).clamp(0.0, 0.65)
+            : (0.55 * progress).clamp(0.0, 0.55);
+        final shadowAlpha = ((isDark ? 0.22 : 0.05) * progress).clamp(0.0, 0.22);
+        final borderAlpha = (0.08 * progress).clamp(0.0, 0.08);
 
-        Widget navContent = AnimatedContainer(
-                duration: const Duration(milliseconds: 140),
-                height: totalHeight,
-                decoration: BoxDecoration(
-                  color: (isDark ? const Color(0xFF0B111A) : Colors.white)
-                      .withValues(alpha: bgOpacity),
-                  border: Border(
+        Widget navContent = Container(
+          height: totalHeight,
+          decoration: BoxDecoration(
+            gradient: progress < 0.99
+                ? LinearGradient(
+                    begin: Alignment.topCenter,
+                    end: Alignment.bottomCenter,
+                    colors: isDark
+                        ? [
+                            const Color(0xFF0B111A).withValues(
+                              alpha: (0.45 * (1.0 - progress) + (0.65 * progress)).clamp(0.0, 0.65),
+                            ),
+                            const Color(0xFF0B111A).withValues(
+                              alpha: (0.65 * progress).clamp(0.0, 0.65),
+                            ),
+                          ]
+                        : [
+                            Colors.white.withValues(
+                              alpha: (0.50 * (1.0 - progress) + (0.55 * progress)).clamp(0.0, 0.55),
+                            ),
+                            Colors.white.withValues(
+                              alpha: (0.55 * progress).clamp(0.0, 0.55),
+                            ),
+                          ],
+                  )
+                : null,
+            color: progress >= 0.99
+                ? (isDark ? const Color(0xFF0B111A) : Colors.white).withValues(alpha: bgOpacity)
+                : null,
+            border: borderAlpha > 0.001
+                ? Border(
                     bottom: BorderSide(
                       color: (isDark ? Colors.white : Colors.black)
                           .withValues(alpha: borderAlpha),
                       width: 1,
                     ),
-                  ),
-                  boxShadow: [
+                  )
+                : null,
+            boxShadow: shadowAlpha > 0.001
+                ? [
                     BoxShadow(
                       color: Colors.black.withValues(alpha: shadowAlpha),
                       blurRadius: 6.0 + (8.0 * progress),
                       offset: Offset(0, 1.0 + (2.0 * progress)),
                     ),
-                  ],
-                ),
-                child: SafeArea(
-                  bottom: false,
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
+                  ]
+                : null,
+          ),
+          child: SafeArea(
+            bottom: false,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
                     children: [
                       // Tier 1: Institutional Utility Strip (Desktops only, smoothly collapses on scroll)
                       if (utilityHeight > 2)
@@ -851,19 +916,33 @@ class _WebLandingScreenState extends ConsumerState<WebLandingScreen> {
                                   Icon(
                                     Icons.verified_rounded,
                                     size: 13,
-                                    color: AppTheme.primary,
+                                    color: isDark ? const Color(0xFF34D399) : const Color(0xFF0F766E),
+                                    shadows: [
+                                      Shadow(
+                                        color: isDark ? Colors.black87 : Colors.white,
+                                        blurRadius: 3,
+                                      ),
+                                    ],
                                   ),
                                   const SizedBox(width: 6),
                                   Flexible(
                                     child: Text(
                                       'DepEd K-12 Aligned • Institutional Learning & Assessment Infrastructure',
                                       style: TextStyle(
-                                        fontSize: 11,
-                                        fontWeight: FontWeight.w600,
+                                        fontSize: 11.5,
+                                        fontWeight: FontWeight.w700,
                                         color: isDark
-                                            ? const Color(0xFF94A3B8)
-                                            : const Color(0xFF64748B),
+                                            ? const Color(0xFFF1F5F9)
+                                            : const Color(0xFF0F172A),
                                         letterSpacing: 0.2,
+                                        shadows: [
+                                          Shadow(
+                                            color: isDark
+                                                ? Colors.black.withValues(alpha: 0.9)
+                                                : Colors.white.withValues(alpha: 0.95),
+                                            blurRadius: 4,
+                                          ),
+                                        ],
                                       ),
                                       maxLines: 1,
                                       overflow: TextOverflow.ellipsis,
@@ -921,10 +1000,16 @@ class _WebLandingScreenState extends ConsumerState<WebLandingScreen> {
                                           Text(
                                             'AIRA',
                                             style: TextStyle(
-                                              color: isDark ? Colors.white : Colors.black,
+                                              color: isDark ? Colors.white : const Color(0xFF0F172A),
                                               fontWeight: FontWeight.w900,
                                               fontSize: isMobile ? 13 : 20,
                                               letterSpacing: isMobile ? 0.4 : 1.1,
+                                              shadows: [
+                                                Shadow(
+                                                  color: isDark ? Colors.black87 : Colors.white,
+                                                  blurRadius: 4,
+                                                ),
+                                              ],
                                             ),
                                           ),
                                           Text(
@@ -934,17 +1019,27 @@ class _WebLandingScreenState extends ConsumerState<WebLandingScreen> {
                                               fontWeight: FontWeight.w900,
                                               fontSize: isMobile ? 13 : 20,
                                               letterSpacing: isMobile ? 0.4 : 1.1,
+                                              shadows: [
+                                                Shadow(
+                                                  color: isDark ? Colors.black87 : Colors.white,
+                                                  blurRadius: 4,
+                                                ),
+                                              ],
                                             ),
                                           ),
                                           SizedBox(width: isMobile ? 4 : 6),
                                           Container(
                                             padding: EdgeInsets.symmetric(
-                                              horizontal: isMobile ? 3 : 5,
+                                              horizontal: isMobile ? 4 : 6,
                                               vertical: isMobile ? 1 : 2,
                                             ),
                                             decoration: BoxDecoration(
-                                              color: AppTheme.primary.withValues(alpha: 0.15),
+                                              color: AppTheme.primary.withValues(alpha: 0.16),
                                               borderRadius: BorderRadius.circular(4),
+                                              border: Border.all(
+                                                color: AppTheme.primary.withValues(alpha: 0.35),
+                                                width: 0.8,
+                                              ),
                                             ),
                                             child: Text(
                                               'PORTAL',
@@ -1010,8 +1105,14 @@ class _WebLandingScreenState extends ConsumerState<WebLandingScreen> {
                                 onPressed: () => ref.read(themeProvider.notifier).toggleTheme(),
                                 icon: Icon(
                                   isDark ? Icons.light_mode_rounded : Icons.dark_mode_rounded,
-                                  color: isDark ? AppTheme.warning : AppTheme.primary,
+                                  color: isDark ? AppTheme.warning : const Color(0xFF0F766E),
                                   size: isMobile ? 18 : 22,
+                                  shadows: [
+                                    Shadow(
+                                      color: isDark ? Colors.black87 : Colors.white,
+                                      blurRadius: 4,
+                                    ),
+                                  ],
                                 ),
                               ),
                               SizedBox(width: isMobile ? 4 : 8),
@@ -1107,10 +1208,18 @@ class _WebLandingScreenState extends ConsumerState<WebLandingScreen> {
         child: Text(
           label,
           style: TextStyle(
-            fontSize: 11,
-            fontWeight: FontWeight.w600,
-            color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF475569),
+            fontSize: 11.5,
+            fontWeight: FontWeight.w700,
+            color: isDark ? const Color(0xFFF8FAFC) : const Color(0xFF0F172A),
             letterSpacing: 0.2,
+            shadows: [
+              Shadow(
+                color: isDark
+                    ? Colors.black.withValues(alpha: 0.9)
+                    : Colors.white.withValues(alpha: 0.95),
+                blurRadius: 4,
+              ),
+            ],
           ),
         ),
       ),
@@ -1124,7 +1233,14 @@ class _WebLandingScreenState extends ConsumerState<WebLandingScreen> {
         '|',
         style: TextStyle(
           fontSize: 10,
-          color: (isDark ? Colors.white : Colors.black).withValues(alpha: 0.2),
+          fontWeight: FontWeight.w600,
+          color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B),
+          shadows: [
+            Shadow(
+              color: isDark ? Colors.black54 : Colors.white70,
+              blurRadius: 2,
+            ),
+          ],
         ),
       ),
     );
@@ -1442,8 +1558,8 @@ class _HeaderNavLinkState extends State<_HeaderNavLink> {
   @override
   Widget build(BuildContext context) {
     final textColor = widget.isDark
-        ? (_isHovered ? AppTheme.darkPrimaryLight : const Color(0xFFCBD5E1))
-        : (_isHovered ? AppTheme.lightPrimary : const Color(0xFF334155));
+        ? (_isHovered ? AppTheme.darkPrimaryLight : Colors.white)
+        : (_isHovered ? AppTheme.lightPrimary : const Color(0xFF0F172A));
 
     return MouseRegion(
       onEnter: (_) => setState(() => _isHovered = true),
@@ -1456,17 +1572,25 @@ class _HeaderNavLinkState extends State<_HeaderNavLink> {
           padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
           decoration: BoxDecoration(
             color: _isHovered
-                ? AppTheme.primary.withValues(alpha: widget.isDark ? 0.14 : 0.08)
+                ? AppTheme.primary.withValues(alpha: widget.isDark ? 0.20 : 0.12)
                 : Colors.transparent,
             borderRadius: BorderRadius.circular(6),
           ),
           child: Text(
             widget.label,
             style: TextStyle(
-              fontSize: 13,
-              fontWeight: _isHovered ? FontWeight.w700 : FontWeight.w600,
+              fontSize: 13.5,
+              fontWeight: _isHovered ? FontWeight.w800 : FontWeight.w700,
               color: textColor,
               letterSpacing: 0.2,
+              shadows: [
+                Shadow(
+                  color: widget.isDark
+                      ? Colors.black.withValues(alpha: 0.90)
+                      : Colors.white.withValues(alpha: 0.95),
+                  blurRadius: 5,
+                ),
+              ],
             ),
           ),
         ),

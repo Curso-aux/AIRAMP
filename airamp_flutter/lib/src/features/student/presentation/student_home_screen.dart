@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/theme/theme_provider.dart';
+import '../../../core/utils/announcement_helper.dart';
 import '../../../core/utils/philippine_time_helper.dart';
 import '../../auth/application/auth_provider.dart';
 import '../../admin/data/admin_repository.dart';
@@ -588,7 +589,8 @@ class _StudentHomeScreenState extends ConsumerState<StudentHomeScreen> {
     String? section,
     String? authorName,
   }) {
-    final isHigh = priority.toLowerCase() == 'high';
+    final priorityUpper = AnnouncementPriorityHelper.formatUpper(priority);
+    final priorityColor = AnnouncementPriorityHelper.getColor(priority);
     final hasSpecificSec = section != null && section.isNotEmpty && section != 'All Sections' && section != 'All Handled Sections';
 
     return Container(
@@ -606,15 +608,15 @@ class _StudentHomeScreenState extends ConsumerState<StudentHomeScreen> {
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                 decoration: BoxDecoration(
-                  color: isHigh ? AppTheme.error.withValues(alpha: 0.10) : AppTheme.primary.withValues(alpha: 0.10),
+                  color: priorityColor.withValues(alpha: 0.10),
                   borderRadius: BorderRadius.circular(4),
                 ),
                 child: Text(
-                  priority.toUpperCase(),
+                  priorityUpper,
                   style: TextStyle(
                     fontSize: 9.5,
                     fontWeight: FontWeight.w700,
-                    color: isHigh ? AppTheme.error : AppTheme.primary,
+                    color: priorityColor,
                     letterSpacing: 0.3,
                   ),
                 ),
