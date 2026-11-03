@@ -310,6 +310,18 @@ class _TeacherSubjectDetailScreenState extends ConsumerState<TeacherSubjectDetai
           ),
         ],
       ),
+      floatingActionButton: _selectedTab == 2
+          ? FloatingActionButton.extended(
+              onPressed: _openCreateAssignment,
+              backgroundColor: AppTheme.primary,
+              foregroundColor: Colors.black,
+              icon: const Icon(Icons.add_task),
+              label: const Text(
+                'New Assignment',
+                style: TextStyle(fontWeight: FontWeight.bold),
+              ),
+            )
+          : null,
     );
   }
 
@@ -880,6 +892,7 @@ class _TeacherSubjectDetailScreenState extends ConsumerState<TeacherSubjectDetai
       builder: (ctx) => CreateAssignmentDialog(
         subjectId: subId,
         subjectName: _subject?['name']?.toString() ?? 'Subject',
+        initialSection: _subject?['section']?.toString(),
       ),
     );
 
@@ -1021,6 +1034,26 @@ class _TeacherSubjectDetailScreenState extends ConsumerState<TeacherSubjectDetai
                                 '${a.totalPoints} pts · Format: ${a.submissionType.toUpperCase()}',
                                 style: TextStyle(fontSize: 12, color: AppTheme.textSecondary),
                               ),
+                              if (a.targetSections != null && a.targetSections!.isNotEmpty) ...[
+                                const SizedBox(height: 4),
+                                Row(
+                                  children: [
+                                    Icon(Icons.groups_outlined, size: 13, color: AppTheme.primary),
+                                    const SizedBox(width: 4),
+                                    Flexible(
+                                      child: Text(
+                                        a.targetSections!,
+                                        style: TextStyle(
+                                          fontSize: 11,
+                                          fontWeight: FontWeight.w600,
+                                          color: AppTheme.primary,
+                                        ),
+                                        overflow: TextOverflow.ellipsis,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ],
                             ],
                           ),
                         ),

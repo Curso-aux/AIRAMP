@@ -21,6 +21,8 @@ class Assignment {
   final String? attachmentPath;
   final int? attachmentSize;
   final String? attachmentBytes;
+  final String? cloudId;
+  final String? targetSections;
 
   // Student specific context (if fetched for student)
   final int? submissionId;
@@ -53,6 +55,8 @@ class Assignment {
     this.attachmentPath,
     this.attachmentSize,
     this.attachmentBytes,
+    this.cloudId,
+    this.targetSections,
     this.submissionId,
     this.studentSubmissionStatus,
     this.studentGrade,
@@ -85,6 +89,8 @@ class Assignment {
       attachmentPath: map['attachment_path'] as String?,
       attachmentSize: (map['attachment_size'] as num?)?.toInt(),
       attachmentBytes: map['attachment_bytes'] as String?,
+      cloudId: map['cloud_id'] as String?,
+      targetSections: map['target_sections'] as String?,
       submissionId: map['submission_id'] as int?,
       studentSubmissionStatus: map['submission_status'] as String?,
       studentGrade: (map['grade'] as num?)?.toDouble(),
@@ -101,6 +107,7 @@ class Assignment {
 class Submission {
   final int id;
   final int assignmentId;
+  final String? assignmentCloudId;
   final String studentId;
   final String? studentName;
   final String? studentEmail;
@@ -126,6 +133,7 @@ class Submission {
   const Submission({
     required this.id,
     required this.assignmentId,
+    this.assignmentCloudId,
     required this.studentId,
     this.studentName,
     this.studentEmail,
@@ -153,10 +161,11 @@ class Submission {
     return Submission(
       id: map['id'] as int,
       assignmentId: map['assignment_id'] as int,
+      assignmentCloudId: map['assignment_cloud_id'] as String?,
       studentId: map['student_id'] as String,
       studentName: map['student_name'] as String? ?? map['full_name'] as String?,
       studentEmail: map['email'] as String?,
-      studentSection: map['section'] as String?,
+      studentSection: map['student_section'] as String? ?? map['section'] as String?,
       studentGradeLevel: map['student_grade_level'] as String? ?? (map['grade'] is String ? map['grade'] as String : null),
       submissionType: map['submission_type'] as String? ?? 'link',
       contentLink: map['content_link'] as String?,
@@ -231,6 +240,8 @@ class SubmissionsRepository {
     String? attachmentPath,
     int? attachmentSize,
     String? attachmentBytes,
+    String? targetSections,
+    String? cloudId,
   }) {
     return _dbHelper.createAssignment(
       title: title,
@@ -245,6 +256,8 @@ class SubmissionsRepository {
       attachmentPath: attachmentPath,
       attachmentSize: attachmentSize,
       attachmentBytes: attachmentBytes,
+      targetSections: targetSections,
+      cloudId: cloudId,
     );
   }
 
@@ -316,6 +329,9 @@ final studentSubmissionProvider = FutureProvider.family<Submission?, ({int assig
 
 final subjectAssignmentsProvider = FutureProvider.family<List<Assignment>, int>((ref, subjectId) async {
   final repo = ref.watch(submissionsRepositoryProvider);
+  try {
+    await DatabaseHelper().syncCloudAssignmentsToLocal();
+  } catch (_) {}
   return repo.getAssignmentsForSubject(subjectId);
 });
 

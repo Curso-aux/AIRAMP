@@ -76,7 +76,9 @@ class DatabaseHelper {
       await db.execute('ALTER TABLE users ADD COLUMN username TEXT');
     } catch (_) {}
     try {
-      await db.execute("ALTER TABLE users ADD COLUMN student_type TEXT DEFAULT 'regular'");
+      await db.execute(
+        "ALTER TABLE users ADD COLUMN student_type TEXT DEFAULT 'regular'",
+      );
     } catch (_) {}
     try {
       await db.execute("ALTER TABLE users ADD COLUMN special_notes TEXT");
@@ -112,10 +114,14 @@ class DatabaseHelper {
       ''');
     } catch (_) {}
     try {
-      await db.execute("ALTER TABLE users ADD COLUMN must_change_password INTEGER DEFAULT 0");
+      await db.execute(
+        "ALTER TABLE users ADD COLUMN must_change_password INTEGER DEFAULT 0",
+      );
     } catch (_) {}
     try {
-      await db.execute("ALTER TABLE sessions ADD COLUMN must_change_password INTEGER DEFAULT 0");
+      await db.execute(
+        "ALTER TABLE sessions ADD COLUMN must_change_password INTEGER DEFAULT 0",
+      );
     } catch (_) {}
     try {
       await db.execute('ALTER TABLE sections ADD COLUMN enrollment_key TEXT');
@@ -136,16 +142,42 @@ class DatabaseHelper {
       await db.execute('ALTER TABLE submissions ADD COLUMN image_bytes TEXT');
     } catch (_) {}
     try {
-      await db.execute('ALTER TABLE assignments ADD COLUMN attachment_name TEXT');
+      await db.execute(
+        'ALTER TABLE assignments ADD COLUMN attachment_name TEXT',
+      );
     } catch (_) {}
     try {
-      await db.execute('ALTER TABLE assignments ADD COLUMN attachment_path TEXT');
+      await db.execute(
+        'ALTER TABLE assignments ADD COLUMN attachment_path TEXT',
+      );
     } catch (_) {}
     try {
-      await db.execute('ALTER TABLE assignments ADD COLUMN attachment_size INTEGER');
+      await db.execute(
+        'ALTER TABLE assignments ADD COLUMN attachment_size INTEGER',
+      );
     } catch (_) {}
     try {
-      await db.execute('ALTER TABLE assignments ADD COLUMN attachment_bytes TEXT');
+      await db.execute(
+        'ALTER TABLE assignments ADD COLUMN attachment_bytes TEXT',
+      );
+    } catch (_) {}
+    try {
+      await db.execute('ALTER TABLE assignments ADD COLUMN cloud_id TEXT');
+    } catch (_) {}
+    try {
+      await db.execute(
+        'ALTER TABLE assignments ADD COLUMN target_sections TEXT',
+      );
+    } catch (_) {}
+    try {
+      await db.execute(
+        'ALTER TABLE submissions ADD COLUMN assignment_cloud_id TEXT',
+      );
+    } catch (_) {}
+    try {
+      await db.execute(
+        'ALTER TABLE submissions ADD COLUMN student_section TEXT',
+      );
     } catch (_) {}
     try {
       await db.execute('''
@@ -165,22 +197,34 @@ class DatabaseHelper {
       ''');
     } catch (_) {}
     try {
-      await db.execute('ALTER TABLE notifications ADD COLUMN target_route TEXT');
+      await db.execute(
+        'ALTER TABLE notifications ADD COLUMN target_route TEXT',
+      );
     } catch (_) {}
     try {
-      await db.execute("ALTER TABLE users ADD COLUMN school_id TEXT DEFAULT 'sch_main'");
+      await db.execute(
+        "ALTER TABLE users ADD COLUMN school_id TEXT DEFAULT 'sch_main'",
+      );
     } catch (_) {}
     try {
-      await db.execute("ALTER TABLE subjects ADD COLUMN school_id TEXT DEFAULT 'sch_main'");
+      await db.execute(
+        "ALTER TABLE subjects ADD COLUMN school_id TEXT DEFAULT 'sch_main'",
+      );
     } catch (_) {}
     try {
-      await db.execute("ALTER TABLE sections ADD COLUMN school_id TEXT DEFAULT 'sch_main'");
+      await db.execute(
+        "ALTER TABLE sections ADD COLUMN school_id TEXT DEFAULT 'sch_main'",
+      );
     } catch (_) {}
     try {
-      await db.execute("ALTER TABLE announcements ADD COLUMN school_id TEXT DEFAULT 'sch_main'");
+      await db.execute(
+        "ALTER TABLE announcements ADD COLUMN school_id TEXT DEFAULT 'sch_main'",
+      );
     } catch (_) {}
     try {
-      await db.execute("ALTER TABLE conversations ADD COLUMN school_id TEXT DEFAULT 'sch_main'");
+      await db.execute(
+        "ALTER TABLE conversations ADD COLUMN school_id TEXT DEFAULT 'sch_main'",
+      );
     } catch (_) {}
     try {
       await db.execute('''
@@ -216,7 +260,11 @@ class DatabaseHelper {
       ''');
     } catch (_) {}
     try {
-      final existingSchool = await db.query('schools', where: 'id = ?', whereArgs: ['sch_main']);
+      final existingSchool = await db.query(
+        'schools',
+        where: 'id = ?',
+        whereArgs: ['sch_main'],
+      );
       if (existingSchool.isEmpty) {
         await db.insert('schools', {
           'id': 'sch_main',
@@ -250,7 +298,11 @@ class DatabaseHelper {
       ''');
     } catch (_) {}
     try {
-      final existingCount = Sqflite.firstIntValue(await db.rawQuery('SELECT COUNT(*) FROM class_schedules')) ?? 0;
+      final existingCount =
+          Sqflite.firstIntValue(
+            await db.rawQuery('SELECT COUNT(*) FROM class_schedules'),
+          ) ??
+          0;
       if (existingCount == 0) {
         final now = DateTime.now().toIso8601String();
         await db.insert('class_schedules', {
@@ -387,7 +439,11 @@ class DatabaseHelper {
       ''');
     } catch (_) {}
     try {
-      final existingHubs = Sqflite.firstIntValue(await db.rawQuery('SELECT COUNT(*) FROM offline_hubs')) ?? 0;
+      final existingHubs =
+          Sqflite.firstIntValue(
+            await db.rawQuery('SELECT COUNT(*) FROM offline_hubs'),
+          ) ??
+          0;
       if (existingHubs == 0) {
         final now = DateTime.now().toIso8601String();
         await db.insert('offline_hubs', {
@@ -448,7 +504,9 @@ class DatabaseHelper {
           onOpen: _onDatabaseOpen,
         );
       } catch (e) {
-        debugPrint('Failed to open with shared worker, falling back to databaseFactoryFfiWebNoWebWorker: $e');
+        debugPrint(
+          'Failed to open with shared worker, falling back to databaseFactoryFfiWebNoWebWorker: $e',
+        );
         databaseFactory = databaseFactoryFfiWebNoWebWorker;
         return await openDatabase(
           'airamp_local.db',
@@ -807,6 +865,8 @@ class DatabaseHelper {
     await db.execute('''
       CREATE TABLE IF NOT EXISTS assignments (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
+        cloud_id TEXT,
+        target_sections TEXT,
         title TEXT NOT NULL,
         description TEXT,
         subject_id INTEGER NOT NULL,
@@ -817,6 +877,10 @@ class DatabaseHelper {
         submission_type TEXT DEFAULT 'both',
         status TEXT DEFAULT 'active',
         created_at TEXT NOT NULL,
+        attachment_name TEXT,
+        attachment_path TEXT,
+        attachment_size INTEGER,
+        attachment_bytes TEXT,
         FOREIGN KEY (subject_id) REFERENCES subjects (id) ON DELETE CASCADE
       )
     ''');
@@ -826,16 +890,20 @@ class DatabaseHelper {
       CREATE TABLE IF NOT EXISTS submissions (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         assignment_id INTEGER NOT NULL,
+        assignment_cloud_id TEXT,
         student_id TEXT NOT NULL,
         student_name TEXT,
+        student_section TEXT,
         submission_type TEXT NOT NULL DEFAULT 'link',
         content_link TEXT,
         file_name TEXT,
         file_size INTEGER,
         file_path TEXT,
+        file_bytes TEXT,
         notes TEXT,
         text_response TEXT,
         image_path TEXT,
+        image_bytes TEXT,
         submitted_at TEXT NOT NULL,
         status TEXT DEFAULT 'submitted',
         grade REAL,
@@ -948,14 +1016,29 @@ class DatabaseHelper {
         });
       }
     }
-    
+
     if (oldVersion < 3) {
       // Fix seeded passwords
-      await db.update('users', {'password': 'aira@admin'}, where: 'email = ?', whereArgs: ['aira@admin']);
-      await db.update('users', {'password': 'John@123'}, where: 'email = ?', whereArgs: ['john.reyes@deped.gov.ph']);
-      await db.update('users', {'password': 'Maria@123'}, where: 'email = ?', whereArgs: ['maria@test.com']);
+      await db.update(
+        'users',
+        {'password': 'aira@admin'},
+        where: 'email = ?',
+        whereArgs: ['aira@admin'],
+      );
+      await db.update(
+        'users',
+        {'password': 'John@123'},
+        where: 'email = ?',
+        whereArgs: ['john.reyes@deped.gov.ph'],
+      );
+      await db.update(
+        'users',
+        {'password': 'Maria@123'},
+        where: 'email = ?',
+        whereArgs: ['maria@test.com'],
+      );
     }
-    
+
     if (oldVersion < 4) {
       await db.execute('ALTER TABLE subjects ADD COLUMN subject_code TEXT');
       await db.execute('ALTER TABLE subjects ADD COLUMN grade_level TEXT');
@@ -977,7 +1060,7 @@ class DatabaseHelper {
           FOREIGN KEY (subject_id) REFERENCES subjects (id) ON DELETE CASCADE
         )
       ''');
-      
+
       await db.execute('''
         CREATE TABLE learning_outcomes (
           id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -989,7 +1072,7 @@ class DatabaseHelper {
           FOREIGN KEY (topic_id) REFERENCES topics (id) ON DELETE CASCADE
         )
       ''');
-      
+
       await db.execute('''
         CREATE TABLE contents (
           id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -1021,11 +1104,21 @@ class DatabaseHelper {
     }
 
     if (oldVersion < 8) {
-      await db.execute('ALTER TABLE learning_outcomes ADD COLUMN passing_score INTEGER DEFAULT 0;');
-      await db.execute('ALTER TABLE learning_outcomes ADD COLUMN schedule_start TEXT;');
-      await db.execute('ALTER TABLE learning_outcomes ADD COLUMN schedule_end TEXT;');
-      await db.execute('ALTER TABLE learning_outcomes ADD COLUMN timezone TEXT;');
-      await db.execute('ALTER TABLE learning_outcomes ADD COLUMN allow_extend INTEGER DEFAULT 0;');
+      await db.execute(
+        'ALTER TABLE learning_outcomes ADD COLUMN passing_score INTEGER DEFAULT 0;',
+      );
+      await db.execute(
+        'ALTER TABLE learning_outcomes ADD COLUMN schedule_start TEXT;',
+      );
+      await db.execute(
+        'ALTER TABLE learning_outcomes ADD COLUMN schedule_end TEXT;',
+      );
+      await db.execute(
+        'ALTER TABLE learning_outcomes ADD COLUMN timezone TEXT;',
+      );
+      await db.execute(
+        'ALTER TABLE learning_outcomes ADD COLUMN allow_extend INTEGER DEFAULT 0;',
+      );
     }
 
     if (oldVersion < 9) {
@@ -1082,15 +1175,20 @@ class DatabaseHelper {
       } catch (_) {}
 
       // Update student_1 with section and grade
-      await db.update('users', {
-        'section': 'Emerald',
-        'grade': 'Grade 10',
-      }, where: 'id = ?', whereArgs: ['student_1']);
+      await db.update(
+        'users',
+        {'section': 'Emerald', 'grade': 'Grade 10'},
+        where: 'id = ?',
+        whereArgs: ['student_1'],
+      );
 
       // Update teacher_1 name if needed
-      await db.update('users', {
-        'full_name': 'Sir John Reyes',
-      }, where: 'id = ?', whereArgs: ['teacher_1']);
+      await db.update(
+        'users',
+        {'full_name': 'Sir John Reyes'},
+        where: 'id = ?',
+        whereArgs: ['teacher_1'],
+      );
 
       // Seed additional realistic contacts
       final usersToSeed = [
@@ -1157,7 +1255,11 @@ class DatabaseHelper {
       ];
 
       for (final u in usersToSeed) {
-        final exists = await db.query('users', where: 'id = ?', whereArgs: [u['id']]);
+        final exists = await db.query(
+          'users',
+          where: 'id = ?',
+          whereArgs: [u['id']],
+        );
         if (exists.isEmpty) {
           await db.insert('users', u);
         }
@@ -1166,10 +1268,16 @@ class DatabaseHelper {
 
     if (oldVersion < 13) {
       try {
-        await db.execute('ALTER TABLE conversations ADD COLUMN is_archived INTEGER DEFAULT 0');
+        await db.execute(
+          'ALTER TABLE conversations ADD COLUMN is_archived INTEGER DEFAULT 0',
+        );
       } catch (_) {}
       // Clean up hardcoded dummy users so only authentic and registered users remain
-      await db.delete('users', where: "id IN ('student_2', 'student_3', 'student_4', 'student_5', 'student_6', 'teacher_2')");
+      await db.delete(
+        'users',
+        where:
+            "id IN ('student_2', 'student_3', 'student_4', 'student_5', 'student_6', 'teacher_2')",
+      );
     }
 
     if (oldVersion < 14) {
@@ -1267,7 +1375,9 @@ class DatabaseHelper {
       } catch (_) {}
 
       try {
-        await db.execute('ALTER TABLE quiz_attempts ADD COLUMN quiz_id INTEGER');
+        await db.execute(
+          'ALTER TABLE quiz_attempts ADD COLUMN quiz_id INTEGER',
+        );
       } catch (_) {}
 
       await _seedInitialData(db);
@@ -1288,7 +1398,9 @@ class DatabaseHelper {
         await db.execute('ALTER TABLE quizzes ADD COLUMN schedule_end TEXT');
       } catch (_) {}
       try {
-        await db.execute('ALTER TABLE quizzes ADD COLUMN status TEXT DEFAULT \'published\'');
+        await db.execute(
+          'ALTER TABLE quizzes ADD COLUMN status TEXT DEFAULT \'published\'',
+        );
       } catch (_) {}
       await _seedInitialData(db);
     }
@@ -1352,7 +1464,11 @@ class DatabaseHelper {
         )
       ''');
 
-      final existingSchool = await db.query('schools', where: 'id = ?', whereArgs: ['sch_main']);
+      final existingSchool = await db.query(
+        'schools',
+        where: 'id = ?',
+        whereArgs: ['sch_main'],
+      );
       if (existingSchool.isEmpty) {
         await db.insert('schools', {
           'id': 'sch_main',
@@ -1384,16 +1500,26 @@ class DatabaseHelper {
         )
       ''');
 
-      final tablesToScope = ['users', 'subjects', 'sections', 'announcements', 'conversations'];
+      final tablesToScope = [
+        'users',
+        'subjects',
+        'sections',
+        'announcements',
+        'conversations',
+      ];
       for (final table in tablesToScope) {
         try {
-          await db.execute("ALTER TABLE $table ADD COLUMN school_id TEXT DEFAULT 'sch_main'");
+          await db.execute(
+            "ALTER TABLE $table ADD COLUMN school_id TEXT DEFAULT 'sch_main'",
+          );
         } catch (_) {}
       }
 
       for (final table in tablesToScope) {
         try {
-          await db.execute("UPDATE $table SET school_id = 'sch_main' WHERE school_id IS NULL");
+          await db.execute(
+            "UPDATE $table SET school_id = 'sch_main' WHERE school_id IS NULL",
+          );
         } catch (_) {}
       }
     }
@@ -1414,11 +1540,10 @@ class DatabaseHelper {
 
   Future<void> setSetting(String key, String value) async {
     final db = await database;
-    await db.insert(
-      'app_settings',
-      {'key': key, 'value': value},
-      conflictAlgorithm: ConflictAlgorithm.replace,
-    );
+    await db.insert('app_settings', {
+      'key': key,
+      'value': value,
+    }, conflictAlgorithm: ConflictAlgorithm.replace);
   }
 
   // ── Chat Conversations & Messages ──────────────────────────
@@ -1428,25 +1553,45 @@ class DatabaseHelper {
     return await db.query('conversations', orderBy: 'created_at DESC');
   }
 
-  Future<Map<String, dynamic>?> getConversationBySubjectId(int subjectId) async {
+  Future<Map<String, dynamic>?> getConversationBySubjectId(
+    int subjectId,
+  ) async {
     final db = await database;
-    final res = await db.query('conversations', where: 'subject_id = ?', whereArgs: [subjectId]);
+    final res = await db.query(
+      'conversations',
+      where: 'subject_id = ?',
+      whereArgs: [subjectId],
+    );
     return res.isNotEmpty ? res.first : null;
   }
 
   Future<void> saveConversation(Map<String, dynamic> convo) async {
     final db = await database;
-    await db.insert('conversations', convo, conflictAlgorithm: ConflictAlgorithm.replace);
+    await db.insert(
+      'conversations',
+      convo,
+      conflictAlgorithm: ConflictAlgorithm.replace,
+    );
   }
 
   Future<void> updateConversationName(String id, String newName) async {
     final db = await database;
-    await db.update('conversations', {'name': newName}, where: 'id = ?', whereArgs: [id]);
+    await db.update(
+      'conversations',
+      {'name': newName},
+      where: 'id = ?',
+      whereArgs: [id],
+    );
   }
 
   Future<void> setConversationArchived(String id, bool isArchived) async {
     final db = await database;
-    await db.update('conversations', {'is_archived': isArchived ? 1 : 0}, where: 'id = ?', whereArgs: [id]);
+    await db.update(
+      'conversations',
+      {'is_archived': isArchived ? 1 : 0},
+      where: 'id = ?',
+      whereArgs: [id],
+    );
   }
 
   Future<void> deleteConversation(String id) async {
@@ -1457,7 +1602,12 @@ class DatabaseHelper {
 
   Future<void> updateMessageText(String id, String newText) async {
     final db = await database;
-    await db.update('messages', {'text': newText}, where: 'id = ?', whereArgs: [id]);
+    await db.update(
+      'messages',
+      {'text': newText},
+      where: 'id = ?',
+      whereArgs: [id],
+    );
   }
 
   Future<void> deleteMessage(String id) async {
@@ -1472,7 +1622,9 @@ class DatabaseHelper {
       String? altId;
       if (parts.length == 4 && parts[0] == 'teacher' && parts[2] == 'student') {
         altId = 'dm_student_${parts[3]}_teacher_${parts[1]}';
-      } else if (parts.length == 4 && parts[0] == 'student' && parts[2] == 'teacher') {
+      } else if (parts.length == 4 &&
+          parts[0] == 'student' &&
+          parts[2] == 'teacher') {
         altId = 'dm_teacher_${parts[3]}_student_${parts[1]}';
       }
       if (altId != null) {
@@ -1494,10 +1646,17 @@ class DatabaseHelper {
 
   Future<void> saveMessage(Map<String, dynamic> msg) async {
     final db = await database;
-    await db.insert('messages', msg, conflictAlgorithm: ConflictAlgorithm.replace);
+    await db.insert(
+      'messages',
+      msg,
+      conflictAlgorithm: ConflictAlgorithm.replace,
+    );
   }
 
-  Future<void> markMessagesAsRead(String conversationId, {String? excludeSenderId}) async {
+  Future<void> markMessagesAsRead(
+    String conversationId, {
+    String? excludeSenderId,
+  }) async {
     final db = await database;
     if (excludeSenderId != null) {
       await db.update(
@@ -1535,7 +1694,10 @@ class DatabaseHelper {
     return await db.query('users', orderBy: 'role ASC, full_name ASC');
   }
 
-  Future<Map<String, dynamic>?> getDirectConversation(String userId1, String userId2) async {
+  Future<Map<String, dynamic>?> getDirectConversation(
+    String userId1,
+    String userId2,
+  ) async {
     final db = await database;
     final ids = [userId1, userId2]..sort();
     final canonicalId = 'dm_${ids[0]}_${ids[1]}';
@@ -1563,13 +1725,27 @@ class DatabaseHelper {
         final sorted = [matchingUsers[0], matchingUsers[1]]..sort();
         final canonicalId = 'dm_${sorted[0]}_${sorted[1]}';
         if (id != canonicalId) {
-          final existingCanonical = await db.query('conversations', where: 'id = ?', whereArgs: [canonicalId]);
+          final existingCanonical = await db.query(
+            'conversations',
+            where: 'id = ?',
+            whereArgs: [canonicalId],
+          );
           if (existingCanonical.isEmpty) {
-            await db.update('conversations', {'id': canonicalId}, where: 'id = ?', whereArgs: [id]);
+            await db.update(
+              'conversations',
+              {'id': canonicalId},
+              where: 'id = ?',
+              whereArgs: [id],
+            );
           } else {
             await db.delete('conversations', where: 'id = ?', whereArgs: [id]);
           }
-          await db.update('messages', {'conversation_id': canonicalId}, where: 'conversation_id = ?', whereArgs: [id]);
+          await db.update(
+            'messages',
+            {'conversation_id': canonicalId},
+            where: 'conversation_id = ?',
+            whereArgs: [id],
+          );
         }
       }
     }
@@ -1577,46 +1753,61 @@ class DatabaseHelper {
 
   // ── Curriculum, Enrollment, Progress & Quizzes ─────────────
 
-  Future<List<Map<String, dynamic>>> getEnrolledSubjects(String studentId) async {
+  Future<List<Map<String, dynamic>>> getEnrolledSubjects(
+    String studentId,
+  ) async {
     final db = await database;
 
-
-    final subjects = await db.rawQuery('''
+    final subjects = await db.rawQuery(
+      '''
       SELECT s.*, e.enrolled_at, e.status as enrollment_status
       FROM subjects s
       JOIN enrollments e ON e.subject_id = s.id
       WHERE e.student_id = ?
       ORDER BY s.id ASC
-    ''', [studentId]);
+    ''',
+      [studentId],
+    );
 
     final List<Map<String, dynamic>> enriched = [];
     for (final s in subjects) {
       final subjectId = s['id'] as int;
 
       // Count total LOs
-      final totalLoRes = await db.rawQuery('''
+      final totalLoRes = await db.rawQuery(
+        '''
         SELECT COUNT(lo.id) as count
         FROM learning_outcomes lo
         JOIN topics t ON lo.topic_id = t.id
         WHERE t.subject_id = ?
-      ''', [subjectId]);
+      ''',
+        [subjectId],
+      );
       final totalLos = (totalLoRes.first['count'] as int?) ?? 0;
 
       // Count completed LOs
-      final completedLoRes = await db.rawQuery('''
+      final completedLoRes = await db.rawQuery(
+        '''
         SELECT COUNT(id) as count
         FROM student_progress
         WHERE student_id = ? AND subject_id = ? AND is_completed = 1
-      ''', [studentId, subjectId]);
+      ''',
+        [studentId, subjectId],
+      );
       final completedLos = (completedLoRes.first['count'] as int?) ?? 0;
 
       // Count topics (COCs)
-      final topicRes = await db.rawQuery('''
+      final topicRes = await db.rawQuery(
+        '''
         SELECT COUNT(id) as count FROM topics WHERE subject_id = ?
-      ''', [subjectId]);
+      ''',
+        [subjectId],
+      );
       final cocs = (topicRes.first['count'] as int?) ?? 0;
 
-      final progress = totalLos > 0 ? ((completedLos / totalLos) * 100).round() : 0;
+      final progress = totalLos > 0
+          ? ((completedLos / totalLos) * 100).round()
+          : 0;
 
       enriched.add({
         ...s,
@@ -1635,47 +1826,48 @@ class DatabaseHelper {
     final now = DateTime.now().toIso8601String();
 
     // 1. Enroll all student users
-    final students = await db.query('users', where: 'role = ?', whereArgs: ['student']);
+    final students = await db.query(
+      'users',
+      where: 'role = ?',
+      whereArgs: ['student'],
+    );
     for (final st in students) {
       final studentId = st['id']?.toString();
       if (studentId != null && studentId.isNotEmpty) {
-        await db.insert(
-          'enrollments',
-          {
-            'student_id': studentId,
-            'subject_id': subjectId,
-            'enrolled_at': now,
-            'status': 'active',
-          },
-          conflictAlgorithm: ConflictAlgorithm.ignore,
-        );
+        await db.insert('enrollments', {
+          'student_id': studentId,
+          'subject_id': subjectId,
+          'enrolled_at': now,
+          'status': 'active',
+        }, conflictAlgorithm: ConflictAlgorithm.ignore);
       }
     }
   }
 
-  Future<List<Map<String, dynamic>>> getAvailableSubjects(String studentId) async {
+  Future<List<Map<String, dynamic>>> getAvailableSubjects(
+    String studentId,
+  ) async {
     final db = await database;
-    return await db.rawQuery('''
+    return await db.rawQuery(
+      '''
       SELECT * FROM subjects
       WHERE id NOT IN (
         SELECT subject_id FROM enrollments WHERE student_id = ?
       )
       ORDER BY id DESC
-    ''', [studentId]);
+    ''',
+      [studentId],
+    );
   }
 
   Future<void> enrollSubject(String studentId, int subjectId) async {
     final db = await database;
-    await db.insert(
-      'enrollments',
-      {
-        'student_id': studentId,
-        'subject_id': subjectId,
-        'enrolled_at': DateTime.now().toIso8601String(),
-        'status': 'active',
-      },
-      conflictAlgorithm: ConflictAlgorithm.replace,
-    );
+    await db.insert('enrollments', {
+      'student_id': studentId,
+      'subject_id': subjectId,
+      'enrolled_at': DateTime.now().toIso8601String(),
+      'status': 'active',
+    }, conflictAlgorithm: ConflictAlgorithm.replace);
   }
 
   Future<void> unenrollSubject(String studentId, int subjectId) async {
@@ -1697,28 +1889,37 @@ class DatabaseHelper {
     final keyUpper = trimmedKey.toUpperCase();
 
     // 1. Check sections table by enrollment_key or name
-    final secResults = await db.rawQuery('''
+    final secResults = await db.rawQuery(
+      '''
       SELECT * FROM sections
       WHERE UPPER(COALESCE(enrollment_key, '')) = ?
          OR UPPER(name) = ?
          OR UPPER(name) LIKE ?
       ORDER BY id DESC
-    ''', [keyUpper, keyUpper, '%$keyUpper%']);
+    ''',
+      [keyUpper, keyUpper, '%$keyUpper%'],
+    );
 
     Map<String, dynamic>? section;
     if (secResults.isNotEmpty) {
       section = Map<String, dynamic>.from(secResults.first);
     } else {
       // 2. Check reg_links table as fallback
-      final linkResults = await db.rawQuery('''
+      final linkResults = await db.rawQuery(
+        '''
         SELECT * FROM reg_links WHERE UPPER(code) = ?
-      ''', [keyUpper]);
+      ''',
+        [keyUpper],
+      );
       if (linkResults.isNotEmpty) {
         final secName = linkResults.first['section'] as String?;
         if (secName != null && secName.isNotEmpty) {
-          final matchedSec = await db.rawQuery('''
+          final matchedSec = await db.rawQuery(
+            '''
             SELECT * FROM sections WHERE UPPER(name) = ?
-          ''', [secName.toUpperCase()]);
+          ''',
+            [secName.toUpperCase()],
+          );
           if (matchedSec.isNotEmpty) {
             section = Map<String, dynamic>.from(matchedSec.first);
           } else {
@@ -1752,10 +1953,7 @@ class DatabaseHelper {
 
     // If no subjects match exact grade level, load all available subjects
     if (matchingSubjects.isEmpty) {
-      matchingSubjects = await db.query(
-        'subjects',
-        orderBy: 'id ASC',
-      );
+      matchingSubjects = await db.query('subjects', orderBy: 'id ASC');
     }
 
     // Ensure subjects have teacher names attached
@@ -1764,21 +1962,23 @@ class DatabaseHelper {
       final tName = s['teacher_name']?.toString();
       enrichedSubjects.add({
         ...s,
-        'teacher_name': (tName != null && tName.isNotEmpty) ? tName : 'Sir John Reyes',
+        'teacher_name': (tName != null && tName.isNotEmpty)
+            ? tName
+            : 'Sir John Reyes',
         'room': section['room'] ?? 'Main Campus',
         'section_name': sectionName,
       });
     }
 
-    return {
-      'section': section,
-      'subjects': enrichedSubjects,
-    };
+    return {'section': section, 'subjects': enrichedSubjects};
   }
 
   /// Enrolls a student into a section via the admin-issued key,
   /// updating user record and linking all section curriculum subjects.
-  Future<bool> enrollStudentBySectionKey(String studentId, String rawKey) async {
+  Future<bool> enrollStudentBySectionKey(
+    String studentId,
+    String rawKey,
+  ) async {
     final db = await database;
     final verified = await verifySectionKey(rawKey);
     if (verified == null) return false;
@@ -1792,10 +1992,7 @@ class DatabaseHelper {
     // 1. Update user record with section and grade
     await db.update(
       'users',
-      {
-        'section': sectionName,
-        'grade': grade,
-      },
+      {'section': sectionName, 'grade': grade},
       where: 'id = ?',
       whereArgs: [studentId],
     );
@@ -1815,29 +2012,35 @@ class DatabaseHelper {
     );
 
     // 3. Clear old enrollments for this student and enroll in all section subjects
-    await db.delete('enrollments', where: 'student_id = ?', whereArgs: [studentId]);
+    await db.delete(
+      'enrollments',
+      where: 'student_id = ?',
+      whereArgs: [studentId],
+    );
     final now = DateTime.now().toIso8601String();
     for (final s in subjects) {
       final subId = s['id'] as int;
-      await db.insert(
-        'enrollments',
-        {
-          'student_id': studentId,
-          'subject_id': subId,
-          'enrolled_at': now,
-          'status': 'active',
-        },
-        conflictAlgorithm: ConflictAlgorithm.replace,
-      );
+      await db.insert('enrollments', {
+        'student_id': studentId,
+        'subject_id': subId,
+        'enrolled_at': now,
+        'status': 'active',
+      }, conflictAlgorithm: ConflictAlgorithm.replace);
     }
 
     return true;
   }
 
   /// Get section details for the given student
-  Future<Map<String, dynamic>?> getSectionDetailsForStudent(String studentId) async {
+  Future<Map<String, dynamic>?> getSectionDetailsForStudent(
+    String studentId,
+  ) async {
     final db = await database;
-    final userRes = await db.query('users', where: 'id = ?', whereArgs: [studentId]);
+    final userRes = await db.query(
+      'users',
+      where: 'id = ?',
+      whereArgs: [studentId],
+    );
     if (userRes.isEmpty) return null;
 
     final user = userRes.first;
@@ -1882,7 +2085,11 @@ class DatabaseHelper {
       where: 'id = ?',
       whereArgs: [studentId],
     );
-    await db.delete('enrollments', where: 'student_id = ?', whereArgs: [studentId]);
+    await db.delete(
+      'enrollments',
+      where: 'student_id = ?',
+      whereArgs: [studentId],
+    );
   }
 
   // ── Student Quiz Attempt Validation ───────────────────────
@@ -1894,11 +2101,14 @@ class DatabaseHelper {
     required int quizId,
   }) async {
     final db = await database;
-    final results = await db.rawQuery('''
+    final results = await db.rawQuery(
+      '''
       SELECT COUNT(*) as count
       FROM quiz_attempts
       WHERE student_id = ? AND quiz_id = ? AND quiz_id IS NOT NULL
-    ''', [studentId, quizId]);
+    ''',
+      [studentId, quizId],
+    );
 
     return (results.first['count'] as int) == 0;
   }
@@ -1910,11 +2120,14 @@ class DatabaseHelper {
     required int loId,
   }) async {
     final db = await database;
-    final results = await db.rawQuery('''
+    final results = await db.rawQuery(
+      '''
       SELECT COUNT(*) as count
       FROM quiz_attempts
       WHERE student_id = ? AND lo_id = ? AND (quiz_id IS NULL OR quiz_id = 0)
-    ''', [studentId, loId]);
+    ''',
+      [studentId, loId],
+    );
 
     return (results.first['count'] as int) == 0;
   }
@@ -1926,11 +2139,14 @@ class DatabaseHelper {
     required int quizId,
   }) async {
     final db = await database;
-    final attempts = await db.rawQuery('''
+    final attempts = await db.rawQuery(
+      '''
       SELECT * FROM quiz_attempts
       WHERE student_id = ? AND quiz_id = ? AND quiz_id IS NOT NULL
       ORDER BY attempted_at DESC LIMIT 1
-    ''', [studentId, quizId]);
+    ''',
+      [studentId, quizId],
+    );
 
     if (attempts.isEmpty) {
       return {
@@ -1946,11 +2162,14 @@ class DatabaseHelper {
     final attempt = attempts.first;
     return {
       'canAttempt': false,
-      'attemptsCount': await db.rawQuery('''
+      'attemptsCount': await db.rawQuery(
+        '''
         SELECT COUNT(*) as count
         FROM quiz_attempts
         WHERE student_id = ? AND quiz_id = ? AND quiz_id IS NOT NULL
-      ''', [studentId, quizId]),
+      ''',
+        [studentId, quizId],
+      ),
       'lastAttempt': attempt['attempted_at'],
       'lastScore': attempt['score'],
       'lastPercentage': attempt['percentage'],
@@ -1972,7 +2191,8 @@ class DatabaseHelper {
       whereClause = 'student_id = ? AND quiz_id = ?';
       whereArgs = [studentId, quizId];
     } else if (loId != null && loId > 0) {
-      whereClause = 'student_id = ? AND lo_id = ? AND (quiz_id IS NULL OR quiz_id = 0)';
+      whereClause =
+          'student_id = ? AND lo_id = ? AND (quiz_id IS NULL OR quiz_id = 0)';
       whereArgs = [studentId, loId];
     } else {
       return null;
@@ -2020,7 +2240,8 @@ class DatabaseHelper {
     final db = await database;
     await db.delete(
       'quiz_attempts',
-      where: 'lo_id = ? AND student_id = ? AND (quiz_id IS NULL OR quiz_id = 0)',
+      where:
+          'lo_id = ? AND student_id = ? AND (quiz_id IS NULL OR quiz_id = 0)',
       whereArgs: [loId, studentId],
     );
     await db.delete(
@@ -2047,21 +2268,33 @@ class DatabaseHelper {
 
     // Validate quiz attempt - check if student already completed
     if (quizId != null && quizId > 0) {
-      final canAttempt = await hasStudentCompletedQuiz(studentId: studentId, quizId: quizId);
+      final canAttempt = await hasStudentCompletedQuiz(
+        studentId: studentId,
+        quizId: quizId,
+      );
       if (!canAttempt) {
-        throw Exception('Student has already completed this quiz. Contact the teacher for a reset if needed.');
+        throw Exception(
+          'Student has already completed this quiz. Contact the teacher for a reset if needed.',
+        );
       }
     } else if (loId > 0) {
-      final canAttempt = await hasStudentCompletedLoQuiz(studentId: studentId, loId: loId);
+      final canAttempt = await hasStudentCompletedLoQuiz(
+        studentId: studentId,
+        loId: loId,
+      );
       if (!canAttempt) {
-        throw Exception('Student has already completed this assessment. Contact the teacher for a reset if needed.');
+        throw Exception(
+          'Student has already completed this assessment. Contact the teacher for a reset if needed.',
+        );
       }
     }
 
     String? answersJson;
     if (selectedAnswers != null && selectedAnswers.isNotEmpty) {
       try {
-        answersJson = jsonEncode(selectedAnswers.map((k, v) => MapEntry(k.toString(), v)));
+        answersJson = jsonEncode(
+          selectedAnswers.map((k, v) => MapEntry(k.toString(), v)),
+        );
       } catch (_) {}
     }
 
@@ -2090,18 +2323,14 @@ class DatabaseHelper {
     }
 
     if (isPassed && loId > 0) {
-      await db.insert(
-        'student_progress',
-        {
-          'student_id': studentId,
-          'lo_id': loId,
-          'subject_id': subjectId,
-          'is_completed': 1,
-          'score': score,
-          'completed_at': now,
-        },
-        conflictAlgorithm: ConflictAlgorithm.replace,
-      );
+      await db.insert('student_progress', {
+        'student_id': studentId,
+        'lo_id': loId,
+        'subject_id': subjectId,
+        'is_completed': 1,
+        'score': score,
+        'completed_at': now,
+      }, conflictAlgorithm: ConflictAlgorithm.replace);
     }
     AppCacheManager.instance.invalidatePrefix('teacher_scores_');
     AppCacheManager.instance.invalidatePrefix('teacher_dashboard_');
@@ -2112,7 +2341,8 @@ class DatabaseHelper {
     required int quizId,
   }) async {
     final db = await database;
-    return await db.rawQuery('''
+    return await db.rawQuery(
+      '''
       SELECT
         qa.*,
         u.full_name as student_name,
@@ -2129,13 +2359,19 @@ class DatabaseHelper {
       JOIN quizzes q ON qa.quiz_id = q.id
       WHERE qa.quiz_id = ?
       ORDER BY qa.attempted_at DESC
-    ''', [quizId]);
+    ''',
+      [quizId],
+    );
   }
 
-  Future<List<Map<String, dynamic>>> getStudentQuizAttempts(String studentId, {int? subjectId}) async {
+  Future<List<Map<String, dynamic>>> getStudentQuizAttempts(
+    String studentId, {
+    int? subjectId,
+  }) async {
     final db = await database;
     if (subjectId != null) {
-      return await db.rawQuery('''
+      return await db.rawQuery(
+        '''
         SELECT qa.*, 
                s.name as subject_name, 
                s.subject_code, 
@@ -2147,9 +2383,12 @@ class DatabaseHelper {
         LEFT JOIN quizzes qz ON qa.quiz_id = qz.id
         WHERE qa.student_id = ? AND qa.subject_id = ?
         ORDER BY qa.attempted_at DESC
-      ''', [studentId, subjectId]);
+      ''',
+        [studentId, subjectId],
+      );
     }
-    return await db.rawQuery('''
+    return await db.rawQuery(
+      '''
       SELECT qa.*, 
              s.name as subject_name, 
              s.subject_code, 
@@ -2161,10 +2400,15 @@ class DatabaseHelper {
       LEFT JOIN quizzes qz ON qa.quiz_id = qz.id
       WHERE qa.student_id = ?
       ORDER BY qa.attempted_at DESC
-    ''', [studentId]);
+    ''',
+      [studentId],
+    );
   }
 
-  Future<Map<String, dynamic>> getStudentProgressSummary(String studentId, {int? subjectId}) async {
+  Future<Map<String, dynamic>> getStudentProgressSummary(
+    String studentId, {
+    int? subjectId,
+  }) async {
     final enrolled = await getEnrolledSubjects(studentId);
     final activeCourses = enrolled.length;
 
@@ -2177,9 +2421,14 @@ class DatabaseHelper {
       }
     }
 
-    final attempts = await getStudentQuizAttempts(studentId, subjectId: subjectId);
+    final attempts = await getStudentQuizAttempts(
+      studentId,
+      subjectId: subjectId,
+    );
     final totalAttempts = attempts.length;
-    final passedAttempts = attempts.where((a) => (a['is_passed'] as int? ?? 0) == 1).length;
+    final passedAttempts = attempts
+        .where((a) => (a['is_passed'] as int? ?? 0) == 1)
+        .length;
 
     double avgScore = 0.0;
     double bestScore = 0.0;
@@ -2193,7 +2442,9 @@ class DatabaseHelper {
       avgScore = sum / totalAttempts;
     }
 
-    final pending = (totalLos - completedLos) > 0 ? (totalLos - completedLos) : 0;
+    final pending = (totalLos - completedLos) > 0
+        ? (totalLos - completedLos)
+        : 0;
 
     return {
       'activeCourses': activeCourses,
@@ -2209,38 +2460,71 @@ class DatabaseHelper {
 
   Future<Map<String, dynamic>?> getLoQuiz(int loId) async {
     final db = await database;
-    final loRes = await db.query('learning_outcomes', where: 'id = ?', whereArgs: [loId]);
+    final loRes = await db.query(
+      'learning_outcomes',
+      where: 'id = ?',
+      whereArgs: [loId],
+    );
     if (loRes.isEmpty) return null;
 
     final lo = loRes.first;
-    final topicRes = await db.query('topics', where: 'id = ?', whereArgs: [lo['topic_id']]);
-    final subjectId = topicRes.isNotEmpty ? topicRes.first['subject_id'] as int : 0;
+    final topicRes = await db.query(
+      'topics',
+      where: 'id = ?',
+      whereArgs: [lo['topic_id']],
+    );
+    final subjectId = topicRes.isNotEmpty
+        ? topicRes.first['subject_id'] as int
+        : 0;
 
-    final questions = await db.query('questions', where: 'lo_id = ?', whereArgs: [loId], orderBy: 'id ASC');
+    final questions = await db.query(
+      'questions',
+      where: 'lo_id = ?',
+      whereArgs: [loId],
+      orderBy: 'id ASC',
+    );
 
-    return {
-      ...lo,
-      'subject_id': subjectId,
-      'questions': questions,
-    };
+    return {...lo, 'subject_id': subjectId, 'questions': questions};
   }
 
   /// Load comprehensive module data (LO info, Topic info, Subject, Reading Materials, and Questions)
   Future<Map<String, dynamic>?> getModuleDataForReview(int loId) async {
     final db = await database;
-    final loRes = await db.query('learning_outcomes', where: 'id = ?', whereArgs: [loId]);
+    final loRes = await db.query(
+      'learning_outcomes',
+      where: 'id = ?',
+      whereArgs: [loId],
+    );
     if (loRes.isEmpty) return null;
     final lo = loRes.first;
 
-    final topicRes = await db.query('topics', where: 'id = ?', whereArgs: [lo['topic_id']]);
+    final topicRes = await db.query(
+      'topics',
+      where: 'id = ?',
+      whereArgs: [lo['topic_id']],
+    );
     final topic = topicRes.isNotEmpty ? topicRes.first : null;
     final subjectId = topic != null ? topic['subject_id'] as int : 0;
 
-    final subjectRes = await db.query('subjects', where: 'id = ?', whereArgs: [subjectId]);
+    final subjectRes = await db.query(
+      'subjects',
+      where: 'id = ?',
+      whereArgs: [subjectId],
+    );
     final subject = subjectRes.isNotEmpty ? subjectRes.first : null;
 
-    final contents = await db.query('contents', where: 'lo_id = ?', whereArgs: [loId], orderBy: 'id ASC');
-    final questions = await db.query('questions', where: 'lo_id = ?', whereArgs: [loId], orderBy: 'id ASC');
+    final contents = await db.query(
+      'contents',
+      where: 'lo_id = ?',
+      whereArgs: [loId],
+      orderBy: 'id ASC',
+    );
+    final questions = await db.query(
+      'questions',
+      where: 'lo_id = ?',
+      whereArgs: [loId],
+      orderBy: 'id ASC',
+    );
 
     return {
       ...lo,
@@ -2257,22 +2541,45 @@ class DatabaseHelper {
   /// Load comprehensive topic data (all LOs, contents, and questions under this topic)
   Future<Map<String, dynamic>?> getTopicDataForReview(int topicId) async {
     final db = await database;
-    final topicRes = await db.query('topics', where: 'id = ?', whereArgs: [topicId]);
+    final topicRes = await db.query(
+      'topics',
+      where: 'id = ?',
+      whereArgs: [topicId],
+    );
     if (topicRes.isEmpty) return null;
     final topic = topicRes.first;
 
     final subjectId = topic['subject_id'] as int? ?? 0;
-    final subjectRes = await db.query('subjects', where: 'id = ?', whereArgs: [subjectId]);
+    final subjectRes = await db.query(
+      'subjects',
+      where: 'id = ?',
+      whereArgs: [subjectId],
+    );
     final subject = subjectRes.isNotEmpty ? subjectRes.first : null;
 
-    final los = await db.query('learning_outcomes', where: 'topic_id = ?', whereArgs: [topicId], orderBy: 'id ASC');
+    final los = await db.query(
+      'learning_outcomes',
+      where: 'topic_id = ?',
+      whereArgs: [topicId],
+      orderBy: 'id ASC',
+    );
     List<Map<String, dynamic>> allContents = [];
     List<Map<String, dynamic>> allQuestions = [];
 
     for (final lo in los) {
       final loId = lo['id'] as int;
-      final c = await db.query('contents', where: 'lo_id = ?', whereArgs: [loId], orderBy: 'id ASC');
-      final q = await db.query('questions', where: 'lo_id = ?', whereArgs: [loId], orderBy: 'id ASC');
+      final c = await db.query(
+        'contents',
+        where: 'lo_id = ?',
+        whereArgs: [loId],
+        orderBy: 'id ASC',
+      );
+      final q = await db.query(
+        'questions',
+        where: 'lo_id = ?',
+        whereArgs: [loId],
+        orderBy: 'id ASC',
+      );
       allContents.addAll(c);
       allQuestions.addAll(q);
     }
@@ -2293,17 +2600,31 @@ class DatabaseHelper {
   /// Retrieve cached flashcards for a specific Learning Outcome
   Future<List<Map<String, dynamic>>> getModuleFlashcards(int loId) async {
     final db = await database;
-    return await db.query('module_flashcards', where: 'lo_id = ?', whereArgs: [loId], orderBy: 'id ASC');
+    return await db.query(
+      'module_flashcards',
+      where: 'lo_id = ?',
+      whereArgs: [loId],
+      orderBy: 'id ASC',
+    );
   }
 
   /// Retrieve cached flashcards for an entire Topic
   Future<List<Map<String, dynamic>>> getTopicFlashcards(int topicId) async {
     final db = await database;
-    return await db.query('module_flashcards', where: 'topic_id = ?', whereArgs: [topicId], orderBy: 'id ASC');
+    return await db.query(
+      'module_flashcards',
+      where: 'topic_id = ?',
+      whereArgs: [topicId],
+      orderBy: 'id ASC',
+    );
   }
 
   /// Save or refresh generated flashcards for a module
-  Future<void> saveModuleFlashcards(int loId, int? topicId, List<Map<String, dynamic>> cards) async {
+  Future<void> saveModuleFlashcards(
+    int loId,
+    int? topicId,
+    List<Map<String, dynamic>> cards,
+  ) async {
     final db = await database;
     final batch = db.batch();
     batch.delete('module_flashcards', where: 'lo_id = ?', whereArgs: [loId]);
@@ -2316,12 +2637,16 @@ class DatabaseHelper {
         'front_text': c['front_text'] ?? '',
         'back_text': c['back_text'] ?? '',
         'options_json': c['options_json'] != null
-            ? (c['options_json'] is String ? c['options_json'] : jsonEncode(c['options_json']))
+            ? (c['options_json'] is String
+                  ? c['options_json']
+                  : jsonEncode(c['options_json']))
             : null,
         'correct_option': c['correct_option'],
         'explanation': c['explanation'],
         'source_snippet': c['source_snippet'],
-        'is_mastered': (c['is_mastered'] == true || c['is_mastered'] == 1) ? 1 : 0,
+        'is_mastered': (c['is_mastered'] == true || c['is_mastered'] == 1)
+            ? 1
+            : 0,
         'review_count': c['review_count'] ?? 0,
         'created_at': now,
       });
@@ -2341,7 +2666,12 @@ class DatabaseHelper {
   /// Reset all mastery flags in a module for fresh practice
   Future<void> resetModuleFlashcardMastery(int loId) async {
     final db = await database;
-    await db.update('module_flashcards', {'is_mastered': 0}, where: 'lo_id = ?', whereArgs: [loId]);
+    await db.update(
+      'module_flashcards',
+      {'is_mastered': 0},
+      where: 'lo_id = ?',
+      whereArgs: [loId],
+    );
   }
 
   /// Load existing quiz data for editing (includes questions, assignments)
@@ -2349,7 +2679,11 @@ class DatabaseHelper {
     final db = await database;
 
     // Load quiz metadata
-    final quizzes = await db.query('quizzes', where: 'id = ?', whereArgs: [quizId]);
+    final quizzes = await db.query(
+      'quizzes',
+      where: 'id = ?',
+      whereArgs: [quizId],
+    );
     if (quizzes.isEmpty) return null;
 
     final quiz = quizzes.first;
@@ -2392,7 +2726,10 @@ class DatabaseHelper {
     final db = await database;
     final now = DateTime.now().toIso8601String();
 
-    final qCountRes = await db.rawQuery('SELECT COUNT(*) as count FROM questions WHERE quiz_id = ?', [quizId]);
+    final qCountRes = await db.rawQuery(
+      'SELECT COUNT(*) as count FROM questions WHERE quiz_id = ?',
+      [quizId],
+    );
     final totalQuestions = (qCountRes.first['count'] as int?) ?? 0;
 
     // 1. Update due_date on all existing assignments for this quiz
@@ -2449,10 +2786,7 @@ class DatabaseHelper {
       } else {
         await db.update(
           'quiz_assignments',
-          {
-            'due_date': dueDate,
-            'total_questions': totalQuestions,
-          },
+          {'due_date': dueDate, 'total_questions': totalQuestions},
           where: 'quiz_id = ? AND student_id = ?',
           whereArgs: [quizId, studentId],
         );
@@ -2520,13 +2854,19 @@ class DatabaseHelper {
         'option_b': q['option_b'] ?? '',
         'option_c': q['option_c'] ?? '',
         'option_d': q['option_d'] ?? '',
-        'correct_option': (q['correct_option'] ?? 'A').toString().toUpperCase().trim(),
+        'correct_option': (q['correct_option'] ?? 'A')
+            .toString()
+            .toUpperCase()
+            .trim(),
         'created_at': q['created_at'] ?? now,
       });
     }
   }
 
-  Future<List<Map<String, dynamic>>> getAllQuizScores({String? section, String? query}) async {
+  Future<List<Map<String, dynamic>>> getAllQuizScores({
+    String? section,
+    String? query,
+  }) async {
     final db = await database;
     final results = await db.rawQuery('''
       SELECT qa.*, 
@@ -2552,8 +2892,11 @@ class DatabaseHelper {
     if (section != null && section.isNotEmpty && section != 'All Sections') {
       final secLower = section.trim().toLowerCase();
       list = list.where((r) {
-        final studentSec = (r['student_section'] as String?)?.trim().toLowerCase() ?? '';
-        return studentSec == secLower || studentSec.contains(secLower) || secLower.contains(studentSec);
+        final studentSec =
+            (r['student_section'] as String?)?.trim().toLowerCase() ?? '';
+        return studentSec == secLower ||
+            studentSec.contains(secLower) ||
+            secLower.contains(studentSec);
       }).toList();
     }
     if (query != null && query.trim().isNotEmpty) {
@@ -2564,7 +2907,11 @@ class DatabaseHelper {
         final subject = (r['subject_name'] as String? ?? '').toLowerCase();
         final code = (r['subject_code'] as String? ?? '').toLowerCase();
         final lo = (r['lo_title'] as String? ?? '').toLowerCase();
-        return name.contains(q) || email.contains(q) || subject.contains(q) || code.contains(q) || lo.contains(q);
+        return name.contains(q) ||
+            email.contains(q) ||
+            subject.contains(q) ||
+            code.contains(q) ||
+            lo.contains(q);
       }).toList();
     }
     return list;
@@ -2584,11 +2931,12 @@ class DatabaseHelper {
     final db = await database;
 
     final allUsers = await db.query('users');
-    
+
     // 1. Filter Users by role, section, and student category
     final users = allUsers.where((u) {
       final uRole = u['role'] as String? ?? 'student';
-      if (role != null && role != 'all' && role.isNotEmpty && uRole != role) return false;
+      if (role != null && role != 'all' && role.isNotEmpty && uRole != role)
+        return false;
 
       final sec = (u['section'] as String? ?? '').trim();
       if (section != null && section.isNotEmpty && section != 'All Sections') {
@@ -2599,40 +2947,56 @@ class DatabaseHelper {
         }
       }
 
-      if (departmentGradeLevel != null && departmentGradeLevel != 'All Levels' && departmentGradeLevel.isNotEmpty) {
+      if (departmentGradeLevel != null &&
+          departmentGradeLevel != 'All Levels' &&
+          departmentGradeLevel.isNotEmpty) {
         final uGrade = (u['grade'] as String? ?? '').toLowerCase();
         final gLower = departmentGradeLevel.toLowerCase();
         if (gLower.contains('senior high') || gLower.contains('grade 11-12')) {
           if (!uGrade.contains('11') && !uGrade.contains('12')) return false;
-        } else if (gLower.contains('junior high') || gLower.contains('grade 7-10')) {
-          if (!uGrade.contains('7') && !uGrade.contains('8') && !uGrade.contains('9') && !uGrade.contains('10')) return false;
+        } else if (gLower.contains('junior high') ||
+            gLower.contains('grade 7-10')) {
+          if (!uGrade.contains('7') &&
+              !uGrade.contains('8') &&
+              !uGrade.contains('9') &&
+              !uGrade.contains('10'))
+            return false;
         } else if (gLower.contains('stem')) {
-          if (!uGrade.contains('stem') && !sec.toLowerCase().contains('stem')) return false;
+          if (!uGrade.contains('stem') && !sec.toLowerCase().contains('stem'))
+            return false;
         } else if (gLower.contains('abm')) {
-          if (!uGrade.contains('abm') && !sec.toLowerCase().contains('abm')) return false;
+          if (!uGrade.contains('abm') && !sec.toLowerCase().contains('abm'))
+            return false;
         } else if (gLower.contains('humss')) {
-          if (!uGrade.contains('humss') && !sec.toLowerCase().contains('humss')) return false;
+          if (!uGrade.contains('humss') && !sec.toLowerCase().contains('humss'))
+            return false;
         } else if (gLower.contains('tvl')) {
-          if (!uGrade.contains('tvl') && !sec.toLowerCase().contains('tvl')) return false;
+          if (!uGrade.contains('tvl') && !sec.toLowerCase().contains('tvl'))
+            return false;
         } else if (gLower.startsWith('grade ')) {
           final targetGrade = gLower.replaceAll('grade ', '').trim();
           if (!uGrade.contains(targetGrade)) return false;
         }
       }
 
-      if (studentCategory != null && studentCategory != 'all' && studentCategory.isNotEmpty) {
+      if (studentCategory != null &&
+          studentCategory != 'all' &&
+          studentCategory.isNotEmpty) {
         final type = (u['student_type'] as String? ?? 'regular').toLowerCase();
         final secLower = sec.toLowerCase();
         if (studentCategory == 'unassigned') {
           if (secLower.isNotEmpty && secLower != 'unassigned') return false;
         } else if (studentCategory == 'irregular') {
-          if (!type.contains('irregular') && !type.contains('cross')) return false;
+          if (!type.contains('irregular') && !type.contains('cross'))
+            return false;
         } else if (studentCategory == 'sped') {
-          if (!type.contains('sped') && !type.contains('accommodat')) return false;
+          if (!type.contains('sped') && !type.contains('accommodat'))
+            return false;
         } else if (studentCategory == 'transferee') {
           if (!type.contains('transferee')) return false;
         } else if (studentCategory == 'regular') {
-          if (type != 'regular' || secLower.isEmpty || secLower == 'unassigned') return false;
+          if (type != 'regular' || secLower.isEmpty || secLower == 'unassigned')
+            return false;
         }
       }
       return true;
@@ -2641,8 +3005,13 @@ class DatabaseHelper {
     final totalUsers = users.length;
     final totalStudents = users.where((u) => u['role'] == 'student').length;
     final totalTeachers = users.where((u) => u['role'] == 'teacher').length;
-    final totalAdmins = users.where((u) => u['role'] == 'admin' || u['role'] == 'super_admin').length;
-    final matchingStudentIds = users.where((u) => u['role'] == 'student').map((u) => u['id'] as String).toSet();
+    final totalAdmins = users
+        .where((u) => u['role'] == 'admin' || u['role'] == 'super_admin')
+        .length;
+    final matchingStudentIds = users
+        .where((u) => u['role'] == 'student')
+        .map((u) => u['id'] as String)
+        .toSet();
 
     // 2. Filter Subjects
     final allSubjects = await db.query('subjects');
@@ -2655,7 +3024,9 @@ class DatabaseHelper {
     final allEnrollments = await db.query('enrollments');
     final enrollments = allEnrollments.where((e) {
       if ((section != null && section != 'All Sections') ||
-          (studentCategory != null && studentCategory != 'all' && studentCategory.isNotEmpty)) {
+          (studentCategory != null &&
+              studentCategory != 'all' &&
+              studentCategory.isNotEmpty)) {
         if (!matchingStudentIds.contains(e['student_id'])) return false;
       }
       if (subjectId != null && e['subject_id'] != subjectId) return false;
@@ -2692,7 +3063,9 @@ class DatabaseHelper {
     final allAttempts = await db.query('quiz_attempts');
     final attempts = allAttempts.where((a) {
       if ((section != null && section != 'All Sections') ||
-          (studentCategory != null && studentCategory != 'all' && studentCategory.isNotEmpty)) {
+          (studentCategory != null &&
+              studentCategory != 'all' &&
+              studentCategory.isNotEmpty)) {
         if (!matchingStudentIds.contains(a['student_id'])) return false;
       }
       if (subjectId != null && a['subject_id'] != subjectId) return false;
@@ -2707,32 +3080,51 @@ class DatabaseHelper {
     }).toList();
 
     final totalAttempts = attempts.length;
-    final passedAttempts = attempts.where((a) => a['is_passed'] == 1 || a['is_passed'] == true).length;
-    final passRate = totalAttempts > 0 ? ((passedAttempts / totalAttempts) * 100).round() : 0;
+    final passedAttempts = attempts
+        .where((a) => a['is_passed'] == 1 || a['is_passed'] == true)
+        .length;
+    final passRate = totalAttempts > 0
+        ? ((passedAttempts / totalAttempts) * 100).round()
+        : 0;
     final avgScore = totalAttempts > 0
-        ? (attempts.map((a) => (a['percentage'] as num?)?.toDouble() ?? 0.0).reduce((a, b) => a + b) / totalAttempts).round()
+        ? (attempts
+                      .map((a) => (a['percentage'] as num?)?.toDouble() ?? 0.0)
+                      .reduce((a, b) => a + b) /
+                  totalAttempts)
+              .round()
         : 0;
 
     // 6. Subject Enrollments breakdown
     final List<Map<String, dynamic>> subjectEnrollments = [];
     for (final s in subjects) {
       final subId = s['id'] as int;
-      final subEnrollments = enrollments.where((e) => e['subject_id'] == subId).length;
-      final subAttempts = attempts.where((a) => a['subject_id'] == subId).toList();
-      final subPassed = subAttempts.where((a) => a['is_passed'] == 1 || a['is_passed'] == true).length;
-      final subPassRate = subAttempts.isNotEmpty ? ((subPassed / subAttempts.length) * 100).round() : 0;
+      final subEnrollments = enrollments
+          .where((e) => e['subject_id'] == subId)
+          .length;
+      final subAttempts = attempts
+          .where((a) => a['subject_id'] == subId)
+          .toList();
+      final subPassed = subAttempts
+          .where((a) => a['is_passed'] == 1 || a['is_passed'] == true)
+          .length;
+      final subPassRate = subAttempts.isNotEmpty
+          ? ((subPassed / subAttempts.length) * 100).round()
+          : 0;
       subjectEnrollments.add({
         'id': subId,
         'name': s['name'] as String? ?? 'Subject',
         'code': s['subject_code'] as String? ?? 'CS',
-        'teacher_name': s['assigned_teacher_name'] as String? ?? 'Faculty Assigned',
+        'teacher_name':
+            s['assigned_teacher_name'] as String? ?? 'Faculty Assigned',
         'enrollments': subEnrollments,
         'attempts': subAttempts.length,
         'passed': subPassed,
         'passRate': subPassRate,
       });
     }
-    subjectEnrollments.sort((a, b) => (b['enrollments'] as int).compareTo(a['enrollments'] as int));
+    subjectEnrollments.sort(
+      (a, b) => (b['enrollments'] as int).compareTo(a['enrollments'] as int),
+    );
 
     // 7. Section Distribution breakdown (matching students)
     final Map<String, int> sectionMap = {};
@@ -2767,31 +3159,46 @@ class DatabaseHelper {
     final List<Map<String, dynamic>> sectionDistribution = sectionMap.entries
         .map((e) => {'section': e.key, 'count': e.value})
         .toList();
-    sectionDistribution.sort((a, b) => (b['count'] as int).compareTo(a['count'] as int));
+    sectionDistribution.sort(
+      (a, b) => (b['count'] as int).compareTo(a['count'] as int),
+    );
 
-    final announcements = await db.query('announcements', orderBy: 'id DESC', limit: 5);
+    final announcements = await db.query(
+      'announcements',
+      orderBy: 'id DESC',
+      limit: 5,
+    );
 
     // 8. Filtered recent attempts matching all criteria
     final allRecentAttempts = await getAllQuizScores();
-    final recentAttempts = allRecentAttempts.where((a) {
-      if ((section != null && section != 'All Sections') ||
-          (studentCategory != null && studentCategory != 'all' && studentCategory.isNotEmpty)) {
-        final studentId = a['student_id'] as String?;
-        if (studentId == null || !matchingStudentIds.contains(studentId)) return false;
-      }
-      if (subjectId != null && a['subject_id'] != subjectId) return false;
-      if (startDate != null) {
-        final dateStr = a['attempted_at']?.toString();
-        if (dateStr != null) {
-          final d = DateTime.tryParse(dateStr);
-          if (d == null || d.isBefore(startDate)) return false;
-        }
-      }
-      return true;
-    }).take(8).toList();
+    final recentAttempts = allRecentAttempts
+        .where((a) {
+          if ((section != null && section != 'All Sections') ||
+              (studentCategory != null &&
+                  studentCategory != 'all' &&
+                  studentCategory.isNotEmpty)) {
+            final studentId = a['student_id'] as String?;
+            if (studentId == null || !matchingStudentIds.contains(studentId))
+              return false;
+          }
+          if (subjectId != null && a['subject_id'] != subjectId) return false;
+          if (startDate != null) {
+            final dateStr = a['attempted_at']?.toString();
+            if (dateStr != null) {
+              final d = DateTime.tryParse(dateStr);
+              if (d == null || d.isBefore(startDate)) return false;
+            }
+          }
+          return true;
+        })
+        .take(8)
+        .toList();
 
-    final bool hasData = totalUsers > 0 || totalAttempts > 0 || totalEnrollments > 0;
-    final String ratio = totalTeachers > 0 ? (totalStudents / totalTeachers).toStringAsFixed(1) : '0';
+    final bool hasData =
+        totalUsers > 0 || totalAttempts > 0 || totalEnrollments > 0;
+    final String ratio = totalTeachers > 0
+        ? (totalStudents / totalTeachers).toStringAsFixed(1)
+        : '0';
 
     return {
       'totalUsers': totalUsers,
@@ -2823,27 +3230,52 @@ class DatabaseHelper {
     };
   }
 
-  Future<List<Map<String, dynamic>>> getAdminStudentsList({String? section, String? grade, String? query}) async {
+  Future<List<Map<String, dynamic>>> getAdminStudentsList({
+    String? section,
+    String? grade,
+    String? query,
+  }) async {
     final db = await database;
 
-    final users = await db.query('users', where: "role = 'student'", orderBy: 'full_name ASC');
+    final users = await db.query(
+      'users',
+      where: "role = 'student'",
+      orderBy: 'full_name ASC',
+    );
     final enrollments = await db.query('enrollments');
-    final progress = await db.query('student_progress', where: 'is_completed = 1');
+    final progress = await db.query(
+      'student_progress',
+      where: 'is_completed = 1',
+    );
     final attempts = await db.query('quiz_attempts');
 
     List<Map<String, dynamic>> enriched = [];
     for (final u in users) {
       final sId = u['id'] as String;
-      final studentEnrollments = enrollments.where((e) => e['student_id'] == sId).length;
-      final studentProgress = progress.where((p) => p['student_id'] == sId).length;
-      final studentAttempts = attempts.where((a) => a['student_id'] == sId).toList();
+      final studentEnrollments = enrollments
+          .where((e) => e['student_id'] == sId)
+          .length;
+      final studentProgress = progress
+          .where((p) => p['student_id'] == sId)
+          .length;
+      final studentAttempts = attempts
+          .where((a) => a['student_id'] == sId)
+          .toList();
       final avgScore = studentAttempts.isNotEmpty
-          ? (studentAttempts.map((a) => (a['percentage'] as num?)?.toDouble() ?? 0.0).reduce((a, b) => a + b) / studentAttempts.length).round()
+          ? (studentAttempts
+                        .map(
+                          (a) => (a['percentage'] as num?)?.toDouble() ?? 0.0,
+                        )
+                        .reduce((a, b) => a + b) /
+                    studentAttempts.length)
+                .round()
           : 0;
 
       enriched.add({
         ...u,
-        'student_type': (u['student_type'] as String?)?.isNotEmpty == true ? u['student_type'] : 'regular',
+        'student_type': (u['student_type'] as String?)?.isNotEmpty == true
+            ? u['student_type']
+            : 'regular',
         'enrolled_courses': studentEnrollments,
         'completed_los': studentProgress,
         'avg_score': avgScore,
@@ -2852,10 +3284,14 @@ class DatabaseHelper {
     }
 
     if (section != null && section.isNotEmpty && section != 'All') {
-      enriched = enriched.where((s) => (s['section'] as String? ?? 'Unassigned') == section).toList();
+      enriched = enriched
+          .where((s) => (s['section'] as String? ?? 'Unassigned') == section)
+          .toList();
     }
     if (grade != null && grade.isNotEmpty && grade != 'All') {
-      enriched = enriched.where((s) => (s['grade'] as String? ?? '') == grade).toList();
+      enriched = enriched
+          .where((s) => (s['grade'] as String? ?? '') == grade)
+          .toList();
     }
     if (query != null && query.trim().isNotEmpty) {
       final q = query.toLowerCase().trim();
@@ -2870,22 +3306,40 @@ class DatabaseHelper {
     return enriched;
   }
 
-  Future<void> updateStudentSection(String studentId, String section, {String? grade}) async {
+  Future<void> updateStudentSection(
+    String studentId,
+    String section, {
+    String? grade,
+  }) async {
     final db = await database;
     final Map<String, dynamic> updateData = {'section': section};
     if (grade != null && grade.isNotEmpty) {
       updateData['grade'] = grade;
     }
-    await db.update('users', updateData, where: 'id = ?', whereArgs: [studentId]);
+    await db.update(
+      'users',
+      updateData,
+      where: 'id = ?',
+      whereArgs: [studentId],
+    );
   }
 
-  Future<void> updateStudentClassification(String studentId, String studentType, {String? notes}) async {
+  Future<void> updateStudentClassification(
+    String studentId,
+    String studentType, {
+    String? notes,
+  }) async {
     final db = await database;
     final Map<String, dynamic> updateData = {'student_type': studentType};
     if (notes != null) {
       updateData['special_notes'] = notes;
     }
-    await db.update('users', updateData, where: 'id = ?', whereArgs: [studentId]);
+    await db.update(
+      'users',
+      updateData,
+      where: 'id = ?',
+      whereArgs: [studentId],
+    );
   }
 
   /// Permanently removes a student, unenrolls from all subjects,
@@ -2894,30 +3348,59 @@ class DatabaseHelper {
     final db = await database;
     String? email;
     try {
-      final userRows = await db.query('users', where: 'id = ?', whereArgs: [studentId], limit: 1);
+      final userRows = await db.query(
+        'users',
+        where: 'id = ?',
+        whereArgs: [studentId],
+        limit: 1,
+      );
       if (userRows.isNotEmpty) {
         email = userRows.first['email'] as String?;
       }
     } catch (_) {}
 
     // 1. Delete course enrollments
-    await db.delete('enrollments', where: 'student_id = ?', whereArgs: [studentId]);
+    await db.delete(
+      'enrollments',
+      where: 'student_id = ?',
+      whereArgs: [studentId],
+    );
     // 2. Delete learning outcome progress
-    await db.delete('student_progress', where: 'student_id = ?', whereArgs: [studentId]);
+    await db.delete(
+      'student_progress',
+      where: 'student_id = ?',
+      whereArgs: [studentId],
+    );
     // 3. Delete quiz attempts and assignments
     try {
-      await db.delete('quiz_attempts', where: 'student_id = ?', whereArgs: [studentId]);
+      await db.delete(
+        'quiz_attempts',
+        where: 'student_id = ?',
+        whereArgs: [studentId],
+      );
     } catch (_) {}
     try {
-      await db.delete('quiz_assignments', where: 'student_id = ?', whereArgs: [studentId]);
+      await db.delete(
+        'quiz_assignments',
+        where: 'student_id = ?',
+        whereArgs: [studentId],
+      );
     } catch (_) {}
     // 4. Delete assignment submissions
     try {
-      await db.delete('submissions', where: 'student_id = ?', whereArgs: [studentId]);
+      await db.delete(
+        'submissions',
+        where: 'student_id = ?',
+        whereArgs: [studentId],
+      );
     } catch (_) {}
     // 5. Delete notifications
     try {
-      await db.delete('notifications', where: 'user_id = ?', whereArgs: [studentId]);
+      await db.delete(
+        'notifications',
+        where: 'user_id = ?',
+        whereArgs: [studentId],
+      );
     } catch (_) {}
     // 6. Delete user record
     await db.delete('users', where: 'id = ?', whereArgs: [studentId]);
@@ -2925,17 +3408,26 @@ class DatabaseHelper {
     try {
       await FirestoreService()
           .deleteUser(studentId, email: email)
-          .timeout(const Duration(seconds: 4), onTimeout: () {
-        debugPrint('[DatabaseHelper] Firestore deleteUser timed out for $studentId');
-      });
+          .timeout(
+            const Duration(seconds: 4),
+            onTimeout: () {
+              debugPrint(
+                '[DatabaseHelper] Firestore deleteUser timed out for $studentId',
+              );
+            },
+          );
     } catch (e) {
-      debugPrint('[DatabaseHelper] Error deleting student $studentId from Firestore: $e');
+      debugPrint(
+        '[DatabaseHelper] Error deleting student $studentId from Firestore: $e',
+      );
     }
   }
 
   /// Bulk import students and faculty members with atomic validation,
   /// password salting, section mapping, and automated course enrollment.
-  Future<Map<String, dynamic>> bulkImportUsers(List<Map<String, dynamic>> usersToImport) async {
+  Future<Map<String, dynamic>> bulkImportUsers(
+    List<Map<String, dynamic>> usersToImport,
+  ) async {
     final db = await database;
     int successCount = 0;
     final List<Map<String, dynamic>> errors = [];
@@ -2964,24 +3456,43 @@ class DatabaseHelper {
       final fullName = (row['full_name'] as String? ?? '').trim();
       final email = (row['email'] as String? ?? '').trim().toLowerCase();
       final rawRole = (row['role'] as String? ?? '').trim().toLowerCase();
-      final role = (rawRole == 'teacher' || rawRole == 'admin' || rawRole == 'super_admin') ? rawRole : 'student';
+      final role =
+          (rawRole == 'teacher' ||
+              rawRole == 'admin' ||
+              rawRole == 'super_admin')
+          ? rawRole
+          : 'student';
       final rawSection = (row['section'] as String? ?? '').trim();
       final rawGrade = (row['grade'] as String? ?? '').trim();
-      final studentType = (row['student_type'] as String? ?? 'regular').trim().toLowerCase();
+      final studentType = (row['student_type'] as String? ?? 'regular')
+          .trim()
+          .toLowerCase();
       final specialNotes = (row['special_notes'] as String? ?? '').trim();
       final rawPassword = (row['password'] as String? ?? '').trim();
 
       // Validation
       if (fullName.isEmpty) {
-        errors.add({'row': i + 1, 'email': email, 'reason': 'Missing full name'});
+        errors.add({
+          'row': i + 1,
+          'email': email,
+          'reason': 'Missing full name',
+        });
         continue;
       }
       if (email.isEmpty || !email.contains('@') || !email.contains('.')) {
-        errors.add({'row': i + 1, 'email': email, 'reason': 'Invalid email address format'});
+        errors.add({
+          'row': i + 1,
+          'email': email,
+          'reason': 'Invalid email address format',
+        });
         continue;
       }
       if (existingEmails.contains(email)) {
-        errors.add({'row': i + 1, 'email': email, 'reason': 'Email already registered in system'});
+        errors.add({
+          'row': i + 1,
+          'email': email,
+          'reason': 'Email already registered in system',
+        });
         continue;
       }
 
@@ -3017,7 +3528,9 @@ class DatabaseHelper {
       final hashedPassword = hashPassword(defaultPass, salt);
       final username = email.split('@').first;
 
-      final category = (role == 'teacher') ? 'teacher' : (role == 'student' ? 'student' : role);
+      final category = (role == 'teacher')
+          ? 'teacher'
+          : (role == 'student' ? 'student' : role);
       final userRecord = <String, dynamic>{
         'id': userId,
         'email': email,
@@ -3040,10 +3553,13 @@ class DatabaseHelper {
         try {
           await db.insert('users', userRecord);
         } catch (_) {
-          final fallback = Map<String, dynamic>.from(userRecord)..remove('category');
+          final fallback = Map<String, dynamic>.from(userRecord)
+            ..remove('category');
           await db.insert('users', fallback);
         }
-        existingEmails.add(email); // Prevent duplicates within same import batch
+        existingEmails.add(
+          email,
+        ); // Prevent duplicates within same import batch
         insertedUsers.add(userRecord);
         successCount++;
 
@@ -3054,14 +3570,22 @@ class DatabaseHelper {
 
         // Auto-enroll if student with assigned section
         if (role == 'student' && resolvedSection.isNotEmpty) {
-          await autoEnrollStudentBySection(userId, resolvedSection, resolvedGrade);
+          await autoEnrollStudentBySection(
+            userId,
+            resolvedSection,
+            resolvedGrade,
+          );
           await db.rawUpdate(
             'UPDATE sections SET student_count = student_count + 1 WHERE LOWER(name) = ?',
             [resolvedSection.toLowerCase()],
           );
         }
       } catch (e) {
-        errors.add({'row': i + 1, 'email': email, 'reason': 'Database error: $e'});
+        errors.add({
+          'row': i + 1,
+          'email': email,
+          'reason': 'Database error: $e',
+        });
       }
     }
 
@@ -3097,21 +3621,39 @@ class DatabaseHelper {
       final row = teachersToImport[i];
       final fullName = (row['full_name'] as String? ?? '').trim();
       final email = (row['email'] as String? ?? '').trim().toLowerCase();
-      final rawSections = (row['handled_sections'] as String? ?? row['section'] as String? ?? '').trim();
+      final rawSections =
+          (row['handled_sections'] as String? ??
+                  row['section'] as String? ??
+                  '')
+              .trim();
       final specialty = (row['specialty'] as String? ?? '').trim();
-      final notes = (row['notes'] as String? ?? row['special_notes'] as String? ?? '').trim();
+      final notes =
+          (row['notes'] as String? ?? row['special_notes'] as String? ?? '')
+              .trim();
       final customPassword = (row['password'] as String? ?? '').trim();
 
       if (fullName.isEmpty) {
-        errors.add({'row': i + 1, 'email': email, 'reason': 'Missing full name'});
+        errors.add({
+          'row': i + 1,
+          'email': email,
+          'reason': 'Missing full name',
+        });
         continue;
       }
       if (email.isEmpty || !email.contains('@') || !email.contains('.')) {
-        errors.add({'row': i + 1, 'email': email, 'reason': 'Invalid email address format'});
+        errors.add({
+          'row': i + 1,
+          'email': email,
+          'reason': 'Invalid email address format',
+        });
         continue;
       }
       if (existingEmails.contains(email)) {
-        errors.add({'row': i + 1, 'email': email, 'reason': 'Email already registered in system'});
+        errors.add({
+          'row': i + 1,
+          'email': email,
+          'reason': 'Email already registered in system',
+        });
         continue;
       }
 
@@ -3119,8 +3661,8 @@ class DatabaseHelper {
       final plainPassword = customPassword.isNotEmpty
           ? customPassword
           : (defaultPassword?.isNotEmpty == true
-              ? defaultPassword!
-              : 'Teach_${(1000 + (i * 37 + DateTime.now().millisecond) % 9000)}#');
+                ? defaultPassword!
+                : 'Teach_${(1000 + (i * 37 + DateTime.now().millisecond) % 9000)}#');
       final salt = generateSalt();
       final hashedPassword = hashPassword(plainPassword, salt);
       final username = email.split('@').first;
@@ -3148,7 +3690,8 @@ class DatabaseHelper {
         try {
           await db.insert('users', teacherRecord);
         } catch (_) {
-          final fallback = Map<String, dynamic>.from(teacherRecord)..remove('category');
+          final fallback = Map<String, dynamic>.from(teacherRecord)
+            ..remove('category');
           await db.insert('users', fallback);
         }
         existingEmails.add(email);
@@ -3166,7 +3709,11 @@ class DatabaseHelper {
           FirestoreService().saveUser(teacherRecord);
         } catch (_) {}
       } catch (e) {
-        errors.add({'row': i + 1, 'email': email, 'reason': 'Database error: $e'});
+        errors.add({
+          'row': i + 1,
+          'email': email,
+          'reason': 'Database error: $e',
+        });
       }
     }
 
@@ -3182,11 +3729,16 @@ class DatabaseHelper {
   Future<List<String>> getAvailableSectionsList() async {
     final db = await database;
     try {
-      final dbSections = await db.query('sections', orderBy: 'grade ASC, name ASC');
+      final dbSections = await db.query(
+        'sections',
+        orderBy: 'grade ASC, name ASC',
+      );
       final list = <String>[];
       for (final s in dbSections) {
         final name = s['name'] as String?;
-        if (name != null && name.trim().isNotEmpty && !list.contains(name.trim())) {
+        if (name != null &&
+            name.trim().isNotEmpty &&
+            !list.contains(name.trim())) {
           list.add(name.trim());
         }
       }
@@ -3204,18 +3756,14 @@ class DatabaseHelper {
     String? expiration,
   }) async {
     final db = await database;
-    await db.insert(
-      'reg_links',
-      {
-        'code': code.trim().toUpperCase(),
-        'section': section,
-        'max_uses': maxUses,
-        'used_count': 0,
-        'expiration': expiration ?? '2026-12-31',
-        'created_at': DateTime.now().toIso8601String(),
-      },
-      conflictAlgorithm: ConflictAlgorithm.replace,
-    );
+    await db.insert('reg_links', {
+      'code': code.trim().toUpperCase(),
+      'section': section,
+      'max_uses': maxUses,
+      'used_count': 0,
+      'expiration': expiration ?? '2026-12-31',
+      'created_at': DateTime.now().toIso8601String(),
+    }, conflictAlgorithm: ConflictAlgorithm.replace);
   }
 
   Future<List<Map<String, dynamic>>> getEnrollmentKeysList() async {
@@ -3238,10 +3786,7 @@ class DatabaseHelper {
         if (resolvedGrade == null || resolvedGrade.isEmpty) {
           resolvedGrade = SectionKeyHelper.extractGradeFromSection(secName);
         }
-        return {
-          ...r,
-          'grade': resolvedGrade,
-        };
+        return {...r, 'grade': resolvedGrade};
       }).toList();
     } catch (_) {
       return await db.query('reg_links', orderBy: 'created_at DESC');
@@ -3265,7 +3810,11 @@ class DatabaseHelper {
 
     // Ensure super admin account exists with username, email, and credentials
     try {
-      final existingAdmin1 = await db.query('users', where: 'email = ?', whereArgs: ['aira@admin']);
+      final existingAdmin1 = await db.query(
+        'users',
+        where: 'email = ?',
+        whereArgs: ['aira@admin'],
+      );
       final saltAdmin1 = generateSalt();
       if (existingAdmin1.isEmpty) {
         await db.insert('users', {
@@ -3281,27 +3830,41 @@ class DatabaseHelper {
           'created_at': DateTime.now().toIso8601String(),
         });
       } else {
-        await db.update('users', {
-          'role': 'super_admin',
-        }, where: 'id = ? OR email = ?', whereArgs: ['admin_1', 'aira@admin']);
+        await db.update(
+          'users',
+          {'role': 'super_admin'},
+          where: 'id = ? OR email = ?',
+          whereArgs: ['admin_1', 'aira@admin'],
+        );
 
         final currentSalt = existingAdmin1.first['password_salt'] as String?;
         final currentPass = existingAdmin1.first['password'] as String?;
-        if (currentSalt == null || currentSalt.isEmpty || currentPass == 'aira@admin') {
-          await db.update('users', {
-            'username': 'Aira Admin',
-            'full_name': 'Aira Admin',
-            'password': hashPassword('aira@admin', saltAdmin1),
-            'password_salt': saltAdmin1,
-            'role': 'super_admin',
-          }, where: 'email = ?', whereArgs: ['aira@admin']);
+        if (currentSalt == null ||
+            currentSalt.isEmpty ||
+            currentPass == 'aira@admin') {
+          await db.update(
+            'users',
+            {
+              'username': 'Aira Admin',
+              'full_name': 'Aira Admin',
+              'password': hashPassword('aira@admin', saltAdmin1),
+              'password_salt': saltAdmin1,
+              'role': 'super_admin',
+            },
+            where: 'email = ?',
+            whereArgs: ['aira@admin'],
+          );
         }
       }
     } catch (_) {}
 
     // Ensure admin_2 has username & hashed password
     try {
-      final existingAdmin2 = await db.query('users', where: 'email = ?', whereArgs: ['admin@aira.edu']);
+      final existingAdmin2 = await db.query(
+        'users',
+        where: 'email = ?',
+        whereArgs: ['admin@aira.edu'],
+      );
       final saltAdmin2 = generateSalt();
       if (existingAdmin2.isEmpty) {
         await db.insert('users', {
@@ -3319,19 +3882,30 @@ class DatabaseHelper {
       } else {
         final currentSalt = existingAdmin2.first['password_salt'] as String?;
         final currentPass = existingAdmin2.first['password'] as String?;
-        if (currentSalt == null || currentSalt.isEmpty || currentPass == 'Admin@123') {
-          await db.update('users', {
-            'username': 'admin',
-            'password': hashPassword('Admin@123', saltAdmin2),
-            'password_salt': saltAdmin2,
-          }, where: 'email = ?', whereArgs: ['admin@aira.edu']);
+        if (currentSalt == null ||
+            currentSalt.isEmpty ||
+            currentPass == 'Admin@123') {
+          await db.update(
+            'users',
+            {
+              'username': 'admin',
+              'password': hashPassword('Admin@123', saltAdmin2),
+              'password_salt': saltAdmin2,
+            },
+            where: 'email = ?',
+            whereArgs: ['admin@aira.edu'],
+          );
         }
       }
     } catch (_) {}
 
     // Ensure evangelistachristian88@gmail.com exists as Super Administrator & Administrator
     try {
-      final existingChristian = await db.query('users', where: 'LOWER(email) = ?', whereArgs: ['evangelistachristian88@gmail.com']);
+      final existingChristian = await db.query(
+        'users',
+        where: 'LOWER(email) = ?',
+        whereArgs: ['evangelistachristian88@gmail.com'],
+      );
       final saltChristian = generateSalt();
       if (existingChristian.isEmpty) {
         await db.insert('users', {
@@ -3347,9 +3921,12 @@ class DatabaseHelper {
           'created_at': DateTime.now().toIso8601String(),
         });
       } else {
-        await db.update('users', {
-          'role': 'super_admin',
-        }, where: 'LOWER(email) = ?', whereArgs: ['evangelistachristian88@gmail.com']);
+        await db.update(
+          'users',
+          {'role': 'super_admin'},
+          where: 'LOWER(email) = ?',
+          whereArgs: ['evangelistachristian88@gmail.com'],
+        );
       }
     } catch (_) {}
 
@@ -3360,43 +3937,64 @@ class DatabaseHelper {
 
     // Ensure teacher and student have correct roles, usernames, and hashed passwords
     try {
-      final teacherRow = await db.query('users', where: "email = 'john.reyes@deped.gov.ph' OR id = 'teacher_1'");
+      final teacherRow = await db.query(
+        'users',
+        where: "email = 'john.reyes@deped.gov.ph' OR id = 'teacher_1'",
+      );
       if (teacherRow.isNotEmpty) {
         // Ensure teacher role is explicitly 'teacher'
         await db.update(
           'users',
           {'role': 'teacher'},
-          where: "(email = 'john.reyes@deped.gov.ph' OR id = 'teacher_1') AND role != 'teacher'",
+          where:
+              "(email = 'john.reyes@deped.gov.ph' OR id = 'teacher_1') AND role != 'teacher'",
         );
 
         final currentSalt = teacherRow.first['password_salt'] as String?;
         final currentPass = teacherRow.first['password'] as String?;
-        if (currentSalt == null || currentSalt.isEmpty || currentPass == 'John@123') {
+        if (currentSalt == null ||
+            currentSalt.isEmpty ||
+            currentPass == 'John@123') {
           final saltTeacher = generateSalt();
-          await db.update('users', {
-            'role': 'teacher',
-            'username': 'john.reyes',
-            'full_name': 'Sir John Reyes',
-            'password': hashPassword('John@123', saltTeacher),
-            'password_salt': saltTeacher,
-          }, where: "id = ?", whereArgs: [teacherRow.first['id']]);
+          await db.update(
+            'users',
+            {
+              'role': 'teacher',
+              'username': 'john.reyes',
+              'full_name': 'Sir John Reyes',
+              'password': hashPassword('John@123', saltTeacher),
+              'password_salt': saltTeacher,
+            },
+            where: "id = ?",
+            whereArgs: [teacherRow.first['id']],
+          );
         }
       }
 
-      final studentRow = await db.query('users', where: "email = 'maria@test.com' OR id = 'student_1'");
+      final studentRow = await db.query(
+        'users',
+        where: "email = 'maria@test.com' OR id = 'student_1'",
+      );
       if (studentRow.isNotEmpty) {
         final currentSalt = studentRow.first['password_salt'] as String?;
         final currentPass = studentRow.first['password'] as String?;
-        if (currentSalt == null || currentSalt.isEmpty || currentPass == 'Maria@123') {
+        if (currentSalt == null ||
+            currentSalt.isEmpty ||
+            currentPass == 'Maria@123') {
           final saltStudent = generateSalt();
-          await db.update('users', {
-            'role': 'student',
-            'username': 'maria.lopez',
-            'section': 'Emerald',
-            'grade': 'Grade 10',
-            'password': hashPassword('Maria@123', saltStudent),
-            'password_salt': saltStudent,
-          }, where: "id = ?", whereArgs: [studentRow.first['id']]);
+          await db.update(
+            'users',
+            {
+              'role': 'student',
+              'username': 'maria.lopez',
+              'section': 'Emerald',
+              'grade': 'Grade 10',
+              'password': hashPassword('Maria@123', saltStudent),
+              'password_salt': saltStudent,
+            },
+            where: "id = ?",
+            whereArgs: [studentRow.first['id']],
+          );
         }
       }
     } catch (_) {}
@@ -3406,57 +4004,75 @@ class DatabaseHelper {
     if (existingAnnouncements.isEmpty) {
       await db.insert('announcements', {
         'title': 'Welcome to 1st Semester A.Y. 2026-2027!',
-        'message': 'All course learning outcomes, reading contents, and quizzes have been updated. Make sure to review your enrolled subjects and prepare for upcoming quizzes.',
+        'message':
+            'All course learning outcomes, reading contents, and quizzes have been updated. Make sure to review your enrolled subjects and prepare for upcoming quizzes.',
         'priority': 'high',
         'target_audience': 'all',
         'created_at': DateTime.now().toIso8601String(),
       });
       await db.insert('announcements', {
         'title': 'Flutter & Dart Assessment Scheduled',
-        'message': 'Topic assessments are now active. Students must achieve at least 70% passing score to complete each Learning Outcome.',
+        'message':
+            'Topic assessments are now active. Students must achieve at least 70% passing score to complete each Learning Outcome.',
         'priority': 'medium',
         'target_audience': 'students',
-        'created_at': DateTime.now().subtract(const Duration(hours: 3)).toIso8601String(),
+        'created_at': DateTime.now()
+            .subtract(const Duration(hours: 3))
+            .toIso8601String(),
       });
     }
 
     // Ensure core curriculum subjects CS101 and CS202 exist
-    final existingCs101 = await db.query('subjects', where: 'subject_code = ?', whereArgs: ['CS101']);
+    final existingCs101 = await db.query(
+      'subjects',
+      where: 'subject_code = ?',
+      whereArgs: ['CS101'],
+    );
     int cs101Id = 0;
     int lo1Id = 0;
     if (existingCs101.isEmpty) {
       cs101Id = await db.insert('subjects', {
         'name': 'Introduction to Flutter & Dart',
         'subject_code': 'CS101',
-        'description': 'Master cross-platform mobile development with Flutter framework and the modern Dart language.',
+        'description':
+            'Master cross-platform mobile development with Flutter framework and the modern Dart language.',
         'grade_level': 'Grade 10',
         'semester': '1st Semester',
         'unlock_type': 'Sequential',
         'teacher_id': 'teacher_1',
         'teacher_name': 'Sir John Reyes',
-        'created_at': DateTime.now().subtract(const Duration(days: 5)).toIso8601String(),
+        'created_at': DateTime.now()
+            .subtract(const Duration(days: 5))
+            .toIso8601String(),
       });
 
       // Topic 1
       final topic1Id = await db.insert('topics', {
         'subject_id': cs101Id,
         'title': 'Topic 1: Dart Fundamentals & OOP',
-        'description': 'Learn variables, functions, null safety, and object-oriented programming in Dart.',
-        'created_at': DateTime.now().subtract(const Duration(days: 5)).toIso8601String(),
+        'description':
+            'Learn variables, functions, null safety, and object-oriented programming in Dart.',
+        'created_at': DateTime.now()
+            .subtract(const Duration(days: 5))
+            .toIso8601String(),
       });
 
       // LO 1
       lo1Id = await db.insert('learning_outcomes', {
         'topic_id': topic1Id,
         'title': 'Variables, Types, and Functions',
-        'description': 'Understand variable declarations, data types, and functions in Dart.',
-        'performance_criteria': 'Demonstrate knowledge of basic syntax and type declarations.',
+        'description':
+            'Understand variable declarations, data types, and functions in Dart.',
+        'performance_criteria':
+            'Demonstrate knowledge of basic syntax and type declarations.',
         'passing_score': 70,
         'schedule_start': null,
         'schedule_end': null,
         'timezone': 'Asia/Manila',
         'allow_extend': 0,
-        'created_at': DateTime.now().subtract(const Duration(days: 5)).toIso8601String(),
+        'created_at': DateTime.now()
+            .subtract(const Duration(days: 5))
+            .toIso8601String(),
       });
 
       // Contents for LO 1
@@ -3464,88 +4080,116 @@ class DatabaseHelper {
         'lo_id': lo1Id,
         'content_type': 'Text',
         'title': 'Dart Variables & Strong Typing',
-        'content_data': 'Dart is a strongly typed language. While type annotation is optional because Dart can infer types with "var", types are known at compile time.\n\nKey Keywords:\n• var - mutable variable with inferred type\n• final - single-assignment variable known at runtime\n• const - compile-time constant',
-        'created_at': DateTime.now().subtract(const Duration(days: 5)).toIso8601String(),
+        'content_data':
+            'Dart is a strongly typed language. While type annotation is optional because Dart can infer types with "var", types are known at compile time.\n\nKey Keywords:\n• var - mutable variable with inferred type\n• final - single-assignment variable known at runtime\n• const - compile-time constant',
+        'created_at': DateTime.now()
+            .subtract(const Duration(days: 5))
+            .toIso8601String(),
       });
       await db.insert('contents', {
         'lo_id': lo1Id,
         'content_type': 'Text',
         'title': 'Functions & Shorthand Arrow Syntax',
-        'content_data': 'Functions in Dart are first-class citizens. For functions with a single expression, Dart provides shorthand arrow syntax:\n\nint add(int a, int b) => a + b;\n\nNamed parameters can be wrapped in curly braces { } and can be marked as required.',
-        'created_at': DateTime.now().subtract(const Duration(days: 5)).toIso8601String(),
+        'content_data':
+            'Functions in Dart are first-class citizens. For functions with a single expression, Dart provides shorthand arrow syntax:\n\nint add(int a, int b) => a + b;\n\nNamed parameters can be wrapped in curly braces { } and can be marked as required.',
+        'created_at': DateTime.now()
+            .subtract(const Duration(days: 5))
+            .toIso8601String(),
       });
 
       // Questions for LO 1
       await db.insert('questions', {
         'lo_id': lo1Id,
-        'question_text': 'Which keyword is used to declare a variable whose value cannot be reassigned after initialization?',
+        'question_text':
+            'Which keyword is used to declare a variable whose value cannot be reassigned after initialization?',
         'option_a': 'final',
         'option_b': 'dynamic',
         'option_c': 'var',
         'option_d': 'static',
         'correct_option': 'A',
-        'created_at': DateTime.now().subtract(const Duration(days: 5)).toIso8601String(),
+        'created_at': DateTime.now()
+            .subtract(const Duration(days: 5))
+            .toIso8601String(),
       });
       await db.insert('questions', {
         'lo_id': lo1Id,
-        'question_text': 'What is the return type of a Dart function that performs an action but does not return any value?',
+        'question_text':
+            'What is the return type of a Dart function that performs an action but does not return any value?',
         'option_a': 'null',
         'option_b': 'void',
         'option_c': 'Nothing',
         'option_d': 'empty',
         'correct_option': 'B',
-        'created_at': DateTime.now().subtract(const Duration(days: 5)).toIso8601String(),
+        'created_at': DateTime.now()
+            .subtract(const Duration(days: 5))
+            .toIso8601String(),
       });
       await db.insert('questions', {
         'lo_id': lo1Id,
-        'question_text': 'Which Dart collection stores an unordered group of unique values?',
+        'question_text':
+            'Which Dart collection stores an unordered group of unique values?',
         'option_a': 'List',
         'option_b': 'Set',
         'option_c': 'Map',
         'option_d': 'Queue',
         'correct_option': 'B',
-        'created_at': DateTime.now().subtract(const Duration(days: 5)).toIso8601String(),
+        'created_at': DateTime.now()
+            .subtract(const Duration(days: 5))
+            .toIso8601String(),
       });
 
       // Topic 2
       final topic2Id = await db.insert('topics', {
         'subject_id': cs101Id,
         'title': 'Topic 2: Flutter Widgets & Layouts',
-        'description': 'Master Stateless and Stateful widgets, layout composition, and Material Design components.',
-        'created_at': DateTime.now().subtract(const Duration(days: 4)).toIso8601String(),
+        'description':
+            'Master Stateless and Stateful widgets, layout composition, and Material Design components.',
+        'created_at': DateTime.now()
+            .subtract(const Duration(days: 4))
+            .toIso8601String(),
       });
 
       // LO 2
       final lo2Id = await db.insert('learning_outcomes', {
         'topic_id': topic2Id,
         'title': 'Widget Tree & Composition',
-        'description': 'Understand how Flutter builds and renders the widget tree hierarchy.',
-        'performance_criteria': 'Build responsive multi-child layouts using Column, Row, and Flex.',
+        'description':
+            'Understand how Flutter builds and renders the widget tree hierarchy.',
+        'performance_criteria':
+            'Build responsive multi-child layouts using Column, Row, and Flex.',
         'passing_score': 70,
         'schedule_start': null,
         'schedule_end': null,
         'timezone': 'Asia/Manila',
         'allow_extend': 0,
-        'created_at': DateTime.now().subtract(const Duration(days: 4)).toIso8601String(),
+        'created_at': DateTime.now()
+            .subtract(const Duration(days: 4))
+            .toIso8601String(),
       });
 
       await db.insert('contents', {
         'lo_id': lo2Id,
         'content_type': 'Text',
         'title': 'Stateless vs Stateful Widgets',
-        'content_data': 'In Flutter, almost everything is a widget. A StatelessWidget never changes its configuration during its lifetime, while a StatefulWidget maintains mutable state that can trigger rebuilds via setState().',
-        'created_at': DateTime.now().subtract(const Duration(days: 4)).toIso8601String(),
+        'content_data':
+            'In Flutter, almost everything is a widget. A StatelessWidget never changes its configuration during its lifetime, while a StatefulWidget maintains mutable state that can trigger rebuilds via setState().',
+        'created_at': DateTime.now()
+            .subtract(const Duration(days: 4))
+            .toIso8601String(),
       });
 
       await db.insert('questions', {
         'lo_id': lo2Id,
-        'question_text': 'Which widget is best suited for displaying an immutable icon or label?',
+        'question_text':
+            'Which widget is best suited for displaying an immutable icon or label?',
         'option_a': 'StatelessWidget',
         'option_b': 'StatefulWidget',
         'option_c': 'InheritedWidget',
         'option_d': 'RenderObjectWidget',
         'correct_option': 'A',
-        'created_at': DateTime.now().subtract(const Duration(days: 4)).toIso8601String(),
+        'created_at': DateTime.now()
+            .subtract(const Duration(days: 4))
+            .toIso8601String(),
       });
 
       // LO 3
@@ -3553,123 +4197,168 @@ class DatabaseHelper {
         'topic_id': topic2Id,
         'title': 'State Management Basics',
         'description': 'Manage ephemeral state inside StatefulWidgets.',
-        'performance_criteria': 'Properly call setState() to trigger widget tree updates.',
+        'performance_criteria':
+            'Properly call setState() to trigger widget tree updates.',
         'passing_score': 70,
         'schedule_start': null,
         'schedule_end': null,
         'timezone': 'Asia/Manila',
         'allow_extend': 0,
-        'created_at': DateTime.now().subtract(const Duration(days: 3)).toIso8601String(),
+        'created_at': DateTime.now()
+            .subtract(const Duration(days: 3))
+            .toIso8601String(),
       });
 
       await db.insert('contents', {
         'lo_id': lo3Id,
         'content_type': 'Text',
         'title': 'Lifecycle of a StatefulWidget',
-        'content_data': 'A StatefulWidget creates a State object whose lifecycle includes createState(), initState(), didChangeDependencies(), build(), and dispose(). Always clean up controllers in dispose().',
-        'created_at': DateTime.now().subtract(const Duration(days: 3)).toIso8601String(),
+        'content_data':
+            'A StatefulWidget creates a State object whose lifecycle includes createState(), initState(), didChangeDependencies(), build(), and dispose(). Always clean up controllers in dispose().',
+        'created_at': DateTime.now()
+            .subtract(const Duration(days: 3))
+            .toIso8601String(),
       });
 
       await db.insert('questions', {
         'lo_id': lo3Id,
-        'question_text': 'Which lifecycle method is called exactly once when a State object is inserted into the tree?',
+        'question_text':
+            'Which lifecycle method is called exactly once when a State object is inserted into the tree?',
         'option_a': 'build()',
         'option_b': 'initState()',
         'option_c': 'didUpdateWidget()',
         'option_d': 'dispose()',
         'correct_option': 'B',
-        'created_at': DateTime.now().subtract(const Duration(days: 3)).toIso8601String(),
+        'created_at': DateTime.now()
+            .subtract(const Duration(days: 3))
+            .toIso8601String(),
       });
       await db.insert('questions', {
         'lo_id': lo3Id,
-        'question_text': 'What method must be called inside a State class to notify the framework to redraw the widget?',
+        'question_text':
+            'What method must be called inside a State class to notify the framework to redraw the widget?',
         'option_a': 'redraw()',
         'option_b': 'setState()',
         'option_c': 'refresh()',
         'option_d': 'update()',
         'correct_option': 'B',
-        'created_at': DateTime.now().subtract(const Duration(days: 3)).toIso8601String(),
+        'created_at': DateTime.now()
+            .subtract(const Duration(days: 3))
+            .toIso8601String(),
       });
     } else {
       cs101Id = existingCs101.first['id'] as int;
-      await db.update('subjects', {
-        'teacher_id': 'teacher_1',
-        'teacher_name': 'Sir John Reyes',
-        'grade_level': 'Grade 10',
-      }, where: 'id = ?', whereArgs: [cs101Id]);
+      await db.update(
+        'subjects',
+        {
+          'teacher_id': 'teacher_1',
+          'teacher_name': 'Sir John Reyes',
+          'grade_level': 'Grade 10',
+        },
+        where: 'id = ?',
+        whereArgs: [cs101Id],
+      );
     }
 
     // Ensure Subject 2: CS202 exists
-    final existingCs202 = await db.query('subjects', where: 'subject_code = ?', whereArgs: ['CS202']);
+    final existingCs202 = await db.query(
+      'subjects',
+      where: 'subject_code = ?',
+      whereArgs: ['CS202'],
+    );
     int cs202Id = 0;
     if (existingCs202.isEmpty) {
       cs202Id = await db.insert('subjects', {
         'name': 'Mobile UI & State Management',
         'subject_code': 'CS202',
-        'description': 'Advanced mobile UI development with Riverpod and responsive layout design.',
+        'description':
+            'Advanced mobile UI development with Riverpod and responsive layout design.',
         'grade_level': 'Grade 11',
         'semester': '1st Semester',
         'unlock_type': 'Flexible',
         'teacher_id': 'teacher_1',
         'teacher_name': 'Sir John Reyes',
-        'created_at': DateTime.now().subtract(const Duration(days: 2)).toIso8601String(),
+        'created_at': DateTime.now()
+            .subtract(const Duration(days: 2))
+            .toIso8601String(),
       });
 
       final topic3Id = await db.insert('topics', {
         'subject_id': cs202Id,
         'title': 'Topic 1: Modern State Management with Riverpod',
-        'description': 'Learn reactive state patterns, providers, and notifiers.',
-        'created_at': DateTime.now().subtract(const Duration(days: 2)).toIso8601String(),
+        'description':
+            'Learn reactive state patterns, providers, and notifiers.',
+        'created_at': DateTime.now()
+            .subtract(const Duration(days: 2))
+            .toIso8601String(),
       });
 
       final lo4Id = await db.insert('learning_outcomes', {
         'topic_id': topic3Id,
         'title': 'Riverpod Providers & Notifiers',
-        'description': 'Build clean reactive Flutter state using Notifier and Provider.',
-        'performance_criteria': 'Properly inject and watch providers without unnecessary rebuilds.',
+        'description':
+            'Build clean reactive Flutter state using Notifier and Provider.',
+        'performance_criteria':
+            'Properly inject and watch providers without unnecessary rebuilds.',
         'passing_score': 75,
         'schedule_start': null,
         'schedule_end': null,
         'timezone': 'Asia/Manila',
         'allow_extend': 0,
-        'created_at': DateTime.now().subtract(const Duration(days: 2)).toIso8601String(),
+        'created_at': DateTime.now()
+            .subtract(const Duration(days: 2))
+            .toIso8601String(),
       });
 
       await db.insert('contents', {
         'lo_id': lo4Id,
         'content_type': 'Text',
         'title': 'Understanding Riverpod',
-        'content_data': 'Riverpod is a compile-safe reactive state management framework for Flutter and Dart. It does not depend on the Flutter widget tree to declare providers, avoiding common BuildContext issues.',
-        'created_at': DateTime.now().subtract(const Duration(days: 2)).toIso8601String(),
+        'content_data':
+            'Riverpod is a compile-safe reactive state management framework for Flutter and Dart. It does not depend on the Flutter widget tree to declare providers, avoiding common BuildContext issues.',
+        'created_at': DateTime.now()
+            .subtract(const Duration(days: 2))
+            .toIso8601String(),
       });
 
       await db.insert('questions', {
         'lo_id': lo4Id,
-        'question_text': 'What widget must be placed at the root of a Flutter app to enable Riverpod providers?',
+        'question_text':
+            'What widget must be placed at the root of a Flutter app to enable Riverpod providers?',
         'option_a': 'ProviderScope',
         'option_b': 'MultiProvider',
         'option_c': 'RiverpodApp',
         'option_d': 'MaterialAppScope',
         'correct_option': 'A',
-        'created_at': DateTime.now().subtract(const Duration(days: 2)).toIso8601String(),
+        'created_at': DateTime.now()
+            .subtract(const Duration(days: 2))
+            .toIso8601String(),
       });
       await db.insert('questions', {
         'lo_id': lo4Id,
-        'question_text': 'Which method on WidgetRef is used in build() to listen to a provider and trigger rebuilds on state change?',
+        'question_text':
+            'Which method on WidgetRef is used in build() to listen to a provider and trigger rebuilds on state change?',
         'option_a': 'ref.read',
         'option_b': 'ref.watch',
         'option_c': 'ref.listen',
         'option_d': 'ref.refresh',
         'correct_option': 'B',
-        'created_at': DateTime.now().subtract(const Duration(days: 2)).toIso8601String(),
+        'created_at': DateTime.now()
+            .subtract(const Duration(days: 2))
+            .toIso8601String(),
       });
     } else {
       cs202Id = existingCs202.first['id'] as int;
-      await db.update('subjects', {
-        'teacher_id': 'teacher_1',
-        'teacher_name': 'Sir John Reyes',
-        'grade_level': 'Grade 11',
-      }, where: 'id = ?', whereArgs: [cs202Id]);
+      await db.update(
+        'subjects',
+        {
+          'teacher_id': 'teacher_1',
+          'teacher_name': 'Sir John Reyes',
+          'grade_level': 'Grade 11',
+        },
+        where: 'id = ?',
+        whereArgs: [cs202Id],
+      );
     }
 
     // Pre-enroll student_1 (Maria Lopez) in CS101 and seed an initial quiz attempt
@@ -3677,7 +4366,9 @@ class DatabaseHelper {
       await db.insert('enrollments', {
         'student_id': 'student_1',
         'subject_id': cs101Id,
-        'enrolled_at': DateTime.now().subtract(const Duration(days: 4)).toIso8601String(),
+        'enrolled_at': DateTime.now()
+            .subtract(const Duration(days: 4))
+            .toIso8601String(),
         'status': 'active',
       });
 
@@ -3691,7 +4382,9 @@ class DatabaseHelper {
         'percentage': 100.0,
         'is_passed': 1,
         'duration_seconds': 145,
-        'attempted_at': DateTime.now().subtract(const Duration(days: 1)).toIso8601String(),
+        'attempted_at': DateTime.now()
+            .subtract(const Duration(days: 1))
+            .toIso8601String(),
       });
 
       // Mark LO 1 completed for student_1
@@ -3701,7 +4394,9 @@ class DatabaseHelper {
         'subject_id': cs101Id,
         'is_completed': 1,
         'score': 3,
-        'completed_at': DateTime.now().subtract(const Duration(days: 1)).toIso8601String(),
+        'completed_at': DateTime.now()
+            .subtract(const Duration(days: 1))
+            .toIso8601String(),
       });
     }
 
@@ -3753,7 +4448,12 @@ class DatabaseHelper {
               final clean = secName.replaceAll(RegExp(r'[^A-Z0-9]'), '');
               key = 'SEC-${clean.length > 6 ? clean.substring(0, 6) : clean}';
             }
-            await db.update('sections', {'enrollment_key': key}, where: 'id = ?', whereArgs: [sec['id']]);
+            await db.update(
+              'sections',
+              {'enrollment_key': key},
+              where: 'id = ?',
+              whereArgs: [sec['id']],
+            );
           }
         }
       }
@@ -3763,10 +4463,7 @@ class DatabaseHelper {
     try {
       await db.update(
         'subjects',
-        {
-          'teacher_id': 'teacher_1',
-          'teacher_name': 'Sir John Reyes',
-        },
+        {'teacher_id': 'teacher_1', 'teacher_name': 'Sir John Reyes'},
         where: 'teacher_id IS NULL OR teacher_id = ?',
         whereArgs: [''],
       );
@@ -3774,9 +4471,13 @@ class DatabaseHelper {
 
     // Ensure authentic students exist: only seed defaults if no real students exist
     try {
-      final realStudentCount = Sqflite.firstIntValue(await db.rawQuery(
-        "SELECT COUNT(*) FROM users WHERE role = 'student' AND email NOT LIKE '%@school.edu' AND email != 'maria@test.com'"
-      )) ?? 0;
+      final realStudentCount =
+          Sqflite.firstIntValue(
+            await db.rawQuery(
+              "SELECT COUNT(*) FROM users WHERE role = 'student' AND email NOT LIKE '%@school.edu' AND email != 'maria@test.com'",
+            ),
+          ) ??
+          0;
 
       if (realStudentCount == 0) {
         final defaultStudents = [
@@ -3790,7 +4491,9 @@ class DatabaseHelper {
             'section': 'Grade 10 - Emerald',
             'grade': 'Grade 10',
             'profile_image': 'preset:girl_1',
-            'created_at': DateTime.now().subtract(const Duration(days: 5)).toIso8601String(),
+            'created_at': DateTime.now()
+                .subtract(const Duration(days: 5))
+                .toIso8601String(),
           },
           {
             'id': 'student_2',
@@ -3802,7 +4505,9 @@ class DatabaseHelper {
             'section': 'Grade 10 - Emerald',
             'grade': 'Grade 10',
             'profile_image': 'preset:boy_1',
-            'created_at': DateTime.now().subtract(const Duration(days: 4)).toIso8601String(),
+            'created_at': DateTime.now()
+                .subtract(const Duration(days: 4))
+                .toIso8601String(),
           },
           {
             'id': 'student_3',
@@ -3814,7 +4519,9 @@ class DatabaseHelper {
             'section': 'Grade 11 - STEM B',
             'grade': 'Grade 11',
             'profile_image': 'preset:bob_cut',
-            'created_at': DateTime.now().subtract(const Duration(days: 4)).toIso8601String(),
+            'created_at': DateTime.now()
+                .subtract(const Duration(days: 4))
+                .toIso8601String(),
           },
           {
             'id': 'student_4',
@@ -3825,16 +4532,25 @@ class DatabaseHelper {
             'full_name': 'Mark Bautista',
             'section': 'Grade 10 - Emerald',
             'grade': 'Grade 10',
-            'created_at': DateTime.now().subtract(const Duration(days: 3)).toIso8601String(),
+            'created_at': DateTime.now()
+                .subtract(const Duration(days: 3))
+                .toIso8601String(),
           },
         ];
 
         for (final s in defaultStudents) {
-          final existing = await db.query('users', where: 'id = ? OR email = ?', whereArgs: [s['id'], s['email']]);
+          final existing = await db.query(
+            'users',
+            where: 'id = ? OR email = ?',
+            whereArgs: [s['id'], s['email']],
+          );
           if (existing.isEmpty) {
             final salt = generateSalt();
             final userToInsert = Map<String, dynamic>.from(s);
-            userToInsert['password'] = hashPassword(s['password'] as String, salt);
+            userToInsert['password'] = hashPassword(
+              s['password'] as String,
+              salt,
+            );
             userToInsert['password_salt'] = salt;
             await db.insert('users', userToInsert);
           } else {
@@ -3846,75 +4562,126 @@ class DatabaseHelper {
               'role': 'student',
               'full_name': s['full_name'],
             };
-            if (currentSalt == null || currentSalt.isEmpty || currentPass == s['password']) {
+            if (currentSalt == null ||
+                currentSalt.isEmpty ||
+                currentPass == s['password']) {
               final salt = generateSalt();
-              updateData['password'] = hashPassword(s['password'] as String, salt);
+              updateData['password'] = hashPassword(
+                s['password'] as String,
+                salt,
+              );
               updateData['password_salt'] = salt;
             }
-            await db.update('users', updateData, where: 'id = ?', whereArgs: [s['id']]);
+            await db.update(
+              'users',
+              updateData,
+              where: 'id = ?',
+              whereArgs: [s['id']],
+            );
           }
         }
       } else {
         // Real students exist; clean out mock student seeds from local database
-        await db.delete('users', where: "id IN ('student_1', 'student_2', 'student_3', 'student_4') OR email LIKE '%@school.edu'");
+        await db.delete(
+          'users',
+          where:
+              "id IN ('student_1', 'student_2', 'student_3', 'student_4') OR email LIKE '%@school.edu'",
+        );
       }
 
       // Normalize existing student records to valid section names from the sections table
       await db.update(
         'users',
         {'section': 'Grade 10 - Emerald', 'grade': 'Grade 10'},
-        where: "role = 'student' AND (section IN ('Emerald', 'Ruby') OR id IN ('student_1', 'student_2', 'student_4'))",
+        where:
+            "role = 'student' AND (section IN ('Emerald', 'Ruby') OR id IN ('student_1', 'student_2', 'student_4'))",
       );
       await db.update(
         'users',
         {'section': 'Grade 11 - STEM B', 'grade': 'Grade 11'},
-        where: "role = 'student' AND (section IN ('Diamond', 'STEM B') OR id = 'student_3')",
+        where:
+            "role = 'student' AND (section IN ('Diamond', 'STEM B') OR id = 'student_3')",
       );
       // Remove any test section from sections table that isn't standard
-      await db.delete('sections', where: "name NOT IN ('Grade 10 - Emerald', 'Grade 11 - STEM B') AND name LIKE 'Sapphire%'");
+      await db.delete(
+        'sections',
+        where:
+            "name NOT IN ('Grade 10 - Emerald', 'Grade 11 - STEM B') AND name LIKE 'Sapphire%'",
+      );
       // Update section student counts accurately
-      final emCount = Sqflite.firstIntValue(await db.rawQuery(
-        "SELECT COUNT(*) FROM users WHERE section = 'Grade 10 - Emerald' AND role = 'student'"
-      )) ?? 3;
-      final stemCount = Sqflite.firstIntValue(await db.rawQuery(
-        "SELECT COUNT(*) FROM users WHERE section = 'Grade 11 - STEM B' AND role = 'student'"
-      )) ?? 1;
-      await db.update('sections', {'student_count': emCount}, where: "name = 'Grade 10 - Emerald'");
-      await db.update('sections', {'student_count': stemCount}, where: "name = 'Grade 11 - STEM B'");
+      final emCount =
+          Sqflite.firstIntValue(
+            await db.rawQuery(
+              "SELECT COUNT(*) FROM users WHERE section = 'Grade 10 - Emerald' AND role = 'student'",
+            ),
+          ) ??
+          3;
+      final stemCount =
+          Sqflite.firstIntValue(
+            await db.rawQuery(
+              "SELECT COUNT(*) FROM users WHERE section = 'Grade 11 - STEM B' AND role = 'student'",
+            ),
+          ) ??
+          1;
+      await db.update('sections', {
+        'student_count': emCount,
+      }, where: "name = 'Grade 10 - Emerald'");
+      await db.update('sections', {
+        'student_count': stemCount,
+      }, where: "name = 'Grade 11 - STEM B'");
 
       // Migrate any remaining unhashed passwords to salted SHA-256
       try {
         final unhashedUsers = await db.rawQuery(
-          "SELECT id, password FROM users WHERE password_salt IS NULL OR password_salt = ''"
+          "SELECT id, password FROM users WHERE password_salt IS NULL OR password_salt = ''",
         );
         for (final u in unhashedUsers) {
           final id = u['id'] as String;
           final pass = u['password'] as String;
           final salt = generateSalt();
           final hashed = hashPassword(pass, salt);
-          await db.update('users', {
-            'password': hashed,
-            'password_salt': salt,
-          }, where: 'id = ?', whereArgs: [id]);
+          await db.update(
+            'users',
+            {'password': hashed, 'password_salt': salt},
+            where: 'id = ?',
+            whereArgs: [id],
+          );
         }
       } catch (_) {}
 
       // Remove temporary test subjects that may linger from tests
-      await db.delete('subjects', where: "name LIKE 'Test Subject for Deletion%'");
+      await db.delete(
+        'subjects',
+        where: "name LIKE 'Test Subject for Deletion%'",
+      );
 
       // Ensure enrollments for CS101 and CS202
-      final cs101Rows = await db.query('subjects', where: 'subject_code = ?', whereArgs: ['CS101']);
-      final cs202Rows = await db.query('subjects', where: 'subject_code = ?', whereArgs: ['CS202']);
+      final cs101Rows = await db.query(
+        'subjects',
+        where: 'subject_code = ?',
+        whereArgs: ['CS101'],
+      );
+      final cs202Rows = await db.query(
+        'subjects',
+        where: 'subject_code = ?',
+        whereArgs: ['CS202'],
+      );
 
       if (cs101Rows.isNotEmpty) {
         final sub1Id = cs101Rows.first['id'] as int;
         for (final sid in ['student_1', 'student_2', 'student_4']) {
-          final enr = await db.query('enrollments', where: 'student_id = ? AND subject_id = ?', whereArgs: [sid, sub1Id]);
+          final enr = await db.query(
+            'enrollments',
+            where: 'student_id = ? AND subject_id = ?',
+            whereArgs: [sid, sub1Id],
+          );
           if (enr.isEmpty) {
             await db.insert('enrollments', {
               'student_id': sid,
               'subject_id': sub1Id,
-              'enrolled_at': DateTime.now().subtract(const Duration(days: 4)).toIso8601String(),
+              'enrolled_at': DateTime.now()
+                  .subtract(const Duration(days: 4))
+                  .toIso8601String(),
               'status': 'active',
             });
           }
@@ -3924,12 +4691,18 @@ class DatabaseHelper {
       if (cs202Rows.isNotEmpty) {
         final sub2Id = cs202Rows.first['id'] as int;
         for (final sid in ['student_1', 'student_3']) {
-          final enr = await db.query('enrollments', where: 'student_id = ? AND subject_id = ?', whereArgs: [sid, sub2Id]);
+          final enr = await db.query(
+            'enrollments',
+            where: 'student_id = ? AND subject_id = ?',
+            whereArgs: [sid, sub2Id],
+          );
           if (enr.isEmpty) {
             await db.insert('enrollments', {
               'student_id': sid,
               'subject_id': sub2Id,
-              'enrolled_at': DateTime.now().subtract(const Duration(days: 3)).toIso8601String(),
+              'enrolled_at': DateTime.now()
+                  .subtract(const Duration(days: 3))
+                  .toIso8601String(),
               'status': 'active',
             });
           }
@@ -3938,12 +4711,18 @@ class DatabaseHelper {
 
       // Ensure default class schedules for Grade 10 - Emerald exist
       try {
-        final emSchedCount = Sqflite.firstIntValue(await db.rawQuery(
-          "SELECT COUNT(*) FROM class_schedules WHERE LOWER(section_name) LIKE '%emerald%'"
-        )) ?? 0;
+        final emSchedCount =
+            Sqflite.firstIntValue(
+              await db.rawQuery(
+                "SELECT COUNT(*) FROM class_schedules WHERE LOWER(section_name) LIKE '%emerald%'",
+              ),
+            ) ??
+            0;
         if (emSchedCount == 0) {
           final now = DateTime.now().toIso8601String();
-          final subId = cs101Rows.isNotEmpty ? (cs101Rows.first['id'] as int) : 1;
+          final subId = cs101Rows.isNotEmpty
+              ? (cs101Rows.first['id'] as int)
+              : 1;
           await db.insert('class_schedules', {
             'id': 'sched_emerald_1',
             'school_id': 'sch_main',
@@ -3978,10 +4757,17 @@ class DatabaseHelper {
       } catch (_) {}
 
       // If teacher_1 has any other subjects without enrollments, enroll authentic students
-      final otherTeacherSubjects = await db.query('subjects', where: "teacher_id = 'teacher_1' OR teacher_id LIKE '%reyes%'");
+      final otherTeacherSubjects = await db.query(
+        'subjects',
+        where: "teacher_id = 'teacher_1' OR teacher_id LIKE '%reyes%'",
+      );
       for (final sub in otherTeacherSubjects) {
         final sid = sub['id'] as int;
-        final enrs = await db.query('enrollments', where: 'subject_id = ?', whereArgs: [sid]);
+        final enrs = await db.query(
+          'enrollments',
+          where: 'subject_id = ?',
+          whereArgs: [sid],
+        );
         if (enrs.isEmpty) {
           final g = (sub['grade_level'] as String?)?.toLowerCase() ?? '';
           final targetStudents = g.contains('11')
@@ -3991,7 +4777,9 @@ class DatabaseHelper {
             await db.insert('enrollments', {
               'student_id': stId,
               'subject_id': sid,
-              'enrolled_at': DateTime.now().subtract(const Duration(days: 2)).toIso8601String(),
+              'enrolled_at': DateTime.now()
+                  .subtract(const Duration(days: 2))
+                  .toIso8601String(),
               'status': 'active',
             });
           }
@@ -4003,12 +4791,17 @@ class DatabaseHelper {
     try {
       final existingQuizzes = await db.query('quizzes');
       if (existingQuizzes.isEmpty) {
-        final subjects = await db.query('subjects', where: 'subject_code = ?', whereArgs: ['CS101']);
+        final subjects = await db.query(
+          'subjects',
+          where: 'subject_code = ?',
+          whereArgs: ['CS101'],
+        );
         if (subjects.isNotEmpty) {
           final cs101Id = subjects.first['id'] as int;
           final quizId = await db.insert('quizzes', {
             'title': 'CS101: Midterm Quiz Assessment',
-            'description': 'Comprehensive assessment covering Dart language fundamentals, sound null safety, and OOP concepts.',
+            'description':
+                'Comprehensive assessment covering Dart language fundamentals, sound null safety, and OOP concepts.',
             'subject_id': cs101Id,
             'lo_id': null,
             'teacher_id': 'teacher_1',
@@ -4016,14 +4809,19 @@ class DatabaseHelper {
             'time_limit_minutes': 15,
             'passing_score': 70,
             'status': 'published',
-            'due_date': DateTime.now().add(const Duration(days: 7)).toIso8601String(),
-            'created_at': DateTime.now().subtract(const Duration(hours: 4)).toIso8601String(),
+            'due_date': DateTime.now()
+                .add(const Duration(days: 7))
+                .toIso8601String(),
+            'created_at': DateTime.now()
+                .subtract(const Duration(hours: 4))
+                .toIso8601String(),
           });
 
           await db.insert('questions', {
             'lo_id': 0,
             'quiz_id': quizId,
-            'question_text': 'What is the primary role of the "main()" function in a Dart and Flutter application?',
+            'question_text':
+                'What is the primary role of the "main()" function in a Dart and Flutter application?',
             'option_a': 'To declare build-time styles',
             'option_b': 'Entry point where program execution begins',
             'option_c': 'To connect to local SQLite database',
@@ -4035,7 +4833,8 @@ class DatabaseHelper {
           await db.insert('questions', {
             'lo_id': 0,
             'quiz_id': quizId,
-            'question_text': 'Which keyword is used in Dart to declare a compile-time constant?',
+            'question_text':
+                'Which keyword is used in Dart to declare a compile-time constant?',
             'option_a': 'final',
             'option_b': 'const',
             'option_c': 'static',
@@ -4047,7 +4846,8 @@ class DatabaseHelper {
           await db.insert('questions', {
             'lo_id': 0,
             'quiz_id': quizId,
-            'question_text': 'In Flutter, what kind of widget should you use when parts of the UI need to change dynamically?',
+            'question_text':
+                'In Flutter, what kind of widget should you use when parts of the UI need to change dynamically?',
             'option_a': 'StatelessWidget',
             'option_b': 'StatefulWidget',
             'option_c': 'InheritedWidget',
@@ -4060,8 +4860,12 @@ class DatabaseHelper {
           await db.insert('quiz_assignments', {
             'quiz_id': quizId,
             'student_id': 'student_1',
-            'assigned_at': DateTime.now().subtract(const Duration(hours: 4)).toIso8601String(),
-            'due_date': DateTime.now().add(const Duration(days: 7)).toIso8601String(),
+            'assigned_at': DateTime.now()
+                .subtract(const Duration(hours: 4))
+                .toIso8601String(),
+            'due_date': DateTime.now()
+                .add(const Duration(days: 7))
+                .toIso8601String(),
             'status': 'pending',
             'score': 0,
             'total_questions': 3,
@@ -4081,15 +4885,20 @@ class DatabaseHelper {
           final subjId = subjects.first['id'] as int;
           await db.insert('assignments', {
             'title': 'Final Project: Flutter Migration',
-            'description': 'Please provide a link to your GitHub repository or Google Drive folder containing the final project files, or attach your project archive.',
+            'description':
+                'Please provide a link to your GitHub repository or Google Drive folder containing the final project files, or attach your project archive.',
             'subject_id': subjId,
             'teacher_id': 'teacher_1',
             'teacher_name': 'Sir John Reyes',
-            'due_date': DateTime.now().add(const Duration(days: 14)).toIso8601String(),
+            'due_date': DateTime.now()
+                .add(const Duration(days: 14))
+                .toIso8601String(),
             'total_points': 100,
             'submission_type': 'both',
             'status': 'active',
-            'created_at': DateTime.now().subtract(const Duration(days: 1)).toIso8601String(),
+            'created_at': DateTime.now()
+                .subtract(const Duration(days: 1))
+                .toIso8601String(),
           });
         }
       }
@@ -4109,7 +4918,12 @@ class DatabaseHelper {
 
   Future<int> updateSection(int id, Map<String, dynamic> section) async {
     final db = await database;
-    return await db.update('sections', section, where: 'id = ?', whereArgs: [id]);
+    return await db.update(
+      'sections',
+      section,
+      where: 'id = ?',
+      whereArgs: [id],
+    );
   }
 
   Future<int> deleteSection(int id) async {
@@ -4140,10 +4954,14 @@ class DatabaseHelper {
         final enrollments = await db.query(
           'enrollments',
           columns: ['student_id'],
-          where: 'subject_id IN (${subIds.map((_) => '?').join(',')}) AND status = ?',
+          where:
+              'subject_id IN (${subIds.map((_) => '?').join(',')}) AND status = ?',
           whereArgs: [...subIds, 'active'],
         );
-        studentCount = enrollments.map((e) => e['student_id'] as String).toSet().length;
+        studentCount = enrollments
+            .map((e) => e['student_id'] as String)
+            .toSet()
+            .length;
       }
 
       enriched.add({
@@ -4164,7 +4982,12 @@ class DatabaseHelper {
     if (cleanId.isEmpty) return false;
     try {
       final db = await database;
-      final local = await db.query('users', where: 'id = ?', whereArgs: [cleanId], limit: 1);
+      final local = await db.query(
+        'users',
+        where: 'id = ?',
+        whereArgs: [cleanId],
+        limit: 1,
+      );
       if (local.isNotEmpty) return true;
     } catch (_) {}
     try {
@@ -4261,7 +5084,9 @@ class DatabaseHelper {
       existingId = existingUsers.first['id'] as String?;
     } else {
       try {
-        final cloudMatch = await FirestoreService().findUserByIdentifier(cleanEmail);
+        final cloudMatch = await FirestoreService().findUserByIdentifier(
+          cleanEmail,
+        );
         if (cloudMatch != null && cloudMatch.containsKey('id')) {
           existingId = cloudMatch['id']?.toString();
         }
@@ -4285,7 +5110,9 @@ class DatabaseHelper {
 
     final resolvedUsername = (username != null && username.trim().isNotEmpty)
         ? username.trim()
-        : (email.contains('@') ? email.split('@').first : fullName.trim().toLowerCase().replaceAll(' ', '.'));
+        : (email.contains('@')
+              ? email.split('@').first
+              : fullName.trim().toLowerCase().replaceAll(' ', '.'));
 
     final teacherData = {
       'id': finalTeacherId,
@@ -4303,17 +5130,37 @@ class DatabaseHelper {
 
     if (existingId != null && existingId.isNotEmpty) {
       try {
-        await db.update('users', teacherData, where: 'id = ?', whereArgs: [finalTeacherId]);
+        await db.update(
+          'users',
+          teacherData,
+          where: 'id = ?',
+          whereArgs: [finalTeacherId],
+        );
       } catch (_) {
-        final fallback = Map<String, dynamic>.from(teacherData)..remove('category');
-        await db.update('users', fallback, where: 'id = ?', whereArgs: [finalTeacherId]);
+        final fallback = Map<String, dynamic>.from(teacherData)
+          ..remove('category');
+        await db.update(
+          'users',
+          fallback,
+          where: 'id = ?',
+          whereArgs: [finalTeacherId],
+        );
       }
     } else {
       try {
-        await db.insert('users', teacherData, conflictAlgorithm: ConflictAlgorithm.replace);
+        await db.insert(
+          'users',
+          teacherData,
+          conflictAlgorithm: ConflictAlgorithm.replace,
+        );
       } catch (_) {
-        final fallbackData = Map<String, dynamic>.from(teacherData)..remove('category');
-        await db.insert('users', fallbackData, conflictAlgorithm: ConflictAlgorithm.replace);
+        final fallbackData = Map<String, dynamic>.from(teacherData)
+          ..remove('category');
+        await db.insert(
+          'users',
+          fallbackData,
+          conflictAlgorithm: ConflictAlgorithm.replace,
+        );
       }
     }
 
@@ -4339,7 +5186,9 @@ class DatabaseHelper {
         role: 'teacher',
       );
     } catch (e) {
-      debugPrint('[DatabaseHelper] Error dispatching teacher credentials email: $e');
+      debugPrint(
+        '[DatabaseHelper] Error dispatching teacher credentials email: $e',
+      );
     }
 
     return finalTeacherId;
@@ -4374,7 +5223,9 @@ class DatabaseHelper {
       existingId = existingUsers.first['id'] as String?;
     } else {
       try {
-        final cloudMatch = await FirestoreService().findUserByIdentifier(cleanEmail);
+        final cloudMatch = await FirestoreService().findUserByIdentifier(
+          cleanEmail,
+        );
         if (cloudMatch != null && cloudMatch.containsKey('id')) {
           existingId = cloudMatch['id']?.toString();
         }
@@ -4400,7 +5251,9 @@ class DatabaseHelper {
 
     final resolvedUsername = (username != null && username.trim().isNotEmpty)
         ? username.trim()
-        : (email.contains('@') ? email.split('@').first : fullName.trim().toLowerCase().replaceAll(' ', '.'));
+        : (email.contains('@')
+              ? email.split('@').first
+              : fullName.trim().toLowerCase().replaceAll(' ', '.'));
 
     final studentData = {
       'id': finalStudentId,
@@ -4422,17 +5275,37 @@ class DatabaseHelper {
 
     if (existingId != null && existingId.isNotEmpty) {
       try {
-        await db.update('users', studentData, where: 'id = ?', whereArgs: [finalStudentId]);
+        await db.update(
+          'users',
+          studentData,
+          where: 'id = ?',
+          whereArgs: [finalStudentId],
+        );
       } catch (_) {
-        final fallback = Map<String, dynamic>.from(studentData)..remove('category');
-        await db.update('users', fallback, where: 'id = ?', whereArgs: [finalStudentId]);
+        final fallback = Map<String, dynamic>.from(studentData)
+          ..remove('category');
+        await db.update(
+          'users',
+          fallback,
+          where: 'id = ?',
+          whereArgs: [finalStudentId],
+        );
       }
     } else {
       try {
-        await db.insert('users', studentData, conflictAlgorithm: ConflictAlgorithm.replace);
+        await db.insert(
+          'users',
+          studentData,
+          conflictAlgorithm: ConflictAlgorithm.replace,
+        );
       } catch (_) {
-        final fallbackData = Map<String, dynamic>.from(studentData)..remove('category');
-        await db.insert('users', fallbackData, conflictAlgorithm: ConflictAlgorithm.replace);
+        final fallbackData = Map<String, dynamic>.from(studentData)
+          ..remove('category');
+        await db.insert(
+          'users',
+          fallbackData,
+          conflictAlgorithm: ConflictAlgorithm.replace,
+        );
       }
     }
 
@@ -4466,7 +5339,9 @@ class DatabaseHelper {
         specialNotes: specialNotes,
       );
     } catch (e) {
-      debugPrint('[DatabaseHelper] Error dispatching student credentials email: $e');
+      debugPrint(
+        '[DatabaseHelper] Error dispatching student credentials email: $e',
+      );
     }
 
     return finalStudentId;
@@ -4479,14 +5354,27 @@ class DatabaseHelper {
     required String newPassword,
   }) async {
     final db = await database;
-    final userRows = await db.query('users', where: 'id = ?', whereArgs: [userId], limit: 1);
+    final userRows = await db.query(
+      'users',
+      where: 'id = ?',
+      whereArgs: [userId],
+      limit: 1,
+    );
     if (userRows.isEmpty) {
-      return EmailResult(success: false, message: 'User $userId not found in database.', channel: 'none');
+      return EmailResult(
+        success: false,
+        message: 'User $userId not found in database.',
+        channel: 'none',
+      );
     }
     final user = userRows.first;
     final email = (user['email'] as String? ?? '').trim();
     if (email.isEmpty) {
-      return EmailResult(success: false, message: 'User does not have an email address configured.', channel: 'none');
+      return EmailResult(
+        success: false,
+        message: 'User does not have an email address configured.',
+        channel: 'none',
+      );
     }
 
     final salt = generateSalt();
@@ -4499,7 +5387,12 @@ class DatabaseHelper {
 
     await db.update('users', updates, where: 'id = ?', whereArgs: [userId]);
     try {
-      await db.update('sessions', {'must_change_password': 1}, where: 'user_id = ?', whereArgs: [userId]);
+      await db.update(
+        'sessions',
+        {'must_change_password': 1},
+        where: 'user_id = ?',
+        whereArgs: [userId],
+      );
       final prefs = await SharedPreferences.getInstance();
       await prefs.setBool('must_change_password_$userId', true);
     } catch (_) {}
@@ -4507,14 +5400,18 @@ class DatabaseHelper {
     try {
       await FirestoreService().saveUser({'id': userId, ...updates});
     } catch (e) {
-      debugPrint('[DatabaseHelper] Error syncing reset password to Firestore: $e');
+      debugPrint(
+        '[DatabaseHelper] Error syncing reset password to Firestore: $e',
+      );
     }
 
     final fullName = user['full_name'] as String? ?? 'User';
     final role = user['role'] as String? ?? 'student';
     final resolvedUsername = (user['username'] as String?)?.isNotEmpty == true
         ? user['username'] as String
-        : (email.contains('@') ? email.split('@').first : fullName.toLowerCase().replaceAll(' ', '.'));
+        : (email.contains('@')
+              ? email.split('@').first
+              : fullName.toLowerCase().replaceAll(' ', '.'));
 
     return await EmailService().sendAccountCredentials(
       toEmail: email,
@@ -4536,9 +5433,12 @@ class DatabaseHelper {
   }) async {
     final db = await database;
     final updates = <String, dynamic>{};
-    if (data.containsKey('full_name')) updates['full_name'] = (data['full_name'] as String).trim();
-    if (data.containsKey('email')) updates['email'] = (data['email'] as String).trim();
-    if (data.containsKey('username')) updates['username'] = (data['username'] as String).trim();
+    if (data.containsKey('full_name'))
+      updates['full_name'] = (data['full_name'] as String).trim();
+    if (data.containsKey('email'))
+      updates['email'] = (data['email'] as String).trim();
+    if (data.containsKey('username'))
+      updates['username'] = (data['username'] as String).trim();
     if (data.containsKey('password')) {
       final rawPass = data['password'] as String;
       if (rawPass.isNotEmpty) {
@@ -4547,7 +5447,12 @@ class DatabaseHelper {
         updates['password_salt'] = salt;
         updates['must_change_password'] = 1;
         try {
-          await db.update('sessions', {'must_change_password': 1}, where: 'user_id = ?', whereArgs: [teacherId]);
+          await db.update(
+            'sessions',
+            {'must_change_password': 1},
+            where: 'user_id = ?',
+            whereArgs: [teacherId],
+          );
           final prefs = await SharedPreferences.getInstance();
           await prefs.setBool('must_change_password_$teacherId', true);
         } catch (_) {}
@@ -4555,14 +5460,28 @@ class DatabaseHelper {
     }
 
     if (updates.isNotEmpty) {
-      await db.update('users', updates, where: 'id = ?', whereArgs: [teacherId]);
+      await db.update(
+        'users',
+        updates,
+        where: 'id = ?',
+        whereArgs: [teacherId],
+      );
       try {
         await FirestoreService().saveUser({'id': teacherId, ...updates});
       } catch (_) {}
     }
 
-    final teacherRows = await db.query('users', columns: ['full_name'], where: 'id = ?', whereArgs: [teacherId]);
-    final teacherName = (teacherRows.isNotEmpty ? teacherRows.first['full_name'] as String? : null) ?? 'Teacher';
+    final teacherRows = await db.query(
+      'users',
+      columns: ['full_name'],
+      where: 'id = ?',
+      whereArgs: [teacherId],
+    );
+    final teacherName =
+        (teacherRows.isNotEmpty
+            ? teacherRows.first['full_name'] as String?
+            : null) ??
+        'Teacher';
 
     if (assignSubjectIds != null) {
       // Unassign subjects previously assigned to this teacher
@@ -4584,7 +5503,12 @@ class DatabaseHelper {
     final db = await database;
     String? email;
     try {
-      final userRows = await db.query('users', where: 'id = ?', whereArgs: [teacherId], limit: 1);
+      final userRows = await db.query(
+        'users',
+        where: 'id = ?',
+        whereArgs: [teacherId],
+        limit: 1,
+      );
       if (userRows.isNotEmpty) {
         email = userRows.first['email'] as String?;
       }
@@ -4603,15 +5527,24 @@ class DatabaseHelper {
     try {
       await FirestoreService()
           .deleteUser(teacherId, email: email)
-          .timeout(const Duration(seconds: 4), onTimeout: () {
-        debugPrint('[DatabaseHelper] Firestore deleteUser timed out for $teacherId');
-      });
+          .timeout(
+            const Duration(seconds: 4),
+            onTimeout: () {
+              debugPrint(
+                '[DatabaseHelper] Firestore deleteUser timed out for $teacherId',
+              );
+            },
+          );
     } catch (e) {
-      debugPrint('[DatabaseHelper] Error deleting teacher $teacherId from Firestore: $e');
+      debugPrint(
+        '[DatabaseHelper] Error deleting teacher $teacherId from Firestore: $e',
+      );
     }
   }
 
-  Future<List<Map<String, dynamic>>> getSubjectsForTeacher(String teacherId) async {
+  Future<List<Map<String, dynamic>>> getSubjectsForTeacher(
+    String teacherId,
+  ) async {
     final db = await database;
     return await db.query(
       'subjects',
@@ -4621,14 +5554,15 @@ class DatabaseHelper {
     );
   }
 
-  Future<int> assignTeacherToSubject(int subjectId, String teacherId, String teacherName) async {
+  Future<int> assignTeacherToSubject(
+    int subjectId,
+    String teacherId,
+    String teacherName,
+  ) async {
     final db = await database;
     return await db.update(
       'subjects',
-      {
-        'teacher_id': teacherId,
-        'teacher_name': teacherName,
-      },
+      {'teacher_id': teacherId, 'teacher_name': teacherName},
       where: 'id = ?',
       whereArgs: [subjectId],
     );
@@ -4641,7 +5575,9 @@ class DatabaseHelper {
     final db = await database;
     final users = await db.query('users', where: "role = 'student'");
     final total = users.length;
-    final active = users.where((u) => (u['section'] as String?)?.isNotEmpty == true).length;
+    final active = users
+        .where((u) => (u['section'] as String?)?.isNotEmpty == true)
+        .length;
     final unassigned = total - active;
 
     final gradeCounts = <String, int>{};
@@ -4668,9 +5604,17 @@ class DatabaseHelper {
   /// Teacher dashboard stats: subjects, unique students, attempts, pass rate, avg score, recent attempts,
   /// plus rich descriptive, predictive, and prescriptive analytics.
   /// Supports optional filtering by section or specific student
-  Future<Map<String, dynamic>> getTeacherDashboardStats(String teacherId, {String? section, String? studentId}) async {
+  Future<Map<String, dynamic>> getTeacherDashboardStats(
+    String teacherId, {
+    String? section,
+    String? studentId,
+  }) async {
     final db = await database;
-    final subjects = await db.query('subjects', where: 'teacher_id = ?', whereArgs: [teacherId]);
+    final subjects = await db.query(
+      'subjects',
+      where: 'teacher_id = ?',
+      whereArgs: [teacherId],
+    );
     final totalSubjects = subjects.length;
     final subjectIds = subjects.map((s) => s['id'] as int).toList();
 
@@ -4684,8 +5628,13 @@ class DatabaseHelper {
 
     // Determine target student IDs if filtering by section or student
     Set<String>? allowedStudentIds;
-    final hasSectionFilter = section != null && section.isNotEmpty && section != 'All Handled Sections' && section != 'All Sections';
-    final hasStudentFilter = studentId != null && studentId.isNotEmpty && studentId != 'All';
+    final hasSectionFilter =
+        section != null &&
+        section.isNotEmpty &&
+        section != 'All Handled Sections' &&
+        section != 'All Sections';
+    final hasStudentFilter =
+        studentId != null && studentId.isNotEmpty && studentId != 'All';
 
     if (hasStudentFilter) {
       allowedStudentIds = {studentId};
@@ -4693,7 +5642,11 @@ class DatabaseHelper {
       final secLower = section.toLowerCase().trim();
       final secStudents = await db.query('users', where: "role = 'student'");
       allowedStudentIds = secStudents
-          .where((s) => ((s['section'] as String?)?.toLowerCase().trim() ?? '') == secLower)
+          .where(
+            (s) =>
+                ((s['section'] as String?)?.toLowerCase().trim() ?? '') ==
+                secLower,
+          )
           .map((s) => s['id'] as String)
           .toSet();
     }
@@ -4702,7 +5655,8 @@ class DatabaseHelper {
       final placeholders = subjectIds.map((_) => '?').join(',');
 
       // 1. Efficient enrollment query (count unique enrolled students)
-      String enrollQuery = 'SELECT DISTINCT student_id FROM enrollments WHERE subject_id IN ($placeholders)';
+      String enrollQuery =
+          'SELECT DISTINCT student_id FROM enrollments WHERE subject_id IN ($placeholders)';
       final enrollArgs = List<dynamic>.from(subjectIds);
       if (allowedStudentIds != null && allowedStudentIds.isNotEmpty) {
         final sPlaceholders = allowedStudentIds.map((_) => '?').join(',');
@@ -4740,7 +5694,8 @@ class DatabaseHelper {
         totalPct = (row['avg_score'] as num?)?.toDouble() ?? 0.0;
         masteryCount = (row['mastery_count'] as num?)?.toInt() ?? 0;
         proficientCount = (row['proficient_count'] as num?)?.toInt() ?? 0;
-        needsAttentionCount = (row['needs_attention_count'] as num?)?.toInt() ?? 0;
+        needsAttentionCount =
+            (row['needs_attention_count'] as num?)?.toInt() ?? 0;
       }
     }
 
@@ -4752,11 +5707,21 @@ class DatabaseHelper {
         final handledSections = await getSectionsForTeacher(teacherId);
         if (handledSections.isNotEmpty) {
           final targetSections = hasSectionFilter ? [section] : handledSections;
-          final handledLower = targetSections.map((s) => s.toLowerCase().trim()).toSet();
-          final allStudents = await db.query('users', where: 'role = ?', whereArgs: ['student']);
+          final handledLower = targetSections
+              .map((s) => s.toLowerCase().trim())
+              .toSet();
+          final allStudents = await db.query(
+            'users',
+            where: 'role = ?',
+            whereArgs: ['student'],
+          );
           final matched = allStudents.where((s) {
             final sec = (s['section'] as String?)?.toLowerCase().trim() ?? '';
-            return sec.isNotEmpty && (handledLower.contains(sec) || handledLower.any((h) => h.contains(sec) || sec.contains(h)));
+            return sec.isNotEmpty &&
+                (handledLower.contains(sec) ||
+                    handledLower.any(
+                      (h) => h.contains(sec) || sec.contains(h),
+                    ));
           }).length;
           if (matched > 0) {
             totalStudents = matched;
@@ -4765,14 +5730,17 @@ class DatabaseHelper {
       }
     }
 
-    final passRate = totalAttempts > 0 ? ((passedAttempts / totalAttempts) * 100).round() : 0;
+    final passRate = totalAttempts > 0
+        ? ((passedAttempts / totalAttempts) * 100).round()
+        : 0;
     final avgScore = totalPct.round();
 
     // 3. Predictive Analytics: Identify students needing attention soon
     List<Map<String, dynamic>> atRiskStudents = [];
     if (subjectIds.isNotEmpty) {
       final placeholders = subjectIds.map((_) => '?').join(',');
-      String atRiskQuery = '''
+      String atRiskQuery =
+          '''
         SELECT u.id, u.full_name, u.section, u.profile_image,
                AVG(qa.percentage) as avg_score,
                COUNT(qa.id) as attempts_count,
@@ -4803,7 +5771,8 @@ class DatabaseHelper {
         } else if (minPass == 0) {
           reason = 'Borderline: Did not pass most recent attempt';
         } else {
-          reason = 'Borderline: Average score ${avg.round()}% is near 75% cutoff';
+          reason =
+              'Borderline: Average score ${avg.round()}% is near 75% cutoff';
         }
         return {
           'id': r['id'] as String,
@@ -4821,7 +5790,8 @@ class DatabaseHelper {
     if (totalSubjects == 0) {
       recommendedActions.add({
         'title': 'Set Up Your First Subject',
-        'description': 'Add your curriculum subjects and syllabi so students can enroll and access learning materials.',
+        'description':
+            'Add your curriculum subjects and syllabi so students can enroll and access learning materials.',
         'actionType': 'create_subject',
         'badge': 'Curriculum Setup',
         'icon': 'menu_book_outlined',
@@ -4829,7 +5799,8 @@ class DatabaseHelper {
     } else if (totalStudents == 0) {
       recommendedActions.add({
         'title': 'Verify Student Rosters',
-        'description': 'No enrolled students found yet in your active subjects. Review section assignments to connect your class.',
+        'description':
+            'No enrolled students found yet in your active subjects. Review section assignments to connect your class.',
         'actionType': 'view_roster',
         'badge': 'Roster Enrollment',
         'icon': 'group_add_outlined',
@@ -4837,7 +5808,8 @@ class DatabaseHelper {
     } else if (totalAttempts == 0) {
       recommendedActions.add({
         'title': 'Publish First Practice Quiz',
-        'description': 'Quizzes gauge student learning. Publish a practice assessment to start gathering performance analytics.',
+        'description':
+            'Quizzes gauge student learning. Publish a practice assessment to start gathering performance analytics.',
         'actionType': 'create_quiz',
         'badge': 'Assessment',
         'icon': 'quiz_outlined',
@@ -4847,7 +5819,8 @@ class DatabaseHelper {
         final firstStudent = atRiskStudents.first['name'];
         recommendedActions.add({
           'title': 'Offer Review for Struggling Students',
-          'description': '${atRiskStudents.length} student(s) including $firstStudent could benefit from targeted practice before the next exam.',
+          'description':
+              '${atRiskStudents.length} student(s) including $firstStudent could benefit from targeted practice before the next exam.',
           'actionType': 'view_students',
           'badge': 'Targeted Support',
           'icon': 'support_agent_outlined',
@@ -4858,7 +5831,8 @@ class DatabaseHelper {
         if (pct >= 25) {
           recommendedActions.add({
             'title': 'Dedicate 10-Min Review in Class',
-            'description': '$pct% of quiz attempts were below 75%. Clarifying key quiz questions will boost overall class confidence.',
+            'description':
+                '$pct% of quiz attempts were below 75%. Clarifying key quiz questions will boost overall class confidence.',
             'actionType': 'post_announcement',
             'badge': 'Concept Review',
             'icon': 'rate_review_outlined',
@@ -4868,7 +5842,8 @@ class DatabaseHelper {
       if (passRate >= 80) {
         recommendedActions.add({
           'title': 'Challenge Advanced Learners',
-          'description': 'Class is performing strongly ($passRate% pass rate). Consider unlocking enrichment projects or peer tutoring.',
+          'description':
+              'Class is performing strongly ($passRate% pass rate). Consider unlocking enrichment projects or peer tutoring.',
           'actionType': 'create_quiz',
           'badge': 'Enrichment',
           'icon': 'workspace_premium_outlined',
@@ -4909,13 +5884,19 @@ class DatabaseHelper {
       'proficientCount': proficientCount,
       'needsAttentionCount': needsAttentionCount,
       'atRiskStudents': atRiskStudents,
-      'forecastPassRate': totalAttempts > 0 ? ((passRate * 0.95 + 4).clamp(0, 100)).round() : null,
+      'forecastPassRate': totalAttempts > 0
+          ? ((passRate * 0.95 + 4).clamp(0, 100)).round()
+          : null,
       'recommendedActions': recommendedActions,
     };
   }
 
   /// Student roster for teacher with progress per subject and section-based queries
-  Future<List<Map<String, dynamic>>> getStudentsForTeacher(String teacherId, {String? section, String? query}) async {
+  Future<List<Map<String, dynamic>>> getStudentsForTeacher(
+    String teacherId, {
+    String? section,
+    String? query,
+  }) async {
     final db = await database;
     final subjects = await getSubjectsForTeacher(teacherId);
     final subjectIds = subjects.map((s) => s['id'] as int).toList();
@@ -4929,11 +5910,16 @@ class DatabaseHelper {
         whereArgs: subjectIds,
       );
     }
-    final enrolledStudentIds = enrollments.map((e) => e['student_id'] as String).toSet();
+    final enrolledStudentIds = enrollments
+        .map((e) => e['student_id'] as String)
+        .toSet();
 
     // Query students
     List<Map<String, dynamic>> students;
-    if (section != null && section.isNotEmpty && section != 'All Sections' && section != 'All Handled Sections') {
+    if (section != null &&
+        section.isNotEmpty &&
+        section != 'All Sections' &&
+        section != 'All Handled Sections') {
       // Find students whose section matches or who are enrolled in teacher's subjects with this section
       final cleanSection = section.trim().toLowerCase();
       final candidates = await db.query(
@@ -4942,7 +5928,8 @@ class DatabaseHelper {
         whereArgs: ['student'],
       );
       students = candidates.where((s) {
-        final studentSec = (s['section'] as String?)?.trim().toLowerCase() ?? '';
+        final studentSec =
+            (s['section'] as String?)?.trim().toLowerCase() ?? '';
         if (studentSec.isEmpty) return false;
         return studentSec == cleanSection || studentSec.contains(cleanSection);
       }).toList();
@@ -4950,15 +5937,26 @@ class DatabaseHelper {
       // All sections: find all students enrolled in teacher's subjects,
       // OR students belonging to any of teacher's handled sections
       final handledSections = await getSectionsForTeacher(teacherId);
-      final handledLower = handledSections.map((s) => s.toLowerCase().trim()).toSet();
+      final handledLower = handledSections
+          .map((s) => s.toLowerCase().trim())
+          .toSet();
 
-      final allStudents = await db.query('users', where: 'role = ?', whereArgs: ['student']);
+      final allStudents = await db.query(
+        'users',
+        where: 'role = ?',
+        whereArgs: ['student'],
+      );
       students = allStudents.where((s) {
         final sid = s['id'] as String;
         final sec = (s['section'] as String?)?.toLowerCase().trim() ?? '';
         return enrolledStudentIds.contains(sid) ||
             (sec.isNotEmpty && handledLower.contains(sec)) ||
-            handledLower.any((h) => h.isNotEmpty && sec.isNotEmpty && (sec.contains(h) || h.contains(sec)));
+            handledLower.any(
+              (h) =>
+                  h.isNotEmpty &&
+                  sec.isNotEmpty &&
+                  (sec.contains(h) || h.contains(sec)),
+            );
       }).toList();
     }
 
@@ -4981,14 +5979,21 @@ class DatabaseHelper {
       // Progress for this student in teacher's subjects
       int completedLos = 0;
       if (subjectIds.isNotEmpty) {
-        final progress = await db.rawQuery('''
+        final progress = await db.rawQuery(
+          '''
           SELECT * FROM student_progress 
           WHERE student_id = ? AND subject_id IN (${subjectIds.map((_) => '?').join(',')})
-        ''', [sid, ...subjectIds]);
-        completedLos = progress.where((p) => (p['is_completed'] as int?) == 1).length;
+        ''',
+          [sid, ...subjectIds],
+        );
+        completedLos = progress
+            .where((p) => (p['is_completed'] as int?) == 1)
+            .length;
       }
 
-      final studentSubjectEnrollments = enrollments.where((e) => e['student_id'] == sid).length;
+      final studentSubjectEnrollments = enrollments
+          .where((e) => e['student_id'] == sid)
+          .length;
       final isEnrolled = enrolledStudentIds.contains(sid);
 
       list.add({
@@ -4999,12 +6004,18 @@ class DatabaseHelper {
       });
     }
 
-    list.sort((a, b) => (a['full_name'] as String? ?? '').compareTo(b['full_name'] as String? ?? ''));
+    list.sort(
+      (a, b) => (a['full_name'] as String? ?? '').compareTo(
+        b['full_name'] as String? ?? '',
+      ),
+    );
     return list;
   }
 
   /// Get handled sections with metadata, student counts, and enrolled courses
-  Future<List<Map<String, dynamic>>> getHandledSectionsWithDetails(String teacherId) async {
+  Future<List<Map<String, dynamic>>> getHandledSectionsWithDetails(
+    String teacherId,
+  ) async {
     final db = await database;
     final handledSectionNames = await getSectionsForTeacher(teacherId);
     final subjects = await getSubjectsForTeacher(teacherId);
@@ -5029,9 +6040,15 @@ class DatabaseHelper {
         whereArgs: subjectIds,
       );
     }
-    final enrolledStudentIds = teacherEnrollments.map((e) => e['student_id'] as String).toSet();
+    final enrolledStudentIds = teacherEnrollments
+        .map((e) => e['student_id'] as String)
+        .toSet();
 
-    final allStudents = await db.query('users', where: 'role = ?', whereArgs: ['student']);
+    final allStudents = await db.query(
+      'users',
+      where: 'role = ?',
+      whereArgs: ['student'],
+    );
 
     final details = <Map<String, dynamic>>[];
     for (final secName in handledSectionNames) {
@@ -5039,11 +6056,15 @@ class DatabaseHelper {
 
       final studentsInSection = allStudents.where((s) {
         final sSec = (s['section'] as String?)?.toLowerCase().trim() ?? '';
-        return sSec == secLower || (sSec.isNotEmpty && (sSec.contains(secLower) || secLower.contains(sSec)));
+        return sSec == secLower ||
+            (sSec.isNotEmpty &&
+                (sSec.contains(secLower) || secLower.contains(sSec)));
       }).toList();
 
       final totalStudents = studentsInSection.length;
-      final enrolledCount = studentsInSection.where((s) => enrolledStudentIds.contains(s['id'] as String)).length;
+      final enrolledCount = studentsInSection
+          .where((s) => enrolledStudentIds.contains(s['id'] as String))
+          .length;
 
       // Determine grade and room
       String grade = '';
@@ -5072,7 +6093,10 @@ class DatabaseHelper {
         grade = 'Senior High';
       }
 
-      final subjectNames = subjects.map((s) => s['name']?.toString() ?? '').where((n) => n.isNotEmpty).toList();
+      final subjectNames = subjects
+          .map((s) => s['name']?.toString() ?? '')
+          .where((n) => n.isNotEmpty)
+          .toList();
 
       details.add({
         'name': secName,
@@ -5085,7 +6109,10 @@ class DatabaseHelper {
       });
     }
 
-    details.sort((a, b) => (a['name'] as String? ?? '').compareTo(b['name'] as String? ?? ''));
+    details.sort(
+      (a, b) =>
+          (a['name'] as String? ?? '').compareTo(b['name'] as String? ?? ''),
+    );
     return details;
   }
 
@@ -5105,12 +6132,16 @@ class DatabaseHelper {
         where: 'subject_id IN (${subjectIds.map((_) => '?').join(',')})',
         whereArgs: subjectIds,
       );
-      final studentIds = enrollments.map((e) => e['student_id'] as String).toSet().toList();
+      final studentIds = enrollments
+          .map((e) => e['student_id'] as String)
+          .toSet()
+          .toList();
       if (studentIds.isNotEmpty) {
         final students = await db.query(
           'users',
           columns: ['section'],
-          where: 'id IN (${studentIds.map((_) => '?').join(',')}) AND section IS NOT NULL',
+          where:
+              'id IN (${studentIds.map((_) => '?').join(',')}) AND section IS NOT NULL',
           whereArgs: studentIds,
         );
         for (final s in students) {
@@ -5144,14 +6175,18 @@ class DatabaseHelper {
         for (final r in secRows) {
           final rGrade = (r['grade'] as String?)?.trim().toLowerCase();
           final rName = (r['name'] as String?)?.trim();
-          if (rGrade != null && subjectGrades.contains(rGrade) && rName != null && rName.isNotEmpty) {
+          if (rGrade != null &&
+              subjectGrades.contains(rGrade) &&
+              rName != null &&
+              rName.isNotEmpty) {
             sections.add(rName);
           }
         }
       }
 
       // If still empty and teacher is teacher_1 (default faculty instructor), link to available school sections
-      if (sections.isEmpty && (teacherId == 'teacher_1' || teacherId.contains('reyes'))) {
+      if (sections.isEmpty &&
+          (teacherId == 'teacher_1' || teacherId.contains('reyes'))) {
         sections.addAll(availableSections);
       }
     }
@@ -5161,7 +6196,10 @@ class DatabaseHelper {
   }
 
   /// Get announcements for a teacher with optional section filtering
-  Future<List<Map<String, dynamic>>> getAnnouncementsForTeacher(String teacherId, {String? section}) async {
+  Future<List<Map<String, dynamic>>> getAnnouncementsForTeacher(
+    String teacherId, {
+    String? section,
+  }) async {
     final db = await database;
     final all = await db.query('announcements', orderBy: 'id DESC');
     final handledSections = await getSectionsForTeacher(teacherId);
@@ -5193,7 +6231,9 @@ class DatabaseHelper {
   }
 
   /// Get announcements targeted to a student based on audience and section
-  Future<List<Map<String, dynamic>>> getAnnouncementsForStudent(String? studentSection) async {
+  Future<List<Map<String, dynamic>>> getAnnouncementsForStudent(
+    String? studentSection,
+  ) async {
     final db = await database;
     final all = await db.query('announcements', orderBy: 'id DESC');
     return all.where((a) {
@@ -5215,11 +6255,22 @@ class DatabaseHelper {
   }
 
   /// Get students enrolled in a subject, or all students if subject enrollments are empty
-  Future<List<Map<String, dynamic>>> getStudentsForSubjectOrAll(int subjectId, {String? section, String? query}) async {
+  Future<List<Map<String, dynamic>>> getStudentsForSubjectOrAll(
+    int subjectId, {
+    String? section,
+    String? query,
+  }) async {
     final db = await database;
     try {
-      final enrollments = await db.query('enrollments', where: 'subject_id = ?', whereArgs: [subjectId]);
-      final studentIds = enrollments.map((e) => e['student_id'] as String).toSet().toList();
+      final enrollments = await db.query(
+        'enrollments',
+        where: 'subject_id = ?',
+        whereArgs: [subjectId],
+      );
+      final studentIds = enrollments
+          .map((e) => e['student_id'] as String)
+          .toSet()
+          .toList();
 
       List<Map<String, dynamic>> students = [];
       if (studentIds.isNotEmpty) {
@@ -5244,12 +6295,18 @@ class DatabaseHelper {
       final list = <Map<String, dynamic>>[];
       for (final s in students) {
         final sec = (s['section'] as String?) ?? '';
-        if (section != null && section.isNotEmpty && section != 'All Sections' && sec != section) continue;
+        if (section != null &&
+            section.isNotEmpty &&
+            section != 'All Sections' &&
+            sec != section)
+          continue;
         final name = (s['full_name'] as String?) ?? '';
         final email = (s['email'] as String?) ?? '';
         if (query != null && query.trim().isNotEmpty) {
           final q = query.toLowerCase();
-          if (!name.toLowerCase().contains(q) && !email.toLowerCase().contains(q)) continue;
+          if (!name.toLowerCase().contains(q) &&
+              !email.toLowerCase().contains(q))
+            continue;
         }
         list.add(s);
       }
@@ -5260,7 +6317,9 @@ class DatabaseHelper {
   }
 
   /// Returns all available subjects with is_enrolled flag and enrollment date for a given student
-  Future<List<Map<String, dynamic>>> getStudentEnrollmentsWithDetails(String studentId) async {
+  Future<List<Map<String, dynamic>>> getStudentEnrollmentsWithDetails(
+    String studentId,
+  ) async {
     final db = await database;
     final allSubjects = await db.query('subjects', orderBy: 'id ASC');
     final activeEnrollments = await db.query(
@@ -5287,7 +6346,10 @@ class DatabaseHelper {
   }
 
   /// Sets exactly which subjects a student is enrolled in, activating new ones and removing unselected ones
-  Future<void> setStudentEnrollments(String studentId, List<int> subjectIds) async {
+  Future<void> setStudentEnrollments(
+    String studentId,
+    List<int> subjectIds,
+  ) async {
     final db = await database;
     if (subjectIds.isEmpty) {
       await db.delete(
@@ -5301,7 +6363,8 @@ class DatabaseHelper {
     // Delete enrollments not in subjectIds
     await db.delete(
       'enrollments',
-      where: 'student_id = ? AND subject_id NOT IN (${subjectIds.map((_) => '?').join(',')})',
+      where:
+          'student_id = ? AND subject_id NOT IN (${subjectIds.map((_) => '?').join(',')})',
       whereArgs: [studentId, ...subjectIds],
     );
 
@@ -5332,7 +6395,11 @@ class DatabaseHelper {
   }
 
   /// Auto-enroll student in all subjects matching grade/section assigned to teachers
-  Future<void> autoEnrollStudentBySection(String studentId, String section, String grade) async {
+  Future<void> autoEnrollStudentBySection(
+    String studentId,
+    String section,
+    String grade,
+  ) async {
     final db = await database;
     // Find subjects that match the grade level (via subjects.grade_level) or have teachers assigned
     final subjects = await db.query('subjects');
@@ -5352,9 +6419,16 @@ class DatabaseHelper {
   }
 
   /// Validate and consume a registration key atomically
-  Future<bool> validateAndConsumeRegistrationKey(String code, String studentId) async {
+  Future<bool> validateAndConsumeRegistrationKey(
+    String code,
+    String studentId,
+  ) async {
     final db = await database;
-    final res = await db.query('reg_links', where: 'code = ?', whereArgs: [code]);
+    final res = await db.query(
+      'reg_links',
+      where: 'code = ?',
+      whereArgs: [code],
+    );
     if (res.isEmpty) return false;
     final link = res.first;
     final usedCount = (link['used_count'] as int?) ?? 0;
@@ -5367,17 +6441,30 @@ class DatabaseHelper {
     if (maxUses > 0 && usedCount >= maxUses) return false;
 
     // Atomically increment and bind student
-    await db.update('reg_links', {
-      'used_count': usedCount + 1,
-    }, where: 'code = ?', whereArgs: [code]);
+    await db.update(
+      'reg_links',
+      {'used_count': usedCount + 1},
+      where: 'code = ?',
+      whereArgs: [code],
+    );
 
     final sectionName = link['section'] as String? ?? '';
     if (sectionName.isNotEmpty) {
-      await db.update('users', {
-        'section': sectionName,
-      }, where: 'id = ?', whereArgs: [studentId]);
-      await db.execute('UPDATE sections SET student_count = student_count + 1 WHERE name = ?', [sectionName]);
-      await autoEnrollStudentBySection(studentId, sectionName, ''); // grade handled separately if needed
+      await db.update(
+        'users',
+        {'section': sectionName},
+        where: 'id = ?',
+        whereArgs: [studentId],
+      );
+      await db.execute(
+        'UPDATE sections SET student_count = student_count + 1 WHERE name = ?',
+        [sectionName],
+      );
+      await autoEnrollStudentBySection(
+        studentId,
+        sectionName,
+        '',
+      ); // grade handled separately if needed
     }
     return true;
   }
@@ -5427,16 +6514,30 @@ class DatabaseHelper {
         'option_b': q['option_b'] ?? '',
         'option_c': q['option_c'] ?? '',
         'option_d': q['option_d'] ?? '',
-        'correct_option': (q['correct_option'] ?? 'A').toString().toUpperCase().trim(),
+        'correct_option': (q['correct_option'] ?? 'A')
+            .toString()
+            .toUpperCase()
+            .trim(),
         'created_at': now,
       });
     }
 
     try {
-      final sub = await db.query('subjects', where: 'id = ?', whereArgs: [subjectId]);
-      final subCode = sub.isNotEmpty ? sub.first['subject_code'] as String? ?? 'SUBJ' : 'SUBJ';
-      final subName = sub.isNotEmpty ? sub.first['name'] as String? ?? 'Subject' : 'Subject';
-      final cleanTitle = title.toLowerCase().replaceAll(RegExp(r'[^a-z0-9]'), '_');
+      final sub = await db.query(
+        'subjects',
+        where: 'id = ?',
+        whereArgs: [subjectId],
+      );
+      final subCode = sub.isNotEmpty
+          ? sub.first['subject_code'] as String? ?? 'SUBJ'
+          : 'SUBJ';
+      final subName = sub.isNotEmpty
+          ? sub.first['name'] as String? ?? 'Subject'
+          : 'Subject';
+      final cleanTitle = title.toLowerCase().replaceAll(
+        RegExp(r'[^a-z0-9]'),
+        '_',
+      );
       final cloudDocId = 'quiz_${subCode}_${cleanTitle}_$quizId';
 
       await FirestoreService().saveDocument('quizzes', cloudDocId, {
@@ -5471,27 +6572,26 @@ class DatabaseHelper {
     final db = await database;
     final now = DateTime.now().toIso8601String();
 
-    final qCountRes = await db.rawQuery('SELECT COUNT(*) as count FROM questions WHERE quiz_id = ?', [quizId]);
+    final qCountRes = await db.rawQuery(
+      'SELECT COUNT(*) as count FROM questions WHERE quiz_id = ?',
+      [quizId],
+    );
     final totalQuestions = (qCountRes.first['count'] as int?) ?? 0;
 
     int assigned = 0;
     for (final sid in studentIds) {
       try {
-        await db.insert(
-          'quiz_assignments',
-          {
-            'quiz_id': quizId,
-            'student_id': sid,
-            'assigned_at': now,
-            'due_date': dueDate,
-            'status': 'pending',
-            'score': 0,
-            'total_questions': totalQuestions,
-            'percentage': 0.0,
-            'completed_at': null,
-          },
-          conflictAlgorithm: ConflictAlgorithm.replace,
-        );
+        await db.insert('quiz_assignments', {
+          'quiz_id': quizId,
+          'student_id': sid,
+          'assigned_at': now,
+          'due_date': dueDate,
+          'status': 'pending',
+          'score': 0,
+          'total_questions': totalQuestions,
+          'percentage': 0.0,
+          'completed_at': null,
+        }, conflictAlgorithm: ConflictAlgorithm.replace);
         assigned++;
       } catch (e) {
         debugPrint('Error assigning quiz $quizId to $sid: $e');
@@ -5499,11 +6599,21 @@ class DatabaseHelper {
     }
 
     try {
-      final quizRow = await db.query('quizzes', where: 'id = ?', whereArgs: [quizId]);
+      final quizRow = await db.query(
+        'quizzes',
+        where: 'id = ?',
+        whereArgs: [quizId],
+      );
       if (quizRow.isNotEmpty) {
         final q = quizRow.first;
-        final sub = await db.query('subjects', where: 'id = ?', whereArgs: [q['subject_id']]);
-        final subCode = sub.isNotEmpty ? sub.first['subject_code'] as String? ?? 'SUBJ' : 'SUBJ';
+        final sub = await db.query(
+          'subjects',
+          where: 'id = ?',
+          whereArgs: [q['subject_id']],
+        );
+        final subCode = sub.isNotEmpty
+            ? sub.first['subject_code'] as String? ?? 'SUBJ'
+            : 'SUBJ';
         for (final sid in studentIds) {
           final docId = 'qa_${quizId}_$sid';
           await FirestoreService().saveDocument('quiz_assignments', docId, {
@@ -5537,13 +6647,22 @@ class DatabaseHelper {
     final List<Map<String, dynamic>> enriched = [];
     for (final q in quizzes) {
       final qId = q['id'] as int;
-      final qCountRes = await db.rawQuery('SELECT COUNT(*) as count FROM questions WHERE quiz_id = ?', [qId]);
+      final qCountRes = await db.rawQuery(
+        'SELECT COUNT(*) as count FROM questions WHERE quiz_id = ?',
+        [qId],
+      );
       final qCount = (qCountRes.first['count'] as int?) ?? 0;
 
-      final assignCountRes = await db.rawQuery('SELECT COUNT(*) as count FROM quiz_assignments WHERE quiz_id = ?', [qId]);
+      final assignCountRes = await db.rawQuery(
+        'SELECT COUNT(*) as count FROM quiz_assignments WHERE quiz_id = ?',
+        [qId],
+      );
       final assignCount = (assignCountRes.first['count'] as int?) ?? 0;
 
-      final compCountRes = await db.rawQuery("SELECT COUNT(*) as count FROM quiz_assignments WHERE quiz_id = ? AND status = 'completed'", [qId]);
+      final compCountRes = await db.rawQuery(
+        "SELECT COUNT(*) as count FROM quiz_assignments WHERE quiz_id = ? AND status = 'completed'",
+        [qId],
+      );
       final compCount = (compCountRes.first['count'] as int?) ?? 0;
 
       enriched.add({
@@ -5556,12 +6675,17 @@ class DatabaseHelper {
     return enriched;
   }
 
-  Future<List<Map<String, dynamic>>> getAssignedQuizzesForStudent(String studentId, {int? subjectId}) async {
+  Future<List<Map<String, dynamic>>> getAssignedQuizzesForStudent(
+    String studentId, {
+    int? subjectId,
+  }) async {
     final db = await database;
 
     // Auto-ensure quiz_assignments record for each published quiz so students never see a blank screen
     try {
-      final String subWhere = subjectId != null ? 'AND q.subject_id = $subjectId' : '';
+      final String subWhere = subjectId != null
+          ? 'AND q.subject_id = $subjectId'
+          : '';
       await db.execute('''
         INSERT OR IGNORE INTO quiz_assignments (quiz_id, student_id, assigned_at, due_date, status, score, total_questions, percentage)
         SELECT q.id, '$studentId', q.created_at, q.due_date, 'pending', 0,
@@ -5607,7 +6731,8 @@ class DatabaseHelper {
       query += ' AND q.subject_id = ?';
       args.add(subjectId);
     }
-    query += ' ORDER BY CASE WHEN COALESCE(qa.status, \'pending\') = \'pending\' THEN 0 ELSE 1 END, COALESCE(qa.assigned_at, q.created_at) DESC';
+    query +=
+        ' ORDER BY CASE WHEN COALESCE(qa.status, \'pending\') = \'pending\' THEN 0 ELSE 1 END, COALESCE(qa.assigned_at, q.created_at) DESC';
 
     return await db.rawQuery(query, args);
   }
@@ -5628,12 +6753,15 @@ class DatabaseHelper {
 
   Future<Map<String, dynamic>?> getQuizById(int quizId) async {
     final db = await database;
-    final quizRes = await db.rawQuery('''
+    final quizRes = await db.rawQuery(
+      '''
       SELECT q.*, s.name as subject_name, s.subject_code
       FROM quizzes q
       LEFT JOIN subjects s ON q.subject_id = s.id
       WHERE q.id = ?
-    ''', [quizId]);
+    ''',
+      [quizId],
+    );
 
     if (quizRes.isEmpty) return null;
     final quiz = quizRes.first;
@@ -5645,13 +6773,13 @@ class DatabaseHelper {
       orderBy: 'id ASC',
     );
 
-    return {
-      ...quiz,
-      'questions': questions,
-    };
+    return {...quiz, 'questions': questions};
   }
 
-  Future<Map<String, dynamic>?> getQuizAssignment(int quizId, String studentId) async {
+  Future<Map<String, dynamic>?> getQuizAssignment(
+    int quizId,
+    String studentId,
+  ) async {
     final db = await database;
     final res = await db.query(
       'quiz_assignments',
@@ -5691,7 +6819,11 @@ class DatabaseHelper {
       whereArgs: [quizId, studentId],
     );
     if (existing.isEmpty) {
-      final qRes = await db.query('quizzes', where: 'id = ?', whereArgs: [quizId]);
+      final qRes = await db.query(
+        'quizzes',
+        where: 'id = ?',
+        whereArgs: [quizId],
+      );
       if (qRes.isNotEmpty) {
         final q = qRes.first;
         final subjectId = (q['subject_id'] as int?) ?? 1;
@@ -5717,7 +6849,8 @@ class DatabaseHelper {
 
   Future<List<Map<String, dynamic>>> getQuizAssignmentRoster(int quizId) async {
     final db = await database;
-    return await db.rawQuery('''
+    return await db.rawQuery(
+      '''
       SELECT qa.*,
              u.full_name as student_name,
              u.email as student_email,
@@ -5737,7 +6870,9 @@ class DatabaseHelper {
       JOIN users u ON qa.student_id = u.id
       WHERE qa.quiz_id = ?
       ORDER BY CASE WHEN qa.status = 'completed' THEN 0 ELSE 1 END, qa.score DESC
-    ''', [quizId]);
+    ''',
+      [quizId],
+    );
   }
 
   /// Reset a single student's quiz attempt (teacher resets individual student)
@@ -5749,7 +6884,12 @@ class DatabaseHelper {
 
     // Look up quiz to check if it is tied to a learning outcome
     int? loId;
-    final qRes = await db.query('quizzes', columns: ['lo_id'], where: 'id = ?', whereArgs: [quizId]);
+    final qRes = await db.query(
+      'quizzes',
+      columns: ['lo_id'],
+      where: 'id = ?',
+      whereArgs: [quizId],
+    );
     if (qRes.isNotEmpty) {
       loId = qRes.first['lo_id'] as int?;
     }
@@ -5806,13 +6946,20 @@ class DatabaseHelper {
 
   Future<void> deleteQuiz(int quizId) async {
     final db = await database;
-    await db.delete('quiz_assignments', where: 'quiz_id = ?', whereArgs: [quizId]);
+    await db.delete(
+      'quiz_assignments',
+      where: 'quiz_id = ?',
+      whereArgs: [quizId],
+    );
     await db.delete('questions', where: 'quiz_id = ?', whereArgs: [quizId]);
     await db.delete('quizzes', where: 'id = ?', whereArgs: [quizId]);
   }
 
   /// Retrieves all quizzes available for analysis, optionally filtered by teacher or subject.
-  Future<List<Map<String, dynamic>>> getQuizzesAvailableForAnalysis({String? teacherId, int? subjectId}) async {
+  Future<List<Map<String, dynamic>>> getQuizzesAvailableForAnalysis({
+    String? teacherId,
+    int? subjectId,
+  }) async {
     final db = await database;
     String query = '''
       SELECT q.id,
@@ -5846,12 +6993,15 @@ class DatabaseHelper {
   Future<ItemAnalysisReport> calculateQuizItemAnalysis(int quizId) async {
     final db = await database;
 
-    final quizRes = await db.rawQuery('''
+    final quizRes = await db.rawQuery(
+      '''
       SELECT q.*, s.name as subject_name, s.subject_code
       FROM quizzes q
       LEFT JOIN subjects s ON q.subject_id = s.id
       WHERE q.id = ?
-    ''', [quizId]);
+    ''',
+      [quizId],
+    );
 
     if (quizRes.isEmpty) {
       return ItemAnalysisReport.empty(
@@ -5919,25 +7069,35 @@ class DatabaseHelper {
     int passedCount = 0;
     for (final att in attempts) {
       final scoreVal = ((att['score'] as num?)?.toDouble()) ?? 0.0;
-      final totalQ = ((att['total_questions'] as num?)?.toInt()) ?? questionsRaw.length;
-      final pct = totalQ > 0 ? (scoreVal / totalQ) * 100 : (((att['percentage'] as num?)?.toDouble()) ?? 0.0);
+      final totalQ =
+          ((att['total_questions'] as num?)?.toInt()) ?? questionsRaw.length;
+      final pct = totalQ > 0
+          ? (scoreVal / totalQ) * 100
+          : (((att['percentage'] as num?)?.toDouble()) ?? 0.0);
       studentScores.add(scoreVal);
-      if (pct >= passingScore || att['is_passed'] == 1 || att['is_passed'] == true) {
+      if (pct >= passingScore ||
+          att['is_passed'] == 1 ||
+          att['is_passed'] == true) {
         passedCount++;
       }
     }
 
     studentScores.sort();
-    final double meanScore = studentScores.reduce((a, b) => a + b) / totalAttempts;
+    final double meanScore =
+        studentScores.reduce((a, b) => a + b) / totalAttempts;
     final double medianScore = (totalAttempts % 2 == 1)
         ? studentScores[totalAttempts ~/ 2]
-        : (studentScores[(totalAttempts ~/ 2) - 1] + studentScores[totalAttempts ~/ 2]) / 2.0;
+        : (studentScores[(totalAttempts ~/ 2) - 1] +
+                  studentScores[totalAttempts ~/ 2]) /
+              2.0;
     final double passRate = (passedCount / totalAttempts) * 100.0;
 
     // Variance of test scores: sigma^2 = sum((x - mean)^2) / N
-    final double scoreVariance = studentScores
-        .map((s) => pow(s - meanScore, 2).toDouble())
-        .reduce((a, b) => a + b) / totalAttempts;
+    final double scoreVariance =
+        studentScores
+            .map((s) => pow(s - meanScore, 2).toDouble())
+            .reduce((a, b) => a + b) /
+        totalAttempts;
 
     // Rank attempts by score descending for Upper & Lower group partitioning
     attempts.sort((a, b) {
@@ -5968,7 +7128,10 @@ class DatabaseHelper {
         try {
           final decoded = jsonDecode(answersStr);
           if (decoded is Map) {
-            studentAnswersMap[sid] = decoded.map((k, v) => MapEntry(k.toString(), v.toString().trim().toUpperCase()));
+            studentAnswersMap[sid] = decoded.map(
+              (k, v) =>
+                  MapEntry(k.toString(), v.toString().trim().toUpperCase()),
+            );
           }
         } catch (_) {}
       }
@@ -5987,7 +7150,9 @@ class DatabaseHelper {
       final q = questionsRaw[qIdx];
       final qId = q['id'] as int;
       final qText = q['question_text']?.toString() ?? 'Question #${qIdx + 1}';
-      final correctOpt = (q['correct_option']?.toString() ?? 'A').trim().toUpperCase();
+      final correctOpt = (q['correct_option']?.toString() ?? 'A')
+          .trim()
+          .toUpperCase();
 
       final optionTexts = <String, String>{
         'A': q['option_a']?.toString() ?? '',
@@ -6041,12 +7206,18 @@ class DatabaseHelper {
       // Percentages
       final selectionPercentages = <String, double>{};
       totalSelections.forEach((key, count) {
-        selectionPercentages[key] = totalAttempts > 0 ? (count / totalAttempts) * 100.0 : 0.0;
+        selectionPercentages[key] = totalAttempts > 0
+            ? (count / totalAttempts) * 100.0
+            : 0.0;
       });
 
       // Difficulty Index (p) = Total Correct / Total Examinees
       final int correctCount = totalSelections[correctOpt] ?? 0;
-      final double p = (totalAttempts > 0 ? (correctCount / totalAttempts) : 0.0).clamp(0.0, 1.0);
+      final double p =
+          (totalAttempts > 0 ? (correctCount / totalAttempts) : 0.0).clamp(
+            0.0,
+            1.0,
+          );
       sumP += p;
       sumPtimesOneMinusP += (p * (1.0 - p));
 
@@ -6066,7 +7237,9 @@ class DatabaseHelper {
       // Discrimination Index (D) = (Upper Correct - Lower Correct) / GroupSize
       final int uCorrect = upperSelections[correctOpt] ?? 0;
       final int lCorrect = lowerSelections[correctOpt] ?? 0;
-      final double d = (groupSize > 0 ? ((uCorrect - lCorrect) / groupSize.toDouble()) : 0.0).clamp(-1.0, 1.0);
+      final double d =
+          (groupSize > 0 ? ((uCorrect - lCorrect) / groupSize.toDouble()) : 0.0)
+              .clamp(-1.0, 1.0);
       sumD += d;
 
       final String discriminationLabel;
@@ -6093,9 +7266,13 @@ class DatabaseHelper {
         final lCount = lowerSelections[opt] ?? 0;
 
         if (pct < 5.0) {
-          distractorWarnings.add('Option $opt is non-functioning ($count selections, ${pct.toStringAsFixed(1)}%). It provides no plausible alternative.');
+          distractorWarnings.add(
+            'Option $opt is non-functioning ($count selections, ${pct.toStringAsFixed(1)}%). It provides no plausible alternative.',
+          );
         } else if (uCount > lCount) {
-          distractorWarnings.add('Option $opt attracted more high-scoring students ($uCount) than low-scoring students ($lCount). Review wording for ambiguity.');
+          distractorWarnings.add(
+            'Option $opt attracted more high-scoring students ($uCount) than low-scoring students ($lCount). Review wording for ambiguity.',
+          );
         }
       }
 
@@ -6107,62 +7284,74 @@ class DatabaseHelper {
       if (d < 0.0) {
         recommendation = ItemAction.checkKey;
         recommendationLabel = 'Check Answer Key';
-        pedagogicalAdvice = 'Negative discrimination: Lower-scoring students outperformed higher-scoring students. Verify that the answer key is correct or investigate misleading phrasing.';
+        pedagogicalAdvice =
+            'Negative discrimination: Lower-scoring students outperformed higher-scoring students. Verify that the answer key is correct or investigate misleading phrasing.';
         checkKeyCount++;
       } else if ((p <= 0.20 && d < 0.20) || (p >= 0.90 && d < 0.15)) {
         recommendation = ItemAction.discard;
         recommendationLabel = 'Discard or Replace';
-        pedagogicalAdvice = 'Question has very low discrimination and extreme difficulty. Consider removing or replacing it.';
+        pedagogicalAdvice =
+            'Question has very low discrimination and extreme difficulty. Consider removing or replacing it.';
         discardCount++;
       } else if (p <= 0.25 || p >= 0.85 || d < 0.25) {
         recommendation = ItemAction.reviseStem;
         recommendationLabel = 'Revise Question Stem';
-        pedagogicalAdvice = 'Difficulty or discrimination is marginal. Polish the question stem for better clarity and precision.';
+        pedagogicalAdvice =
+            'Difficulty or discrimination is marginal. Polish the question stem for better clarity and precision.';
         reviseCount++;
       } else if (distractorWarnings.isNotEmpty) {
         recommendation = ItemAction.reviseDistractor;
         recommendationLabel = 'Revise Distractors';
-        pedagogicalAdvice = 'Stem difficulty and discrimination are acceptable, but one or more incorrect options should be updated to function as plausible distractors.';
+        pedagogicalAdvice =
+            'Stem difficulty and discrimination are acceptable, but one or more incorrect options should be updated to function as plausible distractors.';
         reviseCount++;
       } else {
         recommendation = ItemAction.retain;
         recommendationLabel = 'Retain Item';
-        pedagogicalAdvice = 'High-performing item. Effectively discriminates between upper and lower students with balanced difficulty.';
+        pedagogicalAdvice =
+            'High-performing item. Effectively discriminates between upper and lower students with balanced difficulty.';
         retainCount++;
       }
 
-      questionAnalyses.add(QuestionItemAnalysis(
-        index: qIdx + 1,
-        questionId: qId,
-        questionText: qText,
-        correctOption: correctOpt,
-        optionTexts: optionTexts,
-        totalSelections: totalSelections,
-        selectionPercentages: selectionPercentages,
-        upperGroupSelections: upperSelections,
-        lowerGroupSelections: lowerSelections,
-        skippedCount: skippedCount,
-        totalRespondents: totalAttempts,
-        difficultyIndex: p,
-        difficultyLabel: difficultyLabel,
-        discriminationIndex: d,
-        discriminationLabel: discriminationLabel,
-        recommendation: recommendation,
-        recommendationLabel: recommendationLabel,
-        distractorWarnings: distractorWarnings,
-        pedagogicalAdvice: pedagogicalAdvice,
-      ));
+      questionAnalyses.add(
+        QuestionItemAnalysis(
+          index: qIdx + 1,
+          questionId: qId,
+          questionText: qText,
+          correctOption: correctOpt,
+          optionTexts: optionTexts,
+          totalSelections: totalSelections,
+          selectionPercentages: selectionPercentages,
+          upperGroupSelections: upperSelections,
+          lowerGroupSelections: lowerSelections,
+          skippedCount: skippedCount,
+          totalRespondents: totalAttempts,
+          difficultyIndex: p,
+          difficultyLabel: difficultyLabel,
+          discriminationIndex: d,
+          discriminationLabel: discriminationLabel,
+          recommendation: recommendation,
+          recommendationLabel: recommendationLabel,
+          distractorWarnings: distractorWarnings,
+          pedagogicalAdvice: pedagogicalAdvice,
+        ),
+      );
     }
 
-    final double meanDiff = questionsRaw.isNotEmpty ? (sumP / questionsRaw.length) : 0.0;
-    final double meanDisc = questionsRaw.isNotEmpty ? (sumD / questionsRaw.length) : 0.0;
+    final double meanDiff = questionsRaw.isNotEmpty
+        ? (sumP / questionsRaw.length)
+        : 0.0;
+    final double meanDisc = questionsRaw.isNotEmpty
+        ? (sumD / questionsRaw.length)
+        : 0.0;
 
     // KR-20 Reliability: (k / (k - 1)) * (1 - (sum(p * (1 - p)) / sigma^2))
     double? kr20;
     String reliabilityRating = 'N/A';
     final int k = questionsRaw.length;
     if (k > 1 && scoreVariance > 0.0001) {
-      final rawKr20 = (k / (k - 1)) * (1.0 - (sumPtimesOneMinusP / scoreVariance));
+      final rawKr20 =
+          (k / (k - 1)) * (1.0 - (sumPtimesOneMinusP / scoreVariance));
       kr20 = rawKr20.clamp(0.0, 1.0);
       if (kr20 >= 0.85) {
         reliabilityRating = 'Excellent';
@@ -6200,7 +7389,12 @@ class DatabaseHelper {
 
   Future<void> updateSubjectUnlockType(int subjectId, String unlockType) async {
     final db = await database;
-    await db.update('subjects', {'unlock_type': unlockType}, where: 'id = ?', whereArgs: [subjectId]);
+    await db.update(
+      'subjects',
+      {'unlock_type': unlockType},
+      where: 'id = ?',
+      whereArgs: [subjectId],
+    );
   }
 
   // ── Assignments & Submissions Management ───────────────
@@ -6218,10 +7412,22 @@ class DatabaseHelper {
     String? attachmentPath,
     int? attachmentSize,
     String? attachmentBytes,
+    String? targetSections,
+    String? cloudId,
   }) async {
     final db = await database;
     final now = DateTime.now().toIso8601String();
+    final cleanTitle = title.toLowerCase().replaceAll(
+      RegExp(r'[^a-z0-9]'),
+      '_',
+    );
+    final canonicalCloudId =
+        cloudId ??
+        'assign_${DateTime.now().millisecondsSinceEpoch}_$cleanTitle';
+
     final id = await db.insert('assignments', {
+      'cloud_id': canonicalCloudId,
+      'target_sections': targetSections,
       'title': title,
       'description': description,
       'subject_id': subjectId,
@@ -6240,14 +7446,28 @@ class DatabaseHelper {
 
     // 1. Sync assignment to Cloud Firestore
     try {
-      final sub = await db.query('subjects', where: 'id = ?', whereArgs: [subjectId]);
-      final subCode = sub.isNotEmpty ? sub.first['subject_code'] as String? ?? 'SUBJ' : 'SUBJ';
-      final subName = sub.isNotEmpty ? sub.first['name'] as String? ?? 'Subject' : 'Subject';
-      final cleanTitle = title.toLowerCase().replaceAll(RegExp(r'[^a-z0-9]'), '_');
-      final cloudDocId = 'assign_${subCode}_${cleanTitle}_$id';
+      final sub = await db.query(
+        'subjects',
+        where: 'id = ?',
+        whereArgs: [subjectId],
+      );
+      final subCode = sub.isNotEmpty
+          ? sub.first['subject_code'] as String? ?? 'SUBJ'
+          : 'SUBJ';
+      final subName = sub.isNotEmpty
+          ? sub.first['name'] as String? ?? 'Subject'
+          : 'Subject';
+
+      // Cap Base64 size at 750KB to respect Firestore's 1MB document limit
+      final safeAttachmentBytes =
+          (attachmentBytes != null && attachmentBytes.length < 750000)
+          ? attachmentBytes
+          : null;
 
       final assignmentMap = {
-        'id': id,
+        'id': canonicalCloudId,
+        'cloud_id': canonicalCloudId,
+        'local_id': id,
         'title': title,
         'description': description,
         'subject_id': subjectId,
@@ -6255,17 +7475,33 @@ class DatabaseHelper {
         'subject_name': subName,
         'teacher_id': teacherId,
         'teacher_name': teacherName,
+        'target_sections': targetSections,
         'due_date': dueDate,
         'total_points': totalPoints,
         'submission_type': submissionType,
         'attachment_name': attachmentName,
         'attachment_path': attachmentPath,
         'attachment_size': attachmentSize,
-        'attachment_bytes': attachmentBytes,
+        'attachment_bytes': safeAttachmentBytes,
         'status': 'active',
         'created_at': now,
       };
-      await FirestoreService().saveDocument('assignments', cloudDocId, assignmentMap);
+      await FirestoreService().saveDocument(
+        'assignments',
+        canonicalCloudId,
+        assignmentMap,
+      );
+      // Also save with legacy ID key for backward compatibility
+      final legacyCloudDocId = 'assign_${subCode}_${cleanTitle}_$id';
+      if (legacyCloudDocId != canonicalCloudId) {
+        unawaited(
+          FirestoreService().saveDocument(
+            'assignments',
+            legacyCloudDocId,
+            assignmentMap,
+          ),
+        );
+      }
     } catch (_) {}
 
     // 2. Generate notifications for all enrolled students in this subject
@@ -6276,21 +7512,31 @@ class DatabaseHelper {
         where: 'subject_id = ?',
         whereArgs: [subjectId],
       );
-      final sub = await db.query('subjects', columns: ['name'], where: 'id = ?', whereArgs: [subjectId]);
-      final subName = sub.isNotEmpty ? sub.first['name'] as String? ?? 'Subject' : 'Subject';
+      final sub = await db.query(
+        'subjects',
+        columns: ['name'],
+        where: 'id = ?',
+        whereArgs: [subjectId],
+      );
+      final subName = sub.isNotEmpty
+          ? sub.first['name'] as String? ?? 'Subject'
+          : 'Subject';
       for (final e in enrollments) {
         final sId = e['student_id'] as String?;
         if (sId != null && sId.isNotEmpty) {
-          unawaited(createNotification(
-            userId: sId,
-            type: 'new_assignment',
-            title: 'New Assignment: $title',
-            message: '${teacherName ?? "Your teacher"} posted "$title" in $subName.${dueDate != null ? " Due: ${dueDate.substring(0, 10)}" : ""}',
-            relatedId: id.toString(),
-            subjectId: subjectId,
-            actorId: teacherId,
-            actorName: teacherName,
-          ));
+          unawaited(
+            createNotification(
+              userId: sId,
+              type: 'new_assignment',
+              title: 'New Assignment: $title',
+              message:
+                  '${teacherName ?? "Your teacher"} posted "$title" in $subName.${dueDate != null ? " Due: ${dueDate.substring(0, 10)}" : ""}',
+              relatedId: id.toString(),
+              subjectId: subjectId,
+              actorId: teacherId,
+              actorName: teacherName,
+            ),
+          );
         }
       }
     } catch (_) {}
@@ -6301,7 +7547,9 @@ class DatabaseHelper {
   /// Sync all assignments from Cloud Firestore down to local SQLite cache
   Future<void> syncCloudAssignmentsToLocal() async {
     try {
-      final cloudDocs = await FirestoreService().fetchAllDocuments('assignments');
+      final cloudDocs = await FirestoreService().fetchAllDocuments(
+        'assignments',
+      );
       if (cloudDocs.isEmpty) return;
       final db = await database;
       for (final doc in cloudDocs) {
@@ -6310,24 +7558,43 @@ class DatabaseHelper {
         final rawSubId = (doc['subject_id'] as num?)?.toInt() ?? 1;
         final subCode = doc['subject_code']?.toString().trim();
         final subName = doc['subject_name']?.toString().trim();
+        final cloudId = doc['cloud_id']?.toString() ?? doc['id']?.toString();
+        final targetSections = doc['target_sections']?.toString();
 
         // Resolve subject ID on this device by matching subject_code or name
         int targetSubjectId = rawSubId;
         if (subCode != null && subCode.isNotEmpty) {
-          final match = await db.query('subjects', where: 'LOWER(subject_code) = ?', whereArgs: [subCode.toLowerCase()]);
+          final match = await db.query(
+            'subjects',
+            where: 'LOWER(subject_code) = ?',
+            whereArgs: [subCode.toLowerCase()],
+          );
           if (match.isNotEmpty) {
             targetSubjectId = match.first['id'] as int;
           } else if (subName != null && subName.isNotEmpty) {
-            final matchName = await db.query('subjects', where: 'LOWER(TRIM(name)) = ?', whereArgs: [subName.toLowerCase().trim()]);
-            if (matchName.isNotEmpty) targetSubjectId = matchName.first['id'] as int;
+            final matchName = await db.query(
+              'subjects',
+              where: 'LOWER(TRIM(name)) = ?',
+              whereArgs: [subName.toLowerCase().trim()],
+            );
+            if (matchName.isNotEmpty)
+              targetSubjectId = matchName.first['id'] as int;
           }
         } else if (subName != null && subName.isNotEmpty) {
-          final match = await db.query('subjects', where: 'LOWER(TRIM(name)) = ?', whereArgs: [subName.toLowerCase().trim()]);
+          final match = await db.query(
+            'subjects',
+            where: 'LOWER(TRIM(name)) = ?',
+            whereArgs: [subName.toLowerCase().trim()],
+          );
           if (match.isNotEmpty) targetSubjectId = match.first['id'] as int;
         }
 
         // Ensure subject exists locally
-        final checkSub = await db.query('subjects', where: 'id = ?', whereArgs: [targetSubjectId]);
+        final checkSub = await db.query(
+          'subjects',
+          where: 'id = ?',
+          whereArgs: [targetSubjectId],
+        );
         if (checkSub.isEmpty) {
           final anySub = await db.query('subjects', limit: 1);
           if (anySub.isNotEmpty) targetSubjectId = anySub.first['id'] as int;
@@ -6339,7 +7606,8 @@ class DatabaseHelper {
         final totalPoints = (doc['total_points'] as num?)?.toInt() ?? 100;
         final submissionType = doc['submission_type']?.toString() ?? 'both';
         final status = doc['status']?.toString() ?? 'active';
-        final createdAt = doc['created_at']?.toString() ?? DateTime.now().toIso8601String();
+        final createdAt =
+            doc['created_at']?.toString() ?? DateTime.now().toIso8601String();
         final attachmentName = doc['attachment_name']?.toString();
         final attachmentPath = doc['attachment_path']?.toString();
         final attachmentSize = (doc['attachment_size'] as num?)?.toInt();
@@ -6347,12 +7615,18 @@ class DatabaseHelper {
 
         final existing = await db.query(
           'assignments',
-          where: 'LOWER(title) = ? AND subject_id = ?',
-          whereArgs: [title.toLowerCase().trim(), targetSubjectId],
+          where: (cloudId != null && cloudId.isNotEmpty)
+              ? 'cloud_id = ? OR (LOWER(title) = ? AND subject_id = ?)'
+              : 'LOWER(title) = ? AND subject_id = ?',
+          whereArgs: (cloudId != null && cloudId.isNotEmpty)
+              ? [cloudId, title.toLowerCase().trim(), targetSubjectId]
+              : [title.toLowerCase().trim(), targetSubjectId],
         );
 
         if (existing.isEmpty) {
           await db.insert('assignments', {
+            'cloud_id': cloudId,
+            'target_sections': targetSections,
             'title': title,
             'description': description,
             'subject_id': targetSubjectId,
@@ -6370,23 +7644,32 @@ class DatabaseHelper {
           });
         } else {
           final existingId = existing.first['id'] as int;
-          await db.update('assignments', {
-            'title': title,
-            'description': description,
-            'teacher_id': teacherId,
-            'teacher_name': teacherName,
-            'due_date': dueDate,
-            'total_points': totalPoints,
-            'submission_type': submissionType,
-            'status': status,
-            'attachment_name': ?attachmentName,
-            'attachment_path': ?attachmentPath,
-            'attachment_size': ?attachmentSize,
-            'attachment_bytes': ?attachmentBytes,
-          }, where: 'id = ?', whereArgs: [existingId]);
+          await db.update(
+            'assignments',
+            {
+              if (cloudId != null && cloudId.isNotEmpty) 'cloud_id': cloudId,
+              if (targetSections != null) 'target_sections': targetSections,
+              'title': title,
+              'description': description,
+              'teacher_id': teacherId,
+              'teacher_name': teacherName,
+              'due_date': dueDate,
+              'total_points': totalPoints,
+              'submission_type': submissionType,
+              'status': status,
+              'attachment_name': attachmentName,
+              'attachment_path': attachmentPath,
+              'attachment_size': attachmentSize,
+              'attachment_bytes': attachmentBytes,
+            },
+            where: 'id = ?',
+            whereArgs: [existingId],
+          );
         }
       }
-      debugPrint('[DatabaseHelper] Synced ${cloudDocs.length} Cloud assignments to local SQLite');
+      debugPrint(
+        '[DatabaseHelper] Synced ${cloudDocs.length} Cloud assignments to local SQLite',
+      );
     } catch (e) {
       debugPrint('[DatabaseHelper] syncCloudAssignmentsToLocal note: $e');
     }
@@ -6401,10 +7684,21 @@ class DatabaseHelper {
         final aId = a['id'] as int;
         final title = a['title']?.toString() ?? 'Assignment';
         final subId = a['subject_id'] as int? ?? 1;
-        final sub = await db.query('subjects', where: 'id = ?', whereArgs: [subId]);
-        final subCode = sub.isNotEmpty ? sub.first['subject_code'] as String? ?? 'SUBJ' : 'SUBJ';
-        final subName = sub.isNotEmpty ? sub.first['name'] as String? ?? 'Subject' : 'Subject';
-        final cleanTitle = title.toLowerCase().replaceAll(RegExp(r'[^a-z0-9]'), '_');
+        final sub = await db.query(
+          'subjects',
+          where: 'id = ?',
+          whereArgs: [subId],
+        );
+        final subCode = sub.isNotEmpty
+            ? sub.first['subject_code'] as String? ?? 'SUBJ'
+            : 'SUBJ';
+        final subName = sub.isNotEmpty
+            ? sub.first['name'] as String? ?? 'Subject'
+            : 'Subject';
+        final cleanTitle = title.toLowerCase().replaceAll(
+          RegExp(r'[^a-z0-9]'),
+          '_',
+        );
         final cloudDocId = 'assign_${subCode}_${cleanTitle}_$aId';
 
         final map = {
@@ -6442,13 +7736,28 @@ class DatabaseHelper {
         final qId = q['id'] as int;
         final title = q['title']?.toString() ?? 'Quiz';
         final subId = q['subject_id'] as int? ?? 1;
-        final sub = await db.query('subjects', where: 'id = ?', whereArgs: [subId]);
-        final subCode = sub.isNotEmpty ? sub.first['subject_code'] as String? ?? 'SUBJ' : 'SUBJ';
-        final subName = sub.isNotEmpty ? sub.first['name'] as String? ?? 'Subject' : 'Subject';
-        final cleanTitle = title.toLowerCase().replaceAll(RegExp(r'[^a-z0-9]'), '_');
+        final sub = await db.query(
+          'subjects',
+          where: 'id = ?',
+          whereArgs: [subId],
+        );
+        final subCode = sub.isNotEmpty
+            ? sub.first['subject_code'] as String? ?? 'SUBJ'
+            : 'SUBJ';
+        final subName = sub.isNotEmpty
+            ? sub.first['name'] as String? ?? 'Subject'
+            : 'Subject';
+        final cleanTitle = title.toLowerCase().replaceAll(
+          RegExp(r'[^a-z0-9]'),
+          '_',
+        );
         final cloudDocId = 'quiz_${subCode}_${cleanTitle}_$qId';
 
-        final questions = await db.query('questions', where: 'quiz_id = ?', whereArgs: [qId]);
+        final questions = await db.query(
+          'questions',
+          where: 'quiz_id = ?',
+          whereArgs: [qId],
+        );
 
         final map = {
           'id': qId,
@@ -6467,14 +7776,18 @@ class DatabaseHelper {
           'schedule_start': q['schedule_start'],
           'schedule_end': q['schedule_end'],
           'created_at': q['created_at'] ?? DateTime.now().toIso8601String(),
-          'questions': questions.map((item) => {
-            'question_text': item['question_text'],
-            'option_a': item['option_a'],
-            'option_b': item['option_b'],
-            'option_c': item['option_c'],
-            'option_d': item['option_d'],
-            'correct_option': item['correct_option'],
-          }).toList(),
+          'questions': questions
+              .map(
+                (item) => {
+                  'question_text': item['question_text'],
+                  'option_a': item['option_a'],
+                  'option_b': item['option_b'],
+                  'option_c': item['option_c'],
+                  'option_d': item['option_d'],
+                  'correct_option': item['correct_option'],
+                },
+              )
+              .toList(),
         };
         await FirestoreService().saveDocument('quizzes', cloudDocId, map);
       }
@@ -6486,7 +7799,9 @@ class DatabaseHelper {
   /// Syncs all quizzes and quiz assignments from Cloud Firestore down to SQLite
   Future<void> syncCloudQuizzesToLocal() async {
     try {
-      final cloudQuizzes = await FirestoreService().fetchAllDocuments('quizzes');
+      final cloudQuizzes = await FirestoreService().fetchAllDocuments(
+        'quizzes',
+      );
       if (cloudQuizzes.isEmpty) return;
       final db = await database;
 
@@ -6499,20 +7814,37 @@ class DatabaseHelper {
 
         int targetSubjectId = rawSubId;
         if (subCode != null && subCode.isNotEmpty) {
-          final match = await db.query('subjects', where: 'LOWER(subject_code) = ?', whereArgs: [subCode.toLowerCase()]);
+          final match = await db.query(
+            'subjects',
+            where: 'LOWER(subject_code) = ?',
+            whereArgs: [subCode.toLowerCase()],
+          );
           if (match.isNotEmpty) {
             targetSubjectId = match.first['id'] as int;
           } else if (subName != null && subName.isNotEmpty) {
-            final matchName = await db.query('subjects', where: 'LOWER(TRIM(name)) = ?', whereArgs: [subName.toLowerCase().trim()]);
-            if (matchName.isNotEmpty) targetSubjectId = matchName.first['id'] as int;
+            final matchName = await db.query(
+              'subjects',
+              where: 'LOWER(TRIM(name)) = ?',
+              whereArgs: [subName.toLowerCase().trim()],
+            );
+            if (matchName.isNotEmpty)
+              targetSubjectId = matchName.first['id'] as int;
           }
         } else if (subName != null && subName.isNotEmpty) {
-          final match = await db.query('subjects', where: 'LOWER(TRIM(name)) = ?', whereArgs: [subName.toLowerCase().trim()]);
+          final match = await db.query(
+            'subjects',
+            where: 'LOWER(TRIM(name)) = ?',
+            whereArgs: [subName.toLowerCase().trim()],
+          );
           if (match.isNotEmpty) targetSubjectId = match.first['id'] as int;
         }
 
         // Ensure subject exists locally
-        final checkSub = await db.query('subjects', where: 'id = ?', whereArgs: [targetSubjectId]);
+        final checkSub = await db.query(
+          'subjects',
+          where: 'id = ?',
+          whereArgs: [targetSubjectId],
+        );
         if (checkSub.isEmpty) {
           final anySub = await db.query('subjects', limit: 1);
           if (anySub.isNotEmpty) targetSubjectId = anySub.first['id'] as int;
@@ -6526,7 +7858,8 @@ class DatabaseHelper {
         final dueDate = doc['due_date']?.toString();
         final schedStart = doc['schedule_start']?.toString();
         final schedEnd = doc['schedule_end']?.toString();
-        final createdAt = doc['created_at']?.toString() ?? DateTime.now().toIso8601String();
+        final createdAt =
+            doc['created_at']?.toString() ?? DateTime.now().toIso8601String();
 
         final existing = await db.query(
           'quizzes',
@@ -6552,21 +7885,31 @@ class DatabaseHelper {
           });
         } else {
           localQuizId = existing.first['id'] as int;
-          await db.update('quizzes', {
-            'title': title,
-            'description': description,
-            'time_limit_minutes': timeLimit,
-            'passing_score': passingScore,
-            'status': status,
-            'due_date': dueDate,
-            'schedule_start': schedStart,
-            'schedule_end': schedEnd,
-          }, where: 'id = ?', whereArgs: [localQuizId]);
+          await db.update(
+            'quizzes',
+            {
+              'title': title,
+              'description': description,
+              'time_limit_minutes': timeLimit,
+              'passing_score': passingScore,
+              'status': status,
+              'due_date': dueDate,
+              'schedule_start': schedStart,
+              'schedule_end': schedEnd,
+            },
+            where: 'id = ?',
+            whereArgs: [localQuizId],
+          );
         }
 
-        final questions = (doc['questions'] as List?)?.cast<Map<String, dynamic>>() ?? [];
+        final questions =
+            (doc['questions'] as List?)?.cast<Map<String, dynamic>>() ?? [];
         if (questions.isNotEmpty) {
-          final existingQ = await db.query('questions', where: 'quiz_id = ?', whereArgs: [localQuizId]);
+          final existingQ = await db.query(
+            'questions',
+            where: 'quiz_id = ?',
+            whereArgs: [localQuizId],
+          );
           if (existingQ.isEmpty) {
             for (final q in questions) {
               await db.insert('questions', {
@@ -6584,7 +7927,11 @@ class DatabaseHelper {
         }
 
         // Auto-assign this quiz to all students enrolled in this subject so it is immediately visible
-        final enrollments = await db.query('enrollments', where: 'subject_id = ?', whereArgs: [targetSubjectId]);
+        final enrollments = await db.query(
+          'enrollments',
+          where: 'subject_id = ?',
+          whereArgs: [targetSubjectId],
+        );
         for (final en in enrollments) {
           final sid = en['student_id']?.toString();
           if (sid != null && sid.isNotEmpty) {
@@ -6610,16 +7957,24 @@ class DatabaseHelper {
       }
 
       // Sync explicit quiz assignments from Cloud Firestore
-      final cloudAssignments = await FirestoreService().fetchAllDocuments('quiz_assignments');
+      final cloudAssignments = await FirestoreService().fetchAllDocuments(
+        'quiz_assignments',
+      );
       for (final qa in cloudAssignments) {
         final qTitle = qa['quiz_title']?.toString();
         final studentId = qa['student_id']?.toString();
         if (studentId == null || studentId.isEmpty) continue;
 
         final qMatch = qTitle != null
-            ? await db.query('quizzes', where: 'LOWER(title) = ?', whereArgs: [qTitle.toLowerCase().trim()])
+            ? await db.query(
+                'quizzes',
+                where: 'LOWER(title) = ?',
+                whereArgs: [qTitle.toLowerCase().trim()],
+              )
             : <Map<String, dynamic>>[];
-        final localQuizId = qMatch.isNotEmpty ? qMatch.first['id'] as int : (qa['quiz_id'] as num?)?.toInt();
+        final localQuizId = qMatch.isNotEmpty
+            ? qMatch.first['id'] as int
+            : (qa['quiz_id'] as num?)?.toInt();
         if (localQuizId == null) continue;
 
         final existingQa = await db.query(
@@ -6631,7 +7986,8 @@ class DatabaseHelper {
           await db.insert('quiz_assignments', {
             'quiz_id': localQuizId,
             'student_id': studentId,
-            'assigned_at': qa['assigned_at'] ?? DateTime.now().toIso8601String(),
+            'assigned_at':
+                qa['assigned_at'] ?? DateTime.now().toIso8601String(),
             'due_date': qa['due_date'],
             'status': qa['status'] ?? 'pending',
             'score': (qa['score'] as num?)?.toInt() ?? 0,
@@ -6641,7 +7997,9 @@ class DatabaseHelper {
           });
         }
       }
-      debugPrint('[DatabaseHelper] Synced ${cloudQuizzes.length} Cloud quizzes to local SQLite');
+      debugPrint(
+        '[DatabaseHelper] Synced ${cloudQuizzes.length} Cloud quizzes to local SQLite',
+      );
     } catch (e) {
       debugPrint('[DatabaseHelper] syncCloudQuizzesToLocal note: $e');
     }
@@ -6657,18 +8015,34 @@ class DatabaseHelper {
         final subCode = s['subject_code']?.toString() ?? 'SUBJ_$subId';
         final cloudDocId = 'subj_$subCode';
 
-        final topics = await db.query('topics', where: 'subject_id = ?', whereArgs: [subId]);
+        final topics = await db.query(
+          'topics',
+          where: 'subject_id = ?',
+          whereArgs: [subId],
+        );
         final topicsPayload = <Map<String, dynamic>>[];
 
         for (final t in topics) {
           final tId = t['id'] as int;
-          final los = await db.query('learning_outcomes', where: 'topic_id = ?', whereArgs: [tId]);
+          final los = await db.query(
+            'learning_outcomes',
+            where: 'topic_id = ?',
+            whereArgs: [tId],
+          );
           final losPayload = <Map<String, dynamic>>[];
 
           for (final lo in los) {
             final loId = lo['id'] as int;
-            final contents = await db.query('contents', where: 'lo_id = ?', whereArgs: [loId]);
-            final questions = await db.query('questions', where: 'lo_id = ?', whereArgs: [loId]);
+            final contents = await db.query(
+              'contents',
+              where: 'lo_id = ?',
+              whereArgs: [loId],
+            );
+            final questions = await db.query(
+              'questions',
+              where: 'lo_id = ?',
+              whereArgs: [loId],
+            );
 
             losPayload.add({
               'id': loId,
@@ -6680,19 +8054,27 @@ class DatabaseHelper {
               'schedule_end': lo['schedule_end'],
               'timezone': lo['timezone'],
               'allow_extend': lo['allow_extend'] ?? 0,
-              'contents': contents.map((c) => {
-                'content_type': c['content_type'],
-                'title': c['title'],
-                'content_data': c['content_data'],
-              }).toList(),
-              'questions': questions.map((q) => {
-                'question_text': q['question_text'],
-                'option_a': q['option_a'],
-                'option_b': q['option_b'],
-                'option_c': q['option_c'],
-                'option_d': q['option_d'],
-                'correct_option': q['correct_option'],
-              }).toList(),
+              'contents': contents
+                  .map(
+                    (c) => {
+                      'content_type': c['content_type'],
+                      'title': c['title'],
+                      'content_data': c['content_data'],
+                    },
+                  )
+                  .toList(),
+              'questions': questions
+                  .map(
+                    (q) => {
+                      'question_text': q['question_text'],
+                      'option_a': q['option_a'],
+                      'option_b': q['option_b'],
+                      'option_c': q['option_c'],
+                      'option_d': q['option_d'],
+                      'correct_option': q['correct_option'],
+                    },
+                  )
+                  .toList(),
             });
           }
 
@@ -6718,7 +8100,11 @@ class DatabaseHelper {
           'topics': topicsPayload,
         };
 
-        await FirestoreService().saveDocument('curriculum_subjects', cloudDocId, subjectMap);
+        await FirestoreService().saveDocument(
+          'curriculum_subjects',
+          cloudDocId,
+          subjectMap,
+        );
       }
     } catch (e) {
       debugPrint('[DatabaseHelper] pushLocalCurriculumToCloud error: $e');
@@ -6728,7 +8114,9 @@ class DatabaseHelper {
   /// Pulls all subjects, topics, and learning outcomes from Cloud Firestore and caches in SQLite
   Future<void> syncCloudCurriculumToLocal() async {
     try {
-      final cloudSubjects = await FirestoreService().fetchAllDocuments('curriculum_subjects');
+      final cloudSubjects = await FirestoreService().fetchAllDocuments(
+        'curriculum_subjects',
+      );
       if (cloudSubjects.isEmpty) return;
       final db = await database;
 
@@ -6743,9 +8131,14 @@ class DatabaseHelper {
         final unlock = doc['unlock_type']?.toString() ?? 'Sequential';
         final teacherId = doc['teacher_id']?.toString() ?? 'teacher_1';
         final teacherName = doc['teacher_name']?.toString() ?? 'Sir John Reyes';
-        final createdAt = doc['created_at']?.toString() ?? DateTime.now().toIso8601String();
+        final createdAt =
+            doc['created_at']?.toString() ?? DateTime.now().toIso8601String();
 
-        final matchSub = await db.query('subjects', where: 'subject_code = ?', whereArgs: [subCode]);
+        final matchSub = await db.query(
+          'subjects',
+          where: 'subject_code = ?',
+          whereArgs: [subCode],
+        );
         int localSubId;
         if (matchSub.isEmpty) {
           localSubId = await db.insert('subjects', {
@@ -6761,18 +8154,24 @@ class DatabaseHelper {
           });
         } else {
           localSubId = matchSub.first['id'] as int;
-          await db.update('subjects', {
-            'name': name,
-            'description': desc,
-            'grade_level': grade,
-            'semester': sem,
-            'unlock_type': unlock,
-            'teacher_id': teacherId,
-            'teacher_name': teacherName,
-          }, where: 'id = ?', whereArgs: [localSubId]);
+          await db.update(
+            'subjects',
+            {
+              'name': name,
+              'description': desc,
+              'grade_level': grade,
+              'semester': sem,
+              'unlock_type': unlock,
+              'teacher_id': teacherId,
+              'teacher_name': teacherName,
+            },
+            where: 'id = ?',
+            whereArgs: [localSubId],
+          );
         }
 
-        final topics = (doc['topics'] as List?)?.cast<Map<String, dynamic>>() ?? [];
+        final topics =
+            (doc['topics'] as List?)?.cast<Map<String, dynamic>>() ?? [];
         for (final t in topics) {
           final tTitle = t['title']?.toString() ?? 'Topic';
           final tDesc = t['description']?.toString();
@@ -6792,12 +8191,17 @@ class DatabaseHelper {
             });
           } else {
             localTopicId = matchT.first['id'] as int;
-            await db.update('topics', {
-              'description': tDesc,
-            }, where: 'id = ?', whereArgs: [localTopicId]);
+            await db.update(
+              'topics',
+              {'description': tDesc},
+              where: 'id = ?',
+              whereArgs: [localTopicId],
+            );
           }
 
-          final los = (t['learning_outcomes'] as List?)?.cast<Map<String, dynamic>>() ?? [];
+          final los =
+              (t['learning_outcomes'] as List?)?.cast<Map<String, dynamic>>() ??
+              [];
           for (final lo in los) {
             final loTitle = lo['title']?.toString() ?? 'Learning Outcome';
             final matchLo = await db.query(
@@ -6821,16 +8225,22 @@ class DatabaseHelper {
               });
             } else {
               localLoId = matchLo.first['id'] as int;
-              await db.update('learning_outcomes', {
-                'description': lo['description'],
-                'performance_criteria': lo['performance_criteria'],
-                'passing_score': (lo['passing_score'] as num?)?.toInt() ?? 70,
-                'schedule_start': lo['schedule_start'],
-                'schedule_end': lo['schedule_end'],
-              }, where: 'id = ?', whereArgs: [localLoId]);
+              await db.update(
+                'learning_outcomes',
+                {
+                  'description': lo['description'],
+                  'performance_criteria': lo['performance_criteria'],
+                  'passing_score': (lo['passing_score'] as num?)?.toInt() ?? 70,
+                  'schedule_start': lo['schedule_start'],
+                  'schedule_end': lo['schedule_end'],
+                },
+                where: 'id = ?',
+                whereArgs: [localLoId],
+              );
             }
 
-            final contents = (lo['contents'] as List?)?.cast<Map<String, dynamic>>() ?? [];
+            final contents =
+                (lo['contents'] as List?)?.cast<Map<String, dynamic>>() ?? [];
             for (final c in contents) {
               final cTitle = c['title']?.toString() ?? 'Content';
               final matchC = await db.query(
@@ -6866,7 +8276,11 @@ class DatabaseHelper {
         final sId = s['student_id'];
         if (aId == null || sId == null) continue;
         final docId = '${aId}_$sId';
-        await FirestoreService().saveDocument('submissions', docId, Map<String, dynamic>.from(s));
+        await FirestoreService().saveDocument(
+          'submissions',
+          docId,
+          Map<String, dynamic>.from(s),
+        );
       }
     } catch (e) {
       debugPrint('[DatabaseHelper] pushLocalSubmissionsToCloud note: $e');
@@ -6902,16 +8316,36 @@ class DatabaseHelper {
   /// Sync student submissions from Cloud Firestore down to local SQLite cache
   Future<void> syncCloudSubmissionsToLocal({int? assignmentId}) async {
     try {
-      final cloudDocs = await FirestoreService().fetchAllDocuments('submissions');
+      final cloudDocs = await FirestoreService().fetchAllDocuments(
+        'submissions',
+      );
       if (cloudDocs.isEmpty) return;
       final db = await database;
       for (final doc in cloudDocs) {
-        final aId = (doc['assignment_id'] as num?)?.toInt();
+        final rawAId = (doc['assignment_id'] as num?)?.toInt();
         final sId = doc['student_id']?.toString();
-        if (aId == null || sId == null || sId.isEmpty) continue;
-        if (assignmentId != null && aId != assignmentId) continue;
+        final cloudAssignId = doc['assignment_cloud_id']?.toString();
+        if (sId == null || sId.isEmpty) continue;
+
+        // Resolve local assignment ID for this device
+        int? targetAssignmentId = rawAId;
+        if (cloudAssignId != null && cloudAssignId.isNotEmpty) {
+          final matchedAssign = await db.query(
+            'assignments',
+            columns: ['id'],
+            where: 'cloud_id = ?',
+            whereArgs: [cloudAssignId],
+          );
+          if (matchedAssign.isNotEmpty) {
+            targetAssignmentId = matchedAssign.first['id'] as int;
+          }
+        }
+        if (targetAssignmentId == null) continue;
+        if (assignmentId != null && targetAssignmentId != assignmentId)
+          continue;
 
         final studentName = doc['student_name']?.toString();
+        final studentSec = doc['student_section']?.toString();
         final submissionType = doc['submission_type']?.toString() ?? 'both';
         final contentLink = doc['content_link']?.toString();
         final fileName = doc['file_name']?.toString();
@@ -6922,17 +8356,22 @@ class DatabaseHelper {
         final imagePath = doc['image_path']?.toString();
         final imageBytes = doc['image_bytes']?.toString();
         final notes = doc['notes']?.toString();
-        final submittedAt = doc['submitted_at']?.toString() ?? DateTime.now().toIso8601String();
+        final submittedAt =
+            doc['submitted_at']?.toString() ?? DateTime.now().toIso8601String();
         final status = doc['status']?.toString() ?? 'submitted';
-        final grade = (doc['grade'] is num) ? (doc['grade'] as num).toDouble() : double.tryParse(doc['grade']?.toString() ?? '');
+        final grade = (doc['grade'] is num)
+            ? (doc['grade'] as num).toDouble()
+            : double.tryParse(doc['grade']?.toString() ?? '');
         final feedback = doc['feedback']?.toString();
         final gradedAt = doc['graded_at']?.toString();
         final gradedBy = doc['graded_by']?.toString();
 
         await db.insert('submissions', {
-          'assignment_id': aId,
+          'assignment_id': targetAssignmentId,
+          'assignment_cloud_id': cloudAssignId,
           'student_id': sId,
           'student_name': studentName,
+          'student_section': studentSec,
           'submission_type': submissionType,
           'content_link': contentLink,
           'file_name': fileName,
@@ -6958,30 +8397,53 @@ class DatabaseHelper {
 
   Future<Map<String, dynamic>?> getAssignmentById(int id) async {
     final db = await database;
-    final res = await db.rawQuery('''
+    final res = await db.rawQuery(
+      '''
       SELECT a.*, s.name as subject_name, s.subject_code
       FROM assignments a
       LEFT JOIN subjects s ON a.subject_id = s.id
       WHERE a.id = ?
-    ''', [id]);
+    ''',
+      [id],
+    );
     return res.isNotEmpty ? res.first : null;
   }
 
-  Future<List<Map<String, dynamic>>> getAssignmentsForSubject(int subjectId) async {
+  Future<List<Map<String, dynamic>>> getAssignmentsForSubject(
+    int subjectId,
+  ) async {
     final db = await database;
-    final assignments = await db.rawQuery('''
+    final assignments = await db.rawQuery(
+      '''
       SELECT a.*,
              (SELECT COUNT(*) FROM submissions WHERE assignment_id = a.id) as submission_count,
              (SELECT COUNT(*) FROM submissions WHERE assignment_id = a.id AND status = 'graded') as graded_count
       FROM assignments a
       WHERE a.subject_id = ?
       ORDER BY a.created_at DESC
-    ''', [subjectId]);
+    ''',
+      [subjectId],
+    );
     return assignments;
   }
 
-  Future<List<Map<String, dynamic>>> getAssignmentsForStudent(String studentId, {int? subjectId}) async {
+  Future<List<Map<String, dynamic>>> getAssignmentsForStudent(
+    String studentId, {
+    int? subjectId,
+  }) async {
     final db = await database;
+
+    // Check student's section for targeted filtering
+    final studentUser = await db.query(
+      'users',
+      columns: ['section'],
+      where: 'id = ?',
+      whereArgs: [studentId],
+    );
+    final studentSec = studentUser.isNotEmpty
+        ? studentUser.first['section']?.toString().trim().toLowerCase()
+        : null;
+
     String query = '''
       SELECT a.*,
              s.name as subject_name,
@@ -7007,11 +8469,31 @@ class DatabaseHelper {
       query += ' WHERE a.subject_id = ?';
       args.add(subjectId);
     }
-    query += ' ORDER BY CASE WHEN sub.status IS NULL THEN 0 ELSE 1 END, a.due_date ASC, a.created_at DESC';
-    return await db.rawQuery(query, args);
+    query +=
+        ' ORDER BY CASE WHEN sub.status IS NULL THEN 0 ELSE 1 END, a.due_date ASC, a.created_at DESC';
+    final rows = await db.rawQuery(query, args);
+
+    if (studentSec == null || studentSec.isEmpty) {
+      return rows;
+    }
+
+    // Filter by target_sections if specified
+    return rows.where((a) {
+      final target = (a['target_sections'] as String?)?.trim().toLowerCase();
+      if (target == null ||
+          target.isEmpty ||
+          target == 'all handled sections' ||
+          target == 'all sections') {
+        return true;
+      }
+      return target.contains(studentSec) || studentSec.contains(target);
+    }).toList();
   }
 
-  Future<Map<String, dynamic>?> getSubmissionForAssignment(int assignmentId, String studentId) async {
+  Future<Map<String, dynamic>?> getSubmissionForAssignment(
+    int assignmentId,
+    String studentId,
+  ) async {
     final db = await database;
     final res = await db.query(
       'submissions',
@@ -7021,20 +8503,29 @@ class DatabaseHelper {
     return res.isNotEmpty ? res.first : null;
   }
 
-  Future<List<Map<String, dynamic>>> getSubmissionsForAssignment(int assignmentId) async {
+  Future<List<Map<String, dynamic>>> getSubmissionsForAssignment(
+    int assignmentId,
+  ) async {
     final db = await database;
-    return await db.rawQuery('''
+    return await db.rawQuery(
+      '''
       SELECT sub.*, u.full_name, u.email, u.section, u.grade as student_grade_level, u.profile_image
       FROM submissions sub
       LEFT JOIN users u ON sub.student_id = u.id
       WHERE sub.assignment_id = ?
       ORDER BY sub.submitted_at DESC
-    ''', [assignmentId]);
+    ''',
+      [assignmentId],
+    );
   }
 
-  Future<List<Map<String, dynamic>>> getRecentSubmissionsForTeacher(String teacherId, {int limit = 10}) async {
+  Future<List<Map<String, dynamic>>> getRecentSubmissionsForTeacher(
+    String teacherId, {
+    int limit = 10,
+  }) async {
     final db = await database;
-    return await db.rawQuery('''
+    return await db.rawQuery(
+      '''
       SELECT sub.*, 
              a.title as assignment_title, 
              a.total_points, 
@@ -7049,13 +8540,17 @@ class DatabaseHelper {
       WHERE a.teacher_id = ?
       ORDER BY sub.submitted_at DESC
       LIMIT ?
-    ''', [teacherId, limit]);
+    ''',
+      [teacherId, limit],
+    );
   }
 
   /// Get complete student submission roster for an assignment:
   /// Returns all enrolled students in the subject with their submission status:
   /// 'not submitted', 'submitted', 'late', 'graded'
-  Future<List<Map<String, dynamic>>> getActivityRosterForTeacher(int assignmentId) async {
+  Future<List<Map<String, dynamic>>> getActivityRosterForTeacher(
+    int assignmentId,
+  ) async {
     final db = await database;
     final assignment = await getAssignmentById(assignmentId);
     if (assignment == null) return [];
@@ -7070,7 +8565,8 @@ class DatabaseHelper {
     }
 
     // 1. Query enrolled students for this subject with their submissions
-    final rows = await db.rawQuery('''
+    final rows = await db.rawQuery(
+      '''
       SELECT 
         u.id as student_id,
         u.full_name,
@@ -7098,11 +8594,16 @@ class DatabaseHelper {
       LEFT JOIN submissions sub ON sub.assignment_id = ? AND sub.student_id = u.id
       WHERE u.role = 'student'
       ORDER BY u.full_name ASC
-    ''', [subjectId, assignmentId]);
+    ''',
+      [subjectId, assignmentId],
+    );
 
     // Also find any submissions by students not currently in enrollments table
-    final enrolledStudentIds = rows.map((r) => r['student_id'] as String).toSet();
-    final orphanSubmissions = await db.rawQuery('''
+    final enrolledStudentIds = rows
+        .map((r) => r['student_id'] as String)
+        .toSet();
+    final orphanSubmissions = await db.rawQuery(
+      '''
       SELECT 
         sub.student_id,
         u.full_name,
@@ -7128,7 +8629,9 @@ class DatabaseHelper {
       FROM submissions sub
       LEFT JOIN users u ON sub.student_id = u.id
       WHERE sub.assignment_id = ?
-    ''', [assignmentId]);
+    ''',
+      [assignmentId],
+    );
 
     final allRows = <Map<String, dynamic>>[...rows];
     for (final orphan in orphanSubmissions) {
@@ -7155,7 +8658,9 @@ class DatabaseHelper {
       if (rawStatus == 'graded' || map['grade'] != null) {
         computedStatus = 'graded';
       } else if (map['submission_id'] != null) {
-        if (dueDate != null && submittedAt != null && submittedAt.isAfter(dueDate)) {
+        if (dueDate != null &&
+            submittedAt != null &&
+            submittedAt.isAfter(dueDate)) {
           computedStatus = 'late';
         } else {
           computedStatus = 'submitted';
@@ -7195,7 +8700,12 @@ class DatabaseHelper {
     // Check if submission is late based on assignment due_date
     String status = 'submitted';
     final assignment = await getAssignmentById(assignmentId);
-    if (assignment != null && assignment['due_date'] != null && (assignment['due_date'] as String).isNotEmpty) {
+    final cloudAssignmentId =
+        assignment?['cloud_id']?.toString() ?? 'assign_$assignmentId';
+
+    if (assignment != null &&
+        assignment['due_date'] != null &&
+        (assignment['due_date'] as String).isNotEmpty) {
       try {
         final due = DateTime.parse(assignment['due_date'] as String);
         if (DateTime.now().isAfter(due)) {
@@ -7204,10 +8714,23 @@ class DatabaseHelper {
       } catch (_) {}
     }
 
+    // Look up student section
+    final studentUser = await db.query(
+      'users',
+      columns: ['section'],
+      where: 'id = ?',
+      whereArgs: [studentId],
+    );
+    final studentSec = studentUser.isNotEmpty
+        ? studentUser.first['section']?.toString()
+        : null;
+
     final subData = {
       'assignment_id': assignmentId,
+      'assignment_cloud_id': cloudAssignmentId,
       'student_id': studentId,
       'student_name': studentName,
+      'student_section': studentSec,
       'submission_type': submissionType,
       'content_link': contentLink,
       'file_name': fileName,
@@ -7230,11 +8753,34 @@ class DatabaseHelper {
 
     // 1. Sync submission to Cloud Firestore
     try {
-      final docId = '${assignmentId}_$studentId';
-      unawaited(FirestoreService().saveDocument('submissions', docId, {
-        ...subData,
-        'id': id,
-      }));
+      final docId = '${cloudAssignmentId}_$studentId';
+      final safeFileBytes = (fileBytes != null && fileBytes.length < 750000)
+          ? fileBytes
+          : null;
+      final safeImageBytes = (imageBytes != null && imageBytes.length < 750000)
+          ? imageBytes
+          : null;
+
+      unawaited(
+        FirestoreService().saveDocument('submissions', docId, {
+          ...subData,
+          'file_bytes': safeFileBytes,
+          'image_bytes': safeImageBytes,
+          'id': id,
+        }),
+      );
+      // Also update legacy format so older clients receive it
+      if (cloudAssignmentId != assignmentId.toString()) {
+        unawaited(
+          FirestoreService()
+              .saveDocument('submissions', '${assignmentId}_$studentId', {
+                ...subData,
+                'file_bytes': safeFileBytes,
+                'image_bytes': safeImageBytes,
+                'id': id,
+              }),
+        );
+      }
     } catch (_) {}
 
     // 2. Automatically notify the assignment's teacher!
@@ -7243,16 +8789,19 @@ class DatabaseHelper {
       final aTitle = assignment['title'] as String? ?? 'Activity';
       final sName = studentName ?? 'A student';
       final subName = assignment['subject_name'] as String? ?? '';
-      unawaited(createNotification(
-        userId: teacherId,
-        type: 'activity_submission',
-        title: 'New Activity Submission: $aTitle',
-        message: '$sName submitted "$aTitle"${subName.isNotEmpty ? " for $subName" : ""}${status == "late" ? " (Late Submission)" : ""}.',
-        relatedId: assignmentId.toString(),
-        subjectId: assignment['subject_id'] as int?,
-        actorId: studentId,
-        actorName: studentName,
-      ));
+      unawaited(
+        createNotification(
+          userId: teacherId,
+          type: 'activity_submission',
+          title: 'New Activity Submission: $aTitle',
+          message:
+              '$sName submitted "$aTitle"${subName.isNotEmpty ? " for $subName" : ""}${status == "late" ? " (Late Submission)" : ""}.',
+          relatedId: assignmentId.toString(),
+          subjectId: assignment['subject_id'] as int?,
+          actorId: studentId,
+          actorName: studentName,
+        ),
+      );
     }
 
     return id;
@@ -7281,33 +8830,57 @@ class DatabaseHelper {
 
     // Sync grade to Cloud Firestore and notify the student
     try {
-      final subRows = await db.query('submissions', where: 'id = ?', whereArgs: [submissionId]);
+      final subRows = await db.query(
+        'submissions',
+        where: 'id = ?',
+        whereArgs: [submissionId],
+      );
       if (subRows.isNotEmpty) {
         final sub = subRows.first;
         final studentId = sub['student_id'] as String?;
         final assignmentId = sub['assignment_id'] as int?;
+        final cloudAssignId = sub['assignment_cloud_id'] as String?;
         if (studentId != null && assignmentId != null) {
-          final docId = '${assignmentId}_$studentId';
-          unawaited(FirestoreService().saveDocument('submissions', docId, {
-            'grade': grade,
-            'feedback': feedback,
-            'graded_at': now,
-            'graded_by': gradedBy,
-            'status': 'graded',
-          }));
+          final docId = (cloudAssignId != null && cloudAssignId.isNotEmpty)
+              ? '${cloudAssignId}_$studentId'
+              : '${assignmentId}_$studentId';
+          unawaited(
+            FirestoreService().saveDocument('submissions', docId, {
+              'grade': grade,
+              'feedback': feedback,
+              'graded_at': now,
+              'graded_by': gradedBy,
+              'status': 'graded',
+            }),
+          );
+          if (docId != '${assignmentId}_$studentId') {
+            unawaited(
+              FirestoreService()
+                  .saveDocument('submissions', '${assignmentId}_$studentId', {
+                    'grade': grade,
+                    'feedback': feedback,
+                    'graded_at': now,
+                    'graded_by': gradedBy,
+                    'status': 'graded',
+                  }),
+            );
+          }
 
           final assignment = await getAssignmentById(assignmentId);
           final title = assignment?['title'] ?? 'Activity';
           final totalPoints = assignment?['total_points'] ?? 100;
-          unawaited(createNotification(
-            userId: studentId,
-            type: 'grade_released',
-            title: 'Activity Graded: $title',
-            message: 'Your submission for "$title" was graded: ${grade.toStringAsFixed(1)}/$totalPoints pts.${feedback != null && feedback.isNotEmpty ? " Feedback: $feedback" : ""}',
-            relatedId: assignmentId.toString(),
-            subjectId: assignment?['subject_id'] as int?,
-            actorId: gradedBy,
-          ));
+          unawaited(
+            createNotification(
+              userId: studentId,
+              type: 'grade_released',
+              title: 'Activity Graded: $title',
+              message:
+                  'Your submission for "$title" was graded: ${grade.toStringAsFixed(1)}/$totalPoints pts.${feedback != null && feedback.isNotEmpty ? " Feedback: $feedback" : ""}',
+              relatedId: assignmentId.toString(),
+              subjectId: assignment?['subject_id'] as int?,
+              actorId: gradedBy,
+            ),
+          );
         }
       }
     } catch (_) {}
@@ -7317,10 +8890,21 @@ class DatabaseHelper {
 
   Future<int> deleteAssignment(int id) async {
     final db = await database;
+    final assign = await getAssignmentById(id);
+    final cloudId = assign?['cloud_id'] as String?;
     await db.delete('submissions', where: 'assignment_id = ?', whereArgs: [id]);
-    final deleted = await db.delete('assignments', where: 'id = ?', whereArgs: [id]);
+    final deleted = await db.delete(
+      'assignments',
+      where: 'id = ?',
+      whereArgs: [id],
+    );
     try {
-      unawaited(FirestoreService().deleteDocument('assignments', id.toString()));
+      if (cloudId != null && cloudId.isNotEmpty) {
+        unawaited(FirestoreService().deleteDocument('assignments', cloudId));
+      }
+      unawaited(
+        FirestoreService().deleteDocument('assignments', id.toString()),
+      );
     } catch (_) {}
     return deleted;
   }
@@ -7340,7 +8924,8 @@ class DatabaseHelper {
   }) async {
     final db = await database;
     final now = DateTime.now().toIso8601String();
-    final id = 'notif_${DateTime.now().millisecondsSinceEpoch}_${(userId.hashCode % 1000).abs()}';
+    final id =
+        'notif_${DateTime.now().millisecondsSinceEpoch}_${(userId.hashCode % 1000).abs()}';
     final notifData = {
       'id': id,
       'user_id': userId,
@@ -7359,13 +8944,17 @@ class DatabaseHelper {
 
     // Sync notification to Cloud Firestore
     try {
-      unawaited(FirestoreService().saveDocument('notifications', id, notifData));
+      unawaited(
+        FirestoreService().saveDocument('notifications', id, notifData),
+      );
     } catch (_) {}
 
     return id;
   }
 
-  Future<List<Map<String, dynamic>>> getNotificationsForUser(String userId) async {
+  Future<List<Map<String, dynamic>>> getNotificationsForUser(
+    String userId,
+  ) async {
     final db = await database;
     return await db.query(
       'notifications',
@@ -7407,36 +8996,33 @@ class DatabaseHelper {
 
   Future<void> deleteNotification(String id) async {
     final db = await database;
-    await db.delete(
-      'notifications',
-      where: 'id = ?',
-      whereArgs: [id],
-    );
+    await db.delete('notifications', where: 'id = ?', whereArgs: [id]);
   }
 
   Future<void> clearNotificationsForUser(String userId) async {
     final db = await database;
-    await db.delete(
-      'notifications',
-      where: 'user_id = ?',
-      whereArgs: [userId],
-    );
+    await db.delete('notifications', where: 'user_id = ?', whereArgs: [userId]);
   }
 
   // ── School Administrators & Super Admin Management ─────────
-  Future<List<Map<String, dynamic>>> getAdminsList({String? query, String? schoolId}) async {
+  Future<List<Map<String, dynamic>>> getAdminsList({
+    String? query,
+    String? schoolId,
+  }) async {
     final db = await database;
     String whereClause = "(role = 'admin' OR role = 'super_admin')";
     final List<dynamic> whereArgs = [];
 
     if (schoolId != null && schoolId.isNotEmpty && schoolId != 'all') {
-      whereClause += " AND (school_id = ? OR school_id IS NULL OR role = 'super_admin')";
+      whereClause +=
+          " AND (school_id = ? OR school_id IS NULL OR role = 'super_admin')";
       whereArgs.add(schoolId);
     }
 
     if (query != null && query.trim().isNotEmpty) {
       final q = '%${query.trim().toLowerCase()}%';
-      whereClause += " AND (LOWER(full_name) LIKE ? OR LOWER(email) LIKE ? OR LOWER(COALESCE(username, '')) LIKE ?)";
+      whereClause +=
+          " AND (LOWER(full_name) LIKE ? OR LOWER(email) LIKE ? OR LOWER(COALESCE(username, '')) LIKE ?)";
       whereArgs.addAll([q, q, q]);
     }
 
@@ -7444,7 +9030,8 @@ class DatabaseHelper {
       'users',
       where: whereClause,
       whereArgs: whereArgs.isNotEmpty ? whereArgs : null,
-      orderBy: "CASE WHEN role = 'super_admin' THEN 0 ELSE 1 END, full_name ASC",
+      orderBy:
+          "CASE WHEN role = 'super_admin' THEN 0 ELSE 1 END, full_name ASC",
     );
 
     return admins;
@@ -7464,7 +9051,9 @@ class DatabaseHelper {
     final adminId = 'admin_${DateTime.now().millisecondsSinceEpoch}';
     final resolvedUsername = (username != null && username.trim().isNotEmpty)
         ? username.trim()
-        : (email.contains('@') ? email.split('@').first : fullName.trim().toLowerCase().replaceAll(' ', '.'));
+        : (email.contains('@')
+              ? email.split('@').first
+              : fullName.trim().toLowerCase().replaceAll(' ', '.'));
 
     final adminData = {
       'id': adminId,
@@ -7487,19 +9076,21 @@ class DatabaseHelper {
     return adminId;
   }
 
-  Future<void> updateAdmin(
-    String adminId,
-    Map<String, dynamic> data,
-  ) async {
+  Future<void> updateAdmin(String adminId, Map<String, dynamic> data) async {
     final db = await database;
     final updates = <String, dynamic>{};
-    if (data.containsKey('full_name')) updates['full_name'] = (data['full_name'] as String).trim();
-    if (data.containsKey('email')) updates['email'] = (data['email'] as String).trim().toLowerCase();
-    if (data.containsKey('username')) updates['username'] = (data['username'] as String).trim();
+    if (data.containsKey('full_name'))
+      updates['full_name'] = (data['full_name'] as String).trim();
+    if (data.containsKey('email'))
+      updates['email'] = (data['email'] as String).trim().toLowerCase();
+    if (data.containsKey('username'))
+      updates['username'] = (data['username'] as String).trim();
     if (data.containsKey('school_id')) updates['school_id'] = data['school_id'];
     if (data.containsKey('role')) updates['role'] = data['role'];
-    if (data.containsKey('student_type')) updates['student_type'] = data['student_type'];
-    if (data.containsKey('special_notes')) updates['special_notes'] = data['special_notes'];
+    if (data.containsKey('student_type'))
+      updates['student_type'] = data['student_type'];
+    if (data.containsKey('special_notes'))
+      updates['special_notes'] = data['special_notes'];
     if (data.containsKey('password')) {
       final rawPass = data['password'] as String;
       if (rawPass.isNotEmpty) {
@@ -7538,7 +9129,7 @@ class DatabaseHelper {
             'address': 'DepEd Campus, Manila, Philippines',
             'status': 'active',
             'created_at': DateTime.now().toIso8601String(),
-          }
+          },
         ];
       }
       return results;
@@ -7551,7 +9142,7 @@ class DatabaseHelper {
           'address': 'DepEd Campus, Manila, Philippines',
           'status': 'active',
           'created_at': DateTime.now().toIso8601String(),
-        }
+        },
       ];
     }
   }
@@ -7595,14 +9186,22 @@ class DatabaseHelper {
 
   Future<bool> deleteSchool(String id) async {
     if (id == 'sch_main') {
-      throw Exception('The primary default demonstration school cannot be deleted.');
+      throw Exception(
+        'The primary default demonstration school cannot be deleted.',
+      );
     }
     final db = await database;
-    final usersCount = Sqflite.firstIntValue(
-      await db.rawQuery('SELECT COUNT(*) FROM users WHERE school_id = ?', [id]),
-    ) ?? 0;
+    final usersCount =
+        Sqflite.firstIntValue(
+          await db.rawQuery('SELECT COUNT(*) FROM users WHERE school_id = ?', [
+            id,
+          ]),
+        ) ??
+        0;
     if (usersCount > 0) {
-      throw Exception('Cannot delete school with $usersCount enrolled users. Reassign or remove users first.');
+      throw Exception(
+        'Cannot delete school with $usersCount enrolled users. Reassign or remove users first.',
+      );
     }
     await db.delete('schools', where: 'id = ?', whereArgs: [id]);
     return true;
@@ -7610,30 +9209,38 @@ class DatabaseHelper {
 
   Future<Map<String, int>> getSchoolStats(String schoolId) async {
     final db = await database;
-    final studentCount = Sqflite.firstIntValue(
-      await db.rawQuery(
-        "SELECT COUNT(*) FROM users WHERE role = 'student' AND (school_id = ? OR (? = 'sch_main' AND school_id IS NULL))",
-        [schoolId, schoolId],
-      ),
-    ) ?? 0;
-    final teacherCount = Sqflite.firstIntValue(
-      await db.rawQuery(
-        "SELECT COUNT(*) FROM users WHERE role = 'teacher' AND (school_id = ? OR (? = 'sch_main' AND school_id IS NULL))",
-        [schoolId, schoolId],
-      ),
-    ) ?? 0;
-    final sectionCount = Sqflite.firstIntValue(
-      await db.rawQuery(
-        "SELECT COUNT(*) FROM sections WHERE school_id = ? OR (? = 'sch_main' AND school_id IS NULL)",
-        [schoolId, schoolId],
-      ),
-    ) ?? 0;
-    final subjectCount = Sqflite.firstIntValue(
-      await db.rawQuery(
-        "SELECT COUNT(*) FROM subjects WHERE school_id = ? OR (? = 'sch_main' AND school_id IS NULL)",
-        [schoolId, schoolId],
-      ),
-    ) ?? 0;
+    final studentCount =
+        Sqflite.firstIntValue(
+          await db.rawQuery(
+            "SELECT COUNT(*) FROM users WHERE role = 'student' AND (school_id = ? OR (? = 'sch_main' AND school_id IS NULL))",
+            [schoolId, schoolId],
+          ),
+        ) ??
+        0;
+    final teacherCount =
+        Sqflite.firstIntValue(
+          await db.rawQuery(
+            "SELECT COUNT(*) FROM users WHERE role = 'teacher' AND (school_id = ? OR (? = 'sch_main' AND school_id IS NULL))",
+            [schoolId, schoolId],
+          ),
+        ) ??
+        0;
+    final sectionCount =
+        Sqflite.firstIntValue(
+          await db.rawQuery(
+            "SELECT COUNT(*) FROM sections WHERE school_id = ? OR (? = 'sch_main' AND school_id IS NULL)",
+            [schoolId, schoolId],
+          ),
+        ) ??
+        0;
+    final subjectCount =
+        Sqflite.firstIntValue(
+          await db.rawQuery(
+            "SELECT COUNT(*) FROM subjects WHERE school_id = ? OR (? = 'sch_main' AND school_id IS NULL)",
+            [schoolId, schoolId],
+          ),
+        ) ??
+        0;
     return {
       'students': studentCount,
       'teachers': teacherCount,
@@ -7644,8 +9251,18 @@ class DatabaseHelper {
 
   Future<void> assignSchoolAdmin(String schoolId, String adminId) async {
     final db = await database;
-    await db.update('schools', {'admin_id': adminId}, where: 'id = ?', whereArgs: [schoolId]);
-    await db.update('users', {'school_id': schoolId}, where: 'id = ?', whereArgs: [adminId]);
+    await db.update(
+      'schools',
+      {'admin_id': adminId},
+      where: 'id = ?',
+      whereArgs: [schoolId],
+    );
+    await db.update(
+      'users',
+      {'school_id': schoolId},
+      where: 'id = ?',
+      whereArgs: [adminId],
+    );
   }
 
   // ── Class Schedules Management ──────────────────────────────
@@ -7663,7 +9280,9 @@ class DatabaseHelper {
 
     if (teacherId != null && teacherId.isNotEmpty) {
       if (teacherName != null && teacherName.trim().isNotEmpty) {
-        whereClauses.add('(teacher_id = ? OR LOWER(TRIM(teacher_name)) = LOWER(TRIM(?)))');
+        whereClauses.add(
+          '(teacher_id = ? OR LOWER(TRIM(teacher_name)) = LOWER(TRIM(?)))',
+        );
         whereArgs.addAll([teacherId, teacherName.trim()]);
       } else {
         whereClauses.add('teacher_id = ?');
@@ -7677,7 +9296,10 @@ class DatabaseHelper {
       whereClauses.add('section_id = ?');
       whereArgs.add(sectionId);
     }
-    if (sectionName != null && sectionName.trim().isNotEmpty && sectionName != 'All Sections' && sectionName != 'All Handled Sections') {
+    if (sectionName != null &&
+        sectionName.trim().isNotEmpty &&
+        sectionName != 'All Sections' &&
+        sectionName != 'All Handled Sections') {
       final clean = sectionName.trim();
       final normalized = clean.replaceAll('–', '-').replaceAll('—', '-');
       String keyword = '';
@@ -7717,7 +9339,9 @@ class DatabaseHelper {
       whereArgs.add(dayOfWeek);
     }
 
-    final whereString = whereClauses.isNotEmpty ? whereClauses.join(' AND ') : null;
+    final whereString = whereClauses.isNotEmpty
+        ? whereClauses.join(' AND ')
+        : null;
     final results = await db.query(
       'class_schedules',
       where: whereString,
@@ -7729,13 +9353,19 @@ class DatabaseHelper {
 
   Future<String> createClassSchedule(Map<String, dynamic> data) async {
     final db = await database;
-    final id = data['id'] as String? ?? 'sched_${DateTime.now().millisecondsSinceEpoch}';
+    final id =
+        data['id'] as String? ??
+        'sched_${DateTime.now().millisecondsSinceEpoch}';
     final now = DateTime.now().toIso8601String();
     final row = Map<String, dynamic>.from(data);
     row['id'] = id;
     row['created_at'] ??= now;
     row['school_id'] ??= 'sch_main';
-    await db.insert('class_schedules', row, conflictAlgorithm: ConflictAlgorithm.replace);
+    await db.insert(
+      'class_schedules',
+      row,
+      conflictAlgorithm: ConflictAlgorithm.replace,
+    );
     return id;
   }
 
@@ -7775,7 +9405,8 @@ class DatabaseHelper {
       whereArgs.add(excludeScheduleId);
     }
 
-    final query = '''
+    final query =
+        '''
       SELECT * FROM class_schedules
       WHERE ${whereClauses.join(' AND ')}
       AND (start_time < ? AND end_time > ?)
@@ -7791,28 +9422,33 @@ class DatabaseHelper {
           'hasConflict': true,
           'type': 'teacher',
           'conflict': c,
-          'reason': 'Teacher is already scheduled for "${c['subject_name']}" (${c['section_name']}) at ${c['start_time']} - ${c['end_time']}.',
+          'reason':
+              'Teacher is already scheduled for "${c['subject_name']}" (${c['section_name']}) at ${c['start_time']} - ${c['end_time']}.',
         };
       }
       if (sectionName != null &&
           sectionName.trim().isNotEmpty &&
-          (c['section_name'] as String).trim().toLowerCase() == sectionName.trim().toLowerCase()) {
+          (c['section_name'] as String).trim().toLowerCase() ==
+              sectionName.trim().toLowerCase()) {
         return {
           'hasConflict': true,
           'type': 'section',
           'conflict': c,
-          'reason': 'Section "$sectionName" already has "${c['subject_name']}" scheduled at ${c['start_time']} - ${c['end_time']}.',
+          'reason':
+              'Section "$sectionName" already has "${c['subject_name']}" scheduled at ${c['start_time']} - ${c['end_time']}.',
         };
       }
       if (room != null &&
           room.trim().isNotEmpty &&
           c['room'] != null &&
-          (c['room'] as String).trim().toLowerCase() == room.trim().toLowerCase()) {
+          (c['room'] as String).trim().toLowerCase() ==
+              room.trim().toLowerCase()) {
         return {
           'hasConflict': true,
           'type': 'room',
           'conflict': c,
-          'reason': 'Room "$room" is already occupied by ${c['teacher_name']} for "${c['subject_name']}" at ${c['start_time']} - ${c['end_time']}.',
+          'reason':
+              'Room "$room" is already occupied by ${c['teacher_name']} for "${c['subject_name']}" at ${c['start_time']} - ${c['end_time']}.',
         };
       }
     }
@@ -7822,7 +9458,9 @@ class DatabaseHelper {
 
   // ── Inquiries & Helpdesk Management ─────────────────────────
 
-  Future<Map<String, dynamic>?> findUserByIdOrIdentifier(String identifier) async {
+  Future<Map<String, dynamic>?> findUserByIdOrIdentifier(
+    String identifier,
+  ) async {
     final db = await database;
     final trimmed = identifier.trim();
     if (trimmed.isEmpty) return null;
@@ -7863,7 +9501,8 @@ class DatabaseHelper {
     required String question,
   }) async {
     final db = await database;
-    final id = 'INQ-${(DateTime.now().millisecondsSinceEpoch % 100000).toString().padLeft(5, '0')}';
+    final id =
+        'INQ-${(DateTime.now().millisecondsSinceEpoch % 100000).toString().padLeft(5, '0')}';
     final now = DateTime.now().toIso8601String();
     await db.insert('inquiries', {
       'id': id,
@@ -7891,10 +9530,7 @@ class DatabaseHelper {
         orderBy: 'created_at DESC',
       );
     }
-    return await db.query(
-      'inquiries',
-      orderBy: 'created_at DESC',
-    );
+    return await db.query('inquiries', orderBy: 'created_at DESC');
   }
 
   Future<int> getPendingInquiriesCount() async {
@@ -7973,7 +9609,8 @@ class DatabaseHelper {
 
     await logAuditEvent(
       action: 'REGISTER_OFFLINE_HUB',
-      details: 'Registered ESP32 offline learning hub "$hubName" ($hubId) at IP $ipAddress',
+      details:
+          'Registered ESP32 offline learning hub "$hubName" ($hubId) at IP $ipAddress',
       schoolId: schoolId,
     );
 
@@ -8008,7 +9645,8 @@ class DatabaseHelper {
           {
             'id': 'log_init_1',
             'action': 'SYSTEM_INITIALIZATION',
-            'details': 'AIRAMP Super Admin Governance & Multi-Tenant Scoping Engine loaded.',
+            'details':
+                'AIRAMP Super Admin Governance & Multi-Tenant Scoping Engine loaded.',
             'actor_id': 'admin_1',
             'actor_name': 'Aira Super Admin',
             'school_id': 'sch_main',
@@ -8017,7 +9655,8 @@ class DatabaseHelper {
           {
             'id': 'log_init_2',
             'action': 'SECURITY_RBAC_SALT_ACTIVE',
-            'details': 'Cryptographic salted SHA-256 password security verified across database.',
+            'details':
+                'Cryptographic salted SHA-256 password security verified across database.',
             'actor_id': 'admin_1',
             'actor_name': 'Aira Super Admin',
             'school_id': 'sch_main',
@@ -8056,16 +9695,64 @@ class DatabaseHelper {
   // ── Executive Global System Metrics ─────────────────────────
   Future<Map<String, dynamic>> getSuperAdminGlobalStats() async {
     final db = await database;
-    final totalSchools = Sqflite.firstIntValue(await db.rawQuery('SELECT COUNT(*) FROM schools')) ?? 1;
-    final totalAdmins = Sqflite.firstIntValue(await db.rawQuery("SELECT COUNT(*) FROM users WHERE role = 'admin' OR role = 'super_admin'")) ?? 0;
-    final schoolAdmins = Sqflite.firstIntValue(await db.rawQuery("SELECT COUNT(*) FROM users WHERE role = 'admin'")) ?? 0;
-    final superAdmins = Sqflite.firstIntValue(await db.rawQuery("SELECT COUNT(*) FROM users WHERE role = 'super_admin'")) ?? 0;
-    final totalTeachers = Sqflite.firstIntValue(await db.rawQuery("SELECT COUNT(*) FROM users WHERE role = 'teacher'")) ?? 0;
-    final totalStudents = Sqflite.firstIntValue(await db.rawQuery("SELECT COUNT(*) FROM users WHERE role = 'student'")) ?? 0;
-    final totalSubjects = Sqflite.firstIntValue(await db.rawQuery('SELECT COUNT(*) FROM subjects')) ?? 0;
-    final totalSections = Sqflite.firstIntValue(await db.rawQuery('SELECT COUNT(*) FROM sections')) ?? 0;
-    final totalHubs = Sqflite.firstIntValue(await db.rawQuery('SELECT COUNT(*) FROM offline_hubs')) ?? 0;
-    final totalSchedules = Sqflite.firstIntValue(await db.rawQuery('SELECT COUNT(*) FROM class_schedules')) ?? 0;
+    final totalSchools =
+        Sqflite.firstIntValue(
+          await db.rawQuery('SELECT COUNT(*) FROM schools'),
+        ) ??
+        1;
+    final totalAdmins =
+        Sqflite.firstIntValue(
+          await db.rawQuery(
+            "SELECT COUNT(*) FROM users WHERE role = 'admin' OR role = 'super_admin'",
+          ),
+        ) ??
+        0;
+    final schoolAdmins =
+        Sqflite.firstIntValue(
+          await db.rawQuery("SELECT COUNT(*) FROM users WHERE role = 'admin'"),
+        ) ??
+        0;
+    final superAdmins =
+        Sqflite.firstIntValue(
+          await db.rawQuery(
+            "SELECT COUNT(*) FROM users WHERE role = 'super_admin'",
+          ),
+        ) ??
+        0;
+    final totalTeachers =
+        Sqflite.firstIntValue(
+          await db.rawQuery(
+            "SELECT COUNT(*) FROM users WHERE role = 'teacher'",
+          ),
+        ) ??
+        0;
+    final totalStudents =
+        Sqflite.firstIntValue(
+          await db.rawQuery(
+            "SELECT COUNT(*) FROM users WHERE role = 'student'",
+          ),
+        ) ??
+        0;
+    final totalSubjects =
+        Sqflite.firstIntValue(
+          await db.rawQuery('SELECT COUNT(*) FROM subjects'),
+        ) ??
+        0;
+    final totalSections =
+        Sqflite.firstIntValue(
+          await db.rawQuery('SELECT COUNT(*) FROM sections'),
+        ) ??
+        0;
+    final totalHubs =
+        Sqflite.firstIntValue(
+          await db.rawQuery('SELECT COUNT(*) FROM offline_hubs'),
+        ) ??
+        0;
+    final totalSchedules =
+        Sqflite.firstIntValue(
+          await db.rawQuery('SELECT COUNT(*) FROM class_schedules'),
+        ) ??
+        0;
 
     return {
       'total_schools': totalSchools,
@@ -8082,6 +9769,3 @@ class DatabaseHelper {
     };
   }
 }
-
-
-

@@ -836,38 +836,10 @@ class _TeacherDashboardScreenState extends ConsumerState<TeacherDashboardScreen>
 
           const SizedBox(width: 10),
 
-          // Right: Create Assignment + Analytics Launcher + Notifications Bell
+          // Right: Analytics Launcher + Notifications Bell
           Row(
             mainAxisSize: MainAxisSize.min,
             children: [
-              // Create Assignment Action Button
-              Container(
-                decoration: BoxDecoration(
-                  color: AppTheme.primary.withValues(alpha: 0.15),
-                  borderRadius: BorderRadius.circular(10),
-                  border: Border.all(
-                    color: AppTheme.primary.withValues(alpha: 0.35),
-                    width: 1.0,
-                  ),
-                ),
-                child: IconButton(
-                  icon: Icon(Icons.add_task, color: AppTheme.primary, size: 20),
-                  tooltip: 'Create / Upload Assignment',
-                  constraints: const BoxConstraints(minWidth: 36, minHeight: 36),
-                  padding: const EdgeInsets.all(7),
-                  onPressed: () {
-                    showDialog(
-                      context: context,
-                      builder: (ctx) => const CreateAssignmentDialog(),
-                    ).then((_) {
-                      ref.invalidate(teacherSubjectsProvider);
-                      ref.invalidate(teacherRecentSubmissionsProvider(currentUser?.id ?? ''));
-                    });
-                  },
-                ),
-              ),
-              const SizedBox(width: 8),
-
               // Analytics Quick Launcher Button
               Container(
                 decoration: BoxDecoration(

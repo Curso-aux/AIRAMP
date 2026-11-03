@@ -15,11 +15,13 @@ import '../../data/teacher_repository.dart';
 class CreateAssignmentDialog extends ConsumerStatefulWidget {
   final int? subjectId;
   final String? subjectName;
+  final String? initialSection;
 
   const CreateAssignmentDialog({
     super.key,
     this.subjectId,
     this.subjectName,
+    this.initialSection,
   });
 
   @override
@@ -37,6 +39,7 @@ class _CreateAssignmentDialogState extends ConsumerState<CreateAssignmentDialog>
 
   int? _selectedSubjectId;
   String? _selectedSubjectName;
+  String _selectedSection = 'All Handled Sections';
   String? _attachmentName;
   int? _attachmentSize;
   String? _attachmentPath;
@@ -49,6 +52,9 @@ class _CreateAssignmentDialogState extends ConsumerState<CreateAssignmentDialog>
     super.initState();
     _selectedSubjectId = widget.subjectId != null && widget.subjectId! > 0 ? widget.subjectId : null;
     _selectedSubjectName = widget.subjectName;
+    if (widget.initialSection != null && widget.initialSection!.trim().isNotEmpty) {
+      _selectedSection = widget.initialSection!.trim();
+    }
 
     _draftDisposer.add(_titleController.bindSessionDraft(formId: _formId, fieldKey: 'title'));
     _draftDisposer.add(_descController.bindSessionDraft(formId: _formId, fieldKey: 'desc'));
@@ -186,6 +192,7 @@ class _CreateAssignmentDialogState extends ConsumerState<CreateAssignmentDialog>
         subjectId: effectiveSubjectId,
         teacherId: teacherId,
         teacherName: teacherName,
+        targetSections: _selectedSection,
         dueDate: _dueDate?.toIso8601String(),
         totalPoints: points,
         submissionType: _submissionType,
@@ -306,8 +313,40 @@ class _CreateAssignmentDialogState extends ConsumerState<CreateAssignmentDialog>
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    // Subject Selection Dropdown (if not passed via subject screen)
-                    if (widget.subjectId == null || widget.subjectId! <= 0) ...[
+                    // Subject Context or Selection Dropdown
+                    if (widget.subjectId != null && widget.subjectId! > 0) ...[
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                        decoration: BoxDecoration(
+                          color: AppTheme.primary.withValues(alpha: 0.12),
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(color: AppTheme.primary.withValues(alpha: 0.3)),
+                        ),
+                        child: Row(
+                          children: [
+                            Icon(Icons.menu_book, color: AppTheme.primary, size: 18),
+                            const SizedBox(width: 10),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    'Subject / Class Context',
+                                    style: TextStyle(fontSize: 10, color: AppTheme.textMuted, fontWeight: FontWeight.bold),
+                                  ),
+                                  Text(
+                                    _selectedSubjectName ?? widget.subjectName ?? 'Subject',
+                                    style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: AppTheme.text),
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(height: 14),
+                    ] else ...[
                       Text('Assigned Subject *', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: AppTheme.textSecondary)),
                       const SizedBox(height: 6),
                       Consumer(
@@ -349,6 +388,89 @@ class _CreateAssignmentDialogState extends ConsumerState<CreateAssignmentDialog>
                       ),
                       const SizedBox(height: 16),
                     ],
+
+                    // Target Handled Section(s)
+                    Text('Target Handled Section *', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: AppTheme.textSecondary)),
+                    const SizedBox(height: 6),
+                    Consumer(
+                      builder: (context, ref, _) {
+                        final sectionsAsync = ref.watch(teacherHandledSectionsProvider);
+                        final handledSections = sectionsAsync.value ?? [];
+                        final allOptions = ['All Handled Sections', ...handledSections.where((s) => s != 'All Handled Sections' && s != 'All Sections')];
+
+                        return Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            DropdownButtonFormField<String>(
+                              initialValue: allOptions.contains(_selectedSection) ? _selectedSection : 'All Handled Sections',
+                              decoration: InputDecoration(
+                                prefixIcon: Icon(Icons.groups_outlined, size: 18, color: AppTheme.primary),
+                                hintText: 'Specify which section will do this task',
+                                hintStyle: TextStyle(color: AppTheme.textMuted, fontSize: 13),
+                                filled: true,
+                                fillColor: AppTheme.background,
+                                border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide(color: AppTheme.border)),
+                                enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide(color: AppTheme.border)),
+                                focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide(color: AppTheme.primary)),
+                              ),
+                              items: allOptions.map((sec) {
+                                return DropdownMenuItem<String>(
+                                  value: sec,
+                                  child: Text(
+                                    sec == 'All Handled Sections' ? '👥 All Handled Sections (All Students)' : '📌 $sec',
+                                    style: TextStyle(
+                                      color: AppTheme.text,
+                                      fontSize: 13,
+                                      fontWeight: sec == 'All Handled Sections' ? FontWeight.w600 : FontWeight.normal,
+                                    ),
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
+                                );
+                              }).toList(),
+                              onChanged: (val) {
+                                if (val != null) {
+                                  setState(() {
+                                    _selectedSection = val;
+                                  });
+                                }
+                              },
+                            ),
+                            if (allOptions.length > 1) ...[
+                              const SizedBox(height: 8),
+                              SingleChildScrollView(
+                                scrollDirection: Axis.horizontal,
+                                child: Row(
+                                  children: allOptions.map((sec) {
+                                    final isSel = _selectedSection == sec;
+                                    return Padding(
+                                      padding: const EdgeInsets.only(right: 6),
+                                      child: ChoiceChip(
+                                        label: Text(
+                                          sec == 'All Handled Sections' ? 'All Sections' : sec,
+                                          style: TextStyle(
+                                            fontSize: 11,
+                                            fontWeight: isSel ? FontWeight.bold : FontWeight.normal,
+                                          ),
+                                        ),
+                                        selected: isSel,
+                                        onSelected: (_) => setState(() => _selectedSection = sec),
+                                        selectedColor: AppTheme.primary.withValues(alpha: 0.2),
+                                        backgroundColor: AppTheme.background,
+                                        labelStyle: TextStyle(
+                                          color: isSel ? AppTheme.primary : AppTheme.textMuted,
+                                        ),
+                                        visualDensity: VisualDensity.compact,
+                                      ),
+                                    );
+                                  }).toList(),
+                                ),
+                              ),
+                            ],
+                          ],
+                        );
+                      },
+                    ),
+                    const SizedBox(height: 16),
 
                     // Assignment Title
                     Text('Title *', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: AppTheme.textSecondary)),
