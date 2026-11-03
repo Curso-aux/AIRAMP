@@ -9,6 +9,7 @@ import '../../auth/application/auth_provider.dart';
 import '../data/teacher_repository.dart';
 import 'components/post_announcement_dialog.dart';
 import 'components/assignment_roster_dialog.dart';
+import 'components/create_assignment_dialog.dart';
 import 'components/class_overview_widget.dart';
 import '../../../core/database/database_helper.dart';
 import '../../../core/utils/announcement_helper.dart';
@@ -526,6 +527,8 @@ class _TeacherDashboardScreenState extends ConsumerState<TeacherDashboardScreen>
                             const SizedBox(height: 28),
                             _buildSubmissionsSection(context, recentAttempts),
                             const SizedBox(height: 28),
+                            _buildRecentAssignmentSubmissionsSection(context, currentUser?.id ?? ''),
+                            const SizedBox(height: 28),
                             _buildAssignedSubjectsSection(context, subjects),
                           ],
                         ),
@@ -556,6 +559,8 @@ class _TeacherDashboardScreenState extends ConsumerState<TeacherDashboardScreen>
                       _buildAnnouncementsSection(currentUser, announcements, handledSections),
                       const SizedBox(height: 28),
                       _buildSubmissionsSection(context, recentAttempts),
+                      const SizedBox(height: 28),
+                      _buildRecentAssignmentSubmissionsSection(context, currentUser?.id ?? ''),
                       const SizedBox(height: 28),
                       _buildAssignedSubjectsSection(context, subjects),
                     ],
@@ -617,6 +622,27 @@ class _TeacherDashboardScreenState extends ConsumerState<TeacherDashboardScreen>
             ],
           ),
           const Spacer(),
+          ElevatedButton.icon(
+            onPressed: () {
+              showDialog(
+                context: context,
+                builder: (ctx) => const CreateAssignmentDialog(),
+              ).then((_) {
+                ref.invalidate(teacherSubjectsProvider);
+                ref.invalidate(teacherRecentSubmissionsProvider(currentUser?.id ?? ''));
+              });
+            },
+            icon: const Icon(Icons.add_task, size: 16),
+            label: const Text('Create Assignment', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppTheme.primary,
+              foregroundColor: Colors.black,
+              elevation: 0,
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(9)),
+            ),
+          ),
+          const SizedBox(width: 10),
           ElevatedButton.icon(
             onPressed: () => _showAnalyticsModal(context),
             icon: const Icon(Icons.bar_chart_rounded, size: 16),
@@ -807,10 +833,38 @@ class _TeacherDashboardScreenState extends ConsumerState<TeacherDashboardScreen>
 
           const SizedBox(width: 10),
 
-          // Right: Analytics Launcher + Notifications Bell
+          // Right: Create Assignment + Analytics Launcher + Notifications Bell
           Row(
             mainAxisSize: MainAxisSize.min,
             children: [
+              // Create Assignment Action Button
+              Container(
+                decoration: BoxDecoration(
+                  color: AppTheme.primary.withValues(alpha: 0.15),
+                  borderRadius: BorderRadius.circular(10),
+                  border: Border.all(
+                    color: AppTheme.primary.withValues(alpha: 0.35),
+                    width: 1.0,
+                  ),
+                ),
+                child: IconButton(
+                  icon: Icon(Icons.add_task, color: AppTheme.primary, size: 20),
+                  tooltip: 'Create / Upload Assignment',
+                  constraints: const BoxConstraints(minWidth: 36, minHeight: 36),
+                  padding: const EdgeInsets.all(7),
+                  onPressed: () {
+                    showDialog(
+                      context: context,
+                      builder: (ctx) => const CreateAssignmentDialog(),
+                    ).then((_) {
+                      ref.invalidate(teacherSubjectsProvider);
+                      ref.invalidate(teacherRecentSubmissionsProvider(currentUser?.id ?? ''));
+                    });
+                  },
+                ),
+              ),
+              const SizedBox(width: 8),
+
               // Analytics Quick Launcher Button
               Container(
                 decoration: BoxDecoration(
@@ -1230,6 +1284,213 @@ class _TeacherDashboardScreenState extends ConsumerState<TeacherDashboardScreen>
             );
           }),
       ],
+    );
+  }
+
+  Widget _buildRecentAssignmentSubmissionsSection(BuildContext context, String teacherId) {
+    if (teacherId.isEmpty) return const SizedBox.shrink();
+
+    return Consumer(
+      builder: (context, ref, _) {
+        final recentSubmissionsAsync = ref.watch(teacherRecentSubmissionsProvider(teacherId));
+
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Expanded(
+                  child: Text(
+                    'Student Assignment Submissions',
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.bold,
+                      color: AppTheme.text,
+                    ),
+                  ),
+                ),
+                TextButton.icon(
+                  onPressed: () {
+                    showDialog(
+                      context: context,
+                      builder: (ctx) => const CreateAssignmentDialog(),
+                    ).then((_) {
+                      ref.invalidate(teacherRecentSubmissionsProvider(teacherId));
+                    });
+                  },
+                  icon: const Icon(Icons.add_task, size: 16),
+                  label: const Text('New Assignment', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
+                ),
+              ],
+            ),
+            const SizedBox(height: 8),
+            recentSubmissionsAsync.when(
+              loading: () => const SkeletonListView(itemCount: 2),
+              error: (e, _) => Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: AppTheme.surface,
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: AppTheme.border),
+                ),
+                child: Text('Unable to load assignment submissions: $e', style: TextStyle(color: AppTheme.textSecondary, fontSize: 12)),
+              ),
+              data: (submissions) {
+                if (submissions.isEmpty) {
+                  return Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.symmetric(vertical: 24, horizontal: 16),
+                    decoration: BoxDecoration(
+                      color: AppTheme.surface,
+                      borderRadius: BorderRadius.circular(14),
+                      border: Border.all(color: AppTheme.border),
+                    ),
+                    child: Column(
+                      children: [
+                        Icon(Icons.assignment_turned_in_outlined, size: 36, color: AppTheme.textMuted),
+                        const SizedBox(height: 10),
+                        Text('No Assignment Submissions Yet', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: AppTheme.text)),
+                        const SizedBox(height: 4),
+                        Text(
+                          'When students upload files, links, or text responses for your assignments, they will appear here ready to review.',
+                          textAlign: TextAlign.center,
+                          style: TextStyle(fontSize: 12, color: AppTheme.textSecondary),
+                        ),
+                      ],
+                    ),
+                  );
+                }
+
+                return Column(
+                  children: submissions.take(5).map((sub) {
+                    final studentName = sub['student_full_name']?.toString() ?? sub['student_name']?.toString() ?? 'Student';
+                    final aTitle = sub['assignment_title']?.toString() ?? 'Activity';
+                    final subName = sub['subject_name']?.toString() ?? 'Subject';
+                    final status = sub['status']?.toString() ?? 'submitted';
+                    final isGraded = status == 'graded' || sub['grade'] != null;
+                    final isLate = status == 'late';
+                    final subType = (sub['submission_type']?.toString() ?? 'file').toUpperCase();
+                    final points = sub['total_points'] ?? 100;
+
+                    return Container(
+                      margin: const EdgeInsets.only(bottom: 10),
+                      padding: const EdgeInsets.all(14),
+                      decoration: BoxDecoration(
+                        color: AppTheme.surface,
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(color: AppTheme.border),
+                      ),
+                      child: Row(
+                        children: [
+                          UserAvatarWidget(
+                            imageSource: sub['student_profile_image'] as String?,
+                            fallbackInitial: studentName.isNotEmpty ? studentName[0].toUpperCase() : 'S',
+                            size: 36,
+                          ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Row(
+                                  children: [
+                                    Expanded(
+                                      child: Text(
+                                        studentName,
+                                        style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13.5, color: AppTheme.text),
+                                        overflow: TextOverflow.ellipsis,
+                                      ),
+                                    ),
+                                    Container(
+                                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                      decoration: BoxDecoration(
+                                        color: isGraded
+                                            ? AppTheme.success.withValues(alpha: 0.15)
+                                            : (isLate ? AppTheme.error.withValues(alpha: 0.15) : AppTheme.primary.withValues(alpha: 0.15)),
+                                        borderRadius: BorderRadius.circular(6),
+                                      ),
+                                      child: Text(
+                                        isGraded ? 'GRADED: ${sub['grade']}/$points' : (isLate ? 'LATE' : 'PENDING REVIEW'),
+                                        style: TextStyle(
+                                          fontSize: 9.5,
+                                          fontWeight: FontWeight.bold,
+                                          color: isGraded ? AppTheme.success : (isLate ? AppTheme.error : AppTheme.primary),
+                                        ),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                                const SizedBox(height: 3),
+                                Text(
+                                  '$aTitle · $subName',
+                                  style: TextStyle(fontSize: 12, color: AppTheme.textSecondary),
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                                const SizedBox(height: 3),
+                                Row(
+                                  children: [
+                                    Icon(Icons.attachment_rounded, size: 12, color: AppTheme.textMuted),
+                                    const SizedBox(width: 4),
+                                    Text(
+                                      'Format: $subType',
+                                      style: TextStyle(fontSize: 11, color: AppTheme.textMuted),
+                                    ),
+                                    if (sub['file_name'] != null) ...[
+                                      const SizedBox(width: 8),
+                                      Expanded(
+                                        child: Text(
+                                          sub['file_name'].toString(),
+                                          style: TextStyle(fontSize: 11, color: AppTheme.primary),
+                                          overflow: TextOverflow.ellipsis,
+                                        ),
+                                      ),
+                                    ],
+                                  ],
+                                ),
+                              ],
+                            ),
+                          ),
+                          const SizedBox(width: 10),
+                          ElevatedButton(
+                            onPressed: () {
+                              showDialog(
+                                context: context,
+                                builder: (ctx) => AssignmentRosterDialog(
+                                  assignmentId: sub['assignment_id'] as int,
+                                  assignmentTitle: aTitle,
+                                  totalPoints: (points as num).toInt(),
+                                  dueDate: sub['due_date'] as String?,
+                                ),
+                              ).then((_) {
+                                ref.invalidate(teacherRecentSubmissionsProvider(teacherId));
+                              });
+                            },
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: isGraded ? AppTheme.surface : AppTheme.primary,
+                              foregroundColor: isGraded ? AppTheme.text : Colors.black,
+                              side: isGraded ? BorderSide(color: AppTheme.border) : null,
+                              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                              visualDensity: VisualDensity.compact,
+                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                            ),
+                            child: Text(
+                              isGraded ? 'Review' : 'Grade',
+                              style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold),
+                            ),
+                          ),
+                        ],
+                      ),
+                    );
+                  }).toList(),
+                );
+              },
+            ),
+          ],
+        );
+      },
     );
   }
 
@@ -2196,12 +2457,16 @@ class _TeacherDashboardScreenState extends ConsumerState<TeacherDashboardScreen>
       children: [
         // 1. Pass Rate Bar
         Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
-            Text(
-              'Class Pass Rate Benchmark',
-              style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: AppTheme.text),
+            Expanded(
+              child: Text(
+                'Class Pass Rate Benchmark',
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: AppTheme.text),
+              ),
             ),
+            const SizedBox(width: 8),
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
               decoration: BoxDecoration(
@@ -2246,12 +2511,16 @@ class _TeacherDashboardScreenState extends ConsumerState<TeacherDashboardScreen>
 
         // 2. Average Score Bar
         Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
-            Text(
-              'Average Score Mastery',
-              style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: AppTheme.text),
+            Expanded(
+              child: Text(
+                'Average Score Mastery',
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: AppTheme.text),
+              ),
             ),
+            const SizedBox(width: 8),
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
               decoration: BoxDecoration(

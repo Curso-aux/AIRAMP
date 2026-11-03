@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -28,6 +29,7 @@ class _SubmissionsScreenState extends ConsumerState<SubmissionsScreen> {
   String? _pickedFileName;
   int _pickedFileSize = 0;
   String? _pickedFilePath;
+  Uint8List? _pickedFileBytes;
 
   String? _pickedImageName;
   int _pickedImageSize = 0;
@@ -84,10 +86,15 @@ class _SubmissionsScreenState extends ConsumerState<SubmissionsScreen> {
       if (files.isNotEmpty) {
         final file = files.first;
         final size = await file.length();
+        Uint8List? bytes;
+        try {
+          bytes = await file.readAsBytes();
+        } catch (_) {}
         setState(() {
           _pickedFileName = file.name;
           _pickedFileSize = size;
           _pickedFilePath = file.path;
+          _pickedFileBytes = bytes;
         });
       }
     } catch (e) {
@@ -104,6 +111,7 @@ class _SubmissionsScreenState extends ConsumerState<SubmissionsScreen> {
       _pickedFileName = null;
       _pickedFileSize = 0;
       _pickedFilePath = null;
+      _pickedFileBytes = null;
     });
   }
 
@@ -432,8 +440,10 @@ class _SubmissionsScreenState extends ConsumerState<SubmissionsScreen> {
         fileName: _pickedFileName ?? existing?.fileName,
         fileSize: _pickedFileSize > 0 ? _pickedFileSize : existing?.fileSize,
         filePath: _pickedFilePath ?? existing?.filePath,
+        fileBytes: _pickedFileBytes != null ? base64Encode(_pickedFileBytes!) : existing?.fileBytes,
         textResponse: text.isNotEmpty ? text : (existing?.textResponse),
         imagePath: _pickedImageName != null ? (_pickedImagePath ?? _pickedImageName) : existing?.imagePath,
+        imageBytes: _pickedImageBytes != null ? base64Encode(_pickedImageBytes!) : existing?.imageBytes,
         notes: _notesController.text.trim().isNotEmpty ? _notesController.text.trim() : existing?.notes,
       );
 

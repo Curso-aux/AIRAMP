@@ -1,3 +1,5 @@
+import 'dart:convert';
+import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../core/animations/app_transitions.dart';
@@ -8,15 +10,16 @@ import '../../../../core/theme/theme_provider.dart';
 import '../../../../core/services/session_draft_service.dart';
 import '../../../auth/application/auth_provider.dart';
 import '../../../submissions/data/submissions_repository.dart';
+import '../../data/teacher_repository.dart';
 
 class CreateAssignmentDialog extends ConsumerStatefulWidget {
-  final int subjectId;
-  final String subjectName;
+  final int? subjectId;
+  final String? subjectName;
 
   const CreateAssignmentDialog({
     super.key,
-    required this.subjectId,
-    required this.subjectName,
+    this.subjectId,
+    this.subjectName,
   });
 
   @override
@@ -32,16 +35,54 @@ class _CreateAssignmentDialogState extends ConsumerState<CreateAssignmentDialog>
   bool _isSaving = false;
   final SessionDraftDisposer _draftDisposer = SessionDraftDisposer();
 
-  String get _formId => 'teacher_create_assignment_${widget.subjectId}';
+  int? _selectedSubjectId;
+  String? _selectedSubjectName;
+  String? _attachmentName;
+  int? _attachmentSize;
+  String? _attachmentPath;
+  String? _attachmentBase64;
+
+  String get _formId => 'teacher_create_assignment_${_selectedSubjectId ?? widget.subjectId ?? 0}';
 
   @override
   void initState() {
     super.initState();
+    _selectedSubjectId = widget.subjectId != null && widget.subjectId! > 0 ? widget.subjectId : null;
+    _selectedSubjectName = widget.subjectName;
+
     _draftDisposer.add(_titleController.bindSessionDraft(formId: _formId, fieldKey: 'title'));
     _draftDisposer.add(_descController.bindSessionDraft(formId: _formId, fieldKey: 'desc'));
     _draftDisposer.add(_pointsController.bindSessionDraft(formId: _formId, fieldKey: 'points'));
     // Default due date: 7 days from now
     _dueDate = DateTime.now().add(const Duration(days: 7, hours: 4));
+  }
+
+  Future<void> _pickAttachment() async {
+    try {
+      final files = await FilePicker.pickFiles(
+        type: FileType.custom,
+        allowedExtensions: ['pdf', 'doc', 'docx', 'txt', 'png', 'jpg', 'jpeg', 'zip'],
+      );
+      if (files.isNotEmpty) {
+        final file = files.first;
+        final bytes = await file.readAsBytes();
+        final size = await file.length();
+        String? b64;
+        if (bytes.isNotEmpty) {
+          b64 = base64Encode(bytes);
+        }
+        setState(() {
+          _attachmentName = file.name;
+          _attachmentSize = size > 0 ? size : bytes.length;
+          _attachmentPath = file.path;
+          _attachmentBase64 = b64;
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        AppToast.showError(context, 'Failed to pick file: $e');
+      }
+    }
   }
 
   @override
@@ -125,6 +166,12 @@ class _CreateAssignmentDialogState extends ConsumerState<CreateAssignmentDialog>
       return;
     }
 
+    final effectiveSubjectId = _selectedSubjectId ?? widget.subjectId;
+    if (effectiveSubjectId == null || effectiveSubjectId <= 0) {
+      AppToast.showWarning(context, 'Please select a subject for this assignment.');
+      return;
+    }
+
     final points = int.tryParse(_pointsController.text.trim()) ?? 100;
     final user = ref.read(authProvider);
     final teacherId = user?.id ?? 'teacher_1';
@@ -136,16 +183,21 @@ class _CreateAssignmentDialogState extends ConsumerState<CreateAssignmentDialog>
       await DatabaseHelper().createAssignment(
         title: title,
         description: _descController.text.trim().isNotEmpty ? _descController.text.trim() : null,
-        subjectId: widget.subjectId,
+        subjectId: effectiveSubjectId,
         teacherId: teacherId,
         teacherName: teacherName,
         dueDate: _dueDate?.toIso8601String(),
         totalPoints: points,
         submissionType: _submissionType,
+        attachmentName: _attachmentName,
+        attachmentPath: _attachmentPath,
+        attachmentSize: _attachmentSize,
+        attachmentBytes: _attachmentBase64,
       );
 
       // Invalidate relevant providers
-      ref.invalidate(subjectAssignmentsProvider(widget.subjectId));
+      ref.invalidate(subjectAssignmentsProvider(effectiveSubjectId));
+      ref.invalidate(teacherSubjectsProvider);
 
       SessionDraftService.instance.clearForm(_formId);
 
@@ -234,7 +286,7 @@ class _CreateAssignmentDialogState extends ConsumerState<CreateAssignmentDialog>
                           style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: AppTheme.text),
                         ),
                         Text(
-                          widget.subjectName,
+                          _selectedSubjectName ?? widget.subjectName ?? 'New Activity / Project',
                           style: TextStyle(fontSize: 12, color: AppTheme.textMuted),
                           overflow: TextOverflow.ellipsis,
                         ),
@@ -254,6 +306,50 @@ class _CreateAssignmentDialogState extends ConsumerState<CreateAssignmentDialog>
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
+                    // Subject Selection Dropdown (if not passed via subject screen)
+                    if (widget.subjectId == null || widget.subjectId! <= 0) ...[
+                      Text('Assigned Subject *', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: AppTheme.textSecondary)),
+                      const SizedBox(height: 6),
+                      Consumer(
+                        builder: (context, ref, _) {
+                          final teacherSubjects = ref.watch(teacherSubjectsProvider);
+                          return DropdownButtonFormField<int>(
+                            value: _selectedSubjectId,
+                            decoration: InputDecoration(
+                              hintText: 'Select which subject to assign to',
+                              hintStyle: TextStyle(color: AppTheme.textMuted, fontSize: 13),
+                              filled: true,
+                              fillColor: AppTheme.background,
+                              border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide(color: AppTheme.border)),
+                              enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide(color: AppTheme.border)),
+                              focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide(color: AppTheme.primary)),
+                            ),
+                            items: teacherSubjects.map((s) {
+                              final sId = s['id'] as int;
+                              final sName = s['name']?.toString() ?? 'Subject';
+                              final sCode = s['subject_code']?.toString() ?? '';
+                              return DropdownMenuItem<int>(
+                                value: sId,
+                                child: Text(
+                                  sCode.isNotEmpty ? '$sName ($sCode)' : sName,
+                                  style: TextStyle(color: AppTheme.text, fontSize: 13),
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                              );
+                            }).toList(),
+                            onChanged: (val) {
+                              setState(() {
+                                _selectedSubjectId = val;
+                                final match = teacherSubjects.firstWhere((s) => s['id'] == val, orElse: () => {});
+                                _selectedSubjectName = match['name']?.toString();
+                              });
+                            },
+                          );
+                        },
+                      ),
+                      const SizedBox(height: 16),
+                    ],
+
                     // Assignment Title
                     Text('Title *', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: AppTheme.textSecondary)),
                     const SizedBox(height: 6),
@@ -394,6 +490,57 @@ class _CreateAssignmentDialogState extends ConsumerState<CreateAssignmentDialog>
                         ],
                       ),
                     ),
+                    const SizedBox(height: 16),
+
+                    // Teacher Reference Attachment
+                    Text('Attach Worksheet / Rubric / Handout (Optional)', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: AppTheme.textSecondary)),
+                    const SizedBox(height: 8),
+                    if (_attachmentName != null) ...[
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                        decoration: BoxDecoration(
+                          color: AppTheme.primary.withValues(alpha: 0.1),
+                          borderRadius: BorderRadius.circular(10),
+                          border: Border.all(color: AppTheme.primary.withValues(alpha: 0.3)),
+                        ),
+                        child: Row(
+                          children: [
+                            Icon(Icons.attach_file, color: AppTheme.primary, size: 20),
+                            const SizedBox(width: 8),
+                            Expanded(
+                              child: Text(
+                                '$_attachmentName (${(_attachmentSize != null && _attachmentSize! > 0) ? (_attachmentSize! / 1024).toStringAsFixed(1) : ""} KB)',
+                                style: TextStyle(color: AppTheme.text, fontSize: 12, fontWeight: FontWeight.w500),
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ),
+                            IconButton(
+                              icon: Icon(Icons.close, size: 18, color: AppTheme.error),
+                              tooltip: 'Remove Attachment',
+                              onPressed: () {
+                                setState(() {
+                                  _attachmentName = null;
+                                  _attachmentSize = null;
+                                  _attachmentPath = null;
+                                  _attachmentBase64 = null;
+                                });
+                              },
+                            ),
+                          ],
+                        ),
+                      ),
+                    ] else ...[
+                      OutlinedButton.icon(
+                        onPressed: _pickAttachment,
+                        icon: Icon(Icons.upload_file_outlined, size: 18, color: AppTheme.primary),
+                        label: Text('Upload Assignment Handout / Brief', style: TextStyle(color: AppTheme.primary, fontSize: 12, fontWeight: FontWeight.w600)),
+                        style: OutlinedButton.styleFrom(
+                          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                          side: BorderSide(color: AppTheme.primary.withValues(alpha: 0.4)),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                        ),
+                      ),
+                    ],
                   ],
                 ),
               ),

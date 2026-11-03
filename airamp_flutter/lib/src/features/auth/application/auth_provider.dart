@@ -206,8 +206,12 @@ class AuthNotifier extends Notifier<User?> {
       userRows = await db.query('users', where: 'LOWER(username) = ?', whereArgs: [session.userId.toLowerCase().trim()]);
     }
 
+    final localAvatar = userRows.isNotEmpty
+        ? (userRows.first['profile_image'] ?? userRows.first['profileImage']) as String?
+        : null;
+
     Map<String, dynamic>? cloudUser;
-    final needsCloudLookup = userRows.isEmpty;
+    final needsCloudLookup = userRows.isEmpty || localAvatar == null || localAvatar.trim().isEmpty;
     if (needsCloudLookup) {
       try {
         cloudUser = await FirestoreService()
@@ -217,7 +221,7 @@ class AuthNotifier extends Notifier<User?> {
     }
 
     if (userRows.isNotEmpty) {
-      final u = userRows.first;
+      final u = Map<String, dynamic>.from(userRows.first);
       final actualRole = u['role'] as String? ?? session.role;
       var mustChange = session.mustChangePassword ||
           persistentMustChange ||
@@ -242,13 +246,24 @@ class AuthNotifier extends Notifier<User?> {
         } catch (_) {}
       }
 
+      var profileImage = (u['profile_image'] ?? u['profileImage']) as String?;
+      if ((profileImage == null || profileImage.trim().isEmpty) && cloudUser != null) {
+        final cloudPhoto = (cloudUser['profileImage'] ?? cloudUser['profile_image']) as String?;
+        if (cloudPhoto != null && cloudPhoto.trim().isNotEmpty) {
+          profileImage = cloudPhoto;
+          try {
+            await db.update('users', {'profile_image': cloudPhoto}, where: 'id = ?', whereArgs: [session.userId]);
+          } catch (_) {}
+        }
+      }
+
       state = User(
         id: session.userId,
         email: u['email'] as String? ?? '',
         role: actualRole,
         fullName: u['full_name'] as String? ?? session.userId,
         username: u['username'] as String? ?? '',
-        profileImage: (u['profile_image'] ?? u['profileImage']) as String?,
+        profileImage: profileImage,
         section: u['section'] as String?,
         grade: u['grade'] as String?,
         schoolId: u['school_id'] as String? ?? 'sch_main',
@@ -283,6 +298,11 @@ class AuthNotifier extends Notifier<User?> {
       );
     }
     ApiClient.setSession(session: session.session, userId: session.userId);
+
+    // Register real-time sync hook to refresh active user state when background cloud sync updates SQLite
+    FirestoreService.onUserSynced = () {
+      refreshProfile();
+    };
   }
 
   Future<void> register({
@@ -310,6 +330,22 @@ class AuthNotifier extends Notifier<User?> {
     } finally {
       isLoading = false;
     }
+  }
+
+  /// Reloads current user's profile from local database and cloud to ensure the latest avatar and metadata are active.
+  Future<void> refreshProfile() async {
+    if (state == null) return;
+    try {
+      final db = await DatabaseHelper().database;
+      final rows = await db.query('users', where: 'id = ?', whereArgs: [state!.id]);
+      if (rows.isNotEmpty) {
+        final r = rows.first;
+        final photo = (r['profile_image'] ?? r['profileImage']) as String?;
+        if (photo != null && photo.isNotEmpty && photo != state!.profileImage) {
+          state = state!.copyWith(profileImage: photo);
+        }
+      }
+    } catch (_) {}
   }
 
   /// Update the current user's profile fields locally.

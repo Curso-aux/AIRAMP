@@ -17,6 +17,9 @@ import '../../esp32_hub/presentation/student_esp32_sync_modal.dart';
 import '../../esp32_hub/domain/esp32_hub_models.dart';
 import '../../esp32_hub/data/saved_materials_service.dart';
 import '../../esp32_hub/presentation/saved_offline_materials_modal.dart';
+import '../../../core/database/database_helper.dart';
+import '../../../core/components/skeleton_loader.dart';
+import '../../submissions/data/submissions_repository.dart';
 
 class StudentHomeScreen extends ConsumerStatefulWidget {
   const StudentHomeScreen({super.key});
@@ -32,6 +35,7 @@ class _StudentHomeScreenState extends ConsumerState<StudentHomeScreen> {
   void initState() {
     super.initState();
     _startScheduleTicker();
+    unawaited(DatabaseHelper().syncCloudAssignmentsToLocal());
   }
 
   void _startScheduleTicker() {
@@ -123,8 +127,10 @@ class _StudentHomeScreenState extends ConsumerState<StudentHomeScreen> {
                     ref.read(studentCoursesProvider.notifier).reload(),
                     ref.read(studentProgressProvider.notifier).loadProgress(),
                     ref.read(studentQuizAssignmentsProvider.notifier).reload(),
+                    DatabaseHelper().syncCloudAssignmentsToLocal(),
                   ]);
                   ref.invalidate(announcementsProvider);
+                  ref.invalidate(studentAssignmentsProvider((studentId: currentUser.id, subjectId: null)));
                 },
                 color: AppTheme.primary,
                 child: SingleChildScrollView(
@@ -159,13 +165,15 @@ class _StudentHomeScreenState extends ConsumerState<StudentHomeScreen> {
                                   ),
                                 ),
                                 const SizedBox(width: 24),
-                                // Right Column (flex: 5): Quizzes, Announcements
+                                // Right Column (flex: 5): Quizzes, Assignments, Announcements
                                 Expanded(
                                   flex: 5,
                                   child: Column(
                                     crossAxisAlignment: CrossAxisAlignment.start,
                                     children: [
                                       _buildQuizzesSection(context, pendingQuizzes),
+                                      const SizedBox(height: 24),
+                                      _buildAssignmentsSection(context, currentUser.id),
                                       const SizedBox(height: 24),
                                       _buildAnnouncementsSection(studentAnnouncements),
                                     ],
@@ -182,6 +190,8 @@ class _StudentHomeScreenState extends ConsumerState<StudentHomeScreen> {
                                 StudentScheduleWidget(sectionName: currentUser.section),
                                 const SizedBox(height: 16),
                                 _buildQuizzesSection(context, pendingQuizzes),
+                                const SizedBox(height: 24),
+                                _buildAssignmentsSection(context, currentUser.id),
                                 const SizedBox(height: 32),
                                 _buildAnnouncementsSection(studentAnnouncements),
                                 const SizedBox(height: 32),
@@ -371,6 +381,274 @@ class _StudentHomeScreenState extends ConsumerState<StudentHomeScreen> {
     );
   }
 
+  Widget _buildAssignmentsSection(BuildContext context, String studentId) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final assignmentsAsync = ref.watch(studentAssignmentsProvider((studentId: studentId, subjectId: null)));
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Expanded(
+              child: Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(7),
+                    decoration: BoxDecoration(
+                      color: AppTheme.primary.withValues(alpha: 0.15),
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: Icon(Icons.assignment_outlined, color: AppTheme.primary, size: 18),
+                  ),
+                  const SizedBox(width: 10),
+                  Flexible(
+                    child: Text(
+                      'Coursework & Assignments',
+                      style: TextStyle(
+                        fontSize: 17.5,
+                        fontWeight: FontWeight.bold,
+                        color: AppTheme.text,
+                        letterSpacing: -0.2,
+                      ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            assignmentsAsync.maybeWhen(
+              data: (assignments) {
+                final pending = assignments.where((a) => a.submissionId == null).length;
+                if (pending == 0) return const SizedBox.shrink();
+                return Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2.5),
+                  decoration: BoxDecoration(
+                    color: isDark ? AppTheme.darkSurfaceLight : const Color(0xFFF1F5F9),
+                    borderRadius: BorderRadius.circular(6),
+                    border: Border.all(color: AppTheme.border),
+                  ),
+                  child: Text(
+                    '$pending Due',
+                    style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: AppTheme.textSecondary),
+                  ),
+                );
+              },
+              orElse: () => const SizedBox.shrink(),
+            ),
+          ],
+        ),
+        const SizedBox(height: 12),
+        assignmentsAsync.when(
+          loading: () => const Padding(
+            padding: EdgeInsets.symmetric(vertical: 8),
+            child: SkeletonListView(itemCount: 2),
+          ),
+          error: (e, _) => Container(
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: AppTheme.surface,
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: AppTheme.border),
+            ),
+            child: Text('Failed to load assignments: $e', style: TextStyle(color: AppTheme.textSecondary, fontSize: 12)),
+          ),
+          data: (assignments) {
+            if (assignments.isEmpty) {
+              return Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: AppTheme.surface,
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: AppTheme.border),
+                ),
+                child: Row(
+                  children: [
+                    Icon(Icons.task_alt, color: AppTheme.success, size: 20),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: Text(
+                        'All caught up! No assignments assigned right now.',
+                        style: TextStyle(color: AppTheme.textMuted, fontSize: 13),
+                      ),
+                    ),
+                  ],
+                ),
+              );
+            }
+
+            return Column(
+              children: assignments.map((a) {
+                final isSubmitted = a.submissionId != null;
+                final isGraded = a.studentSubmissionStatus == 'graded' || a.studentGrade != null;
+                final dueDateStr = a.dueDate;
+                DateTime? dueDate;
+                if (dueDateStr != null && dueDateStr.isNotEmpty) {
+                  try {
+                    dueDate = DateTime.parse(dueDateStr);
+                  } catch (_) {}
+                }
+                final isOverdue = !isSubmitted && dueDate != null && DateTime.now().isAfter(dueDate);
+
+                return Container(
+                  margin: const EdgeInsets.only(bottom: 12),
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    color: AppTheme.surface,
+                    borderRadius: BorderRadius.circular(14),
+                    border: Border.all(
+                      color: isOverdue ? AppTheme.error.withValues(alpha: 0.5) : AppTheme.border,
+                    ),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                            decoration: BoxDecoration(
+                              color: AppTheme.primary.withValues(alpha: 0.12),
+                              borderRadius: BorderRadius.circular(6),
+                            ),
+                            child: Text(
+                              a.subjectName ?? 'Subject',
+                              style: TextStyle(
+                                color: AppTheme.primary,
+                                fontSize: 11,
+                                fontWeight: FontWeight.bold,
+                              ),
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
+                          const Spacer(),
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                            decoration: BoxDecoration(
+                              color: isGraded
+                                  ? AppTheme.success.withValues(alpha: 0.15)
+                                  : (isSubmitted
+                                      ? AppTheme.primary.withValues(alpha: 0.15)
+                                      : (isOverdue
+                                          ? AppTheme.error.withValues(alpha: 0.15)
+                                          : AppTheme.border.withValues(alpha: 0.2))),
+                              borderRadius: BorderRadius.circular(6),
+                            ),
+                            child: Text(
+                              isGraded
+                                  ? 'Score: ${a.studentGrade?.toStringAsFixed(0)}/${a.totalPoints}'
+                                  : (isSubmitted
+                                      ? 'Submitted'
+                                      : (isOverdue ? 'Overdue' : 'Due Soon')),
+                              style: TextStyle(
+                                fontSize: 11,
+                                fontWeight: FontWeight.bold,
+                                color: isGraded
+                                    ? AppTheme.success
+                                    : (isSubmitted
+                                        ? AppTheme.primary
+                                        : (isOverdue ? AppTheme.error : AppTheme.textSecondary)),
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 10),
+                      Text(
+                        a.title,
+                        style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15, color: AppTheme.text),
+                      ),
+                      if (a.description != null && a.description!.isNotEmpty) ...[
+                        const SizedBox(height: 4),
+                        Text(
+                          a.description!,
+                          style: TextStyle(fontSize: 12, color: AppTheme.textSecondary),
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ],
+                      const SizedBox(height: 10),
+                      Row(
+                        children: [
+                          Icon(Icons.calendar_today_outlined, size: 12, color: AppTheme.textMuted),
+                          const SizedBox(width: 4),
+                          Text(
+                            dueDate != null ? 'Due: ${dueDateStr!.substring(0, 10)}' : 'No deadline',
+                            style: TextStyle(fontSize: 11, color: isOverdue ? AppTheme.error : AppTheme.textMuted),
+                          ),
+                          const SizedBox(width: 14),
+                          Icon(Icons.star_outline, size: 13, color: AppTheme.textMuted),
+                          const SizedBox(width: 4),
+                          Text(
+                            '${a.totalPoints} pts',
+                            style: TextStyle(fontSize: 11, color: AppTheme.textMuted),
+                          ),
+                        ],
+                      ),
+                      if (a.attachmentName != null && a.attachmentName!.isNotEmpty) ...[
+                        const SizedBox(height: 8),
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                          decoration: BoxDecoration(
+                            color: AppTheme.background,
+                            borderRadius: BorderRadius.circular(8),
+                            border: Border.all(color: AppTheme.border),
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(Icons.attach_file, size: 14, color: AppTheme.primary),
+                              const SizedBox(width: 6),
+                              Flexible(
+                                child: Text(
+                                  'Handout: ${a.attachmentName}',
+                                  style: TextStyle(fontSize: 11, color: AppTheme.primary, fontWeight: FontWeight.w500),
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                      const SizedBox(height: 12),
+                      SizedBox(
+                        width: double.infinity,
+                        child: ElevatedButton.icon(
+                          onPressed: () {
+                            context.push('/submissions/${a.id}').then((_) {
+                              ref.invalidate(studentAssignmentsProvider((studentId: studentId, subjectId: null)));
+                            });
+                          },
+                          icon: Icon(
+                            isSubmitted ? Icons.visibility_outlined : Icons.upload_file,
+                            size: 16,
+                          ),
+                          label: Text(
+                            isSubmitted ? 'View / Edit Submission' : 'Submit Assignment',
+                            style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+                          ),
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: isSubmitted ? AppTheme.surface : AppTheme.primary,
+                            foregroundColor: isSubmitted ? AppTheme.text : Colors.black,
+                            side: isSubmitted ? BorderSide(color: AppTheme.border) : null,
+                            padding: const EdgeInsets.symmetric(vertical: 10),
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                );
+              }).toList(),
+            );
+          },
+        ),
+      ],
+    );
+  }
 
   Widget _buildQuizzesSection(BuildContext context, List<Map<String, dynamic>> pendingQuizzes) {
     final isDark = Theme.of(context).brightness == Brightness.dark;

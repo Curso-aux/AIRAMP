@@ -82,18 +82,22 @@ class _AdminDashboardScreenState extends ConsumerState<AdminDashboardScreen> {
             children: [
               // Header
               Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text('Admin Dashboard', style: TextStyle(fontSize: 14, color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6))),
-                      Text(
-                        currentUser?.fullName ?? 'Teacher John Reyes',
-                        style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold, color: Theme.of(context).colorScheme.onSurface),
-                      ),
-                    ],
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text('Admin Dashboard', style: TextStyle(fontSize: 14, color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6))),
+                        Text(
+                          currentUser?.fullName ?? 'Teacher John Reyes',
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold, color: Theme.of(context).colorScheme.onSurface),
+                        ),
+                      ],
+                    ),
                   ),
+                  const SizedBox(width: 12),
                   UserAvatarWidget(
                     imageSource: currentUser?.profileImage,
                     fallbackInitial: initial,
@@ -859,12 +863,16 @@ class _AdminDashboardScreenState extends ConsumerState<AdminDashboardScreen> {
       children: [
         // 1. Institutional Pass Rate Bar
         Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
-            Text(
-              'Institutional Pass Rate',
-              style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: AppTheme.text),
+            Expanded(
+              child: Text(
+                'Institutional Pass Rate',
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: AppTheme.text),
+              ),
             ),
+            const SizedBox(width: 8),
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
               decoration: BoxDecoration(
@@ -904,12 +912,16 @@ class _AdminDashboardScreenState extends ConsumerState<AdminDashboardScreen> {
 
         // 2. School-wide Average Score Bar
         Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
-            Text(
-              'School-wide Average Score',
-              style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: AppTheme.text),
+            Expanded(
+              child: Text(
+                'School-wide Average Score',
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: AppTheme.text),
+              ),
             ),
+            const SizedBox(width: 8),
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
               decoration: BoxDecoration(

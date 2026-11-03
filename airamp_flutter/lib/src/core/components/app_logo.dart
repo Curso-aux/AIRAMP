@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import '../theme/app_theme.dart';
 
@@ -112,36 +113,65 @@ class AppLogo extends StatelessWidget {
   }
 
   Widget _buildMark(BuildContext context, bool effectiveDark) {
-    // In Dark Mode: pure WHITE logo (assets/images/aira_logo.png).
-    // In Light Mode: pure BLACK logo (assets/images/aira_logo_dark.png).
-    final defaultAsset = effectiveDark
-        ? 'assets/images/aira_logo.png'
-        : 'assets/images/aira_logo_dark.png';
-
-    final effectiveColor = logoColor ?? (effectiveDark ? Colors.white : Colors.black);
     final markSize = showBackground ? size * 0.76 : size;
 
-    Widget imageWidget = Image.asset(
-      defaultAsset,
-      width: markSize,
-      height: markSize,
-      fit: BoxFit.contain,
-      color: effectiveColor,
-      colorBlendMode: BlendMode.srcIn,
-      errorBuilder: (context, error, stackTrace) => Image.asset(
-        'assets/images/aira_logo.png',
+    final Widget imageWidget;
+    if (kIsWeb) {
+      // In Web: Official graduation-cap "A" logo (Toga / Mortarboard emblem)
+      // In Dark Mode: pure WHITE logo (assets/images/aira_logo.png)
+      // In Light Mode: pure BLACK logo (assets/images/aira_logo_dark.png)
+      final defaultAsset = effectiveDark
+          ? 'assets/images/aira_logo.png'
+          : 'assets/images/aira_logo_dark.png';
+      final effectiveColor = logoColor ?? (effectiveDark ? Colors.white : Colors.black);
+
+      imageWidget = Image.asset(
+        defaultAsset,
         width: markSize,
         height: markSize,
         fit: BoxFit.contain,
         color: effectiveColor,
         colorBlendMode: BlendMode.srcIn,
-        errorBuilder: (_, _, _) => Icon(
-          Icons.school_rounded,
-          size: markSize * 0.7,
+        errorBuilder: (context, error, stackTrace) => Image.asset(
+          'assets/images/aira_logo.png',
+          width: markSize,
+          height: markSize,
+          fit: BoxFit.contain,
           color: effectiveColor,
+          colorBlendMode: BlendMode.srcIn,
+          errorBuilder: (_, _, _) => Icon(
+            Icons.school_rounded,
+            size: markSize * 0.7,
+            color: effectiveColor,
+          ),
         ),
-      ),
-    );
+      );
+    } else {
+      // In Mobile: Cute Chibi Mascot logo with graduation cap (Full color)
+      const defaultAsset = 'assets/images/aira_mascot_logo.png';
+
+      imageWidget = Image.asset(
+        defaultAsset,
+        width: markSize,
+        height: markSize,
+        fit: BoxFit.contain,
+        color: logoColor,
+        colorBlendMode: logoColor != null ? BlendMode.srcIn : null,
+        errorBuilder: (context, error, stackTrace) => Image.asset(
+          'assets/images/aira_logo.png',
+          width: markSize,
+          height: markSize,
+          fit: BoxFit.contain,
+          color: logoColor,
+          colorBlendMode: logoColor != null ? BlendMode.srcIn : null,
+          errorBuilder: (_, _, _) => Icon(
+            Icons.school_rounded,
+            size: markSize * 0.7,
+            color: logoColor ?? (effectiveDark ? Colors.white : Colors.black),
+          ),
+        ),
+      );
+    }
 
     if (!showBackground) {
       return SizedBox(

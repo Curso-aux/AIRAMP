@@ -63,6 +63,11 @@ class _TeacherProfileScreenState extends ConsumerState<TeacherProfileScreen>
       });
     }
     _loadPreferences();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) {
+        ref.read(authProvider.notifier).refreshProfile();
+      }
+    });
   }
 
   @override

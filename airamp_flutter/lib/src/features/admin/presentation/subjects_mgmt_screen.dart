@@ -705,16 +705,20 @@ class _SubjectsMgmtScreenState extends ConsumerState<SubjectsMgmtScreen> {
               crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  Text(
-                    'Curriculum Progression Mode',
-                    style: TextStyle(
-                      fontSize: 18,
-                      fontWeight: FontWeight.bold,
-                      color: Theme.of(context).colorScheme.onSurface,
+                  Expanded(
+                    child: Text(
+                      'Curriculum Progression Mode',
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.bold,
+                        color: Theme.of(context).colorScheme.onSurface,
+                      ),
                     ),
                   ),
+                  const SizedBox(width: 8),
                   IconButton(
                     icon: Icon(Icons.close, color: AppTheme.textMuted),
                     onPressed: () => Navigator.pop(ctx),

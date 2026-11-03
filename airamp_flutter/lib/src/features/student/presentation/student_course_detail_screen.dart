@@ -335,16 +335,20 @@ class _StudentCourseDetailScreenState
                     ),
                     const SizedBox(height: 8),
                     Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
-                        Text(
-                          '$completedCount of $totalLos Learning Outcomes Completed',
-                          style: const TextStyle(
-                            fontSize: 12,
-                            fontWeight: FontWeight.w600,
-                            color: Colors.black87,
+                        Expanded(
+                          child: Text(
+                            '$completedCount of $totalLos Learning Outcomes Completed',
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(
+                              fontSize: 12,
+                              fontWeight: FontWeight.w600,
+                              color: Colors.black87,
+                            ),
                           ),
                         ),
+                        const SizedBox(width: 8),
                         Text(
                           '$progressPct%',
                           style: const TextStyle(
@@ -363,26 +367,32 @@ class _StudentCourseDetailScreenState
               // Assigned Quizzes Section
               if (_assignedQuizzes.isNotEmpty) ...[
                 Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    Row(
-                      children: [
-                        Icon(
-                          Icons.quiz_outlined,
-                          color: AppTheme.primary,
-                          size: 22,
-                        ),
-                        const SizedBox(width: 8),
-                        Text(
-                          'Assigned Quizzes',
-                          style: TextStyle(
-                            fontSize: 20,
-                            fontWeight: FontWeight.bold,
-                            color: AppTheme.text,
+                    Expanded(
+                      child: Row(
+                        children: [
+                          Icon(
+                            Icons.quiz_outlined,
+                            color: AppTheme.primary,
+                            size: 22,
                           ),
-                        ),
-                      ],
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: Text(
+                              'Assigned Quizzes',
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: TextStyle(
+                                fontSize: 20,
+                                fontWeight: FontWeight.bold,
+                                color: AppTheme.text,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
                     ),
+                    const SizedBox(width: 8),
                     Container(
                       padding: const EdgeInsets.symmetric(
                         horizontal: 8,
@@ -431,26 +441,32 @@ class _StudentCourseDetailScreenState
               // Assignments & Projects Section
               if (_assignments.isNotEmpty) ...[
                 Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    Row(
-                      children: [
-                        Icon(
-                          Icons.assignment_outlined,
-                          color: AppTheme.primary,
-                          size: 22,
-                        ),
-                        const SizedBox(width: 8),
-                        Text(
-                          'Assignments & Projects',
-                          style: TextStyle(
-                            fontSize: 20,
-                            fontWeight: FontWeight.bold,
-                            color: AppTheme.text,
+                    Expanded(
+                      child: Row(
+                        children: [
+                          Icon(
+                            Icons.assignment_outlined,
+                            color: AppTheme.primary,
+                            size: 22,
                           ),
-                        ),
-                      ],
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: Text(
+                              'Assignments & Projects',
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: TextStyle(
+                                fontSize: 20,
+                                fontWeight: FontWeight.bold,
+                                color: AppTheme.text,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
                     ),
+                    const SizedBox(width: 8),
                     Container(
                       padding: const EdgeInsets.symmetric(
                         horizontal: 8,

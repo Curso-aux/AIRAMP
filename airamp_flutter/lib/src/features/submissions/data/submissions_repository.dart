@@ -17,6 +17,10 @@ class Assignment {
   final String? subjectCode;
   final int submissionCount;
   final int gradedCount;
+  final String? attachmentName;
+  final String? attachmentPath;
+  final int? attachmentSize;
+  final String? attachmentBytes;
 
   // Student specific context (if fetched for student)
   final int? submissionId;
@@ -45,6 +49,10 @@ class Assignment {
     this.subjectCode,
     this.submissionCount = 0,
     this.gradedCount = 0,
+    this.attachmentName,
+    this.attachmentPath,
+    this.attachmentSize,
+    this.attachmentBytes,
     this.submissionId,
     this.studentSubmissionStatus,
     this.studentGrade,
@@ -73,6 +81,10 @@ class Assignment {
       subjectCode: map['subject_code'] as String?,
       submissionCount: (map['submission_count'] as num?)?.toInt() ?? 0,
       gradedCount: (map['graded_count'] as num?)?.toInt() ?? 0,
+      attachmentName: map['attachment_name'] as String?,
+      attachmentPath: map['attachment_path'] as String?,
+      attachmentSize: (map['attachment_size'] as num?)?.toInt(),
+      attachmentBytes: map['attachment_bytes'] as String?,
       submissionId: map['submission_id'] as int?,
       studentSubmissionStatus: map['submission_status'] as String?,
       studentGrade: (map['grade'] as num?)?.toDouble(),
@@ -99,8 +111,10 @@ class Submission {
   final String? fileName;
   final int? fileSize;
   final String? filePath;
+  final String? fileBytes;
   final String? textResponse;
   final String? imagePath;
+  final String? imageBytes;
   final String? notes;
   final String submittedAt;
   final String status;
@@ -122,8 +136,10 @@ class Submission {
     this.fileName,
     this.fileSize,
     this.filePath,
+    this.fileBytes,
     this.textResponse,
     this.imagePath,
+    this.imageBytes,
     this.notes,
     required this.submittedAt,
     this.status = 'submitted',
@@ -147,8 +163,10 @@ class Submission {
       fileName: map['file_name'] as String?,
       fileSize: (map['file_size'] as num?)?.toInt(),
       filePath: map['file_path'] as String?,
+      fileBytes: map['file_bytes'] as String?,
       textResponse: map['text_response'] as String?,
       imagePath: map['image_path'] as String?,
+      imageBytes: map['image_bytes'] as String?,
       notes: map['notes'] as String?,
       submittedAt: map['submitted_at'] as String? ?? '',
       status: map['status'] as String? ?? 'submitted',
@@ -196,6 +214,10 @@ class SubmissionsRepository {
     return _dbHelper.getActivityRosterForTeacher(assignmentId);
   }
 
+  Future<List<Map<String, dynamic>>> getRecentSubmissionsForTeacher(String teacherId, {int limit = 10}) {
+    return _dbHelper.getRecentSubmissionsForTeacher(teacherId, limit: limit);
+  }
+
   Future<int> createAssignment({
     required String title,
     String? description,
@@ -205,6 +227,10 @@ class SubmissionsRepository {
     String? dueDate,
     int totalPoints = 100,
     String submissionType = 'both',
+    String? attachmentName,
+    String? attachmentPath,
+    int? attachmentSize,
+    String? attachmentBytes,
   }) {
     return _dbHelper.createAssignment(
       title: title,
@@ -215,6 +241,10 @@ class SubmissionsRepository {
       dueDate: dueDate,
       totalPoints: totalPoints,
       submissionType: submissionType,
+      attachmentName: attachmentName,
+      attachmentPath: attachmentPath,
+      attachmentSize: attachmentSize,
+      attachmentBytes: attachmentBytes,
     );
   }
 
@@ -227,8 +257,10 @@ class SubmissionsRepository {
     String? fileName,
     int? fileSize,
     String? filePath,
+    String? fileBytes,
     String? textResponse,
     String? imagePath,
+    String? imageBytes,
     String? notes,
   }) {
     return _dbHelper.submitAssignment(
@@ -240,8 +272,10 @@ class SubmissionsRepository {
       fileName: fileName,
       fileSize: fileSize,
       filePath: filePath,
+      fileBytes: fileBytes,
       textResponse: textResponse,
       imagePath: imagePath,
+      imageBytes: imageBytes,
       notes: notes,
     );
   }
@@ -287,6 +321,9 @@ final subjectAssignmentsProvider = FutureProvider.family<List<Assignment>, int>(
 
 final studentAssignmentsProvider = FutureProvider.family<List<Assignment>, ({String studentId, int? subjectId})>((ref, arg) async {
   final repo = ref.watch(submissionsRepositoryProvider);
+  try {
+    await DatabaseHelper().syncCloudAssignmentsToLocal();
+  } catch (_) {}
   return repo.getAssignmentsForStudent(arg.studentId, subjectId: arg.subjectId);
 });
 
@@ -297,7 +334,18 @@ final assignmentSubmissionsProvider = FutureProvider.family<List<Submission>, in
 
 final activityRosterProvider = FutureProvider.family<List<Map<String, dynamic>>, int>((ref, assignmentId) async {
   final repo = ref.watch(submissionsRepositoryProvider);
+  try {
+    await DatabaseHelper().syncCloudSubmissionsToLocal(assignmentId: assignmentId);
+  } catch (_) {}
   return repo.getActivityRosterForTeacher(assignmentId);
+});
+
+final teacherRecentSubmissionsProvider = FutureProvider.family<List<Map<String, dynamic>>, String>((ref, teacherId) async {
+  final repo = ref.watch(submissionsRepositoryProvider);
+  try {
+    await DatabaseHelper().syncCloudSubmissionsToLocal();
+  } catch (_) {}
+  return repo.getRecentSubmissionsForTeacher(teacherId);
 });
 
 final userNotificationsProvider = FutureProvider.family<List<Map<String, dynamic>>, String>((ref, userId) async {

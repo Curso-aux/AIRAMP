@@ -142,24 +142,26 @@ class _QuizHistoryScreenState extends ConsumerState<QuizHistoryScreen> {
                       ),
                     ),
                     const SizedBox(width: 12),
-                    Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          'My Quizzes',
-                          style: TextStyle(
-                            fontSize: 26,
-                            fontWeight: FontWeight.bold,
-                            letterSpacing: -0.4,
-                            color: Theme.of(context).colorScheme.onSurface,
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'My Quizzes',
+                            style: TextStyle(
+                              fontSize: 26,
+                              fontWeight: FontWeight.bold,
+                              letterSpacing: -0.4,
+                              color: Theme.of(context).colorScheme.onSurface,
+                            ),
                           ),
-                        ),
-                        const SizedBox(height: 2),
-                        Text(
-                          'Assigned quizzes, exams & live results',
-                          style: TextStyle(fontSize: 13, color: AppTheme.textSecondary),
-                        ),
-                      ],
+                          const SizedBox(height: 2),
+                          Text(
+                            'Assigned quizzes, exams & live results',
+                            style: TextStyle(fontSize: 13, color: AppTheme.textSecondary),
+                          ),
+                        ],
+                      ),
                     ),
                   ],
                 ),
@@ -1112,21 +1114,23 @@ class _QuizHistoryScreenState extends ConsumerState<QuizHistoryScreen> {
             // Top Row: Subject Code Tag + Soft Status Pill
             Row(
               children: [
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2.5),
-                  decoration: BoxDecoration(
-                    color: isDark ? AppTheme.darkSurfaceLight : const Color(0xFFF1F5F9),
-                    borderRadius: BorderRadius.circular(4),
-                  ),
-                  child: Text(
-                    subject,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: TextStyle(
-                      fontSize: 11,
-                      fontWeight: FontWeight.w700,
-                      color: isDark ? AppTheme.darkText : const Color(0xFF1E293B),
-                      letterSpacing: 0.2,
+                Flexible(
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2.5),
+                    decoration: BoxDecoration(
+                      color: isDark ? AppTheme.darkSurfaceLight : const Color(0xFFF1F5F9),
+                      borderRadius: BorderRadius.circular(4),
+                    ),
+                    child: Text(
+                      subject,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        fontSize: 11,
+                        fontWeight: FontWeight.w700,
+                        color: isDark ? AppTheme.darkText : const Color(0xFF1E293B),
+                        letterSpacing: 0.2,
+                      ),
                     ),
                   ),
                 ),
@@ -1215,26 +1219,39 @@ class _QuizHistoryScreenState extends ConsumerState<QuizHistoryScreen> {
                     ),
                   ),
                 ),
-                const Spacer(),
-                Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Icon(Icons.calendar_today_outlined, size: 12, color: AppTheme.textMuted),
-                    const SizedBox(width: 4),
-                    Text(
-                      date,
-                      style: TextStyle(fontSize: 11, color: AppTheme.textMuted),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Align(
+                    alignment: Alignment.centerRight,
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(Icons.calendar_today_outlined, size: 12, color: AppTheme.textMuted),
+                        const SizedBox(width: 4),
+                        Flexible(
+                          child: Text(
+                            date,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: TextStyle(fontSize: 11, color: AppTheme.textMuted),
+                          ),
+                        ),
+                        if (duration.isNotEmpty) ...[
+                          const SizedBox(width: 8),
+                          Icon(Icons.timer_outlined, size: 12, color: AppTheme.textMuted),
+                          const SizedBox(width: 4),
+                          Flexible(
+                            child: Text(
+                              duration,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: TextStyle(fontSize: 11, color: AppTheme.textMuted),
+                            ),
+                          ),
+                        ],
+                      ],
                     ),
-                    if (duration.isNotEmpty) ...[
-                      const SizedBox(width: 8),
-                      Icon(Icons.timer_outlined, size: 12, color: AppTheme.textMuted),
-                      const SizedBox(width: 4),
-                      Text(
-                        duration,
-                        style: TextStyle(fontSize: 11, color: AppTheme.textMuted),
-                      ),
-                    ],
-                  ],
+                  ),
                 ),
               ],
             ),

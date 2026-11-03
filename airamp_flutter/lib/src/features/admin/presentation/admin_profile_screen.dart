@@ -67,6 +67,11 @@ class _AdminProfileScreenState extends ConsumerState<AdminProfileScreen>
     }
 
     _loadPreferences();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) {
+        ref.read(authProvider.notifier).refreshProfile();
+      }
+    });
   }
 
   @override

@@ -552,16 +552,20 @@ class _MyCoursesScreenState extends ConsumerState<MyCoursesScreen> {
 
                       // Fixed Subjects Header
                       Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
-                          Text(
-                            'Fixed Curriculum (${subjects.length} Subjects)',
-                            style: TextStyle(
-                              fontSize: 15,
-                              fontWeight: FontWeight.bold,
-                              color: Theme.of(context).colorScheme.onSurface,
+                          Expanded(
+                            child: Text(
+                              'Fixed Curriculum (${subjects.length} Subjects)',
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: TextStyle(
+                                fontSize: 15,
+                                fontWeight: FontWeight.bold,
+                                color: Theme.of(context).colorScheme.onSurface,
+                              ),
                             ),
                           ),
+                          const SizedBox(width: 8),
                           Text(
                             'Assigned Faculty',
                             style: TextStyle(fontSize: 12, color: AppTheme.textMuted),
@@ -1001,18 +1005,22 @@ class _MyCoursesScreenState extends ConsumerState<MyCoursesScreen> {
 
                 // Curriculum Subjects Header
                 Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    Text(
-                      'Curriculum Subjects (${courses.length})',
-                      style: TextStyle(
-                        fontSize: 17,
-                        fontWeight: FontWeight.bold,
-                        letterSpacing: -0.2,
-                        color: Theme.of(context).colorScheme.onSurface,
+                    Expanded(
+                      child: Text(
+                        'Curriculum Subjects (${courses.length})',
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          fontSize: 17,
+                          fontWeight: FontWeight.bold,
+                          letterSpacing: -0.2,
+                          color: Theme.of(context).colorScheme.onSurface,
+                        ),
                       ),
                     ),
-                    if (hasSection)
+                    if (hasSection) ...[
+                      const SizedBox(width: 8),
                       Container(
                         padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                         decoration: BoxDecoration(
@@ -1032,6 +1040,7 @@ class _MyCoursesScreenState extends ConsumerState<MyCoursesScreen> {
                           ),
                         ),
                       ),
+                    ],
                   ],
                 ),
                 const SizedBox(height: 14),
@@ -1716,12 +1725,16 @@ class _MyCoursesScreenState extends ConsumerState<MyCoursesScreen> {
                       ),
                       const SizedBox(height: 6),
                       Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
-                          Text(
-                            '$completedLos/$totalLos LOs · $cocs Topics',
-                            style: TextStyle(fontSize: 11.5, color: AppTheme.textMuted),
+                          Expanded(
+                            child: Text(
+                              '$completedLos/$totalLos LOs · $cocs Topics',
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: TextStyle(fontSize: 11.5, color: AppTheme.textMuted),
+                            ),
                           ),
+                          const SizedBox(width: 8),
                           Text(
                             '$progress%',
                             style: TextStyle(

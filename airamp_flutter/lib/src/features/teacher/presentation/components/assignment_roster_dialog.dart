@@ -1,6 +1,11 @@
+import 'dart:convert';
+import 'dart:io';
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:path_provider/path_provider.dart';
+import 'package:url_launcher/url_launcher.dart';
 import '../../../../core/components/user_avatar_widget.dart';
 import '../../../../core/database/database_helper.dart';
 import '../../../../core/theme/app_theme.dart';
@@ -94,6 +99,129 @@ class _AssignmentRosterDialogState extends ConsumerState<AssignmentRosterDialog>
 
       return true;
     }).toList();
+  }
+
+  Future<void> _openLink(String url) async {
+    try {
+      final target = url.trim();
+      final uri = Uri.parse(target.startsWith('http://') || target.startsWith('https://') ? target : 'https://$target');
+      await launchUrl(uri, mode: LaunchMode.externalApplication);
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Could not open link: $e')));
+      }
+    }
+  }
+
+  void _openImagePreview(String? imagePath, String? imageBytes, String studentName) {
+    Widget imageWidget;
+    if (imageBytes != null && imageBytes.isNotEmpty) {
+      try {
+        final decoded = base64Decode(imageBytes);
+        imageWidget = Image.memory(decoded, fit: BoxFit.contain);
+      } catch (_) {
+        imageWidget = const Icon(Icons.broken_image, size: 60, color: Colors.grey);
+      }
+    } else if (imagePath != null && imagePath.isNotEmpty) {
+      if (!kIsWeb && File(imagePath).existsSync()) {
+        imageWidget = Image.file(File(imagePath), fit: BoxFit.contain);
+      } else {
+        imageWidget = Image.network(imagePath, fit: BoxFit.contain, errorBuilder: (_, _, _) => const Icon(Icons.broken_image, size: 60, color: Colors.grey));
+      }
+    } else {
+      return;
+    }
+
+    showDialog(
+      context: context,
+      builder: (ctx) => Dialog(
+        backgroundColor: Colors.black87,
+        insetPadding: const EdgeInsets.all(16),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            AppBar(
+              backgroundColor: Colors.transparent,
+              elevation: 0,
+              title: Text('$studentName - Submitted Work', style: const TextStyle(color: Colors.white, fontSize: 15)),
+              leading: IconButton(
+                icon: const Icon(Icons.close, color: Colors.white),
+                onPressed: () => Navigator.pop(ctx),
+              ),
+            ),
+            Flexible(
+              child: InteractiveViewer(
+                panEnabled: true,
+                boundaryMargin: const EdgeInsets.all(20),
+                minScale: 0.5,
+                maxScale: 4.0,
+                child: imageWidget,
+              ),
+            ),
+            const SizedBox(height: 16),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Future<void> _openFile(String? fileName, String? filePath, String? fileBytes) async {
+    try {
+      if (fileBytes != null && fileBytes.isNotEmpty) {
+        if (kIsWeb) {
+          final dataUri = Uri.parse('data:application/octet-stream;base64,$fileBytes');
+          await launchUrl(dataUri);
+          return;
+        }
+        final tempDir = await getTemporaryDirectory();
+        final cleanName = (fileName != null && fileName.isNotEmpty) ? fileName : 'student_submission.pdf';
+        final file = File('${tempDir.path}/$cleanName');
+        await file.writeAsBytes(base64Decode(fileBytes));
+        final uri = Uri.file(file.path);
+        await launchUrl(uri, mode: LaunchMode.externalApplication);
+        return;
+      }
+
+      if (!kIsWeb && filePath != null && filePath.isNotEmpty) {
+        final uri = Uri.file(filePath);
+        await launchUrl(uri, mode: LaunchMode.externalApplication);
+        return;
+      }
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('File content not available')),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Could not open file: $e')));
+      }
+    }
+  }
+
+  void _showFullTextDialog(String studentName, String text) {
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: AppTheme.surface,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: Text('Written Response: $studentName', style: TextStyle(color: AppTheme.text, fontSize: 16)),
+        content: SizedBox(
+          width: 500,
+          child: SingleChildScrollView(
+            child: SelectableText(
+              text,
+              style: TextStyle(color: AppTheme.text, fontSize: 13, height: 1.5),
+            ),
+          ),
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Close')),
+        ],
+      ),
+    );
   }
 
   void _openGradingDialog(Map<String, dynamic> student) {
@@ -528,6 +656,9 @@ class _AssignmentRosterDialogState extends ConsumerState<AssignmentRosterDialog>
                             final fileSize = student['file_size'];
                             final textResponse = student['text_response'];
                             final imagePath = student['image_path'];
+                            final imageBytes = student['image_bytes'] as String?;
+                            final filePath = student['file_path'] as String?;
+                            final fileBytes = student['file_bytes'] as String?;
                             final notes = student['notes'];
                             final grade = student['grade'];
                             final feedback = student['feedback'];
@@ -609,7 +740,17 @@ class _AssignmentRosterDialogState extends ConsumerState<AssignmentRosterDialog>
 
                                     // 1. Text response
                                     if (textResponse != null && textResponse.isNotEmpty) ...[
-                                      Text('Written Response:', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: AppTheme.textSecondary)),
+                                      Row(
+                                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                        children: [
+                                          Text('Written Response:', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: AppTheme.textSecondary)),
+                                          if (textResponse.length > 150)
+                                            InkWell(
+                                              onTap: () => _showFullTextDialog(studentName, textResponse),
+                                              child: Text('Read Full Response', style: TextStyle(fontSize: 11, color: AppTheme.primary, fontWeight: FontWeight.bold)),
+                                            ),
+                                        ],
+                                      ),
                                       const SizedBox(height: 4),
                                       Container(
                                         width: double.infinity,
@@ -622,78 +763,160 @@ class _AssignmentRosterDialogState extends ConsumerState<AssignmentRosterDialog>
                                         child: Text(
                                           textResponse,
                                           style: TextStyle(color: AppTheme.text, fontSize: 12, height: 1.4),
+                                          maxLines: 4,
+                                          overflow: TextOverflow.ellipsis,
                                         ),
                                       ),
                                       const SizedBox(height: 8),
                                     ],
 
                                     // 2. Image attachment
-                                    if (imagePath != null && imagePath.isNotEmpty) ...[
-                                      Row(
-                                        children: [
-                                          Icon(Icons.image_outlined, size: 14, color: AppTheme.primary),
-                                          const SizedBox(width: 6),
-                                          Expanded(
-                                            child: Text(
-                                              'Image: $imagePath',
-                                              style: TextStyle(color: AppTheme.textSecondary, fontSize: 12, fontWeight: FontWeight.w600),
-                                              maxLines: 1,
-                                              overflow: TextOverflow.ellipsis,
+                                    if ((imagePath != null && imagePath.isNotEmpty) || (imageBytes != null && imageBytes.isNotEmpty)) ...[
+                                      Container(
+                                        margin: const EdgeInsets.only(bottom: 8),
+                                        padding: const EdgeInsets.all(10),
+                                        decoration: BoxDecoration(
+                                          color: AppTheme.surface,
+                                          borderRadius: BorderRadius.circular(10),
+                                          border: Border.all(color: AppTheme.border),
+                                        ),
+                                        child: Row(
+                                          children: [
+                                            ClipRRect(
+                                              borderRadius: BorderRadius.circular(6),
+                                              child: Container(
+                                                width: 44,
+                                                height: 44,
+                                                color: AppTheme.background,
+                                                child: imageBytes != null && imageBytes.isNotEmpty
+                                                    ? Image.memory(base64Decode(imageBytes), fit: BoxFit.cover, errorBuilder: (_, _, _) => Icon(Icons.image, color: AppTheme.primary))
+                                                    : (imagePath != null && !kIsWeb && File(imagePath).existsSync()
+                                                        ? Image.file(File(imagePath), fit: BoxFit.cover, errorBuilder: (_, _, _) => Icon(Icons.image, color: AppTheme.primary))
+                                                        : Icon(Icons.image, color: AppTheme.primary)),
+                                              ),
                                             ),
-                                          ),
-                                        ],
+                                            const SizedBox(width: 10),
+                                            Expanded(
+                                              child: Column(
+                                                crossAxisAlignment: CrossAxisAlignment.start,
+                                                children: [
+                                                  Text('Photo / Image Submission', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12, color: AppTheme.text)),
+                                                  Text('Tap button to inspect in full resolution', style: TextStyle(fontSize: 11, color: AppTheme.textSecondary)),
+                                                ],
+                                              ),
+                                            ),
+                                            ElevatedButton.icon(
+                                              onPressed: () => _openImagePreview(imagePath, imageBytes, studentName),
+                                              icon: const Icon(Icons.zoom_in, size: 14),
+                                              label: const Text('View Image', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold)),
+                                              style: ElevatedButton.styleFrom(
+                                                backgroundColor: AppTheme.primary,
+                                                foregroundColor: Colors.black,
+                                                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                                                visualDensity: VisualDensity.compact,
+                                              ),
+                                            ),
+                                          ],
+                                        ),
                                       ),
-                                      const SizedBox(height: 6),
                                     ],
 
                                     // 3. File attachment
                                     if (fileName != null && fileName.isNotEmpty) ...[
-                                      Row(
-                                        children: [
-                                          Icon(Icons.insert_drive_file_outlined, size: 14, color: AppTheme.primary),
-                                          const SizedBox(width: 6),
-                                          Expanded(
-                                            child: Text(
-                                              'File: $fileName (${fileSize != null ? _formatFileSize(fileSize) : ""})',
-                                              style: TextStyle(color: AppTheme.textSecondary, fontSize: 12),
-                                              maxLines: 1,
-                                              overflow: TextOverflow.ellipsis,
+                                      Container(
+                                        margin: const EdgeInsets.only(bottom: 8),
+                                        padding: const EdgeInsets.all(10),
+                                        decoration: BoxDecoration(
+                                          color: AppTheme.surface,
+                                          borderRadius: BorderRadius.circular(10),
+                                          border: Border.all(color: AppTheme.border),
+                                        ),
+                                        child: Row(
+                                          children: [
+                                            Icon(Icons.insert_drive_file_outlined, size: 24, color: AppTheme.primary),
+                                            const SizedBox(width: 10),
+                                            Expanded(
+                                              child: Column(
+                                                crossAxisAlignment: CrossAxisAlignment.start,
+                                                children: [
+                                                  Text(
+                                                    fileName,
+                                                    style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12, color: AppTheme.text),
+                                                    maxLines: 1,
+                                                    overflow: TextOverflow.ellipsis,
+                                                  ),
+                                                  Text(
+                                                    fileSize != null ? _formatFileSize(fileSize) : 'Attached document',
+                                                    style: TextStyle(fontSize: 11, color: AppTheme.textSecondary),
+                                                  ),
+                                                ],
+                                              ),
                                             ),
-                                          ),
-                                        ],
+                                            const SizedBox(width: 8),
+                                            ElevatedButton.icon(
+                                              onPressed: () => _openFile(fileName, filePath, fileBytes),
+                                              icon: const Icon(Icons.open_in_new, size: 14),
+                                              label: const Text('Open File', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold)),
+                                              style: ElevatedButton.styleFrom(
+                                                backgroundColor: AppTheme.primary.withValues(alpha: 0.15),
+                                                foregroundColor: AppTheme.primary,
+                                                side: BorderSide(color: AppTheme.primary.withValues(alpha: 0.3)),
+                                                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                                                visualDensity: VisualDensity.compact,
+                                                elevation: 0,
+                                              ),
+                                            ),
+                                          ],
+                                        ),
                                       ),
-                                      const SizedBox(height: 6),
                                     ],
 
                                     // 4. Link
                                     if (link != null && link.isNotEmpty) ...[
-                                      Row(
-                                        children: [
-                                          Icon(Icons.link, size: 14, color: AppTheme.primary),
-                                          const SizedBox(width: 6),
-                                          Expanded(
-                                            child: Text(
-                                              link,
-                                              style: TextStyle(color: AppTheme.primary, fontSize: 12, decoration: TextDecoration.underline),
-                                              maxLines: 1,
-                                              overflow: TextOverflow.ellipsis,
+                                      Container(
+                                        margin: const EdgeInsets.only(bottom: 8),
+                                        padding: const EdgeInsets.all(10),
+                                        decoration: BoxDecoration(
+                                          color: AppTheme.surface,
+                                          borderRadius: BorderRadius.circular(10),
+                                          border: Border.all(color: AppTheme.border),
+                                        ),
+                                        child: Row(
+                                          children: [
+                                            Icon(Icons.link, size: 20, color: AppTheme.primary),
+                                            const SizedBox(width: 8),
+                                            Expanded(
+                                              child: Text(
+                                                link,
+                                                style: TextStyle(color: AppTheme.primary, fontSize: 12, decoration: TextDecoration.underline),
+                                                maxLines: 1,
+                                                overflow: TextOverflow.ellipsis,
+                                              ),
                                             ),
-                                          ),
-                                          IconButton(
-                                            icon: const Icon(Icons.copy, size: 14),
-                                            color: AppTheme.textMuted,
-                                            padding: EdgeInsets.zero,
-                                            constraints: const BoxConstraints(),
-                                            onPressed: () {
-                                              Clipboard.setData(ClipboardData(text: link));
-                                              ScaffoldMessenger.of(context).showSnackBar(
-                                                const SnackBar(content: Text('Link copied!')),
-                                              );
-                                            },
-                                          ),
-                                        ],
+                                            const SizedBox(width: 6),
+                                            IconButton(
+                                              icon: const Icon(Icons.copy, size: 16),
+                                              tooltip: 'Copy Link',
+                                              color: AppTheme.textMuted,
+                                              onPressed: () {
+                                                Clipboard.setData(ClipboardData(text: link));
+                                                ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Link copied!')));
+                                              },
+                                            ),
+                                            ElevatedButton.icon(
+                                              onPressed: () => _openLink(link),
+                                              icon: const Icon(Icons.open_in_browser, size: 14),
+                                              label: const Text('Open Link', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold)),
+                                              style: ElevatedButton.styleFrom(
+                                                backgroundColor: AppTheme.primary,
+                                                foregroundColor: Colors.black,
+                                                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                                                visualDensity: VisualDensity.compact,
+                                              ),
+                                            ),
+                                          ],
+                                        ),
                                       ),
-                                      const SizedBox(height: 6),
                                     ],
 
                                     // 5. Notes

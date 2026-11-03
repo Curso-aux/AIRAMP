@@ -66,6 +66,11 @@ class _StudentProfileScreenState extends ConsumerState<StudentProfileScreen>
       });
     }
     _loadPreferences();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) {
+        ref.read(authProvider.notifier).refreshProfile();
+      }
+    });
   }
 
   Future<void> _loadPreferences() async {
@@ -1037,15 +1042,19 @@ class _StudentProfileScreenState extends ConsumerState<StudentProfileScreen>
               color: AppTheme.textSecondary,
             ),
             const SizedBox(width: 8),
-            Text(
-              'Student Profile & Academic Settings',
-              style: TextStyle(
-                fontSize: 16,
-                fontWeight: FontWeight.bold,
-                color: AppTheme.text,
+            Expanded(
+              child: Text(
+                'Student Profile & Academic Settings',
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.bold,
+                  color: AppTheme.text,
+                ),
               ),
             ),
-            const Spacer(),
+            const SizedBox(width: 12),
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
               decoration: BoxDecoration(
@@ -1833,26 +1842,32 @@ class _StudentProfileScreenState extends ConsumerState<StudentProfileScreen>
         children: [
           // Elegant Header without Loud Colored Box
           Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Row(
-                children: [
-                  Icon(
-                    Icons.auto_stories_outlined,
-                    size: 17,
-                    color: AppTheme.textSecondary,
-                  ),
-                  const SizedBox(width: 8),
-                  Text(
-                    'Academic Standing & Subjects',
-                    style: TextStyle(
-                      fontSize: 15.5,
-                      fontWeight: FontWeight.bold,
-                      color: AppTheme.text,
+              Expanded(
+                child: Row(
+                  children: [
+                    Icon(
+                      Icons.auto_stories_outlined,
+                      size: 17,
+                      color: AppTheme.textSecondary,
                     ),
-                  ),
-                ],
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        'Academic Standing & Subjects',
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          fontSize: 15.5,
+                          fontWeight: FontWeight.bold,
+                          color: AppTheme.text,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
               ),
+              const SizedBox(width: 8),
               InkWell(
                 onTap: () => context.go('/student/courses'),
                 borderRadius: BorderRadius.circular(6),
@@ -2052,6 +2067,8 @@ class _StudentProfileScreenState extends ConsumerState<StudentProfileScreen>
                       children: [
                         Text(
                           'Weekly Class Timetable Schedule',
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
                           style: TextStyle(
                             fontSize: 12.5,
                             fontWeight: FontWeight.w600,
@@ -2060,6 +2077,8 @@ class _StudentProfileScreenState extends ConsumerState<StudentProfileScreen>
                         ),
                         Text(
                           '${schedules.length} active periods in timetable matrix',
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
                           style: TextStyle(
                             fontSize: 11,
                             color: AppTheme.textMuted,
@@ -2105,26 +2124,32 @@ class _StudentProfileScreenState extends ConsumerState<StudentProfileScreen>
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Row(
-                children: [
-                  Icon(
-                    Icons.badge_outlined,
-                    size: 17,
-                    color: AppTheme.textSecondary,
-                  ),
-                  const SizedBox(width: 8),
-                  Text(
-                    'Personal Information',
-                    style: TextStyle(
-                      fontSize: 15.5,
-                      fontWeight: FontWeight.bold,
-                      color: AppTheme.text,
+              Expanded(
+                child: Row(
+                  children: [
+                    Icon(
+                      Icons.badge_outlined,
+                      size: 17,
+                      color: AppTheme.textSecondary,
                     ),
-                  ),
-                ],
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        'Personal Information',
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          fontSize: 15.5,
+                          fontWeight: FontWeight.bold,
+                          color: AppTheme.text,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
               ),
+              const SizedBox(width: 8),
               if (!_isEditing)
                 GestureDetector(
                   onTap: () => setState(() => _isEditing = true),
@@ -2505,12 +2530,16 @@ class _StudentProfileScreenState extends ConsumerState<StudentProfileScreen>
                 Expanded(
                   child: Row(
                     children: [
-                      Text(
-                        'Change Password',
-                        style: TextStyle(
-                          fontSize: 14.5,
-                          fontWeight: FontWeight.w600,
-                          color: AppTheme.text,
+                      Flexible(
+                        child: Text(
+                          'Change Password',
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(
+                            fontSize: 14.5,
+                            fontWeight: FontWeight.w600,
+                            color: AppTheme.text,
+                          ),
                         ),
                       ),
                       if (isRequired) ...[
@@ -2731,10 +2760,14 @@ class _StudentProfileScreenState extends ConsumerState<StudentProfileScreen>
                                       : AppTheme.surface,
                                 ),
                                 const SizedBox(width: 8),
-                                Text(
-                                  isRequired
-                                      ? 'Save Password & Unlock Account'
-                                      : 'Update Password',
+                                Flexible(
+                                  child: Text(
+                                    isRequired
+                                        ? 'Save Password & Unlock Account'
+                                        : 'Update Password',
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
                                 ),
                               ],
                             ),
@@ -2953,15 +2986,19 @@ class _StudentProfileScreenState extends ConsumerState<StudentProfileScreen>
                 color: AppTheme.textSecondary,
               ),
               const SizedBox(width: 8),
-              Text(
-                'Institutional Support & Info',
-                style: TextStyle(
-                  fontSize: 15.5,
-                  fontWeight: FontWeight.bold,
-                  color: AppTheme.text,
+              Expanded(
+                child: Text(
+                  'Institutional Support & Info',
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    fontSize: 15.5,
+                    fontWeight: FontWeight.bold,
+                    color: AppTheme.text,
+                  ),
                 ),
               ),
-              const Spacer(),
+              const SizedBox(width: 8),
               Container(
                 padding: const EdgeInsets.symmetric(
                   horizontal: 7,

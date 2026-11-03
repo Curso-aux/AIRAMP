@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 import 'dart:math';
 import 'package:crypto/crypto.dart';
@@ -87,6 +88,30 @@ class DatabaseHelper {
       await db.execute('ALTER TABLE users ADD COLUMN profile_image TEXT');
     } catch (_) {}
     try {
+      await db.rawUpdate('''
+        UPDATE users 
+        SET profile_image = 'preset:girl_1' 
+        WHERE (id = 'student_1' OR email = 'maria@test.com') 
+          AND (profile_image IS NULL OR profile_image = '')
+      ''');
+    } catch (_) {}
+    try {
+      await db.rawUpdate('''
+        UPDATE users 
+        SET profile_image = 'preset:boy_1' 
+        WHERE (id = 'teacher_1' OR email = 'john.reyes@deped.gov.ph') 
+          AND (profile_image IS NULL OR profile_image = '')
+      ''');
+    } catch (_) {}
+    try {
+      await db.rawUpdate('''
+        UPDATE users 
+        SET profile_image = 'assets/images/aira_mascot_logo.png' 
+        WHERE (id = 'admin_1' OR email = 'aira@admin') 
+          AND (profile_image IS NULL OR profile_image = '')
+      ''');
+    } catch (_) {}
+    try {
       await db.execute("ALTER TABLE users ADD COLUMN must_change_password INTEGER DEFAULT 0");
     } catch (_) {}
     try {
@@ -103,6 +128,24 @@ class DatabaseHelper {
     } catch (_) {}
     try {
       await db.execute('ALTER TABLE submissions ADD COLUMN image_path TEXT');
+    } catch (_) {}
+    try {
+      await db.execute('ALTER TABLE submissions ADD COLUMN file_bytes TEXT');
+    } catch (_) {}
+    try {
+      await db.execute('ALTER TABLE submissions ADD COLUMN image_bytes TEXT');
+    } catch (_) {}
+    try {
+      await db.execute('ALTER TABLE assignments ADD COLUMN attachment_name TEXT');
+    } catch (_) {}
+    try {
+      await db.execute('ALTER TABLE assignments ADD COLUMN attachment_path TEXT');
+    } catch (_) {}
+    try {
+      await db.execute('ALTER TABLE assignments ADD COLUMN attachment_size INTEGER');
+    } catch (_) {}
+    try {
+      await db.execute('ALTER TABLE assignments ADD COLUMN attachment_bytes TEXT');
     } catch (_) {}
     try {
       await db.execute('''
@@ -467,6 +510,7 @@ class DatabaseHelper {
       'full_name': 'Aira Admin',
       'section': null,
       'grade': null,
+      'profile_image': 'assets/images/aira_mascot_logo.png',
       'created_at': DateTime.now().toIso8601String(),
     });
     await db.insert('users', {
@@ -479,6 +523,7 @@ class DatabaseHelper {
       'full_name': 'School Administrator',
       'section': null,
       'grade': null,
+      'profile_image': 'preset:champion',
       'created_at': DateTime.now().toIso8601String(),
     });
     await db.insert('users', {
@@ -491,6 +536,7 @@ class DatabaseHelper {
       'full_name': 'Sir John Reyes',
       'section': null,
       'grade': null,
+      'profile_image': 'preset:boy_1',
       'created_at': DateTime.now().toIso8601String(),
     });
     await db.insert('users', {
@@ -503,6 +549,7 @@ class DatabaseHelper {
       'full_name': 'Maria Lopez',
       'section': 'Emerald',
       'grade': 'Grade 10',
+      'profile_image': 'preset:girl_1',
       'created_at': DateTime.now().toIso8601String(),
     });
 
@@ -3742,6 +3789,7 @@ class DatabaseHelper {
             'full_name': 'Maria Lopez',
             'section': 'Grade 10 - Emerald',
             'grade': 'Grade 10',
+            'profile_image': 'preset:girl_1',
             'created_at': DateTime.now().subtract(const Duration(days: 5)).toIso8601String(),
           },
           {
@@ -3753,6 +3801,7 @@ class DatabaseHelper {
             'full_name': 'Juan Dela Cruz',
             'section': 'Grade 10 - Emerald',
             'grade': 'Grade 10',
+            'profile_image': 'preset:boy_1',
             'created_at': DateTime.now().subtract(const Duration(days: 4)).toIso8601String(),
           },
           {
@@ -3764,6 +3813,7 @@ class DatabaseHelper {
             'full_name': 'Angela Santos',
             'section': 'Grade 11 - STEM B',
             'grade': 'Grade 11',
+            'profile_image': 'preset:bob_cut',
             'created_at': DateTime.now().subtract(const Duration(days: 4)).toIso8601String(),
           },
           {
@@ -6097,10 +6147,14 @@ class DatabaseHelper {
     String? dueDate,
     int totalPoints = 100,
     String submissionType = 'both',
+    String? attachmentName,
+    String? attachmentPath,
+    int? attachmentSize,
+    String? attachmentBytes,
   }) async {
     final db = await database;
     final now = DateTime.now().toIso8601String();
-    return await db.insert('assignments', {
+    final id = await db.insert('assignments', {
       'title': title,
       'description': description,
       'subject_id': subjectId,
@@ -6109,9 +6163,189 @@ class DatabaseHelper {
       'due_date': dueDate,
       'total_points': totalPoints,
       'submission_type': submissionType,
+      'attachment_name': attachmentName,
+      'attachment_path': attachmentPath,
+      'attachment_size': attachmentSize,
+      'attachment_bytes': attachmentBytes,
       'status': 'active',
       'created_at': now,
     });
+
+    // 1. Sync assignment to Cloud Firestore
+    try {
+      final assignmentMap = {
+        'id': id,
+        'title': title,
+        'description': description,
+        'subject_id': subjectId,
+        'teacher_id': teacherId,
+        'teacher_name': teacherName,
+        'due_date': dueDate,
+        'total_points': totalPoints,
+        'submission_type': submissionType,
+        'attachment_name': attachmentName,
+        'attachment_path': attachmentPath,
+        'attachment_size': attachmentSize,
+        'attachment_bytes': attachmentBytes,
+        'status': 'active',
+        'created_at': now,
+      };
+      unawaited(FirestoreService().saveDocument('assignments', id.toString(), assignmentMap));
+    } catch (_) {}
+
+    // 2. Generate notifications for all enrolled students in this subject
+    try {
+      final enrollments = await db.query(
+        'enrollments',
+        columns: ['student_id'],
+        where: 'subject_id = ?',
+        whereArgs: [subjectId],
+      );
+      final sub = await db.query('subjects', columns: ['name'], where: 'id = ?', whereArgs: [subjectId]);
+      final subName = sub.isNotEmpty ? sub.first['name'] as String? ?? 'Subject' : 'Subject';
+      for (final e in enrollments) {
+        final sId = e['student_id'] as String?;
+        if (sId != null && sId.isNotEmpty) {
+          unawaited(createNotification(
+            userId: sId,
+            type: 'new_assignment',
+            title: 'New Assignment: $title',
+            message: '${teacherName ?? "Your teacher"} posted "$title" in $subName.${dueDate != null ? " Due: ${dueDate.substring(0, 10)}" : ""}',
+            relatedId: id.toString(),
+            subjectId: subjectId,
+            actorId: teacherId,
+            actorName: teacherName,
+          ));
+        }
+      }
+    } catch (_) {}
+
+    return id;
+  }
+
+  /// Sync all assignments from Cloud Firestore down to local SQLite cache
+  Future<void> syncCloudAssignmentsToLocal() async {
+    try {
+      final cloudDocs = await FirestoreService().fetchAllDocuments('assignments');
+      if (cloudDocs.isEmpty) return;
+      final db = await database;
+      for (final doc in cloudDocs) {
+        final rawId = doc['id'];
+        final intId = rawId is int ? rawId : int.tryParse(rawId.toString());
+        if (intId == null) continue;
+
+        final title = doc['title']?.toString() ?? 'Assignment';
+        final description = doc['description']?.toString();
+        final subjectId = (doc['subject_id'] as num?)?.toInt() ?? 1;
+        final teacherId = doc['teacher_id']?.toString() ?? 'teacher_1';
+        final teacherName = doc['teacher_name']?.toString();
+        final dueDate = doc['due_date']?.toString();
+        final totalPoints = (doc['total_points'] as num?)?.toInt() ?? 100;
+        final submissionType = doc['submission_type']?.toString() ?? 'both';
+        final status = doc['status']?.toString() ?? 'active';
+        final createdAt = doc['created_at']?.toString() ?? DateTime.now().toIso8601String();
+        final attachmentName = doc['attachment_name']?.toString();
+        final attachmentPath = doc['attachment_path']?.toString();
+        final attachmentSize = (doc['attachment_size'] as num?)?.toInt();
+        final attachmentBytes = doc['attachment_bytes']?.toString();
+
+        final existing = await db.query('assignments', where: 'id = ?', whereArgs: [intId]);
+        if (existing.isEmpty) {
+          await db.insert('assignments', {
+            'id': intId,
+            'title': title,
+            'description': description,
+            'subject_id': subjectId,
+            'teacher_id': teacherId,
+            'teacher_name': teacherName,
+            'due_date': dueDate,
+            'total_points': totalPoints,
+            'submission_type': submissionType,
+            'status': status,
+            'created_at': createdAt,
+            'attachment_name': attachmentName,
+            'attachment_path': attachmentPath,
+            'attachment_size': attachmentSize,
+            'attachment_bytes': attachmentBytes,
+          });
+        } else {
+          await db.update('assignments', {
+            'title': title,
+            'description': description,
+            'subject_id': subjectId,
+            'teacher_id': teacherId,
+            'teacher_name': teacherName,
+            'due_date': dueDate,
+            'total_points': totalPoints,
+            'submission_type': submissionType,
+            'status': status,
+            if (attachmentName != null) 'attachment_name': attachmentName,
+            if (attachmentPath != null) 'attachment_path': attachmentPath,
+            if (attachmentSize != null) 'attachment_size': attachmentSize,
+            if (attachmentBytes != null) 'attachment_bytes': attachmentBytes,
+          }, where: 'id = ?', whereArgs: [intId]);
+        }
+      }
+    } catch (e) {
+      debugPrint('[DatabaseHelper] syncCloudAssignmentsToLocal note: $e');
+    }
+  }
+
+  /// Sync student submissions from Cloud Firestore down to local SQLite cache
+  Future<void> syncCloudSubmissionsToLocal({int? assignmentId}) async {
+    try {
+      final cloudDocs = await FirestoreService().fetchAllDocuments('submissions');
+      if (cloudDocs.isEmpty) return;
+      final db = await database;
+      for (final doc in cloudDocs) {
+        final aId = (doc['assignment_id'] as num?)?.toInt();
+        final sId = doc['student_id']?.toString();
+        if (aId == null || sId == null || sId.isEmpty) continue;
+        if (assignmentId != null && aId != assignmentId) continue;
+
+        final studentName = doc['student_name']?.toString();
+        final submissionType = doc['submission_type']?.toString() ?? 'both';
+        final contentLink = doc['content_link']?.toString();
+        final fileName = doc['file_name']?.toString();
+        final fileSize = (doc['file_size'] as num?)?.toInt();
+        final filePath = doc['file_path']?.toString();
+        final fileBytes = doc['file_bytes']?.toString();
+        final textResponse = doc['text_response']?.toString();
+        final imagePath = doc['image_path']?.toString();
+        final imageBytes = doc['image_bytes']?.toString();
+        final notes = doc['notes']?.toString();
+        final submittedAt = doc['submitted_at']?.toString() ?? DateTime.now().toIso8601String();
+        final status = doc['status']?.toString() ?? 'submitted';
+        final grade = (doc['grade'] is num) ? (doc['grade'] as num).toDouble() : double.tryParse(doc['grade']?.toString() ?? '');
+        final feedback = doc['feedback']?.toString();
+        final gradedAt = doc['graded_at']?.toString();
+        final gradedBy = doc['graded_by']?.toString();
+
+        await db.insert('submissions', {
+          'assignment_id': aId,
+          'student_id': sId,
+          'student_name': studentName,
+          'submission_type': submissionType,
+          'content_link': contentLink,
+          'file_name': fileName,
+          'file_size': fileSize,
+          'file_path': filePath,
+          'file_bytes': fileBytes,
+          'text_response': textResponse,
+          'image_path': imagePath,
+          'image_bytes': imageBytes,
+          'notes': notes,
+          'submitted_at': submittedAt,
+          'status': status,
+          'grade': grade,
+          'feedback': feedback,
+          'graded_at': gradedAt,
+          'graded_by': gradedBy,
+        }, conflictAlgorithm: ConflictAlgorithm.replace);
+      }
+    } catch (e) {
+      debugPrint('[DatabaseHelper] syncCloudSubmissionsToLocal note: $e');
+    }
   }
 
   Future<Map<String, dynamic>?> getAssignmentById(int id) async {
@@ -6188,6 +6422,26 @@ class DatabaseHelper {
       WHERE sub.assignment_id = ?
       ORDER BY sub.submitted_at DESC
     ''', [assignmentId]);
+  }
+
+  Future<List<Map<String, dynamic>>> getRecentSubmissionsForTeacher(String teacherId, {int limit = 10}) async {
+    final db = await database;
+    return await db.rawQuery('''
+      SELECT sub.*, 
+             a.title as assignment_title, 
+             a.total_points, 
+             a.due_date,
+             s.name as subject_name,
+             u.full_name as student_full_name,
+             u.profile_image as student_profile_image
+      FROM submissions sub
+      JOIN assignments a ON sub.assignment_id = a.id
+      JOIN subjects s ON a.subject_id = s.id
+      LEFT JOIN users u ON sub.student_id = u.id
+      WHERE a.teacher_id = ?
+      ORDER BY sub.submitted_at DESC
+      LIMIT ?
+    ''', [teacherId, limit]);
   }
 
   /// Get complete student submission roster for an assignment:
@@ -6321,8 +6575,10 @@ class DatabaseHelper {
     String? fileName,
     int? fileSize,
     String? filePath,
+    String? fileBytes,
     String? textResponse,
     String? imagePath,
+    String? imageBytes,
     String? notes,
   }) async {
     final db = await database;
@@ -6340,33 +6596,46 @@ class DatabaseHelper {
       } catch (_) {}
     }
 
+    final subData = {
+      'assignment_id': assignmentId,
+      'student_id': studentId,
+      'student_name': studentName,
+      'submission_type': submissionType,
+      'content_link': contentLink,
+      'file_name': fileName,
+      'file_size': fileSize,
+      'file_path': filePath,
+      'file_bytes': fileBytes,
+      'text_response': textResponse,
+      'image_path': imagePath,
+      'image_bytes': imageBytes,
+      'notes': notes,
+      'submitted_at': now,
+      'status': status,
+    };
+
     final id = await db.insert(
       'submissions',
-      {
-        'assignment_id': assignmentId,
-        'student_id': studentId,
-        'student_name': studentName,
-        'submission_type': submissionType,
-        'content_link': contentLink,
-        'file_name': fileName,
-        'file_size': fileSize,
-        'file_path': filePath,
-        'text_response': textResponse,
-        'image_path': imagePath,
-        'notes': notes,
-        'submitted_at': now,
-        'status': status,
-      },
+      subData,
       conflictAlgorithm: ConflictAlgorithm.replace,
     );
 
-    // Automatically notify the assignment's teacher!
+    // 1. Sync submission to Cloud Firestore
+    try {
+      final docId = '${assignmentId}_$studentId';
+      unawaited(FirestoreService().saveDocument('submissions', docId, {
+        ...subData,
+        'id': id,
+      }));
+    } catch (_) {}
+
+    // 2. Automatically notify the assignment's teacher!
     if (assignment != null && assignment['teacher_id'] != null) {
       final teacherId = assignment['teacher_id'] as String;
       final aTitle = assignment['title'] as String? ?? 'Activity';
       final sName = studentName ?? 'A student';
       final subName = assignment['subject_name'] as String? ?? '';
-      await createNotification(
+      unawaited(createNotification(
         userId: teacherId,
         type: 'activity_submission',
         title: 'New Activity Submission: $aTitle',
@@ -6375,7 +6644,7 @@ class DatabaseHelper {
         subjectId: assignment['subject_id'] as int?,
         actorId: studentId,
         actorName: studentName,
-      );
+      ));
     }
 
     return id;
@@ -6402,7 +6671,7 @@ class DatabaseHelper {
       whereArgs: [submissionId],
     );
 
-    // Notify the student about the grade
+    // Sync grade to Cloud Firestore and notify the student
     try {
       final subRows = await db.query('submissions', where: 'id = ?', whereArgs: [submissionId]);
       if (subRows.isNotEmpty) {
@@ -6410,10 +6679,19 @@ class DatabaseHelper {
         final studentId = sub['student_id'] as String?;
         final assignmentId = sub['assignment_id'] as int?;
         if (studentId != null && assignmentId != null) {
+          final docId = '${assignmentId}_$studentId';
+          unawaited(FirestoreService().saveDocument('submissions', docId, {
+            'grade': grade,
+            'feedback': feedback,
+            'graded_at': now,
+            'graded_by': gradedBy,
+            'status': 'graded',
+          }));
+
           final assignment = await getAssignmentById(assignmentId);
           final title = assignment?['title'] ?? 'Activity';
           final totalPoints = assignment?['total_points'] ?? 100;
-          await createNotification(
+          unawaited(createNotification(
             userId: studentId,
             type: 'grade_released',
             title: 'Activity Graded: $title',
@@ -6421,7 +6699,7 @@ class DatabaseHelper {
             relatedId: assignmentId.toString(),
             subjectId: assignment?['subject_id'] as int?,
             actorId: gradedBy,
-          );
+          ));
         }
       }
     } catch (_) {}
@@ -6432,7 +6710,11 @@ class DatabaseHelper {
   Future<int> deleteAssignment(int id) async {
     final db = await database;
     await db.delete('submissions', where: 'assignment_id = ?', whereArgs: [id]);
-    return await db.delete('assignments', where: 'id = ?', whereArgs: [id]);
+    final deleted = await db.delete('assignments', where: 'id = ?', whereArgs: [id]);
+    try {
+      unawaited(FirestoreService().deleteDocument('assignments', id.toString()));
+    } catch (_) {}
+    return deleted;
   }
 
   // ── Notifications Management ──────────────────────────────
@@ -6451,7 +6733,7 @@ class DatabaseHelper {
     final db = await database;
     final now = DateTime.now().toIso8601String();
     final id = 'notif_${DateTime.now().millisecondsSinceEpoch}_${(userId.hashCode % 1000).abs()}';
-    await db.insert('notifications', {
+    final notifData = {
       'id': id,
       'user_id': userId,
       'type': type,
@@ -6464,7 +6746,14 @@ class DatabaseHelper {
       'subject_id': subjectId,
       'actor_id': actorId,
       'actor_name': actorName,
-    });
+    };
+    await db.insert('notifications', notifData);
+
+    // Sync notification to Cloud Firestore
+    try {
+      unawaited(FirestoreService().saveDocument('notifications', id, notifData));
+    } catch (_) {}
+
     return id;
   }
 

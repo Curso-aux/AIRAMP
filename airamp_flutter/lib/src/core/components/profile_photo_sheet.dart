@@ -212,30 +212,36 @@ class _ProfilePhotoSheetState extends State<ProfilePhotoSheet> {
 
             // Header title
             Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      'Customize Profile Photo',
-                      style: TextStyle(
-                        fontSize: 17,
-                        fontWeight: FontWeight.bold,
-                        color: AppTheme.text,
-                        letterSpacing: -0.3,
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Customize Profile Photo',
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          fontSize: 17,
+                          fontWeight: FontWeight.bold,
+                          color: AppTheme.text,
+                          letterSpacing: -0.3,
+                        ),
                       ),
-                    ),
-                    const SizedBox(height: 2),
-                    Text(
-                      'Choose a styled avatar or upload from your device',
-                      style: TextStyle(
-                        fontSize: 12,
-                        color: AppTheme.textSecondary,
+                      const SizedBox(height: 2),
+                      Text(
+                        'Choose a styled avatar or upload from your device',
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: AppTheme.textSecondary,
+                        ),
                       ),
-                    ),
-                  ],
+                    ],
+                  ),
                 ),
+                const SizedBox(width: 8),
                 IconButton(
                   icon: Icon(Icons.close_rounded, size: 20, color: AppTheme.textMuted),
                   onPressed: () => Navigator.of(context).pop(),
@@ -308,13 +314,17 @@ class _ProfilePhotoSheetState extends State<ProfilePhotoSheet> {
             ),
             const SizedBox(height: 18),
 
-            // Section Label: Preset Characters
+            // Section Label: Preset Human Face Avatars
             Row(
               children: [
-                Icon(Icons.palette_outlined, size: 15, color: AppTheme.textMuted),
+                HumanFaceWidget(
+                  presetId: 'preset:joyful',
+                  size: 16,
+                  color: AppTheme.textMuted,
+                ),
                 const SizedBox(width: 6),
                 Text(
-                  'OR SELECT AN AVATAR STYLE',
+                  'OR CHOOSE A HUMAN FACE AVATAR',
                   style: TextStyle(
                     fontSize: 11,
                     fontWeight: FontWeight.w700,
@@ -326,7 +336,7 @@ class _ProfilePhotoSheetState extends State<ProfilePhotoSheet> {
             ),
             const SizedBox(height: 12),
 
-            // Complete Grid of Presets (All 10 presets displayed in 2 balanced rows; none cut in half!)
+            // Complete Grid of Presets (All 10 human faces displayed in 2 balanced rows; none cut in half!)
             GridView.builder(
               shrinkWrap: true,
               physics: const NeverScrollableScrollPhysics(),
@@ -339,7 +349,8 @@ class _ProfilePhotoSheetState extends State<ProfilePhotoSheet> {
               itemCount: kAvatarPresets.length,
               itemBuilder: (context, index) {
                 final preset = kAvatarPresets[index];
-                final isSelected = _previewPhoto == preset.id;
+                final isSelected = _previewPhoto == preset.id ||
+                    preset.aliases.contains(_previewPhoto);
 
                 return InkWell(
                   onTap: _isProcessing
@@ -373,10 +384,12 @@ class _ProfilePhotoSheetState extends State<ProfilePhotoSheet> {
                               colors: preset.gradientColors,
                             ),
                           ),
-                          child: Icon(
-                            preset.icon,
-                            size: 22,
-                            color: preset.iconColor,
+                          child: Center(
+                            child: HumanFaceWidget(
+                              presetId: preset.id,
+                              size: 24,
+                              color: preset.iconColor,
+                            ),
                           ),
                         ),
                       ),

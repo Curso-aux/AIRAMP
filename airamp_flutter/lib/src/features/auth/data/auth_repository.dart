@@ -118,6 +118,7 @@ class AuthRepository {
             'student_type': cloudUser['student_type'] ?? 'regular',
             'special_notes': cloudUser['special_notes'],
             'school_id': cloudUser['school_id'] ?? 'sch_main',
+            'profile_image': cloudUser['profile_image'] ?? cloudUser['profileImage'],
             'must_change_password': cloudMust ? 1 : 0,
             'created_at': cloudUser['created_at'] ?? DateTime.now().toIso8601String(),
           };
@@ -163,6 +164,25 @@ class AuthRepository {
     }
     final role = user['role'] as String;
 
+    // Check Cloud Firestore for this user to restore any cloud avatar or updated profile:
+    try {
+      final cloudUser = await FirestoreService()
+          .findUserByIdentifier(user['email']?.toString() ?? user['username']?.toString() ?? userId)
+          .timeout(const Duration(seconds: 3), onTimeout: () => null);
+      if (cloudUser != null) {
+        final cloudPhoto = (cloudUser['profileImage'] ?? cloudUser['profile_image']) as String?;
+        if (cloudPhoto != null && cloudPhoto.trim().isNotEmpty) {
+          user['profile_image'] = cloudPhoto;
+          user['profileImage'] = cloudPhoto;
+          try {
+            await db.update('users', {'profile_image': cloudPhoto}, where: 'id = ?', whereArgs: [userId]);
+          } catch (_) {}
+        }
+      }
+    } catch (e) {
+      debugPrint('[AuthRepository] Cloud profile sync on login note: $e');
+    }
+
     final mustChange = user['must_change_password'] == 1 ||
         user['must_change_password'] == true ||
         user['must_change_password'] == '1';
@@ -181,9 +201,15 @@ class AuthRepository {
       } catch (_) {}
     }
 
-    // Synchronize authenticated user with Cloud Firestore
+    // Synchronize authenticated user with Cloud Firestore safely (never overwrite cloud avatar with null)
     try {
-      FirestoreService().saveUser(user);
+      final syncData = Map<String, dynamic>.from(user);
+      if (syncData['profile_image'] == null ||
+          (syncData['profile_image'] is String && (syncData['profile_image'] as String).isEmpty)) {
+        syncData.remove('profile_image');
+        syncData.remove('profileImage');
+      }
+      FirestoreService().saveUser(syncData);
     } catch (_) {}
 
     String token = _localToken(userId);

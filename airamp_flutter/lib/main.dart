@@ -75,6 +75,7 @@ class _AirampAppState extends ConsumerState<AirampApp> {
       setState(() => _bootstrapped = true);
       // Pre-warm primary branding assets to eliminate image decode stutters
       try {
+        precacheImage(const AssetImage('assets/images/aira_mascot_logo.png'), context);
         precacheImage(const AssetImage('assets/images/aira_logo.png'), context);
         precacheImage(const AssetImage('assets/images/aira_logo_white.png'), context);
         precacheImage(const AssetImage('assets/images/aira_logo_dark.png'), context);

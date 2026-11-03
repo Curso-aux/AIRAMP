@@ -276,7 +276,14 @@ class _QuizScreenState extends ConsumerState<QuizScreen> {
           children: [
             Icon(Icons.warning_amber_rounded, color: AppTheme.error, size: 24),
             const SizedBox(width: 8),
-            Text('Exit & Submit Quiz?', style: TextStyle(color: AppTheme.text, fontWeight: FontWeight.bold, fontSize: 18)),
+            Expanded(
+              child: Text(
+                'Exit & Submit Quiz?',
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(color: AppTheme.text, fontWeight: FontWeight.bold, fontSize: 18),
+              ),
+            ),
           ],
         ),
         content: Text(
@@ -937,9 +944,13 @@ class _QuizScreenState extends ConsumerState<QuizScreen> {
               children: [
                 Icon(Icons.visibility, size: 14, color: AppTheme.primary),
                 const SizedBox(width: 6),
-                Text(
-                  'Teacher Preview Mode — No score will be recorded',
-                  style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: AppTheme.primary),
+                Flexible(
+                  child: Text(
+                    'Teacher Preview Mode — No score will be recorded',
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: AppTheme.primary),
+                  ),
                 ),
               ],
             ),

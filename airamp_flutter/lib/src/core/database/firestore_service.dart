@@ -16,6 +16,9 @@ class FirestoreService {
   factory FirestoreService() => _instance;
   FirestoreService._internal();
 
+  /// Optional listener triggered when cloud users/avatars are synced down to SQLite
+  static VoidCallback? onUserSynced;
+
   static final Dio _dio = Dio(
     BaseOptions(
       connectTimeout: const Duration(seconds: 8),
@@ -209,6 +212,60 @@ class FirestoreService {
     }
   }
 
+  /// Generic helper to fetch all documents from any collection in Cloud Firestore (SDK + REST fallback)
+  Future<List<Map<String, dynamic>>> fetchAllDocuments(String collection) async {
+    final list = <Map<String, dynamic>>[];
+    if (isAvailable && !_useRestPrimary) {
+      try {
+        final snap = await firestore.collection(collection).get().timeout(const Duration(seconds: 4));
+        for (final doc in snap.docs) {
+          final data = Map<String, dynamic>.from(doc.data());
+          data['id'] = doc.id;
+          list.add(data);
+        }
+        return list;
+      } catch (e) {
+        debugPrint('[FirestoreService] SDK fetchAllDocuments for $collection error: $e');
+        await _disableSdkNetwork(e);
+      }
+    }
+
+    try {
+      final dio = _dio;
+      String? pageToken;
+      final keyParam = apiKey.isNotEmpty ? '&key=$apiKey' : '';
+
+      do {
+        final tokenParam = pageToken != null && pageToken.isNotEmpty ? '&pageToken=$pageToken' : '';
+        final url = 'https://firestore.googleapis.com/v1/projects/$projectId/databases/(default)/documents/$collection?pageSize=300$tokenParam$keyParam';
+        final response = await dio.get(url);
+
+        if (response.data is Map && response.data.containsKey('documents')) {
+          final docs = response.data['documents'] as List? ?? [];
+          for (final d in docs) {
+            if (d is Map && d.containsKey('fields')) {
+              final fields = d['fields'] as Map<String, dynamic>? ?? {};
+              final parsed = _parseFirestoreFields(fields);
+              if (!parsed.containsKey('id') && d.containsKey('name')) {
+                parsed['id'] = (d['name'] as String).split('/').last;
+              }
+              list.add(parsed);
+            }
+          }
+        }
+
+        pageToken = (response.data is Map && response.data.containsKey('nextPageToken'))
+            ? response.data['nextPageToken'] as String?
+            : null;
+      } while (pageToken != null && pageToken.isNotEmpty);
+
+      return list;
+    } catch (e) {
+      debugPrint('[FirestoreService] REST fetchAllDocuments for $collection error: $e');
+      return list;
+    }
+  }
+
   /// Calculates the highest numeric sequence for a given ID prefix (e.g. '001-' or '002-')
   Future<int> getHighestSequence(String prefix) async {
     int maxSeq = 0;
@@ -245,6 +302,16 @@ class FirestoreService {
       dataToSave['username_lower'] = (dataToSave['username'] as String).toLowerCase().trim();
     }
     dataToSave['updated_at'] = DateTime.now().toIso8601String();
+
+    // Ensure profile_image and profileImage fields stay consistent
+    if (dataToSave.containsKey('profile_image') && !dataToSave.containsKey('profileImage')) {
+      dataToSave['profileImage'] = dataToSave['profile_image'];
+    } else if (dataToSave.containsKey('profileImage') && !dataToSave.containsKey('profile_image')) {
+      dataToSave['profile_image'] = dataToSave['profileImage'];
+    }
+
+    // Never overwrite existing non-null cloud fields with nulls during routine sync/login
+    dataToSave.removeWhere((key, value) => value == null);
 
     // 1. Try Firebase SDK if available and not switched to REST primary
     if (isAvailable && !_useRestPrimary) {
@@ -554,8 +621,12 @@ class FirestoreService {
         final localId = local['id']?.toString() ?? '';
         final localEmail = (local['email']?.toString() ?? '').toLowerCase().trim();
 
-        // Keep system super_admin seeds if needed, otherwise verify presence in cloud
-        final isPermanentSeed = localId == 'admin_1' || localId == 'superadmin_1';
+        // Keep system core accounts permanent so a fresh cloud sync never purges demo users
+        final isPermanentSeed = localId == 'admin_1' ||
+            localId == 'admin_2' ||
+            localId == 'superadmin_1' ||
+            localId == 'teacher_1' ||
+            localId == 'student_1';
         if (!isPermanentSeed && !cloudIds.contains(localId) && !cloudEmails.contains(localEmail)) {
           await db.delete('users', where: 'id = ?', whereArgs: [localId]);
           try {
@@ -569,6 +640,9 @@ class FirestoreService {
       }
 
       debugPrint('[FirestoreService] Synced ${cloudUsers.length} Cloud Firestore users to local SQLite cache');
+      try {
+        onUserSynced?.call();
+      } catch (_) {}
     } catch (e) {
       debugPrint('[FirestoreService] Error syncing cloud users to local SQLite: $e');
     }
