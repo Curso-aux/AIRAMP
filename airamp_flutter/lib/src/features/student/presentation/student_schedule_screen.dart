@@ -157,8 +157,9 @@ class _StudentScheduleScreenState extends ConsumerState<StudentScheduleScreen> {
   bool _isClassOngoing(Map<String, dynamic> sched) {
     final schedDay = sched['day_of_week'] as String?;
     if (schedDay == null ||
-        schedDay.toLowerCase() != getCurrentDayOfWeek().toLowerCase())
+        schedDay.toLowerCase() != getCurrentDayOfWeek().toLowerCase()) {
       return false;
+    }
 
     final now = TimeOfDay.now();
     final nowMinutes = now.hour * 60 + now.minute;
@@ -1255,8 +1256,9 @@ class _StudentScheduleScreenState extends ConsumerState<StudentScheduleScreen> {
                                           d.toLowerCase() ==
                                           dayStr.toLowerCase(),
                                     );
-                                    if (dayIndex < 0)
+                                    if (dayIndex < 0) {
                                       return const SizedBox.shrink();
+                                    }
 
                                     final startM = _parseTimeToMinutes(
                                       item['start_time'] as String?,

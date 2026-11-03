@@ -215,7 +215,7 @@ class UserAvatarWidget extends StatelessWidget {
         width: size,
         height: size,
         fit: BoxFit.cover,
-        errorBuilder: (_, __, ___) => _buildInitialFallback(context, initial),
+        errorBuilder: (_, _, _) => _buildInitialFallback(context, initial),
       );
     } catch (_) {
       return _buildInitialFallback(context, initial);
@@ -228,7 +228,7 @@ class UserAvatarWidget extends StatelessWidget {
       width: size,
       height: size,
       fit: BoxFit.cover,
-      errorBuilder: (_, __, ___) => _buildInitialFallback(context, initial),
+      errorBuilder: (_, _, _) => _buildInitialFallback(context, initial),
     );
   }
 
@@ -238,7 +238,7 @@ class UserAvatarWidget extends StatelessWidget {
       width: size,
       height: size,
       fit: BoxFit.cover,
-      errorBuilder: (_, __, ___) => _buildInitialFallback(context, initial),
+      errorBuilder: (_, _, _) => _buildInitialFallback(context, initial),
     );
   }
 

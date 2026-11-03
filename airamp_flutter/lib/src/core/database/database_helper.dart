@@ -6308,8 +6308,8 @@ class DatabaseHelper {
         final title = doc['title']?.toString() ?? 'Assignment';
         final description = doc['description']?.toString();
         final rawSubId = (doc['subject_id'] as num?)?.toInt() ?? 1;
-        final subCode = doc['subject_code']?.toString()?.trim();
-        final subName = doc['subject_name']?.toString()?.trim();
+        final subCode = doc['subject_code']?.toString().trim();
+        final subName = doc['subject_name']?.toString().trim();
 
         // Resolve subject ID on this device by matching subject_code or name
         int targetSubjectId = rawSubId;
@@ -6379,10 +6379,10 @@ class DatabaseHelper {
             'total_points': totalPoints,
             'submission_type': submissionType,
             'status': status,
-            if (attachmentName != null) 'attachment_name': attachmentName,
-            if (attachmentPath != null) 'attachment_path': attachmentPath,
-            if (attachmentSize != null) 'attachment_size': attachmentSize,
-            if (attachmentBytes != null) 'attachment_bytes': attachmentBytes,
+            'attachment_name': ?attachmentName,
+            'attachment_path': ?attachmentPath,
+            'attachment_size': ?attachmentSize,
+            'attachment_bytes': ?attachmentBytes,
           }, where: 'id = ?', whereArgs: [existingId]);
         }
       }
@@ -6493,8 +6493,8 @@ class DatabaseHelper {
       for (final doc in cloudQuizzes) {
         final title = doc['title']?.toString() ?? 'Quiz';
         final description = doc['description']?.toString();
-        final subCode = doc['subject_code']?.toString()?.trim();
-        final subName = doc['subject_name']?.toString()?.trim();
+        final subCode = doc['subject_code']?.toString().trim();
+        final subName = doc['subject_name']?.toString().trim();
         final rawSubId = (doc['subject_id'] as num?)?.toInt() ?? 1;
 
         int targetSubjectId = rawSubId;

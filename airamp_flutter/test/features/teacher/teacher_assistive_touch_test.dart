@@ -35,11 +35,6 @@ void main() {
 
   testWidgets('TeacherQuickActionsMenuDialog renders institutional academic shortcuts and triggers actions', (tester) async {
     bool createQuizTapped = false;
-    bool announceTapped = false;
-    bool curriculumTapped = false;
-    bool scheduleTapped = false;
-    bool scoresTapped = false;
-    bool studentsTapped = false;
     bool profileTapped = false;
 
     await tester.pumpWidget(
@@ -47,11 +42,11 @@ void main() {
         child: MaterialApp(
           home: TeacherQuickActionsMenuDialog(
             onCreateQuiz: () => createQuizTapped = true,
-            onAnnounce: () => announceTapped = true,
-            onCurriculum: () => curriculumTapped = true,
-            onSchedule: () => scheduleTapped = true,
-            onScores: () => scoresTapped = true,
-            onStudents: () => studentsTapped = true,
+            onAnnounce: () {},
+            onCurriculum: () {},
+            onSchedule: () {},
+            onScores: () {},
+            onStudents: () {},
             onProfile: () => profileTapped = true,
           ),
         ),

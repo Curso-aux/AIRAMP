@@ -481,7 +481,7 @@ class _AdminProfileScreenState extends ConsumerState<AdminProfileScreen>
                         onPressed: () async {
                           Navigator.of(ctx).pop();
                           await ref.read(authProvider.notifier).logout();
-                          if (context.mounted) {
+                          if (mounted) {
                             context.go('/admin/login');
                           }
                         },
@@ -620,7 +620,6 @@ class _AdminProfileScreenState extends ConsumerState<AdminProfileScreen>
                                   child: Column(
                                     children: [
                                       _buildHeroAdminCard(
-                                        context: context,
                                         currentUser: currentUser,
                                         initial: initial,
                                         totalStudents: totalStudentsCount,
@@ -645,7 +644,6 @@ class _AdminProfileScreenState extends ConsumerState<AdminProfileScreen>
                                   child: Column(
                                     children: [
                                       _buildGovernanceOverviewCard(
-                                        context: context,
                                         totalStudents: totalStudentsCount,
                                         totalTeachers: totalTeachersCount,
                                         totalSubjects: subjects.length,
@@ -665,7 +663,6 @@ class _AdminProfileScreenState extends ConsumerState<AdminProfileScreen>
                           ] else ...[
                             // Mobile / Narrow View Single Column Stack
                             _buildHeroAdminCard(
-                              context: context,
                               currentUser: currentUser,
                               initial: initial,
                               totalStudents: totalStudentsCount,
@@ -676,7 +673,6 @@ class _AdminProfileScreenState extends ConsumerState<AdminProfileScreen>
                             const SizedBox(height: 16),
 
                             _buildGovernanceOverviewCard(
-                              context: context,
                               totalStudents: totalStudentsCount,
                               totalTeachers: totalTeachersCount,
                               totalSubjects: subjects.length,
@@ -829,7 +825,6 @@ class _AdminProfileScreenState extends ConsumerState<AdminProfileScreen>
   //  2. HERO ADMINISTRATOR CARD (Identity + 4 KPIs)
   // ═══════════════════════════════════════════════════════════
   Widget _buildHeroAdminCard({
-    required BuildContext context,
     required User currentUser,
     required String initial,
     required int totalStudents,
@@ -967,7 +962,6 @@ class _AdminProfileScreenState extends ConsumerState<AdminProfileScreen>
               children: [
                 Expanded(
                   child: _buildWorkloadStat(
-                    context: context,
                     icon: Icons.people_alt_rounded,
                     count: '$totalStudents',
                     label: 'Students',
@@ -977,7 +971,6 @@ class _AdminProfileScreenState extends ConsumerState<AdminProfileScreen>
                 Container(width: 1, height: 32, color: AppTheme.border),
                 Expanded(
                   child: _buildWorkloadStat(
-                    context: context,
                     icon: Icons.co_present_rounded,
                     count: '$totalTeachers',
                     label: 'Faculty',
@@ -987,7 +980,6 @@ class _AdminProfileScreenState extends ConsumerState<AdminProfileScreen>
                 Container(width: 1, height: 32, color: AppTheme.border),
                 Expanded(
                   child: _buildWorkloadStat(
-                    context: context,
                     icon: Icons.grid_view_rounded,
                     count: '$totalSections',
                     label: 'Sections',
@@ -997,7 +989,6 @@ class _AdminProfileScreenState extends ConsumerState<AdminProfileScreen>
                 Container(width: 1, height: 32, color: AppTheme.border),
                 Expanded(
                   child: _buildWorkloadStat(
-                    context: context,
                     icon: Icons.key_rounded,
                     count: '$totalKeys',
                     label: 'Keys',
@@ -1013,7 +1004,6 @@ class _AdminProfileScreenState extends ConsumerState<AdminProfileScreen>
   }
 
   Widget _buildWorkloadStat({
-    required BuildContext context,
     required IconData icon,
     required String count,
     required String label,
@@ -1091,7 +1081,6 @@ class _AdminProfileScreenState extends ConsumerState<AdminProfileScreen>
   //  3. INSTITUTIONAL GOVERNANCE & OPERATIONS CARD (Right Column)
   // ═══════════════════════════════════════════════════════════
   Widget _buildGovernanceOverviewCard({
-    required BuildContext context,
     required int totalStudents,
     required int totalTeachers,
     required int totalSubjects,

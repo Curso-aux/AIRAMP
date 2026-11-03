@@ -1534,8 +1534,10 @@ class _AdminWebTeachersScreenState extends ConsumerState<AdminWebTeachersScreen>
                       .read(adminTeachersProvider.notifier)
                       .deleteTeacher(teacherId)
                       .timeout(const Duration(seconds: 8));
-                  if (mounted) {
+                  if (dialogCtx.mounted) {
                     Navigator.of(dialogCtx).pop();
+                  }
+                  if (rootContext.mounted) {
                     AiraActionToast.showSuccess(
                       rootContext,
                       title: 'Faculty account deleted',
@@ -1544,7 +1546,7 @@ class _AdminWebTeachersScreenState extends ConsumerState<AdminWebTeachersScreen>
                     );
                   }
                 } catch (e) {
-                  if (mounted) {
+                  if (rootContext.mounted) {
                     AiraActionToast.showError(
                       rootContext,
                       title: 'Failed to delete faculty member',

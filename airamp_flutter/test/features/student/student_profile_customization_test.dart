@@ -1,4 +1,3 @@
-import 'dart:convert';
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -49,7 +48,7 @@ void main() {
       );
 
       // Verify the school icon from kAvatarPresets is rendered
-      expect(find.byIcon(Icons.school_rounded), findsOneWidget);
+      expect(find.byType(HumanFaceWidget), findsOneWidget);
       expect(find.text('K'), findsNothing);
     });
 

@@ -314,7 +314,7 @@ class _CreateAssignmentDialogState extends ConsumerState<CreateAssignmentDialog>
                         builder: (context, ref, _) {
                           final teacherSubjects = ref.watch(teacherSubjectsProvider);
                           return DropdownButtonFormField<int>(
-                            value: _selectedSubjectId,
+                            initialValue: _selectedSubjectId,
                             decoration: InputDecoration(
                               hintText: 'Select which subject to assign to',
                               hintStyle: TextStyle(color: AppTheme.textMuted, fontSize: 13),

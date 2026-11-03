@@ -1862,8 +1862,10 @@ class _AdminWebStudentsScreenState extends ConsumerState<AdminWebStudentsScreen>
                                 .read(adminStudentsProvider.notifier)
                                 .deleteStudent(studentId)
                                 .timeout(const Duration(seconds: 8));
-                            if (mounted) {
+                            if (dialogCtx.mounted) {
                               Navigator.of(dialogCtx).pop();
+                            }
+                            if (rootContext.mounted) {
                               AiraActionToast.showSuccess(
                                 rootContext,
                                 title: 'Student record deleted',
@@ -1873,7 +1875,7 @@ class _AdminWebStudentsScreenState extends ConsumerState<AdminWebStudentsScreen>
                             }
                           } catch (e) {
                             setDialogState(() => isDeleting = false);
-                            if (mounted) {
+                            if (rootContext.mounted) {
                               AiraActionToast.showError(
                                 rootContext,
                                 title: 'Failed to delete student',

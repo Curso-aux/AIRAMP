@@ -1,7 +1,6 @@
 import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import '../database/firestore_service.dart';
 import '../database/database_helper.dart';
 
 enum SyncConnectivityStatus {
