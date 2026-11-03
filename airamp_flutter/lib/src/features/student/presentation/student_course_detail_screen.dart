@@ -58,6 +58,15 @@ class _StudentCourseDetailScreenState
     final id = int.tryParse(widget.courseId);
     if (id == null) return;
 
+    try {
+      await DatabaseHelper().syncCloudCurriculumToLocal();
+      await Future.wait([
+        DatabaseHelper().syncCloudAssignmentsToLocal(),
+        DatabaseHelper().syncCloudQuizzesToLocal(),
+        DatabaseHelper().syncCloudSubmissionsToLocal(),
+      ]);
+    } catch (_) {}
+
     final subject = await ref
         .read(subjectsProvider.notifier)
         .getSubjectById(id);
@@ -187,9 +196,13 @@ class _StudentCourseDetailScreenState
     return Scaffold(
       backgroundColor: AppTheme.background,
       body: SafeArea(
-        child: SingleChildScrollView(
-          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
-          child: Column(
+        child: RefreshIndicator(
+          onRefresh: () async => await _loadData(),
+          color: AppTheme.primary,
+          child: SingleChildScrollView(
+            physics: const AlwaysScrollableScrollPhysics(),
+            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+            child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               // Back link
@@ -504,8 +517,9 @@ class _StudentCourseDetailScreenState
           ),
         ),
       ),
-    );
-  }
+    ),
+  );
+}
 
   Widget _buildGizmoPracticeHeroBanner(List<Map<String, dynamic>> topics) {
     int? targetLoId;
@@ -591,7 +605,10 @@ class _StudentCourseDetailScreenState
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Row(
+                      Wrap(
+                        spacing: 8,
+                        runSpacing: 4,
+                        crossAxisAlignment: WrapCrossAlignment.center,
                         children: [
                           Container(
                             padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
@@ -609,7 +626,6 @@ class _StudentCourseDetailScreenState
                               ),
                             ),
                           ),
-                          const SizedBox(width: 8),
                           Container(
                             padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                             decoration: BoxDecoration(
@@ -617,6 +633,7 @@ class _StudentCourseDetailScreenState
                               borderRadius: BorderRadius.circular(4),
                             ),
                             child: Row(
+                              mainAxisSize: MainAxisSize.min,
                               children: [
                                 Icon(Icons.auto_awesome, size: 11, color: AppTheme.success),
                                 const SizedBox(width: 3),
@@ -719,12 +736,16 @@ class _StudentCourseDetailScreenState
         children: [
           Icon(icon, size: 13, color: AppTheme.primary),
           const SizedBox(width: 5),
-          Text(
-            label,
-            style: TextStyle(
-              fontSize: 11,
-              fontWeight: FontWeight.w600,
-              color: AppTheme.textSecondary,
+          Flexible(
+            child: Text(
+              label,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(
+                fontSize: 11,
+                fontWeight: FontWeight.w600,
+                color: AppTheme.textSecondary,
+              ),
             ),
           ),
         ],

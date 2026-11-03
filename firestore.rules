@@ -2,122 +2,111 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
     
-    // Helper functions
-    function isAuthenticated() {
-      return request.auth != null;
-    }
-    
-    function isOwner(userId) {
-      return isAuthenticated() && request.auth.uid == userId;
-    }
-
-    function isSuperAdmin() {
-      return isAuthenticated() && (
-        request.auth.token.email == 'evangelistachristian88@gmail.com' ||
-        request.auth.token.role == 'super_admin'
-      );
-    }
-
-    function isAdmin() {
-      return isSuperAdmin() || (isAuthenticated() && request.auth.token.role == 'admin');
-    }
-
     // ── USERS COLLECTION ──────────────────────────────────────
     match /users/{userId} {
-      // Allow reading user documents for authenticated users or for login queries
-      allow read: if true;
-      
-      // Allow user creation on signup with required fields
-      allow create: if request.resource.data.keys().hasAll(['email', 'role', 'full_name'])
-                    && request.resource.data.role in ['student', 'teacher', 'admin', 'super_admin'];
-                    
-      // Allow updating own user profile, or admin updating records
-      allow update: if isAuthenticated() && (
-        request.auth.uid == userId ||
-        isAdmin() ||
-        request.auth.token.role == 'teacher'
-      );
-      
-      // Allow admin / super admin deletion of user records
-      allow delete: if isAdmin();
+      allow read, write: if true;
     }
 
     // ── SECTIONS & SUBJECTS ──────────────────────────────────
     match /sections/{sectionId} {
-      allow read: if true;
-      allow write: if isAuthenticated();
+      allow read, write: if true;
     }
 
     match /subjects/{subjectId} {
-      allow read: if true;
-      allow write: if isAuthenticated();
+      allow read, write: if true;
       
       match /modules/{moduleId} {
-        allow read: if true;
-        allow write: if isAuthenticated();
+        allow read, write: if true;
       }
+    }
+
+    match /curriculum_subjects/{subjectId} {
+      allow read, write: if true;
     }
 
     // ── ANNOUNCEMENTS ─────────────────────────────────────────
     match /announcements/{announcementId} {
-      allow read: if true;
-      allow create, update, delete: if isAuthenticated();
+      allow read, write: if true;
     }
 
     // ── QUIZZES & ATTEMPTS ────────────────────────────────────
     match /quizzes/{quizId} {
-      allow read: if true;
-      allow write: if isAuthenticated();
+      allow read, write: if true;
+    }
+
+    match /quiz_assignments/{qaId} {
+      allow read, write: if true;
     }
 
     match /quiz_attempts/{attemptId} {
-      allow read: if true;
-      allow write: if isAuthenticated();
+      allow read, write: if true;
     }
 
     // ── SUBMISSIONS & ASSIGNMENTS ─────────────────────────────
+    match /assignments/{assignmentId} {
+      allow read, write: if true;
+    }
+
     match /submissions/{submissionId} {
-      allow read, write: if isAuthenticated();
+      allow read, write: if true;
     }
 
     // ── FLASHCARDS & GIZMOS ───────────────────────────────────
     match /module_flashcards/{cardId} {
-      allow read: if true;
-      allow write: if isAuthenticated();
+      allow read, write: if true;
     }
 
     // ── NOTIFICATIONS ─────────────────────────────────────────
     match /notifications/{notificationId} {
-      allow read, write: if isAuthenticated();
+      allow read, write: if true;
     }
 
     // ── CHAT CONVERSATIONS & MESSAGES ─────────────────────────
     match /conversations/{conversationId} {
-      allow read, write: if isAuthenticated();
+      allow read, write: if true;
       
       match /messages/{messageId} {
-        allow read, write: if isAuthenticated();
+        allow read, write: if true;
       }
+    }
+
+    // ── CLASS SCHEDULES ───────────────────────────────────────
+    match /class_schedules/{scheduleId} {
+      allow read, write: if true;
+    }
+
+    // ── INQUIRIES & HELPDESK ─────────────────────────────────
+    match /inquiries/{inquiryId} {
+      allow read, write: if true;
+    }
+
+    // ── OFFLINE HUBS & FLEET ─────────────────────────────────
+    match /offline_hubs/{hubId} {
+      allow read, write: if true;
+    }
+
+    // ── AUDIT LOGS ───────────────────────────────────────────
+    match /system_audit_logs/{logId} {
+      allow read, write: if true;
     }
 
     // ── MAIL & EMAIL DISPATCH AUDIT ──────────────────────────
     match /mail/{mailId} {
-      allow read, write: if isAuthenticated();
+      allow read, write: if true;
     }
 
     // ── SECURITY & PASSWORD OTPS ──────────────────────────────
     match /security_otps/{otpId} {
-      allow read, write: if isAuthenticated();
+      allow read, write: if true;
     }
 
     match /password_otps/{otpId} {
-      allow read, write: if true; // required for unauthenticated forgot password flow
+      allow read, write: if true;
     }
 
     // ── DEFAULT FALLBACK ──────────────────────────────────────
     match /{document=**} {
-      allow read: if true;
-      allow write: if isAuthenticated();
+      allow read, write: if true;
     }
   }
 }

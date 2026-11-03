@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -42,6 +43,7 @@ class _TeacherDashboardScreenState extends ConsumerState<TeacherDashboardScreen>
   @override
   void initState() {
     super.initState();
+    unawaited(DatabaseHelper().syncAllCloudData());
     _loadAnalyticsPreferences();
     WidgetsBinding.instance.addPostFrameCallback((_) {
       ref.invalidate(teacherHandledSectionsDetailsProvider);
@@ -489,6 +491,7 @@ class _TeacherDashboardScreenState extends ConsumerState<TeacherDashboardScreen>
               child: RefreshIndicator(
                 onRefresh: () async {
                   await Future.wait([
+                    DatabaseHelper().syncAllCloudData(),
                     ref.read(teacherDashboardProvider.notifier).reload(
                       section: _analyticsSectionFilter,
                       studentId: _analyticsStudentFilter,

@@ -52,6 +52,9 @@ class OfflineSyncNotifier extends Notifier<OfflineSyncState> {
     });
 
     // Start in online synchronized state with fresh timestamp
+    // Proactively perform full bidirectional sync in background
+    Future.microtask(() => syncNow());
+
     return OfflineSyncState(
       status: SyncConnectivityStatus.onlineSynced,
       lastSyncedAt: DateTime.now().subtract(const Duration(minutes: 2)),
@@ -70,10 +73,8 @@ class OfflineSyncNotifier extends Notifier<OfflineSyncState> {
     );
 
     try {
-      // Perform actual Cloud Firestore to local SQLite sync roundtrip
-      await FirestoreService().syncCloudUsersToLocal();
-      await DatabaseHelper().syncCloudAssignmentsToLocal();
-      await DatabaseHelper().syncCloudSubmissionsToLocal();
+      // Perform full bidirectional Cloud Firestore to local SQLite sync roundtrip
+      await DatabaseHelper().syncAllCloudData();
 
       state = state.copyWith(
         status: SyncConnectivityStatus.onlineSynced,

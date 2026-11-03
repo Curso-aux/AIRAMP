@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/components/app_toast.dart';
@@ -42,6 +43,7 @@ class _TeacherSubjectDetailScreenState extends ConsumerState<TeacherSubjectDetai
   Future<void> _loadSubject() async {
     final id = int.tryParse(widget.subjectId);
     if (id == null) return;
+    unawaited(DatabaseHelper().syncAllCloudData());
     final subject = await ref.read(teacherSubjectsProvider.notifier).getSubjectById(id);
     if (mounted) {
       setState(() {
@@ -65,6 +67,7 @@ class _TeacherSubjectDetailScreenState extends ConsumerState<TeacherSubjectDetai
     if (created == true && mounted) {
       ref.invalidate(subjectQuizzesProvider(int.parse(widget.subjectId)));
       ref.invalidate(teacherDashboardProvider);
+      unawaited(DatabaseHelper().syncAllCloudData());
     }
   }
 
@@ -882,6 +885,7 @@ class _TeacherSubjectDetailScreenState extends ConsumerState<TeacherSubjectDetai
 
     if (created == true && mounted) {
       ref.invalidate(subjectAssignmentsProvider(subId));
+      unawaited(DatabaseHelper().syncAllCloudData());
     }
   }
 

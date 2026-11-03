@@ -35,7 +35,22 @@ class _StudentHomeScreenState extends ConsumerState<StudentHomeScreen> {
   void initState() {
     super.initState();
     _startScheduleTicker();
-    unawaited(DatabaseHelper().syncCloudAssignmentsToLocal());
+    _initCloudSync();
+  }
+
+  void _initCloudSync() {
+    DatabaseHelper().syncAllCloudData().then((_) {
+      if (mounted) {
+        ref.read(studentCoursesProvider.notifier).reload();
+        ref.read(studentProgressProvider.notifier).loadProgress();
+        ref.read(studentQuizAssignmentsProvider.notifier).reload();
+        ref.invalidate(announcementsProvider);
+        final user = ref.read(authProvider);
+        if (user != null) {
+          ref.invalidate(studentAssignmentsProvider((studentId: user.id, subjectId: null)));
+        }
+      }
+    });
   }
 
   void _startScheduleTicker() {
@@ -123,11 +138,11 @@ class _StudentHomeScreenState extends ConsumerState<StudentHomeScreen> {
                   }
                   ref.invalidate(allClassSchedulesProvider);
                   ref.invalidate(scheduledSectionsProvider);
+                  await DatabaseHelper().syncAllCloudData();
                   await Future.wait([
                     ref.read(studentCoursesProvider.notifier).reload(),
                     ref.read(studentProgressProvider.notifier).loadProgress(),
                     ref.read(studentQuizAssignmentsProvider.notifier).reload(),
-                    DatabaseHelper().syncCloudAssignmentsToLocal(),
                   ]);
                   ref.invalidate(announcementsProvider);
                   ref.invalidate(studentAssignmentsProvider((studentId: currentUser.id, subjectId: null)));

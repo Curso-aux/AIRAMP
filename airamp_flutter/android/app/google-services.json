@@ -7,7 +7,7 @@
   "client": [
     {
       "client_info": {
-        "mobilesdk_app_id": "1:156822326046:android:03e651e72a4bf67413570f",
+        "mobilesdk_app_id": "1:156822326046:android:95cbf986b55a0e7113570f",
         "android_client_info": {
           "package_name": "com.example.airamp_flutter"
         }
@@ -15,7 +15,7 @@
       "oauth_client": [],
       "api_key": [
         {
-          "current_key": "AIzaSyC5W7a4lOwSrdS27n8G3mfDmqgTbxfBFhs"
+          "current_key": "AIzaSyB56Kbnq0LniUexk1lDVn6kMMUGW-VSigU"
         }
       ],
       "services": {

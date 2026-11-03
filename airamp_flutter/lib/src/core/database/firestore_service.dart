@@ -1,6 +1,7 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:dio/dio.dart';
 import 'package:firebase_core/firebase_core.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:sqflite/sqflite.dart';
@@ -56,8 +57,6 @@ class FirestoreService {
   }
 
   FirebaseFirestore? _firestore;
-  bool _useRestPrimary = false;
-  bool _isNetworkDisabled = false;
   bool _probeCompleted = false;
 
   bool get isAvailable {
@@ -77,55 +76,82 @@ class FirestoreService {
     return firestore.collection('users');
   }
 
-  /// Disables native SDK gRPC network channel when gRPC DNS resolution fails on emulators/devices.
-  /// This terminates the native background WriteStream and permanently switches to high-reliability HTTPS REST API.
-  Future<void> _disableSdkNetwork([dynamic reason]) async {
-    if (_isNetworkDisabled) return;
-    _isNetworkDisabled = true;
-    _useRestPrimary = true;
-    if (reason != null) {
-      debugPrint('[FirestoreService] Switching to HTTPS REST API (gRPC unavailable: $reason)');
-    }
-    try {
-      if (Firebase.apps.isNotEmpty) {
-        await firestore.disableNetwork();
-      }
-    } catch (_) {}
-  }
-
-  /// Proactively probes gRPC stream connectivity once. If it times out or fails (e.g. emulator DNS issue),
-  /// it disables the SDK network channel immediately to prevent recurring logcat warnings.
+  /// Proactively ensures the Firebase native SDK network channel is enabled and tests connectivity.
+  /// Never permanently disables the native SDK on physical devices.
   Future<void> probeConnectivity() async {
     if (_probeCompleted || !isAvailable) return;
     _probeCompleted = true;
     try {
-      await usersCollection.limit(1).get(const GetOptions(source: Source.server))
-          .timeout(const Duration(seconds: 2));
+      if (Firebase.apps.isNotEmpty) {
+        await firestore.enableNetwork();
+        if (FirebaseAuth.instance.currentUser == null) {
+          try {
+            await FirebaseAuth.instance.signInAnonymously();
+            debugPrint('[FirestoreService] Anonymous auth initialized for cloud sync: ${FirebaseAuth.instance.currentUser?.uid}');
+          } catch (_) {}
+        }
+      }
+      await usersCollection.limit(1).get(const GetOptions(source: Source.serverAndCache))
+          .timeout(const Duration(seconds: 8));
+      debugPrint('[FirestoreService] Cloud Firestore SDK connected successfully');
     } catch (e) {
-      await _disableSdkNetwork(e);
+      debugPrint('[FirestoreService] Cloud Firestore initial probe note: $e');
     }
   }
 
   /// Parses Firestore REST API field format into a standard Dart Map
+  dynamic _parseFirestoreValue(dynamic val) {
+    if (val is! Map) return val;
+    if (val.containsKey('stringValue')) return val['stringValue'];
+    if (val.containsKey('integerValue')) return int.tryParse(val['integerValue'].toString()) ?? val['integerValue'];
+    if (val.containsKey('doubleValue')) return double.tryParse(val['doubleValue'].toString()) ?? val['doubleValue'];
+    if (val.containsKey('booleanValue')) return val['booleanValue'];
+    if (val.containsKey('nullValue')) return null;
+    if (val.containsKey('arrayValue')) {
+      final values = val['arrayValue']?['values'] as List? ?? [];
+      return values.map((v) => _parseFirestoreValue(v)).toList();
+    }
+    if (val.containsKey('mapValue')) {
+      final fields = val['mapValue']?['fields'] as Map<String, dynamic>? ?? {};
+      return _parseFirestoreFields(fields);
+    }
+    return val;
+  }
+
   Map<String, dynamic> _parseFirestoreFields(Map<String, dynamic> fields) {
     final result = <String, dynamic>{};
     for (final entry in fields.entries) {
-      final val = entry.value;
-      if (val is Map) {
-        if (val.containsKey('stringValue')) {
-          result[entry.key] = val['stringValue'];
-        } else if (val.containsKey('integerValue')) {
-          result[entry.key] = int.tryParse(val['integerValue'].toString()) ?? val['integerValue'];
-        } else if (val.containsKey('doubleValue')) {
-          result[entry.key] = double.tryParse(val['doubleValue'].toString()) ?? val['doubleValue'];
-        } else if (val.containsKey('booleanValue')) {
-          result[entry.key] = val['booleanValue'];
-        } else if (val.containsKey('nullValue')) {
-          result[entry.key] = null;
-        }
-      }
+      result[entry.key] = _parseFirestoreValue(entry.value);
     }
     return result;
+  }
+
+  Map<String, dynamic> _convertValueToFirestoreField(dynamic val) {
+    if (val == null) {
+      return {'nullValue': null};
+    } else if (val is bool) {
+      return {'booleanValue': val};
+    } else if (val is int) {
+      return {'integerValue': val.toString()};
+    } else if (val is double) {
+      return {'doubleValue': val};
+    } else if (val is List) {
+      return {
+        'arrayValue': {
+          'values': val.map((item) => _convertValueToFirestoreField(item)).toList(),
+        }
+      };
+    } else if (val is Map) {
+      final mapFields = <String, dynamic>{};
+      for (final e in val.entries) {
+        mapFields[e.key.toString()] = _convertValueToFirestoreField(e.value);
+      }
+      return {
+        'mapValue': {'fields': mapFields}
+      };
+    } else {
+      return {'stringValue': val.toString()};
+    }
   }
 
   /// REST fallback query to find user by field value
@@ -215,18 +241,20 @@ class FirestoreService {
   /// Generic helper to fetch all documents from any collection in Cloud Firestore (SDK + REST fallback)
   Future<List<Map<String, dynamic>>> fetchAllDocuments(String collection) async {
     final list = <Map<String, dynamic>>[];
-    if (isAvailable && !_useRestPrimary) {
+    if (isAvailable) {
       try {
-        final snap = await firestore.collection(collection).get().timeout(const Duration(seconds: 4));
+        final snap = await firestore
+            .collection(collection)
+            .get(const GetOptions(source: Source.serverAndCache))
+            .timeout(const Duration(seconds: 12));
         for (final doc in snap.docs) {
           final data = Map<String, dynamic>.from(doc.data());
           data['id'] = doc.id;
           list.add(data);
         }
-        return list;
+        if (list.isNotEmpty) return list;
       } catch (e) {
         debugPrint('[FirestoreService] SDK fetchAllDocuments for $collection error: $e');
-        await _disableSdkNetwork(e);
       }
     }
 
@@ -313,16 +341,15 @@ class FirestoreService {
     // Never overwrite existing non-null cloud fields with nulls during routine sync/login
     dataToSave.removeWhere((key, value) => value == null);
 
-    // 1. Try Firebase SDK if available and not switched to REST primary
-    if (isAvailable && !_useRestPrimary) {
+    // 1. Try Firebase SDK if available
+    if (isAvailable) {
       try {
         await usersCollection.doc(id).set(dataToSave, SetOptions(merge: true))
-            .timeout(const Duration(seconds: 3));
+            .timeout(const Duration(seconds: 12));
         debugPrint('[FirestoreService] Successfully saved user $id via SDK');
         return;
       } catch (e) {
         debugPrint('[FirestoreService] SDK save failed, falling back to REST: $e');
-        await _disableSdkNetwork(e);
       }
     }
 
@@ -371,15 +398,15 @@ class FirestoreService {
   Future<Map<String, dynamic>?> _findUserInternal(String idLower, String rawTrimmed) async {
     final isEmail = rawTrimmed.contains('@');
 
-    // 1. Try SDK if available and not switched to REST primary
-    if (isAvailable && !_useRestPrimary) {
+    // 1. Try SDK if available
+    if (isAvailable) {
       try {
         if (isEmail) {
-          // Parallel search targeted to email fields with snappy timeout
+          // Parallel search targeted to email fields
           final results = await Future.wait([
-            usersCollection.where('email_lower', isEqualTo: idLower).limit(1).get().timeout(const Duration(milliseconds: 1500)),
-            usersCollection.where('email', isEqualTo: rawTrimmed).limit(1).get().timeout(const Duration(milliseconds: 1500)),
-            usersCollection.doc(idLower).get().timeout(const Duration(milliseconds: 1500)),
+            usersCollection.where('email_lower', isEqualTo: idLower).limit(1).get().timeout(const Duration(seconds: 6)),
+            usersCollection.where('email', isEqualTo: rawTrimmed).limit(1).get().timeout(const Duration(seconds: 6)),
+            usersCollection.doc(idLower).get().timeout(const Duration(seconds: 6)),
           ]);
           for (final snap in results) {
             if (snap is QuerySnapshot<Map<String, dynamic>> && snap.docs.isNotEmpty) {
@@ -395,10 +422,10 @@ class FirestoreService {
         } else {
           // Parallel search targeted to user ID and username
           final results = await Future.wait([
-            usersCollection.doc(rawTrimmed).get().timeout(const Duration(milliseconds: 1500)),
-            usersCollection.where('id', isEqualTo: rawTrimmed).limit(1).get().timeout(const Duration(milliseconds: 1500)),
-            usersCollection.where('username_lower', isEqualTo: idLower).limit(1).get().timeout(const Duration(milliseconds: 1500)),
-            usersCollection.where('username', isEqualTo: rawTrimmed).limit(1).get().timeout(const Duration(milliseconds: 1500)),
+            usersCollection.doc(rawTrimmed).get().timeout(const Duration(seconds: 6)),
+            usersCollection.where('id', isEqualTo: rawTrimmed).limit(1).get().timeout(const Duration(seconds: 6)),
+            usersCollection.where('username_lower', isEqualTo: idLower).limit(1).get().timeout(const Duration(seconds: 6)),
+            usersCollection.where('username', isEqualTo: rawTrimmed).limit(1).get().timeout(const Duration(seconds: 6)),
           ]);
           for (final snap in results) {
             if (snap is DocumentSnapshot<Map<String, dynamic>> && snap.exists && snap.data() != null) {
@@ -414,7 +441,6 @@ class FirestoreService {
         }
       } catch (e) {
         debugPrint('[FirestoreService] SDK search note: $e');
-        await _disableSdkNetwork(e);
       }
     }
 
@@ -461,16 +487,16 @@ class FirestoreService {
   /// Fetches all users from Cloud Firestore (via SDK or REST fallback)
   Future<List<Map<String, dynamic>>> fetchAllUsers() async {
     List<Map<String, dynamic>> cloudUsers = [];
-    if (isAvailable && !_useRestPrimary) {
+    if (isAvailable) {
       try {
-        final snapshot = await usersCollection.get().timeout(const Duration(seconds: 3));
+        final snapshot = await usersCollection.get().timeout(const Duration(seconds: 12));
         cloudUsers = snapshot.docs.map((d) {
           final data = d.data();
           data['id'] = d.id;
           return data;
         }).toList();
       } catch (e) {
-        await _disableSdkNetwork(e);
+        debugPrint('[FirestoreService] SDK fetchAllUsers note: $e');
       }
     }
     if (cloudUsers.isEmpty) {
@@ -529,16 +555,16 @@ class FirestoreService {
     try {
       List<Map<String, dynamic>> cloudUsers = [];
 
-      if (isAvailable && !_useRestPrimary) {
+      if (isAvailable) {
         try {
-          final snapshot = await usersCollection.get().timeout(const Duration(seconds: 3));
+          final snapshot = await usersCollection.get().timeout(const Duration(seconds: 12));
           cloudUsers = snapshot.docs.map((d) {
             final data = d.data();
             data['id'] = d.id;
             return data;
           }).toList();
         } catch (e) {
-          await _disableSdkNetwork(e);
+          debugPrint('[FirestoreService] SDK syncCloudUsersToLocal note: $e');
         }
       }
 
@@ -549,6 +575,7 @@ class FirestoreService {
       if (cloudUsers.isEmpty) return;
 
       final db = await DatabaseHelper().database;
+      final prefs = await SharedPreferences.getInstance();
 
       final cloudIds = <String>{};
       final cloudEmails = <String>{};
@@ -573,11 +600,7 @@ class FirestoreService {
               (existing.first['must_change_password'] == 1 ||
                existing.first['must_change_password'] == true ||
                existing.first['must_change_password'] == '1');
-          bool prefMust = false;
-          try {
-            final prefs = await SharedPreferences.getInstance();
-            prefMust = prefs.getBool('must_change_password_$userId') == true;
-          } catch (_) {}
+          final prefMust = prefs.getBool('must_change_password_$userId') == true;
           final mustChangeVal = (cloudMust || localMust || prefMust) ? 1 : 0;
           if (mustChangeVal == 1) {
             try {
@@ -656,7 +679,8 @@ class FirestoreService {
     if (isAvailable) {
       try {
         await firestore.collection(collection).doc(cleanDocId).set(data, SetOptions(merge: true))
-            .timeout(const Duration(seconds: 3));
+            .timeout(const Duration(seconds: 12));
+        debugPrint('[FirestoreService] Successfully saved $collection/$cleanDocId via SDK');
         return;
       } catch (e) {
         debugPrint('[FirestoreService] SDK saveDocument error: $e');
@@ -665,23 +689,15 @@ class FirestoreService {
 
     try {
       final dio = _dio;
-      final url = 'https://firestore.googleapis.com/v1/projects/$projectId/databases/(default)/documents/$collection/$cleanDocId?key=$apiKey';
       final fields = <String, dynamic>{};
       for (final entry in data.entries) {
-        final val = entry.value;
-        if (val == null) {
-          fields[entry.key] = {'nullValue': null};
-        } else if (val is bool) {
-          fields[entry.key] = {'booleanValue': val};
-        } else if (val is int) {
-          fields[entry.key] = {'integerValue': val.toString()};
-        } else if (val is double) {
-          fields[entry.key] = {'doubleValue': val};
-        } else {
-          fields[entry.key] = {'stringValue': val.toString()};
-        }
+        fields[entry.key] = _convertValueToFirestoreField(entry.value);
       }
+      final maskQuery = fields.keys.map((k) => 'updateMask.fieldPaths=$k').join('&');
+      final keyParam = apiKey.isNotEmpty ? '&key=$apiKey' : '';
+      final url = 'https://firestore.googleapis.com/v1/projects/$projectId/databases/(default)/documents/$collection/$cleanDocId?$maskQuery$keyParam';
       await dio.patch(url, data: {'fields': fields});
+      debugPrint('[FirestoreService] Successfully saved $collection/$cleanDocId via REST');
     } catch (e) {
       debugPrint('[FirestoreService] REST saveDocument error: $e');
     }
@@ -727,17 +743,16 @@ class FirestoreService {
     final cleanDocId = docId.trim();
     if (cleanDocId.isEmpty) return;
 
-    if (isAvailable && !_useRestPrimary) {
+    if (isAvailable) {
       try {
         await firestore
             .collection(collection)
             .doc(cleanDocId)
             .delete()
-            .timeout(const Duration(seconds: 3));
+            .timeout(const Duration(seconds: 12));
         return;
       } catch (e) {
         debugPrint('[FirestoreService] SDK deleteDocument error: $e');
-        await _disableSdkNetwork(e);
       }
     }
 

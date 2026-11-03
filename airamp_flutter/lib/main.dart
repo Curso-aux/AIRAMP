@@ -1,11 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:firebase_core/firebase_core.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'firebase_options.dart';
 import 'src/routing/app_router.dart';
 import 'src/core/theme/app_theme.dart';
 import 'src/core/theme/theme_provider.dart';
 import 'src/core/database/firestore_service.dart';
+import 'src/core/database/database_helper.dart';
 import 'src/core/services/app_update_service.dart';
 import 'src/core/services/session_draft_service.dart';
 import 'src/core/services/aira_voice_service.dart';
@@ -22,6 +24,16 @@ void main() async {
       options: DefaultFirebaseOptions.currentPlatform,
     );
     debugPrint('[Firebase] Initialized successfully for platform');
+
+    // Ensure authenticated session for Cloud Firestore security rules
+    try {
+      if (FirebaseAuth.instance.currentUser == null) {
+        await FirebaseAuth.instance.signInAnonymously();
+        debugPrint('[FirebaseAuth] Anonymous cloud session active: ${FirebaseAuth.instance.currentUser?.uid}');
+      }
+    } catch (authErr) {
+      debugPrint('[FirebaseAuth] Anonymous cloud session note: $authErr');
+    }
   } catch (e) {
     debugPrint('[Firebase] Initialization note: $e');
   }
@@ -83,10 +95,10 @@ class _AirampAppState extends ConsumerState<AirampApp> {
         precacheImage(const AssetImage('assets/images/aira_avatar_speaking.png'), context);
       } catch (_) {}
     }
-    // Background cloud user sync with network auto-detection
+    // Background cloud full synchronization with network auto-detection
     try {
       FirestoreService().probeConnectivity().then((_) {
-        return FirestoreService().syncCloudUsersToLocal();
+        return DatabaseHelper().syncAllCloudData();
       });
     } catch (_) {}
 

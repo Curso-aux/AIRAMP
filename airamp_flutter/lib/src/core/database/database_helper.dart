@@ -5432,6 +5432,34 @@ class DatabaseHelper {
       });
     }
 
+    try {
+      final sub = await db.query('subjects', where: 'id = ?', whereArgs: [subjectId]);
+      final subCode = sub.isNotEmpty ? sub.first['subject_code'] as String? ?? 'SUBJ' : 'SUBJ';
+      final subName = sub.isNotEmpty ? sub.first['name'] as String? ?? 'Subject' : 'Subject';
+      final cleanTitle = title.toLowerCase().replaceAll(RegExp(r'[^a-z0-9]'), '_');
+      final cloudDocId = 'quiz_${subCode}_${cleanTitle}_$quizId';
+
+      await FirestoreService().saveDocument('quizzes', cloudDocId, {
+        'id': quizId,
+        'title': title,
+        'description': description,
+        'subject_id': subjectId,
+        'subject_code': subCode,
+        'subject_name': subName,
+        'lo_id': loId,
+        'teacher_id': teacherId,
+        'teacher_name': teacherName,
+        'time_limit_minutes': timeLimitMinutes,
+        'passing_score': passingScore,
+        'status': status,
+        'due_date': dueDate,
+        'schedule_start': scheduleStart,
+        'schedule_end': scheduleEnd,
+        'created_at': now,
+        'questions': questions,
+      });
+    } catch (_) {}
+
     return quizId;
   }
 
@@ -5469,6 +5497,31 @@ class DatabaseHelper {
         debugPrint('Error assigning quiz $quizId to $sid: $e');
       }
     }
+
+    try {
+      final quizRow = await db.query('quizzes', where: 'id = ?', whereArgs: [quizId]);
+      if (quizRow.isNotEmpty) {
+        final q = quizRow.first;
+        final sub = await db.query('subjects', where: 'id = ?', whereArgs: [q['subject_id']]);
+        final subCode = sub.isNotEmpty ? sub.first['subject_code'] as String? ?? 'SUBJ' : 'SUBJ';
+        for (final sid in studentIds) {
+          final docId = 'qa_${quizId}_$sid';
+          await FirestoreService().saveDocument('quiz_assignments', docId, {
+            'quiz_id': quizId,
+            'quiz_title': q['title'],
+            'subject_id': q['subject_id'],
+            'subject_code': subCode,
+            'student_id': sid,
+            'assigned_at': now,
+            'due_date': dueDate ?? q['due_date'],
+            'status': 'pending',
+            'score': 0,
+            'total_questions': totalQuestions,
+            'percentage': 0.0,
+          });
+        }
+      }
+    } catch (_) {}
     return assigned;
   }
 
@@ -5505,15 +5558,29 @@ class DatabaseHelper {
 
   Future<List<Map<String, dynamic>>> getAssignedQuizzesForStudent(String studentId, {int? subjectId}) async {
     final db = await database;
+
+    // Auto-ensure quiz_assignments record for each published quiz so students never see a blank screen
+    try {
+      final String subWhere = subjectId != null ? 'AND q.subject_id = $subjectId' : '';
+      await db.execute('''
+        INSERT OR IGNORE INTO quiz_assignments (quiz_id, student_id, assigned_at, due_date, status, score, total_questions, percentage)
+        SELECT q.id, '$studentId', q.created_at, q.due_date, 'pending', 0,
+               COALESCE((SELECT COUNT(*) FROM questions WHERE quiz_id = q.id), 0), 0.0
+        FROM quizzes q
+        WHERE (q.status != 'draft' OR q.status IS NULL)
+        $subWhere
+      ''');
+    } catch (_) {}
+
     String query = '''
-      SELECT qa.id as assignment_id,
-             qa.quiz_id,
-             qa.student_id,
-             qa.assigned_at,
-             qa.status,
-             qa.score,
-             qa.total_questions,
-             qa.percentage,
+      SELECT COALESCE(qa.id, q.id) as assignment_id,
+             q.id as quiz_id,
+             COALESCE(qa.student_id, ?) as student_id,
+             COALESCE(qa.assigned_at, q.created_at) as assigned_at,
+             COALESCE(qa.status, 'pending') as status,
+             COALESCE(qa.score, 0) as score,
+             COALESCE(qa.total_questions, (SELECT COUNT(*) FROM questions WHERE quiz_id = q.id)) as total_questions,
+             COALESCE(qa.percentage, 0.0) as percentage,
              qa.completed_at,
              q.title,
              q.description,
@@ -5526,21 +5593,21 @@ class DatabaseHelper {
              q.status as quiz_status,
              q.schedule_start,
              q.schedule_end,
-             COALESCE(q.due_date, qa.due_date) as due_date,
+             COALESCE(qa.due_date, q.due_date) as due_date,
              s.name as subject_name,
              s.subject_code,
              (SELECT COUNT(*) FROM questions WHERE quiz_id = q.id) as question_count
-      FROM quiz_assignments qa
-      JOIN quizzes q ON qa.quiz_id = q.id
+      FROM quizzes q
+      LEFT JOIN quiz_assignments qa ON qa.quiz_id = q.id AND qa.student_id = ?
       LEFT JOIN subjects s ON q.subject_id = s.id
-      WHERE qa.student_id = ? AND (q.status != 'draft' OR q.status IS NULL)
+      WHERE (q.status != 'draft' OR q.status IS NULL)
     ''';
-    List<dynamic> args = [studentId];
+    List<dynamic> args = [studentId, studentId];
     if (subjectId != null) {
       query += ' AND q.subject_id = ?';
       args.add(subjectId);
     }
-    query += ' ORDER BY CASE WHEN qa.status = \'pending\' THEN 0 ELSE 1 END, qa.assigned_at DESC';
+    query += ' ORDER BY CASE WHEN COALESCE(qa.status, \'pending\') = \'pending\' THEN 0 ELSE 1 END, COALESCE(qa.assigned_at, q.created_at) DESC';
 
     return await db.rawQuery(query, args);
   }
@@ -6173,11 +6240,19 @@ class DatabaseHelper {
 
     // 1. Sync assignment to Cloud Firestore
     try {
+      final sub = await db.query('subjects', where: 'id = ?', whereArgs: [subjectId]);
+      final subCode = sub.isNotEmpty ? sub.first['subject_code'] as String? ?? 'SUBJ' : 'SUBJ';
+      final subName = sub.isNotEmpty ? sub.first['name'] as String? ?? 'Subject' : 'Subject';
+      final cleanTitle = title.toLowerCase().replaceAll(RegExp(r'[^a-z0-9]'), '_');
+      final cloudDocId = 'assign_${subCode}_${cleanTitle}_$id';
+
       final assignmentMap = {
         'id': id,
         'title': title,
         'description': description,
         'subject_id': subjectId,
+        'subject_code': subCode,
+        'subject_name': subName,
         'teacher_id': teacherId,
         'teacher_name': teacherName,
         'due_date': dueDate,
@@ -6190,7 +6265,7 @@ class DatabaseHelper {
         'status': 'active',
         'created_at': now,
       };
-      unawaited(FirestoreService().saveDocument('assignments', id.toString(), assignmentMap));
+      await FirestoreService().saveDocument('assignments', cloudDocId, assignmentMap);
     } catch (_) {}
 
     // 2. Generate notifications for all enrolled students in this subject
@@ -6230,13 +6305,34 @@ class DatabaseHelper {
       if (cloudDocs.isEmpty) return;
       final db = await database;
       for (final doc in cloudDocs) {
-        final rawId = doc['id'];
-        final intId = rawId is int ? rawId : int.tryParse(rawId.toString());
-        if (intId == null) continue;
-
         final title = doc['title']?.toString() ?? 'Assignment';
         final description = doc['description']?.toString();
-        final subjectId = (doc['subject_id'] as num?)?.toInt() ?? 1;
+        final rawSubId = (doc['subject_id'] as num?)?.toInt() ?? 1;
+        final subCode = doc['subject_code']?.toString()?.trim();
+        final subName = doc['subject_name']?.toString()?.trim();
+
+        // Resolve subject ID on this device by matching subject_code or name
+        int targetSubjectId = rawSubId;
+        if (subCode != null && subCode.isNotEmpty) {
+          final match = await db.query('subjects', where: 'LOWER(subject_code) = ?', whereArgs: [subCode.toLowerCase()]);
+          if (match.isNotEmpty) {
+            targetSubjectId = match.first['id'] as int;
+          } else if (subName != null && subName.isNotEmpty) {
+            final matchName = await db.query('subjects', where: 'LOWER(TRIM(name)) = ?', whereArgs: [subName.toLowerCase().trim()]);
+            if (matchName.isNotEmpty) targetSubjectId = matchName.first['id'] as int;
+          }
+        } else if (subName != null && subName.isNotEmpty) {
+          final match = await db.query('subjects', where: 'LOWER(TRIM(name)) = ?', whereArgs: [subName.toLowerCase().trim()]);
+          if (match.isNotEmpty) targetSubjectId = match.first['id'] as int;
+        }
+
+        // Ensure subject exists locally
+        final checkSub = await db.query('subjects', where: 'id = ?', whereArgs: [targetSubjectId]);
+        if (checkSub.isEmpty) {
+          final anySub = await db.query('subjects', limit: 1);
+          if (anySub.isNotEmpty) targetSubjectId = anySub.first['id'] as int;
+        }
+
         final teacherId = doc['teacher_id']?.toString() ?? 'teacher_1';
         final teacherName = doc['teacher_name']?.toString();
         final dueDate = doc['due_date']?.toString();
@@ -6249,13 +6345,17 @@ class DatabaseHelper {
         final attachmentSize = (doc['attachment_size'] as num?)?.toInt();
         final attachmentBytes = doc['attachment_bytes']?.toString();
 
-        final existing = await db.query('assignments', where: 'id = ?', whereArgs: [intId]);
+        final existing = await db.query(
+          'assignments',
+          where: 'LOWER(title) = ? AND subject_id = ?',
+          whereArgs: [title.toLowerCase().trim(), targetSubjectId],
+        );
+
         if (existing.isEmpty) {
           await db.insert('assignments', {
-            'id': intId,
             'title': title,
             'description': description,
-            'subject_id': subjectId,
+            'subject_id': targetSubjectId,
             'teacher_id': teacherId,
             'teacher_name': teacherName,
             'due_date': dueDate,
@@ -6269,10 +6369,10 @@ class DatabaseHelper {
             'attachment_bytes': attachmentBytes,
           });
         } else {
+          final existingId = existing.first['id'] as int;
           await db.update('assignments', {
             'title': title,
             'description': description,
-            'subject_id': subjectId,
             'teacher_id': teacherId,
             'teacher_name': teacherName,
             'due_date': dueDate,
@@ -6283,11 +6383,519 @@ class DatabaseHelper {
             if (attachmentPath != null) 'attachment_path': attachmentPath,
             if (attachmentSize != null) 'attachment_size': attachmentSize,
             if (attachmentBytes != null) 'attachment_bytes': attachmentBytes,
-          }, where: 'id = ?', whereArgs: [intId]);
+          }, where: 'id = ?', whereArgs: [existingId]);
+        }
+      }
+      debugPrint('[DatabaseHelper] Synced ${cloudDocs.length} Cloud assignments to local SQLite');
+    } catch (e) {
+      debugPrint('[DatabaseHelper] syncCloudAssignmentsToLocal note: $e');
+    }
+  }
+
+  /// Uploads all local assignments to Cloud Firestore so teachers on Web or Mobile share them
+  Future<void> pushLocalAssignmentsToCloud() async {
+    try {
+      final db = await database;
+      final assignments = await db.query('assignments');
+      for (final a in assignments) {
+        final aId = a['id'] as int;
+        final title = a['title']?.toString() ?? 'Assignment';
+        final subId = a['subject_id'] as int? ?? 1;
+        final sub = await db.query('subjects', where: 'id = ?', whereArgs: [subId]);
+        final subCode = sub.isNotEmpty ? sub.first['subject_code'] as String? ?? 'SUBJ' : 'SUBJ';
+        final subName = sub.isNotEmpty ? sub.first['name'] as String? ?? 'Subject' : 'Subject';
+        final cleanTitle = title.toLowerCase().replaceAll(RegExp(r'[^a-z0-9]'), '_');
+        final cloudDocId = 'assign_${subCode}_${cleanTitle}_$aId';
+
+        final map = {
+          'id': aId,
+          'title': title,
+          'description': a['description'],
+          'subject_id': subId,
+          'subject_code': subCode,
+          'subject_name': subName,
+          'teacher_id': a['teacher_id'] ?? 'teacher_1',
+          'teacher_name': a['teacher_name'] ?? 'Sir John Reyes',
+          'due_date': a['due_date'],
+          'total_points': a['total_points'] ?? 100,
+          'submission_type': a['submission_type'] ?? 'both',
+          'attachment_name': a['attachment_name'],
+          'attachment_path': a['attachment_path'],
+          'attachment_size': a['attachment_size'],
+          'attachment_bytes': a['attachment_bytes'],
+          'status': a['status'] ?? 'active',
+          'created_at': a['created_at'] ?? DateTime.now().toIso8601String(),
+        };
+        await FirestoreService().saveDocument('assignments', cloudDocId, map);
+      }
+    } catch (e) {
+      debugPrint('[DatabaseHelper] pushLocalAssignmentsToCloud error: $e');
+    }
+  }
+
+  /// Uploads all local quizzes to Cloud Firestore
+  Future<void> pushLocalQuizzesToCloud() async {
+    try {
+      final db = await database;
+      final quizzes = await db.query('quizzes');
+      for (final q in quizzes) {
+        final qId = q['id'] as int;
+        final title = q['title']?.toString() ?? 'Quiz';
+        final subId = q['subject_id'] as int? ?? 1;
+        final sub = await db.query('subjects', where: 'id = ?', whereArgs: [subId]);
+        final subCode = sub.isNotEmpty ? sub.first['subject_code'] as String? ?? 'SUBJ' : 'SUBJ';
+        final subName = sub.isNotEmpty ? sub.first['name'] as String? ?? 'Subject' : 'Subject';
+        final cleanTitle = title.toLowerCase().replaceAll(RegExp(r'[^a-z0-9]'), '_');
+        final cloudDocId = 'quiz_${subCode}_${cleanTitle}_$qId';
+
+        final questions = await db.query('questions', where: 'quiz_id = ?', whereArgs: [qId]);
+
+        final map = {
+          'id': qId,
+          'title': title,
+          'description': q['description'],
+          'subject_id': subId,
+          'subject_code': subCode,
+          'subject_name': subName,
+          'lo_id': q['lo_id'],
+          'teacher_id': q['teacher_id'] ?? 'teacher_1',
+          'teacher_name': q['teacher_name'] ?? 'Sir John Reyes',
+          'time_limit_minutes': q['time_limit_minutes'] ?? 0,
+          'passing_score': q['passing_score'] ?? 70,
+          'status': q['status'] ?? 'published',
+          'due_date': q['due_date'],
+          'schedule_start': q['schedule_start'],
+          'schedule_end': q['schedule_end'],
+          'created_at': q['created_at'] ?? DateTime.now().toIso8601String(),
+          'questions': questions.map((item) => {
+            'question_text': item['question_text'],
+            'option_a': item['option_a'],
+            'option_b': item['option_b'],
+            'option_c': item['option_c'],
+            'option_d': item['option_d'],
+            'correct_option': item['correct_option'],
+          }).toList(),
+        };
+        await FirestoreService().saveDocument('quizzes', cloudDocId, map);
+      }
+    } catch (e) {
+      debugPrint('[DatabaseHelper] pushLocalQuizzesToCloud error: $e');
+    }
+  }
+
+  /// Syncs all quizzes and quiz assignments from Cloud Firestore down to SQLite
+  Future<void> syncCloudQuizzesToLocal() async {
+    try {
+      final cloudQuizzes = await FirestoreService().fetchAllDocuments('quizzes');
+      if (cloudQuizzes.isEmpty) return;
+      final db = await database;
+
+      for (final doc in cloudQuizzes) {
+        final title = doc['title']?.toString() ?? 'Quiz';
+        final description = doc['description']?.toString();
+        final subCode = doc['subject_code']?.toString()?.trim();
+        final subName = doc['subject_name']?.toString()?.trim();
+        final rawSubId = (doc['subject_id'] as num?)?.toInt() ?? 1;
+
+        int targetSubjectId = rawSubId;
+        if (subCode != null && subCode.isNotEmpty) {
+          final match = await db.query('subjects', where: 'LOWER(subject_code) = ?', whereArgs: [subCode.toLowerCase()]);
+          if (match.isNotEmpty) {
+            targetSubjectId = match.first['id'] as int;
+          } else if (subName != null && subName.isNotEmpty) {
+            final matchName = await db.query('subjects', where: 'LOWER(TRIM(name)) = ?', whereArgs: [subName.toLowerCase().trim()]);
+            if (matchName.isNotEmpty) targetSubjectId = matchName.first['id'] as int;
+          }
+        } else if (subName != null && subName.isNotEmpty) {
+          final match = await db.query('subjects', where: 'LOWER(TRIM(name)) = ?', whereArgs: [subName.toLowerCase().trim()]);
+          if (match.isNotEmpty) targetSubjectId = match.first['id'] as int;
+        }
+
+        // Ensure subject exists locally
+        final checkSub = await db.query('subjects', where: 'id = ?', whereArgs: [targetSubjectId]);
+        if (checkSub.isEmpty) {
+          final anySub = await db.query('subjects', limit: 1);
+          if (anySub.isNotEmpty) targetSubjectId = anySub.first['id'] as int;
+        }
+
+        final teacherId = doc['teacher_id']?.toString() ?? 'teacher_1';
+        final teacherName = doc['teacher_name']?.toString();
+        final timeLimit = (doc['time_limit_minutes'] as num?)?.toInt() ?? 0;
+        final passingScore = (doc['passing_score'] as num?)?.toInt() ?? 70;
+        final status = doc['status']?.toString() ?? 'published';
+        final dueDate = doc['due_date']?.toString();
+        final schedStart = doc['schedule_start']?.toString();
+        final schedEnd = doc['schedule_end']?.toString();
+        final createdAt = doc['created_at']?.toString() ?? DateTime.now().toIso8601String();
+
+        final existing = await db.query(
+          'quizzes',
+          where: 'LOWER(title) = ? AND subject_id = ?',
+          whereArgs: [title.toLowerCase().trim(), targetSubjectId],
+        );
+
+        int localQuizId;
+        if (existing.isEmpty) {
+          localQuizId = await db.insert('quizzes', {
+            'title': title,
+            'description': description,
+            'subject_id': targetSubjectId,
+            'teacher_id': teacherId,
+            'teacher_name': teacherName,
+            'time_limit_minutes': timeLimit,
+            'passing_score': passingScore,
+            'status': status,
+            'due_date': dueDate,
+            'schedule_start': schedStart,
+            'schedule_end': schedEnd,
+            'created_at': createdAt,
+          });
+        } else {
+          localQuizId = existing.first['id'] as int;
+          await db.update('quizzes', {
+            'title': title,
+            'description': description,
+            'time_limit_minutes': timeLimit,
+            'passing_score': passingScore,
+            'status': status,
+            'due_date': dueDate,
+            'schedule_start': schedStart,
+            'schedule_end': schedEnd,
+          }, where: 'id = ?', whereArgs: [localQuizId]);
+        }
+
+        final questions = (doc['questions'] as List?)?.cast<Map<String, dynamic>>() ?? [];
+        if (questions.isNotEmpty) {
+          final existingQ = await db.query('questions', where: 'quiz_id = ?', whereArgs: [localQuizId]);
+          if (existingQ.isEmpty) {
+            for (final q in questions) {
+              await db.insert('questions', {
+                'quiz_id': localQuizId,
+                'question_text': q['question_text'] ?? '',
+                'option_a': q['option_a'] ?? '',
+                'option_b': q['option_b'] ?? '',
+                'option_c': q['option_c'] ?? '',
+                'option_d': q['option_d'] ?? '',
+                'correct_option': q['correct_option'] ?? 'A',
+                'created_at': createdAt,
+              });
+            }
+          }
+        }
+
+        // Auto-assign this quiz to all students enrolled in this subject so it is immediately visible
+        final enrollments = await db.query('enrollments', where: 'subject_id = ?', whereArgs: [targetSubjectId]);
+        for (final en in enrollments) {
+          final sid = en['student_id']?.toString();
+          if (sid != null && sid.isNotEmpty) {
+            final existingQa = await db.query(
+              'quiz_assignments',
+              where: 'quiz_id = ? AND student_id = ?',
+              whereArgs: [localQuizId, sid],
+            );
+            if (existingQa.isEmpty) {
+              await db.insert('quiz_assignments', {
+                'quiz_id': localQuizId,
+                'student_id': sid,
+                'assigned_at': createdAt,
+                'due_date': dueDate,
+                'status': 'pending',
+                'score': 0,
+                'total_questions': questions.isNotEmpty ? questions.length : 3,
+                'percentage': 0.0,
+              });
+            }
+          }
+        }
+      }
+
+      // Sync explicit quiz assignments from Cloud Firestore
+      final cloudAssignments = await FirestoreService().fetchAllDocuments('quiz_assignments');
+      for (final qa in cloudAssignments) {
+        final qTitle = qa['quiz_title']?.toString();
+        final studentId = qa['student_id']?.toString();
+        if (studentId == null || studentId.isEmpty) continue;
+
+        final qMatch = qTitle != null
+            ? await db.query('quizzes', where: 'LOWER(title) = ?', whereArgs: [qTitle.toLowerCase().trim()])
+            : <Map<String, dynamic>>[];
+        final localQuizId = qMatch.isNotEmpty ? qMatch.first['id'] as int : (qa['quiz_id'] as num?)?.toInt();
+        if (localQuizId == null) continue;
+
+        final existingQa = await db.query(
+          'quiz_assignments',
+          where: 'quiz_id = ? AND student_id = ?',
+          whereArgs: [localQuizId, studentId],
+        );
+        if (existingQa.isEmpty) {
+          await db.insert('quiz_assignments', {
+            'quiz_id': localQuizId,
+            'student_id': studentId,
+            'assigned_at': qa['assigned_at'] ?? DateTime.now().toIso8601String(),
+            'due_date': qa['due_date'],
+            'status': qa['status'] ?? 'pending',
+            'score': (qa['score'] as num?)?.toInt() ?? 0,
+            'total_questions': (qa['total_questions'] as num?)?.toInt() ?? 0,
+            'percentage': (qa['percentage'] as num?)?.toDouble() ?? 0.0,
+            'completed_at': qa['completed_at'],
+          });
+        }
+      }
+      debugPrint('[DatabaseHelper] Synced ${cloudQuizzes.length} Cloud quizzes to local SQLite');
+    } catch (e) {
+      debugPrint('[DatabaseHelper] syncCloudQuizzesToLocal note: $e');
+    }
+  }
+
+  /// Uploads subjects, topics, learning outcomes, and contents to Cloud Firestore
+  Future<void> pushLocalCurriculumToCloud() async {
+    try {
+      final db = await database;
+      final subjects = await db.query('subjects');
+      for (final s in subjects) {
+        final subId = s['id'] as int;
+        final subCode = s['subject_code']?.toString() ?? 'SUBJ_$subId';
+        final cloudDocId = 'subj_$subCode';
+
+        final topics = await db.query('topics', where: 'subject_id = ?', whereArgs: [subId]);
+        final topicsPayload = <Map<String, dynamic>>[];
+
+        for (final t in topics) {
+          final tId = t['id'] as int;
+          final los = await db.query('learning_outcomes', where: 'topic_id = ?', whereArgs: [tId]);
+          final losPayload = <Map<String, dynamic>>[];
+
+          for (final lo in los) {
+            final loId = lo['id'] as int;
+            final contents = await db.query('contents', where: 'lo_id = ?', whereArgs: [loId]);
+            final questions = await db.query('questions', where: 'lo_id = ?', whereArgs: [loId]);
+
+            losPayload.add({
+              'id': loId,
+              'title': lo['title'],
+              'description': lo['description'],
+              'performance_criteria': lo['performance_criteria'],
+              'passing_score': lo['passing_score'] ?? 70,
+              'schedule_start': lo['schedule_start'],
+              'schedule_end': lo['schedule_end'],
+              'timezone': lo['timezone'],
+              'allow_extend': lo['allow_extend'] ?? 0,
+              'contents': contents.map((c) => {
+                'content_type': c['content_type'],
+                'title': c['title'],
+                'content_data': c['content_data'],
+              }).toList(),
+              'questions': questions.map((q) => {
+                'question_text': q['question_text'],
+                'option_a': q['option_a'],
+                'option_b': q['option_b'],
+                'option_c': q['option_c'],
+                'option_d': q['option_d'],
+                'correct_option': q['correct_option'],
+              }).toList(),
+            });
+          }
+
+          topicsPayload.add({
+            'id': tId,
+            'title': t['title'],
+            'description': t['description'],
+            'learning_outcomes': losPayload,
+          });
+        }
+
+        final subjectMap = {
+          'id': subId,
+          'name': s['name'],
+          'subject_code': subCode,
+          'description': s['description'],
+          'grade_level': s['grade_level'],
+          'semester': s['semester'],
+          'unlock_type': s['unlock_type'] ?? 'Sequential',
+          'teacher_id': s['teacher_id'] ?? 'teacher_1',
+          'teacher_name': s['teacher_name'] ?? 'Sir John Reyes',
+          'created_at': s['created_at'] ?? DateTime.now().toIso8601String(),
+          'topics': topicsPayload,
+        };
+
+        await FirestoreService().saveDocument('curriculum_subjects', cloudDocId, subjectMap);
+      }
+    } catch (e) {
+      debugPrint('[DatabaseHelper] pushLocalCurriculumToCloud error: $e');
+    }
+  }
+
+  /// Pulls all subjects, topics, and learning outcomes from Cloud Firestore and caches in SQLite
+  Future<void> syncCloudCurriculumToLocal() async {
+    try {
+      final cloudSubjects = await FirestoreService().fetchAllDocuments('curriculum_subjects');
+      if (cloudSubjects.isEmpty) return;
+      final db = await database;
+
+      for (final doc in cloudSubjects) {
+        final subCode = doc['subject_code']?.toString();
+        final name = doc['name']?.toString() ?? 'Subject';
+        if (subCode == null || subCode.isEmpty) continue;
+
+        final desc = doc['description']?.toString();
+        final grade = doc['grade_level']?.toString();
+        final sem = doc['semester']?.toString();
+        final unlock = doc['unlock_type']?.toString() ?? 'Sequential';
+        final teacherId = doc['teacher_id']?.toString() ?? 'teacher_1';
+        final teacherName = doc['teacher_name']?.toString() ?? 'Sir John Reyes';
+        final createdAt = doc['created_at']?.toString() ?? DateTime.now().toIso8601String();
+
+        final matchSub = await db.query('subjects', where: 'subject_code = ?', whereArgs: [subCode]);
+        int localSubId;
+        if (matchSub.isEmpty) {
+          localSubId = await db.insert('subjects', {
+            'name': name,
+            'subject_code': subCode,
+            'description': desc,
+            'grade_level': grade,
+            'semester': sem,
+            'unlock_type': unlock,
+            'teacher_id': teacherId,
+            'teacher_name': teacherName,
+            'created_at': createdAt,
+          });
+        } else {
+          localSubId = matchSub.first['id'] as int;
+          await db.update('subjects', {
+            'name': name,
+            'description': desc,
+            'grade_level': grade,
+            'semester': sem,
+            'unlock_type': unlock,
+            'teacher_id': teacherId,
+            'teacher_name': teacherName,
+          }, where: 'id = ?', whereArgs: [localSubId]);
+        }
+
+        final topics = (doc['topics'] as List?)?.cast<Map<String, dynamic>>() ?? [];
+        for (final t in topics) {
+          final tTitle = t['title']?.toString() ?? 'Topic';
+          final tDesc = t['description']?.toString();
+
+          final matchT = await db.query(
+            'topics',
+            where: 'subject_id = ? AND LOWER(title) = ?',
+            whereArgs: [localSubId, tTitle.toLowerCase().trim()],
+          );
+          int localTopicId;
+          if (matchT.isEmpty) {
+            localTopicId = await db.insert('topics', {
+              'subject_id': localSubId,
+              'title': tTitle,
+              'description': tDesc,
+              'created_at': createdAt,
+            });
+          } else {
+            localTopicId = matchT.first['id'] as int;
+            await db.update('topics', {
+              'description': tDesc,
+            }, where: 'id = ?', whereArgs: [localTopicId]);
+          }
+
+          final los = (t['learning_outcomes'] as List?)?.cast<Map<String, dynamic>>() ?? [];
+          for (final lo in los) {
+            final loTitle = lo['title']?.toString() ?? 'Learning Outcome';
+            final matchLo = await db.query(
+              'learning_outcomes',
+              where: 'topic_id = ? AND LOWER(title) = ?',
+              whereArgs: [localTopicId, loTitle.toLowerCase().trim()],
+            );
+            int localLoId;
+            if (matchLo.isEmpty) {
+              localLoId = await db.insert('learning_outcomes', {
+                'topic_id': localTopicId,
+                'title': loTitle,
+                'description': lo['description'],
+                'performance_criteria': lo['performance_criteria'],
+                'passing_score': (lo['passing_score'] as num?)?.toInt() ?? 70,
+                'schedule_start': lo['schedule_start'],
+                'schedule_end': lo['schedule_end'],
+                'timezone': lo['timezone'],
+                'allow_extend': (lo['allow_extend'] as num?)?.toInt() ?? 0,
+                'created_at': createdAt,
+              });
+            } else {
+              localLoId = matchLo.first['id'] as int;
+              await db.update('learning_outcomes', {
+                'description': lo['description'],
+                'performance_criteria': lo['performance_criteria'],
+                'passing_score': (lo['passing_score'] as num?)?.toInt() ?? 70,
+                'schedule_start': lo['schedule_start'],
+                'schedule_end': lo['schedule_end'],
+              }, where: 'id = ?', whereArgs: [localLoId]);
+            }
+
+            final contents = (lo['contents'] as List?)?.cast<Map<String, dynamic>>() ?? [];
+            for (final c in contents) {
+              final cTitle = c['title']?.toString() ?? 'Content';
+              final matchC = await db.query(
+                'contents',
+                where: 'lo_id = ? AND LOWER(title) = ?',
+                whereArgs: [localLoId, cTitle.toLowerCase().trim()],
+              );
+              if (matchC.isEmpty) {
+                await db.insert('contents', {
+                  'lo_id': localLoId,
+                  'content_type': c['content_type'] ?? 'Text',
+                  'title': cTitle,
+                  'content_data': c['content_data'] ?? '',
+                  'created_at': createdAt,
+                });
+              }
+            }
+          }
         }
       }
     } catch (e) {
-      debugPrint('[DatabaseHelper] syncCloudAssignmentsToLocal note: $e');
+      debugPrint('[DatabaseHelper] syncCloudCurriculumToLocal note: $e');
+    }
+  }
+
+  /// Pushes any local student submissions to Cloud Firestore
+  Future<void> pushLocalSubmissionsToCloud() async {
+    try {
+      final db = await database;
+      final subs = await db.query('submissions');
+      for (final s in subs) {
+        final aId = s['assignment_id'];
+        final sId = s['student_id'];
+        if (aId == null || sId == null) continue;
+        final docId = '${aId}_$sId';
+        await FirestoreService().saveDocument('submissions', docId, Map<String, dynamic>.from(s));
+      }
+    } catch (e) {
+      debugPrint('[DatabaseHelper] pushLocalSubmissionsToCloud note: $e');
+    }
+  }
+
+  /// Full bidirectional synchronization: pushes local creations first, then pulls all cloud records
+  Future<void> syncAllCloudData() async {
+    try {
+      // 1. Push local creations to Cloud Firestore in parallel
+      await Future.wait([
+        pushLocalCurriculumToCloud(),
+        pushLocalQuizzesToCloud(),
+        pushLocalAssignmentsToCloud(),
+        pushLocalSubmissionsToCloud(),
+      ]);
+
+      // 2. Pull all cloud updates to local SQLite cache (course content first for instant UI response)
+      await Future.wait([
+        syncCloudCurriculumToLocal(),
+        syncCloudQuizzesToLocal(),
+        syncCloudAssignmentsToLocal(),
+        syncCloudSubmissionsToLocal(),
+      ]);
+
+      // 3. Sync cloud user directory
+      await FirestoreService().syncCloudUsersToLocal();
+    } catch (e) {
+      debugPrint('[DatabaseHelper] syncAllCloudData note: $e');
     }
   }
 
@@ -6391,7 +6999,7 @@ class DatabaseHelper {
              sub.feedback,
              sub.graded_at
       FROM assignments a
-      JOIN subjects s ON a.subject_id = s.id
+      LEFT JOIN subjects s ON a.subject_id = s.id
       LEFT JOIN submissions sub ON sub.assignment_id = a.id AND sub.student_id = ?
     ''';
     List<dynamic> args = [studentId];

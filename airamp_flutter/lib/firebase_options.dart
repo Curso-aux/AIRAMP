@@ -28,8 +28,8 @@ class DefaultFirebaseOptions {
   );
 
   static const FirebaseOptions android = FirebaseOptions(
-    apiKey: 'AIzaSyC5W7a4lOwSrdS27n8G3mfDmqgTbxfBFhs',
-    appId: '1:156822326046:android:03e651e72a4bf67413570f',
+    apiKey: 'AIzaSyB56Kbnq0LniUexk1lDVn6kMMUGW-VSigU',
+    appId: '1:156822326046:android:95cbf986b55a0e7113570f',
     messagingSenderId: '156822326046',
     projectId: 'aira-app-database',
     storageBucket: 'aira-app-database.firebasestorage.app',
