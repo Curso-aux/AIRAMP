@@ -11,8 +11,8 @@ class ThemeState {
   final bool isDark;
 
   const ThemeState({
-    this.preference = AppThemeMode.dark,
-    this.isDark = true,
+    this.preference = AppThemeMode.light,
+    this.isDark = false,
   });
 
   ThemeState copyWith({
@@ -31,9 +31,9 @@ class ThemeNotifier extends Notifier<ThemeState> {
 
   @override
   ThemeState build() {
-    // Default to dark mode
-    AppTheme.setDark(true);
-    return const ThemeState(preference: AppThemeMode.dark, isDark: true);
+    // Default to white/light mode on first install
+    AppTheme.setDark(false);
+    return const ThemeState(preference: AppThemeMode.light, isDark: false);
   }
 
   /// Load persisted theme preference from SQLite database.
@@ -41,10 +41,14 @@ class ThemeNotifier extends Notifier<ThemeState> {
     try {
       final saved = await DatabaseHelper().getSetting(_settingKey);
       if (saved != null) {
-        final mode = saved == 'light' ? AppThemeMode.light : AppThemeMode.dark;
+        final mode = saved == 'dark' ? AppThemeMode.dark : AppThemeMode.light;
         final isDark = mode == AppThemeMode.dark;
         AppTheme.setDark(isDark);
         state = ThemeState(preference: mode, isDark: isDark);
+      } else {
+        // First install: default to white/light mode
+        AppTheme.setDark(false);
+        state = const ThemeState(preference: AppThemeMode.light, isDark: false);
       }
     } catch (_) {
       // Fallback silently if DB is not yet available

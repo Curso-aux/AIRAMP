@@ -2,11 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
-import 'package:flutter/foundation.dart';
 import '../../../core/theme/app_theme.dart';
-import '../../../core/components/app_logo.dart';
 import '../../../core/components/auth/required_change_password_dialog.dart';
-import '../../../core/services/app_update_service.dart';
 import '../../../core/services/session_draft_service.dart';
 import '../application/auth_provider.dart';
 
@@ -18,14 +15,20 @@ class LoginScreen extends ConsumerStatefulWidget {
 }
 
 class _LoginScreenState extends ConsumerState<LoginScreen>
-    with SingleTickerProviderStateMixin {
+    with TickerProviderStateMixin {
   final TextEditingController _identifierController = TextEditingController();
   final TextEditingController _passwordController = TextEditingController();
   bool _showPassword = false;
   String _error = '';
 
-  late AnimationController _buttonScaleController;
-  late Animation<double> _buttonScaleAnimation;
+  // Smooth entrance & tactile feedback animations
+  late final AnimationController _entranceController;
+  late final Animation<double> _fadeAnimation;
+  late final Animation<Offset> _slideAnimation;
+
+  late final AnimationController _buttonScaleController;
+  late final Animation<double> _buttonScaleAnimation;
+
   final SessionDraftDisposer _draftDisposer = SessionDraftDisposer();
   static const String _formId = 'auth_login';
 
@@ -37,11 +40,31 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
       fieldKey: 'identifier',
       onDraftRestored: () => setState(() {}),
     ));
+
+    // Smooth Entrance: 400ms ease-out cubic fade + slide
+    _entranceController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 400),
+    );
+    _fadeAnimation = CurvedAnimation(
+      parent: _entranceController,
+      curve: Curves.easeOutCubic,
+    );
+    _slideAnimation = Tween<Offset>(
+      begin: const Offset(0, 0.04),
+      end: Offset.zero,
+    ).animate(CurvedAnimation(
+      parent: _entranceController,
+      curve: Curves.easeOutCubic,
+    ));
+    _entranceController.forward();
+
+    // Tactile button bounce
     _buttonScaleController = AnimationController(
       vsync: this,
       duration: const Duration(milliseconds: 100),
     );
-    _buttonScaleAnimation = Tween<double>(begin: 1.0, end: 0.95).animate(
+    _buttonScaleAnimation = Tween<double>(begin: 1.0, end: 0.975).animate(
       CurvedAnimation(parent: _buttonScaleController, curve: Curves.easeInOut),
     );
   }
@@ -51,6 +74,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
     _draftDisposer.dispose();
     _identifierController.dispose();
     _passwordController.dispose();
+    _entranceController.dispose();
     _buttonScaleController.dispose();
     super.dispose();
   }
@@ -65,7 +89,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
 
     if (identifier.isEmpty || password.isEmpty) {
       setState(() {
-        _error = 'Please fill in all fields.';
+        _error = 'Please fill in both email/username and password.';
       });
       return;
     }
@@ -74,11 +98,12 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
       await ref.read(authProvider.notifier).login(identifier, password);
       final user = ref.read(authProvider);
       if (user != null) {
-        // Mobile App is strictly for Students and Teachers!
+        // Mobile App is strictly for Students and Teachers
         if (user.role == 'admin' || user.role == 'super_admin') {
           await ref.read(authProvider.notifier).logout();
           setState(() {
-            _error = 'Administrator accounts can only access the AIRAMP Web Portal (via web browser). This mobile app is exclusively for Students and Teachers.';
+            _error =
+                'Administrator accounts can only access the AIRAMP Web Portal (via web browser). This mobile app is exclusively for Students and Teachers.';
           });
           return;
         }
@@ -98,8 +123,6 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
           if (mounted) context.go('/teacher/dashboard');
         } else if (user.role == 'student') {
           if (mounted) context.go('/student/home');
-        } else {
-          // admin / super_admin handled above
         }
       }
     } catch (e) {
@@ -113,275 +136,473 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
   @override
   Widget build(BuildContext context) {
     final isLoading = ref.watch(authProvider.notifier).isLoading;
+    final isDark = Theme.of(context).brightness == Brightness.dark || AppTheme.isDark;
+
+    // Palette tuned for a clean, formal academic institution portal
+    final canvasBg = isDark ? AppTheme.darkBackground : const Color(0xFFF8FAFC);
+    final cardBg = isDark ? AppTheme.darkSurface : Colors.white;
+    final borderColor = isDark ? AppTheme.darkBorder : const Color(0xFFE2E8F0);
+    final inputFill = isDark ? const Color(0xFF1B2638) : const Color(0xFFF8FAFC);
+    final primaryAccent = isDark ? AppTheme.darkPrimary : AppTheme.lightPrimary;
 
     return Scaffold(
-      body: SafeArea(
-        child: Center(
-          child: SingleChildScrollView(
-            padding: const EdgeInsets.symmetric(
-              horizontal: 28.0,
-              vertical: 40.0,
-            ),
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                // Logo Section
-                const Center(
-                  child: AppLogo(),
+      backgroundColor: canvasBg,
+      body: Stack(
+        fit: StackFit.expand,
+        children: [
+          // 1. Subtle, serene ambient lighting at the top
+          Positioned(
+            top: -100,
+            left: 0,
+            right: 0,
+            height: 380,
+            child: Container(
+              decoration: BoxDecoration(
+                gradient: RadialGradient(
+                  center: Alignment.topCenter,
+                  radius: 1.1,
+                  colors: [
+                    primaryAccent.withValues(alpha: isDark ? 0.08 : 0.04),
+                    Colors.transparent,
+                  ],
                 ),
-                const SizedBox(height: 32),
+              ),
+            ),
+          ),
 
-                // Form Section
-                Container(
-                  width: double.infinity,
-                  padding: const EdgeInsets.all(24),
-                  decoration: BoxDecoration(
-                    color: Theme.of(context).colorScheme.surface,
-                    borderRadius: BorderRadius.circular(20),
-                    border: Border.all(color: AppTheme.border),
-                    boxShadow: const [
-                      BoxShadow(
-                        color: Colors.black38,
-                        blurRadius: 40,
-                        offset: Offset(0, 12),
-                      ),
-                    ],
-                  ),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        'Welcome Back',
-                        style: TextStyle(
-                          fontSize: 26,
-                          fontWeight: FontWeight.w800,
-                          color: Theme.of(context).colorScheme.onSurface,
-                        ),
-                      ),
-                      const SizedBox(height: 4),
-                      Text(
-                        'Sign in with your email or username',
-                        style: TextStyle(
-                          fontSize: 14,
-                          color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6),
-                        ),
-                      ),
-                      const SizedBox(height: 24),
-
-                      if (_error.isNotEmpty)
-                        Container(
-                          margin: const EdgeInsets.only(bottom: 16),
-                          padding: const EdgeInsets.all(14),
-                          decoration: BoxDecoration(
-                            color: AppTheme.errorSoft,
-                            borderRadius: BorderRadius.circular(12),
-                            border: Border.all(
-                              color: Theme.of(context).colorScheme.error.withValues(alpha: 0.3),
-                            ),
-                          ),
-                          child: Row(
-                            children: [
-                              Icon(
-                                Icons.error_outline,
-                                color: Theme.of(context).colorScheme.error,
-                                size: 20,
-                              ),
-                              const SizedBox(width: 8),
-                              Expanded(
-                                child: Text(
-                                  _error,
-                                  style: TextStyle(
-                                    color: Theme.of(context).colorScheme.error,
-                                    fontSize: 13,
-                                  ),
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-
-                      // Email/Username Input
-                      TextField(
-                        controller: _identifierController,
-                        maxLength: 50,
-                        buildCounter: (context, {required currentLength, required isFocused, maxLength}) => null,
-                        style: TextStyle(
-                          color: Theme.of(context).colorScheme.onSurface,
-                          fontSize: 15,
-                        ),
-                        keyboardType: TextInputType.text,
-                        autocorrect: false,
-                        enableSuggestions: true,
-                        decoration: InputDecoration(
-                          hintText: 'Email or Username',
-                          counterText: '',
-                          prefixIcon: Icon(
-                            Icons.alternate_email,
-                            color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.4),
-                            size: 20,
-                          ),
-                        ),
-                      ),
-                      const SizedBox(height: 14),
-
-                      // Password Input
-                      TextField(
-                        controller: _passwordController,
-                        maxLength: 16,
-                        buildCounter: (context, {required currentLength, required isFocused, maxLength}) => null,
-                        obscureText: !_showPassword,
-                        style: TextStyle(
-                          color: Theme.of(context).colorScheme.onSurface,
-                          fontSize: 15,
-                        ),
-                        decoration: InputDecoration(
-                          hintText: 'Password',
-                          counterText: '',
-                          prefixIcon: Icon(
-                            Icons.lock_outline,
-                            color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.4),
-                            size: 20,
-                          ),
-                          suffixIcon: IconButton(
-                            icon: Icon(
-                              _showPassword
-                                  ? Icons.visibility_off_outlined
-                                  : Icons.visibility_outlined,
-                              color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.4),
-                              size: 20,
-                            ),
-                            onPressed: () {
-                              setState(() {
-                                _showPassword = !_showPassword;
-                              });
-                            },
-                          ),
-                        ),
-                      ),
-                      const SizedBox(height: 8),
-
-                      Align(
-                        alignment: Alignment.centerRight,
-                        child: TextButton(
-                          onPressed: () => context.push('/forgot-password'),
-                          child: Text(
-                            'Forgot Password?',
-                            style: TextStyle(
-                              color: Theme.of(context).colorScheme.secondary,
-                              fontSize: 13,
-                              fontWeight: FontWeight.w600,
-                            ),
-                          ),
-                        ),
-                      ),
-                      const SizedBox(height: 16),
-
-                      // Login Button
-                      GestureDetector(
-                        onTapDown: (_) => _buttonScaleController.forward(),
-                        onTapUp: (_) {
-                          _buttonScaleController.reverse();
-                          if (!isLoading) _handleLogin();
-                        },
-                        onTapCancel: () => _buttonScaleController.reverse(),
-                        child: ScaleTransition(
-                          scale: _buttonScaleAnimation,
-                          child: Container(
-                            height: 54,
-                            decoration: BoxDecoration(
-                              color: Theme.of(context).colorScheme.primary,
-                              borderRadius: BorderRadius.circular(14),
-                              boxShadow: [
-                                BoxShadow(
-                                  color: AppTheme.glowPrimary,
-                                  blurRadius: 16,
-                                  offset: Offset(0, 4),
-                                ),
-                              ],
-                            ),
-                            alignment: Alignment.center,
-                            child: Row(
-                              mainAxisAlignment: MainAxisAlignment.center,
-                              children: [
-                                Text(
-                                  isLoading ? 'Signing In...' : 'Sign In',
-                                  style: const TextStyle(
-                                    color: Colors.black,
-                                    fontSize: 16,
-                                    fontWeight: FontWeight.w800,
-                                  ),
-                                ),
-                                if (!isLoading) ...[
-                                  const SizedBox(width: 8),
-                                  const Icon(
-                                    Icons.arrow_forward,
-                                    color: Colors.black,
-                                    size: 20,
-                                  ),
-                                ],
-                              ],
-                            ),
-                          ),
-                        ),
-                      ),
-                      const SizedBox(height: 24),
-
-                      // Signup Links
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          Text(
-                            "Don't have an account? ",
-                            style: TextStyle(
-                              color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6),
-                              fontSize: 14,
-                            ),
-                          ),
-                          GestureDetector(
-                            onTap: () => context.push('/signup'),
-                            child: Text(
-                              'Sign Up',
-                              style: TextStyle(
-                                color: Theme.of(context).colorScheme.primary,
-                                fontSize: 14,
-                                fontWeight: FontWeight.w700,
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
-
-                      if (kIsWeb) ...[
-                        const SizedBox(height: 20),
-                        Divider(color: AppTheme.border.withValues(alpha: 0.5)),
-                        const SizedBox(height: 12),
-                        Row(
-                          mainAxisAlignment: MainAxisAlignment.center,
+          // 2. Main Login Content with smooth entrance animation
+          SafeArea(
+            child: Center(
+              child: SingleChildScrollView(
+                physics: const BouncingScrollPhysics(),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 24.0,
+                  vertical: 32.0,
+                ),
+                child: FadeTransition(
+                  opacity: _fadeAnimation,
+                  child: SlideTransition(
+                    position: _slideAnimation,
+                    child: Center(
+                      child: ConstrainedBox(
+                        constraints: const BoxConstraints(maxWidth: 420),
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
                           children: [
-                            TextButton.icon(
-                              onPressed: () => AppUpdateService.showInstallPwaInstructions(context),
-                              icon: Icon(Icons.install_mobile_rounded, size: 16, color: AppTheme.primary),
-                              label: Text('Install on iOS / Android', style: TextStyle(color: AppTheme.primary, fontSize: 12, fontWeight: FontWeight.w600)),
+                            // Clean Institutional Brand Hero
+                            _buildBrandHero(isDark),
+
+                            const SizedBox(height: 28),
+
+                            // Elevated, Crisp Form Card
+                            _buildFormCard(
+                              context: context,
+                              isDark: isDark,
+                              cardBg: cardBg,
+                              borderColor: borderColor,
+                              inputFill: inputFill,
+                              primaryAccent: primaryAccent,
+                              isLoading: isLoading,
                             ),
-                            const SizedBox(width: 4),
-                            Text('•', style: TextStyle(color: AppTheme.textMuted)),
-                            const SizedBox(width: 4),
-                            TextButton.icon(
-                              onPressed: () => AppUpdateService().downloadLatestApk(),
-                              icon: Icon(Icons.download_rounded, size: 16, color: AppTheme.textMuted),
-                              label: Text('Download APK', style: TextStyle(color: AppTheme.textMuted, fontSize: 12)),
-                            ),
+
+                            const SizedBox(height: 24),
+
+                            // Quiet Institutional Footnote (No Register / Sign-up)
+                            _buildFooter(isDark),
                           ],
                         ),
-                      ],
-                    ],
+                      ),
+                    ),
                   ),
                 ),
-              ],
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// Authentic, clean branding without cheap border wrappers
+  Widget _buildBrandHero(bool isDark) {
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        // Clean Mascot Emblem rendered naturally with soft ground depth
+        SizedBox(
+          width: 104,
+          height: 104,
+          child: Image.asset(
+            'assets/images/aira_mascot_logo.png',
+            fit: BoxFit.contain,
+            filterQuality: FilterQuality.medium,
+            errorBuilder: (_, _, _) => Image.asset(
+              'assets/images/aira_logo.png',
+              fit: BoxFit.contain,
             ),
           ),
         ),
+
+        const SizedBox(height: 14),
+
+        // Brand Title
+        Text(
+          'AIRA',
+          style: TextStyle(
+            fontSize: 27,
+            fontWeight: FontWeight.w900,
+            letterSpacing: 3.5,
+            color: isDark ? AppTheme.darkTextBright : AppTheme.lightText,
+          ),
+        ),
+
+        const SizedBox(height: 4),
+
+        // Institutional Subtitle
+        Text(
+          'Academic Integrated Review & Assessment',
+          textAlign: TextAlign.center,
+          style: TextStyle(
+            fontSize: 13,
+            fontWeight: FontWeight.w500,
+            letterSpacing: 0.2,
+            color: isDark ? AppTheme.darkTextSecondary : AppTheme.lightTextSecondary,
+          ),
+        ),
+      ],
+    );
+  }
+
+  /// Modern, crisp institutional form card
+  Widget _buildFormCard({
+    required BuildContext context,
+    required bool isDark,
+    required Color cardBg,
+    required Color borderColor,
+    required Color inputFill,
+    required Color primaryAccent,
+    required bool isLoading,
+  }) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.symmetric(horizontal: 28.0, vertical: 30.0),
+      decoration: BoxDecoration(
+        color: cardBg,
+        borderRadius: BorderRadius.circular(24),
+        border: Border.all(color: borderColor, width: 1.0),
+        boxShadow: [
+          BoxShadow(
+            color: const Color(0xFF0F172A).withValues(alpha: isDark ? 0.30 : 0.04),
+            blurRadius: 28,
+            offset: const Offset(0, 10),
+            spreadRadius: 0,
+          ),
+          BoxShadow(
+            color: const Color(0xFF0F172A).withValues(alpha: isDark ? 0.18 : 0.02),
+            blurRadius: 8,
+            offset: const Offset(0, 2),
+          ),
+        ],
       ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Card Title
+          Text(
+            'Welcome Back',
+            style: TextStyle(
+              fontSize: 21,
+              fontWeight: FontWeight.w700,
+              letterSpacing: -0.2,
+              color: isDark ? AppTheme.darkTextBright : AppTheme.lightText,
+            ),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            'Sign in to your academic account',
+            style: TextStyle(
+              fontSize: 13.5,
+              fontWeight: FontWeight.w400,
+              color: isDark ? AppTheme.darkTextSecondary : AppTheme.lightTextMuted,
+            ),
+          ),
+
+          const SizedBox(height: 22),
+
+          // Error banner
+          if (_error.isNotEmpty) ...[
+            Container(
+              margin: const EdgeInsets.only(bottom: 18),
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+              decoration: BoxDecoration(
+                color: isDark ? AppTheme.darkErrorSoft : AppTheme.lightErrorSoft,
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(
+                  color: (isDark ? AppTheme.darkError : AppTheme.lightError).withValues(alpha: 0.3),
+                  width: 1,
+                ),
+              ),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Icon(
+                    Icons.error_outline_rounded,
+                    color: isDark ? AppTheme.darkError : AppTheme.lightError,
+                    size: 19,
+                  ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Text(
+                      _error,
+                      style: TextStyle(
+                        color: isDark ? AppTheme.darkError : AppTheme.lightError,
+                        fontSize: 12.5,
+                        fontWeight: FontWeight.w500,
+                        height: 1.35,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+
+          // Identifier Field Label
+          _buildFieldLabel('Email or Username', isDark),
+          const SizedBox(height: 6),
+          TextField(
+            controller: _identifierController,
+            maxLength: 50,
+            buildCounter: (context, {required currentLength, required isFocused, maxLength}) => null,
+            style: TextStyle(
+              color: isDark ? AppTheme.darkTextBright : AppTheme.lightText,
+              fontSize: 14.5,
+              fontWeight: FontWeight.w500,
+            ),
+            keyboardType: TextInputType.emailAddress,
+            textInputAction: TextInputAction.next,
+            autocorrect: false,
+            enableSuggestions: true,
+            decoration: _inputDecoration(
+              hint: 'Enter your email or username',
+              prefixIcon: Icons.person_outline_rounded,
+              fillColor: inputFill,
+              borderColor: borderColor,
+              focusColor: primaryAccent,
+              isDark: isDark,
+            ),
+          ),
+
+          const SizedBox(height: 18),
+
+          // Password Field Label + Forgot Password link
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              _buildFieldLabel('Password', isDark),
+              GestureDetector(
+                onTap: () => context.push('/forgot-password'),
+                child: Text(
+                  'Forgot Password?',
+                  style: TextStyle(
+                    color: primaryAccent,
+                    fontSize: 12.5,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 6),
+          TextField(
+            controller: _passwordController,
+            maxLength: 64,
+            buildCounter: (context, {required currentLength, required isFocused, maxLength}) => null,
+            obscureText: !_showPassword,
+            textInputAction: TextInputAction.done,
+            onSubmitted: (_) {
+              if (!isLoading) _handleLogin();
+            },
+            style: TextStyle(
+              color: isDark ? AppTheme.darkTextBright : AppTheme.lightText,
+              fontSize: 14.5,
+              fontWeight: FontWeight.w500,
+            ),
+            decoration: _inputDecoration(
+              hint: 'Enter your password',
+              prefixIcon: Icons.lock_outline_rounded,
+              fillColor: inputFill,
+              borderColor: borderColor,
+              focusColor: primaryAccent,
+              isDark: isDark,
+              suffix: IconButton(
+                splashRadius: 18,
+                icon: Icon(
+                  _showPassword ? Icons.visibility_off_outlined : Icons.visibility_outlined,
+                  color: isDark ? AppTheme.darkTextMuted : AppTheme.lightTextMuted,
+                  size: 20,
+                ),
+                onPressed: () => setState(() => _showPassword = !_showPassword),
+              ),
+            ),
+          ),
+
+          const SizedBox(height: 24),
+
+          // Sign In Action Button
+          GestureDetector(
+            onTapDown: (_) => _buttonScaleController.forward(),
+            onTapUp: (_) {
+              _buttonScaleController.reverse();
+              if (!isLoading) _handleLogin();
+            },
+            onTapCancel: () => _buttonScaleController.reverse(),
+            child: ScaleTransition(
+              scale: _buttonScaleAnimation,
+              child: Container(
+                height: 50,
+                width: double.infinity,
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    colors: isDark
+                        ? [AppTheme.darkPrimary, AppTheme.darkPrimaryDark]
+                        : [AppTheme.lightPrimary, AppTheme.lightPrimaryDark],
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                  ),
+                  borderRadius: BorderRadius.circular(14),
+                  boxShadow: [
+                    BoxShadow(
+                      color: primaryAccent.withValues(alpha: isDark ? 0.35 : 0.28),
+                      blurRadius: 16,
+                      offset: const Offset(0, 5),
+                    ),
+                  ],
+                ),
+                alignment: Alignment.center,
+                child: isLoading
+                    ? const SizedBox(
+                        width: 20,
+                        height: 20,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2.2,
+                          valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                        ),
+                      )
+                    : const Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Text(
+                            'Sign In',
+                            style: TextStyle(
+                              color: Colors.white,
+                              fontSize: 15.5,
+                              fontWeight: FontWeight.w700,
+                              letterSpacing: 0.3,
+                            ),
+                          ),
+                          SizedBox(width: 8),
+                          Icon(
+                            Icons.arrow_forward_rounded,
+                            color: Colors.white,
+                            size: 18,
+                          ),
+                        ],
+                      ),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildFieldLabel(String text, bool isDark) {
+    return Text(
+      text,
+      style: TextStyle(
+        fontSize: 13,
+        fontWeight: FontWeight.w600,
+        letterSpacing: 0.1,
+        color: isDark ? AppTheme.darkText : AppTheme.lightTextSecondary,
+      ),
+    );
+  }
+
+  InputDecoration _inputDecoration({
+    required String hint,
+    required IconData prefixIcon,
+    required Color fillColor,
+    required Color borderColor,
+    required Color focusColor,
+    required bool isDark,
+    Widget? suffix,
+  }) {
+    return InputDecoration(
+      hintText: hint,
+      hintStyle: TextStyle(
+        color: isDark ? AppTheme.darkTextMuted : AppTheme.lightTextMuted,
+        fontSize: 13.5,
+        fontWeight: FontWeight.w400,
+      ),
+      filled: true,
+      fillColor: fillColor,
+      contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 15),
+      counterText: '',
+      prefixIcon: Icon(
+        prefixIcon,
+        color: isDark ? AppTheme.darkTextMuted : AppTheme.lightTextMuted,
+        size: 20,
+      ),
+      suffixIcon: suffix,
+      enabledBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(14),
+        borderSide: BorderSide(color: borderColor, width: 1.0),
+      ),
+      focusedBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(14),
+        borderSide: BorderSide(color: focusColor, width: 1.6),
+      ),
+      errorBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(14),
+        borderSide: BorderSide(
+          color: isDark ? AppTheme.darkError : AppTheme.lightError,
+          width: 1.2,
+        ),
+      ),
+      focusedErrorBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(14),
+        borderSide: BorderSide(
+          color: isDark ? AppTheme.darkError : AppTheme.lightError,
+          width: 1.6,
+        ),
+      ),
+    );
+  }
+
+  /// Quiet, dignified institutional footnote (Registration completely removed)
+  Widget _buildFooter(bool isDark) {
+    final mutedColor = isDark ? AppTheme.darkTextMuted : const Color(0xFF94A3B8);
+
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.center,
+      children: [
+        Icon(
+          Icons.shield_outlined,
+          size: 14,
+          color: mutedColor,
+        ),
+        const SizedBox(width: 6),
+        Text(
+          'DepEd Senior High School Learning Portal',
+          style: TextStyle(
+            fontSize: 12,
+            fontWeight: FontWeight.w500,
+            letterSpacing: 0.2,
+            color: mutedColor,
+          ),
+        ),
+      ],
     );
   }
 }

@@ -706,9 +706,26 @@ class AdminStudentsNotifier extends Notifier<List<Map<String, dynamic>>> {
     ref.read(adminAnalyticsProvider.notifier).loadAnalytics();
   }
 
+  Future<void> archiveStudent(String studentId) async {
+    await DatabaseHelper().archiveStudent(studentId);
+    await loadStudents();
+    ref.read(adminArchivedStudentsProvider.notifier).loadArchived();
+    ref.read(adminAnalyticsProvider.notifier).loadAnalytics();
+    ref.read(sectionsProvider.notifier).reload();
+  }
+
+  Future<void> bulkArchiveStudents(List<String> studentIds) async {
+    await DatabaseHelper().bulkArchiveStudents(studentIds);
+    await loadStudents();
+    ref.read(adminArchivedStudentsProvider.notifier).loadArchived();
+    ref.read(adminAnalyticsProvider.notifier).loadAnalytics();
+    ref.read(sectionsProvider.notifier).reload();
+  }
+
   Future<void> deleteStudent(String studentId) async {
     await DatabaseHelper().deleteStudent(studentId);
     await loadStudents();
+    ref.read(adminArchivedStudentsProvider.notifier).loadArchived();
     ref.read(adminAnalyticsProvider.notifier).loadAnalytics();
     ref.read(sectionsProvider.notifier).reload();
   }
@@ -799,6 +816,56 @@ final availableSectionsProvider = FutureProvider<List<String>>((ref) async {
   return await DatabaseHelper().getAvailableSectionsList();
 });
 
+// --- Admin Archived Students Provider ---
+final adminArchivedStudentsProvider =
+    NotifierProvider<AdminArchivedStudentsNotifier, List<Map<String, dynamic>>>(() {
+  return AdminArchivedStudentsNotifier();
+});
+
+class AdminArchivedStudentsNotifier extends Notifier<List<Map<String, dynamic>>> {
+  @override
+  List<Map<String, dynamic>> build() {
+    loadArchived();
+    return [];
+  }
+
+  Future<void> loadArchived() async {
+    final results = await DatabaseHelper().getArchivedStudentsList();
+    if (!ref.mounted) return;
+    state = results;
+  }
+
+  Future<void> restoreStudent(String studentId) async {
+    await DatabaseHelper().restoreStudent(studentId);
+    await loadArchived();
+    ref.read(adminStudentsProvider.notifier).loadStudents();
+    ref.read(adminAnalyticsProvider.notifier).loadAnalytics();
+    ref.read(sectionsProvider.notifier).reload();
+  }
+
+  Future<void> bulkRestoreStudents(List<String> studentIds) async {
+    await DatabaseHelper().bulkRestoreStudents(studentIds);
+    await loadArchived();
+    ref.read(adminStudentsProvider.notifier).loadStudents();
+    ref.read(adminAnalyticsProvider.notifier).loadAnalytics();
+    ref.read(sectionsProvider.notifier).reload();
+  }
+
+  Future<void> permanentDeleteStudent(String studentId) async {
+    await DatabaseHelper().deleteStudent(studentId);
+    await loadArchived();
+    ref.read(adminAnalyticsProvider.notifier).loadAnalytics();
+    ref.read(sectionsProvider.notifier).reload();
+  }
+
+  Future<void> bulkPermanentDeleteStudents(List<String> studentIds) async {
+    await DatabaseHelper().bulkPermanentDeleteStudents(studentIds);
+    await loadArchived();
+    ref.read(adminAnalyticsProvider.notifier).loadAnalytics();
+    ref.read(sectionsProvider.notifier).reload();
+  }
+}
+
 // --- Admin Faculty / Teachers Provider ---
 final adminTeachersProvider = NotifierProvider<AdminTeachersNotifier, List<Map<String, dynamic>>>(() {
   return AdminTeachersNotifier();
@@ -854,6 +921,20 @@ class AdminTeachersNotifier extends Notifier<List<Map<String, dynamic>>> {
     ref.read(subjectsProvider.notifier).reload();
   }
 
+  Future<void> archiveTeacher(String teacherId) async {
+    await DatabaseHelper().archiveTeacher(teacherId);
+    await loadTeachers();
+    ref.read(adminArchivedTeachersProvider.notifier).loadArchivedTeachers();
+    ref.read(subjectsProvider.notifier).reload();
+  }
+
+  Future<void> bulkArchiveTeachers(List<String> teacherIds) async {
+    await DatabaseHelper().bulkArchiveTeachers(teacherIds);
+    await loadTeachers();
+    ref.read(adminArchivedTeachersProvider.notifier).loadArchivedTeachers();
+    ref.read(subjectsProvider.notifier).reload();
+  }
+
   Future<Map<String, dynamic>> bulkImportTeachers(
     List<Map<String, dynamic>> teachersToImport, {
     String? defaultPassword,
@@ -865,6 +946,52 @@ class AdminTeachersNotifier extends Notifier<List<Map<String, dynamic>>> {
     await loadTeachers();
     ref.read(subjectsProvider.notifier).reload();
     return result;
+  }
+}
+
+// --- Admin Archived Faculty / Teachers Provider ---
+final adminArchivedTeachersProvider =
+    NotifierProvider<AdminArchivedTeachersNotifier, List<Map<String, dynamic>>>(() {
+  return AdminArchivedTeachersNotifier();
+});
+
+class AdminArchivedTeachersNotifier extends Notifier<List<Map<String, dynamic>>> {
+  @override
+  List<Map<String, dynamic>> build() {
+    loadArchivedTeachers();
+    return [];
+  }
+
+  Future<void> loadArchivedTeachers() async {
+    final archived = await DatabaseHelper().getArchivedTeachersList();
+    if (!ref.mounted) return;
+    state = archived;
+  }
+
+  Future<void> restoreTeacher(String teacherId) async {
+    await DatabaseHelper().restoreTeacher(teacherId);
+    await loadArchivedTeachers();
+    ref.read(adminTeachersProvider.notifier).loadTeachers();
+    ref.read(subjectsProvider.notifier).reload();
+  }
+
+  Future<void> bulkRestoreTeachers(List<String> teacherIds) async {
+    await DatabaseHelper().bulkRestoreTeachers(teacherIds);
+    await loadArchivedTeachers();
+    ref.read(adminTeachersProvider.notifier).loadTeachers();
+    ref.read(subjectsProvider.notifier).reload();
+  }
+
+  Future<void> permanentDeleteTeacher(String teacherId) async {
+    await DatabaseHelper().deleteTeacher(teacherId);
+    await loadArchivedTeachers();
+    ref.read(subjectsProvider.notifier).reload();
+  }
+
+  Future<void> bulkPermanentDeleteTeachers(List<String> teacherIds) async {
+    await DatabaseHelper().bulkPermanentDeleteTeachers(teacherIds);
+    await loadArchivedTeachers();
+    ref.read(subjectsProvider.notifier).reload();
   }
 }
 

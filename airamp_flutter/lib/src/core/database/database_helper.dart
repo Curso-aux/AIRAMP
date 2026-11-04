@@ -90,6 +90,12 @@ class DatabaseHelper {
       await db.execute('ALTER TABLE users ADD COLUMN profile_image TEXT');
     } catch (_) {}
     try {
+      await db.execute('ALTER TABLE users ADD COLUMN is_archived INTEGER DEFAULT 0');
+    } catch (_) {}
+    try {
+      await db.execute('ALTER TABLE users ADD COLUMN archived_at TEXT');
+    } catch (_) {}
+    try {
       await db.rawUpdate('''
         UPDATE users 
         SET profile_image = 'preset:girl_1' 
@@ -548,6 +554,8 @@ class DatabaseHelper {
         special_notes TEXT,
         profile_image TEXT,
         must_change_password INTEGER DEFAULT 0,
+        is_archived INTEGER DEFAULT 0,
+        archived_at TEXT,
         created_at TEXT NOT NULL
       )
     ''');
@@ -2935,8 +2943,9 @@ class DatabaseHelper {
     // 1. Filter Users by role, section, and student category
     final users = allUsers.where((u) {
       final uRole = u['role'] as String? ?? 'student';
-      if (role != null && role != 'all' && role.isNotEmpty && uRole != role)
+      if (role != null && role != 'all' && role.isNotEmpty && uRole != role) {
         return false;
+      }
 
       final sec = (u['section'] as String? ?? '').trim();
       if (section != null && section.isNotEmpty && section != 'All Sections') {
@@ -2959,20 +2968,26 @@ class DatabaseHelper {
           if (!uGrade.contains('7') &&
               !uGrade.contains('8') &&
               !uGrade.contains('9') &&
-              !uGrade.contains('10'))
+              !uGrade.contains('10')) {
             return false;
+          }
         } else if (gLower.contains('stem')) {
-          if (!uGrade.contains('stem') && !sec.toLowerCase().contains('stem'))
+          if (!uGrade.contains('stem') && !sec.toLowerCase().contains('stem')) {
             return false;
+          }
         } else if (gLower.contains('abm')) {
-          if (!uGrade.contains('abm') && !sec.toLowerCase().contains('abm'))
+          if (!uGrade.contains('abm') && !sec.toLowerCase().contains('abm')) {
             return false;
+          }
         } else if (gLower.contains('humss')) {
-          if (!uGrade.contains('humss') && !sec.toLowerCase().contains('humss'))
+          if (!uGrade.contains('humss') &&
+              !sec.toLowerCase().contains('humss')) {
             return false;
+          }
         } else if (gLower.contains('tvl')) {
-          if (!uGrade.contains('tvl') && !sec.toLowerCase().contains('tvl'))
+          if (!uGrade.contains('tvl') && !sec.toLowerCase().contains('tvl')) {
             return false;
+          }
         } else if (gLower.startsWith('grade ')) {
           final targetGrade = gLower.replaceAll('grade ', '').trim();
           if (!uGrade.contains(targetGrade)) return false;
@@ -2987,16 +3002,21 @@ class DatabaseHelper {
         if (studentCategory == 'unassigned') {
           if (secLower.isNotEmpty && secLower != 'unassigned') return false;
         } else if (studentCategory == 'irregular') {
-          if (!type.contains('irregular') && !type.contains('cross'))
+          if (!type.contains('irregular') && !type.contains('cross')) {
             return false;
+          }
         } else if (studentCategory == 'sped') {
-          if (!type.contains('sped') && !type.contains('accommodat'))
+          if (!type.contains('sped') && !type.contains('accommodat')) {
             return false;
+          }
         } else if (studentCategory == 'transferee') {
           if (!type.contains('transferee')) return false;
         } else if (studentCategory == 'regular') {
-          if (type != 'regular' || secLower.isEmpty || secLower == 'unassigned')
+          if (type != 'regular' ||
+              secLower.isEmpty ||
+              secLower == 'unassigned') {
             return false;
+          }
         }
       }
       return true;
@@ -3178,8 +3198,9 @@ class DatabaseHelper {
                   studentCategory != 'all' &&
                   studentCategory.isNotEmpty)) {
             final studentId = a['student_id'] as String?;
-            if (studentId == null || !matchingStudentIds.contains(studentId))
+            if (studentId == null || !matchingStudentIds.contains(studentId)) {
               return false;
+            }
           }
           if (subjectId != null && a['subject_id'] != subjectId) return false;
           if (startDate != null) {
@@ -3239,7 +3260,7 @@ class DatabaseHelper {
 
     final users = await db.query(
       'users',
-      where: "role = 'student'",
+      where: "role = 'student' AND (is_archived IS NULL OR is_archived = 0)",
       orderBy: 'full_name ASC',
     );
     final enrollments = await db.query('enrollments');
@@ -3304,6 +3325,174 @@ class DatabaseHelper {
     }
 
     return enriched;
+  }
+
+  /// Retrieves all archived (soft-deleted) students with enrollment and progress stats.
+  Future<List<Map<String, dynamic>>> getArchivedStudentsList({
+    String? query,
+  }) async {
+    final db = await database;
+
+    final users = await db.query(
+      'users',
+      where: "role = 'student' AND is_archived = 1",
+      orderBy: 'archived_at DESC, full_name ASC',
+    );
+    final enrollments = await db.query('enrollments');
+    final progress = await db.query(
+      'student_progress',
+      where: 'is_completed = 1',
+    );
+    final attempts = await db.query('quiz_attempts');
+
+    List<Map<String, dynamic>> enriched = [];
+    for (final u in users) {
+      final sId = u['id'] as String;
+      final studentEnrollments = enrollments
+          .where((e) => e['student_id'] == sId)
+          .length;
+      final studentProgress = progress
+          .where((p) => p['student_id'] == sId)
+          .length;
+      final studentAttempts = attempts
+          .where((a) => a['student_id'] == sId)
+          .toList();
+      final avgScore = studentAttempts.isNotEmpty
+          ? (studentAttempts
+                        .map(
+                          (a) => (a['percentage'] as num?)?.toDouble() ?? 0.0,
+                        )
+                        .reduce((a, b) => a + b) /
+                    studentAttempts.length)
+                .round()
+          : 0;
+
+      enriched.add({
+        ...u,
+        'student_type': (u['student_type'] as String?)?.isNotEmpty == true
+            ? u['student_type']
+            : 'regular',
+        'enrolled_courses': studentEnrollments,
+        'completed_los': studentProgress,
+        'avg_score': avgScore,
+        'attempts_count': studentAttempts.length,
+      });
+    }
+
+    if (query != null && query.trim().isNotEmpty) {
+      final q = query.toLowerCase().trim();
+      enriched = enriched.where((s) {
+        final name = (s['full_name'] as String? ?? '').toLowerCase();
+        final email = (s['email'] as String? ?? '').toLowerCase();
+        final sec = (s['section'] as String? ?? '').toLowerCase();
+        return name.contains(q) || email.contains(q) || sec.contains(q);
+      }).toList();
+    }
+
+    return enriched;
+  }
+
+  /// Soft-deletes a student by moving their record to the archive.
+  Future<void> archiveStudent(String studentId) async {
+    final db = await database;
+    final now = DateTime.now().toIso8601String();
+    await db.update(
+      'users',
+      {
+        'is_archived': 1,
+        'archived_at': now,
+      },
+      where: 'id = ?',
+      whereArgs: [studentId],
+    );
+    try {
+      await FirestoreService().saveDocument('users', studentId, {
+        'is_archived': 1,
+        'archived_at': now,
+      });
+    } catch (_) {}
+  }
+
+  /// Bulk soft-deletes students by moving them to the archive.
+  Future<void> bulkArchiveStudents(List<String> studentIds) async {
+    if (studentIds.isEmpty) return;
+    final db = await database;
+    final now = DateTime.now().toIso8601String();
+    final batch = db.batch();
+    for (final id in studentIds) {
+      batch.update(
+        'users',
+        {
+          'is_archived': 1,
+          'archived_at': now,
+        },
+        where: 'id = ?',
+        whereArgs: [id],
+      );
+    }
+    await batch.commit(noResult: true);
+    for (final id in studentIds) {
+      try {
+        await FirestoreService().saveDocument('users', id, {
+          'is_archived': 1,
+          'archived_at': now,
+        });
+      } catch (_) {}
+    }
+  }
+
+  /// Restores an archived student back to the active directory.
+  Future<void> restoreStudent(String studentId) async {
+    final db = await database;
+    await db.update(
+      'users',
+      {
+        'is_archived': 0,
+        'archived_at': null,
+      },
+      where: 'id = ?',
+      whereArgs: [studentId],
+    );
+    try {
+      await FirestoreService().saveDocument('users', studentId, {
+        'is_archived': 0,
+        'archived_at': null,
+      });
+    } catch (_) {}
+  }
+
+  /// Bulk restores archived students back to the active directory.
+  Future<void> bulkRestoreStudents(List<String> studentIds) async {
+    if (studentIds.isEmpty) return;
+    final db = await database;
+    final batch = db.batch();
+    for (final id in studentIds) {
+      batch.update(
+        'users',
+        {
+          'is_archived': 0,
+          'archived_at': null,
+        },
+        where: 'id = ?',
+        whereArgs: [id],
+      );
+    }
+    await batch.commit(noResult: true);
+    for (final id in studentIds) {
+      try {
+        await FirestoreService().saveDocument('users', id, {
+          'is_archived': 0,
+          'archived_at': null,
+        });
+      } catch (_) {}
+    }
+  }
+
+  /// Bulk permanently deletes students and all related enrollments, progress, attempts, submissions.
+  Future<void> bulkPermanentDeleteStudents(List<String> studentIds) async {
+    for (final id in studentIds) {
+      await deleteStudent(id);
+    }
   }
 
   Future<void> updateStudentSection(
@@ -4936,7 +5125,7 @@ class DatabaseHelper {
     final db = await database;
     final teachers = await db.query(
       'users',
-      where: 'role = ?',
+      where: 'role = ? AND (is_archived IS NULL OR is_archived = 0)',
       whereArgs: ['teacher'],
       orderBy: 'full_name ASC',
     );
@@ -4974,6 +5163,153 @@ class DatabaseHelper {
     }
 
     return enriched;
+  }
+
+  /// Retrieves all soft-deleted archived teachers.
+  Future<List<Map<String, dynamic>>> getArchivedTeachersList() async {
+    final db = await database;
+    final teachers = await db.query(
+      'users',
+      where: 'role = ? AND is_archived = 1',
+      whereArgs: ['teacher'],
+      orderBy: 'archived_at DESC, full_name ASC',
+    );
+
+    final List<Map<String, dynamic>> enriched = [];
+    for (final t in teachers) {
+      final tid = t['id'] as String;
+      final subjects = await getSubjectsForTeacher(tid);
+      final sections = await getSectionsForTeacher(tid);
+
+      int studentCount = 0;
+      final subIds = subjects.map((s) => s['id'] as int).toList();
+      if (subIds.isNotEmpty) {
+        final enrollments = await db.query(
+          'enrollments',
+          columns: ['student_id'],
+          where:
+              'subject_id IN (${subIds.map((_) => '?').join(',')}) AND status = ?',
+          whereArgs: [...subIds, 'active'],
+        );
+        studentCount = enrollments
+            .map((e) => e['student_id'] as String)
+            .toSet()
+            .length;
+      }
+
+      enriched.add({
+        ...t,
+        'assigned_subjects_count': subjects.length,
+        'assigned_subjects': subjects,
+        'handled_sections': sections,
+        'student_count': studentCount,
+      });
+    }
+
+    return enriched;
+  }
+
+  /// Soft-deletes a teacher by moving them to the archive.
+  Future<void> archiveTeacher(String teacherId) async {
+    final db = await database;
+    final now = DateTime.now().toIso8601String();
+    await db.update(
+      'users',
+      {
+        'is_archived': 1,
+        'archived_at': now,
+      },
+      where: 'id = ?',
+      whereArgs: [teacherId],
+    );
+    try {
+      await FirestoreService().saveDocument('users', teacherId, {
+        'is_archived': 1,
+        'archived_at': now,
+      });
+    } catch (_) {}
+  }
+
+  /// Bulk soft-deletes teachers by moving them to the archive.
+  Future<void> bulkArchiveTeachers(List<String> teacherIds) async {
+    if (teacherIds.isEmpty) return;
+    final db = await database;
+    final now = DateTime.now().toIso8601String();
+    final batch = db.batch();
+    for (final id in teacherIds) {
+      batch.update(
+        'users',
+        {
+          'is_archived': 1,
+          'archived_at': now,
+        },
+        where: 'id = ?',
+        whereArgs: [id],
+      );
+    }
+    await batch.commit(noResult: true);
+    for (final id in teacherIds) {
+      try {
+        await FirestoreService().saveDocument('users', id, {
+          'is_archived': 1,
+          'archived_at': now,
+        });
+      } catch (_) {}
+    }
+  }
+
+  /// Restores an archived teacher back to the active faculty directory.
+  Future<void> restoreTeacher(String teacherId) async {
+    final db = await database;
+    await db.update(
+      'users',
+      {
+        'is_archived': 0,
+        'archived_at': null,
+      },
+      where: 'id = ?',
+      whereArgs: [teacherId],
+    );
+    try {
+      await FirestoreService().saveDocument('users', teacherId, {
+        'is_archived': 0,
+        'archived_at': null,
+      });
+    } catch (_) {}
+  }
+
+  /// Bulk restores archived teachers back to the active directory.
+  Future<void> bulkRestoreTeachers(List<String> teacherIds) async {
+    if (teacherIds.isEmpty) return;
+    final db = await database;
+    final batch = db.batch();
+    for (final id in teacherIds) {
+      batch.update(
+        'users',
+        {
+          'is_archived': 0,
+          'archived_at': null,
+        },
+        where: 'id = ?',
+        whereArgs: [id],
+      );
+    }
+    await batch.commit(noResult: true);
+    for (final id in teacherIds) {
+      try {
+        await FirestoreService().saveDocument('users', id, {
+          'is_archived': 0,
+          'archived_at': null,
+        });
+      } catch (_) {}
+    }
+  }
+
+  /// Bulk permanently deletes teachers.
+  Future<void> bulkPermanentDeleteTeachers(List<String> teacherIds) async {
+    for (final id in teacherIds) {
+      await deleteTeacher(id);
+    }
   }
 
   /// Checks whether a given user ID is already registered in local SQLite or Cloud Firestore
@@ -5433,12 +5769,15 @@ class DatabaseHelper {
   }) async {
     final db = await database;
     final updates = <String, dynamic>{};
-    if (data.containsKey('full_name'))
+    if (data.containsKey('full_name')) {
       updates['full_name'] = (data['full_name'] as String).trim();
-    if (data.containsKey('email'))
+    }
+    if (data.containsKey('email')) {
       updates['email'] = (data['email'] as String).trim();
-    if (data.containsKey('username'))
+    }
+    if (data.containsKey('username')) {
       updates['username'] = (data['username'] as String).trim();
+    }
     if (data.containsKey('password')) {
       final rawPass = data['password'] as String;
       if (rawPass.isNotEmpty) {
@@ -6298,15 +6637,17 @@ class DatabaseHelper {
         if (section != null &&
             section.isNotEmpty &&
             section != 'All Sections' &&
-            sec != section)
+            sec != section) {
           continue;
+        }
         final name = (s['full_name'] as String?) ?? '';
         final email = (s['email'] as String?) ?? '';
         if (query != null && query.trim().isNotEmpty) {
           final q = query.toLowerCase();
           if (!name.toLowerCase().contains(q) &&
-              !email.toLowerCase().contains(q))
+              !email.toLowerCase().contains(q)) {
             continue;
+          }
         }
         list.add(s);
       }
@@ -7577,8 +7918,9 @@ class DatabaseHelper {
               where: 'LOWER(TRIM(name)) = ?',
               whereArgs: [subName.toLowerCase().trim()],
             );
-            if (matchName.isNotEmpty)
+            if (matchName.isNotEmpty) {
               targetSubjectId = matchName.first['id'] as int;
+            }
           }
         } else if (subName != null && subName.isNotEmpty) {
           final match = await db.query(
@@ -7648,7 +7990,7 @@ class DatabaseHelper {
             'assignments',
             {
               if (cloudId != null && cloudId.isNotEmpty) 'cloud_id': cloudId,
-              if (targetSections != null) 'target_sections': targetSections,
+              'target_sections': ?targetSections,
               'title': title,
               'description': description,
               'teacher_id': teacherId,
@@ -7827,8 +8169,9 @@ class DatabaseHelper {
               where: 'LOWER(TRIM(name)) = ?',
               whereArgs: [subName.toLowerCase().trim()],
             );
-            if (matchName.isNotEmpty)
+            if (matchName.isNotEmpty) {
               targetSubjectId = matchName.first['id'] as int;
+            }
           }
         } else if (subName != null && subName.isNotEmpty) {
           final match = await db.query(
@@ -8341,8 +8684,9 @@ class DatabaseHelper {
           }
         }
         if (targetAssignmentId == null) continue;
-        if (assignmentId != null && targetAssignmentId != assignmentId)
+        if (assignmentId != null && targetAssignmentId != assignmentId) {
           continue;
+        }
 
         final studentName = doc['student_name']?.toString();
         final studentSec = doc['student_section']?.toString();
@@ -9079,18 +9423,23 @@ class DatabaseHelper {
   Future<void> updateAdmin(String adminId, Map<String, dynamic> data) async {
     final db = await database;
     final updates = <String, dynamic>{};
-    if (data.containsKey('full_name'))
+    if (data.containsKey('full_name')) {
       updates['full_name'] = (data['full_name'] as String).trim();
-    if (data.containsKey('email'))
+    }
+    if (data.containsKey('email')) {
       updates['email'] = (data['email'] as String).trim().toLowerCase();
-    if (data.containsKey('username'))
+    }
+    if (data.containsKey('username')) {
       updates['username'] = (data['username'] as String).trim();
+    }
     if (data.containsKey('school_id')) updates['school_id'] = data['school_id'];
     if (data.containsKey('role')) updates['role'] = data['role'];
-    if (data.containsKey('student_type'))
+    if (data.containsKey('student_type')) {
       updates['student_type'] = data['student_type'];
-    if (data.containsKey('special_notes'))
+    }
+    if (data.containsKey('special_notes')) {
       updates['special_notes'] = data['special_notes'];
+    }
     if (data.containsKey('password')) {
       final rawPass = data['password'] as String;
       if (rawPass.isNotEmpty) {

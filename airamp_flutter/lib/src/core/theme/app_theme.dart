@@ -3,7 +3,7 @@ import '../animations/app_transitions.dart';
 
 class AppTheme {
   // Current active mode flag
-  static bool _isDark = true;
+  static bool _isDark = false; // Default to white/light mode on first install
   static bool get isDark => _isDark;
   static void setDark(bool value) {
     _isDark = value;

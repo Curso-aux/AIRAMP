@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:firebase_core/firebase_core.dart';
@@ -14,6 +15,7 @@ import 'src/core/services/aira_voice_service.dart';
 import 'src/features/auth/application/auth_provider.dart';
 import 'src/features/esp32_hub/data/saved_materials_service.dart';
 import 'src/core/components/aira/global_aira_floating_overlay.dart';
+import 'src/core/components/aira/aira_splash_loading_view.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -78,6 +80,9 @@ class _AirampAppState extends ConsumerState<AirampApp> {
         ref.read(themeProvider.notifier).loadSavedTheme(),
         SessionDraftService.instance.init(),
         SavedMaterialsService.instance.init(),
+        // Splash animation, pop sound, and grace delay are strictly for native mobile app launch
+        if (!kIsWeb)
+          Future.delayed(const Duration(milliseconds: 2000)),
       ]);
       AiraVoiceService.instance.init();
     } catch (e) {
@@ -126,12 +131,16 @@ class _AirampAppState extends ConsumerState<AirampApp> {
         darkTheme: AppTheme.darkTheme,
         themeMode: themeState.isDark ? ThemeMode.dark : ThemeMode.light,
         debugShowCheckedModeBanner: false,
-        home: Scaffold(
-          backgroundColor: AppTheme.background,
-          body: Center(
-            child: CircularProgressIndicator(color: AppTheme.primary),
-          ),
-        ),
+        home: kIsWeb
+            ? Scaffold(
+                backgroundColor: themeState.isDark ? AppTheme.darkBackground : AppTheme.lightBackground,
+                body: Center(
+                  child: CircularProgressIndicator(
+                    color: themeState.isDark ? AppTheme.darkPrimary : AppTheme.lightPrimary,
+                  ),
+                ),
+              )
+            : AiraSplashLoadingView(isDark: themeState.isDark),
       );
     }
 

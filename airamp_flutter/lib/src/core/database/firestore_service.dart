@@ -609,6 +609,11 @@ class FirestoreService {
             } catch (_) {}
           }
 
+          final isArchived = data['is_archived'] == 1 ||
+              data['is_archived'] == true ||
+              data['is_archived'] == '1';
+          final archivedAt = data['archived_at']?.toString();
+
           final dbRow = {
             'id': existing.isNotEmpty ? existing.first['id'] : userId,
             'email': data['email'] ?? '',
@@ -624,6 +629,8 @@ class FirestoreService {
             'special_notes': data['special_notes'],
             'school_id': data['school_id'] ?? 'sch_main',
             'must_change_password': mustChangeVal,
+            'is_archived': isArchived ? 1 : 0,
+            'archived_at': isArchived ? (archivedAt ?? DateTime.now().toIso8601String()) : null,
             'created_at': data['created_at'] ?? DateTime.now().toIso8601String(),
           };
 

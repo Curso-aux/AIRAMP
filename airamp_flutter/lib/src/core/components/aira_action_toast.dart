@@ -17,6 +17,7 @@ class AiraActionToast {
   static OverlayEntry? _currentEntry;
 
   /// Displays a floating card toast in the top-right corner with entrance slide
+  /// Displays a floating card toast in the top-right corner with entrance slide
   /// and animated countdown bar.
   static void show(
     BuildContext context, {
@@ -28,6 +29,8 @@ class AiraActionToast {
     VoidCallback? onAction,
     double width = 440,
     bool showStopButton = true,
+    IconData? customIcon,
+    Color? customAccentColor,
   }) {
     // Dismiss any currently displayed toast before showing the new one
     dismiss();
@@ -46,6 +49,8 @@ class AiraActionToast {
         onAction: onAction,
         width: width,
         showStopButton: showStopButton,
+        customIcon: customIcon,
+        customAccentColor: customAccentColor,
         onDismiss: () {
           if (_currentEntry == entry) {
             _currentEntry = null;
@@ -78,12 +83,112 @@ class AiraActionToast {
     String actionLabel = 'Okay',
     VoidCallback? onAction,
     double width = 440,
+    IconData? customIcon,
+    Color? customAccentColor,
   }) {
     show(
       context,
       title: title,
       message: message,
       type: AiraToastType.success,
+      duration: duration,
+      actionLabel: actionLabel,
+      onAction: onAction,
+      width: width,
+      customIcon: customIcon,
+      customAccentColor: customAccentColor,
+    );
+  }
+
+  /// Convenience helper for restore actions (displays a return/restore icon).
+  static void showRestored(
+    BuildContext context, {
+    required String title,
+    required String message,
+    Duration duration = const Duration(seconds: 8),
+    String actionLabel = 'Okay',
+    VoidCallback? onAction,
+    double width = 440,
+  }) {
+    show(
+      context,
+      title: title,
+      message: message,
+      type: AiraToastType.success,
+      customIcon: Icons.restore_rounded, // Return/restore arrow icon
+      customAccentColor: const Color(0xFF10B981), // Emerald green
+      duration: duration,
+      actionLabel: actionLabel,
+      onAction: onAction,
+      width: width,
+    );
+  }
+
+  /// Convenience helper for permanent delete / purge actions (displays a trash icon and red color).
+  static void showDeleted(
+    BuildContext context, {
+    required String title,
+    required String message,
+    Duration duration = const Duration(seconds: 8),
+    String actionLabel = 'Okay',
+    VoidCallback? onAction,
+    double width = 440,
+  }) {
+    show(
+      context,
+      title: title,
+      message: message,
+      type: AiraToastType.error,
+      customIcon: Icons.delete_outline_rounded, // Trash icon
+      customAccentColor: const Color(0xFFEF4444), // Crimson/Red
+      duration: duration,
+      actionLabel: actionLabel,
+      onAction: onAction,
+      width: width,
+    );
+  }
+
+  /// Convenience helper for deactivation actions (displays a person off icon and amber color).
+  static void showDeactivated(
+    BuildContext context, {
+    required String title,
+    required String message,
+    Duration duration = const Duration(seconds: 8),
+    String actionLabel = 'Okay',
+    VoidCallback? onAction,
+    double width = 440,
+  }) {
+    show(
+      context,
+      title: title,
+      message: message,
+      type: AiraToastType.warning,
+      customIcon: Icons.person_off_outlined,
+      customAccentColor: const Color(0xFFD97706), // Amber
+      duration: duration,
+      actionLabel: actionLabel,
+      onAction: onAction,
+      width: width,
+    );
+  }
+
+  /// Convenience helper for archive actions (displays an archive box icon and amber color).
+  static void showArchived(
+    BuildContext context, {
+    required String title,
+    required String message,
+    Duration duration = const Duration(seconds: 8),
+    String actionLabel = 'Okay',
+    VoidCallback? onAction,
+    double width = 440,
+  }) {
+    show(
+      context,
+      title: title,
+      message: message,
+      type: AiraToastType.warning,
+      customIcon: Icons.archive_outlined, // Archive box icon
+      customAccentColor: const Color(0xFFD97706), // Amber
       duration: duration,
       actionLabel: actionLabel,
       onAction: onAction,
@@ -100,6 +205,8 @@ class AiraActionToast {
     String actionLabel = 'Okay',
     VoidCallback? onAction,
     double width = 440,
+    IconData? customIcon,
+    Color? customAccentColor,
   }) {
     show(
       context,
@@ -110,6 +217,8 @@ class AiraActionToast {
       actionLabel: actionLabel,
       onAction: onAction,
       width: width,
+      customIcon: customIcon,
+      customAccentColor: customAccentColor,
     );
   }
 
@@ -122,6 +231,8 @@ class AiraActionToast {
     String actionLabel = 'Okay',
     VoidCallback? onAction,
     double width = 440,
+    IconData? customIcon,
+    Color? customAccentColor,
   }) {
     show(
       context,
@@ -132,6 +243,8 @@ class AiraActionToast {
       actionLabel: actionLabel,
       onAction: onAction,
       width: width,
+      customIcon: customIcon,
+      customAccentColor: customAccentColor,
     );
   }
 }
@@ -147,6 +260,8 @@ class _AiraActionToastOverlay extends StatefulWidget {
   final VoidCallback? onAction;
   final double width;
   final bool showStopButton;
+  final IconData? customIcon;
+  final Color? customAccentColor;
   final VoidCallback onDismiss;
 
   const _AiraActionToastOverlay({
@@ -158,6 +273,8 @@ class _AiraActionToastOverlay extends StatefulWidget {
     this.onAction,
     required this.width,
     required this.showStopButton,
+    this.customIcon,
+    this.customAccentColor,
     required this.onDismiss,
   });
 
@@ -241,6 +358,8 @@ class _AiraActionToastOverlayState extends State<_AiraActionToastOverlay>
                 actionLabel: widget.actionLabel,
                 onAction: widget.onAction,
                 showStopButton: widget.showStopButton,
+                customIcon: widget.customIcon,
+                customAccentColor: widget.customAccentColor,
                 onDismiss: _handleDismiss,
               ),
             ),
@@ -261,6 +380,8 @@ class AiraActionToastCard extends StatefulWidget {
   final String actionLabel;
   final VoidCallback? onAction;
   final bool showStopButton;
+  final IconData? customIcon;
+  final Color? customAccentColor;
   final VoidCallback onDismiss;
 
   const AiraActionToastCard({
@@ -272,6 +393,8 @@ class AiraActionToastCard extends StatefulWidget {
     required this.actionLabel,
     this.onAction,
     required this.showStopButton,
+    this.customIcon,
+    this.customAccentColor,
     required this.onDismiss,
   });
 
@@ -331,67 +454,83 @@ class _AiraActionToastCardState extends State<AiraActionToastCard>
     final buttonBg = isDark ? const Color(0xFF334155).withValues(alpha: 0.4) : Colors.white;
     final buttonText = isDark ? const Color(0xFFF8FAFC) : const Color(0xFF0F172A);
 
-    // Accent color configuration based on type
-    final Color accentColor;
-    final Widget badgeIcon;
+    // Accent color configuration based on type or customAccentColor
+    final Color accentColor = widget.customAccentColor ??
+        switch (widget.type) {
+          AiraToastType.success => const Color(0xFF10B981), // Emerald green
+          AiraToastType.error => const Color(0xFFEF4444), // Coral red
+          AiraToastType.warning => const Color(0xFFF59E0B), // Honey Amber
+          AiraToastType.info => const Color(0xFF0284C7), // Sky Cerulean
+        };
 
-    switch (widget.type) {
-      case AiraToastType.success:
-        accentColor = const Color(0xFF10B981); // Emerald green
-        badgeIcon = Container(
-          width: 26,
-          height: 26,
-          decoration: BoxDecoration(
-            shape: BoxShape.circle,
-            border: Border.all(color: accentColor, width: 2.2),
-          ),
-          child: const Center(
-            child: Icon(Icons.check_rounded, color: Color(0xFF10B981), size: 16),
-          ),
-        );
-        break;
-      case AiraToastType.error:
-        accentColor = const Color(0xFFEF4444); // Coral red
-        badgeIcon = Container(
-          width: 26,
-          height: 26,
-          decoration: BoxDecoration(
-            shape: BoxShape.circle,
-            border: Border.all(color: accentColor, width: 2.2),
-          ),
-          child: const Center(
-            child: Icon(Icons.close_rounded, color: Color(0xFFEF4444), size: 16),
-          ),
-        );
-        break;
-      case AiraToastType.warning:
-        accentColor = const Color(0xFFF59E0B); // Honey Amber
-        badgeIcon = Container(
-          width: 26,
-          height: 26,
-          decoration: BoxDecoration(
-            shape: BoxShape.circle,
-            border: Border.all(color: accentColor, width: 2.2),
-          ),
-          child: const Center(
-            child: Icon(Icons.priority_high_rounded, color: Color(0xFFF59E0B), size: 16),
-          ),
-        );
-        break;
-      case AiraToastType.info:
-        accentColor = const Color(0xFF0284C7); // Sky Cerulean
-        badgeIcon = Container(
-          width: 26,
-          height: 26,
-          decoration: BoxDecoration(
-            shape: BoxShape.circle,
-            border: Border.all(color: accentColor, width: 2.2),
-          ),
-          child: const Center(
-            child: Icon(Icons.info_outline_rounded, color: Color(0xFF0284C7), size: 16),
-          ),
-        );
-        break;
+    final Widget badgeIcon;
+    if (widget.customIcon != null) {
+      badgeIcon = Container(
+        width: 26,
+        height: 26,
+        decoration: BoxDecoration(
+          shape: BoxShape.circle,
+          border: Border.all(color: accentColor, width: 2.2),
+        ),
+        child: Center(
+          child: Icon(widget.customIcon, color: accentColor, size: 16),
+        ),
+      );
+    } else {
+      switch (widget.type) {
+        case AiraToastType.success:
+          badgeIcon = Container(
+            width: 26,
+            height: 26,
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              border: Border.all(color: accentColor, width: 2.2),
+            ),
+            child: Center(
+              child: Icon(Icons.check_rounded, color: accentColor, size: 16),
+            ),
+          );
+          break;
+        case AiraToastType.error:
+          badgeIcon = Container(
+            width: 26,
+            height: 26,
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              border: Border.all(color: accentColor, width: 2.2),
+            ),
+            child: Center(
+              child: Icon(Icons.close_rounded, color: accentColor, size: 16),
+            ),
+          );
+          break;
+        case AiraToastType.warning:
+          badgeIcon = Container(
+            width: 26,
+            height: 26,
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              border: Border.all(color: accentColor, width: 2.2),
+            ),
+            child: Center(
+              child: Icon(Icons.priority_high_rounded, color: accentColor, size: 16),
+            ),
+          );
+          break;
+        case AiraToastType.info:
+          badgeIcon = Container(
+            width: 26,
+            height: 26,
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              border: Border.all(color: accentColor, width: 2.2),
+            ),
+            child: Center(
+              child: Icon(Icons.info_outline_rounded, color: accentColor, size: 16),
+            ),
+          );
+          break;
+      }
     }
 
     return Container(
