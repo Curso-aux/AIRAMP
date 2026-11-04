@@ -1,3 +1,4 @@
+import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -45,6 +46,14 @@ class _AdminWebStudentsScreenState extends ConsumerState<AdminWebStudentsScreen>
     } catch (_) {
       return 'Deactivated';
     }
+  }
+
+  String _generateAutoStudentPassword() {
+    final rand = Random();
+    const symbols = ['@', '#', '!', '\$'];
+    final symbol = symbols[rand.nextInt(symbols.length)];
+    final num = 1000 + rand.nextInt(9000);
+    return 'Stud$symbol$num';
   }
 
   final List<String> _defaultGrades = [
@@ -279,7 +288,7 @@ class _AdminWebStudentsScreenState extends ConsumerState<AdminWebStudentsScreen>
     final allStudents = ref.watch(adminStudentsProvider);
     final archivedStudents = ref.watch(adminArchivedStudentsProvider);
     final availableSectionsAsync = ref.watch(availableSectionsProvider);
-    final availableSections = availableSectionsAsync.value ?? ['STEM A', 'STEM B', 'STEM C', 'Emerald', 'Ruby'];
+    final availableSections = availableSectionsAsync.value ?? [];
     final subjects = ref.watch(subjectsProvider);
 
     // Compute all dynamic grade levels present
@@ -606,39 +615,82 @@ class _AdminWebStudentsScreenState extends ConsumerState<AdminWebStudentsScreen>
               ),
               const SizedBox(height: 16),
 
-              // Global Search Bar
-              Container(
-                decoration: BoxDecoration(
-                  color: AppTheme.surface,
-                  borderRadius: BorderRadius.circular(14),
-                  border: Border.all(color: AppTheme.border),
-                ),
-                child: TextField(
-                  controller: _searchController,
-                  maxLength: 60,
-                  buildCounter: (context, {required currentLength, required isFocused, maxLength}) => null,
-                  style: TextStyle(color: AppTheme.text, fontSize: 14),
-                  decoration: InputDecoration(
-                    hintText: _isArchiveView
-                        ? 'Search deactivated student name, email, or last section...'
-                        : 'Search student name, email, or section across school...',
-                    counterText: '',
-                    prefixIcon: Icon(Icons.search, size: 20, color: AppTheme.textMuted),
-                    suffixIcon: _searchController.text.isNotEmpty
-                        ? IconButton(
-                            icon: const Icon(Icons.clear, size: 16),
-                            onPressed: () {
-                              _searchController.clear();
-                              setState(() {});
-                            },
-                          )
-                        : null,
-                    filled: false,
-                    isDense: true,
-                    contentPadding: const EdgeInsets.symmetric(vertical: 14, horizontal: 16),
-                    border: InputBorder.none,
-                  ),
-                ),
+              // Global Search & Filter Toolbar (Year Level and Section Filter beside Search Bar)
+              LayoutBuilder(
+                builder: (context, constraints) {
+                  final isWide = constraints.maxWidth >= 900;
+
+                  final searchWidget = Container(
+                    height: 44,
+                    decoration: BoxDecoration(
+                      color: AppTheme.surface,
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(color: AppTheme.border),
+                    ),
+                    child: TextField(
+                      controller: _searchController,
+                      maxLength: 60,
+                      buildCounter: (context, {required currentLength, required isFocused, maxLength}) => null,
+                      style: TextStyle(color: AppTheme.text, fontSize: 13.5),
+                      decoration: InputDecoration(
+                        hintText: _isArchiveView
+                            ? 'Search deactivated student name, email, or last section...'
+                            : 'Search student name, email, or section across school...',
+                        hintStyle: TextStyle(color: AppTheme.textMuted, fontSize: 13.5),
+                        counterText: '',
+                        prefixIcon: Icon(Icons.search, size: 19, color: AppTheme.textMuted),
+                        suffixIcon: _searchController.text.isNotEmpty
+                            ? IconButton(
+                                icon: const Icon(Icons.clear, size: 16),
+                                onPressed: () {
+                                  _searchController.clear();
+                                  setState(() {});
+                                },
+                              )
+                            : null,
+                        filled: false,
+                        isDense: true,
+                        contentPadding: const EdgeInsets.symmetric(vertical: 12, horizontal: 14),
+                        border: InputBorder.none,
+                      ),
+                    ),
+                  );
+
+                  if (_isArchiveView) {
+                    return searchWidget;
+                  }
+
+                  final yearDropdown = _buildYearLevelDropdown(allStudents, displayedGrades, specialStudents, isDark);
+                  final sectionDropdown = _buildSectionDropdown(allStudents, classroomsInSelectedGrade, specialStudents, isDark);
+
+                  if (isWide) {
+                    return Row(
+                      crossAxisAlignment: CrossAxisAlignment.center,
+                      children: [
+                        Expanded(child: searchWidget),
+                        const SizedBox(width: 10),
+                        yearDropdown,
+                        const SizedBox(width: 10),
+                        sectionDropdown,
+                      ],
+                    );
+                  }
+
+                  return Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      searchWidget,
+                      const SizedBox(height: 10),
+                      Row(
+                        children: [
+                          Expanded(child: yearDropdown),
+                          const SizedBox(width: 10),
+                          Expanded(child: sectionDropdown),
+                        ],
+                      ),
+                    ],
+                  );
+                },
               ),
               const SizedBox(height: 18),
 
@@ -792,28 +844,32 @@ class _AdminWebStudentsScreenState extends ConsumerState<AdminWebStudentsScreen>
                               ),
                             ),
                             if (_selectedStudentIds.isNotEmpty) ...[
-                              ElevatedButton.icon(
+                              OutlinedButton.icon(
                                 onPressed: () => _confirmBulkRestore(context, _selectedStudentIds.toList()),
-                                icon: const Icon(Icons.restore_rounded, size: 15),
+                                icon: const Icon(Icons.restore_rounded, size: 14),
                                 label: Text('Restore Selected (${_selectedStudentIds.length})'),
-                                style: ElevatedButton.styleFrom(
-                                  backgroundColor: AppTheme.success,
-                                  foregroundColor: Colors.white,
-                                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                                style: OutlinedButton.styleFrom(
+                                  foregroundColor: isDark ? const Color(0xFF6EE7B7) : const Color(0xFF047857),
+                                  backgroundColor: isDark ? const Color(0xFF064E3B).withValues(alpha: 0.35) : const Color(0xFFECFDF5),
+                                  side: BorderSide(color: isDark ? const Color(0xFF059669).withValues(alpha: 0.45) : const Color(0xFFA7F3D0)),
+                                  padding: const EdgeInsets.symmetric(horizontal: 11, vertical: 5),
+                                  minimumSize: const Size(0, 30),
                                   shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                                  elevation: 0,
+                                  textStyle: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
                                 ),
                               ),
-                              ElevatedButton.icon(
+                              OutlinedButton.icon(
                                 onPressed: () => _confirmBulkPermanentDelete(context, _selectedStudentIds.toList()),
-                                icon: const Icon(Icons.delete_forever_rounded, size: 15),
+                                icon: const Icon(Icons.delete_forever_rounded, size: 14),
                                 label: Text('Delete Permanently (${_selectedStudentIds.length})'),
-                                style: ElevatedButton.styleFrom(
-                                  backgroundColor: AppTheme.error,
-                                  foregroundColor: Colors.white,
-                                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                                style: OutlinedButton.styleFrom(
+                                  foregroundColor: isDark ? const Color(0xFFFCA5A5) : const Color(0xFFB91C1C),
+                                  backgroundColor: isDark ? const Color(0xFF450A0A).withValues(alpha: 0.35) : const Color(0xFFFEF2F2),
+                                  side: BorderSide(color: isDark ? const Color(0xFF991B1B).withValues(alpha: 0.45) : const Color(0xFFFECACA)),
+                                  padding: const EdgeInsets.symmetric(horizontal: 11, vertical: 5),
+                                  minimumSize: const Size(0, 30),
                                   shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                                  elevation: 0,
+                                  textStyle: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
                                 ),
                               ),
                             ],
@@ -824,316 +880,6 @@ class _AdminWebStudentsScreenState extends ConsumerState<AdminWebStudentsScreen>
                   ),
                 )
               else ...[
-                // Hierarchy Navigation Container (STEP 1 & STEP 2) for Active Directory
-                Container(
-                  padding: const EdgeInsets.all(18),
-                  decoration: BoxDecoration(
-                    color: AppTheme.surface,
-                    borderRadius: BorderRadius.circular(16),
-                    border: Border.all(color: AppTheme.border),
-                  ),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      // STEP 1: YEAR LEVEL SELECTOR
-                      Row(
-                        children: [
-                          Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                            decoration: BoxDecoration(
-                              color: AppTheme.primary.withValues(alpha: 0.15),
-                              borderRadius: BorderRadius.circular(6),
-                            ),
-                            child: Text(
-                              'STEP 1',
-                              style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: AppTheme.primary),
-                            ),
-                          ),
-                          const SizedBox(width: 8),
-                          Text(
-                            'Choose Year Level:',
-                            style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: AppTheme.text),
-                          ),
-                          const Spacer(),
-                          if (_isSpecialView)
-                            Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 3),
-                              decoration: BoxDecoration(
-                                color: AppTheme.primary.withValues(alpha: 0.08),
-                                borderRadius: BorderRadius.circular(12),
-                                border: Border.all(color: AppTheme.primary.withValues(alpha: 0.2)),
-                              ),
-                              child: Row(
-                                mainAxisSize: MainAxisSize.min,
-                                children: [
-                                  Icon(Icons.workspace_premium_outlined, size: 13, color: AppTheme.primary),
-                                  const SizedBox(width: 4),
-                                  Text(
-                                    'Special Students Scope',
-                                    style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: AppTheme.primary),
-                                  ),
-                                ],
-                              ),
-                            ),
-                        ],
-                      ),
-                      const SizedBox(height: 12),
-
-                      // Year Level Chips using Wrap (Never clips or extends beyond viewport!)
-                      Wrap(
-                        spacing: 8,
-                        runSpacing: 8,
-                        children: [
-                          // 1. All Students Master List
-                          ChoiceChip(
-                            avatar: Icon(
-                              Icons.list_alt_rounded,
-                              size: 15,
-                              color: _isAllDirectoryView ? Colors.white : AppTheme.textSecondary,
-                            ),
-                            label: Text('All Students (${allStudents.length})'),
-                            selected: _isAllDirectoryView,
-                            selectedColor: AppTheme.primary,
-                            labelStyle: TextStyle(
-                              fontSize: 12,
-                              fontWeight: _isAllDirectoryView ? FontWeight.bold : FontWeight.w500,
-                              color: _isAllDirectoryView ? Colors.white : AppTheme.textSecondary,
-                            ),
-                            backgroundColor: AppTheme.background,
-                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-                            side: BorderSide(color: _isAllDirectoryView ? AppTheme.primary : AppTheme.border),
-                            onSelected: (_) {
-                              setState(() {
-                                _isAllDirectoryView = true;
-                                _isSpecialView = false;
-                                _selectedStudentIds.clear();
-                              });
-                            },
-                          ),
-
-                          // 2. Standard Grade Levels (Grade 7 - Grade 12)
-                          ...displayedGrades.map((grade) {
-                            final isSelected = !_isSpecialView && !_isAllDirectoryView && _selectedGrade == grade;
-                            final count = allStudents.where((s) => s['grade'] == grade).length;
-
-                            return ChoiceChip(
-                              avatar: Icon(
-                                Icons.school_outlined,
-                                size: 15,
-                                color: isSelected ? Colors.white : AppTheme.textSecondary,
-                              ),
-                              label: Text('$grade ($count)'),
-                              selected: isSelected,
-                              selectedColor: AppTheme.primary,
-                              labelStyle: TextStyle(
-                                fontSize: 12,
-                                fontWeight: isSelected ? FontWeight.bold : FontWeight.w500,
-                                color: isSelected ? Colors.white : AppTheme.textSecondary,
-                              ),
-                              backgroundColor: AppTheme.background,
-                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-                              side: BorderSide(color: isSelected ? AppTheme.primary : AppTheme.border),
-                              onSelected: (_) {
-                                setState(() {
-                                  _selectedGrade = grade;
-                                  _selectedSection = 'All';
-                                  _isSpecialView = false;
-                                  _isAllDirectoryView = false;
-                                  _selectedStudentIds.clear();
-                                });
-                              },
-                            );
-                          }),
-
-                          // 3. Special Students Option
-                          ChoiceChip(
-                            avatar: Icon(
-                              Icons.workspace_premium_outlined,
-                              size: 15,
-                              color: _isSpecialView ? Colors.white : AppTheme.textSecondary,
-                            ),
-                            label: Text('Special Students (${specialStudents.length})'),
-                            selected: _isSpecialView,
-                            selectedColor: AppTheme.primary,
-                            labelStyle: TextStyle(
-                              fontSize: 12,
-                              fontWeight: _isSpecialView ? FontWeight.bold : FontWeight.w500,
-                              color: _isSpecialView ? Colors.white : AppTheme.textSecondary,
-                            ),
-                            backgroundColor: AppTheme.background,
-                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-                            side: BorderSide(color: _isSpecialView ? AppTheme.primary : AppTheme.border),
-                            onSelected: (_) {
-                              setState(() {
-                                _isSpecialView = true;
-                                _isAllDirectoryView = false;
-                                _selectedStudentIds.clear();
-                              });
-                            },
-                          ),
-                        ],
-                      ),
-
-                      const SizedBox(height: 14),
-                      Divider(height: 1, color: AppTheme.border),
-                      const SizedBox(height: 14),
-
-                      // STEP 2: CLASSROOM SECTION OR SPECIAL CATEGORY
-                      if (_isSpecialView) ...[
-                        Row(
-                          children: [
-                            Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                              decoration: BoxDecoration(
-                                color: AppTheme.primary.withValues(alpha: 0.08),
-                                borderRadius: BorderRadius.circular(6),
-                              ),
-                              child: Text(
-                                'TRACK',
-                                style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: AppTheme.primary),
-                              ),
-                            ),
-                            const SizedBox(width: 8),
-                            Text(
-                              'Special Student Category:',
-                              style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: AppTheme.text),
-                            ),
-                          ],
-                        ),
-                        const SizedBox(height: 10),
-                        Wrap(
-                          spacing: 8,
-                          runSpacing: 8,
-                          children: [
-                            {'id': 'All', 'name': 'All Special', 'count': specialStudents.length},
-                            {'id': 'Irregular', 'name': 'Irregular', 'count': specialStudents.where((s) => (s['student_type'] as String? ?? '').toLowerCase().contains('irregular')).length},
-                            {'id': 'Transferee', 'name': 'Transferee', 'count': specialStudents.where((s) => (s['student_type'] as String? ?? '').toLowerCase().contains('transferee')).length},
-                            {'id': 'SPED', 'name': 'SPED', 'count': specialStudents.where((s) => (s['student_type'] as String? ?? '').toLowerCase().contains('sped')).length},
-                            {'id': 'Unassigned', 'name': 'Unassigned', 'count': specialStudents.where((s) {
-                              final sec = (s['section'] as String? ?? '').toLowerCase();
-                              return sec == 'unassigned' || sec.isEmpty;
-                            }).length},
-                          ].map((item) {
-                            final cat = item['id'] as String;
-                            final name = item['name'] as String;
-                            final count = item['count'] as int;
-                            final isSel = _specialSubFilter == cat;
-                            return FilterChip(
-                              label: Row(
-                                mainAxisSize: MainAxisSize.min,
-                                children: [
-                                  Text(name),
-                                  const SizedBox(width: 4),
-                                  Text(
-                                    '($count)',
-                                    style: TextStyle(
-                                      fontSize: 11,
-                                      fontWeight: FontWeight.normal,
-                                      color: isSel ? Colors.white : AppTheme.textMuted,
-                                    ),
-                                  ),
-                                ],
-                              ),
-                              selected: isSel,
-                              selectedColor: AppTheme.primary,
-                              labelStyle: TextStyle(
-                                fontSize: 12,
-                                fontWeight: isSel ? FontWeight.bold : FontWeight.w500,
-                                color: isSel ? Colors.white : AppTheme.textSecondary,
-                              ),
-                              backgroundColor: AppTheme.background,
-                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-                              side: BorderSide(color: isSel ? AppTheme.primary : AppTheme.border),
-                              onSelected: (_) => setState(() => _specialSubFilter = cat),
-                            );
-                          }).toList(),
-                        ),
-                      ] else if (_isAllDirectoryView) ...[
-                        Row(
-                          children: [
-                            Icon(Icons.info_outline, size: 16, color: AppTheme.textMuted),
-                            const SizedBox(width: 8),
-                            Expanded(
-                              child: Text(
-                                'Showing all ${allStudents.length} students across all year levels and sections. Select a specific grade above to filter by classroom section.',
-                                style: TextStyle(fontSize: 12.5, color: AppTheme.textSecondary),
-                              ),
-                            ),
-                          ],
-                        ),
-                      ] else ...[
-                        Row(
-                          children: [
-                            Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                              decoration: BoxDecoration(
-                                color: AppTheme.primary.withValues(alpha: 0.08),
-                                borderRadius: BorderRadius.circular(6),
-                              ),
-                              child: Text(
-                                'STEP 2',
-                                style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: AppTheme.primary),
-                              ),
-                            ),
-                            const SizedBox(width: 8),
-                            Text(
-                              'Choose Classroom in $_selectedGrade:',
-                              style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: AppTheme.text),
-                            ),
-                          ],
-                        ),
-                        const SizedBox(height: 10),
-                        Wrap(
-                          spacing: 8,
-                          runSpacing: 8,
-                          children: [
-                            FilterChip(
-                              label: Text('All $_selectedGrade Classrooms'),
-                              selected: _selectedSection == 'All',
-                              selectedColor: AppTheme.primary,
-                              labelStyle: TextStyle(
-                                fontSize: 12,
-                                fontWeight: _selectedSection == 'All' ? FontWeight.bold : FontWeight.normal,
-                                color: _selectedSection == 'All' ? Colors.white : AppTheme.textSecondary,
-                              ),
-                              backgroundColor: AppTheme.background,
-                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-                              side: BorderSide(color: _selectedSection == 'All' ? AppTheme.primary : AppTheme.border),
-                              onSelected: (_) => setState(() => _selectedSection = 'All'),
-                            ),
-                            ...classroomsInSelectedGrade.map((sec) {
-                              final isSel = _selectedSection == sec;
-                              final count = allStudents.where((s) {
-                                final sGrade = s['grade'] as String? ?? '';
-                                final sSec = s['section'] as String? ?? '';
-                                return (sGrade == _selectedGrade || sSec.contains(_selectedGrade)) &&
-                                    (sSec == sec || sSec.endsWith(sec));
-                              }).length;
-
-                              return FilterChip(
-                                avatar: Icon(Icons.meeting_room_outlined, size: 14, color: isSel ? Colors.white : AppTheme.primary),
-                                label: Text('$sec ($count)'),
-                                selected: isSel,
-                                selectedColor: AppTheme.primary,
-                                labelStyle: TextStyle(
-                                  fontSize: 12,
-                                  fontWeight: isSel ? FontWeight.bold : FontWeight.normal,
-                                  color: isSel ? Colors.white : AppTheme.textSecondary,
-                                ),
-                                backgroundColor: AppTheme.background,
-                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-                                side: BorderSide(color: isSel ? AppTheme.primary : AppTheme.border),
-                                onSelected: (_) => setState(() => _selectedSection = sec),
-                              );
-                            }),
-                          ],
-                        ),
-                      ],
-                    ],
-                  ),
-                ),
-                const SizedBox(height: 18),
-
                 // Active Scoped Scope Banner
                 Container(
                   padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
@@ -1166,7 +912,7 @@ class _AdminWebStudentsScreenState extends ConsumerState<AdminWebStudentsScreen>
                           ),
                         ),
                       ),
-                      if (_selectedSection != 'All' || _isSpecialView || _isAllDirectoryView) ...[
+                      if (_selectedSection != 'All' || _isSpecialView || _isAllDirectoryView || _selectedGrade != 'Grade 10') ...[
                         TextButton.icon(
                           icon: const Icon(Icons.restart_alt, size: 16),
                           label: const Text('Reset Filter', style: TextStyle(fontSize: 12)),
@@ -1179,6 +925,7 @@ class _AdminWebStudentsScreenState extends ConsumerState<AdminWebStudentsScreen>
                               _selectedSection = 'All';
                               _isSpecialView = false;
                               _isAllDirectoryView = false;
+                              _specialSubFilter = 'All';
                               _selectedStudentIds.clear();
                               _isSelectionMode = false;
                               _searchController.clear();
@@ -1315,6 +1062,416 @@ class _AdminWebStudentsScreenState extends ConsumerState<AdminWebStudentsScreen>
     );
   }
 
+  Widget _buildYearLevelDropdown(
+    List<Map<String, dynamic>> allStudents,
+    List<String> displayedGrades,
+    List<Map<String, dynamic>> specialStudents,
+    bool isDark,
+  ) {
+    String currentYearLabel = 'Grade 10';
+    if (_isAllDirectoryView) {
+      currentYearLabel = 'All Students';
+    } else if (_isSpecialView) {
+      currentYearLabel = 'Special Students';
+    } else {
+      currentYearLabel = _selectedGrade;
+    }
+
+    final isFiltered = _isSpecialView || _isAllDirectoryView || _selectedGrade != 'Grade 10';
+
+    return PopupMenuButton<String>(
+      tooltip: 'Filter by Year Level',
+      offset: const Offset(0, 48),
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(12),
+        side: BorderSide(color: AppTheme.border),
+      ),
+      color: AppTheme.surface,
+      elevation: 6,
+      onSelected: (val) {
+        setState(() {
+          if (val == 'all') {
+            _isAllDirectoryView = true;
+            _isSpecialView = false;
+            _selectedSection = 'All';
+          } else if (val == 'special') {
+            _isSpecialView = true;
+            _isAllDirectoryView = false;
+            _specialSubFilter = 'All';
+            _selectedSection = 'All';
+          } else {
+            _selectedGrade = val;
+            _isSpecialView = false;
+            _isAllDirectoryView = false;
+            _selectedSection = 'All';
+          }
+          _selectedStudentIds.clear();
+        });
+      },
+      itemBuilder: (context) {
+        return [
+          PopupMenuItem<String>(
+            value: 'all',
+            child: Row(
+              children: [
+                Icon(Icons.list_alt_rounded, size: 16, color: _isAllDirectoryView ? AppTheme.primary : AppTheme.textSecondary),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Text(
+                    'All Students',
+                    style: TextStyle(
+                      fontSize: 13,
+                      fontWeight: _isAllDirectoryView ? FontWeight.bold : FontWeight.normal,
+                      color: _isAllDirectoryView ? AppTheme.primary : AppTheme.text,
+                    ),
+                  ),
+                ),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                  decoration: BoxDecoration(
+                    color: AppTheme.background,
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: Text(
+                    '${allStudents.length}',
+                    style: TextStyle(fontSize: 11, color: AppTheme.textMuted),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const PopupMenuDivider(),
+          ...displayedGrades.map((grade) {
+            final isSel = !_isSpecialView && !_isAllDirectoryView && _selectedGrade == grade;
+            final count = allStudents.where((s) => s['grade'] == grade).length;
+            return PopupMenuItem<String>(
+              value: grade,
+              child: Row(
+                children: [
+                  Icon(Icons.school_outlined, size: 16, color: isSel ? AppTheme.primary : AppTheme.textSecondary),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Text(
+                      grade,
+                      style: TextStyle(
+                        fontSize: 13,
+                        fontWeight: isSel ? FontWeight.bold : FontWeight.normal,
+                        color: isSel ? AppTheme.primary : AppTheme.text,
+                      ),
+                    ),
+                  ),
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                    decoration: BoxDecoration(
+                      color: AppTheme.background,
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: Text(
+                      '$count',
+                      style: TextStyle(fontSize: 11, color: AppTheme.textMuted),
+                    ),
+                  ),
+                ],
+              ),
+            );
+          }),
+          const PopupMenuDivider(),
+          PopupMenuItem<String>(
+            value: 'special',
+            child: Row(
+              children: [
+                Icon(Icons.workspace_premium_outlined, size: 16, color: _isSpecialView ? AppTheme.primary : AppTheme.textSecondary),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Text(
+                    'Special Students',
+                    style: TextStyle(
+                      fontSize: 13,
+                      fontWeight: _isSpecialView ? FontWeight.bold : FontWeight.normal,
+                      color: _isSpecialView ? AppTheme.primary : AppTheme.text,
+                    ),
+                  ),
+                ),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                  decoration: BoxDecoration(
+                    color: AppTheme.background,
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: Text(
+                    '${specialStudents.length}',
+                    style: TextStyle(fontSize: 11, color: AppTheme.textMuted),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ];
+      },
+      child: Container(
+        height: 44,
+        padding: const EdgeInsets.symmetric(horizontal: 14),
+        decoration: BoxDecoration(
+          color: isFiltered ? AppTheme.primary.withValues(alpha: 0.08) : AppTheme.surface,
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(
+            color: isFiltered ? AppTheme.primary.withValues(alpha: 0.4) : AppTheme.border,
+            width: isFiltered ? 1.4 : 1.0,
+          ),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(
+              _isSpecialView
+                  ? Icons.workspace_premium_outlined
+                  : (_isAllDirectoryView ? Icons.list_alt_rounded : Icons.school_outlined),
+              size: 16,
+              color: isFiltered ? AppTheme.primary : AppTheme.textMuted,
+            ),
+            const SizedBox(width: 8),
+            Text(
+              currentYearLabel,
+              style: TextStyle(
+                fontSize: 13,
+                fontWeight: isFiltered ? FontWeight.bold : FontWeight.w500,
+                color: isFiltered ? AppTheme.primary : AppTheme.text,
+              ),
+            ),
+            const SizedBox(width: 6),
+            Icon(Icons.keyboard_arrow_down_rounded, size: 18, color: AppTheme.textMuted),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildSectionDropdown(
+    List<Map<String, dynamic>> allStudents,
+    List<String> classroomsInSelectedGrade,
+    List<Map<String, dynamic>> specialStudents,
+    bool isDark,
+  ) {
+    String currentSectionLabel;
+    IconData icon;
+    bool isFiltered = false;
+
+    if (_isSpecialView) {
+      icon = Icons.category_outlined;
+      currentSectionLabel = _specialSubFilter == 'All' ? 'All Special' : _specialSubFilter;
+      isFiltered = _specialSubFilter != 'All';
+    } else if (_isAllDirectoryView) {
+      icon = Icons.meeting_room_outlined;
+      currentSectionLabel = _selectedSection == 'All' ? 'All Sections' : _selectedSection;
+      isFiltered = _selectedSection != 'All';
+    } else {
+      icon = Icons.meeting_room_outlined;
+      currentSectionLabel = _selectedSection == 'All' ? 'All $_selectedGrade Classrooms' : _selectedSection;
+      isFiltered = _selectedSection != 'All';
+    }
+
+    return PopupMenuButton<String>(
+      tooltip: 'Filter by Classroom Section / Track',
+      offset: const Offset(0, 48),
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(12),
+        side: BorderSide(color: AppTheme.border),
+      ),
+      color: AppTheme.surface,
+      elevation: 6,
+      onSelected: (val) {
+        setState(() {
+          if (_isSpecialView) {
+            _specialSubFilter = val;
+          } else {
+            _selectedSection = val;
+          }
+          _selectedStudentIds.clear();
+        });
+      },
+      itemBuilder: (context) {
+        if (_isSpecialView) {
+          final specialCategories = [
+            {'id': 'All', 'name': 'All Special', 'count': specialStudents.length},
+            {'id': 'Irregular', 'name': 'Irregular', 'count': specialStudents.where((s) => (s['student_type'] as String? ?? '').toLowerCase().contains('irregular')).length},
+            {'id': 'Transferee', 'name': 'Transferee', 'count': specialStudents.where((s) => (s['student_type'] as String? ?? '').toLowerCase().contains('transferee')).length},
+            {'id': 'SPED', 'name': 'SPED', 'count': specialStudents.where((s) => (s['student_type'] as String? ?? '').toLowerCase().contains('sped')).length},
+            {'id': 'Unassigned', 'name': 'Unassigned', 'count': specialStudents.where((s) {
+              final sec = (s['section'] as String? ?? '').toLowerCase();
+              return sec == 'unassigned' || sec.isEmpty;
+            }).length},
+          ];
+
+          return specialCategories.map((item) {
+            final cat = item['id'] as String;
+            final name = item['name'] as String;
+            final count = item['count'] as int;
+            final isSel = _specialSubFilter == cat;
+            return PopupMenuItem<String>(
+              value: cat,
+              child: Row(
+                children: [
+                  Icon(Icons.label_outline_rounded, size: 16, color: isSel ? AppTheme.primary : AppTheme.textSecondary),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Text(
+                      name,
+                      style: TextStyle(
+                        fontSize: 13,
+                        fontWeight: isSel ? FontWeight.bold : FontWeight.normal,
+                        color: isSel ? AppTheme.primary : AppTheme.text,
+                      ),
+                    ),
+                  ),
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                    decoration: BoxDecoration(
+                      color: AppTheme.background,
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: Text(
+                      '$count',
+                      style: TextStyle(fontSize: 11, color: AppTheme.textMuted),
+                    ),
+                  ),
+                ],
+              ),
+            );
+          }).toList();
+        }
+
+        // Standard Grade Sections or All Directory
+        final List<String> availableSectionsToDisplay = _isAllDirectoryView
+            ? () {
+                final set = <String>{};
+                for (final s in allStudents) {
+                  final sec = s['section'] as String?;
+                  if (sec != null && sec.isNotEmpty && sec != 'Unassigned') set.add(sec);
+                }
+                final list = set.toList()..sort();
+                return list;
+              }()
+            : classroomsInSelectedGrade;
+
+        final allClassroomsCount = _isAllDirectoryView
+            ? allStudents.length
+            : allStudents.where((s) {
+                final g = s['grade'] as String? ?? '';
+                final sec = s['section'] as String? ?? '';
+                return g == _selectedGrade || sec.contains(_selectedGrade);
+              }).length;
+
+        return [
+          PopupMenuItem<String>(
+            value: 'All',
+            child: Row(
+              children: [
+                Icon(Icons.dashboard_outlined, size: 16, color: _selectedSection == 'All' ? AppTheme.primary : AppTheme.textSecondary),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Text(
+                    _isAllDirectoryView ? 'All Classrooms' : 'All $_selectedGrade Classrooms',
+                    style: TextStyle(
+                      fontSize: 13,
+                      fontWeight: _selectedSection == 'All' ? FontWeight.bold : FontWeight.normal,
+                      color: _selectedSection == 'All' ? AppTheme.primary : AppTheme.text,
+                    ),
+                  ),
+                ),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                  decoration: BoxDecoration(
+                    color: AppTheme.background,
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: Text(
+                    '$allClassroomsCount',
+                    style: TextStyle(fontSize: 11, color: AppTheme.textMuted),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          if (availableSectionsToDisplay.isNotEmpty) const PopupMenuDivider(),
+          ...availableSectionsToDisplay.map((sec) {
+            final isSel = _selectedSection == sec;
+            final count = allStudents.where((s) {
+              if (_isAllDirectoryView) return s['section'] == sec;
+              final sGrade = s['grade'] as String? ?? '';
+              final sSec = s['section'] as String? ?? '';
+              return (sGrade == _selectedGrade || sSec.contains(_selectedGrade)) &&
+                  (sSec == sec || sSec.endsWith(sec));
+            }).length;
+
+            return PopupMenuItem<String>(
+              value: sec,
+              child: Row(
+                children: [
+                  Icon(Icons.meeting_room_outlined, size: 16, color: isSel ? AppTheme.primary : AppTheme.textSecondary),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Text(
+                      sec,
+                      style: TextStyle(
+                        fontSize: 13,
+                        fontWeight: isSel ? FontWeight.bold : FontWeight.normal,
+                        color: isSel ? AppTheme.primary : AppTheme.text,
+                      ),
+                    ),
+                  ),
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                    decoration: BoxDecoration(
+                      color: AppTheme.background,
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: Text(
+                      '$count',
+                      style: TextStyle(fontSize: 11, color: AppTheme.textMuted),
+                    ),
+                  ),
+                ],
+              ),
+            );
+          }),
+        ];
+      },
+      child: Container(
+        height: 44,
+        padding: const EdgeInsets.symmetric(horizontal: 14),
+        decoration: BoxDecoration(
+          color: isFiltered ? AppTheme.primary.withValues(alpha: 0.08) : AppTheme.surface,
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(
+            color: isFiltered ? AppTheme.primary.withValues(alpha: 0.4) : AppTheme.border,
+            width: isFiltered ? 1.4 : 1.0,
+          ),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(
+              icon,
+              size: 16,
+              color: isFiltered ? AppTheme.primary : AppTheme.textMuted,
+            ),
+            const SizedBox(width: 8),
+            Text(
+              currentSectionLabel,
+              style: TextStyle(
+                fontSize: 13,
+                fontWeight: isFiltered ? FontWeight.bold : FontWeight.w500,
+                color: isFiltered ? AppTheme.primary : AppTheme.text,
+              ),
+            ),
+            const SizedBox(width: 6),
+            Icon(Icons.keyboard_arrow_down_rounded, size: 18, color: AppTheme.textMuted),
+          ],
+        ),
+      ),
+    );
+  }
+
   Widget _buildBatchActionBar(List<Map<String, dynamic>> currentList, bool isDark) {
     if (_selectedStudentIds.isEmpty) return const SizedBox.shrink();
 
@@ -1401,32 +1558,32 @@ class _AdminWebStudentsScreenState extends ConsumerState<AdminWebStudentsScreen>
               ),
             ),
           ] else ...[
-            ElevatedButton.icon(
+            OutlinedButton.icon(
               onPressed: () => _confirmBulkRestore(context, _selectedStudentIds.toList()),
               icon: const Icon(Icons.restore_rounded, size: 14),
               label: Text('Restore Selected ($count)'),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: AppTheme.success,
-                foregroundColor: Colors.white,
-                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
-                minimumSize: const Size(0, 32),
+              style: OutlinedButton.styleFrom(
+                foregroundColor: isDark ? const Color(0xFF6EE7B7) : const Color(0xFF047857),
+                backgroundColor: isDark ? const Color(0xFF064E3B).withValues(alpha: 0.35) : const Color(0xFFECFDF5),
+                side: BorderSide(color: isDark ? const Color(0xFF059669).withValues(alpha: 0.45) : const Color(0xFFA7F3D0)),
+                padding: const EdgeInsets.symmetric(horizontal: 11, vertical: 5),
+                minimumSize: const Size(0, 30),
                 shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                elevation: 0,
                 textStyle: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
               ),
             ),
             const SizedBox(width: 8),
-            ElevatedButton.icon(
+            OutlinedButton.icon(
               onPressed: () => _confirmBulkPermanentDelete(context, _selectedStudentIds.toList()),
               icon: const Icon(Icons.delete_forever_rounded, size: 14),
               label: Text('Delete Permanently ($count)'),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: AppTheme.error,
-                foregroundColor: Colors.white,
-                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
-                minimumSize: const Size(0, 32),
+              style: OutlinedButton.styleFrom(
+                foregroundColor: isDark ? const Color(0xFFFCA5A5) : const Color(0xFFB91C1C),
+                backgroundColor: isDark ? const Color(0xFF450A0A).withValues(alpha: 0.35) : const Color(0xFFFEF2F2),
+                side: BorderSide(color: isDark ? const Color(0xFF991B1B).withValues(alpha: 0.45) : const Color(0xFFFECACA)),
+                padding: const EdgeInsets.symmetric(horizontal: 11, vertical: 5),
+                minimumSize: const Size(0, 30),
                 shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                elevation: 0,
                 textStyle: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
               ),
             ),
@@ -1668,7 +1825,7 @@ class _AdminWebStudentsScreenState extends ConsumerState<AdminWebStudentsScreen>
                         mainAxisSize: MainAxisSize.min,
                         children: [
                           if (_isArchiveView) ...[
-                            ElevatedButton.icon(
+                            OutlinedButton.icon(
                               onPressed: () async {
                                 await ref.read(adminArchivedStudentsProvider.notifier).restoreStudent(studentId);
                                 if (mounted) {
@@ -1679,24 +1836,37 @@ class _AdminWebStudentsScreenState extends ConsumerState<AdminWebStudentsScreen>
                                   );
                                 }
                               },
-                              icon: const Icon(Icons.restore_rounded, size: 14),
-                              label: const Text('Restore', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
-                              style: ElevatedButton.styleFrom(
-                                backgroundColor: AppTheme.success,
-                                foregroundColor: Colors.white,
-                                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
-                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(7)),
-                                minimumSize: const Size(0, 32),
-                                elevation: 0,
+                              icon: const Icon(Icons.restore_rounded, size: 13.5),
+                              label: const Text('Restore', style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.w600)),
+                              style: OutlinedButton.styleFrom(
+                                foregroundColor: isDark ? const Color(0xFF6EE7B7) : const Color(0xFF047857),
+                                backgroundColor: isDark ? const Color(0xFF064E3B).withValues(alpha: 0.35) : const Color(0xFFECFDF5),
+                                side: BorderSide(color: isDark ? const Color(0xFF059669).withValues(alpha: 0.45) : const Color(0xFFA7F3D0)),
+                                padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 4),
+                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(6)),
+                                minimumSize: const Size(0, 28),
                               ),
                             ),
-                            const SizedBox(width: 8),
-                            IconButton(
-                              onPressed: () => _confirmPermanentDeleteStudent(context, s),
-                              tooltip: 'Permanently Delete Record',
-                              icon: const Icon(Icons.delete_forever_rounded, size: 18),
-                              color: AppTheme.error,
-                              visualDensity: VisualDensity.compact,
+                            const SizedBox(width: 6),
+                            Tooltip(
+                              message: 'Permanently Delete Record',
+                              child: InkWell(
+                                onTap: () => _confirmPermanentDeleteStudent(context, s),
+                                borderRadius: BorderRadius.circular(6),
+                                child: Container(
+                                  padding: const EdgeInsets.all(5),
+                                  decoration: BoxDecoration(
+                                    color: isDark ? const Color(0xFF450A0A).withValues(alpha: 0.35) : const Color(0xFFFEF2F2),
+                                    borderRadius: BorderRadius.circular(6),
+                                    border: Border.all(color: isDark ? const Color(0xFF991B1B).withValues(alpha: 0.45) : const Color(0xFFFECACA)),
+                                  ),
+                                  child: Icon(
+                                    Icons.delete_outline_rounded,
+                                    size: 15,
+                                    color: isDark ? const Color(0xFFFCA5A5) : const Color(0xFFB91C1C),
+                                  ),
+                                ),
+                              ),
                             ),
                           ] else ...[
                             OutlinedButton.icon(
@@ -1860,7 +2030,7 @@ class _AdminWebStudentsScreenState extends ConsumerState<AdminWebStudentsScreen>
                 Row(
                   children: [
                     Expanded(
-                      child: ElevatedButton.icon(
+                      child: OutlinedButton.icon(
                         onPressed: () async {
                           await ref.read(adminArchivedStudentsProvider.notifier).restoreStudent(studentId);
                           if (cardCtx.mounted) {
@@ -1871,23 +2041,38 @@ class _AdminWebStudentsScreenState extends ConsumerState<AdminWebStudentsScreen>
                             );
                           }
                         },
-                        icon: const Icon(Icons.restore_rounded, size: 15),
-                        label: const Text('Restore to Active'),
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: AppTheme.success,
-                          foregroundColor: Colors.white,
+                        icon: const Icon(Icons.restore_rounded, size: 14),
+                        label: const Text('Restore to Active', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600)),
+                        style: OutlinedButton.styleFrom(
+                          foregroundColor: isDark ? const Color(0xFF6EE7B7) : const Color(0xFF047857),
+                          backgroundColor: isDark ? const Color(0xFF064E3B).withValues(alpha: 0.35) : const Color(0xFFECFDF5),
+                          side: BorderSide(color: isDark ? const Color(0xFF059669).withValues(alpha: 0.45) : const Color(0xFFA7F3D0)),
+                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
                           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                          elevation: 0,
+                          minimumSize: const Size(0, 32),
                         ),
                       ),
                     ),
                     const SizedBox(width: 8),
-                    IconButton(
-                      onPressed: () => _confirmPermanentDeleteStudent(cardCtx, s),
-                      tooltip: 'Permanently Delete',
-                      icon: const Icon(Icons.delete_forever_rounded, size: 19),
-                      color: AppTheme.error,
-                      visualDensity: VisualDensity.compact,
+                    Tooltip(
+                      message: 'Permanently Delete',
+                      child: InkWell(
+                        onTap: () => _confirmPermanentDeleteStudent(cardCtx, s),
+                        borderRadius: BorderRadius.circular(8),
+                        child: Container(
+                          padding: const EdgeInsets.all(7),
+                          decoration: BoxDecoration(
+                            color: isDark ? const Color(0xFF450A0A).withValues(alpha: 0.35) : const Color(0xFFFEF2F2),
+                            borderRadius: BorderRadius.circular(8),
+                            border: Border.all(color: isDark ? const Color(0xFF991B1B).withValues(alpha: 0.45) : const Color(0xFFFECACA)),
+                          ),
+                          child: Icon(
+                            Icons.delete_outline_rounded,
+                            size: 16,
+                            color: isDark ? const Color(0xFFFCA5A5) : const Color(0xFFB91C1C),
+                          ),
+                        ),
+                      ),
                     ),
                   ],
                 ),
@@ -2093,7 +2278,7 @@ class _AdminWebStudentsScreenState extends ConsumerState<AdminWebStudentsScreen>
     String currentGrade,
     List<String> availableSections,
   ) {
-    String destinationSection = availableSections.contains(currentSection) ? currentSection : (availableSections.isNotEmpty ? availableSections.first : 'Emerald');
+    String destinationSection = availableSections.contains(currentSection) ? currentSection : (availableSections.isNotEmpty ? availableSections.first : 'Unassigned');
     String destinationGrade = currentGrade != 'Unset' ? currentGrade : 'Grade 10';
 
     showDialog(
@@ -2524,6 +2709,16 @@ class _AdminWebStudentsScreenState extends ConsumerState<AdminWebStudentsScreen>
                   onPressed: isProcessing ? null : () => Navigator.of(dialogCtx).pop(),
                   child: Text('Cancel', style: TextStyle(color: AppTheme.textSecondary)),
                 ),
+                TextButton.icon(
+                  onPressed: isProcessing
+                      ? null
+                      : () {
+                          Navigator.of(dialogCtx).pop();
+                          _confirmPermanentDeleteStudent(rootContext, student);
+                        },
+                  icon: const Icon(Icons.delete_forever_rounded, size: 15, color: Color(0xFFB91C1C)),
+                  label: const Text('Delete Permanently Instead', style: TextStyle(color: Color(0xFFB91C1C), fontSize: 13, fontWeight: FontWeight.w600)),
+                ),
                 ElevatedButton.icon(
                   onPressed: isProcessing
                       ? null
@@ -2621,6 +2816,16 @@ class _AdminWebStudentsScreenState extends ConsumerState<AdminWebStudentsScreen>
                 TextButton(
                   onPressed: isProcessing ? null : () => Navigator.of(dialogCtx).pop(),
                   child: Text('Cancel', style: TextStyle(color: AppTheme.textSecondary)),
+                ),
+                TextButton.icon(
+                  onPressed: isProcessing
+                      ? null
+                      : () {
+                          Navigator.of(dialogCtx).pop();
+                          _confirmBulkPermanentDelete(rootContext, studentIds);
+                        },
+                  icon: const Icon(Icons.delete_forever_rounded, size: 15, color: Color(0xFFB91C1C)),
+                  label: const Text('Delete Permanently Instead', style: TextStyle(color: Color(0xFFB91C1C), fontSize: 13, fontWeight: FontWeight.w600)),
                 ),
                 ElevatedButton.icon(
                   onPressed: isProcessing
@@ -2855,10 +3060,10 @@ class _AdminWebStudentsScreenState extends ConsumerState<AdminWebStudentsScreen>
                           }
                         },
                   style: ElevatedButton.styleFrom(
-                    backgroundColor: Colors.red,
+                    backgroundColor: const Color(0xFFB91C1C),
                     foregroundColor: Colors.white,
                     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                    minimumSize: const Size(0, 40),
+                    minimumSize: const Size(0, 36),
                   ),
                   icon: isDeleting
                       ? const SizedBox(
@@ -2947,9 +3152,10 @@ class _AdminWebStudentsScreenState extends ConsumerState<AdminWebStudentsScreen>
                           }
                         },
                   style: ElevatedButton.styleFrom(
-                    backgroundColor: AppTheme.success,
+                    backgroundColor: const Color(0xFF047857),
                     foregroundColor: Colors.white,
                     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                    minimumSize: const Size(0, 36),
                   ),
                   icon: const Icon(Icons.restore_rounded, size: 16),
                   label: Text(isProcessing ? 'Restoring...' : 'Restore All Selected'),
@@ -3032,9 +3238,10 @@ class _AdminWebStudentsScreenState extends ConsumerState<AdminWebStudentsScreen>
                           }
                         },
                   style: ElevatedButton.styleFrom(
-                    backgroundColor: Colors.red,
+                    backgroundColor: const Color(0xFFB91C1C),
                     foregroundColor: Colors.white,
                     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                    minimumSize: const Size(0, 36),
                   ),
                   icon: const Icon(Icons.delete_forever_rounded, size: 16),
                   label: Text(isDeleting ? 'Deleting...' : 'Delete Permanently All Selected'),
@@ -3062,7 +3269,7 @@ void _resendStudentCredentialsDialog(BuildContext context, Map<String, dynamic> 
       return;
     }
 
-    final passwordCtrl = TextEditingController(text: 'Student@123');
+    final passwordCtrl = TextEditingController(text: _generateAutoStudentPassword());
     bool obscurePassword = false;
     bool isSending = false;
     final formKey = GlobalKey<FormState>();
@@ -3169,17 +3376,42 @@ void _resendStudentCredentialsDialog(BuildContext context, Map<String, dynamic> 
                       TextFormField(
                         controller: passwordCtrl,
                         obscureText: obscurePassword,
-                        style: TextStyle(color: AppTheme.text, fontSize: 14),
+                        style: TextStyle(
+                          color: AppTheme.text,
+                          fontSize: 14,
+                          fontWeight: FontWeight.w600,
+                          fontFamily: obscurePassword ? null : 'monospace',
+                        ),
                         decoration: InputDecoration(
-                          hintText: 'e.g. Student@123',
-                          prefixIcon: Icon(Icons.lock_outline, size: 20, color: AppTheme.textMuted),
-                          suffixIcon: IconButton(
-                            icon: Icon(
-                              obscurePassword ? Icons.visibility_off_outlined : Icons.visibility_outlined,
-                              size: 18,
-                              color: AppTheme.textMuted,
-                            ),
-                            onPressed: () => setDialogState(() => obscurePassword = !obscurePassword),
+                          hintText: 'e.g. Stud@4829',
+                          helperText: 'Auto-generated secure password',
+                          prefixIcon: Icon(Icons.lock_outline, size: 20, color: AppTheme.primary),
+                          suffixIcon: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              IconButton(
+                                icon: const Icon(Icons.refresh_rounded, size: 18),
+                                tooltip: 'Regenerate Password',
+                                color: AppTheme.primary,
+                                visualDensity: VisualDensity.compact,
+                                onPressed: () {
+                                  setDialogState(() {
+                                    passwordCtrl.text = _generateAutoStudentPassword();
+                                  });
+                                },
+                              ),
+                              IconButton(
+                                icon: Icon(
+                                  obscurePassword ? Icons.visibility_off_outlined : Icons.visibility_outlined,
+                                  size: 18,
+                                  color: AppTheme.textMuted,
+                                ),
+                                tooltip: obscurePassword ? 'Show Password' : 'Hide Password',
+                                visualDensity: VisualDensity.compact,
+                                onPressed: () => setDialogState(() => obscurePassword = !obscurePassword),
+                              ),
+                              const SizedBox(width: 4),
+                            ],
                           ),
                           filled: true,
                           fillColor: AppTheme.background,
@@ -3293,7 +3525,7 @@ void _resendStudentCredentialsDialog(BuildContext context, Map<String, dynamic> 
     final nameCtrl = TextEditingController();
     final emailCtrl = TextEditingController();
     final usernameCtrl = TextEditingController();
-    final passwordCtrl = TextEditingController(text: 'Student@123');
+    final passwordCtrl = TextEditingController(text: _generateAutoStudentPassword());
     final customSectionCtrl = TextEditingController();
     final notesCtrl = TextEditingController();
 
@@ -3302,26 +3534,20 @@ void _resendStudentCredentialsDialog(BuildContext context, Map<String, dynamic> 
     // Default grade & section based on currently active filter
     String selectedGrade = _selectedGrade != 'All' ? _selectedGrade : 'Grade 10';
 
-    // Build clean list of section options
+    // Build clean list of section options based strictly on registered school sections
     final sectionOptions = <String>{};
     for (final s in availableSections) {
       if (s.isNotEmpty && s != 'All') sectionOptions.add(s);
     }
-    sectionOptions.add('Diamond');
-    sectionOptions.add('Emerald');
-    sectionOptions.add('Ruby');
-    sectionOptions.add('Sapphire');
-    sectionOptions.add('STEM A');
-    sectionOptions.add('STEM B');
     sectionOptions.add('Unassigned');
 
-    String selectedSection = (_selectedSection != 'All' && _selectedSection.isNotEmpty)
+    String selectedSection = (_selectedSection != 'All' && _selectedSection.isNotEmpty && sectionOptions.contains(_selectedSection))
         ? _selectedSection
-        : (sectionOptions.contains('Diamond') ? 'Diamond' : sectionOptions.first);
+        : (sectionOptions.isNotEmpty ? sectionOptions.first : 'Unassigned');
 
     String selectedType = 'regular';
     final selectedSubjectIds = <int>{};
-    bool obscurePassword = true;
+    bool obscurePassword = false;
     bool isSubmitting = false;
 
     showDialog(
@@ -3449,28 +3675,55 @@ void _resendStudentCredentialsDialog(BuildContext context, Map<String, dynamic> 
                             Expanded(
                               child: TextFormField(
                                 controller: passwordCtrl,
-                                maxLength: 16,
+                                maxLength: 24,
                                 buildCounter: (context, {required currentLength, required isFocused, maxLength}) => null,
                                 obscureText: obscurePassword,
-                                style: TextStyle(color: AppTheme.text, fontSize: 14),
+                                style: TextStyle(
+                                  color: AppTheme.text,
+                                  fontSize: 13.5,
+                                  fontWeight: FontWeight.w600,
+                                  fontFamily: obscurePassword ? null : 'monospace',
+                                ),
                                 decoration: InputDecoration(
-                                  labelText: 'Initial Password',
-                                  labelStyle: TextStyle(color: AppTheme.textSecondary, fontSize: 13),
+                                  labelText: 'Initial Password (Auto-Generated)',
+                                  labelStyle: TextStyle(color: AppTheme.primary, fontSize: 13, fontWeight: FontWeight.w600),
+                                  helperText: 'Auto-generated secure password',
+                                  helperStyle: TextStyle(color: AppTheme.textMuted, fontSize: 11),
                                   counterText: '',
-                                  prefixIcon: Icon(Icons.lock_outline, size: 20, color: AppTheme.textMuted),
-                                  suffixIcon: IconButton(
-                                    icon: Icon(
-                                      obscurePassword ? Icons.visibility_off_outlined : Icons.visibility_outlined,
-                                      size: 18,
-                                      color: AppTheme.textMuted,
-                                    ),
-                                    onPressed: () => setDialogState(() => obscurePassword = !obscurePassword),
+                                  prefixIcon: Icon(Icons.lock_outline, size: 20, color: AppTheme.primary),
+                                  suffixIcon: Row(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      IconButton(
+                                        icon: const Icon(Icons.refresh_rounded, size: 18),
+                                        tooltip: 'Regenerate Password',
+                                        color: AppTheme.primary,
+                                        visualDensity: VisualDensity.compact,
+                                        onPressed: () {
+                                          setDialogState(() {
+                                            passwordCtrl.text = _generateAutoStudentPassword();
+                                          });
+                                        },
+                                      ),
+                                      IconButton(
+                                        icon: Icon(
+                                          obscurePassword ? Icons.visibility_off_outlined : Icons.visibility_outlined,
+                                          size: 18,
+                                          color: AppTheme.textMuted,
+                                        ),
+                                        tooltip: obscurePassword ? 'Show Password' : 'Hide Password',
+                                        visualDensity: VisualDensity.compact,
+                                        onPressed: () => setDialogState(() => obscurePassword = !obscurePassword),
+                                      ),
+                                      const SizedBox(width: 4),
+                                    ],
                                   ),
                                   filled: true,
                                   fillColor: AppTheme.background,
                                   border: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: BorderSide(color: AppTheme.border)),
+                                  focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: BorderSide(color: AppTheme.primary, width: 1.5)),
                                 ),
-                                validator: (v) => v == null || v.length < 6 ? 'Minimum 6 characters' : null,
+                                validator: (v) => v == null || v.trim().length < 6 ? 'Minimum 6 characters' : null,
                               ),
                             ),
                           ],

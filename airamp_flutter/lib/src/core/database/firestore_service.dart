@@ -651,12 +651,10 @@ class FirestoreService {
         final localId = local['id']?.toString() ?? '';
         final localEmail = (local['email']?.toString() ?? '').toLowerCase().trim();
 
-        // Keep system core accounts permanent so a fresh cloud sync never purges demo users
+        // Keep system core admin accounts permanent so a fresh cloud sync never purges administrators
         final isPermanentSeed = localId == 'admin_1' ||
             localId == 'admin_2' ||
-            localId == 'superadmin_1' ||
-            localId == 'teacher_1' ||
-            localId == 'student_1';
+            localId == 'superadmin_1';
         if (!isPermanentSeed && !cloudIds.contains(localId) && !cloudEmails.contains(localEmail)) {
           await db.delete('users', where: 'id = ?', whereArgs: [localId]);
           try {

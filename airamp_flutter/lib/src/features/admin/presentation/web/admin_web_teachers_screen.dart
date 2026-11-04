@@ -1,3 +1,4 @@
+import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -37,6 +38,14 @@ class _AdminWebTeachersScreenState extends ConsumerState<AdminWebTeachersScreen>
     } catch (_) {
       return dateStr;
     }
+  }
+
+  String _generateAutoTeacherPassword() {
+    final rand = Random();
+    const symbols = ['@', '#', '!', '\$'];
+    final symbol = symbols[rand.nextInt(symbols.length)];
+    final num = 1000 + rand.nextInt(9000);
+    return 'Teach$symbol$num';
   }
 
   @override
@@ -463,28 +472,32 @@ class _AdminWebTeachersScreenState extends ConsumerState<AdminWebTeachersScreen>
                               ),
                             ),
                             if (_selectedTeacherIds.isNotEmpty) ...[
-                              ElevatedButton.icon(
+                              OutlinedButton.icon(
                                 onPressed: () => _confirmBulkRestore(context, _selectedTeacherIds.toList()),
-                                icon: const Icon(Icons.restore_rounded, size: 15),
+                                icon: const Icon(Icons.restore_rounded, size: 14),
                                 label: Text('Restore Selected (${_selectedTeacherIds.length})'),
-                                style: ElevatedButton.styleFrom(
-                                  backgroundColor: AppTheme.success,
-                                  foregroundColor: Colors.white,
-                                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                                style: OutlinedButton.styleFrom(
+                                  foregroundColor: isDark ? const Color(0xFF6EE7B7) : const Color(0xFF047857),
+                                  backgroundColor: isDark ? const Color(0xFF064E3B).withValues(alpha: 0.35) : const Color(0xFFECFDF5),
+                                  side: BorderSide(color: isDark ? const Color(0xFF059669).withValues(alpha: 0.45) : const Color(0xFFA7F3D0)),
+                                  padding: const EdgeInsets.symmetric(horizontal: 11, vertical: 5),
+                                  minimumSize: const Size(0, 30),
                                   shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                                  elevation: 0,
+                                  textStyle: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
                                 ),
                               ),
-                              ElevatedButton.icon(
+                              OutlinedButton.icon(
                                 onPressed: () => _confirmBulkPermanentDelete(context, _selectedTeacherIds.toList()),
-                                icon: const Icon(Icons.delete_forever_rounded, size: 15),
+                                icon: const Icon(Icons.delete_forever_rounded, size: 14),
                                 label: Text('Delete Permanently (${_selectedTeacherIds.length})'),
-                                style: ElevatedButton.styleFrom(
-                                  backgroundColor: AppTheme.error,
-                                  foregroundColor: Colors.white,
-                                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                                style: OutlinedButton.styleFrom(
+                                  foregroundColor: isDark ? const Color(0xFFFCA5A5) : const Color(0xFFB91C1C),
+                                  backgroundColor: isDark ? const Color(0xFF450A0A).withValues(alpha: 0.35) : const Color(0xFFFEF2F2),
+                                  side: BorderSide(color: isDark ? const Color(0xFF991B1B).withValues(alpha: 0.45) : const Color(0xFFFECACA)),
+                                  padding: const EdgeInsets.symmetric(horizontal: 11, vertical: 5),
+                                  minimumSize: const Size(0, 30),
                                   shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                                  elevation: 0,
+                                  textStyle: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
                                 ),
                               ),
                             ],
@@ -957,7 +970,7 @@ class _AdminWebTeachersScreenState extends ConsumerState<AdminWebTeachersScreen>
                                       ? Row(
                                           mainAxisSize: MainAxisSize.min,
                                           children: [
-                                            ElevatedButton.icon(
+                                            OutlinedButton.icon(
                                               onPressed: () async {
                                                 await ref.read(adminArchivedTeachersProvider.notifier).restoreTeacher(teacherId);
                                                 if (context.mounted) {
@@ -968,24 +981,37 @@ class _AdminWebTeachersScreenState extends ConsumerState<AdminWebTeachersScreen>
                                                   );
                                                 }
                                               },
-                                              icon: const Icon(Icons.restore_rounded, size: 14),
-                                              label: const Text('Restore', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
-                                              style: ElevatedButton.styleFrom(
-                                                backgroundColor: AppTheme.success,
-                                                foregroundColor: Colors.white,
-                                                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
-                                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                                                elevation: 0,
-                                                minimumSize: const Size(0, 32),
+                                              icon: const Icon(Icons.restore_rounded, size: 13.5),
+                                              label: const Text('Restore', style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.w600)),
+                                              style: OutlinedButton.styleFrom(
+                                                foregroundColor: isDark ? const Color(0xFF6EE7B7) : const Color(0xFF047857),
+                                                backgroundColor: isDark ? const Color(0xFF064E3B).withValues(alpha: 0.35) : const Color(0xFFECFDF5),
+                                                side: BorderSide(color: isDark ? const Color(0xFF059669).withValues(alpha: 0.45) : const Color(0xFFA7F3D0)),
+                                                padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 4),
+                                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(6)),
+                                                minimumSize: const Size(0, 28),
                                               ),
                                             ),
-                                            const SizedBox(width: 8),
-                                            IconButton(
-                                              icon: const Icon(Icons.delete_forever_rounded, size: 18),
-                                              tooltip: 'Permanently Delete Faculty',
-                                              color: AppTheme.error,
-                                              visualDensity: VisualDensity.compact,
-                                              onPressed: () => _confirmPermanentDeleteTeacher(context, teacher),
+                                            const SizedBox(width: 6),
+                                            Tooltip(
+                                              message: 'Permanently Delete Faculty',
+                                              child: InkWell(
+                                                onTap: () => _confirmPermanentDeleteTeacher(context, teacher),
+                                                borderRadius: BorderRadius.circular(6),
+                                                child: Container(
+                                                  padding: const EdgeInsets.all(5),
+                                                  decoration: BoxDecoration(
+                                                    color: isDark ? const Color(0xFF450A0A).withValues(alpha: 0.35) : const Color(0xFFFEF2F2),
+                                                    borderRadius: BorderRadius.circular(6),
+                                                    border: Border.all(color: isDark ? const Color(0xFF991B1B).withValues(alpha: 0.45) : const Color(0xFFFECACA)),
+                                                  ),
+                                                  child: Icon(
+                                                    Icons.delete_outline_rounded,
+                                                    size: 15,
+                                                    color: isDark ? const Color(0xFFFCA5A5) : const Color(0xFFB91C1C),
+                                                  ),
+                                                ),
+                                              ),
                                             ),
                                           ],
                                         )
@@ -1131,32 +1157,32 @@ class _AdminWebTeachersScreenState extends ConsumerState<AdminWebTeachersScreen>
               ),
             ),
           ] else ...[
-            ElevatedButton.icon(
+            OutlinedButton.icon(
               onPressed: () => _confirmBulkRestore(context, _selectedTeacherIds.toList()),
               icon: const Icon(Icons.restore_rounded, size: 14),
               label: Text('Restore Selected ($count)'),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: AppTheme.success,
-                foregroundColor: Colors.white,
-                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
-                minimumSize: const Size(0, 32),
+              style: OutlinedButton.styleFrom(
+                foregroundColor: isDark ? const Color(0xFF6EE7B7) : const Color(0xFF047857),
+                backgroundColor: isDark ? const Color(0xFF064E3B).withValues(alpha: 0.35) : const Color(0xFFECFDF5),
+                side: BorderSide(color: isDark ? const Color(0xFF059669).withValues(alpha: 0.45) : const Color(0xFFA7F3D0)),
+                padding: const EdgeInsets.symmetric(horizontal: 11, vertical: 5),
+                minimumSize: const Size(0, 30),
                 shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                elevation: 0,
                 textStyle: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
               ),
             ),
             const SizedBox(width: 8),
-            ElevatedButton.icon(
+            OutlinedButton.icon(
               onPressed: () => _confirmBulkPermanentDelete(context, _selectedTeacherIds.toList()),
               icon: const Icon(Icons.delete_forever_rounded, size: 14),
               label: Text('Delete Permanently ($count)'),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: AppTheme.error,
-                foregroundColor: Colors.white,
-                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
-                minimumSize: const Size(0, 32),
+              style: OutlinedButton.styleFrom(
+                foregroundColor: isDark ? const Color(0xFFFCA5A5) : const Color(0xFFB91C1C),
+                backgroundColor: isDark ? const Color(0xFF450A0A).withValues(alpha: 0.35) : const Color(0xFFFEF2F2),
+                side: BorderSide(color: isDark ? const Color(0xFF991B1B).withValues(alpha: 0.45) : const Color(0xFFFECACA)),
+                padding: const EdgeInsets.symmetric(horizontal: 11, vertical: 5),
+                minimumSize: const Size(0, 30),
                 shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                elevation: 0,
                 textStyle: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
               ),
             ),
@@ -1247,10 +1273,10 @@ class _AdminWebTeachersScreenState extends ConsumerState<AdminWebTeachersScreen>
     final nameCtrl = TextEditingController();
     final emailCtrl = TextEditingController();
     final usernameCtrl = TextEditingController();
-    final passwordCtrl = TextEditingController(text: 'Teacher@123');
+    final passwordCtrl = TextEditingController(text: _generateAutoTeacherPassword());
     final selectedSubjectIds = <int>{};
     final formKey = GlobalKey<FormState>();
-    bool obscurePassword = true;
+    bool obscurePassword = false;
 
     if (!context.mounted) return;
 
@@ -1365,28 +1391,55 @@ class _AdminWebTeachersScreenState extends ConsumerState<AdminWebTeachersScreen>
                             Expanded(
                               child: TextFormField(
                                 controller: passwordCtrl,
-                                maxLength: 16,
+                                maxLength: 24,
                                 buildCounter: (context, {required currentLength, required isFocused, maxLength}) => null,
                                 obscureText: obscurePassword,
-                                style: TextStyle(color: AppTheme.text, fontSize: 14),
+                                style: TextStyle(
+                                  color: AppTheme.text,
+                                  fontSize: 13.5,
+                                  fontWeight: FontWeight.w600,
+                                  fontFamily: obscurePassword ? null : 'monospace',
+                                ),
                                 decoration: InputDecoration(
-                                  labelText: 'Initial Password',
-                                  labelStyle: TextStyle(color: AppTheme.textSecondary, fontSize: 13),
+                                  labelText: 'Initial Password (Auto-Generated)',
+                                  labelStyle: TextStyle(color: AppTheme.primary, fontSize: 13, fontWeight: FontWeight.w600),
+                                  helperText: 'Auto-generated secure password',
+                                  helperStyle: TextStyle(color: AppTheme.textMuted, fontSize: 11),
                                   counterText: '',
-                                  prefixIcon: Icon(Icons.lock_outline, size: 20, color: AppTheme.textMuted),
-                                  suffixIcon: IconButton(
-                                    icon: Icon(
-                                      obscurePassword ? Icons.visibility_off_outlined : Icons.visibility_outlined,
-                                      size: 18,
-                                      color: AppTheme.textMuted,
-                                    ),
-                                    onPressed: () => setDialogState(() => obscurePassword = !obscurePassword),
+                                  prefixIcon: Icon(Icons.lock_outline, size: 20, color: AppTheme.primary),
+                                  suffixIcon: Row(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      IconButton(
+                                        icon: const Icon(Icons.refresh_rounded, size: 18),
+                                        tooltip: 'Regenerate Password',
+                                        color: AppTheme.primary,
+                                        visualDensity: VisualDensity.compact,
+                                        onPressed: () {
+                                          setDialogState(() {
+                                            passwordCtrl.text = _generateAutoTeacherPassword();
+                                          });
+                                        },
+                                      ),
+                                      IconButton(
+                                        icon: Icon(
+                                          obscurePassword ? Icons.visibility_off_outlined : Icons.visibility_outlined,
+                                          size: 18,
+                                          color: AppTheme.textMuted,
+                                        ),
+                                        tooltip: obscurePassword ? 'Show Password' : 'Hide Password',
+                                        visualDensity: VisualDensity.compact,
+                                        onPressed: () => setDialogState(() => obscurePassword = !obscurePassword),
+                                      ),
+                                      const SizedBox(width: 4),
+                                    ],
                                   ),
                                   filled: true,
                                   fillColor: AppTheme.background,
                                   border: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: BorderSide(color: AppTheme.border)),
+                                  focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: BorderSide(color: AppTheme.primary, width: 1.5)),
                                 ),
-                                validator: (v) => v == null || v.length < 6 ? 'Minimum 6 characters' : null,
+                                validator: (v) => v == null || v.trim().length < 6 ? 'Minimum 6 characters' : null,
                               ),
                             ),
                           ],
@@ -1868,7 +1921,7 @@ class _AdminWebTeachersScreenState extends ConsumerState<AdminWebTeachersScreen>
       return;
     }
 
-    final passwordCtrl = TextEditingController(text: 'Teacher@123');
+    final passwordCtrl = TextEditingController(text: _generateAutoTeacherPassword());
     bool obscurePassword = false;
     bool isSending = false;
     final formKey = GlobalKey<FormState>();
@@ -1974,24 +2027,52 @@ class _AdminWebTeachersScreenState extends ConsumerState<AdminWebTeachersScreen>
                       const SizedBox(height: 6),
                       TextFormField(
                         controller: passwordCtrl,
+                        maxLength: 24,
+                        buildCounter: (context, {required currentLength, required isFocused, maxLength}) => null,
                         obscureText: obscurePassword,
-                        style: TextStyle(color: AppTheme.text, fontSize: 14),
+                        style: TextStyle(
+                          color: AppTheme.text,
+                          fontSize: 14,
+                          fontWeight: FontWeight.w600,
+                          fontFamily: obscurePassword ? null : 'monospace',
+                        ),
                         decoration: InputDecoration(
-                          hintText: 'e.g. Teacher@123',
-                          prefixIcon: Icon(Icons.lock_outline, size: 20, color: AppTheme.textMuted),
-                          suffixIcon: IconButton(
-                            icon: Icon(
-                              obscurePassword ? Icons.visibility_off_outlined : Icons.visibility_outlined,
-                              size: 18,
-                              color: AppTheme.textMuted,
-                            ),
-                            onPressed: () => setDialogState(() => obscurePassword = !obscurePassword),
+                          hintText: 'e.g. Teach@4829',
+                          helperText: 'Auto-generated secure password',
+                          prefixIcon: Icon(Icons.lock_outline, size: 20, color: AppTheme.primary),
+                          suffixIcon: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              IconButton(
+                                icon: const Icon(Icons.refresh_rounded, size: 18),
+                                tooltip: 'Regenerate Password',
+                                color: AppTheme.primary,
+                                visualDensity: VisualDensity.compact,
+                                onPressed: () {
+                                  setDialogState(() {
+                                    passwordCtrl.text = _generateAutoTeacherPassword();
+                                  });
+                                },
+                              ),
+                              IconButton(
+                                icon: Icon(
+                                  obscurePassword ? Icons.visibility_off_outlined : Icons.visibility_outlined,
+                                  size: 18,
+                                  color: AppTheme.textMuted,
+                                ),
+                                tooltip: obscurePassword ? 'Show Password' : 'Hide Password',
+                                visualDensity: VisualDensity.compact,
+                                onPressed: () => setDialogState(() => obscurePassword = !obscurePassword),
+                              ),
+                              const SizedBox(width: 4),
+                            ],
                           ),
                           filled: true,
                           fillColor: AppTheme.background,
                           border: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: BorderSide(color: AppTheme.border)),
+                          focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: BorderSide(color: AppTheme.primary, width: 1.5)),
                         ),
-                        validator: (v) => v == null || v.length < 6 ? 'Minimum 6 characters' : null,
+                        validator: (v) => v == null || v.trim().length < 6 ? 'Minimum 6 characters' : null,
                       ),
                       const SizedBox(height: 12),
                       Container(
@@ -2237,6 +2318,16 @@ class _AdminWebTeachersScreenState extends ConsumerState<AdminWebTeachersScreen>
                   onPressed: isProcessing ? null : () => Navigator.of(dialogCtx).pop(),
                   child: Text('Cancel', style: TextStyle(color: AppTheme.textSecondary)),
                 ),
+                TextButton.icon(
+                  onPressed: isProcessing
+                      ? null
+                      : () {
+                          Navigator.of(dialogCtx).pop();
+                          _confirmPermanentDeleteTeacher(rootContext, teacher);
+                        },
+                  icon: const Icon(Icons.delete_forever_rounded, size: 15, color: Color(0xFFB91C1C)),
+                  label: const Text('Delete Permanently Instead', style: TextStyle(color: Color(0xFFB91C1C), fontSize: 13, fontWeight: FontWeight.w600)),
+                ),
                 ElevatedButton.icon(
                   onPressed: isProcessing
                       ? null
@@ -2335,6 +2426,16 @@ class _AdminWebTeachersScreenState extends ConsumerState<AdminWebTeachersScreen>
                 TextButton(
                   onPressed: isProcessing ? null : () => Navigator.of(dialogCtx).pop(),
                   child: Text('Cancel', style: TextStyle(color: AppTheme.textSecondary)),
+                ),
+                TextButton.icon(
+                  onPressed: isProcessing
+                      ? null
+                      : () {
+                          Navigator.of(dialogCtx).pop();
+                          _confirmBulkPermanentDelete(rootContext, teacherIds);
+                        },
+                  icon: const Icon(Icons.delete_forever_rounded, size: 15, color: Color(0xFFB91C1C)),
+                  label: const Text('Delete Permanently Instead', style: TextStyle(color: Color(0xFFB91C1C), fontSize: 13, fontWeight: FontWeight.w600)),
                 ),
                 ElevatedButton.icon(
                   onPressed: isProcessing
@@ -2527,10 +2628,10 @@ class _AdminWebTeachersScreenState extends ConsumerState<AdminWebTeachersScreen>
                           }
                         },
                   style: ElevatedButton.styleFrom(
-                    backgroundColor: Colors.red,
+                    backgroundColor: const Color(0xFFB91C1C),
                     foregroundColor: Colors.white,
                     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                    minimumSize: const Size(0, 40),
+                    minimumSize: const Size(0, 36),
                   ),
                   icon: isDeleting
                       ? const SizedBox(
@@ -2620,9 +2721,10 @@ class _AdminWebTeachersScreenState extends ConsumerState<AdminWebTeachersScreen>
                           }
                         },
                   style: ElevatedButton.styleFrom(
-                    backgroundColor: AppTheme.success,
+                    backgroundColor: const Color(0xFF047857),
                     foregroundColor: Colors.white,
                     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                    minimumSize: const Size(0, 36),
                   ),
                   icon: const Icon(Icons.restore_rounded, size: 16),
                   label: Text(isProcessing ? 'Restoring...' : 'Restore All Selected'),
@@ -2706,9 +2808,10 @@ class _AdminWebTeachersScreenState extends ConsumerState<AdminWebTeachersScreen>
                           }
                         },
                   style: ElevatedButton.styleFrom(
-                    backgroundColor: AppTheme.error,
+                    backgroundColor: const Color(0xFFB91C1C),
                     foregroundColor: Colors.white,
                     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                    minimumSize: const Size(0, 36),
                   ),
                   icon: const Icon(Icons.delete_forever_rounded, size: 16),
                   label: Text(isDeleting ? 'Deleting...' : 'Delete Permanently'),

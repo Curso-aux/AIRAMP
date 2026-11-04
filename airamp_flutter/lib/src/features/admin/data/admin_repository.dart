@@ -854,6 +854,7 @@ class AdminArchivedStudentsNotifier extends Notifier<List<Map<String, dynamic>>>
   Future<void> permanentDeleteStudent(String studentId) async {
     await DatabaseHelper().deleteStudent(studentId);
     await loadArchived();
+    ref.read(adminStudentsProvider.notifier).loadStudents();
     ref.read(adminAnalyticsProvider.notifier).loadAnalytics();
     ref.read(sectionsProvider.notifier).reload();
   }
@@ -861,6 +862,7 @@ class AdminArchivedStudentsNotifier extends Notifier<List<Map<String, dynamic>>>
   Future<void> bulkPermanentDeleteStudents(List<String> studentIds) async {
     await DatabaseHelper().bulkPermanentDeleteStudents(studentIds);
     await loadArchived();
+    ref.read(adminStudentsProvider.notifier).loadStudents();
     ref.read(adminAnalyticsProvider.notifier).loadAnalytics();
     ref.read(sectionsProvider.notifier).reload();
   }
@@ -985,12 +987,14 @@ class AdminArchivedTeachersNotifier extends Notifier<List<Map<String, dynamic>>>
   Future<void> permanentDeleteTeacher(String teacherId) async {
     await DatabaseHelper().deleteTeacher(teacherId);
     await loadArchivedTeachers();
+    ref.read(adminTeachersProvider.notifier).loadTeachers();
     ref.read(subjectsProvider.notifier).reload();
   }
 
   Future<void> bulkPermanentDeleteTeachers(List<String> teacherIds) async {
     await DatabaseHelper().bulkPermanentDeleteTeachers(teacherIds);
     await loadArchivedTeachers();
+    ref.read(adminTeachersProvider.notifier).loadTeachers();
     ref.read(subjectsProvider.notifier).reload();
   }
 }

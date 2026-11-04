@@ -3935,7 +3935,7 @@ class DatabaseHelper {
         return list;
       }
     } catch (_) {}
-    return ['Grade 10 - Emerald', 'Grade 11 - STEM B'];
+    return const [];
   }
 
   Future<void> generateEnrollmentKey({
@@ -4658,126 +4658,26 @@ class DatabaseHelper {
       );
     } catch (_) {}
 
-    // Ensure authentic students exist: only seed defaults if no real students exist
+    // Ensure mock student seeds are permanently purged and never automatically re-created
     try {
-      final realStudentCount =
-          Sqflite.firstIntValue(
-            await db.rawQuery(
-              "SELECT COUNT(*) FROM users WHERE role = 'student' AND email NOT LIKE '%@school.edu' AND email != 'maria@test.com'",
-            ),
-          ) ??
-          0;
-
-      if (realStudentCount == 0) {
-        final defaultStudents = [
-          {
-            'id': 'student_1',
-            'email': 'maria@test.com',
-            'username': 'maria.lopez',
-            'password': 'Maria@123',
-            'role': 'student',
-            'full_name': 'Maria Lopez',
-            'section': 'Grade 10 - Emerald',
-            'grade': 'Grade 10',
-            'profile_image': 'preset:girl_1',
-            'created_at': DateTime.now()
-                .subtract(const Duration(days: 5))
-                .toIso8601String(),
-          },
-          {
-            'id': 'student_2',
-            'email': 'juan.delacruz@school.edu',
-            'username': 'juan.delacruz',
-            'password': 'Juan@123',
-            'role': 'student',
-            'full_name': 'Juan Dela Cruz',
-            'section': 'Grade 10 - Emerald',
-            'grade': 'Grade 10',
-            'profile_image': 'preset:boy_1',
-            'created_at': DateTime.now()
-                .subtract(const Duration(days: 4))
-                .toIso8601String(),
-          },
-          {
-            'id': 'student_3',
-            'email': 'angela.santos@school.edu',
-            'username': 'angela.santos',
-            'password': 'Angela@123',
-            'role': 'student',
-            'full_name': 'Angela Santos',
-            'section': 'Grade 11 - STEM B',
-            'grade': 'Grade 11',
-            'profile_image': 'preset:bob_cut',
-            'created_at': DateTime.now()
-                .subtract(const Duration(days: 4))
-                .toIso8601String(),
-          },
-          {
-            'id': 'student_4',
-            'email': 'mark.bautista@school.edu',
-            'username': 'mark.bautista',
-            'password': 'Mark@123',
-            'role': 'student',
-            'full_name': 'Mark Bautista',
-            'section': 'Grade 10 - Emerald',
-            'grade': 'Grade 10',
-            'created_at': DateTime.now()
-                .subtract(const Duration(days: 3))
-                .toIso8601String(),
-          },
-        ];
-
-        for (final s in defaultStudents) {
-          final existing = await db.query(
-            'users',
-            where: 'id = ? OR email = ?',
-            whereArgs: [s['id'], s['email']],
-          );
-          if (existing.isEmpty) {
-            final salt = generateSalt();
-            final userToInsert = Map<String, dynamic>.from(s);
-            userToInsert['password'] = hashPassword(
-              s['password'] as String,
-              salt,
-            );
-            userToInsert['password_salt'] = salt;
-            await db.insert('users', userToInsert);
-          } else {
-            final currentSalt = existing.first['password_salt'] as String?;
-            final currentPass = existing.first['password'] as String?;
-            final updateData = <String, dynamic>{
-              'section': s['section'],
-              'grade': s['grade'],
-              'role': 'student',
-              'full_name': s['full_name'],
-            };
-            if (currentSalt == null ||
-                currentSalt.isEmpty ||
-                currentPass == s['password']) {
-              final salt = generateSalt();
-              updateData['password'] = hashPassword(
-                s['password'] as String,
-                salt,
-              );
-              updateData['password_salt'] = salt;
-            }
-            await db.update(
-              'users',
-              updateData,
-              where: 'id = ?',
-              whereArgs: [s['id']],
-            );
-          }
-        }
-      } else {
-        // Real students exist; clean out mock student seeds from local database
+      final prefs = await SharedPreferences.getInstance();
+      final hasPurged = prefs.getBool('purged_default_mock_students_v2') ?? false;
+      if (!hasPurged) {
         await db.delete(
           'users',
-          where:
-              "id IN ('student_1', 'student_2', 'student_3', 'student_4') OR email LIKE '%@school.edu'",
+          where: "id IN ('student_1', 'student_2', 'student_3', 'student_4') OR email IN ('maria@test.com', 'juan.delacruz@school.edu', 'angela.santos@school.edu', 'mark.bautista@school.edu')",
         );
+        for (final sid in ['student_1', 'student_2', 'student_3', 'student_4']) {
+          await db.delete('enrollments', where: 'student_id = ?', whereArgs: [sid]);
+          await db.delete('student_progress', where: 'student_id = ?', whereArgs: [sid]);
+          await db.delete('quiz_attempts', where: 'student_id = ?', whereArgs: [sid]);
+          await db.delete('submissions', where: 'student_id = ?', whereArgs: [sid]);
+        }
+        await prefs.setBool('purged_default_mock_students_v2', true);
       }
+    } catch (_) {}
 
+    try {
       // Normalize existing student records to valid section names from the sections table
       await db.update(
         'users',
@@ -4797,21 +4697,21 @@ class DatabaseHelper {
         where:
             "name NOT IN ('Grade 10 - Emerald', 'Grade 11 - STEM B') AND name LIKE 'Sapphire%'",
       );
-      // Update section student counts accurately
+      // Update section student counts accurately based only on active students
       final emCount =
           Sqflite.firstIntValue(
             await db.rawQuery(
-              "SELECT COUNT(*) FROM users WHERE section = 'Grade 10 - Emerald' AND role = 'student'",
+              "SELECT COUNT(*) FROM users WHERE section = 'Grade 10 - Emerald' AND role = 'student' AND (is_archived IS NULL OR is_archived = 0)",
             ),
           ) ??
-          3;
+          0;
       final stemCount =
           Sqflite.firstIntValue(
             await db.rawQuery(
-              "SELECT COUNT(*) FROM users WHERE section = 'Grade 11 - STEM B' AND role = 'student'",
+              "SELECT COUNT(*) FROM users WHERE section = 'Grade 11 - STEM B' AND role = 'student' AND (is_archived IS NULL OR is_archived = 0)",
             ),
           ) ??
-          1;
+          0;
       await db.update('sections', {
         'student_count': emCount,
       }, where: "name = 'Grade 10 - Emerald'");
@@ -4859,6 +4759,8 @@ class DatabaseHelper {
       if (cs101Rows.isNotEmpty) {
         final sub1Id = cs101Rows.first['id'] as int;
         for (final sid in ['student_1', 'student_2', 'student_4']) {
+          final u = await db.query('users', where: 'id = ?', whereArgs: [sid]);
+          if (u.isEmpty) continue;
           final enr = await db.query(
             'enrollments',
             where: 'student_id = ? AND subject_id = ?',
@@ -4880,6 +4782,8 @@ class DatabaseHelper {
       if (cs202Rows.isNotEmpty) {
         final sub2Id = cs202Rows.first['id'] as int;
         for (final sid in ['student_1', 'student_3']) {
+          final u = await db.query('users', where: 'id = ?', whereArgs: [sid]);
+          if (u.isEmpty) continue;
           final enr = await db.query(
             'enrollments',
             where: 'student_id = ? AND subject_id = ?',
@@ -4963,6 +4867,8 @@ class DatabaseHelper {
               ? ['student_3', 'student_1']
               : ['student_1', 'student_2', 'student_4'];
           for (final stId in targetStudents) {
+            final u = await db.query('users', where: 'id = ?', whereArgs: [stId]);
+            if (u.isEmpty) continue;
             await db.insert('enrollments', {
               'student_id': stId,
               'subject_id': sid,
@@ -5045,22 +4951,25 @@ class DatabaseHelper {
             'created_at': DateTime.now().toIso8601String(),
           });
 
-          // Assign to student_1 (Maria Lopez)
-          await db.insert('quiz_assignments', {
-            'quiz_id': quizId,
-            'student_id': 'student_1',
-            'assigned_at': DateTime.now()
-                .subtract(const Duration(hours: 4))
-                .toIso8601String(),
-            'due_date': DateTime.now()
-                .add(const Duration(days: 7))
-                .toIso8601String(),
-            'status': 'pending',
-            'score': 0,
-            'total_questions': 3,
-            'percentage': 0.0,
-            'completed_at': null,
-          });
+          // Assign to student_1 if user exists
+          final student1Exists = await db.query('users', where: 'id = ?', whereArgs: ['student_1']);
+          if (student1Exists.isNotEmpty) {
+            await db.insert('quiz_assignments', {
+              'quiz_id': quizId,
+              'student_id': 'student_1',
+              'assigned_at': DateTime.now()
+                  .subtract(const Duration(hours: 4))
+                  .toIso8601String(),
+              'due_date': DateTime.now()
+                  .add(const Duration(days: 7))
+                  .toIso8601String(),
+              'status': 'pending',
+              'score': 0,
+              'total_questions': 3,
+              'percentage': 0.0,
+              'completed_at': null,
+            });
+          }
         }
       }
     } catch (_) {}
