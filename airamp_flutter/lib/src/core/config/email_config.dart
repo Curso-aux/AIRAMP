@@ -27,9 +27,12 @@ class EmailConfig {
 
   static bool get isConfigured => smtpAppPassword.isNotEmpty;
 
-  /// Local SMTP Bridge HTTP endpoints
+  /// Cloud & Local SMTP Bridge HTTP endpoints
   static const String localBridgeUrl = 'http://127.0.0.1:8088/send-email';
   static const String emulatorBridgeUrl = 'http://10.0.2.2:8088/send-email';
-  static const String cloudBridgeUrl = String.fromEnvironment('SMTP_BRIDGE_URL', defaultValue: '');
+  static const String cloudBridgeUrl = String.fromEnvironment(
+    'SMTP_BRIDGE_URL',
+    defaultValue: 'https://aira-smtp-bridge.onrender.com/send-email',
+  );
 }
 
