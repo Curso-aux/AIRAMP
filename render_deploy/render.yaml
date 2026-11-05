@@ -1,0 +1,21 @@
+# render.yaml — Render Blueprint for one-click deploy
+# See: https://docs.render.com/blueprint-spec
+
+services:
+  - type: web
+    name: aira-smtp-bridge
+    runtime: python
+    plan: free
+    buildCommand: ""
+    startCommand: "python smtp_bridge.py"
+    healthCheckPath: /
+    envVars:
+      - key: SMTP_SENDER_EMAIL
+        sync: false  # You must set this manually in the dashboard
+      - key: SMTP_APP_PASSWORD
+        sync: false  # You must set this manually in the dashboard
+      - key: FIREBASE_PROJECT_ID
+        value: aira-app-database
+      - key: POLL_INTERVAL
+        value: "5"
+
