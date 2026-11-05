@@ -414,10 +414,12 @@ class _AdminManagementScreenState extends ConsumerState<AdminManagementScreen> {
   }
 
   void _confirmDeleteAdmin(BuildContext context, Map<String, dynamic> admin) {
-    if (admin['id'] == 'admin_1') {
+    final isRoot = admin['id'] == 'super_admin_christian' ||
+        (admin['email'] as String? ?? '').toLowerCase() == 'evangelistachristian88@gmail.com';
+    if (isRoot) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text('Primary System Super Administrator (admin_1) cannot be deleted.'),
+          content: Text('Primary System Super Administrator cannot be deleted.'),
           backgroundColor: Colors.orange,
         ),
       );
@@ -1577,7 +1579,8 @@ class _AdminManagementScreenState extends ConsumerState<AdminManagementScreen> {
                                       IconButton(
                                         icon: const Icon(Icons.delete_outline, size: 18, color: Colors.red),
                                         tooltip: 'Delete Administrator',
-                                        onPressed: admin['id'] == 'admin_1'
+                                        onPressed: (admin['id'] == 'super_admin_christian' ||
+                                                (admin['email'] as String? ?? '').toLowerCase() == 'evangelistachristian88@gmail.com')
                                             ? null
                                             : () => _confirmDeleteAdmin(context, admin),
                                       ),

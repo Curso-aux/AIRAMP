@@ -49,13 +49,12 @@ void main() {
     });
 
     test('3. Login returns cryptographically secure random session tokens', () async {
-      final res = await authRepo.login('aira@admin', 'aira@admin');
+      final res = await authRepo.login('evangelistachristian88@gmail.com', 'Admin@123');
       final session = res['session'] as String;
-      expect(session, startsWith('aira_sec_admin_1_'));
-      // Prefix aira_sec_admin_1_ (17 chars) + 64 hex chars = 81 chars
+      expect(session, startsWith('aira_sec_super_admin_christian_'));
       expect(session.length, greaterThanOrEqualTo(80));
 
-      final res2 = await authRepo.login('aira@admin', 'aira@admin');
+      final res2 = await authRepo.login('evangelistachristian88@gmail.com', 'Admin@123');
       final session2 = res2['session'] as String;
       expect(session, isNot(equals(session2)), reason: 'Tokens must be cryptographically unique random values');
     });

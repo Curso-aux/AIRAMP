@@ -30,6 +30,11 @@ if %ERRORLEVEL% EQU 0 (
     goto END
 )
 
+if exist "%LOCALAPPDATA%\Python\pythoncore-3.14-64\python.exe" (
+    "%LOCALAPPDATA%\Python\pythoncore-3.14-64\python.exe" -u "%~dp0smtp_bridge.py"
+    goto END
+)
+
 echo.
 echo [ERROR] Python was not found in PATH!
 echo Please install Python 3.8+ or add python.exe to your PATH environment variable.

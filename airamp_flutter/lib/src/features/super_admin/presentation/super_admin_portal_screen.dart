@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../../core/components/offline_sync_status_pill.dart';
@@ -18,10 +19,12 @@ class SuperAdminPortalScreen extends ConsumerStatefulWidget {
   const SuperAdminPortalScreen({super.key});
 
   @override
-  ConsumerState<SuperAdminPortalScreen> createState() => _SuperAdminPortalScreenState();
+  ConsumerState<SuperAdminPortalScreen> createState() =>
+      _SuperAdminPortalScreenState();
 }
 
-class _SuperAdminPortalScreenState extends ConsumerState<SuperAdminPortalScreen> {
+class _SuperAdminPortalScreenState
+    extends ConsumerState<SuperAdminPortalScreen> {
   int _activeTabIndex = 0;
   bool _isSidebarCollapsed = false;
   final GlobalKey<ScaffoldState> _scaffoldKey = GlobalKey<ScaffoldState>();
@@ -50,7 +53,9 @@ class _SuperAdminPortalScreenState extends ConsumerState<SuperAdminPortalScreen>
             final admins = ref.watch(schoolAdminsProvider);
             return AlertDialog(
               backgroundColor: gTheme.surfaceElevated,
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(14),
+              ),
               title: Row(
                 children: [
                   Container(
@@ -60,12 +65,20 @@ class _SuperAdminPortalScreenState extends ConsumerState<SuperAdminPortalScreen>
                       borderRadius: BorderRadius.circular(8),
                       border: Border.all(color: gTheme.primaryBorder),
                     ),
-                    child: Icon(Icons.add_business_outlined, color: gTheme.primary, size: 20),
+                    child: Icon(
+                      Icons.add_business_outlined,
+                      color: gTheme.primary,
+                      size: 20,
+                    ),
                   ),
                   const SizedBox(width: 12),
                   Text(
                     'Register New Campus / School',
-                    style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18, color: gTheme.textPrimary),
+                    style: TextStyle(
+                      fontWeight: FontWeight.bold,
+                      fontSize: 18,
+                      color: gTheme.textPrimary,
+                    ),
                   ),
                 ],
               ),
@@ -78,46 +91,94 @@ class _SuperAdminPortalScreenState extends ConsumerState<SuperAdminPortalScreen>
                     children: [
                       Text(
                         'Provision a multi-tenant institutional school campus with dedicated school_id scoping.',
-                        style: TextStyle(fontSize: 13, color: gTheme.textSecondary),
+                        style: TextStyle(
+                          fontSize: 13,
+                          color: gTheme.textSecondary,
+                        ),
                       ),
                       const SizedBox(height: 16),
                       TextField(
                         controller: nameCtrl,
                         maxLength: 80,
-                        buildCounter: (context, {required currentLength, required isFocused, maxLength}) => null,
-                        style: TextStyle(color: gTheme.textPrimary, fontSize: 13),
+                        buildCounter:
+                            (
+                              context, {
+                              required currentLength,
+                              required isFocused,
+                              maxLength,
+                            }) => null,
+                        style: TextStyle(
+                          color: gTheme.textPrimary,
+                          fontSize: 13,
+                        ),
                         decoration: InputDecoration(
                           labelText: 'School / Campus Name *',
                           labelStyle: TextStyle(color: gTheme.textSecondary),
-                          prefixIcon: Icon(Icons.school_outlined, size: 18, color: gTheme.textSecondary),
-                          border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+                          prefixIcon: Icon(
+                            Icons.school_outlined,
+                            size: 18,
+                            color: gTheme.textSecondary,
+                          ),
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(8),
+                          ),
                         ),
                       ),
                       const SizedBox(height: 12),
                       TextField(
                         controller: codeCtrl,
                         maxLength: 15,
-                        buildCounter: (context, {required currentLength, required isFocused, maxLength}) => null,
+                        buildCounter:
+                            (
+                              context, {
+                              required currentLength,
+                              required isFocused,
+                              maxLength,
+                            }) => null,
                         textCapitalization: TextCapitalization.characters,
-                        style: TextStyle(color: gTheme.textPrimary, fontSize: 13),
+                        style: TextStyle(
+                          color: gTheme.textPrimary,
+                          fontSize: 13,
+                        ),
                         decoration: InputDecoration(
                           labelText: 'School Identifier Code *',
                           labelStyle: TextStyle(color: gTheme.textSecondary),
-                          prefixIcon: Icon(Icons.tag_rounded, size: 18, color: gTheme.textSecondary),
-                          border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+                          prefixIcon: Icon(
+                            Icons.tag_rounded,
+                            size: 18,
+                            color: gTheme.textSecondary,
+                          ),
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(8),
+                          ),
                         ),
                       ),
                       const SizedBox(height: 12),
                       TextField(
                         controller: addressCtrl,
                         maxLength: 150,
-                        buildCounter: (context, {required currentLength, required isFocused, maxLength}) => null,
-                        style: TextStyle(color: gTheme.textPrimary, fontSize: 13),
+                        buildCounter:
+                            (
+                              context, {
+                              required currentLength,
+                              required isFocused,
+                              maxLength,
+                            }) => null,
+                        style: TextStyle(
+                          color: gTheme.textPrimary,
+                          fontSize: 13,
+                        ),
                         decoration: InputDecoration(
                           labelText: 'Campus Physical Address',
                           labelStyle: TextStyle(color: gTheme.textSecondary),
-                          prefixIcon: Icon(Icons.location_on_outlined, size: 18, color: gTheme.textSecondary),
-                          border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+                          prefixIcon: Icon(
+                            Icons.location_on_outlined,
+                            size: 18,
+                            color: gTheme.textSecondary,
+                          ),
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(8),
+                          ),
                         ),
                       ),
                       const SizedBox(height: 12),
@@ -127,18 +188,36 @@ class _SuperAdminPortalScreenState extends ConsumerState<SuperAdminPortalScreen>
                             child: DropdownButtonFormField<String>(
                               initialValue: selectedStatus,
                               dropdownColor: gTheme.surfaceElevated,
-                              style: TextStyle(color: gTheme.textPrimary, fontSize: 13),
+                              style: TextStyle(
+                                color: gTheme.textPrimary,
+                                fontSize: 13,
+                              ),
                               decoration: InputDecoration(
                                 labelText: 'Operational Status',
-                                labelStyle: TextStyle(color: gTheme.textSecondary),
-                                border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
-                                contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+                                labelStyle: TextStyle(
+                                  color: gTheme.textSecondary,
+                                ),
+                                border: OutlineInputBorder(
+                                  borderRadius: BorderRadius.circular(8),
+                                ),
+                                contentPadding: const EdgeInsets.symmetric(
+                                  horizontal: 12,
+                                  vertical: 12,
+                                ),
                               ),
                               items: const [
-                                DropdownMenuItem(value: 'active', child: Text('Active Campus')),
-                                DropdownMenuItem(value: 'inactive', child: Text('Inactive / Onboarding')),
+                                DropdownMenuItem(
+                                  value: 'active',
+                                  child: Text('Active Campus'),
+                                ),
+                                DropdownMenuItem(
+                                  value: 'inactive',
+                                  child: Text('Inactive / Onboarding'),
+                                ),
                               ],
-                              onChanged: (val) => setDialogState(() => selectedStatus = val ?? 'active'),
+                              onChanged: (val) => setDialogState(
+                                () => selectedStatus = val ?? 'active',
+                              ),
                             ),
                           ),
                           const SizedBox(width: 12),
@@ -146,24 +225,40 @@ class _SuperAdminPortalScreenState extends ConsumerState<SuperAdminPortalScreen>
                             child: DropdownButtonFormField<String?>(
                               initialValue: selectedAdminId,
                               dropdownColor: gTheme.surfaceElevated,
-                              style: TextStyle(color: gTheme.textPrimary, fontSize: 13),
+                              style: TextStyle(
+                                color: gTheme.textPrimary,
+                                fontSize: 13,
+                              ),
                               decoration: InputDecoration(
                                 labelText: 'Assigned Administrator',
-                                labelStyle: TextStyle(color: gTheme.textSecondary),
-                                border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
-                                contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+                                labelStyle: TextStyle(
+                                  color: gTheme.textSecondary,
+                                ),
+                                border: OutlineInputBorder(
+                                  borderRadius: BorderRadius.circular(8),
+                                ),
+                                contentPadding: const EdgeInsets.symmetric(
+                                  horizontal: 12,
+                                  vertical: 12,
+                                ),
                               ),
                               items: [
-                                const DropdownMenuItem(value: null, child: Text('None (Assign Later)')),
-                                ...admins.map((a) => DropdownMenuItem(
-                                  value: a['id'] as String,
-                                  child: Text(
-                                    a['full_name'] as String? ?? 'Admin',
-                                    overflow: TextOverflow.ellipsis,
+                                const DropdownMenuItem(
+                                  value: null,
+                                  child: Text('None (Assign Later)'),
+                                ),
+                                ...admins.map(
+                                  (a) => DropdownMenuItem(
+                                    value: a['id'] as String,
+                                    child: Text(
+                                      a['full_name'] as String? ?? 'Admin',
+                                      overflow: TextOverflow.ellipsis,
+                                    ),
                                   ),
-                                )),
+                                ),
                               ],
-                              onChanged: (val) => setDialogState(() => selectedAdminId = val),
+                              onChanged: (val) =>
+                                  setDialogState(() => selectedAdminId = val),
                             ),
                           ),
                         ],
@@ -175,37 +270,48 @@ class _SuperAdminPortalScreenState extends ConsumerState<SuperAdminPortalScreen>
               actions: [
                 TextButton(
                   onPressed: () => Navigator.of(dialogCtx).pop(),
-                  child: Text('Cancel', style: TextStyle(color: gTheme.textSecondary)),
+                  child: Text(
+                    'Cancel',
+                    style: TextStyle(color: gTheme.textSecondary),
+                  ),
                 ),
                 ElevatedButton(
                   style: ElevatedButton.styleFrom(
                     backgroundColor: gTheme.primary,
                     foregroundColor: Colors.white,
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(8),
+                    ),
                   ),
                   onPressed: () async {
                     final name = nameCtrl.text.trim();
                     final code = codeCtrl.text.trim().toUpperCase();
                     if (name.isEmpty || code.isEmpty) {
                       ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(content: Text('School name and code are required.')),
+                        const SnackBar(
+                          content: Text('School name and code are required.'),
+                        ),
                       );
                       return;
                     }
                     Navigator.of(dialogCtx).pop();
                     try {
-                      await ref.read(schoolsListProvider.notifier).addSchool(
-                        name: name,
-                        code: code,
-                        address: addressCtrl.text.trim(),
-                        adminId: selectedAdminId,
-                        status: selectedStatus,
-                      );
+                      await ref
+                          .read(schoolsListProvider.notifier)
+                          .addSchool(
+                            name: name,
+                            code: code,
+                            address: addressCtrl.text.trim(),
+                            adminId: selectedAdminId,
+                            status: selectedStatus,
+                          );
                       ref.invalidate(superAdminStatsProvider);
                       if (context.mounted) {
                         ScaffoldMessenger.of(context).showSnackBar(
                           SnackBar(
-                            content: Text('Registered campus "$name" ($code) successfully.'),
+                            content: Text(
+                              'Registered campus "$name" ($code) successfully.',
+                            ),
                             backgroundColor: gTheme.successText,
                           ),
                         );
@@ -213,7 +319,10 @@ class _SuperAdminPortalScreenState extends ConsumerState<SuperAdminPortalScreen>
                     } catch (e) {
                       if (context.mounted) {
                         ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(content: Text('Error: $e'), backgroundColor: gTheme.dangerText),
+                          SnackBar(
+                            content: Text('Error: $e'),
+                            backgroundColor: gTheme.dangerText,
+                          ),
                         );
                       }
                     }
@@ -235,6 +344,8 @@ class _SuperAdminPortalScreenState extends ConsumerState<SuperAdminPortalScreen>
     final passCtrl = TextEditingController();
     String selectedRole = 'admin';
     String selectedSchool = 'sch_main';
+    bool isSubmitting = false;
+    bool obscurePass = true;
 
     showDialog(
       context: context,
@@ -244,7 +355,9 @@ class _SuperAdminPortalScreenState extends ConsumerState<SuperAdminPortalScreen>
             final schools = ref.watch(schoolsListProvider);
             return AlertDialog(
               backgroundColor: gTheme.surfaceElevated,
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(14),
+              ),
               title: Row(
                 children: [
                   Container(
@@ -254,12 +367,20 @@ class _SuperAdminPortalScreenState extends ConsumerState<SuperAdminPortalScreen>
                       borderRadius: BorderRadius.circular(8),
                       border: Border.all(color: gTheme.primaryBorder),
                     ),
-                    child: Icon(Icons.person_add_outlined, color: gTheme.primary, size: 20),
+                    child: Icon(
+                      Icons.person_add_outlined,
+                      color: gTheme.primary,
+                      size: 20,
+                    ),
                   ),
                   const SizedBox(width: 12),
                   Text(
                     'Provision Administrator Account',
-                    style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18, color: gTheme.textPrimary),
+                    style: TextStyle(
+                      fontWeight: FontWeight.bold,
+                      fontSize: 18,
+                      color: gTheme.textPrimary,
+                    ),
                   ),
                 ],
               ),
@@ -272,72 +393,173 @@ class _SuperAdminPortalScreenState extends ConsumerState<SuperAdminPortalScreen>
                     children: [
                       Text(
                         'Provision access credentials for a campus administrator or system super-admin.',
-                        style: TextStyle(fontSize: 13, color: gTheme.textSecondary),
+                        style: TextStyle(
+                          fontSize: 13,
+                          color: gTheme.textSecondary,
+                        ),
                       ),
                       const SizedBox(height: 16),
                       TextField(
                         controller: nameCtrl,
                         maxLength: 50,
-                        buildCounter: (context, {required currentLength, required isFocused, maxLength}) => null,
-                        style: TextStyle(color: gTheme.textPrimary, fontSize: 13),
+                        buildCounter:
+                            (
+                              context, {
+                              required currentLength,
+                              required isFocused,
+                              maxLength,
+                            }) => null,
+                        style: TextStyle(
+                          color: gTheme.textPrimary,
+                          fontSize: 13,
+                        ),
                         decoration: InputDecoration(
                           labelText: 'Full Name *',
                           labelStyle: TextStyle(color: gTheme.textSecondary),
-                          prefixIcon: Icon(Icons.badge_outlined, size: 18, color: gTheme.textSecondary),
-                          border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+                          prefixIcon: Icon(
+                            Icons.badge_outlined,
+                            size: 18,
+                            color: gTheme.textSecondary,
+                          ),
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(8),
+                          ),
                         ),
                       ),
                       const SizedBox(height: 12),
                       TextField(
                         controller: emailCtrl,
                         maxLength: 50,
-                        buildCounter: (context, {required currentLength, required isFocused, maxLength}) => null,
+                        buildCounter:
+                            (
+                              context, {
+                              required currentLength,
+                              required isFocused,
+                              maxLength,
+                            }) => null,
                         keyboardType: TextInputType.emailAddress,
-                        style: TextStyle(color: gTheme.textPrimary, fontSize: 13),
+                        style: TextStyle(
+                          color: gTheme.textPrimary,
+                          fontSize: 13,
+                        ),
                         decoration: InputDecoration(
                           labelText: 'Official Email *',
                           labelStyle: TextStyle(color: gTheme.textSecondary),
-                          prefixIcon: Icon(Icons.email_outlined, size: 18, color: gTheme.textSecondary),
-                          border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+                          prefixIcon: Icon(
+                            Icons.email_outlined,
+                            size: 18,
+                            color: gTheme.textSecondary,
+                          ),
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(8),
+                          ),
                         ),
                       ),
                       const SizedBox(height: 12),
                       TextField(
                         controller: userCtrl,
                         maxLength: 30,
-                        buildCounter: (context, {required currentLength, required isFocused, maxLength}) => null,
-                        style: TextStyle(color: gTheme.textPrimary, fontSize: 13),
+                        buildCounter:
+                            (
+                              context, {
+                              required currentLength,
+                              required isFocused,
+                              maxLength,
+                            }) => null,
+                        style: TextStyle(
+                          color: gTheme.textPrimary,
+                          fontSize: 13,
+                        ),
                         decoration: InputDecoration(
                           labelText: 'Username (Optional)',
                           labelStyle: TextStyle(color: gTheme.textSecondary),
-                          prefixIcon: Icon(Icons.alternate_email, size: 18, color: gTheme.textSecondary),
-                          border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+                          prefixIcon: Icon(
+                            Icons.alternate_email,
+                            size: 18,
+                            color: gTheme.textSecondary,
+                          ),
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(8),
+                          ),
                         ),
                       ),
                       const SizedBox(height: 12),
                       TextField(
                         controller: passCtrl,
                         maxLength: 16,
-                        buildCounter: (context, {required currentLength, required isFocused, maxLength}) => null,
-                        obscureText: true,
-                        style: TextStyle(color: gTheme.textPrimary, fontSize: 13),
+                        buildCounter:
+                            (
+                              context, {
+                              required currentLength,
+                              required isFocused,
+                              maxLength,
+                            }) => null,
+                        obscureText: obscurePass,
+                        style: TextStyle(
+                          color: gTheme.textPrimary,
+                          fontSize: 13,
+                        ),
                         decoration: InputDecoration(
                           labelText: 'Temporary Password *',
                           labelStyle: TextStyle(color: gTheme.textSecondary),
-                          prefixIcon: Icon(Icons.lock_outline, size: 18, color: gTheme.textSecondary),
-                          border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+                          prefixIcon: Icon(
+                            Icons.lock_outline,
+                            size: 18,
+                            color: gTheme.textSecondary,
+                          ),
+                          suffixIcon: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              IconButton(
+                                icon: Icon(
+                                  Icons.auto_awesome,
+                                  size: 18,
+                                  color: gTheme.primary,
+                                ),
+                                tooltip: 'Auto-Generate Password',
+                                onPressed: () {
+                                  final gen = 'Admin@${DateTime.now().millisecondsSinceEpoch % 10000}!';
+                                  passCtrl.text = gen;
+                                  setDialogState(() {});
+                                },
+                              ),
+                              IconButton(
+                                icon: Icon(
+                                  obscurePass ? Icons.visibility_off : Icons.visibility,
+                                  size: 18,
+                                  color: gTheme.textSecondary,
+                                ),
+                                tooltip: obscurePass ? 'Show Password' : 'Hide Password',
+                                onPressed: () {
+                                  setDialogState(() => obscurePass = !obscurePass);
+                                },
+                              ),
+                            ],
+                          ),
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(8),
+                          ),
                         ),
                       ),
                       const SizedBox(height: 14),
                       DropdownButtonFormField<String>(
                         initialValue: selectedRole,
                         dropdownColor: gTheme.surfaceElevated,
-                        style: TextStyle(color: gTheme.textPrimary, fontSize: 13),
+                        style: TextStyle(
+                          color: gTheme.textPrimary,
+                          fontSize: 13,
+                        ),
                         decoration: InputDecoration(
                           labelText: 'Administrative Authority',
                           labelStyle: TextStyle(color: gTheme.textSecondary),
-                          prefixIcon: Icon(Icons.security, size: 18, color: gTheme.textSecondary),
-                          border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+                          prefixIcon: Icon(
+                            Icons.security,
+                            size: 18,
+                            color: gTheme.textSecondary,
+                          ),
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(8),
+                          ),
                         ),
                         items: const [
                           DropdownMenuItem(
@@ -350,22 +572,34 @@ class _SuperAdminPortalScreenState extends ConsumerState<SuperAdminPortalScreen>
                           ),
                         ],
                         onChanged: (val) {
-                          if (val != null) setDialogState(() => selectedRole = val);
+                          if (val != null) {
+                            setDialogState(() => selectedRole = val);
+                          }
                         },
                       ),
                       const SizedBox(height: 14),
                       if (selectedRole == 'admin' && schools.isNotEmpty)
                         DropdownButtonFormField<String>(
-                          initialValue: schools.any((s) => s['id'] == selectedSchool)
+                          initialValue:
+                              schools.any((s) => s['id'] == selectedSchool)
                               ? selectedSchool
                               : (schools.first['id'] as String?),
                           dropdownColor: gTheme.surfaceElevated,
-                          style: TextStyle(color: gTheme.textPrimary, fontSize: 13),
+                          style: TextStyle(
+                            color: gTheme.textPrimary,
+                            fontSize: 13,
+                          ),
                           decoration: InputDecoration(
                             labelText: 'Assigned Campus Scope',
                             labelStyle: TextStyle(color: gTheme.textSecondary),
-                            prefixIcon: Icon(Icons.account_balance_outlined, size: 18, color: gTheme.textSecondary),
-                            border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+                            prefixIcon: Icon(
+                              Icons.account_balance_outlined,
+                              size: 18,
+                              color: gTheme.textSecondary,
+                            ),
+                            border: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(8),
+                            ),
                           ),
                           items: schools.map((s) {
                             return DropdownMenuItem(
@@ -374,7 +608,9 @@ class _SuperAdminPortalScreenState extends ConsumerState<SuperAdminPortalScreen>
                             );
                           }).toList(),
                           onChanged: (val) {
-                            if (val != null) setDialogState(() => selectedSchool = val);
+                            if (val != null) {
+                              setDialogState(() => selectedSchool = val);
+                            }
                           },
                         ),
                     ],
@@ -384,50 +620,87 @@ class _SuperAdminPortalScreenState extends ConsumerState<SuperAdminPortalScreen>
               actions: [
                 TextButton(
                   onPressed: () => Navigator.of(dialogCtx).pop(),
-                  child: Text('Cancel', style: TextStyle(color: gTheme.textSecondary)),
+                  child: Text(
+                    'Cancel',
+                    style: TextStyle(color: gTheme.textSecondary),
+                  ),
                 ),
                 ElevatedButton(
-                  onPressed: () async {
-                    final name = nameCtrl.text.trim();
-                    final email = emailCtrl.text.trim();
-                    final pass = passCtrl.text;
-                    if (name.isEmpty || email.isEmpty || pass.isEmpty) {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(content: Text('Name, email, and password are required.')),
-                      );
-                      return;
-                    }
-                    Navigator.of(dialogCtx).pop();
-                    try {
-                      await ref.read(schoolAdminsProvider.notifier).addAdmin(
-                        fullName: name,
-                        email: email,
-                        password: pass,
-                        username: userCtrl.text.trim().isNotEmpty ? userCtrl.text.trim() : null,
-                        role: selectedRole,
-                        schoolId: selectedRole == 'super_admin' ? 'sch_main' : selectedSchool,
-                      );
-                      ref.invalidate(superAdminStatsProvider);
-                      if (context.mounted) {
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(
-                            content: Text('Provisioned administrator "$name" successfully.'),
-                            backgroundColor: gTheme.successText,
-                          ),
-                        );
-                      }
-                    } catch (e) {
-                      if (context.mounted) {
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(content: Text('Error: $e'), backgroundColor: gTheme.dangerText),
-                        );
-                      }
-                    }
-                  },
+                  onPressed: isSubmitting
+                      ? null
+                      : () async {
+                          final name = nameCtrl.text.trim();
+                          final email = emailCtrl.text.trim();
+                          final pass = passCtrl.text;
+                          if (name.isEmpty || email.isEmpty || pass.isEmpty) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(
+                                content: Text(
+                                  'Name, email, and password are required.',
+                                ),
+                              ),
+                            );
+                            return;
+                          }
+                          setDialogState(() => isSubmitting = true);
+                          Navigator.of(dialogCtx).pop();
+
+                          final schoolsList = ref.read(schoolsListProvider);
+                          final chosenCampus = schoolsList.firstWhere(
+                            (s) => s['id'] == (selectedRole == 'super_admin' ? 'sch_main' : selectedSchool),
+                            orElse: () => {'name': 'All Campuses (Master)', 'code': 'ALL'},
+                          );
+                          final resolvedCampusName = selectedRole == 'super_admin'
+                              ? 'Global Master Jurisdiction (All Campuses)'
+                              : '${chosenCampus['name']} (${chosenCampus['code']})';
+
+                          try {
+                            await ref
+                                .read(schoolAdminsProvider.notifier)
+                                .addAdmin(
+                                  fullName: name,
+                                  email: email,
+                                  password: pass,
+                                  username: userCtrl.text.trim().isNotEmpty
+                                      ? userCtrl.text.trim()
+                                      : null,
+                                  role: selectedRole,
+                                  schoolId: selectedRole == 'super_admin'
+                                      ? 'sch_main'
+                                      : selectedSchool,
+                                );
+                            ref.invalidate(superAdminStatsProvider);
+                            if (context.mounted) {
+                              _showProvisionedCredentialsDialog(
+                                context: context,
+                                gTheme: gTheme,
+                                fullName: name,
+                                email: email,
+                                username: userCtrl.text.trim().isNotEmpty
+                                    ? userCtrl.text.trim()
+                                    : email.split('@').first,
+                                temporaryPassword: pass,
+                                role: selectedRole,
+                                campusName: resolvedCampusName,
+                              );
+                            }
+                          } catch (e) {
+                            if (context.mounted) {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                SnackBar(
+                                  content: Text('Error: $e'),
+                                  backgroundColor: gTheme.dangerText,
+                                ),
+                              );
+                            }
+                          }
+                        },
                   style: ElevatedButton.styleFrom(
                     backgroundColor: gTheme.primary,
                     foregroundColor: Colors.white,
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(8),
+                    ),
                   ),
                   child: const Text('Provision Admin'),
                 ),
@@ -436,6 +709,222 @@ class _SuperAdminPortalScreenState extends ConsumerState<SuperAdminPortalScreen>
           },
         );
       },
+    );
+  }
+
+  void _showProvisionedCredentialsDialog({
+    required BuildContext context,
+    required GovernanceTheme gTheme,
+    required String fullName,
+    required String email,
+    required String username,
+    required String temporaryPassword,
+    required String role,
+    required String campusName,
+  }) {
+    final roleTitle = role == 'super_admin' ? 'Super Administrator' : 'Campus Administrator';
+    final credentialsText = '''
+AIRAMP ACCESS CREDENTIALS
+Role: $roleTitle
+Full Name: $fullName
+Username: $username
+Email: $email
+Temporary Password: $temporaryPassword
+Campus Scope: $campusName
+Portal Login: https://aira-app-database.web.app/#/login?role=admin
+''';
+
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (dialogCtx) => AlertDialog(
+        backgroundColor: gTheme.surfaceElevated,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: Row(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                color: gTheme.primarySubtle,
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: Icon(Icons.mark_email_read_outlined, color: gTheme.primary, size: 24),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Administrator Provisioned',
+                    style: TextStyle(
+                      color: gTheme.textPrimary,
+                      fontWeight: FontWeight.bold,
+                      fontSize: 16,
+                    ),
+                  ),
+                  Text(
+                    'Credentials generated & email queued',
+                    style: TextStyle(
+                      color: gTheme.textSecondary,
+                      fontSize: 12,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+        content: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 480),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: gTheme.surfaceSubtle,
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(color: gTheme.border),
+                ),
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Icon(Icons.info_outline, size: 18, color: gTheme.primary),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        'An invitation email with access credentials and the portal URL has been queued to $email. You may also copy these details directly below.',
+                        style: TextStyle(fontSize: 12, color: gTheme.textPrimary),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 16),
+              Container(
+                padding: const EdgeInsets.all(14),
+                decoration: BoxDecoration(
+                  color: gTheme.surfaceSubtle,
+                  borderRadius: BorderRadius.circular(10),
+                  border: Border.all(color: gTheme.border),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    _buildSummaryRow(gTheme, 'Role', roleTitle),
+                    const Divider(height: 14),
+                    _buildSummaryRow(gTheme, 'Name', fullName),
+                    const Divider(height: 14),
+                    _buildSummaryRow(gTheme, 'Email', email),
+                    const Divider(height: 14),
+                    _buildSummaryRow(gTheme, 'Username', username),
+                    const Divider(height: 14),
+                    _buildSummaryRow(gTheme, 'Campus Scope', campusName),
+                    const Divider(height: 14),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Text(
+                          'Temporary Password',
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: gTheme.textSecondary,
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                        Row(
+                          children: [
+                            SelectableText(
+                              temporaryPassword,
+                              style: TextStyle(
+                                fontSize: 13,
+                                fontWeight: FontWeight.bold,
+                                color: gTheme.primary,
+                                fontFamily: 'monospace',
+                              ),
+                            ),
+                            const SizedBox(width: 6),
+                            IconButton(
+                              icon: const Icon(Icons.copy, size: 16),
+                              tooltip: 'Copy password',
+                              visualDensity: VisualDensity.compact,
+                              padding: EdgeInsets.zero,
+                              constraints: const BoxConstraints(),
+                              onPressed: () {
+                                Clipboard.setData(ClipboardData(text: temporaryPassword));
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  const SnackBar(
+                                    content: Text('Password copied to clipboard'),
+                                    duration: Duration(seconds: 2),
+                                  ),
+                                );
+                              },
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+        actions: [
+          OutlinedButton.icon(
+            icon: const Icon(Icons.copy_all, size: 16),
+            label: const Text('Copy All Credentials'),
+            onPressed: () {
+              Clipboard.setData(ClipboardData(text: credentialsText));
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(
+                  content: Text('Full credentials copied to clipboard'),
+                  duration: Duration(seconds: 2),
+                ),
+              );
+            },
+          ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: gTheme.primary,
+              foregroundColor: Colors.white,
+            ),
+            onPressed: () => Navigator.of(dialogCtx).pop(),
+            child: const Text('Done'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildSummaryRow(GovernanceTheme gTheme, String label, String value) {
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          label,
+          style: TextStyle(
+            fontSize: 12,
+            color: gTheme.textSecondary,
+            fontWeight: FontWeight.w500,
+          ),
+        ),
+        const SizedBox(width: 12),
+        Flexible(
+          child: SelectableText(
+            value,
+            textAlign: TextAlign.end,
+            style: TextStyle(
+              fontSize: 12,
+              fontWeight: FontWeight.w600,
+              color: gTheme.textPrimary,
+            ),
+          ),
+        ),
+      ],
     );
   }
 
@@ -449,7 +938,14 @@ class _SuperAdminPortalScreenState extends ConsumerState<SuperAdminPortalScreen>
           children: [
             Icon(Icons.logout_rounded, color: gTheme.dangerText, size: 22),
             const SizedBox(width: 10),
-            Text('Sign Out from Governance Portal', style: TextStyle(color: gTheme.textPrimary, fontWeight: FontWeight.bold, fontSize: 16)),
+            Text(
+              'Sign Out from Governance Portal',
+              style: TextStyle(
+                color: gTheme.textPrimary,
+                fontWeight: FontWeight.bold,
+                fontSize: 16,
+              ),
+            ),
           ],
         ),
         content: Text(
@@ -457,9 +953,18 @@ class _SuperAdminPortalScreenState extends ConsumerState<SuperAdminPortalScreen>
           style: TextStyle(color: gTheme.textSecondary),
         ),
         actions: [
-          TextButton(onPressed: () => Navigator.of(dialogCtx).pop(), child: Text('Cancel', style: TextStyle(color: gTheme.textSecondary))),
+          TextButton(
+            onPressed: () => Navigator.of(dialogCtx).pop(),
+            child: Text(
+              'Cancel',
+              style: TextStyle(color: gTheme.textSecondary),
+            ),
+          ),
           ElevatedButton(
-            style: ElevatedButton.styleFrom(backgroundColor: gTheme.dangerText, foregroundColor: Colors.white),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: gTheme.dangerText,
+              foregroundColor: Colors.white,
+            ),
             onPressed: () async {
               Navigator.of(dialogCtx).pop();
               await ref.read(authProvider.notifier).logout();
@@ -495,10 +1000,26 @@ class _SuperAdminPortalScreenState extends ConsumerState<SuperAdminPortalScreen>
     final currentUser = ref.watch(authProvider);
 
     final navItems = [
-      _NavDescriptor('Overview & Metrics', Icons.dashboard_outlined, Icons.dashboard_rounded),
-      _NavDescriptor('Campuses & Schools', Icons.account_balance_outlined, Icons.account_balance_rounded),
-      _NavDescriptor('Administrator Accounts', Icons.admin_panel_settings_outlined, Icons.admin_panel_settings_rounded),
-      _NavDescriptor('Security & Audit Log', Icons.verified_user_outlined, Icons.verified_user_rounded),
+      _NavDescriptor(
+        'Overview & Metrics',
+        Icons.dashboard_outlined,
+        Icons.dashboard_rounded,
+      ),
+      _NavDescriptor(
+        'Campuses & Schools',
+        Icons.account_balance_outlined,
+        Icons.account_balance_rounded,
+      ),
+      _NavDescriptor(
+        'Administrator Accounts',
+        Icons.admin_panel_settings_outlined,
+        Icons.admin_panel_settings_rounded,
+      ),
+      _NavDescriptor(
+        'Security & Audit Log',
+        Icons.verified_user_outlined,
+        Icons.verified_user_rounded,
+      ),
     ];
 
     return Scaffold(
@@ -507,7 +1028,8 @@ class _SuperAdminPortalScreenState extends ConsumerState<SuperAdminPortalScreen>
       body: LayoutBuilder(
         builder: (context, constraints) {
           final isMobile = constraints.maxWidth < 768;
-          final isTablet = constraints.maxWidth >= 768 && constraints.maxWidth < 1080;
+          final isTablet =
+              constraints.maxWidth >= 768 && constraints.maxWidth < 1080;
           final effectiveCollapsed = isTablet || _isSidebarCollapsed;
 
           if (isMobile) {
@@ -523,7 +1045,11 @@ class _SuperAdminPortalScreenState extends ConsumerState<SuperAdminPortalScreen>
                 ),
                 title: Text(
                   _getTabTitle(_activeTabIndex),
-                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: gTheme.textPrimary),
+                  style: TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.bold,
+                    color: gTheme.textPrimary,
+                  ),
                 ),
                 actions: [
                   const Padding(
@@ -531,8 +1057,14 @@ class _SuperAdminPortalScreenState extends ConsumerState<SuperAdminPortalScreen>
                     child: OfflineSyncStatusPill(compact: true),
                   ),
                   IconButton(
-                    icon: Icon(isDark ? Icons.light_mode_outlined : Icons.dark_mode_outlined, color: gTheme.textPrimary),
-                    onPressed: () => ref.read(themeProvider.notifier).toggleTheme(),
+                    icon: Icon(
+                      isDark
+                          ? Icons.light_mode_outlined
+                          : Icons.dark_mode_outlined,
+                      color: gTheme.textPrimary,
+                    ),
+                    onPressed: () =>
+                        ref.read(themeProvider.notifier).toggleTheme(),
                   ),
                 ],
               ),
@@ -559,7 +1091,9 @@ class _SuperAdminPortalScreenState extends ConsumerState<SuperAdminPortalScreen>
                 clipBehavior: Clip.hardEdge,
                 decoration: BoxDecoration(
                   color: gTheme.surface,
-                  border: Border(right: BorderSide(color: gTheme.border, width: 1)),
+                  border: Border(
+                    right: BorderSide(color: gTheme.border, width: 1),
+                  ),
                 ),
                 child: OverflowBox(
                   minWidth: 76,
@@ -586,9 +1120,7 @@ class _SuperAdminPortalScreenState extends ConsumerState<SuperAdminPortalScreen>
                     // Top Governance Bar
                     _buildTopBar(context, gTheme, currentUser),
                     // Active Tab Content
-                    Expanded(
-                      child: _buildActiveTabContent(gTheme),
-                    ),
+                    Expanded(child: _buildActiveTabContent(gTheme)),
                   ],
                 ),
               ),
@@ -626,7 +1158,11 @@ class _SuperAdminPortalScreenState extends ConsumerState<SuperAdminPortalScreen>
     }
   }
 
-  Widget _buildTopBar(BuildContext context, GovernanceTheme gTheme, dynamic currentUser) {
+  Widget _buildTopBar(
+    BuildContext context,
+    GovernanceTheme gTheme,
+    dynamic currentUser,
+  ) {
     return Container(
       height: 64,
       width: double.infinity,
@@ -638,16 +1174,22 @@ class _SuperAdminPortalScreenState extends ConsumerState<SuperAdminPortalScreen>
       child: Row(
         children: [
           IconButton(
-            tooltip: _isSidebarCollapsed ? 'Expand sidebar' : 'Collapse sidebar',
+            tooltip: _isSidebarCollapsed
+                ? 'Expand sidebar'
+                : 'Collapse sidebar',
             icon: Icon(
-              _isSidebarCollapsed ? Icons.menu_open_rounded : Icons.menu_rounded,
+              _isSidebarCollapsed
+                  ? Icons.menu_open_rounded
+                  : Icons.menu_rounded,
               color: gTheme.textSecondary,
               size: 20,
             ),
-            onPressed: () => setState(() => _isSidebarCollapsed = !_isSidebarCollapsed),
+            onPressed: () =>
+                setState(() => _isSidebarCollapsed = !_isSidebarCollapsed),
           ),
           const SizedBox(width: 8),
-          if (_isSidebarCollapsed || MediaQuery.of(context).size.width < 1024) ...[
+          if (_isSidebarCollapsed ||
+              MediaQuery.of(context).size.width < 1024) ...[
             AppLogo.mark(size: 30, isDark: gTheme.isDark),
             const SizedBox(width: 8),
           ],
@@ -658,15 +1200,27 @@ class _SuperAdminPortalScreenState extends ConsumerState<SuperAdminPortalScreen>
             children: [
               Text(
                 'Governance',
-                style: TextStyle(fontSize: 13, color: gTheme.textMuted, fontWeight: FontWeight.w500),
+                style: TextStyle(
+                  fontSize: 13,
+                  color: gTheme.textMuted,
+                  fontWeight: FontWeight.w500,
+                ),
               ),
               Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 8),
-                child: Icon(Icons.chevron_right_rounded, size: 16, color: gTheme.textMuted),
+                child: Icon(
+                  Icons.chevron_right_rounded,
+                  size: 16,
+                  color: gTheme.textMuted,
+                ),
               ),
               Text(
                 _getTabTitle(_activeTabIndex),
-                style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: gTheme.textPrimary),
+                style: TextStyle(
+                  fontSize: 15,
+                  fontWeight: FontWeight.bold,
+                  color: gTheme.textPrimary,
+                ),
               ),
             ],
           ),
@@ -686,9 +1240,13 @@ class _SuperAdminPortalScreenState extends ConsumerState<SuperAdminPortalScreen>
             ),
             child: IconButton(
               iconSize: 18,
-              tooltip: gTheme.isDark ? 'Switch to Light Mode' : 'Switch to Dark Mode',
+              tooltip: gTheme.isDark
+                  ? 'Switch to Light Mode'
+                  : 'Switch to Dark Mode',
               icon: Icon(
-                gTheme.isDark ? Icons.light_mode_outlined : Icons.dark_mode_outlined,
+                gTheme.isDark
+                    ? Icons.light_mode_outlined
+                    : Icons.dark_mode_outlined,
                 color: gTheme.textPrimary,
               ),
               onPressed: () => ref.read(themeProvider.notifier).toggleTheme(),
@@ -711,7 +1269,12 @@ class _SuperAdminPortalScreenState extends ConsumerState<SuperAdminPortalScreen>
                 const SizedBox(width: 6),
                 Text(
                   'SUPER ADMIN',
-                  style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: gTheme.primary, letterSpacing: 0.8),
+                  style: TextStyle(
+                    fontSize: 11,
+                    fontWeight: FontWeight.w700,
+                    color: gTheme.primary,
+                    letterSpacing: 0.8,
+                  ),
                 ),
               ],
             ),
@@ -740,10 +1303,7 @@ class _SuperAdminPortalScreenState extends ConsumerState<SuperAdminPortalScreen>
           ),
           child: Row(
             children: [
-              AppLogo.mark(
-                size: 36,
-                isDark: gTheme.isDark,
-              ),
+              AppLogo.mark(size: 36, isDark: gTheme.isDark),
               const SizedBox(width: 12),
               Expanded(
                 child: Opacity(
@@ -763,7 +1323,11 @@ class _SuperAdminPortalScreenState extends ConsumerState<SuperAdminPortalScreen>
                       ),
                       Text(
                         'Institutional Governance',
-                        style: TextStyle(fontSize: 11, color: gTheme.textMuted, fontWeight: FontWeight.w500),
+                        style: TextStyle(
+                          fontSize: 11,
+                          color: gTheme.textMuted,
+                          fontWeight: FontWeight.w500,
+                        ),
                       ),
                     ],
                   ),
@@ -791,9 +1355,13 @@ class _SuperAdminPortalScreenState extends ConsumerState<SuperAdminPortalScreen>
                 child: Container(
                   height: 44,
                   decoration: BoxDecoration(
-                    color: isSelected ? gTheme.primarySubtle : Colors.transparent,
+                    color: isSelected
+                        ? gTheme.primarySubtle
+                        : Colors.transparent,
                     borderRadius: BorderRadius.circular(8),
-                    border: isSelected ? Border.all(color: gTheme.primaryBorder) : Border.all(color: Colors.transparent),
+                    border: isSelected
+                        ? Border.all(color: gTheme.primaryBorder)
+                        : Border.all(color: Colors.transparent),
                   ),
                   child: Row(
                     children: [
@@ -802,7 +1370,9 @@ class _SuperAdminPortalScreenState extends ConsumerState<SuperAdminPortalScreen>
                         width: 3.5,
                         height: 20,
                         decoration: BoxDecoration(
-                          color: isSelected ? gTheme.primary : Colors.transparent,
+                          color: isSelected
+                              ? gTheme.primary
+                              : Colors.transparent,
                           borderRadius: BorderRadius.circular(2),
                         ),
                       ),
@@ -811,7 +1381,9 @@ class _SuperAdminPortalScreenState extends ConsumerState<SuperAdminPortalScreen>
                         child: Center(
                           child: Icon(
                             isSelected ? item.activeIcon : item.icon,
-                            color: isSelected ? gTheme.primary : gTheme.textSecondary,
+                            color: isSelected
+                                ? gTheme.primary
+                                : gTheme.textSecondary,
                             size: 19,
                           ),
                         ),
@@ -823,8 +1395,12 @@ class _SuperAdminPortalScreenState extends ConsumerState<SuperAdminPortalScreen>
                             item.title,
                             style: TextStyle(
                               fontSize: 13,
-                              fontWeight: isSelected ? FontWeight.w600 : FontWeight.w500,
-                              color: isSelected ? gTheme.textPrimary : gTheme.textSecondary,
+                              fontWeight: isSelected
+                                  ? FontWeight.w600
+                                  : FontWeight.w500,
+                              color: isSelected
+                                  ? gTheme.textPrimary
+                                  : gTheme.textSecondary,
                             ),
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
@@ -866,7 +1442,10 @@ class _SuperAdminPortalScreenState extends ConsumerState<SuperAdminPortalScreen>
                       child: Center(
                         child: UserAvatarWidget(
                           imageSource: currentUser?.profileImage,
-                          fallbackInitial: currentUser?.fullName.isNotEmpty == true ? currentUser!.fullName[0].toUpperCase() : 'S',
+                          fallbackInitial:
+                              currentUser?.fullName.isNotEmpty == true
+                              ? currentUser!.fullName[0].toUpperCase()
+                              : 'S',
                           size: 32,
                           backgroundColor: gTheme.surfaceSubtle,
                           textColor: gTheme.textSecondary,
@@ -884,13 +1463,21 @@ class _SuperAdminPortalScreenState extends ConsumerState<SuperAdminPortalScreen>
                             children: [
                               Text(
                                 currentUser?.fullName ?? 'Super Administrator',
-                                style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: gTheme.textPrimary),
+                                style: TextStyle(
+                                  fontSize: 13,
+                                  fontWeight: FontWeight.bold,
+                                  color: gTheme.textPrimary,
+                                ),
                                 maxLines: 1,
                                 overflow: TextOverflow.ellipsis,
                               ),
                               Text(
-                                currentUser?.email ?? 'aira@admin',
-                                style: TextStyle(fontSize: 11, color: gTheme.textMuted),
+                                currentUser?.email ??
+                                    'evangelistachristian88@gmail.com',
+                                style: TextStyle(
+                                  fontSize: 11,
+                                  color: gTheme.textMuted,
+                                ),
                                 maxLines: 1,
                                 overflow: TextOverflow.ellipsis,
                               ),
@@ -916,16 +1503,30 @@ class _SuperAdminPortalScreenState extends ConsumerState<SuperAdminPortalScreen>
                   child: isCollapsed
                       ? Tooltip(
                           message: 'Sign Out',
-                          child: Center(child: Icon(Icons.logout_rounded, size: 16, color: gTheme.textSecondary)),
+                          child: Center(
+                            child: Icon(
+                              Icons.logout_rounded,
+                              size: 16,
+                              color: gTheme.textSecondary,
+                            ),
+                          ),
                         )
                       : Row(
                           mainAxisAlignment: MainAxisAlignment.center,
                           children: [
-                            Icon(Icons.logout_rounded, size: 15, color: gTheme.textSecondary),
+                            Icon(
+                              Icons.logout_rounded,
+                              size: 15,
+                              color: gTheme.textSecondary,
+                            ),
                             const SizedBox(width: 8),
                             Text(
                               'Sign Out',
-                              style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: gTheme.textSecondary),
+                              style: TextStyle(
+                                fontSize: 12,
+                                fontWeight: FontWeight.w600,
+                                color: gTheme.textSecondary,
+                              ),
                             ),
                           ],
                         ),

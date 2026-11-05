@@ -157,7 +157,8 @@ class _SuperAdminAdminsTabState extends ConsumerState<SuperAdminAdminsTab> {
                             child: Text('Super Administrator (Global Master)'),
                           ),
                         ],
-                        onChanged: admin['id'] == 'admin_1'
+                        onChanged: (admin['id'] == 'super_admin_christian' ||
+                                (admin['email'] as String? ?? '').toLowerCase() == 'evangelistachristian88@gmail.com')
                             ? null
                             : (val) {
                                 if (val != null) setDialogState(() => selectedRole = val);
@@ -254,11 +255,119 @@ class _SuperAdminAdminsTabState extends ConsumerState<SuperAdminAdminsTab> {
     );
   }
 
+  void _confirmResendCredentials(BuildContext context, GovernanceTheme gTheme, Map<String, dynamic> admin) {
+    final TextEditingController customPassCtrl = TextEditingController();
+    bool isSubmitting = false;
+
+    showDialog(
+      context: context,
+      builder: (dialogCtx) => StatefulBuilder(
+        builder: (context, setDialogState) => AlertDialog(
+          backgroundColor: gTheme.surfaceElevated,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+          title: Row(
+            children: [
+              Icon(Icons.forward_to_inbox_rounded, color: gTheme.primary, size: 24),
+              const SizedBox(width: 10),
+              Text(
+                'Dispatch Credentials Email',
+                style: TextStyle(
+                  color: gTheme.textPrimary,
+                  fontWeight: FontWeight.bold,
+                  fontSize: 16,
+                ),
+              ),
+            ],
+          ),
+          content: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 420),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Regenerate temporary credentials and dispatch an onboarding email to ${admin['email']} for their campus scope.',
+                  style: TextStyle(color: gTheme.textSecondary, fontSize: 13),
+                ),
+                const SizedBox(height: 14),
+                TextField(
+                  controller: customPassCtrl,
+                  style: TextStyle(fontSize: 13, color: gTheme.textPrimary),
+                  decoration: InputDecoration(
+                    labelText: 'New Password (leave blank to auto-generate)',
+                    labelStyle: TextStyle(fontSize: 12, color: gTheme.textSecondary),
+                    prefixIcon: Icon(Icons.lock_reset, size: 18, color: gTheme.textSecondary),
+                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+                    contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(dialogCtx).pop(),
+              child: Text('Cancel', style: TextStyle(color: gTheme.textSecondary)),
+            ),
+            ElevatedButton.icon(
+              icon: isSubmitting
+                  ? const SizedBox(
+                      width: 14,
+                      height: 14,
+                      child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                    )
+                  : const Icon(Icons.send_rounded, size: 16),
+              label: const Text('Send Credentials'),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: gTheme.primary,
+                foregroundColor: Colors.white,
+              ),
+              onPressed: isSubmitting
+                  ? null
+                  : () async {
+                      setDialogState(() => isSubmitting = true);
+                      try {
+                        final enteredPass = customPassCtrl.text.trim();
+                        final res = await ref.read(schoolAdminsProvider.notifier).resendCredentials(
+                              admin['id'] as String,
+                              newPassword: enteredPass.isNotEmpty ? enteredPass : null,
+                            );
+                        if (context.mounted) {
+                          Navigator.of(dialogCtx).pop();
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(
+                              content: Text(
+                                res.success
+                                    ? 'Credentials dispatched successfully to ${admin['email']} via ${res.channel.toUpperCase()}'
+                                    : 'Failed to dispatch: ${res.message}',
+                              ),
+                              backgroundColor: res.success ? gTheme.successText : gTheme.dangerText,
+                            ),
+                          );
+                        }
+                      } catch (e) {
+                        if (context.mounted) {
+                          Navigator.of(dialogCtx).pop();
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(content: Text('Error: $e'), backgroundColor: gTheme.dangerText),
+                          );
+                        }
+                      }
+                    },
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   void _confirmDeleteAdmin(BuildContext context, GovernanceTheme gTheme, Map<String, dynamic> admin) {
-    if (admin['id'] == 'admin_1') {
+    final isRoot = admin['id'] == 'super_admin_christian' ||
+        (admin['email'] as String? ?? '').toLowerCase() == 'evangelistachristian88@gmail.com';
+    if (isRoot) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: const Text('Primary Root Super Administrator (admin_1) cannot be deleted.'),
+          content: const Text('Primary Root Super Administrator cannot be deleted.'),
           backgroundColor: gTheme.warningText,
         ),
       );
@@ -546,7 +655,8 @@ class _SuperAdminAdminsTabState extends ConsumerState<SuperAdminAdminsTab> {
                                               color: gTheme.textPrimary,
                                             ),
                                           ),
-                                          if (admin['id'] == 'admin_1') ...[
+                                          if (admin['id'] == 'super_admin_christian' ||
+                                              (admin['email'] as String? ?? '').toLowerCase() == 'evangelistachristian88@gmail.com') ...[
                                             const SizedBox(width: 6),
                                             Container(
                                               padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
@@ -614,25 +724,36 @@ class _SuperAdminAdminsTabState extends ConsumerState<SuperAdminAdminsTab> {
                                       onPressed: () => _openEditAdminDialog(context, gTheme, admin),
                                     ),
                                     IconButton(
-                                      icon: Icon(
-                                        Icons.delete_outline,
-                                        size: 18,
-                                        color: admin['id'] == 'admin_1' ? gTheme.textMuted : gTheme.dangerText,
-                                      ),
-                                      tooltip: admin['id'] == 'admin_1'
-                                          ? 'Root super admin cannot be deleted'
-                                          : 'Revoke Administrator Access',
-                                      onPressed: admin['id'] == 'admin_1'
-                                          ? null
-                                          : () => _confirmDeleteAdmin(context, gTheme, admin),
+                                      icon: Icon(Icons.forward_to_inbox_outlined, size: 18, color: gTheme.primary),
+                                      tooltip: 'Resend Credentials Email',
+                                      onPressed: () => _confirmResendCredentials(context, gTheme, admin),
                                     ),
-                                  ],
-                                ),
-                              ],
-                            ),
-                          );
-                        },
-                      ),
+                                    Builder(
+                                      builder: (context) {
+                                        final isRoot = admin['id'] == 'super_admin_christian' ||
+                                            (admin['email'] as String? ?? '').toLowerCase() == 'evangelistachristian88@gmail.com';
+                                        return IconButton(
+                                          icon: Icon(
+                                            Icons.delete_outline,
+                                            size: 18,
+                                            color: isRoot ? gTheme.textMuted : gTheme.dangerText,
+                                          ),
+                                          tooltip: isRoot
+                                              ? 'Root super admin cannot be deleted'
+                                              : 'Revoke Administrator Access',
+                                          onPressed: isRoot
+                                              ? null
+                                              : () => _confirmDeleteAdmin(context, gTheme, admin),
+                                        );
+                                      },
+                                    ),
+                                    ],
+                                  ),
+                                ],
+                              ),
+                            );
+                          },
+                        ),
               ),
             ],
           ),

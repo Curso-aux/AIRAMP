@@ -1060,6 +1060,15 @@ class SchoolAdminsNotifier extends Notifier<List<Map<String, dynamic>>> {
     await loadAdmins();
     ref.read(adminAnalyticsProvider.notifier).loadAnalytics();
   }
+
+  Future<EmailResult> resendCredentials(String adminId, {String? newPassword}) async {
+    final result = await DatabaseHelper().resetAndSendAdminCredentials(
+      adminId: adminId,
+      newPassword: newPassword,
+    );
+    await loadAdmins();
+    return result;
+  }
 }
 
 // --- Schools Management (Item 8: Super Admin manages schools) ---

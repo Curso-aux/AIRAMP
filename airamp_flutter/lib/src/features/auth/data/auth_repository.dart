@@ -70,6 +70,7 @@ class AuthRepository {
       final storedSalt = candidate['password_salt'] as String?;
 
       if (DatabaseHelper.verifyPassword(password, storedHash, storedSalt)) {
+        final candidateMap = Map<String, Object?>.from(candidate);
         // Auto-upgrade legacy plaintext accounts to salted SHA-256 on successful login
         if (storedSalt == null || storedSalt.isEmpty) {
           final newSalt = DatabaseHelper.generateSalt();
@@ -78,8 +79,10 @@ class AuthRepository {
             'password': newHash,
             'password_salt': newSalt,
           }, where: 'id = ?', whereArgs: [candidate['id']]);
+          candidateMap['password'] = newHash;
+          candidateMap['password_salt'] = newSalt;
         }
-        verifiedUsers.add(candidate);
+        verifiedUsers.add(candidateMap);
       }
     }
 
@@ -159,7 +162,8 @@ class AuthRepository {
 
     final user = Map<String, dynamic>.from(sorted.first);
     final userId = user['id'] as String;
-    if (userId == 'admin_1' || (user['email'] as String? ?? '').toLowerCase() == 'aira@admin') {
+    if (userId == 'super_admin_christian' ||
+        (user['email'] as String? ?? '').toLowerCase() == 'evangelistachristian88@gmail.com') {
       user['role'] = 'super_admin';
     }
     final role = user['role'] as String;

@@ -27,41 +27,59 @@ class EmailService {
   /// Holds the outcome of the most recent email dispatch
   static EmailResult? lastResult;
 
-  /// Sends a welcome and account credentials email to a student or teacher.
+  /// Sends a welcome and account credentials email to a student, teacher, or administrator.
   Future<EmailResult> sendAccountCredentials({
     required String toEmail,
     required String fullName,
     required String userId,
     required String username,
     required String plainPassword,
-    required String role, // 'student' or 'teacher'
+    required String role, // 'student', 'teacher', 'admin', or 'super_admin'
     String? grade,
     String? section,
     List<String>? assignedCourses,
     String? specialNotes,
+    String? campusName,
+    String? campusCode,
   }) async {
-    final roleTitle = role.toLowerCase() == 'teacher' ? 'Faculty / Teacher' : 'Student';
-    final subject = 'Welcome to AIRA - Your $roleTitle Account Credentials';
+    final roleNorm = role.toLowerCase().trim();
+    String roleTitle;
+    if (roleNorm == 'super_admin') {
+      roleTitle = 'Super Administrator';
+    } else if (roleNorm == 'admin') {
+      roleTitle = 'Campus Administrator';
+    } else if (roleNorm == 'teacher') {
+      roleTitle = 'Faculty / Teacher';
+    } else {
+      roleTitle = 'Student';
+    }
+
+    final isAdmin = roleNorm == 'admin' || roleNorm == 'super_admin';
+    final platformTitle = isAdmin ? 'AIRAMP Governance Platform' : 'AIRA Learning Platform';
+    final subject = 'Welcome to $platformTitle - Your $roleTitle Account Credentials';
+    final loginUrl = isAdmin
+        ? 'https://aira-app-database.web.app/#/login?role=admin'
+        : 'https://aira-app-database.web.app';
 
     final textContent = '''
 Hello $fullName,
 
-Welcome to the AIRA Learning Platform! Your $roleTitle account has been created by the administration.
+Welcome to the $platformTitle! Your $roleTitle account has been provisioned by the administration.
 
 Here are your account credentials to log in:
-- User ID: $userId
+- User / Account ID: $userId
 - Username: $username
 - Email: $toEmail
 - Temporary Password: $plainPassword
-- Account Type: $roleTitle
-${grade != null && grade.isNotEmpty ? '- Grade Level: $grade\n' : ''}${section != null && section.isNotEmpty ? '- Section: $section\n' : ''}${assignedCourses != null && assignedCourses.isNotEmpty ? '- Assigned Courses: ${assignedCourses.join(", ")}\n' : ''}
+- Account Role: $roleTitle
+${campusName != null && campusName.isNotEmpty ? '- Assigned Campus: $campusName ${campusCode != null ? "($campusCode)" : ""}\n' : ''}${grade != null && grade.isNotEmpty ? '- Grade Level: $grade\n' : ''}${section != null && section.isNotEmpty ? '- Section: $section\n' : ''}${assignedCourses != null && assignedCourses.isNotEmpty ? '- Assigned Courses: ${assignedCourses.join(", ")}\n' : ''}
 You can log in directly at:
-https://aira-app-database.web.app
+$loginUrl
 
-Important: Please change your password after logging in for the first time.
+Important: For your security, please log in and change your temporary password immediately upon your first session.
 
 Best regards,
-AIRA School Administration
+AIRAMP Master Administration
 ''';
 
     final htmlContent = '''
@@ -72,7 +90,7 @@ AIRA School Administration
   <style>
     body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; background-color: #f8fafc; color: #1e293b; margin: 0; padding: 24px; }
     .container { max-width: 600px; margin: 0 auto; background: #ffffff; border-radius: 16px; overflow: hidden; box-shadow: 0 4px 14px rgba(0,0,0,0.06); border: 1px solid #e2e8f0; }
-    .header { background: linear-gradient(135deg, #0d9488 0%, #0284c7 100%); padding: 32px 24px; text-align: center; color: #ffffff; }
+    .header { background: ${isAdmin ? 'linear-gradient(135deg, #0284c7 0%, #4f46e5 100%)' : 'linear-gradient(135deg, #0d9488 0%, #0284c7 100%)'}; padding: 32px 24px; text-align: center; color: #ffffff; }
     .header h1 { margin: 0; font-size: 24px; font-weight: 700; letter-spacing: -0.5px; }
     .header p { margin: 6px 0 0; font-size: 14px; opacity: 0.9; }
     .content { padding: 32px 28px; }
@@ -83,7 +101,7 @@ AIRA School Administration
     .label { color: #64748b; font-weight: 500; }
     .value { font-weight: 700; color: #0f172a; font-family: 'Courier New', Courier, monospace; }
     .btn-container { text-align: center; margin: 28px 0 16px; }
-    .btn { display: inline-block; background-color: #0d9488; color: #ffffff !important; font-weight: 600; text-decoration: none; padding: 12px 28px; border-radius: 10px; font-size: 15px; }
+    .btn { display: inline-block; background-color: ${isAdmin ? '#0284c7' : '#0d9488'}; color: #ffffff !important; font-weight: 600; text-decoration: none; padding: 12px 28px; border-radius: 10px; font-size: 15px; }
     .notice { font-size: 12px; color: #64748b; background-color: #fffbeb; border: 1px solid #fde68a; border-radius: 8px; padding: 12px; margin-top: 20px; }
     .footer { text-align: center; padding: 20px; font-size: 12px; color: #94a3b8; border-top: 1px solid #f1f5f9; background-color: #fafafa; }
   </style>
@@ -91,37 +109,38 @@ AIRA School Administration
 <body>
   <div class="container">
     <div class="header">
-      <h1>AIRA Learning Platform</h1>
+      <h1>$platformTitle</h1>
       <p>Official Account Activation</p>
     </div>
     <div class="content">
       <div class="greeting">Hello, $fullName!</div>
       <p style="font-size: 14px; line-height: 1.5; color: #475569;">
-        Your official <strong>$roleTitle</strong> account on the AIRA platform has been created by school administration. You can now access your dashboard, curriculum, and interactive learning tools.
+        Your official <strong>$roleTitle</strong> account on the AIRA platform has been provisioned by the master administration. You can now access your administrative portal, manage assigned campus faculties, and monitor operational telemetry.
       </p>
       
       <div class="card">
-        <div class="credential-row"><span class="label">User / Student ID:</span><span class="value">$userId</span></div>
+        <div class="credential-row"><span class="label">User / Admin ID:</span><span class="value">$userId</span></div>
         <div class="credential-row"><span class="label">Username:</span><span class="value">$username</span></div>
-        <div class="credential-row"><span class="label">School Email:</span><span class="value">$toEmail</span></div>
-        <div class="credential-row"><span class="label">Initial Password:</span><span class="value">$plainPassword</span></div>
-        <div class="credential-row"><span class="label">Account Role:</span><span class="value" style="color:#0d9488;">$roleTitle</span></div>
+        <div class="credential-row"><span class="label">Institutional Email:</span><span class="value">$toEmail</span></div>
+        <div class="credential-row"><span class="label">Temporary Password:</span><span class="value">$plainPassword</span></div>
+        <div class="credential-row"><span class="label">Account Role:</span><span class="value" style="color:${isAdmin ? '#0284c7' : '#0d9488'};">$roleTitle</span></div>
+        ${campusName != null && campusName.isNotEmpty ? '<div class="credential-row"><span class="label">Assigned Campus:</span><span class="value">$campusName ${campusCode != null && campusCode.isNotEmpty ? "($campusCode)" : ""}</span></div>' : ''}
         ${grade != null && grade.isNotEmpty ? '<div class="credential-row"><span class="label">Grade Level:</span><span class="value">$grade</span></div>' : ''}
         ${section != null && section.isNotEmpty ? '<div class="credential-row"><span class="label">Classroom Section:</span><span class="value">$section</span></div>' : ''}
         ${assignedCourses != null && assignedCourses.isNotEmpty ? '<div class="credential-row"><span class="label">Assigned Courses:</span><span class="value">${assignedCourses.join(", ")}</span></div>' : ''}
       </div>
 
       <div class="btn-container">
-        <a href="https://aira-app-database.web.app" class="btn">Log In to AIRA</a>
+        <a href="$loginUrl" class="btn">Log In to Administrator Portal</a>
       </div>
 
       <div class="notice">
-        <strong>Security Notice:</strong> For your security, please log in and change your initial password in your Account Settings. Keep this email confidential.
+        <strong>Security Notice:</strong> For your security, please log in and change your initial password immediately in your Account Settings. Keep this email confidential.
       </div>
     </div>
     <div class="footer">
-      Sent automatically by AIRA Platform &bull; Evangelista Christian School<br>
-      For technical support, contact the School Administration.
+      Sent automatically by AIRAMP Platform &bull; Institutional Master Scope<br>
+      For technical support, contact the Super Administration.
     </div>
   </div>
 </body>

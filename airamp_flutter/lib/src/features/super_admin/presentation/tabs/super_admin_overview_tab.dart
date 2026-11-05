@@ -192,7 +192,7 @@ class SuperAdminOverviewTab extends ConsumerWidget {
               ),
               const SizedBox(height: 4),
               Text(
-                'Active Session: ${currentUser?.fullName ?? "Super Administrator"} (${currentUser?.email ?? "aira@admin"}) • Master Institutional Scope',
+                'Active Session: ${currentUser?.fullName ?? "Super Administrator"} (${currentUser?.email ?? "evangelistachristian88@gmail.com"}) • Master Institutional Scope',
                 style: TextStyle(color: gTheme.textSecondary, fontSize: 13),
               ),
             ],

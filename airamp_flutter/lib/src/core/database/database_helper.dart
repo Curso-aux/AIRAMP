@@ -115,9 +115,12 @@ class DatabaseHelper {
       await db.rawUpdate('''
         UPDATE users 
         SET profile_image = 'assets/images/aira_mascot_logo.png' 
-        WHERE (id = 'admin_1' OR email = 'aira@admin') 
+        WHERE (id = 'super_admin_christian' OR email = 'evangelistachristian88@gmail.com') 
           AND (profile_image IS NULL OR profile_image = '')
       ''');
+    } catch (_) {}
+    try {
+      await db.delete('users', where: "id = 'admin_1' OR id = 'super_admin_1' OR email = 'aira@admin'");
     } catch (_) {}
     try {
       await db.execute(
@@ -560,20 +563,20 @@ class DatabaseHelper {
       )
     ''');
 
-    final saltAdmin1 = generateSalt();
+    final saltChristian = generateSalt();
     final saltAdmin2 = generateSalt();
     final saltTeacher1 = generateSalt();
     final saltStudent1 = generateSalt();
 
     // Seed default authentic accounts with salted hashes
     await db.insert('users', {
-      'id': 'admin_1',
-      'email': 'aira@admin',
-      'username': 'Aira Admin',
-      'password': hashPassword('aira@admin', saltAdmin1),
-      'password_salt': saltAdmin1,
+      'id': 'super_admin_christian',
+      'email': 'evangelistachristian88@gmail.com',
+      'username': 'Christian Evangelista',
+      'password': hashPassword('Admin@123', saltChristian),
+      'password_salt': saltChristian,
       'role': 'super_admin',
-      'full_name': 'Aira Admin',
+      'full_name': 'Christian Evangelista',
       'section': null,
       'grade': null,
       'profile_image': 'assets/images/aira_mascot_logo.png',
@@ -999,11 +1002,11 @@ class DatabaseHelper {
       final existing = await db.query('users');
       if (existing.isEmpty) {
         await db.insert('users', {
-          'id': 'super_admin_1',
-          'email': 'aira@admin',
-          'password': 'aira@admin',
+          'id': 'super_admin_christian',
+          'email': 'evangelistachristian88@gmail.com',
+          'password': 'Admin@123',
           'role': 'super_admin',
-          'full_name': 'Aira Admin',
+          'full_name': 'Christian Evangelista',
           'created_at': DateTime.now().toIso8601String(),
         });
         await db.insert('users', {
@@ -1026,13 +1029,8 @@ class DatabaseHelper {
     }
 
     if (oldVersion < 3) {
-      // Fix seeded passwords
-      await db.update(
-        'users',
-        {'password': 'aira@admin'},
-        where: 'email = ?',
-        whereArgs: ['aira@admin'],
-      );
+      // Purge legacy seeded admin account
+      await db.delete('users', where: "id = 'super_admin_1' OR id = 'admin_1' OR email = 'aira@admin'");
       await db.update(
         'users',
         {'password': 'John@123'},
@@ -3997,54 +3995,9 @@ class DatabaseHelper {
       await db.execute('ALTER TABLE users ADD COLUMN username TEXT');
     } catch (_) {}
 
-    // Ensure super admin account exists with username, email, and credentials
+    // Ensure fake admin accounts are completely purged from database
     try {
-      final existingAdmin1 = await db.query(
-        'users',
-        where: 'email = ?',
-        whereArgs: ['aira@admin'],
-      );
-      final saltAdmin1 = generateSalt();
-      if (existingAdmin1.isEmpty) {
-        await db.insert('users', {
-          'id': 'admin_1',
-          'email': 'aira@admin',
-          'password': hashPassword('aira@admin', saltAdmin1),
-          'password_salt': saltAdmin1,
-          'role': 'super_admin',
-          'full_name': 'Aira Admin',
-          'username': 'Aira Admin',
-          'section': null,
-          'grade': null,
-          'created_at': DateTime.now().toIso8601String(),
-        });
-      } else {
-        await db.update(
-          'users',
-          {'role': 'super_admin'},
-          where: 'id = ? OR email = ?',
-          whereArgs: ['admin_1', 'aira@admin'],
-        );
-
-        final currentSalt = existingAdmin1.first['password_salt'] as String?;
-        final currentPass = existingAdmin1.first['password'] as String?;
-        if (currentSalt == null ||
-            currentSalt.isEmpty ||
-            currentPass == 'aira@admin') {
-          await db.update(
-            'users',
-            {
-              'username': 'Aira Admin',
-              'full_name': 'Aira Admin',
-              'password': hashPassword('aira@admin', saltAdmin1),
-              'password_salt': saltAdmin1,
-              'role': 'super_admin',
-            },
-            where: 'email = ?',
-            whereArgs: ['aira@admin'],
-          );
-        }
-      }
+      await db.delete('users', where: "id = 'admin_1' OR id = 'super_admin_1' OR email = 'aira@admin'");
     } catch (_) {}
 
     // Ensure admin_2 has username & hashed password
@@ -4088,7 +4041,7 @@ class DatabaseHelper {
       }
     } catch (_) {}
 
-    // Ensure evangelistachristian88@gmail.com exists as Super Administrator & Administrator
+    // Ensure evangelistachristian88@gmail.com exists as Primary Root Super Administrator
     try {
       final existingChristian = await db.query(
         'users',
@@ -4105,17 +4058,41 @@ class DatabaseHelper {
           'role': 'super_admin',
           'full_name': 'Christian Evangelista',
           'username': 'Christian Evangelista',
+          'profile_image': 'assets/images/aira_mascot_logo.png',
           'section': null,
           'grade': null,
           'created_at': DateTime.now().toIso8601String(),
         });
       } else {
-        await db.update(
-          'users',
-          {'role': 'super_admin'},
-          where: 'LOWER(email) = ?',
-          whereArgs: ['evangelistachristian88@gmail.com'],
-        );
+        final currentSalt = existingChristian.first['password_salt'] as String?;
+        final currentPass = existingChristian.first['password'] as String?;
+        if (currentSalt == null || currentSalt.isEmpty || currentPass == null || currentPass.isEmpty) {
+          await db.update(
+            'users',
+            {
+              'role': 'super_admin',
+              'username': 'Christian Evangelista',
+              'full_name': 'Christian Evangelista',
+              'password': hashPassword('Admin@123', saltChristian),
+              'password_salt': saltChristian,
+              'profile_image': 'assets/images/aira_mascot_logo.png',
+            },
+            where: 'LOWER(email) = ?',
+            whereArgs: ['evangelistachristian88@gmail.com'],
+          );
+        } else {
+          await db.update(
+            'users',
+            {
+              'role': 'super_admin',
+              'username': 'Christian Evangelista',
+              'full_name': 'Christian Evangelista',
+              'profile_image': 'assets/images/aira_mascot_logo.png',
+            },
+            where: 'LOWER(email) = ?',
+            whereArgs: ['evangelistachristian88@gmail.com'],
+          );
+        }
       }
     } catch (_) {}
 
@@ -9308,6 +9285,17 @@ class DatabaseHelper {
               ? email.split('@').first
               : fullName.trim().toLowerCase().replaceAll(' ', '.'));
 
+    final schoolScope = schoolId ?? 'sch_main';
+    final schools = await getSchoolsList();
+    final campus = schools.firstWhere(
+      (s) => s['id'] == schoolScope,
+      orElse: () => {
+        'id': schoolScope,
+        'name': 'AIRAMP Demonstration High School',
+        'code': 'ADM-01',
+      },
+    );
+
     final adminData = {
       'id': adminId,
       'email': email.trim().toLowerCase(),
@@ -9316,7 +9304,8 @@ class DatabaseHelper {
       'password_salt': salt,
       'role': role,
       'full_name': fullName.trim(),
-      'school_id': schoolId ?? 'sch_main',
+      'school_id': schoolScope,
+      'must_change_password': 1,
       'created_at': DateTime.now().toIso8601String(),
     };
 
@@ -9326,7 +9315,96 @@ class DatabaseHelper {
       await FirestoreService().saveUser(adminData);
     } catch (_) {}
 
+    try {
+      await EmailService().sendAccountCredentials(
+        toEmail: email.trim(),
+        fullName: fullName.trim(),
+        userId: adminId,
+        username: resolvedUsername,
+        plainPassword: password,
+        role: role,
+        campusName: campus['name']?.toString() ?? 'AIRAMP Demonstration High School',
+        campusCode: campus['code']?.toString() ?? 'ADM-01',
+      );
+    } catch (e) {
+      debugPrint('[DatabaseHelper] Error dispatching admin credentials email: $e');
+    }
+
     return adminId;
+  }
+
+  Future<EmailResult> resetAndSendAdminCredentials({
+    required String adminId,
+    String? newPassword,
+  }) async {
+    final db = await database;
+    final adminRows = await db.query(
+      'users',
+      where: 'id = ?',
+      whereArgs: [adminId],
+      limit: 1,
+    );
+    if (adminRows.isEmpty) {
+      return EmailResult(
+        success: false,
+        message: 'Administrator $adminId not found.',
+        channel: 'none',
+      );
+    }
+    final admin = adminRows.first;
+    final email = (admin['email'] as String? ?? '').trim();
+    if (email.isEmpty) {
+      return EmailResult(
+        success: false,
+        message: 'Administrator does not have an email configured.',
+        channel: 'none',
+      );
+    }
+
+    final effectivePassword = (newPassword != null && newPassword.trim().isNotEmpty)
+        ? newPassword.trim()
+        : 'Admin@${DateTime.now().millisecondsSinceEpoch % 10000}!';
+
+    final salt = generateSalt();
+    final hashedPassword = hashPassword(effectivePassword, salt);
+    final updates = {
+      'password': hashedPassword,
+      'password_salt': salt,
+      'must_change_password': 1,
+    };
+
+    await db.update('users', updates, where: 'id = ?', whereArgs: [adminId]);
+    try {
+      await FirestoreService().saveUser({'id': adminId, ...updates});
+    } catch (_) {}
+
+    final schoolScope = admin['school_id'] as String? ?? 'sch_main';
+    final schools = await getSchoolsList();
+    final campus = schools.firstWhere(
+      (s) => s['id'] == schoolScope,
+      orElse: () => {
+        'id': schoolScope,
+        'name': 'AIRAMP Demonstration High School',
+        'code': 'ADM-01',
+      },
+    );
+
+    final fullName = admin['full_name'] as String? ?? 'Administrator';
+    final role = admin['role'] as String? ?? 'admin';
+    final username = (admin['username'] as String?)?.isNotEmpty == true
+        ? admin['username'] as String
+        : (email.contains('@') ? email.split('@').first : fullName);
+
+    return await EmailService().sendAccountCredentials(
+      toEmail: email,
+      fullName: fullName,
+      userId: adminId,
+      username: username,
+      plainPassword: effectivePassword,
+      role: role,
+      campusName: campus['name']?.toString() ?? 'AIRAMP Demonstration High School',
+      campusCode: campus['code']?.toString() ?? 'ADM-01',
+    );
   }
 
   Future<void> updateAdmin(String adminId, Map<String, dynamic> data) async {
@@ -9367,8 +9445,13 @@ class DatabaseHelper {
     final db = await database;
     // Prevent deleting primary super admin
     final row = await db.query('users', where: 'id = ?', whereArgs: [adminId]);
-    if (row.isNotEmpty && row.first['id'] == 'admin_1') {
-      throw StateError('Cannot delete primary system super administrator');
+    if (row.isNotEmpty) {
+      final email = (row.first['email'] as String? ?? '').toLowerCase();
+      final id = row.first['id'] as String? ?? '';
+      if (id == 'super_admin_christian' ||
+          email == 'evangelistachristian88@gmail.com') {
+        throw StateError('Cannot delete primary system super administrator');
+      }
     }
     await db.delete('users', where: 'id = ?', whereArgs: [adminId]);
   }
@@ -9905,8 +9988,8 @@ class DatabaseHelper {
             'action': 'SYSTEM_INITIALIZATION',
             'details':
                 'AIRAMP Super Admin Governance & Multi-Tenant Scoping Engine loaded.',
-            'actor_id': 'admin_1',
-            'actor_name': 'Aira Super Admin',
+            'actor_id': 'super_admin_christian',
+            'actor_name': 'Christian Evangelista',
             'school_id': 'sch_main',
             'created_at': now,
           },
@@ -9915,8 +9998,8 @@ class DatabaseHelper {
             'action': 'SECURITY_RBAC_SALT_ACTIVE',
             'details':
                 'Cryptographic salted SHA-256 password security verified across database.',
-            'actor_id': 'admin_1',
-            'actor_name': 'Aira Super Admin',
+            'actor_id': 'super_admin_christian',
+            'actor_name': 'Christian Evangelista',
             'school_id': 'sch_main',
             'created_at': now,
           },

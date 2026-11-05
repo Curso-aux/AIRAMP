@@ -11,22 +11,22 @@ void main() {
   group('AuthRepository Username and Email Support Tests', () {
     final repo = AuthRepository();
 
-    test('Log in using Admin username: "Aira Admin"', () async {
-      final res = await repo.login('Aira Admin', 'aira@admin');
+    test('Log in using Admin username: "Christian Evangelista"', () async {
+      final res = await repo.login('Christian Evangelista', 'Admin@123');
       expect(res['user']['role'], 'super_admin');
-      expect(res['user']['email'], 'aira@admin');
-      expect(res['user']['fullName'], 'Aira Admin');
-      expect(res['user']['username'], 'Aira Admin');
+      expect(res['user']['email'], 'evangelistachristian88@gmail.com');
+      expect(res['user']['fullName'], 'Christian Evangelista');
+      expect(res['user']['username'], 'Christian Evangelista');
     });
 
-    test('Log in using Admin email: "aira@admin"', () async {
-      final res = await repo.login('aira@admin', 'aira@admin');
+    test('Log in using Admin email: "evangelistachristian88@gmail.com"', () async {
+      final res = await repo.login('evangelistachristian88@gmail.com', 'Admin@123');
       expect(res['user']['role'], 'super_admin');
-      expect(res['user']['email'], 'aira@admin');
+      expect(res['user']['email'], 'evangelistachristian88@gmail.com');
     });
 
-    test('Log in using Admin username lowercase: "aira admin"', () async {
-      final res = await repo.login('aira admin', 'aira@admin');
+    test('Log in using Admin username lowercase: "christian evangelista"', () async {
+      final res = await repo.login('christian evangelista', 'Admin@123');
       expect(res['user']['role'], 'super_admin');
     });
 
