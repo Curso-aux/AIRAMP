@@ -1,17 +1,12 @@
 #!/usr/bin/env python3
 """
-AIRA SMTP Bridge — Cloud Deployment Version
----------------------------------------------
-Runs on Render.com (or any cloud host) to deliver emails for the
-deployed Firebase-hosted AIRA web application.
-
-Two jobs run in parallel:
-1. HTTP Server — accepts POST /send-email from your Flutter app directly.
-2. Firestore Queue Consumer — polls the Cloud Firestore `mail` collection
-   every few seconds for documents with status "pending", sends them via
-   Gmail SMTP, then updates the document status.
-
-All secrets are read from environment variables (set in Render dashboard).
+AIRA SMTP Bridge & Cloud Queue Daemon (Cloud & Local Edition)
+--------------------------------------------------------------
+Dual-delivery engine:
+1. Brevo HTTPS REST API (Port 443) — primary cloud transport (never blocked by Render/AWS).
+2. Gmail SMTP Direct (Port 587/465) — fallback for local execution.
+3. Firestore Queue Consumer — polls Cloud Firestore `mail` collection
+   for pending emails dispatched from Deployed Web (Firebase Hosting).
 """
 
 import sys
@@ -28,21 +23,23 @@ from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
 from datetime import datetime
 
-# Unbuffered stdout so Render logs appear in real time
+# Unbuffered stdout logging
 try:
     if hasattr(sys.stdout, "reconfigure"):
         sys.stdout.reconfigure(line_buffering=True)
 except Exception:
     pass
 
-# ── Configuration (all from environment variables) ──────────────
+# ── Configuration (Environment Variables with Fallbacks) ───────
 PORT = int(os.environ.get("PORT", 10000))
-DEFAULT_SENDER = os.environ.get("SMTP_SENDER_EMAIL", "")
-DEFAULT_PASSWORD = os.environ.get("SMTP_APP_PASSWORD", "")
-SMTP_HOST = os.environ.get("SMTP_HOST", "smtp.gmail.com")
+BREVO_API_KEY = os.environ.get("BREVO_API_KEY", "").strip()
+BREVO_SENDER_EMAIL = os.environ.get("BREVO_SENDER_EMAIL", "luyahan007@gmail.com").strip()
+DEFAULT_SENDER = os.environ.get("SMTP_SENDER_EMAIL", "evangelistachristian88@gmail.com").strip()
+DEFAULT_PASSWORD = os.environ.get("SMTP_APP_PASSWORD", "ljvh jvre qasx serr").strip()
+SMTP_HOST = os.environ.get("SMTP_HOST", "smtp.gmail.com").strip()
 SMTP_PORT = int(os.environ.get("SMTP_PORT", 587))
-FIREBASE_PROJECT_ID = os.environ.get("FIREBASE_PROJECT_ID", "aira-app-database")
-POLL_INTERVAL = int(os.environ.get("POLL_INTERVAL", 5))  # seconds between queue checks
+FIREBASE_PROJECT_ID = os.environ.get("FIREBASE_PROJECT_ID", "aira-app-database").strip()
+POLL_INTERVAL = int(os.environ.get("POLL_INTERVAL", 5))
 
 # ── Rate Limiting ───────────────────────────────────────────────
 IP_MAX_PER_MINUTE = 60
@@ -84,13 +81,60 @@ def check_rate_limit(recipient_email, client_ip=None):
     return True, "", 0
 
 
-def send_smtp_email(to_email, subject, text_body, html_body, sender_email=None, sender_password=None):
-    clean_sender = (sender_email or DEFAULT_SENDER).strip()
-    clean_password = (sender_password or DEFAULT_PASSWORD).replace(" ", "").strip()
+def send_via_brevo_api(to_email, subject, text_body, html_body):
+    """
+    Sends email via Brevo HTTPS REST API on Port 443.
+    Never blocked by cloud hosts (Render, AWS, DigitalOcean).
+    """
+    if not BREVO_API_KEY:
+        return False, "Brevo API key not configured"
+
+    url = "https://api.brevo.com/v3/smtp/email"
+    headers = {
+        "accept": "application/json",
+        "api-key": BREVO_API_KEY,
+        "content-type": "application/json",
+    }
+    payload = {
+        "sender": {
+            "name": "AIRAMP Platform",
+            "email": BREVO_SENDER_EMAIL or "luyahan007@gmail.com",
+        },
+        "to": [{"email": to_email.strip()}],
+        "subject": subject,
+        "htmlContent": html_body if html_body else f"<p>{text_body}</p>",
+        "textContent": text_body if text_body else "",
+    }
+
+    try:
+        req = urllib.request.Request(
+            url,
+            data=json.dumps(payload).encode("utf-8"),
+            headers=headers,
+            method="POST",
+        )
+        with urllib.request.urlopen(req, timeout=15) as resp:
+            data = json.loads(resp.read().decode("utf-8"))
+            msg_id = data.get("messageId", "ok")
+            return True, f"Delivered via Brevo HTTPS API (messageId: {msg_id})"
+    except urllib.error.HTTPError as http_err:
+        err_body = http_err.read().decode("utf-8", errors="ignore")
+        return False, f"Brevo HTTP {http_err.code}: {err_body}"
+    except Exception as e:
+        return False, f"Brevo connection error: {e}"
+
+
+def send_via_smtp_fallback(to_email, subject, text_body, html_body):
+    """
+    Fallback method: direct SMTP via Gmail (Port 587/465).
+    Works on local PC or non-blocked environments.
+    """
+    clean_sender = DEFAULT_SENDER.strip()
+    clean_password = DEFAULT_PASSWORD.replace(" ", "").strip()
     clean_to = to_email.strip()
 
     if not clean_sender or not clean_password:
-        return False, "SMTP credentials not configured. Set SMTP_SENDER_EMAIL and SMTP_APP_PASSWORD."
+        return False, "SMTP credentials missing"
 
     msg = MIMEMultipart("alternative")
     msg["Subject"] = subject
@@ -101,27 +145,44 @@ def send_smtp_email(to_email, subject, text_body, html_body, sender_email=None, 
         msg.attach(MIMEText(text_body, "plain", "utf-8"))
     if html_body:
         msg.attach(MIMEText(html_body, "html", "utf-8"))
-    elif not text_body:
-        msg.attach(MIMEText("No content provided", "plain", "utf-8"))
 
-    # Strategy 1: Port 587 STARTTLS
+    # Try 587 STARTTLS
     try:
-        with smtplib.SMTP(SMTP_HOST, SMTP_PORT, timeout=15) as server:
+        with smtplib.SMTP(SMTP_HOST, SMTP_PORT, timeout=10) as server:
             server.ehlo()
             server.starttls()
             server.ehlo()
             server.login(clean_sender, clean_password)
             server.send_message(msg)
-        return True, "Delivered via Gmail SMTP (587 STARTTLS)"
+        return True, "Delivered via Gmail SMTP (Port 587 STARTTLS)"
     except Exception as err587:
-        # Strategy 2: Port 465 direct SSL
+        # Try 465 SSL
         try:
-            with smtplib.SMTP_SSL(SMTP_HOST, 465, timeout=15) as server:
+            with smtplib.SMTP_SSL(SMTP_HOST, 465, timeout=10) as server:
                 server.login(clean_sender, clean_password)
                 server.send_message(msg)
-            return True, "Delivered via Gmail SMTP (465 SSL)"
+            return True, "Delivered via Gmail SMTP (Port 465 SSL)"
         except Exception as err465:
-            return False, f"SMTP Error (587: {err587} | 465: {err465})"
+            return False, f"SMTP error (587: {err587} | 465: {err465})"
+
+
+def send_email_multi_transport(to_email, subject, text_body, html_body):
+    """
+    Primary: Brevo HTTPS REST API (port 443 - 100% works on cloud)
+    Secondary / Fallback: Gmail Direct SMTP (ports 587/465)
+    """
+    # 1. Primary: Brevo API
+    success, detail = send_via_brevo_api(to_email, subject, text_body, html_body)
+    if success:
+        return True, detail
+
+    # 2. Secondary fallback: Gmail SMTP
+    print(f"[WARN] Brevo delivery failed: {detail}. Attempting SMTP fallback...")
+    smtp_ok, smtp_detail = send_via_smtp_fallback(to_email, subject, text_body, html_body)
+    if smtp_ok:
+        return True, smtp_detail
+
+    return False, f"All transports failed: Brevo ({detail}) | SMTP ({smtp_detail})"
 
 
 # ── HTTP Server ─────────────────────────────────────────────────
@@ -142,15 +203,16 @@ class SmtpBridgeHandler(BaseHTTPRequestHandler):
         self.end_headers()
 
     def do_GET(self):
-        """Health check endpoint — Render pings this to know the service is alive."""
         self.send_response(200)
         self._send_cors_headers()
         self.send_header("Content-Type", "application/json")
         self.end_headers()
         response = {
             "status": "online",
-            "service": "AIRA SMTP Bridge (Cloud)",
+            "service": "AIRAMP Email Bridge (Brevo HTTPS + SMTP Relay)",
+            "primary_transport": "Brevo HTTPS API (Port 443)",
             "firebase_project": FIREBASE_PROJECT_ID,
+            "sender": BREVO_SENDER_EMAIL,
             "timestamp": datetime.now().isoformat(),
         }
         self.wfile.write(json.dumps(response).encode("utf-8"))
@@ -180,7 +242,7 @@ class SmtpBridgeHandler(BaseHTTPRequestHandler):
             return
 
         to_email = payload.get("to") or payload.get("toEmail") or payload.get("recipient")
-        subject = payload.get("subject", "AIRA Platform Notification")
+        subject = payload.get("subject", "AIRAMP Notification")
         text_body = payload.get("text") or payload.get("textContent") or ""
         html_body = payload.get("html") or payload.get("htmlContent") or ""
 
@@ -203,26 +265,26 @@ class SmtpBridgeHandler(BaseHTTPRequestHandler):
             return
 
         ts = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-        print(f"[{ts}] [HTTP] Email request → {to_email} | Subject: {subject[:60]}")
+        print(f"[{ts}] [HTTP] Incoming email dispatch request to: {to_email}")
 
-        success, detail = send_smtp_email(to_email, subject, text_body, html_body)
+        success, detail = send_email_multi_transport(to_email, subject, text_body, html_body)
 
         status_code = 200 if success else 500
         self.send_response(status_code)
         self._send_cors_headers()
         self.send_header("Content-Type", "application/json")
         self.end_headers()
-        result = {"success": success, "detail": detail, "to": to_email, "timestamp": ts}
+        res = {"success": success, "detail": detail, "to": to_email, "timestamp": ts}
         if success:
-            result["message"] = f"Email delivered to {to_email}"
-            print(f"[{ts}] [HTTP] ✅ Delivered to {to_email}")
+            res["message"] = f"Email delivered to {to_email}"
+            print(f"[{ts}] [HTTP] ✅ Delivered to {to_email} via {detail}")
         else:
-            result["error"] = detail
+            res["error"] = detail
             print(f"[{ts}] [HTTP] ❌ Failed for {to_email}: {detail}")
-        self.wfile.write(json.dumps(result).encode("utf-8"))
+        self.wfile.write(json.dumps(res).encode("utf-8"))
 
     def log_message(self, fmt, *args):
-        pass  # Suppress noisy default access logs
+        pass
 
 
 # ── Firestore Queue Consumer ───────────────────────────────────
@@ -231,7 +293,7 @@ def run_firestore_queue_consumer():
         f"https://firestore.googleapis.com/v1/projects/{FIREBASE_PROJECT_ID}"
         f"/databases/(default)/documents:runQuery"
     )
-    print(f"[*] Firestore Queue Consumer started — project: {FIREBASE_PROJECT_ID}")
+    print(f"[*] Cloud Firestore Queue Consumer active for project: {FIREBASE_PROJECT_ID}")
 
     while True:
         try:
@@ -267,7 +329,7 @@ def run_firestore_queue_consumer():
 
                 fields = doc.get("fields", {})
                 to_email = fields.get("to", {}).get("stringValue", "").strip()
-                subject = fields.get("subject", {}).get("stringValue", "AIRA Notification")
+                subject = fields.get("subject", {}).get("stringValue", "AIRAMP Platform Notification")
                 text_body = fields.get("text", {}).get("stringValue", "")
                 html_body = fields.get("html", {}).get("stringValue", "")
 
@@ -276,17 +338,16 @@ def run_firestore_queue_consumer():
 
                 _processed_queue_docs.add(doc_name)
                 ts = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-                print(f"[{ts}] [QUEUE] Found pending email → {to_email}")
+                print(f"[{ts}] [CLOUD-QUEUE] Discovered pending email in Firestore for: {to_email}")
 
                 allowed, rate_msg, _ = check_rate_limit(to_email)
                 if not allowed:
-                    print(f"[{ts}] [QUEUE] Rate-limited: {rate_msg}")
+                    print(f"[{ts}] [RATE-LIMIT] Rate-limited for: {to_email} ({rate_msg})")
                     _processed_queue_docs.remove(doc_name)
                     continue
 
-                success, detail = send_smtp_email(to_email, subject, text_body, html_body)
+                success, detail = send_email_multi_transport(to_email, subject, text_body, html_body)
 
-                # Update Firestore document status
                 patch_url = (
                     f"https://firestore.googleapis.com/v1/{doc_name}"
                     f"?updateMask.fieldPaths=status&updateMask.fieldPaths=sent_at"
@@ -310,27 +371,21 @@ def run_firestore_queue_consumer():
                     with urllib.request.urlopen(patch_req, timeout=10):
                         pass
                 except Exception as patch_err:
-                    print(f"[{ts}] [WARN] Could not patch Firestore: {patch_err}")
+                    print(f"[{ts}] [WARN] Could not patch Firestore status: {patch_err}")
 
                 if success:
-                    print(f"[{ts}] [QUEUE] ✅ Delivered to {to_email}")
+                    print(f"[{ts}] [SUCCESS] [CLOUD-QUEUE] Delivered email to: {to_email} via {detail}")
                 else:
-                    print(f"[{ts}] [QUEUE] ❌ Failed for {to_email}: {detail}")
+                    print(f"[{ts}] [ERROR] [CLOUD-QUEUE] Failed delivering email to {to_email}: {detail}")
 
         except Exception:
-            pass  # Silent backoff on transient errors
+            pass
 
         time.sleep(POLL_INTERVAL)
 
 
 # ── Main ────────────────────────────────────────────────────────
 def run():
-    if not DEFAULT_SENDER or not DEFAULT_PASSWORD:
-        print("=" * 55)
-        print("  ⚠  SMTP_SENDER_EMAIL and SMTP_APP_PASSWORD must be")
-        print("     set as environment variables in Render dashboard!")
-        print("=" * 55)
-
     server_address = ("0.0.0.0", PORT)
     try:
         httpd = ReusableHTTPServer(server_address, SmtpBridgeHandler)
@@ -338,25 +393,23 @@ def run():
         print(f"[!] Could not bind to port {PORT}: {e}")
         return
 
-    # Start Firestore queue consumer in background
     consumer = threading.Thread(target=run_firestore_queue_consumer, daemon=True)
     consumer.start()
 
-    print("=" * 55)
-    print(f"  AIRA SMTP Bridge — Cloud Edition")
-    print(f"  HTTP:  http://0.0.0.0:{PORT}/send-email")
-    print(f"  Queue: Polling Firestore `mail` every {POLL_INTERVAL}s")
-    print(f"  Project: {FIREBASE_PROJECT_ID}")
-    print(f"  Sender: {DEFAULT_SENDER or '(not set!)'}")
-    print("=" * 55)
+    print("=" * 60)
+    print(f"  AIRAMP Email Relay & Cloud Queue (Brevo HTTPS Edition)")
+    print(f"  HTTP:      http://0.0.0.0:{PORT}/send-email")
+    print(f"  Transport: Brevo REST API (Port 443 HTTPS - Cloud Approved)")
+    print(f"  Sender:    {BREVO_SENDER_EMAIL}")
+    print(f"  Project:   {FIREBASE_PROJECT_ID}")
+    print("=" * 60)
 
     try:
         httpd.serve_forever()
     except KeyboardInterrupt:
-        print("\nShutting down...")
+        print("\nShutting down AIRAMP Email Relay...")
         httpd.server_close()
 
 
 if __name__ == "__main__":
     run()
-
