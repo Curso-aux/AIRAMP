@@ -19,7 +19,8 @@ class TeacherProfileScreen extends ConsumerStatefulWidget {
   const TeacherProfileScreen({super.key});
 
   @override
-  ConsumerState<TeacherProfileScreen> createState() => _TeacherProfileScreenState();
+  ConsumerState<TeacherProfileScreen> createState() =>
+      _TeacherProfileScreenState();
 }
 
 class _TeacherProfileScreenState extends ConsumerState<TeacherProfileScreen>
@@ -40,7 +41,8 @@ class _TeacherProfileScreenState extends ConsumerState<TeacherProfileScreen>
   late TextEditingController _usernameController;
   late TextEditingController _emailController;
   final TextEditingController _newPasswordController = TextEditingController();
-  final TextEditingController _confirmPasswordController = TextEditingController();
+  final TextEditingController _confirmPasswordController =
+      TextEditingController();
 
   @override
   void initState() {
@@ -58,7 +60,11 @@ class _TeacherProfileScreenState extends ConsumerState<TeacherProfileScreen>
       _showPasswordForm = true;
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (mounted && !RequiredChangePasswordDialog.hasSeenInThisSession) {
-          RequiredChangePasswordDialog.show(context, isTeacher: true);
+          RequiredChangePasswordDialog.show(
+            context,
+            isTeacher: true,
+            role: 'teacher',
+          );
         }
       });
     }
@@ -75,7 +81,11 @@ class _TeacherProfileScreenState extends ConsumerState<TeacherProfileScreen>
     if (state == AppLifecycleState.resumed) {
       final user = ref.read(authProvider);
       if (user?.mustChangePassword == true && mounted) {
-        RequiredChangePasswordDialog.show(context, isTeacher: true);
+        RequiredChangePasswordDialog.show(
+          context,
+          isTeacher: true,
+          role: 'teacher',
+        );
       }
     }
   }
@@ -86,7 +96,8 @@ class _TeacherProfileScreenState extends ConsumerState<TeacherProfileScreen>
       if (mounted) {
         setState(() {
           _quizAlerts = prefs.getBool('teacher_pref_quiz_alerts') ?? true;
-          _scheduleReminders = prefs.getBool('teacher_pref_schedule_reminders') ?? true;
+          _scheduleReminders =
+              prefs.getBool('teacher_pref_schedule_reminders') ?? true;
           _hapticsEnabled = prefs.getBool('teacher_pref_haptics') ?? true;
         });
       }
@@ -121,10 +132,15 @@ class _TeacherProfileScreenState extends ConsumerState<TeacherProfileScreen>
   @override
   Widget build(BuildContext context) {
     ref.listen<User?>(authProvider, (prev, next) {
-      if (next?.mustChangePassword == true && !RequiredChangePasswordDialog.hasSeenInThisSession) {
+      if (next?.mustChangePassword == true &&
+          !RequiredChangePasswordDialog.hasSeenInThisSession) {
         WidgetsBinding.instance.addPostFrameCallback((_) {
           if (mounted) {
-            RequiredChangePasswordDialog.show(context, isTeacher: true);
+            RequiredChangePasswordDialog.show(
+              context,
+              isTeacher: true,
+              role: 'teacher',
+            );
           }
         });
       }
@@ -133,8 +149,10 @@ class _TeacherProfileScreenState extends ConsumerState<TeacherProfileScreen>
     final currentUser = ref.watch(authProvider);
     final themeState = ref.watch(themeProvider);
     final subjects = ref.watch(teacherSubjectsProvider);
-    final handledSections = ref.watch(teacherHandledSectionsProvider).value ?? [];
-    final handledSectionsDetails = ref.watch(teacherHandledSectionsDetailsProvider).value ?? [];
+    final handledSections =
+        ref.watch(teacherHandledSectionsProvider).value ?? [];
+    final handledSectionsDetails =
+        ref.watch(teacherHandledSectionsDetailsProvider).value ?? [];
     final students = ref.watch(teacherStudentsProvider);
     final schedules = ref.watch(teacherSchedulesProvider);
 
@@ -179,116 +197,122 @@ class _TeacherProfileScreenState extends ConsumerState<TeacherProfileScreen>
         child: currentUser.mustChangePassword
             ? _buildMandatoryPasswordChangeView(currentUser)
             : SafeArea(
-          child: SingleChildScrollView(
-            controller: _scrollController,
-            padding: EdgeInsets.symmetric(
-              horizontal: isDesktopWeb ? 24 : 20,
-              vertical: isDesktopWeb ? 10 : 0,
-            ),
-            child: Center(
-              child: ConstrainedBox(
-                constraints: BoxConstraints(maxWidth: isDesktopWeb ? 1400 : 960),
-                child: Column(
-                  children: [
-                    // 1. App Bar Header with Back navigation & Active Faculty pill
-                    _buildHeaderBar(context, currentUser, isWeb: isDesktopWeb),
-                    SizedBox(height: isDesktopWeb ? 16 : 12),
-
-                    if (isDesktopWeb) ...[
-                      // Desktop Web 2-Column Responsive Dashboard Layout
-                      Row(
-                        crossAxisAlignment: CrossAxisAlignment.start,
+                child: SingleChildScrollView(
+                  controller: _scrollController,
+                  padding: EdgeInsets.symmetric(
+                    horizontal: isDesktopWeb ? 24 : 20,
+                    vertical: isDesktopWeb ? 10 : 0,
+                  ),
+                  child: Center(
+                    child: ConstrainedBox(
+                      constraints: BoxConstraints(
+                        maxWidth: isDesktopWeb ? 1400 : 960,
+                      ),
+                      child: Column(
                         children: [
-                          // Left Identity & Security Column (380-400px)
-                          SizedBox(
-                            width: screenWidth >= 1200 ? 400 : 360,
-                            child: Column(
-                              children: [
-                                _buildHeroFacultyCard(
-                                  context: context,
-                                  currentUser: currentUser,
-                                  initial: initial,
-                                  subjects: subjects,
-                                  handledSections: handledSections,
-                                  students: students,
-                                  schedules: schedules,
-                                ),
-                                const SizedBox(height: 16),
-                                _buildChangePasswordCard(currentUser),
-                                const SizedBox(height: 16),
-                                _buildAboutAndSupportCard(context),
-                                const SizedBox(height: 16),
-                                _buildSignOutButton(),
-                                const SizedBox(height: 32),
-                              ],
-                            ),
+                          // 1. App Bar Header with Back navigation & Active Faculty pill
+                          _buildHeaderBar(
+                            context,
+                            currentUser,
+                            isWeb: isDesktopWeb,
                           ),
-                          const SizedBox(width: 20),
+                          SizedBox(height: isDesktopWeb ? 16 : 12),
 
-                          // Right Main Academic Portfolio & Institutional Management Column
-                          Expanded(
-                            child: Column(
+                          if (isDesktopWeb) ...[
+                            // Desktop Web 2-Column Responsive Dashboard Layout
+                            Row(
+                              crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
-                                _buildAcademicPortfolioCard(
-                                  context: context,
-                                  subjects: subjects,
-                                  handledSections: handledSections,
-                                  sectionDetails: handledSectionsDetails,
-                                  schedules: schedules,
+                                // Left Identity & Security Column (380-400px)
+                                SizedBox(
+                                  width: screenWidth >= 1200 ? 400 : 360,
+                                  child: Column(
+                                    children: [
+                                      _buildHeroFacultyCard(
+                                        context: context,
+                                        currentUser: currentUser,
+                                        initial: initial,
+                                        subjects: subjects,
+                                        handledSections: handledSections,
+                                        students: students,
+                                        schedules: schedules,
+                                      ),
+                                      const SizedBox(height: 16),
+                                      _buildChangePasswordCard(currentUser),
+                                      const SizedBox(height: 16),
+                                      _buildAboutAndSupportCard(context),
+                                      const SizedBox(height: 16),
+                                      _buildSignOutButton(),
+                                      const SizedBox(height: 32),
+                                    ],
+                                  ),
                                 ),
-                                const SizedBox(height: 16),
-                                _buildPersonalInfoCard(currentUser),
-                                const SizedBox(height: 16),
-                                _buildPreferencesCard(themeState),
-                                const SizedBox(height: 32),
+                                const SizedBox(width: 20),
+
+                                // Right Main Academic Portfolio & Institutional Management Column
+                                Expanded(
+                                  child: Column(
+                                    children: [
+                                      _buildAcademicPortfolioCard(
+                                        context: context,
+                                        subjects: subjects,
+                                        handledSections: handledSections,
+                                        sectionDetails: handledSectionsDetails,
+                                        schedules: schedules,
+                                      ),
+                                      const SizedBox(height: 16),
+                                      _buildPersonalInfoCard(currentUser),
+                                      const SizedBox(height: 16),
+                                      _buildPreferencesCard(themeState),
+                                      const SizedBox(height: 32),
+                                    ],
+                                  ),
+                                ),
                               ],
                             ),
-                          ),
+                          ] else ...[
+                            // Mobile / Narrow View Single Column Stack
+                            _buildHeroFacultyCard(
+                              context: context,
+                              currentUser: currentUser,
+                              initial: initial,
+                              subjects: subjects,
+                              handledSections: handledSections,
+                              students: students,
+                              schedules: schedules,
+                            ),
+                            const SizedBox(height: 16),
+
+                            _buildAcademicPortfolioCard(
+                              context: context,
+                              subjects: subjects,
+                              handledSections: handledSections,
+                              sectionDetails: handledSectionsDetails,
+                              schedules: schedules,
+                            ),
+                            const SizedBox(height: 16),
+
+                            _buildPersonalInfoCard(currentUser),
+                            const SizedBox(height: 16),
+
+                            _buildChangePasswordCard(currentUser),
+                            const SizedBox(height: 16),
+
+                            _buildPreferencesCard(themeState),
+                            const SizedBox(height: 16),
+
+                            _buildAboutAndSupportCard(context),
+                            const SizedBox(height: 24),
+
+                            _buildSignOutButton(),
+                            const SizedBox(height: 40),
+                          ],
                         ],
                       ),
-                    ] else ...[
-                      // Mobile / Narrow View Single Column Stack
-                      _buildHeroFacultyCard(
-                        context: context,
-                        currentUser: currentUser,
-                        initial: initial,
-                        subjects: subjects,
-                        handledSections: handledSections,
-                        students: students,
-                        schedules: schedules,
-                      ),
-                      const SizedBox(height: 16),
-
-                      _buildAcademicPortfolioCard(
-                        context: context,
-                        subjects: subjects,
-                        handledSections: handledSections,
-                        sectionDetails: handledSectionsDetails,
-                        schedules: schedules,
-                      ),
-                      const SizedBox(height: 16),
-
-                      _buildPersonalInfoCard(currentUser),
-                      const SizedBox(height: 16),
-
-                      _buildChangePasswordCard(currentUser),
-                      const SizedBox(height: 16),
-
-                      _buildPreferencesCard(themeState),
-                      const SizedBox(height: 16),
-
-                      _buildAboutAndSupportCard(context),
-                      const SizedBox(height: 24),
-
-                      _buildSignOutButton(),
-                      const SizedBox(height: 40),
-                    ],
-                  ],
+                    ),
+                  ),
                 ),
               ),
-            ),
-          ),
-        ),
       ),
     );
   }
@@ -318,7 +342,11 @@ class _TeacherProfileScreenState extends ConsumerState<TeacherProfileScreen>
     context.go('/teacher/dashboard');
   }
 
-  Widget _buildHeaderBar(BuildContext context, User currentUser, {bool isWeb = false}) {
+  Widget _buildHeaderBar(
+    BuildContext context,
+    User currentUser, {
+    bool isWeb = false,
+  }) {
     if (currentUser.mustChangePassword) return const SizedBox.shrink();
 
     if (isWeb) {
@@ -336,16 +364,25 @@ class _TeacherProfileScreenState extends ConsumerState<TeacherProfileScreen>
               onTap: _handleBackNavigation,
               borderRadius: BorderRadius.circular(8),
               child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 12,
+                  vertical: 8,
+                ),
                 decoration: BoxDecoration(
                   color: AppTheme.primary.withValues(alpha: 0.1),
                   borderRadius: BorderRadius.circular(8),
-                  border: Border.all(color: AppTheme.primary.withValues(alpha: 0.2)),
+                  border: Border.all(
+                    color: AppTheme.primary.withValues(alpha: 0.2),
+                  ),
                 ),
                 child: Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    Icon(Icons.arrow_back_rounded, color: AppTheme.primary, size: 18),
+                    Icon(
+                      Icons.arrow_back_rounded,
+                      color: AppTheme.primary,
+                      size: 18,
+                    ),
                     const SizedBox(width: 8),
                     Text(
                       'Back to Dashboard',
@@ -378,7 +415,9 @@ class _TeacherProfileScreenState extends ConsumerState<TeacherProfileScreen>
               decoration: BoxDecoration(
                 color: AppTheme.primary.withValues(alpha: 0.1),
                 borderRadius: BorderRadius.circular(20),
-                border: Border.all(color: AppTheme.primary.withValues(alpha: 0.25)),
+                border: Border.all(
+                  color: AppTheme.primary.withValues(alpha: 0.25),
+                ),
               ),
               child: Row(
                 mainAxisSize: MainAxisSize.min,
@@ -440,7 +479,10 @@ class _TeacherProfileScreenState extends ConsumerState<TeacherProfileScreen>
     required List<Map<String, dynamic>> schedules,
   }) {
     final advisorySection = currentUser.section;
-    final hasAdvisory = advisorySection != null && advisorySection.isNotEmpty && advisorySection != 'null';
+    final hasAdvisory =
+        advisorySection != null &&
+        advisorySection.isNotEmpty &&
+        advisorySection != 'null';
 
     return Container(
       width: double.infinity,
@@ -509,7 +551,10 @@ class _TeacherProfileScreenState extends ConsumerState<TeacherProfileScreen>
                           decoration: BoxDecoration(
                             color: AppTheme.primary,
                             shape: BoxShape.circle,
-                            border: Border.all(color: AppTheme.surface, width: 2),
+                            border: Border.all(
+                              color: AppTheme.surface,
+                              width: 2,
+                            ),
                           ),
                           child: const Icon(
                             Icons.camera_alt_rounded,
@@ -525,7 +570,9 @@ class _TeacherProfileScreenState extends ConsumerState<TeacherProfileScreen>
 
                 // Full Name
                 Text(
-                  currentUser.fullName.isNotEmpty ? currentUser.fullName : 'Faculty Member',
+                  currentUser.fullName.isNotEmpty
+                      ? currentUser.fullName
+                      : 'Faculty Member',
                   textAlign: TextAlign.center,
                   style: TextStyle(
                     fontSize: 20,
@@ -729,7 +776,11 @@ class _TeacherProfileScreenState extends ConsumerState<TeacherProfileScreen>
                         color: AppTheme.primary.withValues(alpha: 0.12),
                         borderRadius: BorderRadius.circular(8),
                       ),
-                      child: Icon(Icons.auto_stories_rounded, size: 18, color: AppTheme.primary),
+                      child: Icon(
+                        Icons.auto_stories_rounded,
+                        size: 18,
+                        color: AppTheme.primary,
+                      ),
                     ),
                     const SizedBox(width: 10),
                     Expanded(
@@ -752,7 +803,10 @@ class _TeacherProfileScreenState extends ConsumerState<TeacherProfileScreen>
                 onTap: () => context.go('/teacher/subjects'),
                 borderRadius: BorderRadius.circular(6),
                 child: Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 6,
+                    vertical: 4,
+                  ),
                   child: Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
@@ -765,7 +819,11 @@ class _TeacherProfileScreenState extends ConsumerState<TeacherProfileScreen>
                         ),
                       ),
                       const SizedBox(width: 2),
-                      Icon(Icons.chevron_right_rounded, size: 16, color: AppTheme.primary),
+                      Icon(
+                        Icons.chevron_right_rounded,
+                        size: 16,
+                        color: AppTheme.primary,
+                      ),
                     ],
                   ),
                 ),
@@ -802,7 +860,10 @@ class _TeacherProfileScreenState extends ConsumerState<TeacherProfileScreen>
                   Expanded(
                     child: Text(
                       'No subjects currently assigned to your teaching load.',
-                      style: TextStyle(fontSize: 12.5, color: AppTheme.textSecondary),
+                      style: TextStyle(
+                        fontSize: 12.5,
+                        color: AppTheme.textSecondary,
+                      ),
                     ),
                   ),
                 ],
@@ -828,7 +889,10 @@ class _TeacherProfileScreenState extends ConsumerState<TeacherProfileScreen>
                   borderRadius: BorderRadius.circular(10),
                   child: Container(
                     constraints: const BoxConstraints(maxWidth: 280),
-                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 10,
+                      vertical: 7,
+                    ),
                     decoration: BoxDecoration(
                       color: AppTheme.inputBg,
                       borderRadius: BorderRadius.circular(10),
@@ -838,7 +902,10 @@ class _TeacherProfileScreenState extends ConsumerState<TeacherProfileScreen>
                       mainAxisSize: MainAxisSize.min,
                       children: [
                         Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 6,
+                            vertical: 2,
+                          ),
                           decoration: BoxDecoration(
                             color: AppTheme.primary.withValues(alpha: 0.15),
                             borderRadius: BorderRadius.circular(5),
@@ -866,7 +933,11 @@ class _TeacherProfileScreenState extends ConsumerState<TeacherProfileScreen>
                           ),
                         ),
                         const SizedBox(width: 4),
-                        Icon(Icons.arrow_forward_ios_rounded, size: 10, color: AppTheme.textMuted),
+                        Icon(
+                          Icons.arrow_forward_ios_rounded,
+                          size: 10,
+                          color: AppTheme.textMuted,
+                        ),
                       ],
                     ),
                   ),
@@ -905,12 +976,16 @@ class _TeacherProfileScreenState extends ConsumerState<TeacherProfileScreen>
                     break;
                   }
                 }
-                final studentCount = detail['studentCount'] ?? detail['student_count'];
+                final studentCount =
+                    detail['studentCount'] ?? detail['student_count'];
                 final room = detail['room'];
 
                 return Container(
                   constraints: const BoxConstraints(maxWidth: 280),
-                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 10,
+                    vertical: 6,
+                  ),
                   decoration: BoxDecoration(
                     color: AppTheme.surface,
                     borderRadius: BorderRadius.circular(8),
@@ -919,7 +994,11 @@ class _TeacherProfileScreenState extends ConsumerState<TeacherProfileScreen>
                   child: Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      Icon(Icons.meeting_room_outlined, size: 13, color: AppTheme.primary),
+                      Icon(
+                        Icons.meeting_room_outlined,
+                        size: 13,
+                        color: AppTheme.primary,
+                      ),
                       const SizedBox(width: 5),
                       Flexible(
                         child: Text(
@@ -937,14 +1016,20 @@ class _TeacherProfileScreenState extends ConsumerState<TeacherProfileScreen>
                         const SizedBox(width: 4),
                         Text(
                           '($studentCount sts)',
-                          style: TextStyle(fontSize: 10.5, color: AppTheme.textMuted),
+                          style: TextStyle(
+                            fontSize: 10.5,
+                            color: AppTheme.textMuted,
+                          ),
                         ),
                       ],
                       if (room != null && room.toString().isNotEmpty) ...[
                         const SizedBox(width: 4),
                         Text(
                           '• $room',
-                          style: TextStyle(fontSize: 10.5, color: AppTheme.textMuted),
+                          style: TextStyle(
+                            fontSize: 10.5,
+                            color: AppTheme.textMuted,
+                          ),
                         ),
                       ],
                     ],
@@ -964,11 +1049,17 @@ class _TeacherProfileScreenState extends ConsumerState<TeacherProfileScreen>
               decoration: BoxDecoration(
                 color: AppTheme.primary.withValues(alpha: 0.08),
                 borderRadius: BorderRadius.circular(10),
-                border: Border.all(color: AppTheme.primary.withValues(alpha: 0.2)),
+                border: Border.all(
+                  color: AppTheme.primary.withValues(alpha: 0.2),
+                ),
               ),
               child: Row(
                 children: [
-                  Icon(Icons.schedule_rounded, size: 18, color: AppTheme.primary),
+                  Icon(
+                    Icons.schedule_rounded,
+                    size: 18,
+                    color: AppTheme.primary,
+                  ),
                   const SizedBox(width: 10),
                   Expanded(
                     child: Column(
@@ -992,7 +1083,11 @@ class _TeacherProfileScreenState extends ConsumerState<TeacherProfileScreen>
                       ],
                     ),
                   ),
-                  Icon(Icons.arrow_forward_ios_rounded, size: 12, color: AppTheme.primary),
+                  Icon(
+                    Icons.arrow_forward_ios_rounded,
+                    size: 12,
+                    color: AppTheme.primary,
+                  ),
                 ],
               ),
             ),
@@ -1003,10 +1098,14 @@ class _TeacherProfileScreenState extends ConsumerState<TeacherProfileScreen>
   }
 
   Widget _buildPersonalInfoCard(User currentUser) {
-    final advisory = (currentUser.section != null && currentUser.section!.isNotEmpty && currentUser.section != 'null')
+    final advisory =
+        (currentUser.section != null &&
+            currentUser.section!.isNotEmpty &&
+            currentUser.section != 'null')
         ? currentUser.section!
         : 'None Assigned';
-    final schoolId = (currentUser.schoolId != null && currentUser.schoolId!.isNotEmpty)
+    final schoolId =
+        (currentUser.schoolId != null && currentUser.schoolId!.isNotEmpty)
         ? currentUser.schoolId!
         : 'sch_main (DepEd Central)';
 
@@ -1026,7 +1125,11 @@ class _TeacherProfileScreenState extends ConsumerState<TeacherProfileScreen>
                         color: AppTheme.primary.withValues(alpha: 0.12),
                         borderRadius: BorderRadius.circular(8),
                       ),
-                      child: Icon(Icons.badge_outlined, size: 18, color: AppTheme.primary),
+                      child: Icon(
+                        Icons.badge_outlined,
+                        size: 18,
+                        color: AppTheme.primary,
+                      ),
                     ),
                     const SizedBox(width: 10),
                     Expanded(
@@ -1067,7 +1170,10 @@ class _TeacherProfileScreenState extends ConsumerState<TeacherProfileScreen>
                 GestureDetector(
                   onTap: _handleSaveProfile,
                   child: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 12,
+                      vertical: 6,
+                    ),
                     decoration: BoxDecoration(
                       color: AppTheme.primary,
                       borderRadius: BorderRadius.circular(8),
@@ -1242,7 +1348,9 @@ class _TeacherProfileScreenState extends ConsumerState<TeacherProfileScreen>
               if (isRequired) {
                 ScaffoldMessenger.of(context).showSnackBar(
                   const SnackBar(
-                    content: Text('Password change is required to unlock your account.'),
+                    content: Text(
+                      'Password change is required to unlock your account.',
+                    ),
                     duration: Duration(seconds: 2),
                   ),
                 );
@@ -1272,11 +1380,16 @@ class _TeacherProfileScreenState extends ConsumerState<TeacherProfileScreen>
                       if (isRequired) ...[
                         const SizedBox(width: 8),
                         Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 7,
+                            vertical: 2,
+                          ),
                           decoration: BoxDecoration(
                             color: Colors.amber.withValues(alpha: 0.2),
                             borderRadius: BorderRadius.circular(6),
-                            border: Border.all(color: Colors.amberAccent.withValues(alpha: 0.5)),
+                            border: Border.all(
+                              color: Colors.amberAccent.withValues(alpha: 0.5),
+                            ),
                           ),
                           child: const Text(
                             'Required',
@@ -1314,7 +1427,13 @@ class _TeacherProfileScreenState extends ConsumerState<TeacherProfileScreen>
                   TextField(
                     controller: _newPasswordController,
                     maxLength: 16,
-                    buildCounter: (context, {required currentLength, required isFocused, maxLength}) => null,
+                    buildCounter:
+                        (
+                          context, {
+                          required currentLength,
+                          required isFocused,
+                          maxLength,
+                        }) => null,
                     obscureText: true,
                     style: TextStyle(color: AppTheme.text, fontSize: 14),
                     decoration: InputDecoration(
@@ -1326,23 +1445,31 @@ class _TeacherProfileScreenState extends ConsumerState<TeacherProfileScreen>
                       border: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(10),
                         borderSide: BorderSide(
-                          color: isRequired ? Colors.amberAccent.withValues(alpha: 0.5) : AppTheme.border,
+                          color: isRequired
+                              ? Colors.amberAccent.withValues(alpha: 0.5)
+                              : AppTheme.border,
                         ),
                       ),
                       enabledBorder: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(10),
                         borderSide: BorderSide(
-                          color: isRequired ? Colors.amberAccent.withValues(alpha: 0.5) : AppTheme.border,
+                          color: isRequired
+                              ? Colors.amberAccent.withValues(alpha: 0.5)
+                              : AppTheme.border,
                         ),
                       ),
                       focusedBorder: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(10),
                         borderSide: BorderSide(
-                          color: isRequired ? Colors.amberAccent : AppTheme.primary,
+                          color: isRequired
+                              ? Colors.amberAccent
+                              : AppTheme.primary,
                         ),
                       ),
                       contentPadding: const EdgeInsets.symmetric(
-                          horizontal: 14, vertical: 10),
+                        horizontal: 14,
+                        vertical: 10,
+                      ),
                     ),
                   ),
                   const SizedBox(height: 10),
@@ -1351,7 +1478,13 @@ class _TeacherProfileScreenState extends ConsumerState<TeacherProfileScreen>
                   TextField(
                     controller: _confirmPasswordController,
                     maxLength: 16,
-                    buildCounter: (context, {required currentLength, required isFocused, maxLength}) => null,
+                    buildCounter:
+                        (
+                          context, {
+                          required currentLength,
+                          required isFocused,
+                          maxLength,
+                        }) => null,
                     obscureText: true,
                     style: TextStyle(color: AppTheme.text, fontSize: 14),
                     decoration: InputDecoration(
@@ -1363,23 +1496,31 @@ class _TeacherProfileScreenState extends ConsumerState<TeacherProfileScreen>
                       border: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(10),
                         borderSide: BorderSide(
-                          color: isRequired ? Colors.amberAccent.withValues(alpha: 0.5) : AppTheme.border,
+                          color: isRequired
+                              ? Colors.amberAccent.withValues(alpha: 0.5)
+                              : AppTheme.border,
                         ),
                       ),
                       enabledBorder: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(10),
                         borderSide: BorderSide(
-                          color: isRequired ? Colors.amberAccent.withValues(alpha: 0.5) : AppTheme.border,
+                          color: isRequired
+                              ? Colors.amberAccent.withValues(alpha: 0.5)
+                              : AppTheme.border,
                         ),
                       ),
                       focusedBorder: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(10),
                         borderSide: BorderSide(
-                          color: isRequired ? Colors.amberAccent : AppTheme.primary,
+                          color: isRequired
+                              ? Colors.amberAccent
+                              : AppTheme.primary,
                         ),
                       ),
                       contentPadding: const EdgeInsets.symmetric(
-                          horizontal: 14, vertical: 10),
+                        horizontal: 14,
+                        vertical: 10,
+                      ),
                     ),
                   ),
                   const SizedBox(height: 12),
@@ -1391,7 +1532,9 @@ class _TeacherProfileScreenState extends ConsumerState<TeacherProfileScreen>
                     child: ElevatedButton(
                       onPressed: _handleChangePassword,
                       style: ElevatedButton.styleFrom(
-                        backgroundColor: isRequired ? Colors.amber.shade400 : AppTheme.primary,
+                        backgroundColor: isRequired
+                            ? Colors.amber.shade400
+                            : AppTheme.primary,
                         foregroundColor: Colors.black,
                         shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(10),
@@ -1405,7 +1548,9 @@ class _TeacherProfileScreenState extends ConsumerState<TeacherProfileScreen>
                         mainAxisAlignment: MainAxisAlignment.center,
                         children: [
                           Icon(
-                            isRequired ? Icons.lock_open_rounded : Icons.check_circle_outline,
+                            isRequired
+                                ? Icons.lock_open_rounded
+                                : Icons.check_circle_outline,
                             size: 18,
                             color: Colors.black,
                           ),
@@ -1443,7 +1588,11 @@ class _TeacherProfileScreenState extends ConsumerState<TeacherProfileScreen>
                   color: AppTheme.primary.withValues(alpha: 0.12),
                   borderRadius: BorderRadius.circular(8),
                 ),
-                child: Icon(Icons.tune_rounded, size: 18, color: AppTheme.primary),
+                child: Icon(
+                  Icons.tune_rounded,
+                  size: 18,
+                  color: AppTheme.primary,
+                ),
               ),
               const SizedBox(width: 10),
               Expanded(
@@ -1487,7 +1636,9 @@ class _TeacherProfileScreenState extends ConsumerState<TeacherProfileScreen>
                   child: GestureDetector(
                     onTap: () {
                       if (isDark) {
-                        ref.read(themeProvider.notifier).setTheme(AppThemeMode.light);
+                        ref
+                            .read(themeProvider.notifier)
+                            .setTheme(AppThemeMode.light);
                       }
                     },
                     child: Container(
@@ -1510,7 +1661,9 @@ class _TeacherProfileScreenState extends ConsumerState<TeacherProfileScreen>
                             style: TextStyle(
                               fontSize: 13,
                               fontWeight: FontWeight.w600,
-                              color: !isDark ? Colors.black : AppTheme.textMuted,
+                              color: !isDark
+                                  ? Colors.black
+                                  : AppTheme.textMuted,
                             ),
                           ),
                         ],
@@ -1522,7 +1675,9 @@ class _TeacherProfileScreenState extends ConsumerState<TeacherProfileScreen>
                   child: GestureDetector(
                     onTap: () {
                       if (!isDark) {
-                        ref.read(themeProvider.notifier).setTheme(AppThemeMode.dark);
+                        ref
+                            .read(themeProvider.notifier)
+                            .setTheme(AppThemeMode.dark);
                       }
                     },
                     child: Container(
@@ -1573,7 +1728,8 @@ class _TeacherProfileScreenState extends ConsumerState<TeacherProfileScreen>
 
           _buildToggleRow(
             title: 'Quiz Submissions Alert',
-            subtitle: 'Notify instantly when a student completes an offline quiz',
+            subtitle:
+                'Notify instantly when a student completes an offline quiz',
             value: _quizAlerts,
             onChanged: (val) {
               setState(() => _quizAlerts = val);
@@ -1595,7 +1751,8 @@ class _TeacherProfileScreenState extends ConsumerState<TeacherProfileScreen>
 
           _buildToggleRow(
             title: 'Haptic Touch Feedback',
-            subtitle: 'Provide tactile vibration feedback during grading and approvals',
+            subtitle:
+                'Provide tactile vibration feedback during grading and approvals',
             value: _hapticsEnabled,
             onChanged: (val) {
               setState(() => _hapticsEnabled = val);
@@ -1621,7 +1778,11 @@ class _TeacherProfileScreenState extends ConsumerState<TeacherProfileScreen>
                   color: AppTheme.primary.withValues(alpha: 0.12),
                   borderRadius: BorderRadius.circular(8),
                 ),
-                child: Icon(Icons.shield_outlined, size: 18, color: AppTheme.primary),
+                child: Icon(
+                  Icons.shield_outlined,
+                  size: 18,
+                  color: AppTheme.primary,
+                ),
               ),
               const SizedBox(width: 10),
               Expanded(
@@ -1680,7 +1841,11 @@ class _TeacherProfileScreenState extends ConsumerState<TeacherProfileScreen>
               padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 4),
               child: Row(
                 children: [
-                  Icon(Icons.help_outline_rounded, size: 18, color: AppTheme.primary),
+                  Icon(
+                    Icons.help_outline_rounded,
+                    size: 18,
+                    color: AppTheme.primary,
+                  ),
                   const SizedBox(width: 10),
                   Expanded(
                     child: Text(
@@ -1692,7 +1857,11 @@ class _TeacherProfileScreenState extends ConsumerState<TeacherProfileScreen>
                       ),
                     ),
                   ),
-                  Icon(Icons.arrow_forward_ios_rounded, size: 12, color: AppTheme.textMuted),
+                  Icon(
+                    Icons.arrow_forward_ios_rounded,
+                    size: 12,
+                    color: AppTheme.textMuted,
+                  ),
                 ],
               ),
             ),
@@ -1706,7 +1875,11 @@ class _TeacherProfileScreenState extends ConsumerState<TeacherProfileScreen>
               padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 4),
               child: Row(
                 children: [
-                  Icon(Icons.policy_outlined, size: 18, color: AppTheme.primary),
+                  Icon(
+                    Icons.policy_outlined,
+                    size: 18,
+                    color: AppTheme.primary,
+                  ),
                   const SizedBox(width: 10),
                   Expanded(
                     child: Text(
@@ -1718,7 +1891,11 @@ class _TeacherProfileScreenState extends ConsumerState<TeacherProfileScreen>
                       ),
                     ),
                   ),
-                  Icon(Icons.arrow_forward_ios_rounded, size: 12, color: AppTheme.textMuted),
+                  Icon(
+                    Icons.arrow_forward_ios_rounded,
+                    size: 12,
+                    color: AppTheme.textMuted,
+                  ),
                 ],
               ),
             ),
@@ -1754,10 +1931,7 @@ class _TeacherProfileScreenState extends ConsumerState<TeacherProfileScreen>
                 const SizedBox(height: 2),
                 Text(
                   subtitle,
-                  style: TextStyle(
-                    fontSize: 11,
-                    color: AppTheme.textMuted,
-                  ),
+                  style: TextStyle(fontSize: 11, color: AppTheme.textMuted),
                 ),
               ],
             ),
@@ -1773,10 +1947,7 @@ class _TeacherProfileScreenState extends ConsumerState<TeacherProfileScreen>
     );
   }
 
-  Widget _buildSystemSpecRow({
-    required String label,
-    required String value,
-  }) {
+  Widget _buildSystemSpecRow({required String label, required String value}) {
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -1810,7 +1981,9 @@ class _TeacherProfileScreenState extends ConsumerState<TeacherProfileScreen>
     return Container(
       padding: const EdgeInsets.symmetric(vertical: 10),
       decoration: BoxDecoration(
-        border: showBorder ? Border(bottom: BorderSide(color: AppTheme.border, width: 1)) : null,
+        border: showBorder
+            ? Border(bottom: BorderSide(color: AppTheme.border, width: 1))
+            : null,
       ),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -1824,7 +1997,10 @@ class _TeacherProfileScreenState extends ConsumerState<TeacherProfileScreen>
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(label, style: TextStyle(fontSize: 11, color: AppTheme.textMuted)),
+                Text(
+                  label,
+                  style: TextStyle(fontSize: 11, color: AppTheme.textMuted),
+                ),
                 const SizedBox(height: 2),
                 Text(
                   value,
@@ -1855,7 +2031,11 @@ class _TeacherProfileScreenState extends ConsumerState<TeacherProfileScreen>
             Expanded(
               child: Text(
                 'Faculty User Guide',
-                style: TextStyle(color: AppTheme.text, fontSize: 16, fontWeight: FontWeight.bold),
+                style: TextStyle(
+                  color: AppTheme.text,
+                  fontSize: 16,
+                  fontWeight: FontWeight.bold,
+                ),
               ),
             ),
           ],
@@ -1867,17 +2047,20 @@ class _TeacherProfileScreenState extends ConsumerState<TeacherProfileScreen>
             children: [
               _buildHelpItem(
                 title: 'Offline Quiz Submissions',
-                desc: 'Students submit quizzes directly to the ESP32 Hub. Scores and answers will synchronize to your device view once connected to the classroom mesh.',
+                desc:
+                    'Students submit quizzes directly to the ESP32 Hub. Scores and answers will synchronize to your device view once connected to the classroom mesh.',
               ),
               const SizedBox(height: 10),
               _buildHelpItem(
                 title: 'Managing Sections & Roster',
-                desc: 'Class sections and student rosters are provisioned by the School Admin. Tap "Station Hub" above to review live connected student clients.',
+                desc:
+                    'Class sections and student rosters are provisioned by the School Admin. Tap "Station Hub" above to review live connected student clients.',
               ),
               const SizedBox(height: 10),
               _buildHelpItem(
                 title: 'ESP32 Classroom Hub',
-                desc: 'Ensure your device is connected to the Classroom Hub Wi-Fi (scan the QR code on the physical ESP32 screen) to distribute lesson materials and activate timed quizzes.',
+                desc:
+                    'Ensure your device is connected to the Classroom Hub Wi-Fi (scan the QR code on the physical ESP32 screen) to distribute lesson materials and activate timed quizzes.',
               ),
             ],
           ),
@@ -1885,7 +2068,13 @@ class _TeacherProfileScreenState extends ConsumerState<TeacherProfileScreen>
         actions: [
           TextButton(
             onPressed: () => Navigator.of(ctx).pop(),
-            child: Text('Close', style: TextStyle(color: AppTheme.primary, fontWeight: FontWeight.bold)),
+            child: Text(
+              'Close',
+              style: TextStyle(
+                color: AppTheme.primary,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
           ),
         ],
       ),
@@ -1898,12 +2087,20 @@ class _TeacherProfileScreenState extends ConsumerState<TeacherProfileScreen>
       children: [
         Text(
           title,
-          style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: AppTheme.text),
+          style: TextStyle(
+            fontSize: 13,
+            fontWeight: FontWeight.bold,
+            color: AppTheme.text,
+          ),
         ),
         const SizedBox(height: 2),
         Text(
           desc,
-          style: TextStyle(fontSize: 12, color: AppTheme.textSecondary, height: 1.3),
+          style: TextStyle(
+            fontSize: 12,
+            color: AppTheme.textSecondary,
+            height: 1.3,
+          ),
         ),
       ],
     );
@@ -1922,35 +2119,64 @@ class _TeacherProfileScreenState extends ConsumerState<TeacherProfileScreen>
             Expanded(
               child: Text(
                 'Data Privacy & Compliance',
-                style: TextStyle(color: AppTheme.text, fontSize: 16, fontWeight: FontWeight.bold),
+                style: TextStyle(
+                  color: AppTheme.text,
+                  fontSize: 16,
+                  fontWeight: FontWeight.bold,
+                ),
               ),
             ),
           ],
         ),
         content: Text(
           'AIRAMP complies with Republic Act 10173 (Data Privacy Act of 2012) and DepEd institutional data handling standards.\n\nAll student records, grades, and teaching assets are stored within local encrypted SQLite databases on-premises and are never transmitted to unauthorized third parties.',
-          style: TextStyle(color: AppTheme.textSecondary, fontSize: 13, height: 1.4),
+          style: TextStyle(
+            color: AppTheme.textSecondary,
+            fontSize: 13,
+            height: 1.4,
+          ),
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.of(ctx).pop(),
-            child: Text('Understood', style: TextStyle(color: AppTheme.primary, fontWeight: FontWeight.bold)),
+            child: Text(
+              'Understood',
+              style: TextStyle(
+                color: AppTheme.primary,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
           ),
         ],
       ),
     );
   }
 
-  Widget _buildFieldRow({required IconData icon, required String label, required String value, required TextEditingController controller, required bool isEditing, required bool showBorder, TextInputType keyboardType = TextInputType.text, int? maxLength}) {
-    final int effectiveLimit = maxLength ?? (
-      label.toLowerCase().contains('phone') ? 15 :
-      label.toLowerCase().contains('user') ? 30 :
-      label.toLowerCase().contains('email') ? 50 : 50
-    );
+  Widget _buildFieldRow({
+    required IconData icon,
+    required String label,
+    required String value,
+    required TextEditingController controller,
+    required bool isEditing,
+    required bool showBorder,
+    TextInputType keyboardType = TextInputType.text,
+    int? maxLength,
+  }) {
+    final int effectiveLimit =
+        maxLength ??
+        (label.toLowerCase().contains('phone')
+            ? 15
+            : label.toLowerCase().contains('user')
+            ? 30
+            : label.toLowerCase().contains('email')
+            ? 50
+            : 50);
     return Container(
       padding: const EdgeInsets.symmetric(vertical: 10),
       decoration: BoxDecoration(
-        border: showBorder ? Border(bottom: BorderSide(color: AppTheme.border, width: 1)) : null,
+        border: showBorder
+            ? Border(bottom: BorderSide(color: AppTheme.border, width: 1))
+            : null,
       ),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -1964,19 +2190,31 @@ class _TeacherProfileScreenState extends ConsumerState<TeacherProfileScreen>
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(label, style: TextStyle(fontSize: 11, color: AppTheme.textMuted)),
+                Text(
+                  label,
+                  style: TextStyle(fontSize: 11, color: AppTheme.textMuted),
+                ),
                 const SizedBox(height: 2),
                 if (isEditing)
                   TextField(
                     controller: controller,
                     maxLength: effectiveLimit,
-                    buildCounter: (context, {required currentLength, required isFocused, maxLength}) => null,
+                    buildCounter:
+                        (
+                          context, {
+                          required currentLength,
+                          required isFocused,
+                          maxLength,
+                        }) => null,
                     keyboardType: keyboardType,
                     style: TextStyle(color: AppTheme.text, fontSize: 15),
                     decoration: InputDecoration(
                       counterText: '',
                       isDense: true,
-                      contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                      contentPadding: const EdgeInsets.symmetric(
+                        horizontal: 10,
+                        vertical: 6,
+                      ),
                       filled: true,
                       fillColor: AppTheme.inputBg,
                       border: OutlineInputBorder(
@@ -1994,7 +2232,10 @@ class _TeacherProfileScreenState extends ConsumerState<TeacherProfileScreen>
                     ),
                   )
                 else
-                  Text(value, style: TextStyle(color: AppTheme.text, fontSize: 15)),
+                  Text(
+                    value,
+                    style: TextStyle(color: AppTheme.text, fontSize: 15),
+                  ),
               ],
             ),
           ),
@@ -2062,10 +2303,7 @@ class _TeacherProfileScreenState extends ConsumerState<TeacherProfileScreen>
                     const SizedBox(height: 2),
                     Text(
                       'End current faculty session safely',
-                      style: TextStyle(
-                        fontSize: 12,
-                        color: AppTheme.textMuted,
-                      ),
+                      style: TextStyle(fontSize: 12, color: AppTheme.textMuted),
                     ),
                   ],
                 ),
@@ -2110,7 +2348,9 @@ class _TeacherProfileScreenState extends ConsumerState<TeacherProfileScreen>
         barrierDismissible: false,
         builder: (ctx) => AlertDialog(
           backgroundColor: AppTheme.surface,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(14),
+          ),
           content: Padding(
             padding: const EdgeInsets.symmetric(vertical: 16),
             child: Row(
@@ -2175,12 +2415,16 @@ class _TeacherProfileScreenState extends ConsumerState<TeacherProfileScreen>
       }
     }
 
-    await ref.read(authProvider.notifier).updateProfile(fullName: fullName, username: username, email: email);
+    await ref
+        .read(authProvider.notifier)
+        .updateProfile(fullName: fullName, username: username, email: email);
     setState(() => _isEditing = false);
     if (!mounted) return;
     _showAlert(
       'Success',
-      isEmailChanged ? 'Email verified and profile updated successfully!' : 'Profile updated successfully!',
+      isEmailChanged
+          ? 'Email verified and profile updated successfully!'
+          : 'Profile updated successfully!',
     );
   }
 
@@ -2329,10 +2573,16 @@ class _TeacherProfileScreenState extends ConsumerState<TeacherProfileScreen>
               style: TextStyle(color: AppTheme.text, fontSize: 14),
               decoration: InputDecoration(
                 hintText: 'example@gmail.com',
-                prefixIcon: Icon(Icons.email_outlined, color: AppTheme.primary, size: 20),
+                prefixIcon: Icon(
+                  Icons.email_outlined,
+                  color: AppTheme.primary,
+                  size: 20,
+                ),
                 filled: true,
                 fillColor: AppTheme.inputBg,
-                border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(10),
+                ),
               ),
             ),
           ],
@@ -2349,7 +2599,9 @@ class _TeacherProfileScreenState extends ConsumerState<TeacherProfileScreen>
                 Navigator.of(ctx).pop(text);
               } else {
                 ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('Please enter a valid email address.')),
+                  const SnackBar(
+                    content: Text('Please enter a valid email address.'),
+                  ),
                 );
               }
             },
@@ -2357,7 +2609,10 @@ class _TeacherProfileScreenState extends ConsumerState<TeacherProfileScreen>
               backgroundColor: AppTheme.primary,
               foregroundColor: Colors.black,
             ),
-            child: const Text('Proceed', style: TextStyle(fontWeight: FontWeight.bold)),
+            child: const Text(
+              'Proceed',
+              style: TextStyle(fontWeight: FontWeight.bold),
+            ),
           ),
         ],
       ),
@@ -2379,7 +2634,11 @@ class _TeacherProfileScreenState extends ConsumerState<TeacherProfileScreen>
                 color: Colors.amber.withValues(alpha: 0.15),
                 shape: BoxShape.circle,
               ),
-              child: const Icon(Icons.warning_amber_rounded, color: Colors.amberAccent, size: 24),
+              child: const Icon(
+                Icons.warning_amber_rounded,
+                color: Colors.amberAccent,
+                size: 24,
+              ),
             ),
             const SizedBox(width: 12),
             Expanded(
@@ -2410,7 +2669,10 @@ class _TeacherProfileScreenState extends ConsumerState<TeacherProfileScreen>
             },
             child: Text(
               'Sign Out',
-              style: TextStyle(color: AppTheme.error, fontWeight: FontWeight.w600),
+              style: TextStyle(
+                color: AppTheme.error,
+                fontWeight: FontWeight.w600,
+              ),
             ),
           ),
           ElevatedButton(
@@ -2418,9 +2680,14 @@ class _TeacherProfileScreenState extends ConsumerState<TeacherProfileScreen>
             style: ElevatedButton.styleFrom(
               backgroundColor: AppTheme.primary,
               foregroundColor: Colors.black,
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(10),
+              ),
             ),
-            child: const Text('Set Password Now', style: TextStyle(fontWeight: FontWeight.bold)),
+            child: const Text(
+              'Set Password Now',
+              style: TextStyle(fontWeight: FontWeight.bold),
+            ),
           ),
         ],
       ),
@@ -2437,6 +2704,14 @@ class _TeacherProfileScreenState extends ConsumerState<TeacherProfileScreen>
     final hasMinLength = newPass.length >= 6;
     final doPasswordsMatch = newPass.isNotEmpty && newPass == confirmPass;
 
+    final isDark = AppTheme.isDark;
+    final accentPrimary = isDark
+        ? const Color(0xFF60A5FA)
+        : const Color(0xFF0284C7);
+    final accentDeep = isDark
+        ? const Color(0xFF3B82F6)
+        : const Color(0xFF1D4ED8);
+
     return SafeArea(
       child: Center(
         child: SingleChildScrollView(
@@ -2447,34 +2722,45 @@ class _TeacherProfileScreenState extends ConsumerState<TeacherProfileScreen>
               mainAxisAlignment: MainAxisAlignment.center,
               crossAxisAlignment: CrossAxisAlignment.center,
               children: [
-                // Glowing Security Shield
+                // Smooth Institutional Security Badge
                 Container(
-                  width: 76,
-                  height: 76,
+                  width: 72,
+                  height: 72,
                   decoration: BoxDecoration(
                     shape: BoxShape.circle,
                     gradient: LinearGradient(
                       begin: Alignment.topLeft,
                       end: Alignment.bottomRight,
-                      colors: [
-                        Colors.amber.shade400,
-                        const Color(0xFFFF8F00),
-                      ],
+                      colors: isDark
+                          ? [
+                              const Color(0xFF1E3A8A).withValues(alpha: 0.55),
+                              const Color(0xFF0F172A),
+                            ]
+                          : [const Color(0xFFEFF6FF), const Color(0xFFE0E7FF)],
+                    ),
+                    border: Border.all(
+                      color: isDark
+                          ? const Color(0xFF3B82F6).withValues(alpha: 0.35)
+                          : const Color(0xFFBFDBFE),
+                      width: 1.5,
                     ),
                     boxShadow: [
                       BoxShadow(
-                        color: Colors.amber.withValues(alpha: 0.35),
-                        blurRadius: 22,
-                        spreadRadius: 2,
-                        offset: const Offset(0, 6),
+                        color: accentDeep.withValues(
+                          alpha: isDark ? 0.22 : 0.12,
+                        ),
+                        blurRadius: 18,
+                        spreadRadius: 1,
                       ),
                     ],
                   ),
-                  child: const Center(
+                  child: Center(
                     child: Icon(
                       Icons.lock_reset_rounded,
-                      size: 42,
-                      color: Colors.black,
+                      size: 36,
+                      color: isDark
+                          ? const Color(0xFF93C5FD)
+                          : const Color(0xFF1D4ED8),
                     ),
                   ),
                 ),
@@ -2507,18 +2793,17 @@ class _TeacherProfileScreenState extends ConsumerState<TeacherProfileScreen>
 
                 // Form Container
                 Container(
-                  padding: const EdgeInsets.all(20),
+                  padding: const EdgeInsets.all(22),
                   decoration: BoxDecoration(
                     color: AppTheme.surface,
                     borderRadius: BorderRadius.circular(18),
-                    border: Border.all(
-                      color: Colors.amberAccent.withValues(alpha: 0.5),
-                      width: 1.5,
-                    ),
+                    border: Border.all(color: AppTheme.border, width: 1.2),
                     boxShadow: [
                       BoxShadow(
-                        color: Colors.black.withValues(alpha: 0.08),
-                        blurRadius: 18,
+                        color: Colors.black.withValues(
+                          alpha: isDark ? 0.35 : 0.05,
+                        ),
+                        blurRadius: 20,
                         offset: const Offset(0, 6),
                       ),
                     ],
@@ -2529,7 +2814,10 @@ class _TeacherProfileScreenState extends ConsumerState<TeacherProfileScreen>
                       // SMTP Verification Info Badge
                       Container(
                         margin: const EdgeInsets.only(bottom: 16),
-                        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 14,
+                          vertical: 12,
+                        ),
                         decoration: BoxDecoration(
                           color: AppTheme.primary.withValues(alpha: 0.08),
                           borderRadius: BorderRadius.circular(12),
@@ -2601,30 +2889,44 @@ class _TeacherProfileScreenState extends ConsumerState<TeacherProfileScreen>
                         decoration: InputDecoration(
                           hintText: 'Enter new password',
                           hintStyle: TextStyle(color: AppTheme.textMuted),
-                          prefixIcon: Icon(Icons.lock_outline_rounded, color: AppTheme.accent, size: 20),
+                          prefixIcon: Icon(
+                            Icons.lock_outline_rounded,
+                            color: accentPrimary,
+                            size: 20,
+                          ),
                           suffixIcon: IconButton(
                             icon: Icon(
-                              _obscureNewPassword ? Icons.visibility_off_outlined : Icons.visibility_outlined,
+                              _obscureNewPassword
+                                  ? Icons.visibility_off_outlined
+                                  : Icons.visibility_outlined,
                               color: AppTheme.textMuted,
-                              size: 20,
+                              size: 18,
                             ),
-                            onPressed: () => setState(() => _obscureNewPassword = !_obscureNewPassword),
+                            onPressed: () => setState(
+                              () => _obscureNewPassword = !_obscureNewPassword,
+                            ),
                           ),
                           filled: true,
                           fillColor: AppTheme.inputBg,
                           border: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(12),
+                            borderRadius: BorderRadius.circular(10),
                             borderSide: BorderSide(color: AppTheme.border),
                           ),
                           enabledBorder: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(12),
+                            borderRadius: BorderRadius.circular(10),
                             borderSide: BorderSide(color: AppTheme.border),
                           ),
                           focusedBorder: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(12),
-                            borderSide: BorderSide(color: AppTheme.primary, width: 1.5),
+                            borderRadius: BorderRadius.circular(10),
+                            borderSide: BorderSide(
+                              color: accentPrimary,
+                              width: 1.5,
+                            ),
                           ),
-                          contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
+                          contentPadding: const EdgeInsets.symmetric(
+                            horizontal: 14,
+                            vertical: 14,
+                          ),
                         ),
                       ),
                       const SizedBox(height: 14),
@@ -2647,30 +2949,45 @@ class _TeacherProfileScreenState extends ConsumerState<TeacherProfileScreen>
                         decoration: InputDecoration(
                           hintText: 'Re-enter new password',
                           hintStyle: TextStyle(color: AppTheme.textMuted),
-                          prefixIcon: Icon(Icons.lock_clock_outlined, color: AppTheme.accent, size: 20),
+                          prefixIcon: Icon(
+                            Icons.lock_rounded,
+                            color: accentPrimary,
+                            size: 20,
+                          ),
                           suffixIcon: IconButton(
                             icon: Icon(
-                              _obscureConfirmPassword ? Icons.visibility_off_outlined : Icons.visibility_outlined,
+                              _obscureConfirmPassword
+                                  ? Icons.visibility_off_outlined
+                                  : Icons.visibility_outlined,
                               color: AppTheme.textMuted,
-                              size: 20,
+                              size: 18,
                             ),
-                            onPressed: () => setState(() => _obscureConfirmPassword = !_obscureConfirmPassword),
+                            onPressed: () => setState(
+                              () => _obscureConfirmPassword =
+                                  !_obscureConfirmPassword,
+                            ),
                           ),
                           filled: true,
                           fillColor: AppTheme.inputBg,
                           border: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(12),
+                            borderRadius: BorderRadius.circular(10),
                             borderSide: BorderSide(color: AppTheme.border),
                           ),
                           enabledBorder: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(12),
+                            borderRadius: BorderRadius.circular(10),
                             borderSide: BorderSide(color: AppTheme.border),
                           ),
                           focusedBorder: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(12),
-                            borderSide: BorderSide(color: AppTheme.primary, width: 1.5),
+                            borderRadius: BorderRadius.circular(10),
+                            borderSide: BorderSide(
+                              color: accentPrimary,
+                              width: 1.5,
+                            ),
                           ),
-                          contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
+                          contentPadding: const EdgeInsets.symmetric(
+                            horizontal: 14,
+                            vertical: 14,
+                          ),
                         ),
                       ),
                       const SizedBox(height: 16),
@@ -2679,10 +2996,14 @@ class _TeacherProfileScreenState extends ConsumerState<TeacherProfileScreen>
                       Container(
                         padding: const EdgeInsets.all(12),
                         decoration: BoxDecoration(
-                          color: isDark ? Colors.white.withValues(alpha: 0.03) : Colors.grey.shade100,
+                          color: isDark
+                              ? Colors.white.withValues(alpha: 0.03)
+                              : Colors.grey.shade100,
                           borderRadius: BorderRadius.circular(10),
                           border: Border.all(
-                            color: isDark ? Colors.white10 : Colors.grey.shade300,
+                            color: isDark
+                                ? Colors.white10
+                                : Colors.grey.shade300,
                           ),
                         ),
                         child: Column(
@@ -2699,67 +3020,81 @@ class _TeacherProfileScreenState extends ConsumerState<TeacherProfileScreen>
                           ],
                         ),
                       ),
-                      const SizedBox(height: 20),
+                      const SizedBox(height: 22),
 
                       // Submit Button (Instant save)
-                      SizedBox(
+                      Container(
                         width: double.infinity,
-                        height: 48,
+                        height: 46,
+                        decoration: BoxDecoration(
+                          borderRadius: BorderRadius.circular(12),
+                          gradient: LinearGradient(
+                            begin: Alignment.topLeft,
+                            end: Alignment.bottomRight,
+                            colors: [accentPrimary, accentDeep],
+                          ),
+                          boxShadow: [
+                            BoxShadow(
+                              color: accentDeep.withValues(
+                                alpha: isDark ? 0.35 : 0.22,
+                              ),
+                              blurRadius: 10,
+                              offset: const Offset(0, 4),
+                            ),
+                          ],
+                        ),
                         child: ElevatedButton(
-                          onPressed: _isSavingPassword ? null : _handleChangePassword,
+                          onPressed: _isSavingPassword
+                              ? null
+                              : _handleChangePassword,
                           style: ElevatedButton.styleFrom(
-                            backgroundColor: Colors.amber.shade400,
-                            foregroundColor: Colors.black,
-                            elevation: 2,
+                            backgroundColor: Colors.transparent,
+                            shadowColor: Colors.transparent,
+                            foregroundColor: Colors.white,
+                            elevation: 0,
                             shape: RoundedRectangleBorder(
                               borderRadius: BorderRadius.circular(12),
                             ),
                           ),
                           child: _isSavingPassword
                               ? const SizedBox(
-                                  width: 22,
-                                  height: 22,
+                                  width: 20,
+                                  height: 20,
                                   child: CircularProgressIndicator(
-                                    strokeWidth: 2.5,
-                                    color: Colors.black,
+                                    strokeWidth: 2,
+                                    color: Colors.white,
                                   ),
                                 )
-                              : const Row(
-                                  mainAxisAlignment: MainAxisAlignment.center,
-                                  mainAxisSize: MainAxisSize.min,
-                                  children: [
-                                    Icon(Icons.check_circle_outline_rounded, size: 18, color: Colors.black),
-                                    SizedBox(width: 8),
-                                    Flexible(
-                                      child: Text(
-                                        'Save Password & Unlock Account',
-                                        overflow: TextOverflow.ellipsis,
-                                        style: TextStyle(
-                                          fontSize: 14,
-                                          fontWeight: FontWeight.bold,
-                                          letterSpacing: 0.2,
-                                        ),
-                                      ),
-                                    ),
-                                  ],
+                              : const Text(
+                                  'Save Password & Unlock Account',
+                                  style: TextStyle(
+                                    fontSize: 14,
+                                    fontWeight: FontWeight.w600,
+                                    letterSpacing: 0.2,
+                                    color: Colors.white,
+                                  ),
                                 ),
                         ),
                       ),
                     ],
                   ),
                 ),
-                const SizedBox(height: 24),
+                const SizedBox(height: 20),
 
                 // Sign Out Option
                 TextButton.icon(
                   onPressed: _handleLogout,
-                  icon: Icon(Icons.logout_rounded, size: 18, color: AppTheme.error),
+                  icon: Icon(
+                    Icons.logout_rounded,
+                    size: 16,
+                    color: AppTheme.textSecondary,
+                  ),
                   label: Text(
                     'Sign out to switch account',
                     style: TextStyle(
-                      color: AppTheme.error,
-                      fontSize: 13.5,
-                      fontWeight: FontWeight.w600,
+                      color: AppTheme.textSecondary,
+                      fontSize: 13,
+                      fontWeight: FontWeight.w500,
                     ),
                   ),
                 ),
@@ -2775,9 +3110,11 @@ class _TeacherProfileScreenState extends ConsumerState<TeacherProfileScreen>
     return Row(
       children: [
         Icon(
-          isMet ? Icons.check_circle_rounded : Icons.radio_button_unchecked_rounded,
+          isMet
+              ? Icons.check_circle_rounded
+              : Icons.radio_button_unchecked_rounded,
           size: 16,
-          color: isMet ? Colors.greenAccent : AppTheme.textMuted,
+          color: isMet ? const Color(0xFF10B981) : AppTheme.textMuted,
         ),
         const SizedBox(width: 8),
         Text(
@@ -2800,7 +3137,9 @@ class _TeacherProfileScreenState extends ConsumerState<TeacherProfileScreen>
         canPop: false,
         child: AlertDialog(
           backgroundColor: AppTheme.surface,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(18),
+          ),
           content: Padding(
             padding: const EdgeInsets.symmetric(vertical: 8),
             child: Column(
@@ -2814,7 +3153,11 @@ class _TeacherProfileScreenState extends ConsumerState<TeacherProfileScreen>
                     color: Colors.green.withValues(alpha: 0.15),
                     border: Border.all(color: Colors.greenAccent, width: 2),
                   ),
-                  child: const Icon(Icons.check_circle_rounded, color: Colors.greenAccent, size: 38),
+                  child: const Icon(
+                    Icons.check_circle_rounded,
+                    color: Colors.greenAccent,
+                    size: 38,
+                  ),
                 ),
                 const SizedBox(height: 16),
                 Text(
@@ -2841,17 +3184,24 @@ class _TeacherProfileScreenState extends ConsumerState<TeacherProfileScreen>
                   child: ElevatedButton(
                     onPressed: () {
                       Navigator.of(ctx).pop();
-                      context.go(isTeacher ? '/teacher/dashboard' : '/student/home');
+                      context.go(
+                        isTeacher ? '/teacher/dashboard' : '/student/home',
+                      );
                     },
                     style: ElevatedButton.styleFrom(
                       backgroundColor: AppTheme.primary,
                       foregroundColor: Colors.black,
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
                       padding: const EdgeInsets.symmetric(vertical: 12),
                     ),
                     child: Text(
                       isTeacher ? 'Proceed to Dashboard' : 'Proceed to Home',
-                      style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
+                      style: const TextStyle(
+                        fontWeight: FontWeight.bold,
+                        fontSize: 14,
+                      ),
                     ),
                   ),
                 ),
@@ -2938,14 +3288,13 @@ class _TeacherProfileScreenState extends ConsumerState<TeacherProfileScreen>
                         onPressed: () => Navigator.of(ctx).pop(),
                         style: OutlinedButton.styleFrom(
                           padding: const EdgeInsets.symmetric(vertical: 12),
-                          side: BorderSide(
-                            color: AppTheme.border,
-                            width: 1.2,
-                          ),
+                          side: BorderSide(color: AppTheme.border, width: 1.2),
                           shape: RoundedRectangleBorder(
                             borderRadius: BorderRadius.circular(12),
                           ),
-                          backgroundColor: AppTheme.background.withValues(alpha: 0.5),
+                          backgroundColor: AppTheme.background.withValues(
+                            alpha: 0.5,
+                          ),
                         ),
                         child: Text(
                           'Cancel',
@@ -3002,11 +3351,34 @@ class _TeacherProfileScreenState extends ConsumerState<TeacherProfileScreen>
   void _showAlert(String title, String message) {
     showDialog(
       context: context,
-      builder: (ctx) => AlertDialog(backgroundColor: AppTheme.surface, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)), title: Text(title, style: TextStyle(color: AppTheme.text, fontWeight: FontWeight.bold)), content: Text(message, style: TextStyle(color: AppTheme.textSecondary)), actions: [TextButton(onPressed: () => Navigator.of(ctx).pop(), child: Text('OK', style: TextStyle(color: AppTheme.primary)))]),
+      builder: (ctx) => AlertDialog(
+        backgroundColor: AppTheme.surface,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+        title: Text(
+          title,
+          style: TextStyle(color: AppTheme.text, fontWeight: FontWeight.bold),
+        ),
+        content: Text(message, style: TextStyle(color: AppTheme.textSecondary)),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(),
+            child: Text('OK', style: TextStyle(color: AppTheme.primary)),
+          ),
+        ],
+      ),
     );
   }
 
   Widget _sectionCard({required Widget child}) {
-    return Container(width: double.infinity, padding: const EdgeInsets.all(16), decoration: BoxDecoration(color: AppTheme.surface, borderRadius: BorderRadius.circular(14), border: Border.all(color: AppTheme.border, width: 1)), child: child);
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: AppTheme.surface,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: AppTheme.border, width: 1),
+      ),
+      child: child,
+    );
   }
 }

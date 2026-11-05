@@ -61,7 +61,11 @@ class _StudentProfileScreenState extends ConsumerState<StudentProfileScreen>
       _showPasswordForm = true;
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (mounted && !RequiredChangePasswordDialog.hasSeenInThisSession) {
-          RequiredChangePasswordDialog.show(context, isTeacher: false);
+          RequiredChangePasswordDialog.show(
+            context,
+            isTeacher: false,
+            role: 'student',
+          );
         }
       });
     }
@@ -99,7 +103,11 @@ class _StudentProfileScreenState extends ConsumerState<StudentProfileScreen>
     if (state == AppLifecycleState.resumed) {
       final user = ref.read(authProvider);
       if (user?.mustChangePassword == true && mounted) {
-        RequiredChangePasswordDialog.show(context, isTeacher: false);
+        RequiredChangePasswordDialog.show(
+          context,
+          isTeacher: false,
+          role: 'student',
+        );
       }
     }
   }
@@ -769,7 +777,11 @@ class _StudentProfileScreenState extends ConsumerState<StudentProfileScreen>
           !RequiredChangePasswordDialog.hasSeenInThisSession) {
         WidgetsBinding.instance.addPostFrameCallback((_) {
           if (mounted) {
-            RequiredChangePasswordDialog.show(context, isTeacher: false);
+            RequiredChangePasswordDialog.show(
+              context,
+              isTeacher: false,
+              role: 'student',
+            );
           }
         });
       }
@@ -1128,6 +1140,14 @@ class _StudentProfileScreenState extends ConsumerState<StudentProfileScreen>
     final hasMinLength = newPass.length >= 6;
     final doPasswordsMatch = newPass.isNotEmpty && newPass == confirmPass;
 
+    final isDark = AppTheme.isDark;
+    final accentPrimary = isDark
+        ? const Color(0xFF60A5FA)
+        : const Color(0xFF0284C7);
+    final accentDeep = isDark
+        ? const Color(0xFF3B82F6)
+        : const Color(0xFF1D4ED8);
+
     return SafeArea(
       child: Center(
         child: SingleChildScrollView(
@@ -1138,31 +1158,45 @@ class _StudentProfileScreenState extends ConsumerState<StudentProfileScreen>
               mainAxisAlignment: MainAxisAlignment.center,
               crossAxisAlignment: CrossAxisAlignment.center,
               children: [
-                // Glowing Security Shield
+                // Smooth Institutional Security Badge
                 Container(
-                  width: 76,
-                  height: 76,
+                  width: 72,
+                  height: 72,
                   decoration: BoxDecoration(
                     shape: BoxShape.circle,
                     gradient: LinearGradient(
                       begin: Alignment.topLeft,
                       end: Alignment.bottomRight,
-                      colors: [Colors.amber.shade400, const Color(0xFFFF8F00)],
+                      colors: isDark
+                          ? [
+                              const Color(0xFF1E3A8A).withValues(alpha: 0.55),
+                              const Color(0xFF0F172A),
+                            ]
+                          : [const Color(0xFFEFF6FF), const Color(0xFFE0E7FF)],
+                    ),
+                    border: Border.all(
+                      color: isDark
+                          ? const Color(0xFF3B82F6).withValues(alpha: 0.35)
+                          : const Color(0xFFBFDBFE),
+                      width: 1.5,
                     ),
                     boxShadow: [
                       BoxShadow(
-                        color: Colors.amber.withValues(alpha: 0.35),
-                        blurRadius: 22,
-                        spreadRadius: 2,
-                        offset: const Offset(0, 6),
+                        color: accentDeep.withValues(
+                          alpha: isDark ? 0.22 : 0.12,
+                        ),
+                        blurRadius: 18,
+                        spreadRadius: 1,
                       ),
                     ],
                   ),
-                  child: const Center(
+                  child: Center(
                     child: Icon(
                       Icons.lock_reset_rounded,
-                      size: 42,
-                      color: Colors.black,
+                      size: 36,
+                      color: isDark
+                          ? const Color(0xFF93C5FD)
+                          : const Color(0xFF1D4ED8),
                     ),
                   ),
                 ),
@@ -1195,18 +1229,17 @@ class _StudentProfileScreenState extends ConsumerState<StudentProfileScreen>
 
                 // Form Container
                 Container(
-                  padding: const EdgeInsets.all(20),
+                  padding: const EdgeInsets.all(22),
                   decoration: BoxDecoration(
                     color: AppTheme.surface,
                     borderRadius: BorderRadius.circular(18),
-                    border: Border.all(
-                      color: Colors.amberAccent.withValues(alpha: 0.5),
-                      width: 1.5,
-                    ),
+                    border: Border.all(color: AppTheme.border, width: 1.2),
                     boxShadow: [
                       BoxShadow(
-                        color: Colors.black.withValues(alpha: 0.08),
-                        blurRadius: 18,
+                        color: Colors.black.withValues(
+                          alpha: isDark ? 0.35 : 0.05,
+                        ),
+                        blurRadius: 20,
                         offset: const Offset(0, 6),
                       ),
                     ],
@@ -1294,7 +1327,7 @@ class _StudentProfileScreenState extends ConsumerState<StudentProfileScreen>
                           hintStyle: TextStyle(color: AppTheme.textMuted),
                           prefixIcon: Icon(
                             Icons.lock_outline_rounded,
-                            color: AppTheme.accent,
+                            color: accentPrimary,
                             size: 20,
                           ),
                           suffixIcon: IconButton(
@@ -1303,7 +1336,7 @@ class _StudentProfileScreenState extends ConsumerState<StudentProfileScreen>
                                   ? Icons.visibility_off_outlined
                                   : Icons.visibility_outlined,
                               color: AppTheme.textMuted,
-                              size: 20,
+                              size: 18,
                             ),
                             onPressed: () => setState(
                               () => _obscureNewPassword = !_obscureNewPassword,
@@ -1312,17 +1345,17 @@ class _StudentProfileScreenState extends ConsumerState<StudentProfileScreen>
                           filled: true,
                           fillColor: AppTheme.inputBg,
                           border: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(12),
+                            borderRadius: BorderRadius.circular(10),
                             borderSide: BorderSide(color: AppTheme.border),
                           ),
                           enabledBorder: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(12),
+                            borderRadius: BorderRadius.circular(10),
                             borderSide: BorderSide(color: AppTheme.border),
                           ),
                           focusedBorder: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(12),
+                            borderRadius: BorderRadius.circular(10),
                             borderSide: BorderSide(
-                              color: AppTheme.primary,
+                              color: accentPrimary,
                               width: 1.5,
                             ),
                           ),
@@ -1353,8 +1386,8 @@ class _StudentProfileScreenState extends ConsumerState<StudentProfileScreen>
                           hintText: 'Re-enter new password',
                           hintStyle: TextStyle(color: AppTheme.textMuted),
                           prefixIcon: Icon(
-                            Icons.lock_clock_outlined,
-                            color: AppTheme.accent,
+                            Icons.lock_rounded,
+                            color: accentPrimary,
                             size: 20,
                           ),
                           suffixIcon: IconButton(
@@ -1363,7 +1396,7 @@ class _StudentProfileScreenState extends ConsumerState<StudentProfileScreen>
                                   ? Icons.visibility_off_outlined
                                   : Icons.visibility_outlined,
                               color: AppTheme.textMuted,
-                              size: 20,
+                              size: 18,
                             ),
                             onPressed: () => setState(
                               () => _obscureConfirmPassword =
@@ -1373,17 +1406,17 @@ class _StudentProfileScreenState extends ConsumerState<StudentProfileScreen>
                           filled: true,
                           fillColor: AppTheme.inputBg,
                           border: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(12),
+                            borderRadius: BorderRadius.circular(10),
                             borderSide: BorderSide(color: AppTheme.border),
                           ),
                           enabledBorder: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(12),
+                            borderRadius: BorderRadius.circular(10),
                             borderSide: BorderSide(color: AppTheme.border),
                           ),
                           focusedBorder: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(12),
+                            borderRadius: BorderRadius.circular(10),
                             borderSide: BorderSide(
-                              color: AppTheme.primary,
+                              color: accentPrimary,
                               width: 1.5,
                             ),
                           ),
@@ -1423,77 +1456,81 @@ class _StudentProfileScreenState extends ConsumerState<StudentProfileScreen>
                           ],
                         ),
                       ),
-                      const SizedBox(height: 20),
+                      const SizedBox(height: 22),
 
                       // Submit Button (Instant save)
-                      SizedBox(
+                      Container(
                         width: double.infinity,
-                        height: 48,
+                        height: 46,
+                        decoration: BoxDecoration(
+                          borderRadius: BorderRadius.circular(12),
+                          gradient: LinearGradient(
+                            begin: Alignment.topLeft,
+                            end: Alignment.bottomRight,
+                            colors: [accentPrimary, accentDeep],
+                          ),
+                          boxShadow: [
+                            BoxShadow(
+                              color: accentDeep.withValues(
+                                alpha: isDark ? 0.35 : 0.22,
+                              ),
+                              blurRadius: 10,
+                              offset: const Offset(0, 4),
+                            ),
+                          ],
+                        ),
                         child: ElevatedButton(
                           onPressed: _isSavingPassword
                               ? null
                               : _handleChangePassword,
                           style: ElevatedButton.styleFrom(
-                            backgroundColor: Colors.amber.shade400,
-                            foregroundColor: Colors.black,
-                            elevation: 2,
+                            backgroundColor: Colors.transparent,
+                            shadowColor: Colors.transparent,
+                            foregroundColor: Colors.white,
+                            elevation: 0,
                             shape: RoundedRectangleBorder(
                               borderRadius: BorderRadius.circular(12),
                             ),
                           ),
                           child: _isSavingPassword
                               ? const SizedBox(
-                                  width: 22,
-                                  height: 22,
+                                  width: 20,
+                                  height: 20,
                                   child: CircularProgressIndicator(
-                                    strokeWidth: 2.5,
-                                    color: Colors.black,
+                                    strokeWidth: 2,
+                                    color: Colors.white,
                                   ),
                                 )
-                              : const Row(
-                                  mainAxisAlignment: MainAxisAlignment.center,
-                                  mainAxisSize: MainAxisSize.min,
-                                  children: [
-                                    Icon(
-                                      Icons.check_circle_outline_rounded,
-                                      size: 18,
-                                      color: Colors.black,
-                                    ),
-                                    SizedBox(width: 8),
-                                    Flexible(
-                                      child: Text(
-                                        'Save Password & Unlock Account',
-                                        overflow: TextOverflow.ellipsis,
-                                        style: TextStyle(
-                                          fontSize: 14,
-                                          fontWeight: FontWeight.bold,
-                                          letterSpacing: 0.2,
-                                        ),
-                                      ),
-                                    ),
-                                  ],
+                              : const Text(
+                                  'Save Password & Unlock Account',
+                                  style: TextStyle(
+                                    fontSize: 14,
+                                    fontWeight: FontWeight.w600,
+                                    letterSpacing: 0.2,
+                                    color: Colors.white,
+                                  ),
                                 ),
                         ),
                       ),
                     ],
                   ),
                 ),
-                const SizedBox(height: 24),
+                const SizedBox(height: 20),
 
                 // Sign Out Option
                 TextButton.icon(
                   onPressed: _handleLogout,
                   icon: Icon(
                     Icons.logout_rounded,
-                    size: 18,
-                    color: AppTheme.error,
+                    size: 16,
+                    color: AppTheme.textSecondary,
                   ),
                   label: Text(
                     'Sign out to switch account',
                     style: TextStyle(
-                      color: AppTheme.error,
-                      fontSize: 13.5,
-                      fontWeight: FontWeight.w600,
+                      color: AppTheme.textSecondary,
+                      fontSize: 13,
+                      fontWeight: FontWeight.w500,
                     ),
                   ),
                 ),
@@ -1513,7 +1550,7 @@ class _StudentProfileScreenState extends ConsumerState<StudentProfileScreen>
               ? Icons.check_circle_rounded
               : Icons.radio_button_unchecked_rounded,
           size: 16,
-          color: isMet ? Colors.greenAccent : AppTheme.textMuted,
+          color: isMet ? const Color(0xFF10B981) : AppTheme.textMuted,
         ),
         const SizedBox(width: 8),
         Text(
