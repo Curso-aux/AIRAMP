@@ -23,6 +23,32 @@ class OtpResult {
   });
 }
 
+class OtpVerificationResult {
+  final bool success;
+  final String? resetTicket;
+  final String message;
+  final String? userId;
+
+  OtpVerificationResult({
+    required this.success,
+    this.resetTicket,
+    required this.message,
+    this.userId,
+  });
+}
+
+class _ResetTicketRecord {
+  final String ticket;
+  final String identifier;
+  final DateTime expiresAt;
+
+  _ResetTicketRecord({
+    required this.ticket,
+    required this.identifier,
+    required this.expiresAt,
+  });
+}
+
 class _OtpRecord {
   final String code;
   final String email;
@@ -46,6 +72,7 @@ class OtpService {
   OtpService._internal();
 
   final Map<String, _OtpRecord> _activeOtps = {};
+  final Map<String, _ResetTicketRecord> _activeResetTickets = {};
   final RateLimiter _limiter = RateLimiter();
 
   /// Masks an email for secure presentation (e.g. "luyahan007@gmail.com" -> "l***7@gmail.com")
@@ -225,7 +252,7 @@ class OtpService {
     if (cleanIdentifier.isEmpty) {
       return OtpResult(
         success: false,
-        message: 'Please enter your Student ID, Teacher ID, or registered email.',
+        message: 'Please enter your Account ID.',
       );
     }
 
@@ -588,5 +615,118 @@ class OtpService {
         reason: 'Too many incorrect verification attempts.',
       );
     }
+  }
+
+  /// Verifies the OTP, burns it so it cannot be reused, and issues an ephemeral
+  /// 10-minute Reset Ticket to securely decouple OTP verification from password setting.
+  Future<OtpVerificationResult> verifyOtpAndIssueTicket({
+    required String identifier,
+    required String enteredCode,
+  }) async {
+    final cleanIdentifier = identifier.trim();
+    final cleanCode = enteredCode.replaceAll(' ', '').trim();
+
+    if (cleanCode.length != 6) {
+      return OtpVerificationResult(
+        success: false,
+        message: 'Please enter the complete 6-digit verification code.',
+      );
+    }
+
+    final lockoutMsg = getLockoutMessage(cleanIdentifier);
+    if (lockoutMsg != null) {
+      return OtpVerificationResult(
+        success: false,
+        message: lockoutMsg,
+      );
+    }
+
+    final isValid = await verifyOtp(
+      identifier: cleanIdentifier,
+      enteredCode: cleanCode,
+    );
+
+    if (!isValid) {
+      final postLockout = getLockoutMessage(cleanIdentifier);
+      return OtpVerificationResult(
+        success: false,
+        message: postLockout ?? 'Incorrect or expired verification code. Please check your email.',
+      );
+    }
+
+    // Generate secure ephemeral reset ticket valid for 10 minutes
+    final secureRand = Random.secure();
+    final randSuffix = List.generate(4, (_) => secureRand.nextInt(999999).toString().padLeft(6, '0')).join();
+    final ticket = 'rst_${DateTime.now().millisecondsSinceEpoch}_$randSuffix';
+    final expiresAt = DateTime.now().add(const Duration(minutes: 10));
+
+    final ticketRecord = _ResetTicketRecord(
+      ticket: ticket,
+      identifier: cleanIdentifier.toLowerCase(),
+      expiresAt: expiresAt,
+    );
+
+    _activeResetTickets[ticket] = ticketRecord;
+
+    // Also persist ticket in Firestore for multi-tab/cross-session reliability
+    try {
+      await FirestoreService().saveDocument('password_reset_tickets', ticket, {
+        'identifier': cleanIdentifier.toLowerCase(),
+        'expires_at': expiresAt.toIso8601String(),
+        'used': false,
+      });
+    } catch (_) {}
+
+    return OtpVerificationResult(
+      success: true,
+      resetTicket: ticket,
+      userId: cleanIdentifier,
+      message: 'Code verified successfully.',
+    );
+  }
+
+  /// Validates and consumes the ephemeral Reset Ticket upon password completion.
+  Future<bool> validateAndConsumeResetTicket({
+    required String identifier,
+    required String resetTicket,
+  }) async {
+    final cleanTicket = resetTicket.trim();
+    if (cleanTicket.isEmpty) return false;
+    final normId = identifier.toLowerCase().trim();
+
+    // 1. In-memory check
+    final inMemory = _activeResetTickets[cleanTicket];
+    if (inMemory != null) {
+      _activeResetTickets.remove(cleanTicket);
+      if (DateTime.now().isAfter(inMemory.expiresAt)) {
+        return false;
+      }
+      if (inMemory.identifier == normId ||
+          inMemory.identifier.contains(normId) ||
+          normId.contains(inMemory.identifier)) {
+        try {
+          await FirestoreService().saveDocument('password_reset_tickets', cleanTicket, {'used': true});
+        } catch (_) {}
+        return true;
+      }
+    }
+
+    // 2. Cloud Firestore fallback
+    try {
+      final doc = await FirestoreService().getDocument('password_reset_tickets', cleanTicket);
+      if (doc != null && doc['used'] != true) {
+        final expStr = doc['expires_at']?.toString();
+        if (expStr != null) {
+          final exp = DateTime.tryParse(expStr);
+          if (exp != null && DateTime.now().isAfter(exp)) {
+            return false;
+          }
+        }
+        await FirestoreService().saveDocument('password_reset_tickets', cleanTicket, {'used': true});
+        return true;
+      }
+    } catch (_) {}
+
+    return false;
   }
 }

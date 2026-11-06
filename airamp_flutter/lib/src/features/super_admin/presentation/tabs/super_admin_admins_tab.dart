@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../../../../core/components/aira_action_toast.dart';
 import '../../../../core/theme/theme_provider.dart';
 import '../../../admin/data/admin_repository.dart';
 import '../super_admin_theme.dart';
@@ -20,6 +21,7 @@ class _SuperAdminAdminsTabState extends ConsumerState<SuperAdminAdminsTab> {
   final _searchController = TextEditingController();
   String _searchQuery = '';
   String _roleFilter = 'all';
+  bool _isArchiveView = false;
 
   @override
   void initState() {
@@ -28,6 +30,10 @@ class _SuperAdminAdminsTabState extends ConsumerState<SuperAdminAdminsTab> {
       setState(() {
         _searchQuery = _searchController.text.trim().toLowerCase();
       });
+    });
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      ref.read(schoolAdminsProvider.notifier).loadAdmins();
+      ref.read(archivedSchoolAdminsProvider.notifier).loadArchivedAdmins();
     });
   }
 
@@ -158,6 +164,7 @@ class _SuperAdminAdminsTabState extends ConsumerState<SuperAdminAdminsTab> {
                           ),
                         ],
                         onChanged: (admin['id'] == 'super_admin_christian' ||
+                                admin['id'] == 'SA-000-0001' ||
                                 (admin['email'] as String? ?? '').toLowerCase() == 'evangelistachristian88@gmail.com')
                             ? null
                             : (val) {
@@ -208,8 +215,10 @@ class _SuperAdminAdminsTabState extends ConsumerState<SuperAdminAdminsTab> {
                     final email = emailCtrl.text.trim();
                     final pass = passCtrl.text;
                     if (name.isEmpty || email.isEmpty) {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(content: Text('Name and email are required.')),
+                      AiraActionToast.showWarning(
+                        context,
+                        title: 'Validation Error',
+                        message: 'Name and email are required.',
                       );
                       return;
                     }
@@ -230,17 +239,18 @@ class _SuperAdminAdminsTabState extends ConsumerState<SuperAdminAdminsTab> {
                         updateData,
                       );
                       if (context.mounted) {
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(
-                            content: Text('Updated administrator "$name" successfully.'),
-                            backgroundColor: gTheme.successText,
-                          ),
+                        AiraActionToast.showSuccess(
+                          context,
+                          title: 'Administrator Updated',
+                          message: 'Updated administrator "$name" successfully.',
                         );
                       }
                     } catch (e) {
                       if (context.mounted) {
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(content: Text('Error: $e'), backgroundColor: gTheme.dangerText),
+                        AiraActionToast.showError(
+                          context,
+                          title: 'Update Failed',
+                          message: 'Error updating administrator: $e',
                         );
                       }
                     }
@@ -334,22 +344,27 @@ class _SuperAdminAdminsTabState extends ConsumerState<SuperAdminAdminsTab> {
                             );
                         if (context.mounted) {
                           Navigator.of(dialogCtx).pop();
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            SnackBar(
-                              content: Text(
-                                res.success
-                                    ? 'Credentials dispatched successfully to ${admin['email']} via ${res.channel.toUpperCase()}'
-                                    : 'Failed to dispatch: ${res.message}',
-                              ),
-                              backgroundColor: res.success ? gTheme.successText : gTheme.dangerText,
-                            ),
-                          );
+                          if (res.success) {
+                            AiraActionToast.showSuccess(
+                              context,
+                              title: 'Credentials Dispatched',
+                              message: 'Credentials dispatched successfully to ${admin['email']} via ${res.channel.toUpperCase()}.',
+                            );
+                          } else {
+                            AiraActionToast.showError(
+                              context,
+                              title: 'Dispatch Failed',
+                              message: 'Failed to dispatch: ${res.message}',
+                            );
+                          }
                         }
                       } catch (e) {
                         if (context.mounted) {
                           Navigator.of(dialogCtx).pop();
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            SnackBar(content: Text('Error: $e'), backgroundColor: gTheme.dangerText),
+                          AiraActionToast.showError(
+                            context,
+                            title: 'Dispatch Error',
+                            message: 'Error sending credentials: $e',
                           );
                         }
                       }
@@ -361,15 +376,201 @@ class _SuperAdminAdminsTabState extends ConsumerState<SuperAdminAdminsTab> {
     );
   }
 
-  void _confirmDeleteAdmin(BuildContext context, GovernanceTheme gTheme, Map<String, dynamic> admin) {
+  void _confirmDeactivateAdmin(BuildContext context, GovernanceTheme gTheme, Map<String, dynamic> admin) {
     final isRoot = admin['id'] == 'super_admin_christian' ||
+        admin['id'] == 'SA-000-0001' ||
         (admin['email'] as String? ?? '').toLowerCase() == 'evangelistachristian88@gmail.com';
     if (isRoot) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: const Text('Primary Root Super Administrator cannot be deleted.'),
-          backgroundColor: gTheme.warningText,
+      AiraActionToast.showWarning(
+        context,
+        title: 'Action Restricted',
+        message: 'Primary Root Super Administrator cannot be deactivated.',
+      );
+      return;
+    }
+
+    showDialog(
+      context: context,
+      builder: (dialogCtx) => AlertDialog(
+        backgroundColor: gTheme.surfaceElevated,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+        title: const Row(
+          children: [
+            Icon(Icons.person_off_outlined, color: Color(0xFFD97706), size: 24),
+            SizedBox(width: 10),
+            Text('Deactivate Administrator', style: TextStyle(fontWeight: FontWeight.bold)),
+          ],
         ),
+        content: Text(
+          'Are you sure you want to deactivate administrative access for ${admin['full_name']} (${admin['email']})?\n\nTheir login permissions will be revoked immediately and moved to Deactivated Accounts. You can restore this account at any time.',
+          style: TextStyle(color: gTheme.textSecondary),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(dialogCtx).pop(),
+            child: Text('Cancel', style: TextStyle(color: gTheme.textSecondary)),
+          ),
+          ElevatedButton(
+            onPressed: () async {
+              try {
+                await ref.read(schoolAdminsProvider.notifier).archiveAdmin(admin['id'] as String);
+                if (context.mounted) {
+                  Navigator.of(dialogCtx).pop();
+                  AiraActionToast.showDeactivated(
+                    context,
+                    title: 'Administrator Deactivated',
+                    message: 'Administrative access for "${admin['full_name']}" has been deactivated.',
+                    duration: const Duration(seconds: 8),
+                  );
+                }
+              } catch (e) {
+                if (context.mounted) {
+                  Navigator.of(dialogCtx).pop();
+                  AiraActionToast.showError(
+                    context,
+                    title: 'Deactivation Failed',
+                    message: 'Error deactivating administrator: $e',
+                  );
+                }
+              }
+            },
+            style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFFD97706), foregroundColor: Colors.white),
+            child: const Text('Deactivate Account'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _confirmRestoreAdmin(BuildContext context, GovernanceTheme gTheme, Map<String, dynamic> admin) {
+    showDialog(
+      context: context,
+      builder: (dialogCtx) => AlertDialog(
+        backgroundColor: gTheme.surfaceElevated,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+        title: const Row(
+          children: [
+            Icon(Icons.restore_rounded, color: Color(0xFF10B981), size: 24),
+            SizedBox(width: 10),
+            Text('Restore Administrator', style: TextStyle(fontWeight: FontWeight.bold)),
+          ],
+        ),
+        content: Text(
+          'Are you sure you want to restore administrative access for ${admin['full_name']} (${admin['email']})?\n\nTheir active status will be re-established and they will be able to sign in to the AIRAMP console again.',
+          style: TextStyle(color: gTheme.textSecondary),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(dialogCtx).pop(),
+            child: Text('Cancel', style: TextStyle(color: gTheme.textSecondary)),
+          ),
+          ElevatedButton(
+            onPressed: () async {
+              try {
+                await ref.read(archivedSchoolAdminsProvider.notifier).restoreAdmin(admin['id'] as String);
+                if (context.mounted) {
+                  Navigator.of(dialogCtx).pop();
+                  AiraActionToast.showRestored(
+                    context,
+                    title: 'Administrator Restored',
+                    message: 'Administrative access for "${admin['full_name']}" has been restored.',
+                    duration: const Duration(seconds: 8),
+                  );
+                }
+              } catch (e) {
+                if (context.mounted) {
+                  Navigator.of(dialogCtx).pop();
+                  AiraActionToast.showError(
+                    context,
+                    title: 'Restore Failed',
+                    message: 'Error restoring administrator: $e',
+                  );
+                }
+              }
+            },
+            style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF10B981), foregroundColor: Colors.white),
+            child: const Text('Restore Access'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _confirmPermanentDeleteAdmin(BuildContext context, GovernanceTheme gTheme, Map<String, dynamic> admin) {
+    final isRoot = admin['id'] == 'super_admin_christian' ||
+        admin['id'] == 'SA-000-0001' ||
+        (admin['email'] as String? ?? '').toLowerCase() == 'evangelistachristian88@gmail.com';
+    if (isRoot) {
+      AiraActionToast.showWarning(
+        context,
+        title: 'Action Restricted',
+        message: 'Primary Root Super Administrator cannot be deleted.',
+      );
+      return;
+    }
+
+    showDialog(
+      context: context,
+      builder: (dialogCtx) => AlertDialog(
+        backgroundColor: gTheme.surfaceElevated,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+        title: Row(
+          children: [
+            Icon(Icons.delete_forever_rounded, color: gTheme.dangerText, size: 24),
+            const SizedBox(width: 10),
+            Text('Permanently Purge Record', style: TextStyle(color: gTheme.textPrimary, fontWeight: FontWeight.bold)),
+          ],
+        ),
+        content: Text(
+          'Are you sure you want to permanently delete "${admin['full_name']}" (${admin['email']})?\n\nThis action cannot be undone. All database records and Cloud Firestore documents will be permanently purged.',
+          style: TextStyle(color: gTheme.textSecondary),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(dialogCtx).pop(),
+            child: Text('Cancel', style: TextStyle(color: gTheme.textSecondary)),
+          ),
+          ElevatedButton(
+            onPressed: () async {
+              try {
+                await ref.read(archivedSchoolAdminsProvider.notifier).permanentDeleteAdmin(admin['id'] as String);
+                if (context.mounted) {
+                  Navigator.of(dialogCtx).pop();
+                  AiraActionToast.showDeleted(
+                    context,
+                    title: 'Administrator Permanently Purged',
+                    message: 'Administrator "${admin['full_name']}" was permanently deleted from all systems.',
+                    duration: const Duration(seconds: 8),
+                  );
+                }
+              } catch (e) {
+                if (context.mounted) {
+                  Navigator.of(dialogCtx).pop();
+                  AiraActionToast.showError(
+                    context,
+                    title: 'Purge Failed',
+                    message: 'Error purging administrator: $e',
+                  );
+                }
+              }
+            },
+            style: ElevatedButton.styleFrom(backgroundColor: gTheme.dangerText, foregroundColor: Colors.white),
+            child: const Text('Purge Permanently'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _confirmDeleteAdmin(BuildContext context, GovernanceTheme gTheme, Map<String, dynamic> admin) {
+    final isRoot = admin['id'] == 'super_admin_christian' ||
+        admin['id'] == 'SA-000-0001' ||
+        (admin['email'] as String? ?? '').toLowerCase() == 'evangelistachristian88@gmail.com';
+    if (isRoot) {
+      AiraActionToast.showWarning(
+        context,
+        title: 'Action Restricted',
+        message: 'Primary Root Super Administrator cannot be deleted.',
       );
       return;
     }
@@ -383,39 +584,68 @@ class _SuperAdminAdminsTabState extends ConsumerState<SuperAdminAdminsTab> {
           children: [
             Icon(Icons.warning_amber_rounded, color: gTheme.dangerText, size: 24),
             const SizedBox(width: 10),
-            Text('Confirm Revocation', style: TextStyle(color: gTheme.textPrimary, fontWeight: FontWeight.bold)),
+            Text('Permanently Delete Account', style: TextStyle(color: gTheme.textPrimary, fontWeight: FontWeight.bold)),
           ],
         ),
         content: Text(
-          'Are you sure you want to permanently revoke administrative access for ${admin['full_name']} (${admin['email']})? This action cannot be undone.',
+          'Are you sure you want to permanently delete administrative access for ${admin['full_name']} (${admin['email']})?\n\nThis will purge this account from both local storage and Cloud Firestore. (If you only want to temporarily suspend access, you can Deactivate the account instead.)',
           style: TextStyle(color: gTheme.textSecondary),
         ),
         actions: [
-          TextButton(onPressed: () => Navigator.of(dialogCtx).pop(), child: Text('Cancel', style: TextStyle(color: gTheme.textSecondary))),
+          TextButton(
+            onPressed: () => Navigator.of(dialogCtx).pop(),
+            child: Text('Cancel', style: TextStyle(color: gTheme.textSecondary)),
+          ),
+          OutlinedButton.icon(
+            icon: const Icon(Icons.person_off_outlined, size: 16, color: Color(0xFFD97706)),
+            label: const Text('Deactivate Instead', style: TextStyle(color: Color(0xFFD97706))),
+            onPressed: () {
+              Navigator.of(dialogCtx).pop();
+              _confirmDeactivateAdmin(context, gTheme, admin);
+            },
+          ),
           ElevatedButton(
             onPressed: () async {
               try {
                 await ref.read(schoolAdminsProvider.notifier).deleteAdmin(admin['id'] as String);
                 if (context.mounted) {
                   Navigator.of(dialogCtx).pop();
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(content: const Text('Administrator access revoked.'), backgroundColor: gTheme.successText),
+                  AiraActionToast.showDeleted(
+                    context,
+                    title: 'Administrator Permanently Deleted',
+                    message: 'Administrative access for "${admin['full_name']}" was permanently purged from all databases.',
+                    duration: const Duration(seconds: 8),
                   );
                 }
               } catch (e) {
                 if (context.mounted) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(content: Text('Error: $e'), backgroundColor: gTheme.dangerText),
+                  Navigator.of(dialogCtx).pop();
+                  AiraActionToast.showError(
+                    context,
+                    title: 'Deletion Failed',
+                    message: 'Error deleting administrator access: $e',
                   );
                 }
               }
             },
             style: ElevatedButton.styleFrom(backgroundColor: gTheme.dangerText, foregroundColor: Colors.white),
-            child: const Text('Revoke Access'),
+            child: const Text('Permanently Delete'),
           ),
         ],
       ),
     );
+  }
+
+  String _formatDate(dynamic dateVal) {
+    if (dateVal == null) return 'N/A';
+    final str = dateVal.toString();
+    try {
+      final dt = DateTime.parse(str).toLocal();
+      const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+      return '${months[dt.month - 1]} ${dt.day}, ${dt.year}';
+    } catch (_) {
+      return str.split('T').first;
+    }
   }
 
   @override
@@ -423,9 +653,12 @@ class _SuperAdminAdminsTabState extends ConsumerState<SuperAdminAdminsTab> {
     final themeState = ref.watch(themeProvider);
     final gTheme = GovernanceTheme(themeState.isDark);
     final admins = ref.watch(schoolAdminsProvider);
+    final archivedAdmins = ref.watch(archivedSchoolAdminsProvider);
     final schools = ref.watch(schoolsListProvider);
 
-    final filteredAdmins = admins.where((a) {
+    final currentAdmins = _isArchiveView ? archivedAdmins : admins;
+
+    final filteredAdmins = currentAdmins.where((a) {
       final name = (a['full_name'] as String? ?? '').toLowerCase();
       final email = (a['email'] as String? ?? '').toLowerCase();
       final user = (a['username'] as String? ?? '').toLowerCase();
@@ -522,6 +755,129 @@ class _SuperAdminAdminsTabState extends ConsumerState<SuperAdminAdminsTab> {
               ),
               const SizedBox(height: 20),
 
+              // ── Active / Deactivated Directory Switcher Pills ──
+              Container(
+                padding: const EdgeInsets.all(4),
+                decoration: BoxDecoration(
+                  color: gTheme.surfaceSubtle,
+                  borderRadius: BorderRadius.circular(10),
+                  border: Border.all(color: gTheme.border),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    InkWell(
+                      onTap: () => setState(() => _isArchiveView = false),
+                      borderRadius: BorderRadius.circular(8),
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                        decoration: BoxDecoration(
+                          color: !_isArchiveView ? gTheme.surfaceElevated : Colors.transparent,
+                          borderRadius: BorderRadius.circular(8),
+                          boxShadow: !_isArchiveView
+                              ? [
+                                  BoxShadow(
+                                    color: Colors.black.withValues(alpha: 0.06),
+                                    blurRadius: 4,
+                                    offset: const Offset(0, 2),
+                                  ),
+                                ]
+                              : null,
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(
+                              Icons.shield_outlined,
+                              size: 16,
+                              color: !_isArchiveView ? gTheme.primary : gTheme.textSecondary,
+                            ),
+                            const SizedBox(width: 8),
+                            Text(
+                              'Active Administrators (${admins.length})',
+                              style: TextStyle(
+                                fontSize: 13,
+                                fontWeight: !_isArchiveView ? FontWeight.bold : FontWeight.w500,
+                                color: !_isArchiveView ? gTheme.primary : gTheme.textSecondary,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 4),
+                    InkWell(
+                      onTap: () => setState(() => _isArchiveView = true),
+                      borderRadius: BorderRadius.circular(8),
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                        decoration: BoxDecoration(
+                          color: _isArchiveView ? gTheme.surfaceElevated : Colors.transparent,
+                          borderRadius: BorderRadius.circular(8),
+                          boxShadow: _isArchiveView
+                              ? [
+                                  BoxShadow(
+                                    color: Colors.black.withValues(alpha: 0.06),
+                                    blurRadius: 4,
+                                    offset: const Offset(0, 2),
+                                  ),
+                                ]
+                              : null,
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(
+                              Icons.person_off_outlined,
+                              size: 16,
+                              color: _isArchiveView ? const Color(0xFFD97706) : gTheme.textSecondary,
+                            ),
+                            const SizedBox(width: 8),
+                            Text(
+                              'Deactivated Accounts (${archivedAdmins.length})',
+                              style: TextStyle(
+                                fontSize: 13,
+                                fontWeight: _isArchiveView ? FontWeight.bold : FontWeight.w500,
+                                color: _isArchiveView ? const Color(0xFFD97706) : gTheme.textSecondary,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 16),
+
+              if (_isArchiveView) ...[
+                Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFD97706).withValues(alpha: 0.1),
+                    borderRadius: BorderRadius.circular(10),
+                    border: Border.all(color: const Color(0xFFD97706).withValues(alpha: 0.3)),
+                  ),
+                  child: Row(
+                    children: [
+                      const Icon(Icons.info_outline, color: Color(0xFFD97706), size: 18),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: Text(
+                          'Deactivated Accounts Archive: These administrators cannot sign in to the AIRAMP console. You can restore their permissions or permanently delete them.',
+                          style: TextStyle(
+                            fontSize: 13,
+                            color: gTheme.isDark ? const Color(0xFFFBBF24) : const Color(0xFF92400E),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 16),
+              ],
+
               // ── Filter Controls ──
               Container(
                 padding: const EdgeInsets.all(14),
@@ -537,7 +893,9 @@ class _SuperAdminAdminsTabState extends ConsumerState<SuperAdminAdminsTab> {
                         controller: _searchController,
                         style: TextStyle(fontSize: 13, color: gTheme.textPrimary),
                         decoration: InputDecoration(
-                          hintText: 'Search administrator by name, email, or username...',
+                          hintText: _isArchiveView
+                              ? 'Search deactivated administrator by name, email, or username...'
+                              : 'Search administrator by name, email, or username...',
                           hintStyle: TextStyle(color: gTheme.textMuted, fontSize: 13),
                           prefixIcon: Icon(Icons.search, size: 18, color: gTheme.textMuted),
                           contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
@@ -601,9 +959,18 @@ class _SuperAdminAdminsTabState extends ConsumerState<SuperAdminAdminsTab> {
                         child: Center(
                           child: Column(
                             children: [
-                              Icon(Icons.person_off_outlined, size: 40, color: gTheme.textMuted),
+                              Icon(
+                                _isArchiveView ? Icons.check_circle_outline : Icons.person_off_outlined,
+                                size: 40,
+                                color: gTheme.textMuted,
+                              ),
                               const SizedBox(height: 10),
-                              Text('No matching administrator accounts found', style: TextStyle(color: gTheme.textMuted)),
+                              Text(
+                                _isArchiveView
+                                    ? 'No deactivated administrator accounts in archive'
+                                    : 'No matching administrator accounts found',
+                                style: TextStyle(color: gTheme.textMuted),
+                              ),
                             ],
                           ),
                         ),
@@ -632,10 +999,16 @@ class _SuperAdminAdminsTabState extends ConsumerState<SuperAdminAdminsTab> {
                               children: [
                                 CircleAvatar(
                                   radius: 20,
-                                  backgroundColor: gTheme.surfaceSubtle,
+                                  backgroundColor: _isArchiveView
+                                      ? const Color(0xFFD97706).withValues(alpha: 0.12)
+                                      : gTheme.surfaceSubtle,
                                   child: Icon(
-                                    isSuper ? Icons.admin_panel_settings : Icons.shield_outlined,
-                                    color: isSuper ? gTheme.primary : gTheme.textSecondary,
+                                    _isArchiveView
+                                        ? Icons.person_off_outlined
+                                        : (isSuper ? Icons.admin_panel_settings : Icons.shield_outlined),
+                                    color: _isArchiveView
+                                        ? const Color(0xFFD97706)
+                                        : (isSuper ? gTheme.primary : gTheme.textSecondary),
                                     size: 20,
                                   ),
                                 ),
@@ -652,10 +1025,11 @@ class _SuperAdminAdminsTabState extends ConsumerState<SuperAdminAdminsTab> {
                                             style: TextStyle(
                                               fontWeight: FontWeight.bold,
                                               fontSize: 14,
-                                              color: gTheme.textPrimary,
+                                              color: _isArchiveView ? gTheme.textSecondary : gTheme.textPrimary,
                                             ),
                                           ),
                                           if (admin['id'] == 'super_admin_christian' ||
+                                              admin['id'] == 'SA-000-0001' ||
                                               (admin['email'] as String? ?? '').toLowerCase() == 'evangelistachristian88@gmail.com') ...[
                                             const SizedBox(width: 6),
                                             Container(
@@ -675,8 +1049,13 @@ class _SuperAdminAdminsTabState extends ConsumerState<SuperAdminAdminsTab> {
                                       ),
                                       const SizedBox(height: 2),
                                       Text(
-                                        '${admin['email'] ?? ""} • Username: ${admin['username'] ?? "N/A"}',
-                                        style: TextStyle(fontSize: 12, color: gTheme.textSecondary),
+                                        _isArchiveView
+                                            ? '${admin['email'] ?? ""} • Deactivated on ${_formatDate(admin['archived_at'])}'
+                                            : '${admin['email'] ?? ""} • Username: ${admin['username'] ?? "N/A"}',
+                                        style: TextStyle(
+                                          fontSize: 12,
+                                          color: _isArchiveView ? const Color(0xFFD97706) : gTheme.textSecondary,
+                                        ),
                                       ),
                                     ],
                                   ),
@@ -688,18 +1067,26 @@ class _SuperAdminAdminsTabState extends ConsumerState<SuperAdminAdminsTab> {
                                     child: Container(
                                       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                                       decoration: BoxDecoration(
-                                        color: isSuper ? gTheme.primarySubtle : gTheme.surfaceSubtle,
+                                        color: _isArchiveView
+                                            ? const Color(0xFFD97706).withValues(alpha: 0.12)
+                                            : (isSuper ? gTheme.primarySubtle : gTheme.surfaceSubtle),
                                         borderRadius: BorderRadius.circular(6),
                                         border: Border.all(
-                                          color: isSuper ? gTheme.primaryBorder : gTheme.border,
+                                          color: _isArchiveView
+                                              ? const Color(0xFFD97706).withValues(alpha: 0.3)
+                                              : (isSuper ? gTheme.primaryBorder : gTheme.border),
                                         ),
                                       ),
                                       child: Text(
-                                        isSuper ? 'SUPER ADMIN' : 'CAMPUS ADMIN',
+                                        _isArchiveView
+                                            ? 'DEACTIVATED'
+                                            : (isSuper ? 'SUPER ADMIN' : 'CAMPUS ADMIN'),
                                         style: TextStyle(
                                           fontSize: 10,
                                           fontWeight: FontWeight.bold,
-                                          color: isSuper ? gTheme.primary : gTheme.textSecondary,
+                                          color: _isArchiveView
+                                              ? const Color(0xFFD97706)
+                                              : (isSuper ? gTheme.primary : gTheme.textSecondary),
                                           letterSpacing: 0.5,
                                         ),
                                       ),
@@ -718,42 +1105,76 @@ class _SuperAdminAdminsTabState extends ConsumerState<SuperAdminAdminsTab> {
                                 Row(
                                   mainAxisSize: MainAxisSize.min,
                                   children: [
-                                    IconButton(
-                                      icon: Icon(Icons.edit_outlined, size: 18, color: gTheme.textSecondary),
-                                      tooltip: 'Edit Administrator',
-                                      onPressed: () => _openEditAdminDialog(context, gTheme, admin),
-                                    ),
-                                    IconButton(
-                                      icon: Icon(Icons.forward_to_inbox_outlined, size: 18, color: gTheme.primary),
-                                      tooltip: 'Resend Credentials Email',
-                                      onPressed: () => _confirmResendCredentials(context, gTheme, admin),
-                                    ),
-                                    Builder(
-                                      builder: (context) {
-                                        final isRoot = admin['id'] == 'super_admin_christian' ||
-                                            (admin['email'] as String? ?? '').toLowerCase() == 'evangelistachristian88@gmail.com';
-                                        return IconButton(
-                                          icon: Icon(
-                                            Icons.delete_outline,
-                                            size: 18,
-                                            color: isRoot ? gTheme.textMuted : gTheme.dangerText,
-                                          ),
-                                          tooltip: isRoot
-                                              ? 'Root super admin cannot be deleted'
-                                              : 'Revoke Administrator Access',
-                                          onPressed: isRoot
-                                              ? null
-                                              : () => _confirmDeleteAdmin(context, gTheme, admin),
-                                        );
-                                      },
-                                    ),
+                                    if (_isArchiveView) ...[
+                                      IconButton(
+                                        icon: const Icon(Icons.restore_rounded, size: 20, color: Color(0xFF10B981)),
+                                        tooltip: 'Restore Administrator Access',
+                                        onPressed: () => _confirmRestoreAdmin(context, gTheme, admin),
+                                      ),
+                                      IconButton(
+                                        icon: Icon(Icons.delete_forever_rounded, size: 20, color: gTheme.dangerText),
+                                        tooltip: 'Permanently Purge Administrator',
+                                        onPressed: () => _confirmPermanentDeleteAdmin(context, gTheme, admin),
+                                      ),
+                                    ] else ...[
+                                      IconButton(
+                                        icon: Icon(Icons.edit_outlined, size: 18, color: gTheme.textSecondary),
+                                        tooltip: 'Edit Administrator',
+                                        onPressed: () => _openEditAdminDialog(context, gTheme, admin),
+                                      ),
+                                      IconButton(
+                                        icon: Icon(Icons.forward_to_inbox_outlined, size: 18, color: gTheme.primary),
+                                        tooltip: 'Resend Credentials Email',
+                                        onPressed: () => _confirmResendCredentials(context, gTheme, admin),
+                                      ),
+                                      Builder(
+                                        builder: (context) {
+                                          final isRoot = admin['id'] == 'super_admin_christian' ||
+                                              admin['id'] == 'SA-000-0001' ||
+                                              (admin['email'] as String? ?? '').toLowerCase() == 'evangelistachristian88@gmail.com';
+                                          return IconButton(
+                                            icon: Icon(
+                                              Icons.person_off_outlined,
+                                              size: 18,
+                                              color: isRoot ? gTheme.textMuted : const Color(0xFFD97706),
+                                            ),
+                                            tooltip: isRoot
+                                                ? 'Root super admin cannot be deactivated'
+                                                : 'Deactivate Administrator Account',
+                                            onPressed: isRoot
+                                                ? null
+                                                : () => _confirmDeactivateAdmin(context, gTheme, admin),
+                                          );
+                                        },
+                                      ),
+                                      Builder(
+                                        builder: (context) {
+                                          final isRoot = admin['id'] == 'super_admin_christian' ||
+                                              admin['id'] == 'SA-000-0001' ||
+                                              (admin['email'] as String? ?? '').toLowerCase() == 'evangelistachristian88@gmail.com';
+                                          return IconButton(
+                                            icon: Icon(
+                                              Icons.delete_outline,
+                                              size: 18,
+                                              color: isRoot ? gTheme.textMuted : gTheme.dangerText,
+                                            ),
+                                            tooltip: isRoot
+                                                ? 'Root super admin cannot be deleted'
+                                                : 'Permanently Delete Administrator',
+                                            onPressed: isRoot
+                                                ? null
+                                                : () => _confirmDeleteAdmin(context, gTheme, admin),
+                                          );
+                                        },
+                                      ),
                                     ],
-                                  ),
-                                ],
-                              ),
-                            );
-                          },
-                        ),
+                                  ],
+                                ),
+                              ],
+                            ),
+                          );
+                        },
+                      ),
               ),
             ],
           ),

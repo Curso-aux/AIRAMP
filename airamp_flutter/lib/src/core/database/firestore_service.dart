@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:dio/dio.dart';
 import 'package:firebase_core/firebase_core.dart';
@@ -58,6 +59,8 @@ class FirestoreService {
 
   FirebaseFirestore? _firestore;
   bool _probeCompleted = false;
+  StreamSubscription<QuerySnapshot<Map<String, dynamic>>>? _usersSubscription;
+  bool _isRealtimeSyncActive = false;
 
   bool get isAvailable {
     try {
@@ -74,6 +77,38 @@ class FirestoreService {
 
   CollectionReference<Map<String, dynamic>> get usersCollection {
     return firestore.collection('users');
+  }
+
+  /// Activates real-time live synchronization of Cloud Firestore users.
+  /// Any creation, modification, archive, or deletion of users on ANY device
+  /// is instantly streamed down, cached locally, and notified to the UI.
+  void startRealtimeUserSync() {
+    if (_isRealtimeSyncActive || !isAvailable) return;
+    _isRealtimeSyncActive = true;
+
+    try {
+      _usersSubscription = usersCollection.snapshots().listen(
+        (snapshot) async {
+          debugPrint('[FirestoreService] Real-time users update received: ${snapshot.docs.length} docs');
+          await syncCloudUsersToLocal();
+          try {
+            onUserSynced?.call();
+          } catch (_) {}
+        },
+        onError: (e) {
+          debugPrint('[FirestoreService] Real-time users stream note: $e');
+        },
+      );
+      debugPrint('[FirestoreService] Real-time live user sync activated');
+    } catch (e) {
+      debugPrint('[FirestoreService] Could not start real-time user sync: $e');
+    }
+  }
+
+  void stopRealtimeUserSync() {
+    _usersSubscription?.cancel();
+    _usersSubscription = null;
+    _isRealtimeSyncActive = false;
   }
 
   /// Proactively ensures the Firebase native SDK network channel is enabled and tests connectivity.
@@ -94,6 +129,7 @@ class FirestoreService {
       await usersCollection.limit(1).get(const GetOptions(source: Source.serverAndCache))
           .timeout(const Duration(seconds: 8));
       debugPrint('[FirestoreService] Cloud Firestore SDK connected successfully');
+      startRealtimeUserSync();
     } catch (e) {
       debugPrint('[FirestoreService] Cloud Firestore initial probe note: $e');
     }
@@ -294,17 +330,18 @@ class FirestoreService {
     }
   }
 
-  /// Calculates the highest numeric sequence for a given ID prefix (e.g. '001-' or '002-')
+  /// Calculates the highest numeric sequence for a given ID prefix (e.g. 'S-100-', 'T-100-', 'A-100-', 'SA-000-', or legacy '001-')
   Future<int> getHighestSequence(String prefix) async {
     int maxSeq = 0;
+    final cleanPrefix = prefix.toUpperCase();
     try {
       final allUsers = await fetchAllUsers();
       for (final u in allUsers) {
-        final uid = u['id']?.toString() ?? '';
-        if (uid.startsWith(prefix)) {
+        final uid = (u['id']?.toString() ?? '').toUpperCase();
+        if (uid.startsWith(cleanPrefix)) {
           final parts = uid.split('-');
-          if (parts.length == 2) {
-            final num = int.tryParse(parts[1]);
+          if (parts.isNotEmpty) {
+            final num = int.tryParse(parts.last);
             if (num != null && num > maxSeq) {
               maxSeq = num;
             }
@@ -340,6 +377,21 @@ class FirestoreService {
 
     // Never overwrite existing non-null cloud fields with nulls during routine sync/login
     dataToSave.removeWhere((key, value) => value == null);
+
+    // Ensure this user ID, email, and username are removed from any local deletion tombstone list
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final deletedList = prefs.getStringList('permanently_deleted_accounts') ?? [];
+      final cleanEmail = (userData['email']?.toString() ?? '').toLowerCase().trim();
+      final cleanUser = (userData['username']?.toString() ?? '').toLowerCase().trim();
+      bool modified = false;
+      if (deletedList.remove(id)) modified = true;
+      if (cleanEmail.isNotEmpty && deletedList.remove(cleanEmail)) modified = true;
+      if (cleanUser.isNotEmpty && deletedList.remove(cleanUser)) modified = true;
+      if (modified) {
+        await prefs.setStringList('permanently_deleted_accounts', deletedList);
+      }
+    } catch (_) {}
 
     // 1. Try Firebase SDK if available
     if (isAvailable) {
@@ -380,15 +432,34 @@ class FirestoreService {
     }
   }
 
-  /// Searches Cloud Firestore for a user matching ID (e.g. 001-0001), email, username, or full name
+  /// Direct REST document fetch by document ID (~100-250ms, bypasses JS SDK cold-start)
+  Future<Map<String, dynamic>?> _fetchDocRest(String docId) async {
+    try {
+      final dio = _dio;
+      final keyParam = apiKey.isNotEmpty ? '?key=$apiKey' : '';
+      final docUrl = 'https://firestore.googleapis.com/v1/projects/$projectId/databases/(default)/documents/users/$docId$keyParam';
+      final docResp = await dio.get(docUrl);
+      if (docResp.statusCode == 200 && docResp.data is Map && docResp.data['fields'] is Map) {
+        final parsed = _parseFirestoreFields(docResp.data['fields'] as Map<String, dynamic>);
+        if (parsed.isNotEmpty) {
+          if (!parsed.containsKey('id')) parsed['id'] = docId;
+          return parsed;
+        }
+      }
+    } catch (_) {}
+    return null;
+  }
+
+  /// Searches Cloud Firestore for an account by email, ID, or username.
+  /// Uses ultra-fast REST direct fetches first (<200ms) with SDK fallback.
   Future<Map<String, dynamic>?> findUserByIdentifier(String identifier) async {
-    final idLower = identifier.toLowerCase().trim();
     final rawTrimmed = identifier.trim();
+    final idLower = rawTrimmed.toLowerCase();
     if (rawTrimmed.isEmpty) return null;
 
     try {
       return await _findUserInternal(idLower, rawTrimmed)
-          .timeout(const Duration(seconds: 8), onTimeout: () => null);
+          .timeout(const Duration(seconds: 4), onTimeout: () => null);
     } catch (e) {
       debugPrint('[FirestoreService] findUserByIdentifier note: $e');
       return null;
@@ -398,88 +469,76 @@ class FirestoreService {
   Future<Map<String, dynamic>?> _findUserInternal(String idLower, String rawTrimmed) async {
     final isEmail = rawTrimmed.contains('@');
 
-    // 1. Try SDK if available
+    // 1. FAST PATH: Direct REST query (~100-250ms, bypasses Web SDK cold-start & WebSocket latency)
+    try {
+      if (!isEmail) {
+        // Direct document fetch by ID (e.g. SA-000-0001, A-100-0001, T-100-0001, S-100-0001)
+        final directUser = await _fetchDocRest(rawTrimmed)
+            .timeout(const Duration(milliseconds: 2000), onTimeout: () => null);
+        if (directUser != null && directUser.isNotEmpty) {
+          return directUser;
+        }
+
+        // Direct doc fetch lowercase if different (e.g. sa-000-0001)
+        if (idLower != rawTrimmed) {
+          final directUserLower = await _fetchDocRest(idLower)
+              .timeout(const Duration(milliseconds: 1500), onTimeout: () => null);
+          if (directUserLower != null && directUserLower.isNotEmpty) {
+            return directUserLower;
+          }
+        }
+
+        // Fast parallel structured query by username or id
+        final restResults = await Future.wait([
+          _queryRest('id', rawTrimmed).timeout(const Duration(milliseconds: 2000), onTimeout: () => null),
+          _queryRest('username_lower', idLower).timeout(const Duration(milliseconds: 2000), onTimeout: () => null),
+          _queryRest('username', rawTrimmed).timeout(const Duration(milliseconds: 2000), onTimeout: () => null),
+        ]);
+        for (final r in restResults) {
+          if (r != null && r.isNotEmpty) return r;
+        }
+      } else {
+        // Fast email query via REST
+        final restResults = await Future.wait([
+          _queryRest('email_lower', idLower).timeout(const Duration(milliseconds: 2000), onTimeout: () => null),
+          _queryRest('email', rawTrimmed).timeout(const Duration(milliseconds: 2000), onTimeout: () => null),
+          _fetchDocRest(idLower).timeout(const Duration(milliseconds: 1500), onTimeout: () => null),
+        ]);
+        for (final r in restResults) {
+          if (r != null && r.isNotEmpty) return r;
+        }
+      }
+    } catch (e) {
+      debugPrint('[FirestoreService] Fast REST search note: $e');
+    }
+
+    // 2. FALLBACK: Native/Web SDK query (if REST didn't resolve)
     if (isAvailable) {
       try {
         if (isEmail) {
-          // Parallel search targeted to email fields
           final results = await Future.wait([
-            usersCollection.where('email_lower', isEqualTo: idLower).limit(1).get().timeout(const Duration(seconds: 6)),
-            usersCollection.where('email', isEqualTo: rawTrimmed).limit(1).get().timeout(const Duration(seconds: 6)),
-            usersCollection.doc(idLower).get().timeout(const Duration(seconds: 6)),
+            usersCollection.where('email_lower', isEqualTo: idLower).limit(1).get().timeout(const Duration(seconds: 2)),
+            usersCollection.where('email', isEqualTo: rawTrimmed).limit(1).get().timeout(const Duration(seconds: 2)),
           ]);
           for (final snap in results) {
-            if (snap is QuerySnapshot<Map<String, dynamic>> && snap.docs.isNotEmpty) {
+            if (snap.docs.isNotEmpty) {
               final d = snap.docs.first.data();
               if (!d.containsKey('id')) d['id'] = snap.docs.first.id;
-              return d;
-            } else if (snap is DocumentSnapshot<Map<String, dynamic>> && snap.exists && snap.data() != null) {
-              final d = snap.data()!;
-              if (!d.containsKey('id')) d['id'] = snap.id;
               return d;
             }
           }
         } else {
-          // Parallel search targeted to user ID and username
-          final results = await Future.wait([
-            usersCollection.doc(rawTrimmed).get().timeout(const Duration(seconds: 6)),
-            usersCollection.where('id', isEqualTo: rawTrimmed).limit(1).get().timeout(const Duration(seconds: 6)),
-            usersCollection.where('username_lower', isEqualTo: idLower).limit(1).get().timeout(const Duration(seconds: 6)),
-            usersCollection.where('username', isEqualTo: rawTrimmed).limit(1).get().timeout(const Duration(seconds: 6)),
-          ]);
-          for (final snap in results) {
-            if (snap is DocumentSnapshot<Map<String, dynamic>> && snap.exists && snap.data() != null) {
-              final d = snap.data()!;
-              if (!d.containsKey('id')) d['id'] = snap.id;
-              return d;
-            } else if (snap is QuerySnapshot<Map<String, dynamic>> && snap.docs.isNotEmpty) {
-              final d = snap.docs.first.data();
-              if (!d.containsKey('id')) d['id'] = snap.docs.first.id;
-              return d;
-            }
+          final docSnap = await usersCollection.doc(rawTrimmed).get().timeout(const Duration(seconds: 2));
+          if (docSnap.exists && docSnap.data() != null) {
+            final d = docSnap.data()!;
+            if (!d.containsKey('id')) d['id'] = docSnap.id;
+            return d;
           }
         }
       } catch (e) {
         debugPrint('[FirestoreService] SDK search note: $e');
       }
     }
-
-    // 2. High-reliability REST query fallback
-    try {
-      if (isEmail) {
-        final results = await Future.wait([
-          _queryRest('email_lower', idLower),
-          _queryRest('email', rawTrimmed),
-        ]);
-        for (final r in results) {
-          if (r != null && r.isNotEmpty) return r;
-        }
-      } else {
-        // Direct document fetch by ID
-        try {
-          final dio = _dio;
-          final keyParam = apiKey.isNotEmpty ? '?key=$apiKey' : '';
-          final docUrl = 'https://firestore.googleapis.com/v1/projects/$projectId/databases/(default)/documents/users/$rawTrimmed$keyParam';
-          final docResp = await dio.get(docUrl);
-          if (docResp.statusCode == 200 && docResp.data is Map && docResp.data['fields'] is Map) {
-            final parsed = _parseFirestoreFields(docResp.data['fields'] as Map<String, dynamic>);
-            if (parsed.isNotEmpty) {
-              if (!parsed.containsKey('id')) parsed['id'] = rawTrimmed;
-              return parsed;
-            }
-          }
-        } catch (_) {}
-
-        final results = await Future.wait([
-          _queryRest('id', rawTrimmed),
-          _queryRest('username_lower', idLower),
-          _queryRest('username', rawTrimmed),
-        ]);
-        for (final r in results) {
-          if (r != null && r.isNotEmpty) return r;
-        }
-      }
-    } catch (_) {}
 
     return null;
   }
@@ -576,15 +635,24 @@ class FirestoreService {
 
       final db = await DatabaseHelper().database;
       final prefs = await SharedPreferences.getInstance();
+      final deletedList = prefs.getStringList('permanently_deleted_accounts') ?? [];
 
       final cloudIds = <String>{};
       final cloudEmails = <String>{};
 
       for (final data in cloudUsers) {
         try {
-          final userId = data['id']?.toString();
-          if (userId == null || userId.isEmpty) continue;
+          final userId = data['id']?.toString() ?? '';
           final email = (data['email']?.toString() ?? '').toLowerCase().trim();
+          if (userId.isEmpty && email.isEmpty) continue;
+
+          // If an active account exists in Cloud Firestore, ensure it is not blocked by stale local deleted tombstone
+          if (deletedList.contains(userId) || (email.isNotEmpty && deletedList.contains(email))) {
+            deletedList.remove(userId);
+            deletedList.remove(email);
+            unawaited(prefs.setStringList('permanently_deleted_accounts', deletedList));
+          }
+
           cloudIds.add(userId);
           if (email.isNotEmpty) cloudEmails.add(email);
 
@@ -595,17 +663,33 @@ class FirestoreService {
 
           final cloudMust = data['must_change_password'] == 1 ||
               data['must_change_password'] == true ||
-              data['must_change_password'] == '1';
+              data['must_change_password'] == '1' ||
+              data['mustChangePassword'] == true;
           final localMust = existing.isNotEmpty &&
               (existing.first['must_change_password'] == 1 ||
                existing.first['must_change_password'] == true ||
                existing.first['must_change_password'] == '1');
           final prefMust = prefs.getBool('must_change_password_$userId') == true;
-          final mustChangeVal = (cloudMust || localMust || prefMust) ? 1 : 0;
+
+          // Cloud is the primary source of truth across devices.
+          // If the cloud document has explicit must_change_password info, respect cloud state.
+          final hasCloudField = data.containsKey('must_change_password') ||
+              data.containsKey('mustChangePassword');
+          final bool mustChangeBool = hasCloudField
+              ? cloudMust
+              : (localMust || prefMust);
+          final mustChangeVal = mustChangeBool ? 1 : 0;
           if (mustChangeVal == 1) {
             try {
               await db.update('sessions', {'must_change_password': 1},
                   where: 'user_id = ?', whereArgs: [userId]);
+              await prefs.setBool('must_change_password_$userId', true);
+            } catch (_) {}
+          } else {
+            try {
+              await db.update('sessions', {'must_change_password': 0},
+                  where: 'user_id = ?', whereArgs: [userId]);
+              await prefs.remove('must_change_password_$userId');
             } catch (_) {}
           }
 
@@ -614,8 +698,13 @@ class FirestoreService {
               data['is_archived'] == '1';
           final archivedAt = data['archived_at']?.toString();
 
+          // Standardize on canonical ID: if userId is SA-000-0001, preserve it
+          final targetId = (userId.startsWith('SA-') || userId.startsWith('A-') || userId.startsWith('T-') || userId.startsWith('S-'))
+              ? userId
+              : (existing.isNotEmpty ? existing.first['id'] : userId);
+
           final dbRow = {
-            'id': existing.isNotEmpty ? existing.first['id'] : userId,
+            'id': targetId,
             'email': data['email'] ?? '',
             'username': data['username'] ?? '',
             'password': data['password'] ?? '',
@@ -637,25 +726,31 @@ class FirestoreService {
           if (existing.isEmpty) {
             await db.insert('users', dbRow, conflictAlgorithm: ConflictAlgorithm.replace);
           } else {
-            final targetId = existing.first['id'];
-            await db.update('users', dbRow, where: 'id = ?', whereArgs: [targetId]);
+            final oldId = existing.first['id'];
+            if (oldId != targetId) {
+              await db.delete('users', where: 'id = ?', whereArgs: [oldId]);
+              await db.insert('users', dbRow, conflictAlgorithm: ConflictAlgorithm.replace);
+            } else {
+              await db.update('users', dbRow, where: 'id = ?', whereArgs: [targetId]);
+            }
           }
         } catch (e) {
           debugPrint('[FirestoreService] Note syncing user ${data['id']}: $e');
         }
       }
 
-      // Prune local SQLite users that no longer exist in Cloud Firestore
+      // Handle local SQLite users with safe tombstone-based pruning and auto-push
       final localUsers = await db.query('users');
       for (final local in localUsers) {
         final localId = local['id']?.toString() ?? '';
         final localEmail = (local['email']?.toString() ?? '').toLowerCase().trim();
 
-        // Keep system core admin accounts permanent so a fresh cloud sync never purges administrators
         final isPermanentSeed = localId == 'super_admin_christian' ||
-            localEmail == 'evangelistachristian88@gmail.com' ||
-            localId == 'admin_2';
-        if (!isPermanentSeed && !cloudIds.contains(localId) && !cloudEmails.contains(localEmail)) {
+            localId == 'SA-000-0001' ||
+            localEmail == 'evangelistachristian88@gmail.com';
+
+        // 1. Only prune if the unique account ID was explicitly marked as permanently deleted (tombstone)
+        if (!isPermanentSeed && deletedList.contains(localId)) {
           await db.delete('users', where: 'id = ?', whereArgs: [localId]);
           try {
             await db.delete('enrollments', where: 'student_id = ?', whereArgs: [localId]);
@@ -663,7 +758,23 @@ class FirestoreService {
             await db.delete('student_progress', where: 'student_id = ?', whereArgs: [localId]);
             await db.delete('submissions', where: 'student_id = ?', whereArgs: [localId]);
           } catch (_) {}
-          debugPrint('[FirestoreService] Pruned obsolete local user: $localId ($localEmail)');
+          debugPrint('[FirestoreService] Pruned permanently deleted user: $localId ($localEmail)');
+          continue;
+        }
+
+        // 2. If user exists locally but hasn't been uploaded to Cloud Firestore yet,
+        // automatically upload it so all other devices receive it!
+        if (!isPermanentSeed &&
+            !cloudIds.contains(localId) &&
+            !cloudEmails.contains(localEmail)) {
+          final isTestDummy = localEmail.contains('newstudent_') ||
+              localEmail.contains('dup_student_') ||
+              localEmail.contains('test_') ||
+              localEmail.contains('security_test_');
+          if (!isTestDummy && localId.isNotEmpty) {
+            unawaited(saveUser(local));
+            debugPrint('[FirestoreService] Auto-pushed un-synced local user to cloud: $localId ($localEmail)');
+          }
         }
       }
 
@@ -773,14 +884,44 @@ class FirestoreService {
   }
 
   /// Deletes a user document from Cloud Firestore, ensuring both direct ID and email matches are purged
-  Future<void> deleteUser(String userId, {String? email}) async {
+  Future<void> deleteUser(String userId, {String? email, String? username}) async {
     final cleanId = userId.trim();
+    final cleanEmail = email?.trim().toLowerCase() ?? '';
+    final cleanUser = username?.trim().toLowerCase() ?? '';
+
     if (cleanId.isNotEmpty) {
       await deleteDocument('users', cleanId);
     }
-    final cleanEmail = email?.trim().toLowerCase() ?? '';
     if (cleanEmail.isNotEmpty && cleanEmail != cleanId.toLowerCase()) {
       await deleteDocument('users', cleanEmail);
+    }
+    if (cleanUser.isNotEmpty && cleanUser != cleanId.toLowerCase() && cleanUser != cleanEmail) {
+      await deleteDocument('users', cleanUser);
+    }
+
+    if (isAvailable) {
+      try {
+        final List<Future<QuerySnapshot<Map<String, dynamic>>>> queries = [];
+        if (cleanId.isNotEmpty) {
+          queries.add(usersCollection.where('id', isEqualTo: cleanId).get());
+        }
+        if (cleanEmail.isNotEmpty) {
+          queries.add(usersCollection.where('email_lower', isEqualTo: cleanEmail).get());
+          queries.add(usersCollection.where('email', isEqualTo: cleanEmail).get());
+        }
+        if (cleanUser.isNotEmpty) {
+          queries.add(usersCollection.where('username_lower', isEqualTo: cleanUser).get());
+          queries.add(usersCollection.where('username', isEqualTo: cleanUser).get());
+        }
+        final results = await Future.wait(queries);
+        for (final snap in results) {
+          for (final doc in snap.docs) {
+            await deleteDocument('users', doc.id);
+          }
+        }
+      } catch (e) {
+        debugPrint('[FirestoreService] Note finding user docs to delete: $e');
+      }
     }
   }
 }

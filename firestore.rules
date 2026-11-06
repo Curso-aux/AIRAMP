@@ -4,7 +4,11 @@ service cloud.firestore {
     
     // ── USERS COLLECTION ──────────────────────────────────────
     match /users/{userId} {
-      allow read, write: if true;
+      allow read, create, update: if true;
+      allow delete: if userId != 'A-100-0001' &&
+                       userId != 'betajhoneilpoblacion@gmail.com' &&
+                       !userId.matches('^SA-.*') &&
+                       userId != 'super_admin_christian';
     }
 
     // ── SECTIONS & SUBJECTS ──────────────────────────────────
@@ -101,11 +105,6 @@ service cloud.firestore {
     }
 
     match /password_otps/{otpId} {
-      allow read, write: if true;
-    }
-
-    // ── DEFAULT FALLBACK ──────────────────────────────────────
-    match /{document=**} {
       allow read, write: if true;
     }
   }

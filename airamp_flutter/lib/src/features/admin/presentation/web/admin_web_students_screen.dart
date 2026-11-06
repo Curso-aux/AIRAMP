@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../../../core/components/aira_action_toast.dart';
+import '../../../../core/components/aira_progress_dialog.dart';
 import '../../../../core/components/user_avatar_widget.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../../core/theme/theme_provider.dart';
@@ -2574,7 +2575,6 @@ class _AdminWebStudentsScreenState extends ConsumerState<AdminWebStudentsScreen>
     showDialog(
       context: rootContext,
       builder: (dialogCtx) {
-        bool isProcessing = false;
         return StatefulBuilder(
           builder: (dialogStateCtx, setDialogState) {
             return AlertDialog(
@@ -2706,66 +2706,61 @@ class _AdminWebStudentsScreenState extends ConsumerState<AdminWebStudentsScreen>
               ),
               actions: [
                 TextButton(
-                  onPressed: isProcessing ? null : () => Navigator.of(dialogCtx).pop(),
+                  onPressed: () => Navigator.of(dialogCtx).pop(),
                   child: Text('Cancel', style: TextStyle(color: AppTheme.textSecondary)),
                 ),
                 TextButton.icon(
-                  onPressed: isProcessing
-                      ? null
-                      : () {
-                          Navigator.of(dialogCtx).pop();
-                          _confirmPermanentDeleteStudent(rootContext, student);
-                        },
+                  onPressed: () {
+                    Navigator.of(dialogCtx).pop();
+                    _confirmPermanentDeleteStudent(rootContext, student);
+                  },
                   icon: const Icon(Icons.delete_forever_rounded, size: 15, color: Color(0xFFB91C1C)),
                   label: const Text('Delete Permanently Instead', style: TextStyle(color: Color(0xFFB91C1C), fontSize: 13, fontWeight: FontWeight.w600)),
                 ),
                 ElevatedButton.icon(
-                  onPressed: isProcessing
-                      ? null
-                      : () async {
-                          setDialogState(() => isProcessing = true);
-                          try {
-                            await ref
-                                .read(adminStudentsProvider.notifier)
-                                .archiveStudent(studentId)
-                                .timeout(const Duration(seconds: 8));
-                            if (dialogCtx.mounted) {
-                              Navigator.of(dialogCtx).pop();
-                            }
-                            if (rootContext.mounted) {
-                              AiraActionToast.showDeactivated(
-                                rootContext,
-                                title: 'Student account deactivated',
-                                message: 'Student "$studentName" ($studentId) was deactivated.',
-                                duration: const Duration(seconds: 6),
-                              );
-                            }
-                          } catch (e) {
-                            setDialogState(() => isProcessing = false);
-                            if (rootContext.mounted) {
-                              AiraActionToast.showError(
-                                rootContext,
-                                title: 'Failed to deactivate student',
-                                message: 'An unexpected error occurred: $e',
-                                duration: const Duration(seconds: 8),
-                              );
-                            }
-                          }
+                  onPressed: () async {
+                    Navigator.of(dialogCtx).pop();
+                    try {
+                      await AiraProgressDialog.showDeactivating(
+                        rootContext,
+                        title: 'Deactivating Student Account',
+                        initialMessage: 'Deactivating "$studentName" and synchronizing cloud records...',
+                        task: (updateProgress) async {
+                          updateProgress(0.3, 'Updating local student records...');
+                          await ref
+                              .read(adminStudentsProvider.notifier)
+                              .archiveStudent(studentId)
+                              .timeout(const Duration(seconds: 10));
+                          updateProgress(1.0, 'Account deactivated successfully!');
                         },
+                      );
+                      if (rootContext.mounted) {
+                        AiraActionToast.showDeactivated(
+                          rootContext,
+                          title: 'Student account deactivated',
+                          message: 'Student "$studentName" ($studentId) was deactivated.',
+                          duration: const Duration(seconds: 6),
+                        );
+                      }
+                    } catch (e) {
+                      if (rootContext.mounted) {
+                        AiraActionToast.showError(
+                          rootContext,
+                          title: 'Failed to deactivate student',
+                          message: 'An unexpected error occurred: $e',
+                          duration: const Duration(seconds: 8),
+                        );
+                      }
+                    }
+                  },
                   style: ElevatedButton.styleFrom(
                     backgroundColor: const Color(0xFFD97706),
                     foregroundColor: Colors.white,
                     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
                     minimumSize: const Size(0, 36),
                   ),
-                  icon: isProcessing
-                      ? const SizedBox(
-                          width: 16,
-                          height: 16,
-                          child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
-                        )
-                      : const Icon(Icons.person_off_outlined, size: 16),
-                  label: Text(isProcessing ? 'Deactivating...' : 'Deactivate Account'),
+                  icon: const Icon(Icons.person_off_outlined, size: 16),
+                  label: const Text('Deactivate Account'),
                 ),
               ],
             );
@@ -2782,7 +2777,6 @@ class _AdminWebStudentsScreenState extends ConsumerState<AdminWebStudentsScreen>
     showDialog(
       context: rootContext,
       builder: (dialogCtx) {
-        bool isProcessing = false;
         return StatefulBuilder(
           builder: (dialogStateCtx, setDialogState) {
             return AlertDialog(
@@ -2814,60 +2808,60 @@ class _AdminWebStudentsScreenState extends ConsumerState<AdminWebStudentsScreen>
               ),
               actions: [
                 TextButton(
-                  onPressed: isProcessing ? null : () => Navigator.of(dialogCtx).pop(),
+                  onPressed: () => Navigator.of(dialogCtx).pop(),
                   child: Text('Cancel', style: TextStyle(color: AppTheme.textSecondary)),
                 ),
                 TextButton.icon(
-                  onPressed: isProcessing
-                      ? null
-                      : () {
-                          Navigator.of(dialogCtx).pop();
-                          _confirmBulkPermanentDelete(rootContext, studentIds);
-                        },
+                  onPressed: () {
+                    Navigator.of(dialogCtx).pop();
+                    _confirmBulkPermanentDelete(rootContext, studentIds);
+                  },
                   icon: const Icon(Icons.delete_forever_rounded, size: 15, color: Color(0xFFB91C1C)),
                   label: const Text('Delete Permanently Instead', style: TextStyle(color: Color(0xFFB91C1C), fontSize: 13, fontWeight: FontWeight.w600)),
                 ),
                 ElevatedButton.icon(
-                  onPressed: isProcessing
-                      ? null
-                      : () async {
-                          setDialogState(() => isProcessing = true);
-                          try {
-                            await ref.read(adminStudentsProvider.notifier).bulkArchiveStudents(studentIds);
-                            setState(() => _selectedStudentIds.clear());
-                            if (dialogCtx.mounted) Navigator.of(dialogCtx).pop();
-                            if (rootContext.mounted) {
-                              AiraActionToast.showDeactivated(
-                                rootContext,
-                                title: 'Students Deactivated',
-                                message: '${studentIds.length} student accounts were deactivated.',
-                              );
-                            }
-                          } catch (e) {
-                            setDialogState(() => isProcessing = false);
-                            if (rootContext.mounted) {
-                              AiraActionToast.showError(
-                                rootContext,
-                                title: 'Deactivation Failed',
-                                message: 'An error occurred while deactivating students: $e',
-                              );
-                            }
-                          }
+                  onPressed: () async {
+                    Navigator.of(dialogCtx).pop();
+                    try {
+                      await AiraProgressDialog.showDeactivating(
+                        rootContext,
+                        title: 'Deactivating ${studentIds.length} Student Accounts',
+                        initialMessage: 'Preparing student records and Cloud Firestore sync...',
+                        task: (updateProgress) async {
+                          await ref.read(adminStudentsProvider.notifier).bulkArchiveStudents(
+                            studentIds,
+                            onProgress: (progress, statusMessage) {
+                              updateProgress(progress, statusMessage);
+                            },
+                          );
                         },
+                      );
+                      setState(() => _selectedStudentIds.clear());
+                      if (rootContext.mounted) {
+                        AiraActionToast.showDeactivated(
+                          rootContext,
+                          title: 'Students Deactivated',
+                          message: '${studentIds.length} student accounts were deactivated.',
+                        );
+                      }
+                    } catch (e) {
+                      if (rootContext.mounted) {
+                        AiraActionToast.showError(
+                          rootContext,
+                          title: 'Deactivation Failed',
+                          message: 'An error occurred while deactivating students: $e',
+                        );
+                      }
+                    }
+                  },
                   style: ElevatedButton.styleFrom(
                     backgroundColor: const Color(0xFFD97706),
                     foregroundColor: Colors.white,
                     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
                     minimumSize: const Size(0, 36),
                   ),
-                  icon: isProcessing
-                      ? const SizedBox(
-                          width: 16,
-                          height: 16,
-                          child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
-                        )
-                      : const Icon(Icons.person_off_outlined, size: 16),
-                  label: Text(isProcessing ? 'Deactivating...' : 'Deactivate All Selected'),
+                  icon: const Icon(Icons.person_off_outlined, size: 16),
+                  label: const Text('Deactivate All Selected'),
                 ),
               ],
             );
@@ -2889,7 +2883,6 @@ class _AdminWebStudentsScreenState extends ConsumerState<AdminWebStudentsScreen>
     showDialog(
       context: rootContext,
       builder: (dialogCtx) {
-        bool isDeleting = false;
         return StatefulBuilder(
           builder: (dialogStateCtx, setDialogState) {
             return AlertDialog(
@@ -3022,57 +3015,54 @@ class _AdminWebStudentsScreenState extends ConsumerState<AdminWebStudentsScreen>
               ),
               actions: [
                 TextButton(
-                  onPressed: isDeleting ? null : () => Navigator.of(dialogCtx).pop(),
+                  onPressed: () => Navigator.of(dialogCtx).pop(),
                   child: Text('Cancel', style: TextStyle(color: AppTheme.textSecondary)),
                 ),
                 ElevatedButton.icon(
-                  onPressed: isDeleting
-                      ? null
-                      : () async {
-                          setDialogState(() => isDeleting = true);
-                          try {
-                            await ref
-                                .read(adminArchivedStudentsProvider.notifier)
-                                .permanentDeleteStudent(studentId)
-                                .timeout(const Duration(seconds: 8));
-                            setState(() => _selectedStudentIds.remove(studentId));
-                            if (dialogCtx.mounted) {
-                              Navigator.of(dialogCtx).pop();
-                            }
-                            if (rootContext.mounted) {
-                              AiraActionToast.showDeleted(
-                                rootContext,
-                                title: 'Student record permanently purged',
-                                message: 'Student "$studentName" ($studentId) was permanently deleted.',
-                                duration: const Duration(seconds: 8),
-                              );
-                            }
-                          } catch (e) {
-                            setDialogState(() => isDeleting = false);
-                            if (rootContext.mounted) {
-                              AiraActionToast.showError(
-                                rootContext,
-                                title: 'Failed to delete student',
-                                message: 'An unexpected error occurred while deleting "$studentName": $e',
-                                duration: const Duration(seconds: 8),
-                              );
-                            }
-                          }
+                  onPressed: () async {
+                    Navigator.of(dialogCtx).pop();
+                    try {
+                      await AiraProgressDialog.showDeleting(
+                        rootContext,
+                        title: 'Permanently Deleting Student Record',
+                        initialMessage: 'Purging student records and cloud database...',
+                        task: (updateProgress) async {
+                          updateProgress(0.4, 'Purging enrollments and quiz attempts...');
+                          await ref
+                              .read(adminArchivedStudentsProvider.notifier)
+                              .permanentDeleteStudent(studentId)
+                              .timeout(const Duration(seconds: 10));
+                          updateProgress(1.0, 'Record purged successfully!');
                         },
+                      );
+                      setState(() => _selectedStudentIds.remove(studentId));
+                      if (rootContext.mounted) {
+                        AiraActionToast.showDeleted(
+                          rootContext,
+                          title: 'Student record permanently purged',
+                          message: 'Student "$studentName" ($studentId) was permanently deleted.',
+                          duration: const Duration(seconds: 8),
+                        );
+                      }
+                    } catch (e) {
+                      if (rootContext.mounted) {
+                        AiraActionToast.showError(
+                          rootContext,
+                          title: 'Failed to delete student',
+                          message: 'An unexpected error occurred while deleting "$studentName": $e',
+                          duration: const Duration(seconds: 8),
+                        );
+                      }
+                    }
+                  },
                   style: ElevatedButton.styleFrom(
                     backgroundColor: const Color(0xFFB91C1C),
                     foregroundColor: Colors.white,
                     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
                     minimumSize: const Size(0, 36),
                   ),
-                  icon: isDeleting
-                      ? const SizedBox(
-                          width: 16,
-                          height: 16,
-                          child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
-                        )
-                      : const Icon(Icons.delete_forever, size: 18),
-                  label: Text(isDeleting ? 'Deleting...' : 'Delete Permanently'),
+                  icon: const Icon(Icons.delete_forever, size: 18),
+                  label: const Text('Delete Permanently'),
                 ),
               ],
             );
@@ -3089,7 +3079,6 @@ class _AdminWebStudentsScreenState extends ConsumerState<AdminWebStudentsScreen>
     showDialog(
       context: rootContext,
       builder: (dialogCtx) {
-        bool isProcessing = false;
         return StatefulBuilder(
           builder: (dialogStateCtx, setDialogState) {
             return AlertDialog(
@@ -3121,36 +3110,41 @@ class _AdminWebStudentsScreenState extends ConsumerState<AdminWebStudentsScreen>
               ),
               actions: [
                 TextButton(
-                  onPressed: isProcessing ? null : () => Navigator.of(dialogCtx).pop(),
+                  onPressed: () => Navigator.of(dialogCtx).pop(),
                   child: Text('Cancel', style: TextStyle(color: AppTheme.textSecondary)),
                 ),
                 ElevatedButton.icon(
-                  onPressed: isProcessing
-                      ? null
-                      : () async {
-                          setDialogState(() => isProcessing = true);
-                          try {
-                            await ref.read(adminArchivedStudentsProvider.notifier).bulkRestoreStudents(studentIds);
-                            setState(() => _selectedStudentIds.clear());
-                            if (dialogCtx.mounted) Navigator.of(dialogCtx).pop();
-                            if (rootContext.mounted) {
-                              AiraActionToast.showRestored(
-                                rootContext,
-                                title: 'Students Restored',
-                                message: '${studentIds.length} students restored to active directory.',
-                              );
-                            }
-                          } catch (e) {
-                            setDialogState(() => isProcessing = false);
-                            if (rootContext.mounted) {
-                              AiraActionToast.showError(
-                                rootContext,
-                                title: 'Bulk Restore Failed',
-                                message: 'An error occurred while restoring students: $e',
-                              );
-                            }
-                          }
+                  onPressed: () async {
+                    Navigator.of(dialogCtx).pop();
+                    try {
+                      await AiraProgressDialog.showRestoring(
+                        rootContext,
+                        title: 'Restoring ${studentIds.length} Students',
+                        initialMessage: 'Reactivating accounts and restoring rosters...',
+                        task: (updateProgress) async {
+                          updateProgress(0.4, 'Restoring local directory records...');
+                          await ref.read(adminArchivedStudentsProvider.notifier).bulkRestoreStudents(studentIds);
+                          updateProgress(1.0, 'Students restored successfully!');
                         },
+                      );
+                      setState(() => _selectedStudentIds.clear());
+                      if (rootContext.mounted) {
+                        AiraActionToast.showRestored(
+                          rootContext,
+                          title: 'Students Restored',
+                          message: '${studentIds.length} students restored to active directory.',
+                        );
+                      }
+                    } catch (e) {
+                      if (rootContext.mounted) {
+                        AiraActionToast.showError(
+                          rootContext,
+                          title: 'Bulk Restore Failed',
+                          message: 'An error occurred while restoring students: $e',
+                        );
+                      }
+                    }
+                  },
                   style: ElevatedButton.styleFrom(
                     backgroundColor: const Color(0xFF047857),
                     foregroundColor: Colors.white,
@@ -3158,7 +3152,7 @@ class _AdminWebStudentsScreenState extends ConsumerState<AdminWebStudentsScreen>
                     minimumSize: const Size(0, 36),
                   ),
                   icon: const Icon(Icons.restore_rounded, size: 16),
-                  label: Text(isProcessing ? 'Restoring...' : 'Restore All Selected'),
+                  label: const Text('Restore All Selected'),
                 ),
               ],
             );
@@ -3175,7 +3169,6 @@ class _AdminWebStudentsScreenState extends ConsumerState<AdminWebStudentsScreen>
     showDialog(
       context: rootContext,
       builder: (dialogCtx) {
-        bool isDeleting = false;
         return StatefulBuilder(
           builder: (dialogStateCtx, setDialogState) {
             return AlertDialog(
@@ -3207,36 +3200,44 @@ class _AdminWebStudentsScreenState extends ConsumerState<AdminWebStudentsScreen>
               ),
               actions: [
                 TextButton(
-                  onPressed: isDeleting ? null : () => Navigator.of(dialogCtx).pop(),
+                  onPressed: () => Navigator.of(dialogCtx).pop(),
                   child: Text('Cancel', style: TextStyle(color: AppTheme.textSecondary)),
                 ),
                 ElevatedButton.icon(
-                  onPressed: isDeleting
-                      ? null
-                      : () async {
-                          setDialogState(() => isDeleting = true);
-                          try {
-                            await ref.read(adminArchivedStudentsProvider.notifier).bulkPermanentDeleteStudents(studentIds);
-                            setState(() => _selectedStudentIds.clear());
-                            if (dialogCtx.mounted) Navigator.of(dialogCtx).pop();
-                            if (rootContext.mounted) {
-                              AiraActionToast.showDeleted(
-                                rootContext,
-                                title: 'Students Permanently Purged',
-                                message: '${studentIds.length} student records were permanently deleted.',
-                              );
-                            }
-                          } catch (e) {
-                            setDialogState(() => isDeleting = false);
-                            if (rootContext.mounted) {
-                              AiraActionToast.showError(
-                                rootContext,
-                                title: 'Bulk Deletion Failed',
-                                message: 'An error occurred while deleting students: $e',
-                              );
-                            }
-                          }
+                  onPressed: () async {
+                    Navigator.of(dialogCtx).pop();
+                    try {
+                      await AiraProgressDialog.showDeleting(
+                        rootContext,
+                        title: 'Permanently Deleting ${studentIds.length} Students',
+                        initialMessage: 'Purging student records and cloud database...',
+                        task: (updateProgress) async {
+                          await ref.read(adminArchivedStudentsProvider.notifier).bulkPermanentDeleteStudents(
+                            studentIds,
+                            onProgress: (progress, statusMessage) {
+                              updateProgress(progress, statusMessage);
+                            },
+                          );
                         },
+                      );
+                      setState(() => _selectedStudentIds.clear());
+                      if (rootContext.mounted) {
+                        AiraActionToast.showDeleted(
+                          rootContext,
+                          title: 'Students Permanently Purged',
+                          message: '${studentIds.length} student records were permanently deleted.',
+                        );
+                      }
+                    } catch (e) {
+                      if (rootContext.mounted) {
+                        AiraActionToast.showError(
+                          rootContext,
+                          title: 'Bulk Deletion Failed',
+                          message: 'An error occurred while deleting students: $e',
+                        );
+                      }
+                    }
+                  },
                   style: ElevatedButton.styleFrom(
                     backgroundColor: const Color(0xFFB91C1C),
                     foregroundColor: Colors.white,
@@ -3244,7 +3245,7 @@ class _AdminWebStudentsScreenState extends ConsumerState<AdminWebStudentsScreen>
                     minimumSize: const Size(0, 36),
                   ),
                   icon: const Icon(Icons.delete_forever_rounded, size: 16),
-                  label: Text(isDeleting ? 'Deleting...' : 'Delete Permanently All Selected'),
+                  label: const Text('Delete Permanently All Selected'),
                 ),
               ],
             );
@@ -3603,7 +3604,7 @@ void _resendStudentCredentialsDialog(BuildContext context, Map<String, dynamic> 
                           buildCounter: (context, {required currentLength, required isFocused, maxLength}) => null,
                           style: TextStyle(color: AppTheme.text, fontSize: 14),
                           decoration: InputDecoration(
-                            labelText: 'Student ID (e.g. 001-0001)',
+                            labelText: 'Student ID (e.g. S-100-0001)',
                             labelStyle: TextStyle(color: AppTheme.textSecondary, fontSize: 13),
                             counterText: '',
                             prefixIcon: Icon(Icons.badge_outlined, size: 20, color: AppTheme.textMuted),

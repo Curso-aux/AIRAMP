@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../../../core/components/aira_action_toast.dart';
+import '../../../../core/components/aira_progress_dialog.dart';
 import '../../../../core/components/user_avatar_widget.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../../core/theme/theme_provider.dart';
@@ -1319,7 +1320,7 @@ class _AdminWebTeachersScreenState extends ConsumerState<AdminWebTeachersScreen>
                           buildCounter: (context, {required currentLength, required isFocused, maxLength}) => null,
                           style: TextStyle(color: AppTheme.text, fontSize: 14),
                           decoration: InputDecoration(
-                            labelText: 'Faculty ID (e.g. 002-0001)',
+                            labelText: 'Faculty ID (e.g. T-100-0001)',
                             labelStyle: TextStyle(color: AppTheme.textSecondary, fontSize: 13),
                             counterText: '',
                             prefixIcon: Icon(Icons.badge_outlined, size: 20, color: AppTheme.textMuted),
@@ -2183,7 +2184,6 @@ class _AdminWebTeachersScreenState extends ConsumerState<AdminWebTeachersScreen>
     showDialog(
       context: rootContext,
       builder: (dialogCtx) {
-        bool isProcessing = false;
         return StatefulBuilder(
           builder: (dialogStateCtx, setDialogState) {
             return AlertDialog(
@@ -2315,66 +2315,61 @@ class _AdminWebTeachersScreenState extends ConsumerState<AdminWebTeachersScreen>
               ),
               actions: [
                 TextButton(
-                  onPressed: isProcessing ? null : () => Navigator.of(dialogCtx).pop(),
+                  onPressed: () => Navigator.of(dialogCtx).pop(),
                   child: Text('Cancel', style: TextStyle(color: AppTheme.textSecondary)),
                 ),
                 TextButton.icon(
-                  onPressed: isProcessing
-                      ? null
-                      : () {
-                          Navigator.of(dialogCtx).pop();
-                          _confirmPermanentDeleteTeacher(rootContext, teacher);
-                        },
+                  onPressed: () {
+                    Navigator.of(dialogCtx).pop();
+                    _confirmPermanentDeleteTeacher(rootContext, teacher);
+                  },
                   icon: const Icon(Icons.delete_forever_rounded, size: 15, color: Color(0xFFB91C1C)),
                   label: const Text('Delete Permanently Instead', style: TextStyle(color: Color(0xFFB91C1C), fontSize: 13, fontWeight: FontWeight.w600)),
                 ),
                 ElevatedButton.icon(
-                  onPressed: isProcessing
-                      ? null
-                      : () async {
-                          setDialogState(() => isProcessing = true);
-                          try {
-                            await ref
-                                .read(adminTeachersProvider.notifier)
-                                .archiveTeacher(teacherId)
-                                .timeout(const Duration(seconds: 8));
-                            if (dialogCtx.mounted) {
-                              Navigator.of(dialogCtx).pop();
-                            }
-                            if (rootContext.mounted) {
-                              AiraActionToast.showDeactivated(
-                                rootContext,
-                                title: 'Faculty Account Deactivated',
-                                message: 'Faculty member "$teacherName" ($teacherId) was deactivated.',
-                                duration: const Duration(seconds: 6),
-                              );
-                            }
-                          } catch (e) {
-                            setDialogState(() => isProcessing = false);
-                            if (rootContext.mounted) {
-                              AiraActionToast.showError(
-                                rootContext,
-                                title: 'Failed to deactivate faculty member',
-                                message: 'An unexpected error occurred: $e',
-                                duration: const Duration(seconds: 8),
-                              );
-                            }
-                          }
+                  onPressed: () async {
+                    Navigator.of(dialogCtx).pop();
+                    try {
+                      await AiraProgressDialog.showDeactivating(
+                        rootContext,
+                        title: 'Deactivating Faculty Account',
+                        initialMessage: 'Deactivating "$teacherName" and updating teaching assignments...',
+                        task: (updateProgress) async {
+                          updateProgress(0.3, 'Updating local faculty records...');
+                          await ref
+                              .read(adminTeachersProvider.notifier)
+                              .archiveTeacher(teacherId)
+                              .timeout(const Duration(seconds: 10));
+                          updateProgress(1.0, 'Account deactivated successfully!');
                         },
+                      );
+                      if (rootContext.mounted) {
+                        AiraActionToast.showDeactivated(
+                          rootContext,
+                          title: 'Faculty Account Deactivated',
+                          message: 'Faculty member "$teacherName" ($teacherId) was deactivated.',
+                          duration: const Duration(seconds: 6),
+                        );
+                      }
+                    } catch (e) {
+                      if (rootContext.mounted) {
+                        AiraActionToast.showError(
+                          rootContext,
+                          title: 'Failed to deactivate faculty member',
+                          message: 'An unexpected error occurred: $e',
+                          duration: const Duration(seconds: 8),
+                        );
+                      }
+                    }
+                  },
                   style: ElevatedButton.styleFrom(
                     backgroundColor: const Color(0xFFD97706),
                     foregroundColor: Colors.white,
                     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
                     minimumSize: const Size(0, 40),
                   ),
-                  icon: isProcessing
-                      ? const SizedBox(
-                          width: 16,
-                          height: 16,
-                          child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
-                        )
-                      : const Icon(Icons.person_off_outlined, size: 18),
-                  label: Text(isProcessing ? 'Deactivating...' : 'Deactivate Account'),
+                  icon: const Icon(Icons.person_off_outlined, size: 18),
+                  label: const Text('Deactivate Account'),
                 ),
               ],
             );
@@ -2392,7 +2387,6 @@ class _AdminWebTeachersScreenState extends ConsumerState<AdminWebTeachersScreen>
     showDialog(
       context: rootContext,
       builder: (dialogCtx) {
-        bool isProcessing = false;
         return StatefulBuilder(
           builder: (dialogStateCtx, setDialogState) {
             return AlertDialog(
@@ -2424,53 +2418,60 @@ class _AdminWebTeachersScreenState extends ConsumerState<AdminWebTeachersScreen>
               ),
               actions: [
                 TextButton(
-                  onPressed: isProcessing ? null : () => Navigator.of(dialogCtx).pop(),
+                  onPressed: () => Navigator.of(dialogCtx).pop(),
                   child: Text('Cancel', style: TextStyle(color: AppTheme.textSecondary)),
                 ),
                 TextButton.icon(
-                  onPressed: isProcessing
-                      ? null
-                      : () {
-                          Navigator.of(dialogCtx).pop();
-                          _confirmBulkPermanentDelete(rootContext, teacherIds);
-                        },
+                  onPressed: () {
+                    Navigator.of(dialogCtx).pop();
+                    _confirmBulkPermanentDelete(rootContext, teacherIds);
+                  },
                   icon: const Icon(Icons.delete_forever_rounded, size: 15, color: Color(0xFFB91C1C)),
                   label: const Text('Delete Permanently Instead', style: TextStyle(color: Color(0xFFB91C1C), fontSize: 13, fontWeight: FontWeight.w600)),
                 ),
                 ElevatedButton.icon(
-                  onPressed: isProcessing
-                      ? null
-                      : () async {
-                          setDialogState(() => isProcessing = true);
-                          try {
-                            await ref.read(adminTeachersProvider.notifier).bulkArchiveTeachers(teacherIds);
-                            setState(() => _selectedTeacherIds.clear());
-                            if (dialogCtx.mounted) Navigator.of(dialogCtx).pop();
-                            if (rootContext.mounted) {
-                              AiraActionToast.showDeactivated(
-                                rootContext,
-                                title: 'Faculty Accounts Deactivated',
-                                message: '${teacherIds.length} faculty accounts were deactivated.',
-                              );
-                            }
-                          } catch (e) {
-                            setDialogState(() => isProcessing = false);
-                            if (rootContext.mounted) {
-                              AiraActionToast.showError(
-                                rootContext,
-                                title: 'Bulk Deactivation Failed',
-                                message: 'An error occurred while deactivating faculty: $e',
-                              );
-                            }
-                          }
+                  onPressed: () async {
+                    Navigator.of(dialogCtx).pop();
+                    try {
+                      await AiraProgressDialog.showDeactivating(
+                        rootContext,
+                        title: 'Deactivating ${teacherIds.length} Faculty Accounts',
+                        initialMessage: 'Preparing faculty records and Cloud Firestore sync...',
+                        task: (updateProgress) async {
+                          await ref.read(adminTeachersProvider.notifier).bulkArchiveTeachers(
+                            teacherIds,
+                            onProgress: (progress, statusMessage) {
+                              updateProgress(progress, statusMessage);
+                            },
+                          );
                         },
+                      );
+                      setState(() => _selectedTeacherIds.clear());
+                      if (rootContext.mounted) {
+                        AiraActionToast.showDeactivated(
+                          rootContext,
+                          title: 'Faculty Accounts Deactivated',
+                          message: '${teacherIds.length} faculty accounts were deactivated.',
+                        );
+                      }
+                    } catch (e) {
+                      if (rootContext.mounted) {
+                        AiraActionToast.showError(
+                          rootContext,
+                          title: 'Bulk Deactivation Failed',
+                          message: 'An error occurred while deactivating faculty: $e',
+                        );
+                      }
+                    }
+                  },
                   style: ElevatedButton.styleFrom(
                     backgroundColor: const Color(0xFFD97706),
                     foregroundColor: Colors.white,
                     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                    minimumSize: const Size(0, 36),
                   ),
                   icon: const Icon(Icons.person_off_outlined, size: 16),
-                  label: Text(isProcessing ? 'Deactivating...' : 'Deactivate All Selected'),
+                  label: const Text('Deactivate All Selected'),
                 ),
               ],
             );
@@ -2493,7 +2494,6 @@ class _AdminWebTeachersScreenState extends ConsumerState<AdminWebTeachersScreen>
     showDialog(
       context: rootContext,
       builder: (dialogCtx) {
-        bool isDeleting = false;
         return StatefulBuilder(
           builder: (dialogStateCtx, setDialogState) {
             return AlertDialog(
@@ -2590,57 +2590,54 @@ class _AdminWebTeachersScreenState extends ConsumerState<AdminWebTeachersScreen>
               ),
               actions: [
                 TextButton(
-                  onPressed: isDeleting ? null : () => Navigator.of(dialogCtx).pop(),
+                  onPressed: () => Navigator.of(dialogCtx).pop(),
                   child: Text('Cancel', style: TextStyle(color: AppTheme.textSecondary)),
                 ),
                 ElevatedButton.icon(
-                  onPressed: isDeleting
-                      ? null
-                      : () async {
-                          setDialogState(() => isDeleting = true);
-                          try {
-                            await ref
-                                .read(adminArchivedTeachersProvider.notifier)
-                                .permanentDeleteTeacher(teacherId)
-                                .timeout(const Duration(seconds: 8));
-                            setState(() => _selectedTeacherIds.remove(teacherId));
-                            if (dialogCtx.mounted) {
-                              Navigator.of(dialogCtx).pop();
-                            }
-                            if (rootContext.mounted) {
-                              AiraActionToast.showDeleted(
-                                rootContext,
-                                title: 'Faculty Account Deleted',
-                                message: 'Faculty member "$teacherName" ($teacherId) was permanently purged.',
-                                duration: const Duration(seconds: 8),
-                              );
-                            }
-                          } catch (e) {
-                            setDialogState(() => isDeleting = false);
-                            if (rootContext.mounted) {
-                              AiraActionToast.showError(
-                                rootContext,
-                                title: 'Failed to delete faculty member',
-                                message: 'An unexpected error occurred while deleting "$teacherName": $e',
-                                duration: const Duration(seconds: 8),
-                              );
-                            }
-                          }
+                  onPressed: () async {
+                    Navigator.of(dialogCtx).pop();
+                    try {
+                      await AiraProgressDialog.showDeleting(
+                        rootContext,
+                        title: 'Permanently Deleting Faculty Record',
+                        initialMessage: 'Purging faculty records and cloud database...',
+                        task: (updateProgress) async {
+                          updateProgress(0.4, 'Unassigning courses and removing credentials...');
+                          await ref
+                              .read(adminArchivedTeachersProvider.notifier)
+                              .permanentDeleteTeacher(teacherId)
+                              .timeout(const Duration(seconds: 10));
+                          updateProgress(1.0, 'Faculty record purged permanently!');
                         },
+                      );
+                      setState(() => _selectedTeacherIds.remove(teacherId));
+                      if (rootContext.mounted) {
+                        AiraActionToast.showDeleted(
+                          rootContext,
+                          title: 'Faculty Account Deleted',
+                          message: 'Faculty member "$teacherName" ($teacherId) was permanently purged.',
+                          duration: const Duration(seconds: 8),
+                        );
+                      }
+                    } catch (e) {
+                      if (rootContext.mounted) {
+                        AiraActionToast.showError(
+                          rootContext,
+                          title: 'Failed to delete faculty member',
+                          message: 'An unexpected error occurred while deleting "$teacherName": $e',
+                          duration: const Duration(seconds: 8),
+                        );
+                      }
+                    }
+                  },
                   style: ElevatedButton.styleFrom(
                     backgroundColor: const Color(0xFFB91C1C),
                     foregroundColor: Colors.white,
                     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
                     minimumSize: const Size(0, 36),
                   ),
-                  icon: isDeleting
-                      ? const SizedBox(
-                          width: 16,
-                          height: 16,
-                          child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
-                        )
-                      : const Icon(Icons.delete_forever, size: 18),
-                  label: Text(isDeleting ? 'Deleting...' : 'Delete Permanently'),
+                  icon: const Icon(Icons.delete_forever, size: 18),
+                  label: const Text('Delete Permanently'),
                 ),
               ],
             );
@@ -2658,7 +2655,6 @@ class _AdminWebTeachersScreenState extends ConsumerState<AdminWebTeachersScreen>
     showDialog(
       context: rootContext,
       builder: (dialogCtx) {
-        bool isProcessing = false;
         return StatefulBuilder(
           builder: (dialogStateCtx, setDialogState) {
             return AlertDialog(
@@ -2690,36 +2686,41 @@ class _AdminWebTeachersScreenState extends ConsumerState<AdminWebTeachersScreen>
               ),
               actions: [
                 TextButton(
-                  onPressed: isProcessing ? null : () => Navigator.of(dialogCtx).pop(),
+                  onPressed: () => Navigator.of(dialogCtx).pop(),
                   child: Text('Cancel', style: TextStyle(color: AppTheme.textSecondary)),
                 ),
                 ElevatedButton.icon(
-                  onPressed: isProcessing
-                      ? null
-                      : () async {
-                          setDialogState(() => isProcessing = true);
-                          try {
-                            await ref.read(adminArchivedTeachersProvider.notifier).bulkRestoreTeachers(teacherIds);
-                            setState(() => _selectedTeacherIds.clear());
-                            if (dialogCtx.mounted) Navigator.of(dialogCtx).pop();
-                            if (rootContext.mounted) {
-                              AiraActionToast.showRestored(
-                                rootContext,
-                                title: 'Faculty Members Restored',
-                                message: '${teacherIds.length} faculty members restored to active directory.',
-                              );
-                            }
-                          } catch (e) {
-                            setDialogState(() => isProcessing = false);
-                            if (rootContext.mounted) {
-                              AiraActionToast.showError(
-                                rootContext,
-                                title: 'Bulk Restore Failed',
-                                message: 'An error occurred while restoring faculty: $e',
-                              );
-                            }
-                          }
+                  onPressed: () async {
+                    Navigator.of(dialogCtx).pop();
+                    try {
+                      await AiraProgressDialog.showRestoring(
+                        rootContext,
+                        title: 'Restoring ${teacherIds.length} Faculty Members',
+                        initialMessage: 'Reactivating accounts and synchronizing directory...',
+                        task: (updateProgress) async {
+                          updateProgress(0.4, 'Restoring local directory records...');
+                          await ref.read(adminArchivedTeachersProvider.notifier).bulkRestoreTeachers(teacherIds);
+                          updateProgress(1.0, 'Faculty members restored successfully!');
                         },
+                      );
+                      setState(() => _selectedTeacherIds.clear());
+                      if (rootContext.mounted) {
+                        AiraActionToast.showRestored(
+                          rootContext,
+                          title: 'Faculty Members Restored',
+                          message: '${teacherIds.length} faculty members restored to active directory.',
+                        );
+                      }
+                    } catch (e) {
+                      if (rootContext.mounted) {
+                        AiraActionToast.showError(
+                          rootContext,
+                          title: 'Bulk Restore Failed',
+                          message: 'An error occurred while restoring faculty: $e',
+                        );
+                      }
+                    }
+                  },
                   style: ElevatedButton.styleFrom(
                     backgroundColor: const Color(0xFF047857),
                     foregroundColor: Colors.white,
@@ -2727,7 +2728,7 @@ class _AdminWebTeachersScreenState extends ConsumerState<AdminWebTeachersScreen>
                     minimumSize: const Size(0, 36),
                   ),
                   icon: const Icon(Icons.restore_rounded, size: 16),
-                  label: Text(isProcessing ? 'Restoring...' : 'Restore All Selected'),
+                  label: const Text('Restore All Selected'),
                 ),
               ],
             );
@@ -2745,7 +2746,6 @@ class _AdminWebTeachersScreenState extends ConsumerState<AdminWebTeachersScreen>
     showDialog(
       context: rootContext,
       builder: (dialogCtx) {
-        bool isDeleting = false;
         return StatefulBuilder(
           builder: (dialogStateCtx, setDialogState) {
             return AlertDialog(
@@ -2777,36 +2777,44 @@ class _AdminWebTeachersScreenState extends ConsumerState<AdminWebTeachersScreen>
               ),
               actions: [
                 TextButton(
-                  onPressed: isDeleting ? null : () => Navigator.of(dialogCtx).pop(),
+                  onPressed: () => Navigator.of(dialogCtx).pop(),
                   child: Text('Cancel', style: TextStyle(color: AppTheme.textSecondary)),
                 ),
                 ElevatedButton.icon(
-                  onPressed: isDeleting
-                      ? null
-                      : () async {
-                          setDialogState(() => isDeleting = true);
-                          try {
-                            await ref.read(adminArchivedTeachersProvider.notifier).bulkPermanentDeleteTeachers(teacherIds);
-                            setState(() => _selectedTeacherIds.clear());
-                            if (dialogCtx.mounted) Navigator.of(dialogCtx).pop();
-                            if (rootContext.mounted) {
-                              AiraActionToast.showDeleted(
-                                rootContext,
-                                title: 'Faculty Accounts Purged',
-                                message: '${teacherIds.length} faculty accounts were permanently deleted.',
-                              );
-                            }
-                          } catch (e) {
-                            setDialogState(() => isDeleting = false);
-                            if (rootContext.mounted) {
-                              AiraActionToast.showError(
-                                rootContext,
-                                title: 'Bulk Purge Failed',
-                                message: 'An error occurred while deleting faculty: $e',
-                              );
-                            }
-                          }
+                  onPressed: () async {
+                    Navigator.of(dialogCtx).pop();
+                    try {
+                      await AiraProgressDialog.showDeleting(
+                        rootContext,
+                        title: 'Permanently Deleting ${teacherIds.length} Faculty Members',
+                        initialMessage: 'Purging faculty records and cloud database...',
+                        task: (updateProgress) async {
+                          await ref.read(adminArchivedTeachersProvider.notifier).bulkPermanentDeleteTeachers(
+                            teacherIds,
+                            onProgress: (progress, statusMessage) {
+                              updateProgress(progress, statusMessage);
+                            },
+                          );
                         },
+                      );
+                      setState(() => _selectedTeacherIds.clear());
+                      if (rootContext.mounted) {
+                        AiraActionToast.showDeleted(
+                          rootContext,
+                          title: 'Faculty Accounts Purged',
+                          message: '${teacherIds.length} faculty accounts were permanently deleted.',
+                        );
+                      }
+                    } catch (e) {
+                      if (rootContext.mounted) {
+                        AiraActionToast.showError(
+                          rootContext,
+                          title: 'Bulk Purge Failed',
+                          message: 'An error occurred while deleting faculty: $e',
+                        );
+                      }
+                    }
+                  },
                   style: ElevatedButton.styleFrom(
                     backgroundColor: const Color(0xFFB91C1C),
                     foregroundColor: Colors.white,
@@ -2814,7 +2822,7 @@ class _AdminWebTeachersScreenState extends ConsumerState<AdminWebTeachersScreen>
                     minimumSize: const Size(0, 36),
                   ),
                   icon: const Icon(Icons.delete_forever_rounded, size: 16),
-                  label: Text(isDeleting ? 'Deleting...' : 'Delete Permanently'),
+                  label: const Text('Delete Permanently'),
                 ),
               ],
             );

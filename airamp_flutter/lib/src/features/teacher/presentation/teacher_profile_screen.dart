@@ -43,6 +43,36 @@ class _TeacherProfileScreenState extends ConsumerState<TeacherProfileScreen>
   final TextEditingController _newPasswordController = TextEditingController();
   final TextEditingController _confirmPasswordController =
       TextEditingController();
+  final FocusNode _newPasswordFocusNode = FocusNode();
+  final FocusNode _confirmPasswordFocusNode = FocusNode();
+
+  void _toggleObscureNewPassword() {
+    setState(() {
+      _obscureNewPassword = !_obscureNewPassword;
+    });
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) {
+        _newPasswordFocusNode.requestFocus();
+        _newPasswordController.selection = TextSelection.fromPosition(
+          TextPosition(offset: _newPasswordController.text.length),
+        );
+      }
+    });
+  }
+
+  void _toggleObscureConfirmPassword() {
+    setState(() {
+      _obscureConfirmPassword = !_obscureConfirmPassword;
+    });
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) {
+        _confirmPasswordFocusNode.requestFocus();
+        _confirmPasswordController.selection = TextSelection.fromPosition(
+          TextPosition(offset: _confirmPasswordController.text.length),
+        );
+      }
+    });
+  }
 
   @override
   void initState() {
@@ -125,6 +155,8 @@ class _TeacherProfileScreenState extends ConsumerState<TeacherProfileScreen>
     _emailController.dispose();
     _newPasswordController.dispose();
     _confirmPasswordController.dispose();
+    _newPasswordFocusNode.dispose();
+    _confirmPasswordFocusNode.dispose();
     _scrollController.dispose();
     super.dispose();
   }
@@ -2882,6 +2914,8 @@ class _TeacherProfileScreenState extends ConsumerState<TeacherProfileScreen>
 
                       // New Password Field
                       TextField(
+                        key: ValueKey('teacher_mand_new_pass_$_obscureNewPassword'),
+                        focusNode: _newPasswordFocusNode,
                         controller: _newPasswordController,
                         obscureText: _obscureNewPassword,
                         style: TextStyle(color: AppTheme.text, fontSize: 14),
@@ -2894,6 +2928,7 @@ class _TeacherProfileScreenState extends ConsumerState<TeacherProfileScreen>
                             size: 20,
                           ),
                           suffixIcon: IconButton(
+                            focusNode: FocusNode(canRequestFocus: false, skipTraversal: true),
                             icon: Icon(
                               _obscureNewPassword
                                   ? Icons.visibility_off_outlined
@@ -2901,9 +2936,7 @@ class _TeacherProfileScreenState extends ConsumerState<TeacherProfileScreen>
                               color: AppTheme.textMuted,
                               size: 18,
                             ),
-                            onPressed: () => setState(
-                              () => _obscureNewPassword = !_obscureNewPassword,
-                            ),
+                            onPressed: _toggleObscureNewPassword,
                           ),
                           filled: true,
                           fillColor: AppTheme.inputBg,
@@ -2942,6 +2975,8 @@ class _TeacherProfileScreenState extends ConsumerState<TeacherProfileScreen>
 
                       // Confirm Password Field
                       TextField(
+                        key: ValueKey('teacher_mand_confirm_pass_$_obscureConfirmPassword'),
+                        focusNode: _confirmPasswordFocusNode,
                         controller: _confirmPasswordController,
                         obscureText: _obscureConfirmPassword,
                         style: TextStyle(color: AppTheme.text, fontSize: 14),
@@ -2954,6 +2989,7 @@ class _TeacherProfileScreenState extends ConsumerState<TeacherProfileScreen>
                             size: 20,
                           ),
                           suffixIcon: IconButton(
+                            focusNode: FocusNode(canRequestFocus: false, skipTraversal: true),
                             icon: Icon(
                               _obscureConfirmPassword
                                   ? Icons.visibility_off_outlined
@@ -2961,10 +2997,7 @@ class _TeacherProfileScreenState extends ConsumerState<TeacherProfileScreen>
                               color: AppTheme.textMuted,
                               size: 18,
                             ),
-                            onPressed: () => setState(
-                              () => _obscureConfirmPassword =
-                                  !_obscureConfirmPassword,
-                            ),
+                            onPressed: _toggleObscureConfirmPassword,
                           ),
                           filled: true,
                           fillColor: AppTheme.inputBg,

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import '../../../core/components/aira_action_toast.dart';
 import '../../../core/components/offline_sync_status_pill.dart';
 import '../../../core/components/user_avatar_widget.dart';
 import '../../../core/theme/theme_provider.dart';
@@ -287,10 +288,10 @@ class _SuperAdminPortalScreenState
                     final name = nameCtrl.text.trim();
                     final code = codeCtrl.text.trim().toUpperCase();
                     if (name.isEmpty || code.isEmpty) {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(
-                          content: Text('School name and code are required.'),
-                        ),
+                      AiraActionToast.showWarning(
+                        context,
+                        title: 'Validation Error',
+                        message: 'School name and code are required.',
                       );
                       return;
                     }
@@ -307,22 +308,18 @@ class _SuperAdminPortalScreenState
                           );
                       ref.invalidate(superAdminStatsProvider);
                       if (context.mounted) {
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(
-                            content: Text(
-                              'Registered campus "$name" ($code) successfully.',
-                            ),
-                            backgroundColor: gTheme.successText,
-                          ),
+                        AiraActionToast.showSuccess(
+                          context,
+                          title: 'Campus Registered',
+                          message: 'Registered campus "$name" ($code) successfully.',
                         );
                       }
                     } catch (e) {
                       if (context.mounted) {
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(
-                            content: Text('Error: $e'),
-                            backgroundColor: gTheme.dangerText,
-                          ),
+                        AiraActionToast.showError(
+                          context,
+                          title: 'Registration Failed',
+                          message: 'Error registering campus: $e',
                         );
                       }
                     }
@@ -633,12 +630,10 @@ class _SuperAdminPortalScreenState
                           final email = emailCtrl.text.trim();
                           final pass = passCtrl.text;
                           if (name.isEmpty || email.isEmpty || pass.isEmpty) {
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              const SnackBar(
-                                content: Text(
-                                  'Name, email, and password are required.',
-                                ),
-                              ),
+                            AiraActionToast.showWarning(
+                              context,
+                              title: 'Validation Error',
+                              message: 'Name, email, and password are required.',
                             );
                             return;
                           }
@@ -686,11 +681,10 @@ class _SuperAdminPortalScreenState
                             }
                           } catch (e) {
                             if (context.mounted) {
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                SnackBar(
-                                  content: Text('Error: $e'),
-                                  backgroundColor: gTheme.dangerText,
-                                ),
+                              AiraActionToast.showError(
+                                context,
+                                title: 'Provisioning Failed',
+                                message: 'Error provisioning administrator: $e',
                               );
                             }
                           }

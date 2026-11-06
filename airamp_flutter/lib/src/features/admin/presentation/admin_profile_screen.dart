@@ -44,6 +44,36 @@ class _AdminProfileScreenState extends ConsumerState<AdminProfileScreen>
   late TextEditingController _emailController;
   final TextEditingController _newPasswordController = TextEditingController();
   final TextEditingController _confirmPasswordController = TextEditingController();
+  final FocusNode _newPasswordFocusNode = FocusNode();
+  final FocusNode _confirmPasswordFocusNode = FocusNode();
+
+  void _toggleObscureNewPassword() {
+    setState(() {
+      _obscureNewPassword = !_obscureNewPassword;
+    });
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) {
+        _newPasswordFocusNode.requestFocus();
+        _newPasswordController.selection = TextSelection.fromPosition(
+          TextPosition(offset: _newPasswordController.text.length),
+        );
+      }
+    });
+  }
+
+  void _toggleObscureConfirmPassword() {
+    setState(() {
+      _obscureConfirmPassword = !_obscureConfirmPassword;
+    });
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) {
+        _confirmPasswordFocusNode.requestFocus();
+        _confirmPasswordController.selection = TextSelection.fromPosition(
+          TextPosition(offset: _confirmPasswordController.text.length),
+        );
+      }
+    });
+  }
 
   @override
   void initState() {
@@ -119,6 +149,8 @@ class _AdminProfileScreenState extends ConsumerState<AdminProfileScreen>
     _emailController.dispose();
     _newPasswordController.dispose();
     _confirmPasswordController.dispose();
+    _newPasswordFocusNode.dispose();
+    _confirmPasswordFocusNode.dispose();
     _scrollController.dispose();
     super.dispose();
   }
@@ -1650,6 +1682,8 @@ class _AdminProfileScreenState extends ConsumerState<AdminProfileScreen>
                 children: [
                   // New Password
                   TextField(
+                    key: ValueKey('admin_new_pass_$_obscureNewPassword'),
+                    focusNode: _newPasswordFocusNode,
                     controller: _newPasswordController,
                     maxLength: 16,
                     buildCounter: (context, {required currentLength, required isFocused, maxLength}) => null,
@@ -1662,12 +1696,13 @@ class _AdminProfileScreenState extends ConsumerState<AdminProfileScreen>
                       filled: true,
                       fillColor: AppTheme.inputBg,
                       suffixIcon: IconButton(
+                        focusNode: FocusNode(canRequestFocus: false, skipTraversal: true),
                         icon: Icon(
                           _obscureNewPassword ? Icons.visibility_off : Icons.visibility,
                           color: AppTheme.textMuted,
                           size: 18,
                         ),
-                        onPressed: () => setState(() => _obscureNewPassword = !_obscureNewPassword),
+                        onPressed: _toggleObscureNewPassword,
                       ),
                       border: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(10),
@@ -1694,6 +1729,8 @@ class _AdminProfileScreenState extends ConsumerState<AdminProfileScreen>
 
                   // Confirm Password
                   TextField(
+                    key: ValueKey('admin_confirm_pass_$_obscureConfirmPassword'),
+                    focusNode: _confirmPasswordFocusNode,
                     controller: _confirmPasswordController,
                     maxLength: 16,
                     buildCounter: (context, {required currentLength, required isFocused, maxLength}) => null,
@@ -1706,12 +1743,13 @@ class _AdminProfileScreenState extends ConsumerState<AdminProfileScreen>
                       filled: true,
                       fillColor: AppTheme.inputBg,
                       suffixIcon: IconButton(
+                        focusNode: FocusNode(canRequestFocus: false, skipTraversal: true),
                         icon: Icon(
                           _obscureConfirmPassword ? Icons.visibility_off : Icons.visibility,
                           color: AppTheme.textMuted,
                           size: 18,
                         ),
-                        onPressed: () => setState(() => _obscureConfirmPassword = !_obscureConfirmPassword),
+                        onPressed: _toggleObscureConfirmPassword,
                       ),
                       border: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(10),
@@ -2768,6 +2806,8 @@ class _AdminProfileScreenState extends ConsumerState<AdminProfileScreen>
                   child: Column(
                     children: [
                       TextField(
+                        key: ValueKey('admin_mand_new_pass_$_obscureNewPassword'),
+                        focusNode: _newPasswordFocusNode,
                         controller: _newPasswordController,
                         maxLength: 16,
                         buildCounter: (context, {required currentLength, required isFocused, maxLength}) => null,
@@ -2777,12 +2817,13 @@ class _AdminProfileScreenState extends ConsumerState<AdminProfileScreen>
                           hintText: 'New Password',
                           prefixIcon: Icon(Icons.lock_outline_rounded, color: accentPrimary, size: 20),
                           suffixIcon: IconButton(
+                            focusNode: FocusNode(canRequestFocus: false, skipTraversal: true),
                             icon: Icon(
                               _obscureNewPassword ? Icons.visibility_off : Icons.visibility,
                               color: AppTheme.textMuted,
                               size: 18,
                             ),
-                            onPressed: () => setState(() => _obscureNewPassword = !_obscureNewPassword),
+                            onPressed: _toggleObscureNewPassword,
                           ),
                           filled: true,
                           fillColor: AppTheme.inputBg,
@@ -2802,6 +2843,8 @@ class _AdminProfileScreenState extends ConsumerState<AdminProfileScreen>
                       ),
                       const SizedBox(height: 14),
                       TextField(
+                        key: ValueKey('admin_mand_confirm_pass_$_obscureConfirmPassword'),
+                        focusNode: _confirmPasswordFocusNode,
                         controller: _confirmPasswordController,
                         maxLength: 16,
                         buildCounter: (context, {required currentLength, required isFocused, maxLength}) => null,
@@ -2811,12 +2854,13 @@ class _AdminProfileScreenState extends ConsumerState<AdminProfileScreen>
                           hintText: 'Confirm New Password',
                           prefixIcon: Icon(Icons.lock_rounded, color: accentPrimary, size: 20),
                           suffixIcon: IconButton(
+                            focusNode: FocusNode(canRequestFocus: false, skipTraversal: true),
                             icon: Icon(
                               _obscureConfirmPassword ? Icons.visibility_off : Icons.visibility,
                               color: AppTheme.textMuted,
                               size: 18,
                             ),
-                            onPressed: () => setState(() => _obscureConfirmPassword = !_obscureConfirmPassword),
+                            onPressed: _toggleObscureConfirmPassword,
                           ),
                           filled: true,
                           fillColor: AppTheme.inputBg,

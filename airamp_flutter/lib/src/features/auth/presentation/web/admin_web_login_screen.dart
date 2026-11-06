@@ -2,8 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../../../core/components/auth/required_change_password_dialog.dart';
-import '../../../../core/components/otp_verification_dialog.dart';
-import '../../../../core/services/otp_service.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../../core/theme/theme_provider.dart';
 import '../../../../core/components/app_logo.dart';
@@ -28,6 +26,7 @@ class AdminWebLoginScreen extends ConsumerStatefulWidget {
 class _AdminWebLoginScreenState extends ConsumerState<AdminWebLoginScreen> {
   final _identifierController = TextEditingController();
   final _passwordController = TextEditingController();
+  final _passwordFocusNode = FocusNode();
   bool _showPassword = false;
   bool _isSubmitting = false;
   String _error = '';
@@ -36,6 +35,7 @@ class _AdminWebLoginScreenState extends ConsumerState<AdminWebLoginScreen> {
   void dispose() {
     _identifierController.dispose();
     _passwordController.dispose();
+    _passwordFocusNode.dispose();
     super.dispose();
   }
 
@@ -47,7 +47,7 @@ class _AdminWebLoginScreenState extends ConsumerState<AdminWebLoginScreen> {
     final password = _passwordController.text;
 
     if (identifier.isEmpty || password.isEmpty) {
-      setState(() => _error = 'Please enter your login identifier and password.');
+      setState(() => _error = 'Please enter your Account ID and password.');
       return;
     }
 
@@ -65,92 +65,13 @@ class _AdminWebLoginScreenState extends ConsumerState<AdminWebLoginScreen> {
           if (mounted) context.go('/super-admin');
           return;
         } else if (user.role == 'admin') {
-          // Allow seeded demo admin (aira@admin, @admin, or non-FQDN emails) to bypass 2FA OTP
-          final isDemoAdmin = user.email.toLowerCase() == 'aira@admin' ||
-              user.email.toLowerCase().endsWith('@admin') ||
-              user.username.toLowerCase() == 'aira admin' ||
-              !user.email.contains('.');
-
-          // Require 2FA OTP verification if admin has a registered external deliverable email
-          if (!isDemoAdmin && user.email.isNotEmpty && user.email.contains('@')) {
-            showDialog(
-              context: context,
-              barrierDismissible: false,
-              builder: (ctx) => AlertDialog(
-                backgroundColor: AppTheme.surface,
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-                content: Padding(
-                  padding: const EdgeInsets.symmetric(vertical: 16),
-                  child: Row(
-                    children: [
-                      CircularProgressIndicator(color: AppTheme.primary),
-                      const SizedBox(width: 20),
-                      Expanded(
-                        child: Text(
-                          'Sending administrator 2FA code to ${OtpService.maskEmail(user.email)}...',
-                          style: TextStyle(color: AppTheme.text, fontSize: 14),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-            );
-
-            final otpResult = await OtpService().requestEmailVerificationOtp(
-              targetEmail: user.email,
-              fullName: user.fullName,
-              userId: user.id,
-              role: user.role,
-              purpose: 'Administrator 2FA Sign-In',
-            );
-
-            if (!mounted) return;
-            Navigator.of(context, rootNavigator: true).pop();
-
-            if (!otpResult.success) {
-              await ref.read(authProvider.notifier).logout();
-              if (mounted) {
-                setState(() => _error = '2FA dispatch failed: ${otpResult.message}. Please try again.');
-              }
-              return;
-            }
-
-            final verified = await OtpVerificationDialog.show(
-              context: context,
-              email: user.email,
-              userId: user.id,
-              fullName: user.fullName,
-              role: user.role,
-              onVerify: (code) async {
-                return await OtpService().verifyOtp(
-                  identifier: user.id,
-                  enteredCode: code,
-                );
-              },
-              onResend: () async {
-                final res = await OtpService().requestEmailVerificationOtp(
-                  targetEmail: user.email,
-                  fullName: user.fullName,
-                  userId: user.id,
-                  role: user.role,
-                  purpose: 'Administrator 2FA Sign-In',
-                );
-                return res.success;
-              },
-            );
-
-            if (!mounted) return;
-            if (verified != true) {
-              await ref.read(authProvider.notifier).logout();
-              if (mounted) {
-                setState(() => _error = '2FA verification was cancelled or unverified.');
-              }
-              return;
-            }
+          if (user.mustChangePassword) {
+            RequiredChangePasswordDialog.resetSession();
+            if (mounted) context.go('/admin/profile');
+          } else {
+            if (mounted) context.go('/admin/dashboard');
           }
-
-          if (mounted) context.go('/admin/dashboard');
+          return;
         } else if (user.role == 'teacher') {
           if (user.mustChangePassword) {
             RequiredChangePasswordDialog.resetSession();
@@ -187,7 +108,7 @@ class _AdminWebLoginScreenState extends ConsumerState<AdminWebLoginScreen> {
     final accentColor = AppTheme.primary;
     final screenWidth = MediaQuery.sizeOf(context).width;
     final isMobile = screenWidth < 600;
-    const identifierHint = 'e.g. 001-0001, teacher@aira.edu, or aira@admin';
+    const identifierHint = 'e.g. S-100-0001, T-100-0001, or A-100-0001';
 
     return Scaffold(
       backgroundColor: theme.scaffoldBackgroundColor,
@@ -401,7 +322,7 @@ class _AdminWebLoginScreenState extends ConsumerState<AdminWebLoginScreen> {
 
                             // Identifier Input
                             Text(
-                              'Student ID, Email, or Username',
+                              'Account ID',
                               style: TextStyle(
                                 fontSize: 13,
                                 fontWeight: FontWeight.w700,
@@ -449,6 +370,8 @@ class _AdminWebLoginScreenState extends ConsumerState<AdminWebLoginScreen> {
                             ),
                             const SizedBox(height: 8),
                             TextField(
+                              key: ValueKey('admin_login_pass_$_showPassword'),
+                              focusNode: _passwordFocusNode,
                               controller: _passwordController,
                               maxLength: 128,
                               buildCounter: (context, {required currentLength, required isFocused, maxLength}) => null,
@@ -460,11 +383,22 @@ class _AdminWebLoginScreenState extends ConsumerState<AdminWebLoginScreen> {
                                 counterText: '',
                                 prefixIcon: Icon(Icons.lock_outline_rounded, size: 20, color: accentColor),
                                 suffixIcon: IconButton(
+                                  focusNode: FocusNode(canRequestFocus: false, skipTraversal: true),
                                   icon: Icon(
                                     _showPassword ? Icons.visibility_off_rounded : Icons.visibility_rounded,
                                     size: 20,
                                   ),
-                                  onPressed: () => setState(() => _showPassword = !_showPassword),
+                                  onPressed: () {
+                                    setState(() => _showPassword = !_showPassword);
+                                    WidgetsBinding.instance.addPostFrameCallback((_) {
+                                      if (mounted) {
+                                        _passwordFocusNode.requestFocus();
+                                        _passwordController.selection = TextSelection.fromPosition(
+                                          TextPosition(offset: _passwordController.text.length),
+                                        );
+                                      }
+                                    });
+                                  },
                                 ),
                                 filled: true,
                                 fillColor: isDark ? Colors.black.withValues(alpha: 0.25) : Colors.black.withValues(alpha: 0.03),

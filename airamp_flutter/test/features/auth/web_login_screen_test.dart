@@ -17,7 +17,7 @@ void main() {
 
     expect(find.text('AIRAMP Portal'), findsOneWidget);
     expect(find.text('Sign in with your institutional account to continue'), findsOneWidget);
-    expect(find.text('Student ID, Email, or Username'), findsOneWidget);
+    expect(find.text('Account ID'), findsOneWidget);
     expect(find.text('Sign In to Portal'), findsOneWidget);
 
     // Verify verbose boilerplate and redundant tags have been cleanly removed

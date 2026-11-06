@@ -656,6 +656,17 @@ class AdminStudentsNotifier extends Notifier<List<Map<String, dynamic>>> {
     );
     if (!ref.mounted) return;
     state = results;
+
+    // Non-blocking background cloud freshness pull
+    FirestoreService().syncCloudUsersToLocal().then((_) async {
+      if (!ref.mounted) return;
+      final fresh = await DatabaseHelper().getAdminStudentsList(
+        section: _selectedSection,
+        grade: _selectedGrade,
+        query: _searchQuery,
+      );
+      if (ref.mounted) state = fresh;
+    }).catchError((_) {});
   }
 
   Future<String> addStudent({
@@ -714,8 +725,11 @@ class AdminStudentsNotifier extends Notifier<List<Map<String, dynamic>>> {
     ref.read(sectionsProvider.notifier).reload();
   }
 
-  Future<void> bulkArchiveStudents(List<String> studentIds) async {
-    await DatabaseHelper().bulkArchiveStudents(studentIds);
+  Future<void> bulkArchiveStudents(
+    List<String> studentIds, {
+    void Function(double progress, String statusMessage)? onProgress,
+  }) async {
+    await DatabaseHelper().bulkArchiveStudents(studentIds, onProgress: onProgress);
     await loadStudents();
     ref.read(adminArchivedStudentsProvider.notifier).loadArchived();
     ref.read(adminAnalyticsProvider.notifier).loadAnalytics();
@@ -859,8 +873,11 @@ class AdminArchivedStudentsNotifier extends Notifier<List<Map<String, dynamic>>>
     ref.read(sectionsProvider.notifier).reload();
   }
 
-  Future<void> bulkPermanentDeleteStudents(List<String> studentIds) async {
-    await DatabaseHelper().bulkPermanentDeleteStudents(studentIds);
+  Future<void> bulkPermanentDeleteStudents(
+    List<String> studentIds, {
+    void Function(double progress, String statusMessage)? onProgress,
+  }) async {
+    await DatabaseHelper().bulkPermanentDeleteStudents(studentIds, onProgress: onProgress);
     await loadArchived();
     ref.read(adminStudentsProvider.notifier).loadStudents();
     ref.read(adminAnalyticsProvider.notifier).loadAnalytics();
@@ -884,6 +901,13 @@ class AdminTeachersNotifier extends Notifier<List<Map<String, dynamic>>> {
     final teachers = await DatabaseHelper().getTeachersList();
     if (!ref.mounted) return;
     state = teachers;
+
+    // Non-blocking background cloud freshness pull
+    FirestoreService().syncCloudUsersToLocal().then((_) async {
+      if (!ref.mounted) return;
+      final fresh = await DatabaseHelper().getTeachersList();
+      if (ref.mounted) state = fresh;
+    }).catchError((_) {});
   }
 
   Future<String> addTeacher({
@@ -930,8 +954,11 @@ class AdminTeachersNotifier extends Notifier<List<Map<String, dynamic>>> {
     ref.read(subjectsProvider.notifier).reload();
   }
 
-  Future<void> bulkArchiveTeachers(List<String> teacherIds) async {
-    await DatabaseHelper().bulkArchiveTeachers(teacherIds);
+  Future<void> bulkArchiveTeachers(
+    List<String> teacherIds, {
+    void Function(double progress, String statusMessage)? onProgress,
+  }) async {
+    await DatabaseHelper().bulkArchiveTeachers(teacherIds, onProgress: onProgress);
     await loadTeachers();
     ref.read(adminArchivedTeachersProvider.notifier).loadArchivedTeachers();
     ref.read(subjectsProvider.notifier).reload();
@@ -991,8 +1018,11 @@ class AdminArchivedTeachersNotifier extends Notifier<List<Map<String, dynamic>>>
     ref.read(subjectsProvider.notifier).reload();
   }
 
-  Future<void> bulkPermanentDeleteTeachers(List<String> teacherIds) async {
-    await DatabaseHelper().bulkPermanentDeleteTeachers(teacherIds);
+  Future<void> bulkPermanentDeleteTeachers(
+    List<String> teacherIds, {
+    void Function(double progress, String statusMessage)? onProgress,
+  }) async {
+    await DatabaseHelper().bulkPermanentDeleteTeachers(teacherIds, onProgress: onProgress);
     await loadArchivedTeachers();
     ref.read(adminTeachersProvider.notifier).loadTeachers();
     ref.read(subjectsProvider.notifier).reload();
@@ -1024,6 +1054,16 @@ class SchoolAdminsNotifier extends Notifier<List<Map<String, dynamic>>> {
     );
     if (!ref.mounted) return;
     state = admins;
+
+    // Non-blocking background cloud freshness pull
+    FirestoreService().syncCloudUsersToLocal().then((_) async {
+      if (!ref.mounted) return;
+      final fresh = await DatabaseHelper().getAdminsList(
+        schoolId: _selectedSchoolId,
+        query: _searchQuery,
+      );
+      if (ref.mounted) state = fresh;
+    }).catchError((_) {});
   }
 
   Future<String> addAdmin({
@@ -1055,9 +1095,17 @@ class SchoolAdminsNotifier extends Notifier<List<Map<String, dynamic>>> {
     await loadAdmins();
   }
 
+  Future<void> archiveAdmin(String adminId) async {
+    await DatabaseHelper().archiveAdmin(adminId);
+    await loadAdmins();
+    ref.read(archivedSchoolAdminsProvider.notifier).loadArchivedAdmins();
+    ref.read(adminAnalyticsProvider.notifier).loadAnalytics();
+  }
+
   Future<void> deleteAdmin(String adminId) async {
     await DatabaseHelper().deleteAdmin(adminId);
     await loadAdmins();
+    ref.read(archivedSchoolAdminsProvider.notifier).loadArchivedAdmins();
     ref.read(adminAnalyticsProvider.notifier).loadAnalytics();
   }
 
@@ -1068,6 +1116,58 @@ class SchoolAdminsNotifier extends Notifier<List<Map<String, dynamic>>> {
     );
     await loadAdmins();
     return result;
+  }
+}
+
+// --- Archived / Deactivated School Administrators Provider ---
+final archivedSchoolAdminsProvider =
+    NotifierProvider<ArchivedSchoolAdminsNotifier, List<Map<String, dynamic>>>(() {
+  return ArchivedSchoolAdminsNotifier();
+});
+
+class ArchivedSchoolAdminsNotifier extends Notifier<List<Map<String, dynamic>>> {
+  String? _selectedSchoolId;
+  String _searchQuery = '';
+
+  @override
+  List<Map<String, dynamic>> build() {
+    loadArchivedAdmins();
+    return [];
+  }
+
+  Future<void> loadArchivedAdmins({String? schoolId, String? query}) async {
+    if (schoolId != null) _selectedSchoolId = schoolId;
+    if (query != null) _searchQuery = query;
+
+    final admins = await DatabaseHelper().getArchivedAdminsList(
+      schoolId: _selectedSchoolId,
+      query: _searchQuery,
+    );
+    if (!ref.mounted) return;
+    state = admins;
+
+    // Non-blocking background cloud freshness pull
+    FirestoreService().syncCloudUsersToLocal().then((_) async {
+      if (!ref.mounted) return;
+      final fresh = await DatabaseHelper().getArchivedAdminsList(
+        schoolId: _selectedSchoolId,
+        query: _searchQuery,
+      );
+      if (ref.mounted) state = fresh;
+    }).catchError((_) {});
+  }
+
+  Future<void> restoreAdmin(String adminId) async {
+    await DatabaseHelper().restoreAdmin(adminId);
+    await loadArchivedAdmins();
+    ref.read(schoolAdminsProvider.notifier).loadAdmins();
+    ref.read(adminAnalyticsProvider.notifier).loadAnalytics();
+  }
+
+  Future<void> permanentDeleteAdmin(String adminId) async {
+    await DatabaseHelper().deleteAdmin(adminId);
+    await loadArchivedAdmins();
+    ref.read(adminAnalyticsProvider.notifier).loadAnalytics();
   }
 }
 

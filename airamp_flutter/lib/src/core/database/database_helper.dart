@@ -114,8 +114,15 @@ class DatabaseHelper {
     try {
       await db.rawUpdate('''
         UPDATE users 
+        SET id = 'SA-000-0001'
+        WHERE id = 'super_admin_christian' OR email = 'evangelistachristian88@gmail.com'
+      ''');
+    } catch (_) {}
+    try {
+      await db.rawUpdate('''
+        UPDATE users 
         SET profile_image = 'assets/images/aira_mascot_logo.png' 
-        WHERE (id = 'super_admin_christian' OR email = 'evangelistachristian88@gmail.com') 
+        WHERE (id = 'SA-000-0001' OR id = 'super_admin_christian' OR email = 'evangelistachristian88@gmail.com') 
           AND (profile_image IS NULL OR profile_image = '')
       ''');
     } catch (_) {}
@@ -3412,8 +3419,14 @@ class DatabaseHelper {
   }
 
   /// Bulk soft-deletes students by moving them to the archive.
-  Future<void> bulkArchiveStudents(List<String> studentIds) async {
+  Future<void> bulkArchiveStudents(
+    List<String> studentIds, {
+    void Function(double progress, String statusMessage)? onProgress,
+  }) async {
     if (studentIds.isEmpty) return;
+    final total = studentIds.length;
+    onProgress?.call(0.1, 'Updating local database records ($total students)...');
+
     final db = await database;
     final now = DateTime.now().toIso8601String();
     final batch = db.batch();
@@ -3429,14 +3442,32 @@ class DatabaseHelper {
       );
     }
     await batch.commit(noResult: true);
-    for (final id in studentIds) {
-      try {
-        await FirestoreService().saveDocument('users', id, {
-          'is_archived': 1,
-          'archived_at': now,
-        });
-      } catch (_) {}
+    onProgress?.call(0.3, 'Synchronizing with Cloud Firestore...');
+
+    // Chunked concurrent execution (12 per batch)
+    const chunkSize = 12;
+    int completed = 0;
+    for (var i = 0; i < studentIds.length; i += chunkSize) {
+      final end = (i + chunkSize < studentIds.length) ? i + chunkSize : studentIds.length;
+      final chunk = studentIds.sublist(i, end);
+      await Future.wait(
+        chunk.map((id) async {
+          try {
+            await FirestoreService().saveDocument('users', id, {
+              'is_archived': 1,
+              'archived_at': now,
+            });
+          } catch (_) {}
+        }),
+      );
+      completed += chunk.length;
+      final progressVal = 0.3 + (0.7 * (completed / total));
+      onProgress?.call(
+        progressVal,
+        'Synchronizing Cloud Firestore ($completed of $total)...',
+      );
     }
+    onProgress?.call(1.0, 'Deactivation complete!');
   }
 
   /// Restores an archived student back to the active directory.
@@ -3487,10 +3518,59 @@ class DatabaseHelper {
   }
 
   /// Bulk permanently deletes students and all related enrollments, progress, attempts, submissions.
-  Future<void> bulkPermanentDeleteStudents(List<String> studentIds) async {
+  Future<void> bulkPermanentDeleteStudents(
+    List<String> studentIds, {
+    void Function(double progress, String statusMessage)? onProgress,
+  }) async {
+    if (studentIds.isEmpty) return;
+    final total = studentIds.length;
+    onProgress?.call(0.1, 'Purging local student enrollments and records ($total students)...');
+
+    final db = await database;
+    final batch = db.batch();
     for (final id in studentIds) {
-      await deleteStudent(id);
+      batch.delete('enrollments', where: 'student_id = ?', whereArgs: [id]);
+      batch.delete('student_progress', where: 'student_id = ?', whereArgs: [id]);
+      batch.delete('quiz_attempts', where: 'student_id = ?', whereArgs: [id]);
+      batch.delete('quiz_assignments', where: 'student_id = ?', whereArgs: [id]);
+      batch.delete('submissions', where: 'student_id = ?', whereArgs: [id]);
+      batch.delete('notifications', where: 'user_id = ?', whereArgs: [id]);
+      batch.delete('users', where: 'id = ?', whereArgs: [id]);
     }
+    await batch.commit(noResult: true);
+
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final deletedList = prefs.getStringList('permanently_deleted_accounts') ?? [];
+      for (final id in studentIds) {
+        if (!deletedList.contains(id)) deletedList.add(id);
+      }
+      await prefs.setStringList('permanently_deleted_accounts', deletedList);
+    } catch (_) {}
+
+    onProgress?.call(0.3, 'Purging Cloud Firestore records...');
+
+    // Chunked concurrent Cloud Firestore deletions
+    const chunkSize = 12;
+    int completed = 0;
+    for (var i = 0; i < studentIds.length; i += chunkSize) {
+      final end = (i + chunkSize < studentIds.length) ? i + chunkSize : studentIds.length;
+      final chunk = studentIds.sublist(i, end);
+      await Future.wait(
+        chunk.map((id) async {
+          try {
+            await FirestoreService().deleteUser(id);
+          } catch (_) {}
+        }),
+      );
+      completed += chunk.length;
+      final progressVal = 0.3 + (0.7 * (completed / total));
+      onProgress?.call(
+        progressVal,
+        'Purging Cloud Firestore ($completed of $total)...',
+      );
+    }
+    onProgress?.call(1.0, 'Purge complete!');
   }
 
   Future<void> updateStudentSection(
@@ -4000,43 +4080,63 @@ class DatabaseHelper {
       await db.delete('users', where: "id = 'admin_1' OR id = 'super_admin_1' OR email = 'aira@admin'");
     } catch (_) {}
 
-    // Ensure admin_2 has username & hashed password
+    // Ensure permanently_deleted_accounts only holds legitimate deleted IDs and NEVER holds email addresses
     try {
-      final existingAdmin2 = await db.query(
-        'users',
-        where: 'email = ?',
-        whereArgs: ['admin@aira.edu'],
-      );
-      final saltAdmin2 = generateSalt();
-      if (existingAdmin2.isEmpty) {
-        await db.insert('users', {
-          'id': 'admin_2',
-          'email': 'admin@aira.edu',
-          'password': hashPassword('Admin@123', saltAdmin2),
-          'password_salt': saltAdmin2,
-          'role': 'admin',
-          'full_name': 'School Administrator',
-          'username': 'admin',
-          'section': null,
-          'grade': null,
-          'created_at': DateTime.now().toIso8601String(),
-        });
-      } else {
-        final currentSalt = existingAdmin2.first['password_salt'] as String?;
-        final currentPass = existingAdmin2.first['password'] as String?;
-        if (currentSalt == null ||
-            currentSalt.isEmpty ||
-            currentPass == 'Admin@123') {
-          await db.update(
-            'users',
-            {
-              'username': 'admin',
+      final prefs = await SharedPreferences.getInstance();
+      final deletedList = prefs.getStringList('permanently_deleted_accounts') ?? [];
+      final cleanedList = deletedList.where((item) => !item.contains('@')).toList();
+      if (cleanedList.length != deletedList.length) {
+        await prefs.setStringList('permanently_deleted_accounts', cleanedList);
+      }
+    } catch (_) {}
+
+    // Ensure admin_2 has username & hashed password (guarded against resurrection after deletion)
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final deletedList = prefs.getStringList('permanently_deleted_accounts') ?? [];
+      final wasDeleted = deletedList.contains('admin_2') || deletedList.contains('admin@aira.edu');
+
+      if (!wasDeleted) {
+        final existingAdmin2 = await db.query(
+          'users',
+          where: 'email = ?',
+          whereArgs: ['admin@aira.edu'],
+        );
+        final saltAdmin2 = generateSalt();
+        if (existingAdmin2.isEmpty) {
+          final hasSeeded = prefs.getBool('seed_admin_2_initialized') ?? false;
+          if (!hasSeeded) {
+            await prefs.setBool('seed_admin_2_initialized', true);
+            await db.insert('users', {
+              'id': 'admin_2',
+              'email': 'admin@aira.edu',
               'password': hashPassword('Admin@123', saltAdmin2),
               'password_salt': saltAdmin2,
-            },
-            where: 'email = ?',
-            whereArgs: ['admin@aira.edu'],
-          );
+              'role': 'admin',
+              'full_name': 'School Administrator',
+              'username': 'admin',
+              'section': null,
+              'grade': null,
+              'created_at': DateTime.now().toIso8601String(),
+            });
+          }
+        } else {
+          final currentSalt = existingAdmin2.first['password_salt'] as String?;
+          final currentPass = existingAdmin2.first['password'] as String?;
+          if (currentSalt == null ||
+              currentSalt.isEmpty ||
+              currentPass == 'Admin@123') {
+            await db.update(
+              'users',
+              {
+                'username': 'admin',
+                'password': hashPassword('Admin@123', saltAdmin2),
+                'password_salt': saltAdmin2,
+              },
+              where: 'email = ?',
+              whereArgs: ['admin@aira.edu'],
+            );
+          }
         }
       }
     } catch (_) {}
@@ -4045,13 +4145,13 @@ class DatabaseHelper {
     try {
       final existingChristian = await db.query(
         'users',
-        where: 'LOWER(email) = ?',
+        where: "LOWER(email) = ? OR id = 'SA-000-0001' OR id = 'super_admin_christian'",
         whereArgs: ['evangelistachristian88@gmail.com'],
       );
       final saltChristian = generateSalt();
       if (existingChristian.isEmpty) {
         await db.insert('users', {
-          'id': 'super_admin_christian',
+          'id': 'SA-000-0001',
           'email': 'evangelistachristian88@gmail.com',
           'password': hashPassword('Admin@123', saltChristian),
           'password_salt': saltChristian,
@@ -4070,6 +4170,7 @@ class DatabaseHelper {
           await db.update(
             'users',
             {
+              'id': 'SA-000-0001',
               'role': 'super_admin',
               'username': 'Christian Evangelista',
               'full_name': 'Christian Evangelista',
@@ -4077,19 +4178,20 @@ class DatabaseHelper {
               'password_salt': saltChristian,
               'profile_image': 'assets/images/aira_mascot_logo.png',
             },
-            where: 'LOWER(email) = ?',
+            where: "LOWER(email) = ? OR id = 'super_admin_christian' OR id = 'SA-000-0001'",
             whereArgs: ['evangelistachristian88@gmail.com'],
           );
         } else {
           await db.update(
             'users',
             {
+              'id': 'SA-000-0001',
               'role': 'super_admin',
               'username': 'Christian Evangelista',
               'full_name': 'Christian Evangelista',
               'profile_image': 'assets/images/aira_mascot_logo.png',
             },
-            where: 'LOWER(email) = ?',
+            where: "LOWER(email) = ? OR id = 'super_admin_christian' OR id = 'SA-000-0001'",
             whereArgs: ['evangelistachristian88@gmail.com'],
           );
         }
@@ -5117,8 +5219,14 @@ class DatabaseHelper {
   }
 
   /// Bulk soft-deletes teachers by moving them to the archive.
-  Future<void> bulkArchiveTeachers(List<String> teacherIds) async {
+  Future<void> bulkArchiveTeachers(
+    List<String> teacherIds, {
+    void Function(double progress, String statusMessage)? onProgress,
+  }) async {
     if (teacherIds.isEmpty) return;
+    final total = teacherIds.length;
+    onProgress?.call(0.1, 'Updating local faculty records ($total members)...');
+
     final db = await database;
     final now = DateTime.now().toIso8601String();
     final batch = db.batch();
@@ -5134,14 +5242,31 @@ class DatabaseHelper {
       );
     }
     await batch.commit(noResult: true);
-    for (final id in teacherIds) {
-      try {
-        await FirestoreService().saveDocument('users', id, {
-          'is_archived': 1,
-          'archived_at': now,
-        });
-      } catch (_) {}
+    onProgress?.call(0.3, 'Synchronizing with Cloud Firestore...');
+
+    const chunkSize = 12;
+    int completed = 0;
+    for (var i = 0; i < teacherIds.length; i += chunkSize) {
+      final end = (i + chunkSize < teacherIds.length) ? i + chunkSize : teacherIds.length;
+      final chunk = teacherIds.sublist(i, end);
+      await Future.wait(
+        chunk.map((id) async {
+          try {
+            await FirestoreService().saveDocument('users', id, {
+              'is_archived': 1,
+              'archived_at': now,
+            });
+          } catch (_) {}
+        }),
+      );
+      completed += chunk.length;
+      final progressVal = 0.3 + (0.7 * (completed / total));
+      onProgress?.call(
+        progressVal,
+        'Synchronizing Cloud Firestore ($completed of $total)...',
+      );
     }
+    onProgress?.call(1.0, 'Deactivation complete!');
   }
 
   /// Restores an archived teacher back to the active faculty directory.
@@ -5192,10 +5317,58 @@ class DatabaseHelper {
   }
 
   /// Bulk permanently deletes teachers.
-  Future<void> bulkPermanentDeleteTeachers(List<String> teacherIds) async {
+  Future<void> bulkPermanentDeleteTeachers(
+    List<String> teacherIds, {
+    void Function(double progress, String statusMessage)? onProgress,
+  }) async {
+    if (teacherIds.isEmpty) return;
+    final total = teacherIds.length;
+    onProgress?.call(0.1, 'Unassigning subjects and purging faculty records ($total members)...');
+
+    final db = await database;
+    final batch = db.batch();
     for (final id in teacherIds) {
-      await deleteTeacher(id);
+      batch.update(
+        'subjects',
+        {'teacher_id': null, 'teacher_name': null},
+        where: 'teacher_id = ?',
+        whereArgs: [id],
+      );
+      batch.delete('users', where: 'id = ?', whereArgs: [id]);
     }
+    await batch.commit(noResult: true);
+
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final deletedList = prefs.getStringList('permanently_deleted_accounts') ?? [];
+      for (final id in teacherIds) {
+        if (!deletedList.contains(id)) deletedList.add(id);
+      }
+      await prefs.setStringList('permanently_deleted_accounts', deletedList);
+    } catch (_) {}
+
+    onProgress?.call(0.3, 'Purging Cloud Firestore records...');
+
+    const chunkSize = 12;
+    int completed = 0;
+    for (var i = 0; i < teacherIds.length; i += chunkSize) {
+      final end = (i + chunkSize < teacherIds.length) ? i + chunkSize : teacherIds.length;
+      final chunk = teacherIds.sublist(i, end);
+      await Future.wait(
+        chunk.map((id) async {
+          try {
+            await FirestoreService().deleteUser(id);
+          } catch (_) {}
+        }),
+      );
+      completed += chunk.length;
+      final progressVal = 0.3 + (0.7 * (completed / total));
+      onProgress?.call(
+        progressVal,
+        'Purging Cloud Firestore ($completed of $total)...',
+      );
+    }
+    onProgress?.call(1.0, 'Purge complete!');
   }
 
   /// Checks whether a given user ID is already registered in local SQLite or Cloud Firestore
@@ -5219,19 +5392,21 @@ class DatabaseHelper {
     return false;
   }
 
-  /// Generates the next sequential Student ID using the 001-XXXX pattern (e.g. 001-0001, 001-0002)
-  Future<String> generateNextStudentId() async {
+  /// Generates the next sequential Student ID using the scalable S-100-XXXX pattern (e.g. S-100-0001)
+  /// Maintains backward compatibility by detecting sequence numbers from both S-100- and legacy 001-
+  Future<String> generateNextStudentId({String campusCode = '100'}) async {
+    final prefix = 'S-$campusCode-';
     int maxSequence = 0;
     try {
       final db = await database;
       final localRows = await db.rawQuery(
-        "SELECT id FROM users WHERE id LIKE '001-%'",
+        "SELECT id FROM users WHERE UPPER(id) LIKE '$prefix%' OR id LIKE '001-%'",
       );
       for (final row in localRows) {
         final idStr = row['id']?.toString() ?? '';
         final parts = idStr.split('-');
-        if (parts.length == 2) {
-          final num = int.tryParse(parts[1]);
+        if (parts.isNotEmpty) {
+          final num = int.tryParse(parts.last);
           if (num != null && num > maxSequence) {
             maxSequence = num;
           }
@@ -5240,29 +5415,35 @@ class DatabaseHelper {
     } catch (_) {}
 
     try {
-      final cloudMax = await FirestoreService().getHighestSequence('001-');
+      final cloudMax = await FirestoreService().getHighestSequence(prefix);
       if (cloudMax > maxSequence) {
         maxSequence = cloudMax;
+      }
+      final legacyMax = await FirestoreService().getHighestSequence('001-');
+      if (legacyMax > maxSequence) {
+        maxSequence = legacyMax;
       }
     } catch (_) {}
 
     final nextNumber = (maxSequence + 1).toString().padLeft(4, '0');
-    return '001-$nextNumber';
+    return '$prefix$nextNumber';
   }
 
-  /// Generates the next sequential Teacher ID using the 002-XXXX pattern (e.g. 002-0001, 002-0002)
-  Future<String> generateNextTeacherId() async {
+  /// Generates the next sequential Teacher ID using the scalable T-100-XXXX pattern (e.g. T-100-0001)
+  /// Maintains backward compatibility by detecting sequence numbers from both T-100- and legacy 002-
+  Future<String> generateNextTeacherId({String campusCode = '100'}) async {
+    final prefix = 'T-$campusCode-';
     int maxSequence = 0;
     try {
       final db = await database;
       final localRows = await db.rawQuery(
-        "SELECT id FROM users WHERE id LIKE '002-%'",
+        "SELECT id FROM users WHERE UPPER(id) LIKE '$prefix%' OR id LIKE '002-%'",
       );
       for (final row in localRows) {
         final idStr = row['id']?.toString() ?? '';
         final parts = idStr.split('-');
-        if (parts.length == 2) {
-          final num = int.tryParse(parts[1]);
+        if (parts.isNotEmpty) {
+          final num = int.tryParse(parts.last);
           if (num != null && num > maxSequence) {
             maxSequence = num;
           }
@@ -5271,14 +5452,82 @@ class DatabaseHelper {
     } catch (_) {}
 
     try {
-      final cloudMax = await FirestoreService().getHighestSequence('002-');
+      final cloudMax = await FirestoreService().getHighestSequence(prefix);
+      if (cloudMax > maxSequence) {
+        maxSequence = cloudMax;
+      }
+      final legacyMax = await FirestoreService().getHighestSequence('002-');
+      if (legacyMax > maxSequence) {
+        maxSequence = legacyMax;
+      }
+    } catch (_) {}
+
+    final nextNumber = (maxSequence + 1).toString().padLeft(4, '0');
+    return '$prefix$nextNumber';
+  }
+
+  /// Generates the next sequential Campus Admin ID using the scalable A-100-XXXX pattern (e.g. A-100-0001)
+  Future<String> generateNextAdminId({String campusCode = '100'}) async {
+    final prefix = 'A-$campusCode-';
+    int maxSequence = 0;
+    try {
+      final db = await database;
+      final localRows = await db.rawQuery(
+        "SELECT id FROM users WHERE UPPER(id) LIKE '$prefix%'",
+      );
+      for (final row in localRows) {
+        final idStr = row['id']?.toString() ?? '';
+        final parts = idStr.split('-');
+        if (parts.isNotEmpty) {
+          final num = int.tryParse(parts.last);
+          if (num != null && num > maxSequence) {
+            maxSequence = num;
+          }
+        }
+      }
+    } catch (_) {}
+
+    try {
+      final cloudMax = await FirestoreService().getHighestSequence(prefix);
       if (cloudMax > maxSequence) {
         maxSequence = cloudMax;
       }
     } catch (_) {}
 
     final nextNumber = (maxSequence + 1).toString().padLeft(4, '0');
-    return '002-$nextNumber';
+    return '$prefix$nextNumber';
+  }
+
+  /// Generates the next sequential Super Admin ID using the scalable SA-000-XXXX pattern (e.g. SA-000-0001)
+  Future<String> generateNextSuperAdminId({String platformCode = '000'}) async {
+    final prefix = 'SA-$platformCode-';
+    int maxSequence = 0;
+    try {
+      final db = await database;
+      final localRows = await db.rawQuery(
+        "SELECT id FROM users WHERE UPPER(id) LIKE '$prefix%'",
+      );
+      for (final row in localRows) {
+        final idStr = row['id']?.toString() ?? '';
+        final parts = idStr.split('-');
+        if (parts.isNotEmpty) {
+          final num = int.tryParse(parts.last);
+          if (num != null && num > maxSequence) {
+            maxSequence = num;
+          }
+        }
+      }
+    } catch (_) {}
+
+    try {
+      final cloudMax = await FirestoreService().getHighestSequence(prefix);
+      if (cloudMax > maxSequence) {
+        maxSequence = cloudMax;
+      }
+    } catch (_) {}
+
+    final nextNumber = (maxSequence + 1).toString().padLeft(4, '0');
+    return '$prefix$nextNumber';
   }
 
   Future<String> createTeacher({
@@ -5349,6 +5598,16 @@ class DatabaseHelper {
       'must_change_password': 1,
       'created_at': DateTime.now().toIso8601String(),
     };
+
+    // Clear any previous tombstone in SharedPreferences so newly created accounts are never blocked
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final deletedList = prefs.getStringList('permanently_deleted_accounts') ?? [];
+      deletedList.remove(finalTeacherId);
+      deletedList.remove(cleanEmail);
+      if (resolvedUsername.isNotEmpty) deletedList.remove(resolvedUsername.toLowerCase());
+      await prefs.setStringList('permanently_deleted_accounts', deletedList);
+    } catch (_) {}
 
     if (existingId != null && existingId.isNotEmpty) {
       try {
@@ -5494,6 +5753,16 @@ class DatabaseHelper {
       'must_change_password': 1,
       'created_at': DateTime.now().toIso8601String(),
     };
+
+    // Clear any previous tombstone in SharedPreferences so newly created accounts are never blocked
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final deletedList = prefs.getStringList('permanently_deleted_accounts') ?? [];
+      deletedList.remove(finalStudentId);
+      deletedList.remove(cleanEmail);
+      if (resolvedUsername.isNotEmpty) deletedList.remove(resolvedUsername.toLowerCase());
+      await prefs.setStringList('permanently_deleted_accounts', deletedList);
+    } catch (_) {}
 
     if (existingId != null && existingId.isNotEmpty) {
       try {
@@ -8519,24 +8788,25 @@ class DatabaseHelper {
   /// Full bidirectional synchronization: pushes local creations first, then pulls all cloud records
   Future<void> syncAllCloudData() async {
     try {
-      // 1. Push local creations to Cloud Firestore in parallel
+      // 1. Sync User Directory with highest priority for immediate cross-device identity
+      try {
+        await FirestoreService().syncLocalUsersToCloud();
+        await FirestoreService().syncCloudUsersToLocal();
+      } catch (e) {
+        debugPrint('[DatabaseHelper] User sync note: $e');
+      }
+
+      // 2. Curriculum, quizzes, assignments, and submissions in background
       await Future.wait([
         pushLocalCurriculumToCloud(),
         pushLocalQuizzesToCloud(),
         pushLocalAssignmentsToCloud(),
         pushLocalSubmissionsToCloud(),
-      ]);
-
-      // 2. Pull all cloud updates to local SQLite cache (course content first for instant UI response)
-      await Future.wait([
         syncCloudCurriculumToLocal(),
         syncCloudQuizzesToLocal(),
         syncCloudAssignmentsToLocal(),
         syncCloudSubmissionsToLocal(),
       ]);
-
-      // 3. Sync cloud user directory
-      await FirestoreService().syncCloudUsersToLocal();
     } catch (e) {
       debugPrint('[DatabaseHelper] syncAllCloudData note: $e');
     }
@@ -9238,10 +9508,15 @@ class DatabaseHelper {
   Future<List<Map<String, dynamic>>> getAdminsList({
     String? query,
     String? schoolId,
+    bool includeArchived = false,
   }) async {
     final db = await database;
     String whereClause = "(role = 'admin' OR role = 'super_admin')";
     final List<dynamic> whereArgs = [];
+
+    if (!includeArchived) {
+      whereClause += " AND (is_archived IS NULL OR is_archived = 0)";
+    }
 
     if (schoolId != null && schoolId.isNotEmpty && schoolId != 'all') {
       whereClause +=
@@ -9267,6 +9542,37 @@ class DatabaseHelper {
     return admins;
   }
 
+  Future<List<Map<String, dynamic>>> getArchivedAdminsList({
+    String? query,
+    String? schoolId,
+  }) async {
+    final db = await database;
+    String whereClause = "(role = 'admin' OR role = 'super_admin') AND is_archived = 1";
+    final List<dynamic> whereArgs = [];
+
+    if (schoolId != null && schoolId.isNotEmpty && schoolId != 'all') {
+      whereClause +=
+          " AND (school_id = ? OR school_id IS NULL OR role = 'super_admin')";
+      whereArgs.add(schoolId);
+    }
+
+    if (query != null && query.trim().isNotEmpty) {
+      final q = '%${query.trim().toLowerCase()}%';
+      whereClause +=
+          " AND (LOWER(full_name) LIKE ? OR LOWER(email) LIKE ? OR LOWER(COALESCE(username, '')) LIKE ?)";
+      whereArgs.addAll([q, q, q]);
+    }
+
+    final admins = await db.query(
+      'users',
+      where: whereClause,
+      whereArgs: whereArgs.isNotEmpty ? whereArgs : null,
+      orderBy: "archived_at DESC, full_name ASC",
+    );
+
+    return admins;
+  }
+
   Future<String> createAdmin({
     required String fullName,
     required String email,
@@ -9278,7 +9584,9 @@ class DatabaseHelper {
     final db = await database;
     final salt = generateSalt();
     final hashedPassword = hashPassword(password, salt);
-    final adminId = 'admin_${DateTime.now().millisecondsSinceEpoch}';
+    final adminId = role == 'super_admin'
+        ? await generateNextSuperAdminId()
+        : await generateNextAdminId();
     final resolvedUsername = (username != null && username.trim().isNotEmpty)
         ? username.trim()
         : (email.contains('@')
@@ -9308,6 +9616,16 @@ class DatabaseHelper {
       'must_change_password': 1,
       'created_at': DateTime.now().toIso8601String(),
     };
+
+    // Clear any previous tombstone in SharedPreferences so newly provisioned accounts are never blocked
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final deletedList = prefs.getStringList('permanently_deleted_accounts') ?? [];
+      final cleanEmail = email.trim().toLowerCase();
+      deletedList.remove(adminId);
+      deletedList.remove(cleanEmail);
+      await prefs.setStringList('permanently_deleted_accounts', deletedList);
+    } catch (_) {}
 
     await db.insert('users', adminData);
 
@@ -9438,6 +9756,88 @@ class DatabaseHelper {
 
     if (updates.isNotEmpty) {
       await db.update('users', updates, where: 'id = ?', whereArgs: [adminId]);
+      try {
+        await FirestoreService().saveUser({'id': adminId, ...updates});
+      } catch (_) {}
+    }
+  }
+
+  Future<void> archiveAdmin(String adminId) async {
+    final db = await database;
+    final row = await db.query('users', where: 'id = ?', whereArgs: [adminId]);
+    if (row.isNotEmpty) {
+      final email = (row.first['email'] as String? ?? '').toLowerCase();
+      final id = row.first['id'] as String? ?? '';
+      if (id == 'super_admin_christian' ||
+          id == 'SA-000-0001' ||
+          email == 'evangelistachristian88@gmail.com') {
+        throw StateError('Cannot deactivate primary system super administrator');
+      }
+    }
+    final now = DateTime.now().toIso8601String();
+    await db.update(
+      'users',
+      {
+        'is_archived': 1,
+        'archived_at': now,
+      },
+      where: 'id = ?',
+      whereArgs: [adminId],
+    );
+    try {
+      await db.delete('sessions', where: 'user_id = ?', whereArgs: [adminId]);
+    } catch (_) {}
+
+    try {
+      await FirestoreService().saveUser({
+        'id': adminId,
+        'is_archived': 1,
+        'archived_at': now,
+      });
+      if (row.isNotEmpty) {
+        final email = row.first['email'] as String?;
+        if (email != null && email.isNotEmpty) {
+          await FirestoreService().saveDocument('users', email.toLowerCase().trim(), {
+            'is_archived': 1,
+            'archived_at': now,
+          });
+        }
+      }
+    } catch (e) {
+      debugPrint('[DatabaseHelper] Error syncing archived admin $adminId to Firestore: $e');
+    }
+  }
+
+  Future<void> restoreAdmin(String adminId) async {
+    final db = await database;
+    await db.update(
+      'users',
+      {
+        'is_archived': 0,
+        'archived_at': null,
+      },
+      where: 'id = ?',
+      whereArgs: [adminId],
+    );
+
+    final row = await db.query('users', where: 'id = ?', whereArgs: [adminId]);
+    try {
+      await FirestoreService().saveUser({
+        'id': adminId,
+        'is_archived': 0,
+        'archived_at': null,
+      });
+      if (row.isNotEmpty) {
+        final email = row.first['email'] as String?;
+        if (email != null && email.isNotEmpty) {
+          await FirestoreService().saveDocument('users', email.toLowerCase().trim(), {
+            'is_archived': 0,
+            'archived_at': null,
+          });
+        }
+      }
+    } catch (e) {
+      debugPrint('[DatabaseHelper] Error syncing restored admin $adminId to Firestore: $e');
     }
   }
 
@@ -9445,15 +9845,45 @@ class DatabaseHelper {
     final db = await database;
     // Prevent deleting primary super admin
     final row = await db.query('users', where: 'id = ?', whereArgs: [adminId]);
+    String? email;
+    String? username;
     if (row.isNotEmpty) {
-      final email = (row.first['email'] as String? ?? '').toLowerCase();
+      email = (row.first['email'] as String? ?? '').toLowerCase();
+      username = row.first['username'] as String?;
       final id = row.first['id'] as String? ?? '';
       if (id == 'super_admin_christian' ||
+          id == 'SA-000-0001' ||
           email == 'evangelistachristian88@gmail.com') {
         throw StateError('Cannot delete primary system super administrator');
       }
     }
     await db.delete('users', where: 'id = ?', whereArgs: [adminId]);
+    try {
+      await db.delete('sessions', where: 'user_id = ?', whereArgs: [adminId]);
+    } catch (_) {}
+
+    // Record deletion in SharedPreferences so seed routines never resurrect it on browser refresh
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final deletedList = prefs.getStringList('permanently_deleted_accounts') ?? [];
+      if (!deletedList.contains(adminId)) deletedList.add(adminId);
+      // NOTE: We only tombstone the unique admin ID, never the email, so new accounts with the same email are never blocked
+      await prefs.setStringList('permanently_deleted_accounts', deletedList);
+    } catch (_) {}
+
+    // Permanently purge from Cloud Firestore
+    try {
+      await FirestoreService()
+          .deleteUser(adminId, email: email, username: username)
+          .timeout(
+            const Duration(seconds: 8),
+            onTimeout: () {
+              debugPrint('[DatabaseHelper] Firestore deleteUser timed out for admin $adminId');
+            },
+          );
+    } catch (e) {
+      debugPrint('[DatabaseHelper] Error deleting admin $adminId from Firestore: $e');
+    }
   }
 
   // ── Schools Management (Item 8 — P2) ─────────────────────────

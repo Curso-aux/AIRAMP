@@ -18,6 +18,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
     with TickerProviderStateMixin {
   final TextEditingController _identifierController = TextEditingController();
   final TextEditingController _passwordController = TextEditingController();
+  final FocusNode _passwordFocusNode = FocusNode();
   bool _showPassword = false;
   String _error = '';
 
@@ -35,11 +36,13 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
   @override
   void initState() {
     super.initState();
-    _draftDisposer.add(_identifierController.bindSessionDraft(
-      formId: _formId,
-      fieldKey: 'identifier',
-      onDraftRestored: () => setState(() {}),
-    ));
+    _draftDisposer.add(
+      _identifierController.bindSessionDraft(
+        formId: _formId,
+        fieldKey: 'identifier',
+        onDraftRestored: () => setState(() {}),
+      ),
+    );
 
     // Smooth Entrance: 400ms ease-out cubic fade + slide
     _entranceController = AnimationController(
@@ -50,13 +53,13 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
       parent: _entranceController,
       curve: Curves.easeOutCubic,
     );
-    _slideAnimation = Tween<Offset>(
-      begin: const Offset(0, 0.04),
-      end: Offset.zero,
-    ).animate(CurvedAnimation(
-      parent: _entranceController,
-      curve: Curves.easeOutCubic,
-    ));
+    _slideAnimation =
+        Tween<Offset>(begin: const Offset(0, 0.04), end: Offset.zero).animate(
+          CurvedAnimation(
+            parent: _entranceController,
+            curve: Curves.easeOutCubic,
+          ),
+        );
     _entranceController.forward();
 
     // Tactile button bounce
@@ -74,6 +77,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
     _draftDisposer.dispose();
     _identifierController.dispose();
     _passwordController.dispose();
+    _passwordFocusNode.dispose();
     _entranceController.dispose();
     _buttonScaleController.dispose();
     super.dispose();
@@ -89,7 +93,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
 
     if (identifier.isEmpty || password.isEmpty) {
       setState(() {
-        _error = 'Please fill in both email/username and password.';
+        _error = 'Please enter your Account ID and password.';
       });
       return;
     }
@@ -136,13 +140,16 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
   @override
   Widget build(BuildContext context) {
     final isLoading = ref.watch(authProvider.notifier).isLoading;
-    final isDark = Theme.of(context).brightness == Brightness.dark || AppTheme.isDark;
+    final isDark =
+        Theme.of(context).brightness == Brightness.dark || AppTheme.isDark;
 
     // Palette tuned for a clean, formal academic institution portal
     final canvasBg = isDark ? AppTheme.darkBackground : const Color(0xFFF8FAFC);
     final cardBg = isDark ? AppTheme.darkSurface : Colors.white;
     final borderColor = isDark ? AppTheme.darkBorder : const Color(0xFFE2E8F0);
-    final inputFill = isDark ? const Color(0xFF1B2638) : const Color(0xFFF8FAFC);
+    final inputFill = isDark
+        ? const Color(0xFF1B2638)
+        : const Color(0xFFF8FAFC);
     final primaryAccent = isDark ? AppTheme.darkPrimary : AppTheme.lightPrimary;
 
     return Scaffold(
@@ -236,10 +243,8 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
             'assets/images/aira_mascot_logo.png',
             fit: BoxFit.contain,
             filterQuality: FilterQuality.medium,
-            errorBuilder: (_, _, _) => Image.asset(
-              'assets/images/aira_logo.png',
-              fit: BoxFit.contain,
-            ),
+            errorBuilder: (_, _, _) =>
+                Image.asset('assets/images/aira_logo.png', fit: BoxFit.contain),
           ),
         ),
 
@@ -266,7 +271,9 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
             fontSize: 13,
             fontWeight: FontWeight.w500,
             letterSpacing: 0.2,
-            color: isDark ? AppTheme.darkTextSecondary : AppTheme.lightTextSecondary,
+            color: isDark
+                ? AppTheme.darkTextSecondary
+                : AppTheme.lightTextSecondary,
           ),
         ),
       ],
@@ -292,13 +299,17 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
         border: Border.all(color: borderColor, width: 1.0),
         boxShadow: [
           BoxShadow(
-            color: const Color(0xFF0F172A).withValues(alpha: isDark ? 0.30 : 0.04),
+            color: const Color(
+              0xFF0F172A,
+            ).withValues(alpha: isDark ? 0.30 : 0.04),
             blurRadius: 28,
             offset: const Offset(0, 10),
             spreadRadius: 0,
           ),
           BoxShadow(
-            color: const Color(0xFF0F172A).withValues(alpha: isDark ? 0.18 : 0.02),
+            color: const Color(
+              0xFF0F172A,
+            ).withValues(alpha: isDark ? 0.18 : 0.02),
             blurRadius: 8,
             offset: const Offset(0, 2),
           ),
@@ -323,7 +334,9 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
             style: TextStyle(
               fontSize: 13.5,
               fontWeight: FontWeight.w400,
-              color: isDark ? AppTheme.darkTextSecondary : AppTheme.lightTextMuted,
+              color: isDark
+                  ? AppTheme.darkTextSecondary
+                  : AppTheme.lightTextMuted,
             ),
           ),
 
@@ -335,10 +348,13 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
               margin: const EdgeInsets.only(bottom: 18),
               padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
               decoration: BoxDecoration(
-                color: isDark ? AppTheme.darkErrorSoft : AppTheme.lightErrorSoft,
+                color: isDark
+                    ? AppTheme.darkErrorSoft
+                    : AppTheme.lightErrorSoft,
                 borderRadius: BorderRadius.circular(12),
                 border: Border.all(
-                  color: (isDark ? AppTheme.darkError : AppTheme.lightError).withValues(alpha: 0.3),
+                  color: (isDark ? AppTheme.darkError : AppTheme.lightError)
+                      .withValues(alpha: 0.3),
                   width: 1,
                 ),
               ),
@@ -355,7 +371,9 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
                     child: Text(
                       _error,
                       style: TextStyle(
-                        color: isDark ? AppTheme.darkError : AppTheme.lightError,
+                        color: isDark
+                            ? AppTheme.darkError
+                            : AppTheme.lightError,
                         fontSize: 12.5,
                         fontWeight: FontWeight.w500,
                         height: 1.35,
@@ -368,24 +386,30 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
           ],
 
           // Identifier Field Label
-          _buildFieldLabel('Email or Username', isDark),
+          _buildFieldLabel('Account ID', isDark),
           const SizedBox(height: 6),
           TextField(
             controller: _identifierController,
             maxLength: 50,
-            buildCounter: (context, {required currentLength, required isFocused, maxLength}) => null,
+            buildCounter:
+                (
+                  context, {
+                  required currentLength,
+                  required isFocused,
+                  maxLength,
+                }) => null,
             style: TextStyle(
               color: isDark ? AppTheme.darkTextBright : AppTheme.lightText,
               fontSize: 14.5,
               fontWeight: FontWeight.w500,
             ),
-            keyboardType: TextInputType.emailAddress,
+            keyboardType: TextInputType.text,
             textInputAction: TextInputAction.next,
             autocorrect: false,
             enableSuggestions: true,
             decoration: _inputDecoration(
-              hint: 'Enter your email or username',
-              prefixIcon: Icons.person_outline_rounded,
+              hint: 'e.g. S-100-0001, T-100-0001, or A-100-0001',
+              prefixIcon: Icons.badge_outlined,
               fillColor: inputFill,
               borderColor: borderColor,
               focusColor: primaryAccent,
@@ -415,9 +439,17 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
           ),
           const SizedBox(height: 6),
           TextField(
+            key: ValueKey('login_pass_$_showPassword'),
+            focusNode: _passwordFocusNode,
             controller: _passwordController,
             maxLength: 64,
-            buildCounter: (context, {required currentLength, required isFocused, maxLength}) => null,
+            buildCounter:
+                (
+                  context, {
+                  required currentLength,
+                  required isFocused,
+                  maxLength,
+                }) => null,
             obscureText: !_showPassword,
             textInputAction: TextInputAction.done,
             onSubmitted: (_) {
@@ -436,13 +468,32 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
               focusColor: primaryAccent,
               isDark: isDark,
               suffix: IconButton(
+                focusNode: FocusNode(
+                  canRequestFocus: false,
+                  skipTraversal: true,
+                ),
                 splashRadius: 18,
                 icon: Icon(
-                  _showPassword ? Icons.visibility_off_outlined : Icons.visibility_outlined,
-                  color: isDark ? AppTheme.darkTextMuted : AppTheme.lightTextMuted,
+                  _showPassword
+                      ? Icons.visibility_off_outlined
+                      : Icons.visibility_outlined,
+                  color: isDark
+                      ? AppTheme.darkTextMuted
+                      : AppTheme.lightTextMuted,
                   size: 20,
                 ),
-                onPressed: () => setState(() => _showPassword = !_showPassword),
+                onPressed: () {
+                  setState(() => _showPassword = !_showPassword);
+                  WidgetsBinding.instance.addPostFrameCallback((_) {
+                    if (mounted) {
+                      _passwordFocusNode.requestFocus();
+                      _passwordController
+                          .selection = TextSelection.fromPosition(
+                        TextPosition(offset: _passwordController.text.length),
+                      );
+                    }
+                  });
+                },
               ),
             ),
           ),
@@ -473,7 +524,9 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
                   borderRadius: BorderRadius.circular(14),
                   boxShadow: [
                     BoxShadow(
-                      color: primaryAccent.withValues(alpha: isDark ? 0.35 : 0.28),
+                      color: primaryAccent.withValues(
+                        alpha: isDark ? 0.35 : 0.28,
+                      ),
                       blurRadius: 16,
                       offset: const Offset(0, 5),
                     ),
@@ -486,7 +539,9 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
                         height: 20,
                         child: CircularProgressIndicator(
                           strokeWidth: 2.2,
-                          valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                          valueColor: AlwaysStoppedAnimation<Color>(
+                            Colors.white,
+                          ),
                         ),
                       )
                     : const Row(
@@ -582,16 +637,14 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
 
   /// Quiet, dignified institutional footnote (Registration completely removed)
   Widget _buildFooter(bool isDark) {
-    final mutedColor = isDark ? AppTheme.darkTextMuted : const Color(0xFF94A3B8);
+    final mutedColor = isDark
+        ? AppTheme.darkTextMuted
+        : const Color(0xFF94A3B8);
 
     return Row(
       mainAxisAlignment: MainAxisAlignment.center,
       children: [
-        Icon(
-          Icons.shield_outlined,
-          size: 14,
-          color: mutedColor,
-        ),
+        Icon(Icons.shield_outlined, size: 14, color: mutedColor),
         const SizedBox(width: 6),
         Text(
           'DepEd Senior High School Learning Portal',

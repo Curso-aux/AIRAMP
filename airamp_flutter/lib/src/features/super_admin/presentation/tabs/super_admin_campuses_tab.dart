@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import '../../../../core/components/aira_action_toast.dart';
 import '../../../../core/theme/theme_provider.dart';
 import '../../../admin/data/admin_repository.dart';
 import '../super_admin_theme.dart';
@@ -189,8 +190,10 @@ class _SuperAdminCampusesTabState extends ConsumerState<SuperAdminCampusesTab> {
                     final name = nameCtrl.text.trim();
                     final code = codeCtrl.text.trim().toUpperCase();
                     if (name.isEmpty || code.isEmpty) {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(content: Text('School name and code are required.')),
+                      AiraActionToast.showWarning(
+                        context,
+                        title: 'Validation Error',
+                        message: 'School name and code are required.',
                       );
                       return;
                     }
@@ -205,17 +208,18 @@ class _SuperAdminCampusesTabState extends ConsumerState<SuperAdminCampusesTab> {
                         status: selectedStatus,
                       );
                       if (context.mounted) {
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(
-                            content: Text('Updated campus "$name" successfully.'),
-                            backgroundColor: gTheme.successText,
-                          ),
+                        AiraActionToast.showSuccess(
+                          context,
+                          title: 'Campus Updated',
+                          message: 'Updated campus "$name" successfully.',
                         );
                       }
                     } catch (e) {
                       if (context.mounted) {
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(content: Text('Error: $e'), backgroundColor: gTheme.dangerText),
+                        AiraActionToast.showError(
+                          context,
+                          title: 'Update Failed',
+                          message: 'Error updating campus: $e',
                         );
                       }
                     }
@@ -233,8 +237,10 @@ class _SuperAdminCampusesTabState extends ConsumerState<SuperAdminCampusesTab> {
   void _confirmDeleteSchool(BuildContext context, GovernanceTheme gTheme, Map<String, dynamic> school) {
     final schoolId = school['id'] as String;
     if (schoolId == 'sch_main') {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('The default demonstration school cannot be deleted.')),
+      AiraActionToast.showWarning(
+        context,
+        title: 'Action Restricted',
+        message: 'The default demonstration school cannot be deleted.',
       );
       return;
     }
@@ -267,17 +273,19 @@ class _SuperAdminCampusesTabState extends ConsumerState<SuperAdminCampusesTab> {
               try {
                 await ref.read(schoolsListProvider.notifier).deleteSchool(schoolId);
                 if (context.mounted) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(
-                      content: Text('Campus "${school['name']}" deleted successfully.'),
-                      backgroundColor: gTheme.successText,
-                    ),
+                  AiraActionToast.showDeleted(
+                    context,
+                    title: 'Campus Deleted',
+                    message: 'Campus "${school['name']}" was permanently deleted.',
+                    duration: const Duration(seconds: 8),
                   );
                 }
               } catch (e) {
                 if (context.mounted) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(content: Text('Error: $e'), backgroundColor: gTheme.dangerText),
+                  AiraActionToast.showError(
+                    context,
+                    title: 'Deletion Failed',
+                    message: 'Error deleting campus: $e',
                   );
                 }
               }

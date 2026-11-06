@@ -5,6 +5,7 @@ import '../../../core/api/api_client.dart';
 import '../../../core/components/auth/required_change_password_dialog.dart';
 import '../../../core/database/database_helper.dart';
 import '../../../core/database/firestore_service.dart';
+import '../../../core/utils/web_session_helper.dart';
 import '../data/auth_repository.dart';
 
 class User {
@@ -140,10 +141,15 @@ class AuthNotifier extends Notifier<User?> {
       final data = await repository.login(identifier, password);
       final user = User.fromJson(data['user']);
       state = user;
+      WebSessionHelper.markSessionActive(user.id);
+      final prefs = await SharedPreferences.getInstance();
       if (user.mustChangePassword) {
         try {
-          final prefs = await SharedPreferences.getInstance();
           await prefs.setBool('must_change_password_${user.id}', true);
+        } catch (_) {}
+      } else {
+        try {
+          await prefs.remove('must_change_password_${user.id}');
         } catch (_) {}
       }
     } finally {
@@ -180,6 +186,15 @@ class AuthNotifier extends Notifier<User?> {
     final session = await repository.currentSession();
     if (session == null) return;
 
+    // Web Session-Only Guard (Option B):
+    // In web browsers, sessionStorage is purged automatically when the tab or window is closed.
+    // If no active session marker exists in sessionStorage, terminate the dormant session so
+    // that opening a new browser window returns the user cleanly to the public landing page.
+    if (kIsWeb && !WebSessionHelper.hasActiveSession()) {
+      await repository.logout();
+      return;
+    }
+
     // Strict platform separation:
     // On Mobile / Desktop (!kIsWeb): Admin sessions are NOT permitted. Mobile is exclusively for Students and Teachers!
     if (!kIsWeb && (session.role == 'admin' || session.role == 'super_admin')) {
@@ -210,41 +225,65 @@ class AuthNotifier extends Notifier<User?> {
         ? (userRows.first['profile_image'] ?? userRows.first['profileImage']) as String?
         : null;
 
+    final localMustChange = session.mustChangePassword ||
+        persistentMustChange ||
+        (userRows.isNotEmpty &&
+            (userRows.first['must_change_password'] == 1 ||
+             userRows.first['must_change_password'] == true ||
+             userRows.first['must_change_password'] == '1'));
+
     Map<String, dynamic>? cloudUser;
-    final needsCloudLookup = userRows.isEmpty || localAvatar == null || localAvatar.trim().isEmpty;
+    // Always query Cloud Firestore if the local session suspects a password change,
+    // ensuring password changes made on another machine (e.g. Laptop A) reflect immediately on Laptop B.
+    final needsCloudLookup = userRows.isEmpty ||
+        localAvatar == null ||
+        localAvatar.trim().isEmpty ||
+        localMustChange;
     if (needsCloudLookup) {
       try {
         cloudUser = await FirestoreService()
             .findUserByIdentifier(session.userId)
-            .timeout(const Duration(seconds: 3), onTimeout: () => null);
+            .timeout(const Duration(seconds: 4), onTimeout: () => null);
+      } catch (_) {}
+    }
+
+    bool mustChange = localMustChange;
+    if (cloudUser != null) {
+      final hasCloudMust = cloudUser.containsKey('must_change_password') ||
+          cloudUser.containsKey('mustChangePassword');
+      if (hasCloudMust) {
+        final cm = cloudUser['must_change_password'];
+        final cmCamel = cloudUser['mustChangePassword'];
+        final cloudMust = cm == 1 || cm == true || cm == '1' || cmCamel == true;
+        mustChange = cloudMust;
+      }
+    }
+
+    if (mustChange) {
+      try {
+        if (userRows.isNotEmpty) {
+          await db.update('users', {'must_change_password': 1},
+              where: 'id = ?', whereArgs: [userRows.first['id']]);
+        }
+        await db.update('sessions', {'must_change_password': 1});
+        final prefs = await SharedPreferences.getInstance();
+        await prefs.setBool('must_change_password_${session.userId}', true);
+      } catch (_) {}
+    } else {
+      try {
+        if (userRows.isNotEmpty) {
+          await db.update('users', {'must_change_password': 0},
+              where: 'id = ?', whereArgs: [userRows.first['id']]);
+        }
+        await db.update('sessions', {'must_change_password': 0});
+        final prefs = await SharedPreferences.getInstance();
+        await prefs.remove('must_change_password_${session.userId}');
       } catch (_) {}
     }
 
     if (userRows.isNotEmpty) {
       final u = Map<String, dynamic>.from(userRows.first);
       final actualRole = u['role'] as String? ?? session.role;
-      var mustChange = session.mustChangePassword ||
-          persistentMustChange ||
-          u['must_change_password'] == 1 ||
-          u['must_change_password'] == true ||
-          u['must_change_password'] == '1';
-
-      if (!mustChange && cloudUser != null) {
-        final cm = cloudUser['must_change_password'];
-        if (cm == 1 || cm == true || cm == '1') {
-          mustChange = true;
-        }
-      }
-
-      if (mustChange) {
-        try {
-          await db.update('users', {'must_change_password': 1},
-              where: 'id = ?', whereArgs: [u['id']]);
-          await db.update('sessions', {'must_change_password': 1});
-          final prefs = await SharedPreferences.getInstance();
-          await prefs.setBool('must_change_password_${session.userId}', true);
-        } catch (_) {}
-      }
 
       var profileImage = (u['profile_image'] ?? u['profileImage']) as String?;
       if ((profileImage == null || profileImage.trim().isEmpty) && cloudUser != null) {
@@ -270,20 +309,6 @@ class AuthNotifier extends Notifier<User?> {
         mustChangePassword: mustChange,
       );
     } else {
-      final cloudMustChange = cloudUser != null &&
-          (cloudUser['must_change_password'] == 1 ||
-           cloudUser['must_change_password'] == true ||
-           cloudUser['must_change_password'] == '1');
-
-      final mustChange = session.mustChangePassword || persistentMustChange || cloudMustChange;
-
-      if (mustChange) {
-        try {
-          final prefs = await SharedPreferences.getInstance();
-          await prefs.setBool('must_change_password_${session.userId}', true);
-        } catch (_) {}
-      }
-
       state = User(
         id: session.userId,
         email: cloudUser?['email'] as String? ?? '',
@@ -327,6 +352,7 @@ class AuthNotifier extends Notifier<User?> {
       );
       final user = User.fromJson(data['user']);
       state = user;
+      WebSessionHelper.markSessionActive(user.id);
     } finally {
       isLoading = false;
     }
@@ -341,9 +367,13 @@ class AuthNotifier extends Notifier<User?> {
       if (rows.isNotEmpty) {
         final r = rows.first;
         final photo = (r['profile_image'] ?? r['profileImage']) as String?;
-        if (photo != null && photo.isNotEmpty && photo != state!.profileImage) {
-          state = state!.copyWith(profileImage: photo);
-        }
+        final mustChange = r['must_change_password'] == 1 ||
+            r['must_change_password'] == true ||
+            r['must_change_password'] == '1';
+        state = state!.copyWith(
+          profileImage: (photo != null && photo.isNotEmpty) ? photo : state!.profileImage,
+          mustChangePassword: mustChange,
+        );
       }
     } catch (_) {}
   }
@@ -416,6 +446,20 @@ class AuthNotifier extends Notifier<User?> {
     );
   }
 
+  /// Completes password reset using verified ephemeral reset ticket
+  Future<void> completePasswordResetWithTicket({
+    required String identifier,
+    required String resetTicket,
+    required String newPassword,
+  }) async {
+    final repository = ref.read(authRepositoryProvider);
+    await repository.completePasswordResetWithTicket(
+      identifier: identifier,
+      resetTicket: resetTicket,
+      newPassword: newPassword,
+    );
+  }
+
   /// Update the current student's section and grade upon key enrollment
   void updateUserSection({required String section, required String grade}) {
     if (state == null) return;
@@ -451,6 +495,7 @@ class AuthNotifier extends Notifier<User?> {
       }
     } catch (_) {}
     try {
+      WebSessionHelper.clearSession();
       await repository.logout();
     } finally {
       isLoading = false;

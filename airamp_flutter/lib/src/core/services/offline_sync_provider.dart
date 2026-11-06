@@ -2,6 +2,9 @@ import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../database/database_helper.dart';
+import '../database/firestore_service.dart';
+import '../../features/admin/data/admin_repository.dart';
+import '../../features/super_admin/data/super_admin_repository.dart';
 
 enum SyncConnectivityStatus {
   onlineSynced,
@@ -50,7 +53,30 @@ class OfflineSyncNotifier extends Notifier<OfflineSyncState> {
       _periodicSyncTimer?.cancel();
     });
 
-    // Start in online synchronized state with fresh timestamp
+    // Wire up real-time user sync callback to immediately notify Riverpod UI
+    FirestoreService.onUserSynced = () {
+      try {
+        ref.read(schoolAdminsProvider.notifier).loadAdmins();
+        ref.read(archivedSchoolAdminsProvider.notifier).loadArchivedAdmins();
+        ref.read(adminTeachersProvider.notifier).loadTeachers();
+        ref.read(adminArchivedTeachersProvider.notifier).loadArchivedTeachers();
+        ref.read(adminStudentsProvider.notifier).loadStudents();
+        ref.read(adminArchivedStudentsProvider.notifier).loadArchived();
+        ref.read(schoolsListProvider.notifier).loadSchools();
+        ref.invalidate(superAdminStatsProvider);
+      } catch (_) {}
+    };
+
+    // Activate Firestore real-time live listener
+    FirestoreService().startRealtimeUserSync();
+
+    // Start periodic background sync on Web
+    if (kIsWeb) {
+      _periodicSyncTimer = Timer.periodic(const Duration(seconds: 25), (_) {
+        syncNow();
+      });
+    }
+
     // Proactively perform full bidirectional sync in background
     Future.microtask(() => syncNow());
 
@@ -81,6 +107,11 @@ class OfflineSyncNotifier extends Notifier<OfflineSyncState> {
         pendingQueueCount: 0,
         syncMessage: 'Cloud sync complete · All changes up to date',
       );
+
+      // Trigger UI reload of all directories immediately
+      try {
+        FirestoreService.onUserSynced?.call();
+      } catch (_) {}
     } catch (e) {
       debugPrint('[OfflineSync] Sync failed: $e');
       state = state.copyWith(

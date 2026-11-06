@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../services/offline_sync_provider.dart';
 import '../theme/app_theme.dart';
+import '../database/firestore_service.dart';
 
 class OfflineSyncStatusPill extends ConsumerStatefulWidget {
   final bool compact;
@@ -56,6 +57,10 @@ class _OfflineSyncStatusPillState extends ConsumerState<OfflineSyncStatusPill>
     if (mounted) {
       _rotationController.stop();
       _rotationController.reset();
+
+      try {
+        FirestoreService.onUserSynced?.call();
+      } catch (_) {}
 
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
