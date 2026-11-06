@@ -2704,7 +2704,6 @@ class _TeacherProfileScreenState extends ConsumerState<TeacherProfileScreen>
     final hasMinLength = newPass.length >= 6;
     final doPasswordsMatch = newPass.isNotEmpty && newPass == confirmPass;
 
-    final isDark = AppTheme.isDark;
     final accentPrimary = isDark
         ? const Color(0xFF60A5FA)
         : const Color(0xFF0284C7);
