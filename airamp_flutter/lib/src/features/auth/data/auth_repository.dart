@@ -463,7 +463,10 @@ class AuthRepository {
     }
     if (updates.isNotEmpty) {
       try {
-        await db.update('users', updates, where: 'id = ?', whereArgs: [userId]);
+        final updatedRows = await db.update('users', updates, where: 'id = ?', whereArgs: [userId]);
+        if (updatedRows == 0 && email != null && email.isNotEmpty) {
+          await db.update('users', updates, where: 'LOWER(email) = ?', whereArgs: [email.toLowerCase().trim()]);
+        }
       } catch (_) {}
       try {
         final cloudUpdates = Map<String, dynamic>.from(updates);

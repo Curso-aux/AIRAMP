@@ -397,8 +397,9 @@ class FirestoreService {
     if (isAvailable) {
       try {
         await usersCollection.doc(id).set(dataToSave, SetOptions(merge: true))
-            .timeout(const Duration(seconds: 12));
+            .timeout(const Duration(seconds: 4));
         debugPrint('[FirestoreService] Successfully saved user $id via SDK');
+        unawaited(_saveUserRest(id, dataToSave));
         return;
       } catch (e) {
         debugPrint('[FirestoreService] SDK save failed, falling back to REST: $e');
@@ -406,6 +407,11 @@ class FirestoreService {
     }
 
     // 2. REST API Fallback
+    await _saveUserRest(id, dataToSave);
+  }
+
+  /// REST fallback helper to patch document directly in Cloud Firestore
+  Future<void> _saveUserRest(String id, Map<String, dynamic> dataToSave) async {
     try {
       final dio = _dio;
       final fields = <String, dynamic>{};
@@ -672,12 +678,29 @@ class FirestoreService {
           final prefMust = prefs.getBool('must_change_password_$userId') == true;
 
           // Cloud is the primary source of truth across devices.
-          // If the cloud document has explicit must_change_password info, respect cloud state.
+          // However, if the user on THIS device has already successfully changed their password (must_change_password == 0),
+          // an outdated cloud snapshot must NEVER revert them back to must_change_password = 1.
+          final bool localHasUnlocked = existing.isNotEmpty &&
+              (existing.first['must_change_password'] == 0 ||
+               existing.first['must_change_password'] == '0' ||
+               existing.first['must_change_password'] == false) &&
+              prefMust == false;
+
           final hasCloudField = data.containsKey('must_change_password') ||
               data.containsKey('mustChangePassword');
-          final bool mustChangeBool = hasCloudField
-              ? cloudMust
-              : (localMust || prefMust);
+
+          final bool mustChangeBool;
+          if (localHasUnlocked) {
+            mustChangeBool = false;
+            // If cloud still has stale 1, auto-repair cloud to 0 so all devices stay unlocked!
+            if (cloudMust) {
+              unawaited(saveUser({'id': userId, 'must_change_password': 0, 'mustChangePassword': false}));
+            }
+          } else if (hasCloudField) {
+            mustChangeBool = cloudMust;
+          } else {
+            mustChangeBool = localMust || prefMust;
+          }
           final mustChangeVal = mustChangeBool ? 1 : 0;
           if (mustChangeVal == 1) {
             try {
