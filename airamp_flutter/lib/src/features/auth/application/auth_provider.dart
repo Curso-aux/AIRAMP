@@ -244,6 +244,14 @@ class AuthNotifier extends Notifier<User?> {
         cloudUser = await FirestoreService()
             .findUserByIdentifier(session.userId)
             .timeout(const Duration(seconds: 4), onTimeout: () => null);
+        if (cloudUser == null && userRows.isNotEmpty) {
+          final uEmail = (userRows.first['email'] as String? ?? '').trim();
+          if (uEmail.isNotEmpty && uEmail != session.userId) {
+            cloudUser = await FirestoreService()
+                .findUserByIdentifier(uEmail)
+                .timeout(const Duration(seconds: 4), onTimeout: () => null);
+          }
+        }
       } catch (_) {}
     }
 
@@ -271,13 +279,18 @@ class AuthNotifier extends Notifier<User?> {
       } catch (_) {}
     } else {
       try {
+        final cleanEmail = (userRows.isNotEmpty ? (userRows.first['email'] as String? ?? '') : '').toLowerCase().trim();
         if (userRows.isNotEmpty) {
           await db.update('users', {'must_change_password': 0},
-              where: 'id = ?', whereArgs: [userRows.first['id']]);
+              where: 'id = ?' + (cleanEmail.isNotEmpty ? ' OR LOWER(email) = ?' : ''),
+              whereArgs: [userRows.first['id'], if (cleanEmail.isNotEmpty) cleanEmail]);
         }
         await db.update('sessions', {'must_change_password': 0});
         final prefs = await SharedPreferences.getInstance();
         await prefs.remove('must_change_password_${session.userId}');
+        if (cleanEmail.isNotEmpty) {
+          await prefs.remove('must_change_password_$cleanEmail');
+        }
       } catch (_) {}
     }
 
@@ -324,10 +337,10 @@ class AuthNotifier extends Notifier<User?> {
     }
     ApiClient.setSession(session: session.session, userId: session.userId);
 
-    // Register real-time sync hook to refresh active user state when background cloud sync updates SQLite
-    FirestoreService.onUserSynced = () {
+    // Register real-time sync hook to refresh active user state when background cloud sync updates store
+    FirestoreService.addSyncListener(() {
       refreshProfile();
-    };
+    });
   }
 
   Future<void> register({
@@ -363,16 +376,24 @@ class AuthNotifier extends Notifier<User?> {
     if (state == null) return;
     try {
       final db = await DatabaseHelper().database;
-      final rows = await db.query('users', where: 'id = ?', whereArgs: [state!.id]);
+      final cleanEmail = state!.email.toLowerCase().trim();
+      final rows = await db.query(
+        'users',
+        where: 'id = ?' + (cleanEmail.isNotEmpty ? ' OR LOWER(email) = ?' : ''),
+        whereArgs: [state!.id, if (cleanEmail.isNotEmpty) cleanEmail],
+      );
       if (rows.isNotEmpty) {
         final r = rows.first;
         final photo = (r['profile_image'] ?? r['profileImage']) as String?;
         final mustChange = r['must_change_password'] == 1 ||
             r['must_change_password'] == true ||
             r['must_change_password'] == '1';
+        // If state already has mustChangePassword == false in this active session,
+        // do not allow a stale SQLite row to revert it back to true.
+        final resolvedMustChange = state!.mustChangePassword ? mustChange : false;
         state = state!.copyWith(
           profileImage: (photo != null && photo.isNotEmpty) ? photo : state!.profileImage,
-          mustChangePassword: mustChange,
+          mustChangePassword: resolvedMustChange,
         );
       }
     } catch (_) {}
@@ -395,6 +416,10 @@ class AuthNotifier extends Notifier<User?> {
       try {
         final prefs = await SharedPreferences.getInstance();
         await prefs.remove('must_change_password_${state!.id}');
+        if (state!.email.isNotEmpty) {
+          await prefs.remove('must_change_password_${state!.email}');
+          await prefs.remove('must_change_password_${state!.email.toLowerCase().trim()}');
+        }
       } catch (_) {}
 
       // Persist security notification for user without circular provider dependency
@@ -403,7 +428,9 @@ class AuthNotifier extends Notifier<User?> {
         type: 'security',
         title: 'Security Alert 🔐',
         message: 'Your account password was updated successfully.',
-        targetRoute: state!.role == 'teacher' ? '/teacher/profile' : '/student/profile',
+        targetRoute: state!.role == 'teacher'
+            ? '/teacher/profile'
+            : (state!.role == 'student' ? '/student/profile' : '/admin/profile'),
       ).catchError((_) => '');
     }
 
@@ -422,8 +449,8 @@ class AuthNotifier extends Notifier<User?> {
       await repository.updateProfile(
         userId: state!.id,
         fullName: fullName,
-        email: email,
-        username: username,
+        email: email ?? state!.email,
+        username: username ?? state!.username,
         profileImage: profileImage,
         password: password,
       );

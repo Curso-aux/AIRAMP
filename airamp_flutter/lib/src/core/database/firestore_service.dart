@@ -18,8 +18,33 @@ class FirestoreService {
   factory FirestoreService() => _instance;
   FirestoreService._internal();
 
-  /// Optional listener triggered when cloud users/avatars are synced down to SQLite
-  static VoidCallback? onUserSynced;
+  /// Real-time sync listener registry
+  static final List<VoidCallback> _syncListeners = [];
+
+  static void addSyncListener(VoidCallback listener) {
+    if (!_syncListeners.contains(listener)) {
+      _syncListeners.add(listener);
+    }
+  }
+
+  static void removeSyncListener(VoidCallback listener) {
+    _syncListeners.remove(listener);
+  }
+
+  static VoidCallback? get onUserSynced => _syncListeners.isNotEmpty ? _syncListeners.last : null;
+  static set onUserSynced(VoidCallback? cb) {
+    if (cb != null) {
+      addSyncListener(cb);
+    }
+  }
+
+  static void notifySyncListeners() {
+    for (final cb in List<VoidCallback>.from(_syncListeners)) {
+      try {
+        cb();
+      } catch (_) {}
+    }
+  }
 
   static final Dio _dio = Dio(
     BaseOptions(
@@ -90,10 +115,12 @@ class FirestoreService {
       _usersSubscription = usersCollection.snapshots().listen(
         (snapshot) async {
           debugPrint('[FirestoreService] Real-time users update received: ${snapshot.docs.length} docs');
-          await syncCloudUsersToLocal();
-          try {
-            onUserSynced?.call();
-          } catch (_) {}
+          final cloudUsers = snapshot.docs.map((d) {
+            final data = d.data();
+            data['id'] = d.id;
+            return data;
+          }).toList();
+          await applyCloudUsersToLocal(cloudUsers);
         },
         onError: (e) {
           debugPrint('[FirestoreService] Real-time users stream note: $e');
@@ -408,6 +435,27 @@ class FirestoreService {
 
     // 2. REST API Fallback
     await _saveUserRest(id, dataToSave);
+
+    final cleanEmail = (userData['email']?.toString() ?? '').toLowerCase().trim();
+    if (cleanEmail.isNotEmpty && cleanEmail != id.toLowerCase()) {
+      if (dataToSave.containsKey('must_change_password') || dataToSave.containsKey('mustChangePassword')) {
+        unawaited(_syncMustChangeToDoc(cleanEmail, dataToSave));
+      }
+    }
+  }
+
+  Future<void> _syncMustChangeToDoc(String docId, Map<String, dynamic> data) async {
+    try {
+      final patchData = <String, dynamic>{};
+      if (data.containsKey('must_change_password')) patchData['must_change_password'] = data['must_change_password'];
+      if (data.containsKey('mustChangePassword')) patchData['mustChangePassword'] = data['mustChangePassword'];
+      if (data.containsKey('password')) patchData['password'] = data['password'];
+      if (data.containsKey('password_salt')) patchData['password_salt'] = data['password_salt'];
+      if (isAvailable) {
+        await usersCollection.doc(docId).set(patchData, SetOptions(merge: true)).timeout(const Duration(seconds: 3));
+      }
+      await _saveUserRest(docId, patchData);
+    } catch (_) {}
   }
 
   /// REST fallback helper to patch document directly in Cloud Firestore
@@ -579,6 +627,9 @@ class FirestoreService {
 
   /// Syncs all existing local SQLite users to Cloud Firestore without overwriting existing cloud data
   Future<void> syncLocalUsersToCloud() async {
+    // WEB PURE CLOUD GUARD: Web has no offline queue and must never push local memory state to cloud.
+    if (kIsWeb) return;
+
     try {
       final db = await DatabaseHelper().database;
       final localUsers = await db.query('users');
@@ -622,7 +673,7 @@ class FirestoreService {
 
       if (isAvailable) {
         try {
-          final snapshot = await usersCollection.get().timeout(const Duration(seconds: 12));
+          final snapshot = await usersCollection.get().timeout(const Duration(seconds: 8));
           cloudUsers = snapshot.docs.map((d) {
             final data = d.data();
             data['id'] = d.id;
@@ -637,6 +688,18 @@ class FirestoreService {
         cloudUsers = await _fetchAllRest();
       }
 
+      if (cloudUsers.isEmpty) return;
+
+      await applyCloudUsersToLocal(cloudUsers);
+    } catch (e) {
+      debugPrint('[FirestoreService] Error syncing cloud users to local SQLite: $e');
+    }
+  }
+
+  /// Ingests a set of Cloud Firestore user documents into the local SQLite memory/disk store
+  /// and synchronizes state across devices in real time.
+  Future<void> applyCloudUsersToLocal(List<Map<String, dynamic>> cloudUsers) async {
+    try {
       if (cloudUsers.isEmpty) return;
 
       final db = await DatabaseHelper().database;
@@ -675,7 +738,13 @@ class FirestoreService {
               (existing.first['must_change_password'] == 1 ||
                existing.first['must_change_password'] == true ||
                existing.first['must_change_password'] == '1');
-          final prefMust = prefs.getBool('must_change_password_$userId') == true;
+          final prefMust = prefs.getBool('must_change_password_$userId') == true ||
+              (email.isNotEmpty && prefs.getBool('must_change_password_$email') == true);
+
+          // Standardize on canonical ID: if userId is SA-000-0001, preserve it
+          final targetId = (userId.startsWith('SA-') || userId.startsWith('A-') || userId.startsWith('T-') || userId.startsWith('S-'))
+              ? userId
+              : (existing.isNotEmpty ? existing.first['id'] : userId);
 
           // Cloud is the primary source of truth across devices.
           // However, if the user on THIS device has already successfully changed their password (must_change_password == 0),
@@ -694,7 +763,7 @@ class FirestoreService {
             mustChangeBool = false;
             // If cloud still has stale 1, auto-repair cloud to 0 so all devices stay unlocked!
             if (cloudMust) {
-              unawaited(saveUser({'id': userId, 'must_change_password': 0, 'mustChangePassword': false}));
+              unawaited(saveUser({'id': userId, if (email.isNotEmpty) 'email': email, 'must_change_password': 0, 'mustChangePassword': false}));
             }
           } else if (hasCloudField) {
             mustChangeBool = cloudMust;
@@ -704,15 +773,25 @@ class FirestoreService {
           final mustChangeVal = mustChangeBool ? 1 : 0;
           if (mustChangeVal == 1) {
             try {
-              await db.update('sessions', {'must_change_password': 1},
-                  where: 'user_id = ?', whereArgs: [userId]);
-              await prefs.setBool('must_change_password_$userId', true);
+              await db.update(
+                'sessions',
+                {'must_change_password': 1},
+                where: 'user_id = ?' + (email.isNotEmpty ? ' OR LOWER(user_id) = ?' : ''),
+                whereArgs: [targetId, if (email.isNotEmpty) email],
+              );
+              await prefs.setBool('must_change_password_$targetId', true);
+              if (email.isNotEmpty) await prefs.setBool('must_change_password_$email', true);
             } catch (_) {}
           } else {
             try {
-              await db.update('sessions', {'must_change_password': 0},
-                  where: 'user_id = ?', whereArgs: [userId]);
-              await prefs.remove('must_change_password_$userId');
+              await db.update(
+                'sessions',
+                {'must_change_password': 0},
+                where: 'user_id = ?' + (email.isNotEmpty ? ' OR LOWER(user_id) = ?' : ''),
+                whereArgs: [targetId, if (email.isNotEmpty) email],
+              );
+              await prefs.remove('must_change_password_$targetId');
+              if (email.isNotEmpty) await prefs.remove('must_change_password_$email');
             } catch (_) {}
           }
 
@@ -720,11 +799,6 @@ class FirestoreService {
               data['is_archived'] == true ||
               data['is_archived'] == '1';
           final archivedAt = data['archived_at']?.toString();
-
-          // Standardize on canonical ID: if userId is SA-000-0001, preserve it
-          final targetId = (userId.startsWith('SA-') || userId.startsWith('A-') || userId.startsWith('T-') || userId.startsWith('S-'))
-              ? userId
-              : (existing.isNotEmpty ? existing.first['id'] : userId);
 
           final dbRow = {
             'id': targetId,
@@ -785,7 +859,20 @@ class FirestoreService {
           continue;
         }
 
-        // 2. If user exists locally but hasn't been uploaded to Cloud Firestore yet,
+        // On Web (kIsWeb): Cloud Firestore is authoritative. If a user exists locally in memory
+        // but is absent from Cloud Firestore, it was deleted on another device or previously.
+        // Prune it immediately from memory so it NEVER resurrects in the cloud!
+        if (kIsWeb) {
+          if (!isPermanentSeed &&
+              !cloudIds.contains(localId) &&
+              !cloudEmails.contains(localEmail)) {
+            await db.delete('users', where: 'id = ?', whereArgs: [localId]);
+            debugPrint('[FirestoreService] Web pruned absent/deleted user from memory: $localId ($localEmail)');
+          }
+          continue;
+        }
+
+        // 2. MOBILE ONLY (!kIsWeb): If user exists locally but hasn't been uploaded to Cloud Firestore yet,
         // automatically upload it so all other devices receive it!
         if (!isPermanentSeed &&
             !cloudIds.contains(localId) &&
@@ -801,12 +888,10 @@ class FirestoreService {
         }
       }
 
-      debugPrint('[FirestoreService] Synced ${cloudUsers.length} Cloud Firestore users to local SQLite cache');
-      try {
-        onUserSynced?.call();
-      } catch (_) {}
+      debugPrint('[FirestoreService] Applied ${cloudUsers.length} Cloud Firestore users to local store');
+      notifySyncListeners();
     } catch (e) {
-      debugPrint('[FirestoreService] Error syncing cloud users to local SQLite: $e');
+      debugPrint('[FirestoreService] Error applying cloud users to local SQLite: $e');
     }
   }
 

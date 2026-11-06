@@ -186,19 +186,35 @@ class AuthRepository {
       // Data already in memory from credential verification — apply instantly in 0ms!
       await _applyCloudProfile(cloudUser, user, userId, db);
     } else {
-      // Local SQLite credentials already verified — sync avatar/profile in background
-      // so login navigation is 100% instant and never blocked by network latency!
-      unawaited(() async {
+      // If local SQLite suspects must_change_password, check Cloud Firestore synchronously
+      // to ensure we never force password change if the user already updated their password on another device!
+      final localMust = user['must_change_password'] == 1 ||
+          user['must_change_password'] == true ||
+          user['must_change_password'] == '1';
+      if (localMust) {
         try {
           final cu = await FirestoreService()
               .findUserByIdentifier(user['email']?.toString() ?? user['username']?.toString() ?? userId)
-              .timeout(const Duration(seconds: 3), onTimeout: () => null);
+              .timeout(const Duration(seconds: 2), onTimeout: () => null);
           if (cu != null) {
-            final appDb = await DatabaseHelper().database;
-            await _applyCloudProfile(cu, null, userId, appDb);
+            cloudUser = cu;
+            await _applyCloudProfile(cu, user, userId, db);
           }
         } catch (_) {}
-      }());
+      } else {
+        // Local SQLite credentials already verified and no password change needed — sync avatar in background
+        unawaited(() async {
+          try {
+            final cu = await FirestoreService()
+                .findUserByIdentifier(user['email']?.toString() ?? user['username']?.toString() ?? userId)
+                .timeout(const Duration(seconds: 3), onTimeout: () => null);
+            if (cu != null) {
+              final appDb = await DatabaseHelper().database;
+              await _applyCloudProfile(cu, null, userId, appDb);
+            }
+          } catch (_) {}
+        }());
+      }
     }
 
     final mustChange = user['must_change_password'] == 1 ||
@@ -235,13 +251,25 @@ class AuthRepository {
       } catch (_) {}
     }
 
-    // Synchronize authenticated user with Cloud Firestore safely (never overwrite cloud avatar with null)
+    // Synchronize authenticated user with Cloud Firestore safely (never overwrite cloud avatar with null,
+    // and never revert cloud must_change_password to 1 if cloud already has 0!)
     try {
       final syncData = Map<String, dynamic>.from(user);
       if (syncData['profile_image'] == null ||
           (syncData['profile_image'] is String && (syncData['profile_image'] as String).isEmpty)) {
         syncData.remove('profile_image');
         syncData.remove('profileImage');
+      }
+      if (cloudUser != null) {
+        final hasCloudMust = cloudUser.containsKey('must_change_password') ||
+            cloudUser.containsKey('mustChangePassword');
+        if (hasCloudMust) {
+          final cm = cloudUser['must_change_password'];
+          final cmCamel = cloudUser['mustChangePassword'];
+          final cloudMust = cm == 1 || cm == true || cm == '1' || cmCamel == true;
+          syncData['must_change_password'] = cloudMust ? 1 : 0;
+          syncData['mustChangePassword'] = cloudMust;
+        }
       }
       unawaited(FirestoreService().saveUser(syncData));
     } catch (_) {}
@@ -423,17 +451,47 @@ class AuthRepository {
   Future<AuthSession?> currentSession() async {
     final db = await DatabaseHelper().database;
     final rows = await db.query('sessions', orderBy: 'id DESC', limit: 1);
-    if (rows.isEmpty) return null;
-    final r = rows.first;
-    final mustChange = r['must_change_password'] == 1 ||
-        r['must_change_password'] == true ||
-        r['must_change_password'] == '1';
-    return AuthSession(
-      session: r['token'] as String,
-      userId: r['user_id'] as String,
-      role: r['role'] as String,
-      mustChangePassword: mustChange,
-    );
+    if (rows.isNotEmpty) {
+      final r = rows.first;
+      final mustChange = r['must_change_password'] == 1 ||
+          r['must_change_password'] == true ||
+          r['must_change_password'] == '1';
+      return AuthSession(
+        session: r['token'] as String,
+        userId: r['user_id'] as String,
+        role: r['role'] as String,
+        mustChangePassword: mustChange,
+      );
+    }
+
+    // Fast-path for Web with in-memory SQLite: restore active session from SharedPreferences
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final savedUserId = prefs.getString('auth_session_user_id');
+      final savedRole = prefs.getString('auth_session_role');
+      final savedToken = prefs.getString('auth_session_token');
+      final savedMust = prefs.getBool('auth_session_must_change_password') ?? false;
+
+      if (savedUserId != null && savedRole != null && savedToken != null) {
+        try {
+          await db.insert('sessions', {
+            'user_id': savedUserId,
+            'token': savedToken,
+            'role': savedRole,
+            'must_change_password': savedMust ? 1 : 0,
+            'created_at': DateTime.now().toIso8601String(),
+          });
+        } catch (_) {}
+        return AuthSession(
+          session: savedToken,
+          userId: savedUserId,
+          role: savedRole,
+          mustChangePassword: savedMust,
+        );
+      }
+    } catch (_) {}
+
+    return null;
   }
 
   Future<void> updateProfile({
@@ -450,22 +508,31 @@ class AuthRepository {
     if (username != null) updates['username'] = username;
     if (email != null) updates['email'] = email;
     if (profileImage != null) updates['profile_image'] = profileImage;
+    final cleanEmail = (email ?? '').toLowerCase().trim();
     if (password != null && password.isNotEmpty) {
       final salt = DatabaseHelper.generateSalt();
       updates['password'] = DatabaseHelper.hashPassword(password, salt);
       updates['password_salt'] = salt;
       updates['must_change_password'] = 0;
       try {
-        await db.update('sessions', {'must_change_password': 0});
+        await db.update(
+          'sessions',
+          {'must_change_password': 0},
+          where: 'user_id = ?' + (cleanEmail.isNotEmpty ? ' OR LOWER(user_id) = ?' : ''),
+          whereArgs: [userId, if (cleanEmail.isNotEmpty) cleanEmail],
+        );
         final prefs = await SharedPreferences.getInstance();
         await prefs.remove('must_change_password_$userId');
+        if (cleanEmail.isNotEmpty) {
+          await prefs.remove('must_change_password_$cleanEmail');
+        }
       } catch (_) {}
     }
     if (updates.isNotEmpty) {
       try {
         final updatedRows = await db.update('users', updates, where: 'id = ?', whereArgs: [userId]);
-        if (updatedRows == 0 && email != null && email.isNotEmpty) {
-          await db.update('users', updates, where: 'LOWER(email) = ?', whereArgs: [email.toLowerCase().trim()]);
+        if (updatedRows == 0 && cleanEmail.isNotEmpty) {
+          await db.update('users', updates, where: 'LOWER(email) = ?', whereArgs: [cleanEmail]);
         }
       } catch (_) {}
       try {
@@ -476,7 +543,12 @@ class AuthRepository {
           cloudUpdates['must_change_password'] = 0;
           cloudUpdates['mustChangePassword'] = false;
         }
-        await FirestoreService().saveUser({'id': userId, ...cloudUpdates});
+        await FirestoreService().saveUser({'id': userId, if (cleanEmail.isNotEmpty) 'email': cleanEmail, ...cloudUpdates});
+        if (cleanEmail.isNotEmpty && cleanEmail != userId.toLowerCase()) {
+          try {
+            await FirestoreService().saveUser({'id': cleanEmail, ...cloudUpdates});
+          } catch (_) {}
+        }
       } catch (_) {}
     }
 
@@ -688,6 +760,13 @@ class AuthRepository {
       }
     }
     await db.delete('sessions');
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.remove('auth_session_user_id');
+      await prefs.remove('auth_session_role');
+      await prefs.remove('auth_session_token');
+      await prefs.remove('auth_session_must_change_password');
+    } catch (_) {}
     ApiClient.clearSession();
     WebSessionHelper.clearSession();
   }
@@ -710,6 +789,13 @@ class AuthRepository {
       'must_change_password': mustChangePassword ? 1 : 0,
       'created_at': DateTime.now().toIso8601String(),
     });
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString('auth_session_user_id', userId);
+      await prefs.setString('auth_session_role', role);
+      await prefs.setString('auth_session_token', token);
+      await prefs.setBool('auth_session_must_change_password', mustChangePassword);
+    } catch (_) {}
   }
 
   static Future<void> _applyCloudProfile(
@@ -737,10 +823,26 @@ class AuthRepository {
       if (user != null) {
         user['must_change_password'] = cloudMust ? 1 : 0;
       }
+      final cleanEmail = (cloudUser['email']?.toString() ?? '').toLowerCase().trim();
       try {
+        await db.update(
+          'users',
+          {'must_change_password': cloudMust ? 1 : 0},
+          where: 'id = ?' + (cleanEmail.isNotEmpty ? ' OR LOWER(email) = ?' : ''),
+          whereArgs: [userId, if (cleanEmail.isNotEmpty) cleanEmail],
+        );
+        await db.update(
+          'sessions',
+          {'must_change_password': cloudMust ? 1 : 0},
+          where: 'user_id = ?' + (cleanEmail.isNotEmpty ? ' OR LOWER(user_id) = ?' : ''),
+          whereArgs: [userId, if (cleanEmail.isNotEmpty) cleanEmail],
+        );
         final prefs = await SharedPreferences.getInstance();
         if (!cloudMust) {
           await prefs.remove('must_change_password_$userId');
+          if (cleanEmail.isNotEmpty) {
+            await prefs.remove('must_change_password_$cleanEmail');
+          }
         } else {
           await prefs.setBool('must_change_password_$userId', true);
         }

@@ -510,10 +510,18 @@ class DatabaseHelper {
 
   Future<Database> _initDatabase() async {
     if (kIsWeb) {
+      // WEB PURE CLOUD-FIRST ARCHITECTURE:
+      // Web browsers have no persistent IndexedDB local database file.
+      // SQLite runs 100% in-memory (inMemoryDatabasePath). This eliminates cross-device
+      // IndexedDB stale cache conflicts, resurrection of deleted accounts, and WebWorker locks.
+      // Cloud Firestore is the global, real-time live source of truth.
       try {
         databaseFactory = databaseFactoryFfiWeb;
+        try {
+          await databaseFactory.deleteDatabase('airamp_local.db');
+        } catch (_) {}
         return await openDatabase(
-          'airamp_local.db',
+          inMemoryDatabasePath,
           version: 21,
           onCreate: _onCreate,
           onUpgrade: _onUpgrade,
@@ -521,11 +529,14 @@ class DatabaseHelper {
         );
       } catch (e) {
         debugPrint(
-          'Failed to open with shared worker, falling back to databaseFactoryFfiWebNoWebWorker: $e',
+          'Failed to open in-memory with shared worker, falling back to databaseFactoryFfiWebNoWebWorker: $e',
         );
         databaseFactory = databaseFactoryFfiWebNoWebWorker;
+        try {
+          await databaseFactory.deleteDatabase('airamp_local.db');
+        } catch (_) {}
         return await openDatabase(
-          'airamp_local.db',
+          inMemoryDatabasePath,
           version: 21,
           onCreate: _onCreate,
           onUpgrade: _onUpgrade,
@@ -4091,12 +4102,13 @@ class DatabaseHelper {
     } catch (_) {}
 
     // Ensure admin_2 has username & hashed password (guarded against resurrection after deletion)
+    // NOTE: On Web (kIsWeb), never seed demo admin_2. All accounts on Web stream directly from Cloud Firestore.
     try {
       final prefs = await SharedPreferences.getInstance();
       final deletedList = prefs.getStringList('permanently_deleted_accounts') ?? [];
       final wasDeleted = deletedList.contains('admin_2') || deletedList.contains('admin@aira.edu');
 
-      if (!wasDeleted) {
+      if (!kIsWeb && !wasDeleted) {
         final existingAdmin2 = await db.query(
           'users',
           where: 'email = ?',

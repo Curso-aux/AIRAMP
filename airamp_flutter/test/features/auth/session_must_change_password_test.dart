@@ -84,6 +84,18 @@ void main() {
 
       expect(postChangeUser, isNotNull);
       expect(postChangeUser!.mustChangePassword, isFalse);
+
+      // 6. Test logging out and logging in again with the new password
+      await postChangeContainer.read(authProvider.notifier).logout();
+
+      final reLoginContainer = ProviderContainer();
+      addTearDown(reLoginContainer.dispose);
+
+      await reLoginContainer.read(authProvider.notifier).login(testStudentEmail, 'NewStrongPassword@123');
+      final reLoginUser = reLoginContainer.read(authProvider);
+
+      expect(reLoginUser, isNotNull);
+      expect(reLoginUser!.mustChangePassword, isFalse);
     });
 
     test('bootstrap enforces mustChangePassword even if user profile in users table is missing or unindexed', () async {

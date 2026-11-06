@@ -54,7 +54,7 @@ class OfflineSyncNotifier extends Notifier<OfflineSyncState> {
     });
 
     // Wire up real-time user sync callback to immediately notify Riverpod UI
-    FirestoreService.onUserSynced = () {
+    void handleSync() {
       try {
         ref.read(schoolAdminsProvider.notifier).loadAdmins();
         ref.read(archivedSchoolAdminsProvider.notifier).loadArchivedAdmins();
@@ -65,7 +65,12 @@ class OfflineSyncNotifier extends Notifier<OfflineSyncState> {
         ref.read(schoolsListProvider.notifier).loadSchools();
         ref.invalidate(superAdminStatsProvider);
       } catch (_) {}
-    };
+    }
+
+    FirestoreService.addSyncListener(handleSync);
+    ref.onDispose(() {
+      FirestoreService.removeSyncListener(handleSync);
+    });
 
     // Activate Firestore real-time live listener
     FirestoreService().startRealtimeUserSync();
