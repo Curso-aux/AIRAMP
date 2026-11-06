@@ -98,22 +98,6 @@ class DatabaseHelper {
     try {
       await db.rawUpdate('''
         UPDATE users 
-        SET profile_image = 'preset:girl_1' 
-        WHERE (id = 'student_1' OR email = 'maria@test.com') 
-          AND (profile_image IS NULL OR profile_image = '')
-      ''');
-    } catch (_) {}
-    try {
-      await db.rawUpdate('''
-        UPDATE users 
-        SET profile_image = 'preset:boy_1' 
-        WHERE (id = 'teacher_1' OR email = 'john.reyes@deped.gov.ph') 
-          AND (profile_image IS NULL OR profile_image = '')
-      ''');
-    } catch (_) {}
-    try {
-      await db.rawUpdate('''
-        UPDATE users 
         SET id = 'SA-000-0001'
         WHERE id = 'super_admin_christian' OR email = 'evangelistachristian88@gmail.com'
       ''');
@@ -582,11 +566,8 @@ class DatabaseHelper {
     ''');
 
     final saltChristian = generateSalt();
-    final saltAdmin2 = generateSalt();
-    final saltTeacher1 = generateSalt();
-    final saltStudent1 = generateSalt();
 
-    // Seed default authentic accounts with salted hashes
+    // Seed default authentic root super administrator with salted hash
     await db.insert('users', {
       'id': 'super_admin_christian',
       'email': 'evangelistachristian88@gmail.com',
@@ -598,45 +579,6 @@ class DatabaseHelper {
       'section': null,
       'grade': null,
       'profile_image': 'assets/images/aira_mascot_logo.png',
-      'created_at': DateTime.now().toIso8601String(),
-    });
-    await db.insert('users', {
-      'id': 'admin_2',
-      'email': 'admin@aira.edu',
-      'username': 'admin',
-      'password': hashPassword('Admin@123', saltAdmin2),
-      'password_salt': saltAdmin2,
-      'role': 'admin',
-      'full_name': 'School Administrator',
-      'section': null,
-      'grade': null,
-      'profile_image': 'preset:champion',
-      'created_at': DateTime.now().toIso8601String(),
-    });
-    await db.insert('users', {
-      'id': 'teacher_1',
-      'email': 'john.reyes@deped.gov.ph',
-      'username': 'john.reyes',
-      'password': hashPassword('John@123', saltTeacher1),
-      'password_salt': saltTeacher1,
-      'role': 'teacher',
-      'full_name': 'Sir John Reyes',
-      'section': null,
-      'grade': null,
-      'profile_image': 'preset:boy_1',
-      'created_at': DateTime.now().toIso8601String(),
-    });
-    await db.insert('users', {
-      'id': 'student_1',
-      'email': 'maria@test.com',
-      'username': 'maria.lopez',
-      'password': hashPassword('Maria@123', saltStudent1),
-      'password_salt': saltStudent1,
-      'role': 'student',
-      'full_name': 'Maria Lopez',
-      'section': 'Emerald',
-      'grade': 'Grade 10',
-      'profile_image': 'preset:girl_1',
       'created_at': DateTime.now().toIso8601String(),
     });
 
@@ -1027,40 +969,12 @@ class DatabaseHelper {
           'full_name': 'Christian Evangelista',
           'created_at': DateTime.now().toIso8601String(),
         });
-        await db.insert('users', {
-          'id': 'teacher_1',
-          'email': 'john.reyes@deped.gov.ph',
-          'password': 'John@123',
-          'role': 'teacher',
-          'full_name': 'Sir John',
-          'created_at': DateTime.now().toIso8601String(),
-        });
-        await db.insert('users', {
-          'id': 'student_1',
-          'email': 'maria@test.com',
-          'password': 'Maria@123',
-          'role': 'student',
-          'full_name': 'Maria Lopez',
-          'created_at': DateTime.now().toIso8601String(),
-        });
       }
     }
 
     if (oldVersion < 3) {
       // Purge legacy seeded admin account
       await db.delete('users', where: "id = 'super_admin_1' OR id = 'admin_1' OR email = 'aira@admin'");
-      await db.update(
-        'users',
-        {'password': 'John@123'},
-        where: 'email = ?',
-        whereArgs: ['john.reyes@deped.gov.ph'],
-      );
-      await db.update(
-        'users',
-        {'password': 'Maria@123'},
-        where: 'email = ?',
-        whereArgs: ['maria@test.com'],
-      );
     }
 
     if (oldVersion < 4) {
@@ -1198,96 +1112,6 @@ class DatabaseHelper {
         await db.execute('ALTER TABLE users ADD COLUMN grade TEXT');
       } catch (_) {}
 
-      // Update student_1 with section and grade
-      await db.update(
-        'users',
-        {'section': 'Emerald', 'grade': 'Grade 10'},
-        where: 'id = ?',
-        whereArgs: ['student_1'],
-      );
-
-      // Update teacher_1 name if needed
-      await db.update(
-        'users',
-        {'full_name': 'Sir John Reyes'},
-        where: 'id = ?',
-        whereArgs: ['teacher_1'],
-      );
-
-      // Seed additional realistic contacts
-      final usersToSeed = [
-        {
-          'id': 'teacher_2',
-          'email': 'sarah.jenkins@university.edu',
-          'password': 'Sarah@123',
-          'role': 'admin',
-          'full_name': 'Prof. Sarah Jenkins',
-          'section': null,
-          'grade': null,
-          'created_at': DateTime.now().toIso8601String(),
-        },
-        {
-          'id': 'student_2',
-          'email': 'juan.delacruz@school.edu',
-          'password': 'Juan@123',
-          'role': 'student',
-          'full_name': 'Juan Dela Cruz',
-          'section': 'Ruby',
-          'grade': 'Grade 10',
-          'created_at': DateTime.now().toIso8601String(),
-        },
-        {
-          'id': 'student_3',
-          'email': 'angela.santos@school.edu',
-          'password': 'Angela@123',
-          'role': 'student',
-          'full_name': 'Angela Santos',
-          'section': 'Diamond',
-          'grade': 'Grade 11',
-          'created_at': DateTime.now().toIso8601String(),
-        },
-        {
-          'id': 'student_4',
-          'email': 'mark.bautista@school.edu',
-          'password': 'Mark@123',
-          'role': 'student',
-          'full_name': 'Mark Bautista',
-          'section': 'Emerald',
-          'grade': 'Grade 10',
-          'created_at': DateTime.now().toIso8601String(),
-        },
-        {
-          'id': 'student_5',
-          'email': 'bea.alonzo@school.edu',
-          'password': 'Bea@123',
-          'role': 'student',
-          'full_name': 'Bea Alonzo',
-          'section': 'Gold',
-          'grade': 'Grade 12',
-          'created_at': DateTime.now().toIso8601String(),
-        },
-        {
-          'id': 'student_6',
-          'email': 'christian.rivera@school.edu',
-          'password': 'Christian@123',
-          'role': 'student',
-          'full_name': 'Christian Rivera',
-          'section': 'Ruby',
-          'grade': 'Grade 11',
-          'created_at': DateTime.now().toIso8601String(),
-        },
-      ];
-
-      for (final u in usersToSeed) {
-        final exists = await db.query(
-          'users',
-          where: 'id = ?',
-          whereArgs: [u['id']],
-        );
-        if (exists.isEmpty) {
-          await db.insert('users', u);
-        }
-      }
     }
 
     if (oldVersion < 13) {
@@ -3538,6 +3362,21 @@ class DatabaseHelper {
     onProgress?.call(0.1, 'Purging local student enrollments and records ($total students)...');
 
     final db = await database;
+    final idToEmail = <String, String>{};
+    try {
+      final rows = await db.query(
+        'users',
+        columns: ['id', 'email'],
+        where: 'id IN (${studentIds.map((_) => '?').join(',')})',
+        whereArgs: studentIds,
+      );
+      for (final r in rows) {
+        final id = r['id']?.toString() ?? '';
+        final email = r['email']?.toString() ?? '';
+        if (id.isNotEmpty) idToEmail[id] = email;
+      }
+    } catch (_) {}
+
     final batch = db.batch();
     for (final id in studentIds) {
       batch.delete('enrollments', where: 'student_id = ?', whereArgs: [id]);
@@ -3570,7 +3409,7 @@ class DatabaseHelper {
       await Future.wait(
         chunk.map((id) async {
           try {
-            await FirestoreService().deleteUser(id);
+            await FirestoreService().deleteUser(id, email: idToEmail[id]);
           } catch (_) {}
         }),
       );
@@ -4101,56 +3940,9 @@ class DatabaseHelper {
       }
     } catch (_) {}
 
-    // Ensure admin_2 has username & hashed password (guarded against resurrection after deletion)
-    // NOTE: On Web (kIsWeb), never seed demo admin_2. All accounts on Web stream directly from Cloud Firestore.
+    // Ensure demo accounts (admin_2, teacher_1, student_1) are permanently purged from local database
     try {
-      final prefs = await SharedPreferences.getInstance();
-      final deletedList = prefs.getStringList('permanently_deleted_accounts') ?? [];
-      final wasDeleted = deletedList.contains('admin_2') || deletedList.contains('admin@aira.edu');
-
-      if (!kIsWeb && !wasDeleted) {
-        final existingAdmin2 = await db.query(
-          'users',
-          where: 'email = ?',
-          whereArgs: ['admin@aira.edu'],
-        );
-        final saltAdmin2 = generateSalt();
-        if (existingAdmin2.isEmpty) {
-          final hasSeeded = prefs.getBool('seed_admin_2_initialized') ?? false;
-          if (!hasSeeded) {
-            await prefs.setBool('seed_admin_2_initialized', true);
-            await db.insert('users', {
-              'id': 'admin_2',
-              'email': 'admin@aira.edu',
-              'password': hashPassword('Admin@123', saltAdmin2),
-              'password_salt': saltAdmin2,
-              'role': 'admin',
-              'full_name': 'School Administrator',
-              'username': 'admin',
-              'section': null,
-              'grade': null,
-              'created_at': DateTime.now().toIso8601String(),
-            });
-          }
-        } else {
-          final currentSalt = existingAdmin2.first['password_salt'] as String?;
-          final currentPass = existingAdmin2.first['password'] as String?;
-          if (currentSalt == null ||
-              currentSalt.isEmpty ||
-              currentPass == 'Admin@123') {
-            await db.update(
-              'users',
-              {
-                'username': 'admin',
-                'password': hashPassword('Admin@123', saltAdmin2),
-                'password_salt': saltAdmin2,
-              },
-              where: 'email = ?',
-              whereArgs: ['admin@aira.edu'],
-            );
-          }
-        }
-      }
+      await db.delete('users', where: "id IN ('admin_2', 'teacher_1', 'student_1') OR email IN ('admin@aira.edu', 'john.reyes@deped.gov.ph', 'maria@test.com')");
     } catch (_) {}
 
     // Ensure evangelistachristian88@gmail.com exists as Primary Root Super Administrator
@@ -4215,68 +4007,12 @@ class DatabaseHelper {
       await db.execute('ALTER TABLE users ADD COLUMN username TEXT');
     } catch (_) {}
 
-    // Ensure teacher and student have correct roles, usernames, and hashed passwords
+    // Purge any legacy teacher or student seeds
     try {
-      final teacherRow = await db.query(
+      await db.delete(
         'users',
-        where: "email = 'john.reyes@deped.gov.ph' OR id = 'teacher_1'",
+        where: "id IN ('teacher_1', 'teacher_test_1', 'student_1', 'student_2', 'student_3', 'student_4') OR email IN ('john.reyes@deped.gov.ph', 'teacher1@aira.edu', 'maria@test.com')",
       );
-      if (teacherRow.isNotEmpty) {
-        // Ensure teacher role is explicitly 'teacher'
-        await db.update(
-          'users',
-          {'role': 'teacher'},
-          where:
-              "(email = 'john.reyes@deped.gov.ph' OR id = 'teacher_1') AND role != 'teacher'",
-        );
-
-        final currentSalt = teacherRow.first['password_salt'] as String?;
-        final currentPass = teacherRow.first['password'] as String?;
-        if (currentSalt == null ||
-            currentSalt.isEmpty ||
-            currentPass == 'John@123') {
-          final saltTeacher = generateSalt();
-          await db.update(
-            'users',
-            {
-              'role': 'teacher',
-              'username': 'john.reyes',
-              'full_name': 'Sir John Reyes',
-              'password': hashPassword('John@123', saltTeacher),
-              'password_salt': saltTeacher,
-            },
-            where: "id = ?",
-            whereArgs: [teacherRow.first['id']],
-          );
-        }
-      }
-
-      final studentRow = await db.query(
-        'users',
-        where: "email = 'maria@test.com' OR id = 'student_1'",
-      );
-      if (studentRow.isNotEmpty) {
-        final currentSalt = studentRow.first['password_salt'] as String?;
-        final currentPass = studentRow.first['password'] as String?;
-        if (currentSalt == null ||
-            currentSalt.isEmpty ||
-            currentPass == 'Maria@123') {
-          final saltStudent = generateSalt();
-          await db.update(
-            'users',
-            {
-              'role': 'student',
-              'username': 'maria.lopez',
-              'section': 'Emerald',
-              'grade': 'Grade 10',
-              'password': hashPassword('Maria@123', saltStudent),
-              'password_salt': saltStudent,
-            },
-            where: "id = ?",
-            whereArgs: [studentRow.first['id']],
-          );
-        }
-      }
     } catch (_) {}
 
     // Seed Announcements if empty
@@ -4319,8 +4055,8 @@ class DatabaseHelper {
         'grade_level': 'Grade 10',
         'semester': '1st Semester',
         'unlock_type': 'Sequential',
-        'teacher_id': 'teacher_1',
-        'teacher_name': 'Sir John Reyes',
+        'teacher_id': null,
+        'teacher_name': null,
         'created_at': DateTime.now()
             .subtract(const Duration(days: 5))
             .toIso8601String(),
@@ -4531,8 +4267,6 @@ class DatabaseHelper {
       await db.update(
         'subjects',
         {
-          'teacher_id': 'teacher_1',
-          'teacher_name': 'Sir John Reyes',
           'grade_level': 'Grade 10',
         },
         where: 'id = ?',
@@ -4556,8 +4290,8 @@ class DatabaseHelper {
         'grade_level': 'Grade 11',
         'semester': '1st Semester',
         'unlock_type': 'Flexible',
-        'teacher_id': 'teacher_1',
-        'teacher_name': 'Sir John Reyes',
+        'teacher_id': null,
+        'teacher_name': null,
         'created_at': DateTime.now()
             .subtract(const Duration(days: 2))
             .toIso8601String(),
@@ -4641,44 +4375,7 @@ class DatabaseHelper {
       );
     }
 
-    // Pre-enroll student_1 (Maria Lopez) in CS101 and seed an initial quiz attempt
-    if (cs101Id > 0 && lo1Id > 0) {
-      await db.insert('enrollments', {
-        'student_id': 'student_1',
-        'subject_id': cs101Id,
-        'enrolled_at': DateTime.now()
-            .subtract(const Duration(days: 4))
-            .toIso8601String(),
-        'status': 'active',
-      });
-
-      // Record Maria\'s attempt for LO 1 (Score 3/3, 100%, passed)
-      await db.insert('quiz_attempts', {
-        'student_id': 'student_1',
-        'lo_id': lo1Id,
-        'subject_id': cs101Id,
-        'score': 3,
-        'total_questions': 3,
-        'percentage': 100.0,
-        'is_passed': 1,
-        'duration_seconds': 145,
-        'attempted_at': DateTime.now()
-            .subtract(const Duration(days: 1))
-            .toIso8601String(),
-      });
-
-      // Mark LO 1 completed for student_1
-      await db.insert('student_progress', {
-        'student_id': 'student_1',
-        'lo_id': lo1Id,
-        'subject_id': cs101Id,
-        'is_completed': 1,
-        'score': 3,
-        'completed_at': DateTime.now()
-            .subtract(const Duration(days: 1))
-            .toIso8601String(),
-      });
-    }
+    // Sections table initialization
 
     // Seed Sections if empty and ensure enrollment_key is populated
     try {
@@ -4835,64 +4532,6 @@ class DatabaseHelper {
         where: "name LIKE 'Test Subject for Deletion%'",
       );
 
-      // Ensure enrollments for CS101 and CS202
-      final cs101Rows = await db.query(
-        'subjects',
-        where: 'subject_code = ?',
-        whereArgs: ['CS101'],
-      );
-      final cs202Rows = await db.query(
-        'subjects',
-        where: 'subject_code = ?',
-        whereArgs: ['CS202'],
-      );
-
-      if (cs101Rows.isNotEmpty) {
-        final sub1Id = cs101Rows.first['id'] as int;
-        for (final sid in ['student_1', 'student_2', 'student_4']) {
-          final u = await db.query('users', where: 'id = ?', whereArgs: [sid]);
-          if (u.isEmpty) continue;
-          final enr = await db.query(
-            'enrollments',
-            where: 'student_id = ? AND subject_id = ?',
-            whereArgs: [sid, sub1Id],
-          );
-          if (enr.isEmpty) {
-            await db.insert('enrollments', {
-              'student_id': sid,
-              'subject_id': sub1Id,
-              'enrolled_at': DateTime.now()
-                  .subtract(const Duration(days: 4))
-                  .toIso8601String(),
-              'status': 'active',
-            });
-          }
-        }
-      }
-
-      if (cs202Rows.isNotEmpty) {
-        final sub2Id = cs202Rows.first['id'] as int;
-        for (final sid in ['student_1', 'student_3']) {
-          final u = await db.query('users', where: 'id = ?', whereArgs: [sid]);
-          if (u.isEmpty) continue;
-          final enr = await db.query(
-            'enrollments',
-            where: 'student_id = ? AND subject_id = ?',
-            whereArgs: [sid, sub2Id],
-          );
-          if (enr.isEmpty) {
-            await db.insert('enrollments', {
-              'student_id': sid,
-              'subject_id': sub2Id,
-              'enrolled_at': DateTime.now()
-                  .subtract(const Duration(days: 3))
-                  .toIso8601String(),
-              'status': 'active',
-            });
-          }
-        }
-      }
-
       // Ensure default class schedules for Grade 10 - Emerald exist
       try {
         final emSchedCount =
@@ -4904,14 +4543,12 @@ class DatabaseHelper {
             0;
         if (emSchedCount == 0) {
           final now = DateTime.now().toIso8601String();
-          final subId = cs101Rows.isNotEmpty
-              ? (cs101Rows.first['id'] as int)
-              : 1;
+          final subId = cs101Id > 0 ? cs101Id : 1;
           await db.insert('class_schedules', {
             'id': 'sched_emerald_1',
             'school_id': 'sch_main',
-            'teacher_id': 'teacher_1',
-            'teacher_name': 'Sir John Reyes',
+            'teacher_id': null,
+            'teacher_name': null,
             'subject_id': subId,
             'subject_name': 'CSS NC II - Computer Systems Servicing',
             'section_name': 'Grade 10 - Emerald',
@@ -4925,8 +4562,8 @@ class DatabaseHelper {
           await db.insert('class_schedules', {
             'id': 'sched_emerald_2',
             'school_id': 'sch_main',
-            'teacher_id': 'teacher_1',
-            'teacher_name': 'Sir John Reyes',
+            'teacher_id': null,
+            'teacher_name': null,
             'subject_id': subId,
             'subject_name': 'CSS NC II - Computer Systems Servicing',
             'section_name': 'Grade 10 - Emerald',
@@ -4939,38 +4576,6 @@ class DatabaseHelper {
           });
         }
       } catch (_) {}
-
-      // If teacher_1 has any other subjects without enrollments, enroll authentic students
-      final otherTeacherSubjects = await db.query(
-        'subjects',
-        where: "teacher_id = 'teacher_1' OR teacher_id LIKE '%reyes%'",
-      );
-      for (final sub in otherTeacherSubjects) {
-        final sid = sub['id'] as int;
-        final enrs = await db.query(
-          'enrollments',
-          where: 'subject_id = ?',
-          whereArgs: [sid],
-        );
-        if (enrs.isEmpty) {
-          final g = (sub['grade_level'] as String?)?.toLowerCase() ?? '';
-          final targetStudents = g.contains('11')
-              ? ['student_3', 'student_1']
-              : ['student_1', 'student_2', 'student_4'];
-          for (final stId in targetStudents) {
-            final u = await db.query('users', where: 'id = ?', whereArgs: [stId]);
-            if (u.isEmpty) continue;
-            await db.insert('enrollments', {
-              'student_id': stId,
-              'subject_id': sid,
-              'enrolled_at': DateTime.now()
-                  .subtract(const Duration(days: 2))
-                  .toIso8601String(),
-              'status': 'active',
-            });
-          }
-        }
-      }
     } catch (_) {}
 
     // Seed Initial Assigned Quiz if none exists
@@ -4990,8 +4595,8 @@ class DatabaseHelper {
                 'Comprehensive assessment covering Dart language fundamentals, sound null safety, and OOP concepts.',
             'subject_id': cs101Id,
             'lo_id': null,
-            'teacher_id': 'teacher_1',
-            'teacher_name': 'Sir John Reyes',
+            'teacher_id': null,
+            'teacher_name': null,
             'time_limit_minutes': 15,
             'passing_score': 70,
             'status': 'published',
@@ -5041,26 +4646,6 @@ class DatabaseHelper {
             'correct_option': 'B',
             'created_at': DateTime.now().toIso8601String(),
           });
-
-          // Assign to student_1 if user exists
-          final student1Exists = await db.query('users', where: 'id = ?', whereArgs: ['student_1']);
-          if (student1Exists.isNotEmpty) {
-            await db.insert('quiz_assignments', {
-              'quiz_id': quizId,
-              'student_id': 'student_1',
-              'assigned_at': DateTime.now()
-                  .subtract(const Duration(hours: 4))
-                  .toIso8601String(),
-              'due_date': DateTime.now()
-                  .add(const Duration(days: 7))
-                  .toIso8601String(),
-              'status': 'pending',
-              'score': 0,
-              'total_questions': 3,
-              'percentage': 0.0,
-              'completed_at': null,
-            });
-          }
         }
       }
     } catch (_) {}
@@ -5077,8 +4662,8 @@ class DatabaseHelper {
             'description':
                 'Please provide a link to your GitHub repository or Google Drive folder containing the final project files, or attach your project archive.',
             'subject_id': subjId,
-            'teacher_id': 'teacher_1',
-            'teacher_name': 'Sir John Reyes',
+            'teacher_id': null,
+            'teacher_name': null,
             'due_date': DateTime.now()
                 .add(const Duration(days: 14))
                 .toIso8601String(),
@@ -5338,6 +4923,21 @@ class DatabaseHelper {
     onProgress?.call(0.1, 'Unassigning subjects and purging faculty records ($total members)...');
 
     final db = await database;
+    final idToEmail = <String, String>{};
+    try {
+      final rows = await db.query(
+        'users',
+        columns: ['id', 'email'],
+        where: 'id IN (${teacherIds.map((_) => '?').join(',')})',
+        whereArgs: teacherIds,
+      );
+      for (final r in rows) {
+        final id = r['id']?.toString() ?? '';
+        final email = r['email']?.toString() ?? '';
+        if (id.isNotEmpty) idToEmail[id] = email;
+      }
+    } catch (_) {}
+
     final batch = db.batch();
     for (final id in teacherIds) {
       batch.update(
@@ -5369,7 +4969,7 @@ class DatabaseHelper {
       await Future.wait(
         chunk.map((id) async {
           try {
-            await FirestoreService().deleteUser(id);
+            await FirestoreService().deleteUser(id, email: idToEmail[id]);
           } catch (_) {}
         }),
       );

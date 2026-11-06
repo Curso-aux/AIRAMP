@@ -625,45 +625,12 @@ class FirestoreService {
     return user != null;
   }
 
-  /// Syncs all existing local SQLite users to Cloud Firestore without overwriting existing cloud data
+  /// Syncs explicitly queued local offline user creations to Cloud Firestore.
+  /// Never blindly pushes SQLite cache up to Cloud Firestore to prevent resurrecting deleted accounts.
   Future<void> syncLocalUsersToCloud() async {
-    // WEB PURE CLOUD GUARD: Web has no offline queue and must never push local memory state to cloud.
-    if (kIsWeb) return;
-
-    try {
-      final db = await DatabaseHelper().database;
-      final localUsers = await db.query('users');
-      int pushedCount = 0;
-      for (final user in localUsers) {
-        final email = (user['email'] as String? ?? '').toLowerCase().trim();
-        final id = (user['id'] as String? ?? '').toLowerCase().trim();
-        if (id.isEmpty) continue;
-        final isTestDummy = email.contains('newstudent_') ||
-            email.contains('dup_student_') ||
-            email.contains('newteacher_') ||
-            email.contains('test_') ||
-            email.contains('security_test_') ||
-            email.contains('legacy_user_') ||
-            email.contains('@school.edu') ||
-            email == 'maria@test.com' ||
-            id.startsWith('student_test_') ||
-            id.startsWith('teacher_test_');
-        if (isTestDummy) continue;
-
-        // CRITICAL GUARD: Never overwrite an existing Cloud Firestore user with local SQLite data!
-        // Cloud Firestore is the primary source of truth for user passwords and account data.
-        final existingInCloud = await findUserByIdentifier(id);
-        if (existingInCloud != null && existingInCloud.isNotEmpty) {
-          continue;
-        }
-
-        await saveUser(user);
-        pushedCount++;
-      }
-      debugPrint('[FirestoreService] Pushed $pushedCount authentic local users to Cloud Firestore');
-    } catch (e) {
-      debugPrint('[FirestoreService] Error pushing local users to Cloud: $e');
-    }
+    // Cloud Firestore is the primary source of truth for user accounts.
+    // Client devices must NEVER push unverified local SQLite cache to the cloud.
+    return;
   }
 
   /// Syncs Cloud Firestore users down to local SQLite cache and prunes deleted accounts
@@ -859,32 +826,21 @@ class FirestoreService {
           continue;
         }
 
-        // On Web (kIsWeb): Cloud Firestore is authoritative. If a user exists locally in memory
-        // but is absent from Cloud Firestore, it was deleted on another device or previously.
-        // Prune it immediately from memory so it NEVER resurrects in the cloud!
-        if (kIsWeb) {
-          if (!isPermanentSeed &&
-              !cloudIds.contains(localId) &&
-              !cloudEmails.contains(localEmail)) {
-            await db.delete('users', where: 'id = ?', whereArgs: [localId]);
-            debugPrint('[FirestoreService] Web pruned absent/deleted user from memory: $localId ($localEmail)');
-          }
-          continue;
-        }
-
-        // 2. MOBILE ONLY (!kIsWeb): If user exists locally but hasn't been uploaded to Cloud Firestore yet,
-        // automatically upload it so all other devices receive it!
+        // Cloud Firestore is authoritative across all platforms. If a user exists locally in SQLite/memory
+        // but is absent from Cloud Firestore, it was deleted in the cloud or previously.
+        // Prune it immediately from local cache so it NEVER resurrects into Cloud Firestore!
         if (!isPermanentSeed &&
             !cloudIds.contains(localId) &&
             !cloudEmails.contains(localEmail)) {
-          final isTestDummy = localEmail.contains('newstudent_') ||
-              localEmail.contains('dup_student_') ||
-              localEmail.contains('test_') ||
-              localEmail.contains('security_test_');
-          if (!isTestDummy && localId.isNotEmpty) {
-            unawaited(saveUser(local));
-            debugPrint('[FirestoreService] Auto-pushed un-synced local user to cloud: $localId ($localEmail)');
-          }
+          await db.delete('users', where: 'id = ?', whereArgs: [localId]);
+          try {
+            await db.delete('enrollments', where: 'student_id = ?', whereArgs: [localId]);
+            await db.delete('quiz_attempts', where: 'student_id = ?', whereArgs: [localId]);
+            await db.delete('student_progress', where: 'student_id = ?', whereArgs: [localId]);
+            await db.delete('submissions', where: 'student_id = ?', whereArgs: [localId]);
+          } catch (_) {}
+          debugPrint('[FirestoreService] Pruned cloud-deleted user from local cache: $localId ($localEmail)');
+          continue;
         }
       }
 
