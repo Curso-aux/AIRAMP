@@ -596,11 +596,23 @@ final routerProvider = Provider<GoRouter>((ref) {
         return '/student/home';
       }
 
-      // 3. Authenticated user visiting login routes redirects to dashboard
+      // 3. Authenticated user visiting landing page '/' or login routes redirects to dashboard
       if (isAuth) {
         final isSuperAdmin = authState.role == 'super_admin';
         final isAdmin = authState.role == 'admin';
         final isTeacher = authState.role == 'teacher';
+
+        if (matched == '/') {
+          if (isSuperAdmin) {
+            return '/super-admin';
+          } else if (isAdmin) {
+            return '/admin/dashboard';
+          } else if (isTeacher) {
+            return '/teacher/dashboard';
+          } else {
+            return '/student/home';
+          }
+        }
 
         final isLoginRoute = matched == '/login' ||
             matched == '/admin/login' ||

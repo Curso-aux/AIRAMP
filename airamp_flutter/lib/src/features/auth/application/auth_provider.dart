@@ -1,6 +1,7 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:sqflite/sqflite.dart';
 import '../../../core/api/api_client.dart';
 import '../../../core/components/auth/required_change_password_dialog.dart';
 import '../../../core/database/database_helper.dart';
@@ -128,8 +129,38 @@ final authRepositoryProvider = Provider<AuthRepository>((ref) {
 class AuthNotifier extends Notifier<User?> {
   bool isLoading = false;
 
+  Map<String, dynamic> _userToMap(User user) {
+    return {
+      'id': user.id,
+      'email': user.email,
+      'role': user.role,
+      'fullName': user.fullName,
+      'username': user.username,
+      'profileImage': user.profileImage,
+      'section': user.section,
+      'grade': user.grade,
+      'schoolId': user.schoolId,
+      'availableRoles': user.availableRoles,
+      'mustChangePassword': user.mustChangePassword,
+    };
+  }
+
   @override
   User? build() {
+    if (kIsWeb && WebSessionHelper.hasActiveSession()) {
+      try {
+        final cached = WebSessionHelper.getSavedUserProfile();
+        if (cached != null && cached.isNotEmpty) {
+          final user = User.fromJson(cached);
+          final savedSession = WebSessionHelper.getSavedSession();
+          final token = savedSession?['token'] as String? ?? '';
+          if (token.isNotEmpty) {
+            ApiClient.setSession(session: token, userId: user.id);
+          }
+          return user;
+        }
+      } catch (_) {}
+    }
     return null;
   }
 
@@ -142,6 +173,9 @@ class AuthNotifier extends Notifier<User?> {
       final user = User.fromJson(data['user']);
       state = user;
       WebSessionHelper.markSessionActive(user.id);
+      if (kIsWeb) {
+        WebSessionHelper.saveUserProfile(_userToMap(user));
+      }
       final prefs = await SharedPreferences.getInstance();
       if (user.mustChangePassword) {
         try {
@@ -161,6 +195,18 @@ class AuthNotifier extends Notifier<User?> {
   Future<void> switchRole(String newRole) async {
     if (state == null) return;
     state = state!.copyWith(role: newRole);
+    if (kIsWeb) {
+      WebSessionHelper.saveUserProfile(_userToMap(state!));
+      final savedSession = WebSessionHelper.getSavedSession();
+      if (savedSession != null) {
+        WebSessionHelper.saveSession(
+          userId: savedSession['userId'] ?? state!.id,
+          role: newRole,
+          token: savedSession['token'] ?? '',
+          mustChangePassword: savedSession['mustChangePassword'] == true,
+        );
+      }
+    }
 
     // Update active session role in local database if a session exists
     try {
@@ -200,6 +246,35 @@ class AuthNotifier extends Notifier<User?> {
     if (!kIsWeb && (session.role == 'admin' || session.role == 'super_admin')) {
       await repository.logout();
       return;
+    }
+
+    // On Web (kIsWeb): Fast restore from cached user profile in sessionStorage immediately if state is not set yet
+    if (kIsWeb && state == null) {
+      final cached = WebSessionHelper.getSavedUserProfile();
+      if (cached != null && cached.isNotEmpty) {
+        state = User.fromJson(cached);
+        ApiClient.setSession(session: session.session, userId: session.userId);
+      }
+    }
+
+    // On Web: Ensure in-memory SQLite contains current authenticated user row
+    if (kIsWeb && state != null) {
+      try {
+        final db = await DatabaseHelper().database;
+        await db.insert('users', {
+          'id': state!.id,
+          'email': state!.email,
+          'username': state!.username,
+          'role': state!.role,
+          'full_name': state!.fullName,
+          'profile_image': state!.profileImage,
+          'section': state!.section,
+          'grade': state!.grade,
+          'school_id': state!.schoolId,
+          'must_change_password': state!.mustChangePassword ? 1 : 0,
+          'created_at': DateTime.now().toIso8601String(),
+        }, conflictAlgorithm: ConflictAlgorithm.replace);
+      } catch (_) {}
     }
 
     // On Web (kIsWeb): Web portal is accessible to Students, Teachers, and Administrators.
@@ -335,6 +410,9 @@ class AuthNotifier extends Notifier<User?> {
         mustChangePassword: mustChange,
       );
     }
+    if (kIsWeb && state != null) {
+      WebSessionHelper.saveUserProfile(_userToMap(state!));
+    }
     ApiClient.setSession(session: session.session, userId: session.userId);
 
     // Register real-time sync hook to refresh active user state when background cloud sync updates store
@@ -366,6 +444,9 @@ class AuthNotifier extends Notifier<User?> {
       final user = User.fromJson(data['user']);
       state = user;
       WebSessionHelper.markSessionActive(user.id);
+      if (kIsWeb) {
+        WebSessionHelper.saveUserProfile(_userToMap(user));
+      }
     } finally {
       isLoading = false;
     }
@@ -395,6 +476,9 @@ class AuthNotifier extends Notifier<User?> {
           profileImage: (photo != null && photo.isNotEmpty) ? photo : state!.profileImage,
           mustChangePassword: resolvedMustChange,
         );
+        if (kIsWeb) {
+          WebSessionHelper.saveUserProfile(_userToMap(state!));
+        }
       }
     } catch (_) {}
   }
@@ -442,6 +526,9 @@ class AuthNotifier extends Notifier<User?> {
       profileImage: profileImage,
       mustChangePassword: isPasswordChanged ? false : state!.mustChangePassword,
     );
+    if (kIsWeb) {
+      WebSessionHelper.saveUserProfile(_userToMap(state!));
+    }
 
     // Persist changes to local SQLite and cloud backend
     final repository = ref.read(authRepositoryProvider);
@@ -494,6 +581,9 @@ class AuthNotifier extends Notifier<User?> {
       section: section,
       grade: grade,
     );
+    if (kIsWeb) {
+      WebSessionHelper.saveUserProfile(_userToMap(state!));
+    }
   }
 
   /// Clear student's current section and grade
@@ -509,6 +599,9 @@ class AuthNotifier extends Notifier<User?> {
       section: null,
       grade: null,
     );
+    if (kIsWeb) {
+      WebSessionHelper.saveUserProfile(_userToMap(state!));
+    }
   }
 
   Future<void> logout() async {

@@ -6,6 +6,18 @@ class WebSessionHelper {
 
   static void markSessionActive(String userId) {}
 
+  static void saveSession({
+    required String userId,
+    required String role,
+    required String token,
+    bool mustChangePassword = false,
+  }) {}
+
+  static Map<String, dynamic>? getSavedSession() => null;
+
+  static void saveUserProfile(Map<String, dynamic> userJson) {}
+
+  static Map<String, dynamic>? getSavedUserProfile() => null;
+
   static void clearSession() {}
 }
-

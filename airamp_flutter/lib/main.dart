@@ -124,26 +124,6 @@ class _AirampAppState extends ConsumerState<AirampApp> {
     final themeState = ref.watch(themeProvider);
     AppTheme.setDark(themeState.isDark);
 
-    // Wait for bootstrap to complete before rendering
-    if (!_bootstrapped) {
-      return MaterialApp(
-        theme: AppTheme.lightTheme,
-        darkTheme: AppTheme.darkTheme,
-        themeMode: themeState.isDark ? ThemeMode.dark : ThemeMode.light,
-        debugShowCheckedModeBanner: false,
-        home: kIsWeb
-            ? Scaffold(
-                backgroundColor: themeState.isDark ? AppTheme.darkBackground : AppTheme.lightBackground,
-                body: Center(
-                  child: CircularProgressIndicator(
-                    color: themeState.isDark ? AppTheme.darkPrimary : AppTheme.lightPrimary,
-                  ),
-                ),
-              )
-            : AiraSplashLoadingView(isDark: themeState.isDark),
-      );
-    }
-
     final router = ref.watch(routerProvider);
 
     return MaterialApp.router(
@@ -155,6 +135,19 @@ class _AirampAppState extends ConsumerState<AirampApp> {
       routerConfig: router,
       debugShowCheckedModeBanner: false,
       builder: (context, child) {
+        if (!_bootstrapped) {
+          return kIsWeb
+              ? Scaffold(
+                  backgroundColor: themeState.isDark ? AppTheme.darkBackground : AppTheme.lightBackground,
+                  body: Center(
+                    child: CircularProgressIndicator(
+                      color: themeState.isDark ? AppTheme.darkPrimary : AppTheme.lightPrimary,
+                    ),
+                  ),
+                )
+              : AiraSplashLoadingView(isDark: themeState.isDark);
+        }
+
         final clampedChild = child != null
             ? MediaQuery.withClampedTextScaling(
                 minScaleFactor: 0.85,

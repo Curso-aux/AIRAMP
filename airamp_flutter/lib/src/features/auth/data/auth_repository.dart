@@ -450,6 +450,42 @@ class AuthRepository {
 
   Future<AuthSession?> currentSession() async {
     final db = await DatabaseHelper().database;
+
+    // Fast-path for Web: check sessionStorage first
+    if (kIsWeb) {
+      if (!WebSessionHelper.hasActiveSession()) {
+        return null;
+      }
+      final webSession = WebSessionHelper.getSavedSession();
+      if (webSession != null) {
+        final savedUserId = webSession['userId'] as String? ?? '';
+        final savedRole = webSession['role'] as String? ?? '';
+        final savedToken = webSession['token'] as String? ?? '';
+        final savedMust = webSession['mustChangePassword'] == true ||
+            webSession['must_change_password'] == 1 ||
+            webSession['must_change_password'] == true;
+
+        if (savedUserId.isNotEmpty && savedRole.isNotEmpty && savedToken.isNotEmpty) {
+          try {
+            await db.delete('sessions');
+            await db.insert('sessions', {
+              'user_id': savedUserId,
+              'token': savedToken,
+              'role': savedRole,
+              'must_change_password': savedMust ? 1 : 0,
+              'created_at': DateTime.now().toIso8601String(),
+            });
+          } catch (_) {}
+          return AuthSession(
+            session: savedToken,
+            userId: savedUserId,
+            role: savedRole,
+            mustChangePassword: savedMust,
+          );
+        }
+      }
+    }
+
     final rows = await db.query('sessions', orderBy: 'id DESC', limit: 1);
     if (rows.isNotEmpty) {
       final r = rows.first;
@@ -464,32 +500,34 @@ class AuthRepository {
       );
     }
 
-    // Fast-path for Web with in-memory SQLite: restore active session from SharedPreferences
-    try {
-      final prefs = await SharedPreferences.getInstance();
-      final savedUserId = prefs.getString('auth_session_user_id');
-      final savedRole = prefs.getString('auth_session_role');
-      final savedToken = prefs.getString('auth_session_token');
-      final savedMust = prefs.getBool('auth_session_must_change_password') ?? false;
+    // Fallback: restore active session from SharedPreferences
+    if (!kIsWeb || WebSessionHelper.hasActiveSession()) {
+      try {
+        final prefs = await SharedPreferences.getInstance();
+        final savedUserId = prefs.getString('auth_session_user_id');
+        final savedRole = prefs.getString('auth_session_role');
+        final savedToken = prefs.getString('auth_session_token');
+        final savedMust = prefs.getBool('auth_session_must_change_password') ?? false;
 
-      if (savedUserId != null && savedRole != null && savedToken != null) {
-        try {
-          await db.insert('sessions', {
-            'user_id': savedUserId,
-            'token': savedToken,
-            'role': savedRole,
-            'must_change_password': savedMust ? 1 : 0,
-            'created_at': DateTime.now().toIso8601String(),
-          });
-        } catch (_) {}
-        return AuthSession(
-          session: savedToken,
-          userId: savedUserId,
-          role: savedRole,
-          mustChangePassword: savedMust,
-        );
-      }
-    } catch (_) {}
+        if (savedUserId != null && savedRole != null && savedToken != null) {
+          try {
+            await db.insert('sessions', {
+              'user_id': savedUserId,
+              'token': savedToken,
+              'role': savedRole,
+              'must_change_password': savedMust ? 1 : 0,
+              'created_at': DateTime.now().toIso8601String(),
+            });
+          } catch (_) {}
+          return AuthSession(
+            session: savedToken,
+            userId: savedUserId,
+            role: savedRole,
+            mustChangePassword: savedMust,
+          );
+        }
+      } catch (_) {}
+    }
 
     return null;
   }
@@ -789,6 +827,16 @@ class AuthRepository {
       'must_change_password': mustChangePassword ? 1 : 0,
       'created_at': DateTime.now().toIso8601String(),
     });
+
+    if (kIsWeb) {
+      WebSessionHelper.saveSession(
+        userId: userId,
+        role: role,
+        token: token,
+        mustChangePassword: mustChangePassword,
+      );
+    }
+
     try {
       final prefs = await SharedPreferences.getInstance();
       await prefs.setString('auth_session_user_id', userId);
