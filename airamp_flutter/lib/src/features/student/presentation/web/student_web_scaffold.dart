@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -255,9 +256,11 @@ class _StudentWebScaffoldState extends ConsumerState<StudentWebScaffold> {
 
           const Spacer(),
 
-          // Persistent Offline-Sync Status Indicator
-          const OfflineSyncStatusPill(),
-          const SizedBox(width: 10),
+          // Persistent Offline-Sync Status Indicator (Mobile Only)
+          if (!kIsWeb) ...[
+            const OfflineSyncStatusPill(),
+            const SizedBox(width: 10),
+          ],
 
           // Section Badge
           if (section.isNotEmpty) ...[

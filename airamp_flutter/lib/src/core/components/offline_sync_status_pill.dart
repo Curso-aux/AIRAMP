@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../services/offline_sync_provider.dart';
@@ -267,6 +268,13 @@ class _OfflineSyncStatusPillState extends ConsumerState<OfflineSyncStatusPill>
 
   @override
   Widget build(BuildContext context) {
+    // Pure Cloud Firestore Architecture for Web:
+    // Web connects directly to Cloud Firestore in real time; offline SQLite synchronization
+    // is strictly for the mobile app. Hide the offline sync pill completely on Web.
+    if (kIsWeb) {
+      return const SizedBox.shrink();
+    }
+
     final syncState = ref.watch(offlineSyncProvider);
     final isDark = Theme.of(context).brightness == Brightness.dark;
 

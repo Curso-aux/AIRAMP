@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -151,10 +152,11 @@ class _AdminWebScaffoldState extends ConsumerState<AdminWebScaffold> {
                     overflow: TextOverflow.ellipsis,
                   ),
                   actions: [
-                    const Padding(
-                      padding: EdgeInsets.symmetric(vertical: 10),
-                      child: OfflineSyncStatusPill(compact: true),
-                    ),
+                    if (!kIsWeb)
+                      const Padding(
+                        padding: EdgeInsets.symmetric(vertical: 10),
+                        child: OfflineSyncStatusPill(compact: true),
+                      ),
                     IconButton(
                       tooltip: 'Search (Ctrl+K)',
                       icon: Icon(Icons.search, color: AppTheme.text),
@@ -396,9 +398,11 @@ class _AdminWebScaffoldState extends ConsumerState<AdminWebScaffold> {
           // Spacer pushes theme toggle and role badge to the absolute far right
           const Spacer(),
 
-          // Persistent Offline-Sync Status Indicator
-          const OfflineSyncStatusPill(),
-          const SizedBox(width: 12),
+          // Persistent Offline-Sync Status Indicator (Mobile Only)
+          if (!kIsWeb) ...[
+            const OfflineSyncStatusPill(),
+            const SizedBox(width: 12),
+          ],
 
           // Campus Switcher for Super Admin or School Badge for Admin
           _buildCampusSwitcher(currentUser),
