@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import '../../../core/components/aira_action_toast.dart';
 import '../../../core/components/user_avatar_widget.dart';
 import '../../../core/database/database_helper.dart';
 import '../../../core/theme/app_theme.dart';
@@ -179,7 +180,6 @@ class _SectionsMgmtScreenState extends ConsumerState<SectionsMgmtScreen> {
                         onConfirm: () async {
                           final sectionId = section['id'];
                           final nav = Navigator.of(context);
-                          final messenger = ScaffoldMessenger.of(context);
                           if (sectionId is int) {
                             final rawKey = editKeyController.text.trim().toUpperCase();
                             final key = rawKey.isNotEmpty ? rawKey : (section['enrollment_key'] ?? 'SEC-${section['id']}');
@@ -195,11 +195,10 @@ class _SectionsMgmtScreenState extends ConsumerState<SectionsMgmtScreen> {
                                 },
                               );
                               if (mounted) {
-                                messenger.showSnackBar(
-                                  SnackBar(
-                                    content: const Text('Section updated successfully.'),
-                                    backgroundColor: AppTheme.success,
-                                  ),
+                                AiraActionToast.showSuccess(
+                                  context,
+                                  title: 'Section Updated',
+                                  message: 'Section "${editNameController.text.trim()}" updated successfully.',
                                 );
                               }
                             } catch (e) {
@@ -208,11 +207,10 @@ class _SectionsMgmtScreenState extends ConsumerState<SectionsMgmtScreen> {
                                 final displayMsg = errStr.contains('UNIQUE constraint') || errStr.contains('already exists')
                                     ? 'A section with this enrollment key or name already exists.'
                                     : 'Failed to update section: ${errStr.replaceFirst("Exception: ", "")}';
-                                messenger.showSnackBar(
-                                  SnackBar(
-                                    content: Text(displayMsg),
-                                    backgroundColor: AppTheme.error,
-                                  ),
+                                AiraActionToast.showError(
+                                  context,
+                                  title: 'Failed to Update Section',
+                                  message: displayMsg,
                                 );
                               }
                             }
@@ -412,11 +410,13 @@ class _SectionsMgmtScreenState extends ConsumerState<SectionsMgmtScreen> {
                                     onPressed: () {
                                       final keyToCopy = isCustomKey && addKeyController.text.isNotEmpty ? addKeyController.text : autoEnrollmentKey;
                                       Clipboard.setData(ClipboardData(text: keyToCopy));
-                                      ScaffoldMessenger.of(context).showSnackBar(
-                                        SnackBar(
-                                          content: Text('Copied key "$keyToCopy"'),
-                                          duration: const Duration(seconds: 1),
-                                        ),
+                                      AiraActionToast.show(
+                                        context,
+                                        title: 'Key Copied',
+                                        message: 'Copied key "$keyToCopy" to clipboard',
+                                        type: AiraToastType.info,
+                                        customIcon: Icons.copy_rounded,
+                                        duration: const Duration(seconds: 3),
                                       );
                                     },
                                   ),
@@ -526,7 +526,7 @@ class _SectionsMgmtScreenState extends ConsumerState<SectionsMgmtScreen> {
                       final rawKey = addKeyController.text.trim().toUpperCase();
                       final enrollmentKey = (isCustomKey && rawKey.isNotEmpty) ? rawKey : autoEnrollmentKey;
 
-                      final messenger = ScaffoldMessenger.of(context);
+                      final rootContext = context;
                       final router = GoRouter.maybeOf(context);
                       Navigator.pop(dialogCtx);
                       try {
@@ -539,28 +539,26 @@ class _SectionsMgmtScreenState extends ConsumerState<SectionsMgmtScreen> {
                           'student_count': 0,
                           'created_at': DateTime.now().toIso8601String(),
                         });
-                        if (mounted) {
-                          messenger.showSnackBar(
-                            SnackBar(
-                              content: Text('Created section "$name" with Key: $enrollmentKey'),
-                              backgroundColor: AppTheme.success,
-                            ),
+                        if (rootContext.mounted) {
+                          AiraActionToast.showSuccess(
+                            rootContext,
+                            title: 'Section Created',
+                            message: 'Created section "$name" with Key: $enrollmentKey',
                           );
                           try {
                             router?.go('/admin/keys');
                           } catch (_) {}
                         }
                       } catch (e) {
-                        if (mounted) {
+                        if (rootContext.mounted) {
                           final errStr = e.toString();
                           final displayMsg = errStr.contains('UNIQUE constraint') || errStr.contains('already exists')
                               ? 'A section with this enrollment key or name already exists. Please choose a different key.'
                               : 'Failed to create section: ${errStr.replaceFirst("Exception: ", "")}';
-                          messenger.showSnackBar(
-                            SnackBar(
-                              content: Text(displayMsg),
-                              backgroundColor: AppTheme.error,
-                            ),
+                          AiraActionToast.showError(
+                            rootContext,
+                            title: 'Failed to Create Section',
+                            message: displayMsg,
                           );
                         }
                       }
@@ -919,25 +917,23 @@ class _SectionsMgmtScreenState extends ConsumerState<SectionsMgmtScreen> {
                           content: 'Are you sure you want to delete "${section['name']}"?',
                           onConfirm: () async {
                             final sectionId = section['id'];
-                            final messenger = ScaffoldMessenger.of(context);
+                            final secName = section['name']?.toString() ?? 'Section';
                             if (sectionId is int) {
                               try {
                                 await ref.read(sectionsProvider.notifier).deleteSection(sectionId);
                                 if (mounted) {
-                                  messenger.showSnackBar(
-                                    SnackBar(
-                                      content: Text('Section "${section['name']}" was deleted.'),
-                                      backgroundColor: AppTheme.success,
-                                    ),
+                                  AiraActionToast.showDeleted(
+                                    context,
+                                    title: 'Section Deleted',
+                                    message: 'Section "$secName" was permanently deleted.',
                                   );
                                 }
                               } catch (e) {
                                 if (mounted) {
-                                  messenger.showSnackBar(
-                                    SnackBar(
-                                      content: Text('Failed to delete section: ${e.toString().replaceFirst("Exception: ", "")}'),
-                                      backgroundColor: AppTheme.error,
-                                    ),
+                                  AiraActionToast.showError(
+                                    context,
+                                    title: 'Failed to Delete Section',
+                                    message: 'Failed to delete section: ${e.toString().replaceFirst("Exception: ", "")}',
                                   );
                                 }
                               }
@@ -968,25 +964,23 @@ class _SectionsMgmtScreenState extends ConsumerState<SectionsMgmtScreen> {
                             content: 'Are you sure you want to delete "${section['name']}"?',
                             onConfirm: () async {
                               final sectionId = section['id'];
-                              final messenger = ScaffoldMessenger.of(context);
+                              final secName = section['name']?.toString() ?? 'Section';
                               if (sectionId is int) {
                                 try {
                                   await ref.read(sectionsProvider.notifier).deleteSection(sectionId);
                                   if (mounted) {
-                                    messenger.showSnackBar(
-                                      SnackBar(
-                                        content: Text('Section "${section['name']}" was deleted.'),
-                                        backgroundColor: AppTheme.success,
-                                      ),
+                                    AiraActionToast.showDeleted(
+                                      context,
+                                      title: 'Section Deleted',
+                                      message: 'Section "$secName" was permanently deleted.',
                                     );
                                   }
                                 } catch (e) {
                                   if (mounted) {
-                                    messenger.showSnackBar(
-                                      SnackBar(
-                                        content: Text('Failed to delete section: ${e.toString().replaceFirst("Exception: ", "")}'),
-                                        backgroundColor: AppTheme.error,
-                                      ),
+                                    AiraActionToast.showError(
+                                      context,
+                                      title: 'Failed to Delete Section',
+                                      message: 'Failed to delete section: ${e.toString().replaceFirst("Exception: ", "")}',
                                     );
                                   }
                                 }
@@ -1132,12 +1126,13 @@ class _SectionCardState extends ConsumerState<_SectionCard> {
                             onTap: () {
                               final key = widget.section['enrollment_key'].toString();
                               Clipboard.setData(ClipboardData(text: key));
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                SnackBar(
-                                  content: Text('Section Key "$key" copied to clipboard! Provide this to students.'),
-                                  backgroundColor: AppTheme.success,
-                                  duration: const Duration(seconds: 2),
-                                ),
+                              AiraActionToast.show(
+                                context,
+                                title: 'Key Copied',
+                                message: 'Section Key "$key" copied to clipboard! Provide this to students.',
+                                type: AiraToastType.info,
+                                customIcon: Icons.copy_rounded,
+                                duration: const Duration(seconds: 3),
                               );
                             },
                             borderRadius: BorderRadius.circular(6),

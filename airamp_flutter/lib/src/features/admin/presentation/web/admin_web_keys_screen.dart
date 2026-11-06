@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:qr_flutter/qr_flutter.dart';
+import '../../../../core/components/aira_action_toast.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../../core/theme/theme_provider.dart';
 import '../../../../core/utils/section_key_helper.dart';
@@ -846,20 +847,13 @@ class _AdminWebKeysScreenState extends ConsumerState<AdminWebKeysScreen> {
       }
     });
 
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Row(
-          children: [
-            const Icon(Icons.check_circle_rounded, color: Colors.white, size: 20),
-            const SizedBox(width: 10),
-            Text('Copied enrollment key "$code" to clipboard!'),
-          ],
-        ),
-        backgroundColor: AppTheme.success,
-        behavior: SnackBarBehavior.floating,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-        duration: const Duration(seconds: 2),
-      ),
+    AiraActionToast.show(
+      context,
+      title: 'Key Copied',
+      message: 'Copied enrollment key "$code" to clipboard!',
+      type: AiraToastType.info,
+      customIcon: Icons.copy_rounded,
+      duration: const Duration(seconds: 3),
     );
   }
 
@@ -1133,11 +1127,13 @@ class _AdminWebKeysScreenState extends ConsumerState<AdminWebKeysScreen> {
                 onPressed: () {
                   Clipboard.setData(ClipboardData(text: invitationText));
                   Navigator.pop(ctx);
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(
-                      content: const Text('Invitation message copied to clipboard!'),
-                      backgroundColor: AppTheme.success,
-                    ),
+                  AiraActionToast.show(
+                    context,
+                    title: 'Invitation Copied',
+                    message: 'Invitation message copied to clipboard!',
+                    type: AiraToastType.info,
+                    customIcon: Icons.copy_rounded,
+                    duration: const Duration(seconds: 3),
                   );
                 },
                 icon: const Icon(Icons.copy, size: 16),
@@ -1173,11 +1169,10 @@ class _AdminWebKeysScreenState extends ConsumerState<AdminWebKeysScreen> {
               Navigator.pop(dialogCtx);
               await ref.read(adminKeysProvider.notifier).deleteKey(code);
               if (mounted) {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(
-                    content: Text('Deleted key "$code"'),
-                    backgroundColor: AppTheme.error,
-                  ),
+                AiraActionToast.showDeleted(
+                  context,
+                  title: 'Enrollment Key Revoked',
+                  message: 'Enrollment key "$code" was permanently deleted.',
                 );
               }
             },

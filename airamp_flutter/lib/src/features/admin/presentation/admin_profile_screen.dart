@@ -322,25 +322,6 @@ class _AdminProfileScreenState extends ConsumerState<AdminProfileScreen>
     final user = ref.read(authProvider);
     if (user == null) return;
 
-    // First-login password setup: save new password directly without blocking on OTP
-    if (user.mustChangePassword) {
-      setState(() => _isSavingPassword = true);
-      try {
-        await ref.read(authProvider.notifier).updateProfile(password: newPass);
-        if (!mounted) return;
-        setState(() => _showPasswordForm = false);
-        _newPasswordController.clear();
-        _confirmPasswordController.clear();
-        _showSuccessUnlockedDialog();
-      } catch (e) {
-        if (!mounted) return;
-        _showAlert('Error', 'Failed to update password: $e');
-      } finally {
-        if (mounted) setState(() => _isSavingPassword = false);
-      }
-      return;
-    }
-
     String targetEmail = user.email.trim();
     if (targetEmail.isEmpty) {
       final inputEmail = await _promptForEmailDialog(context);
@@ -367,7 +348,7 @@ class _AdminProfileScreenState extends ConsumerState<AdminProfileScreen>
               const SizedBox(width: 20),
               Expanded(
                 child: Text(
-                  'Sending verification code to ${OtpService.maskEmail(targetEmail)}...',
+                  'Sending verification code via SMTP to ${OtpService.maskEmail(targetEmail)}...',
                   style: TextStyle(color: AppTheme.text, fontSize: 14),
                 ),
               ),
@@ -2824,6 +2805,62 @@ class _AdminProfileScreenState extends ConsumerState<AdminProfileScreen>
                   ),
                   child: Column(
                     children: [
+                      // SMTP Email Verification Banner
+                      Container(
+                        padding: const EdgeInsets.all(12),
+                        margin: const EdgeInsets.only(bottom: 18),
+                        decoration: BoxDecoration(
+                          color: AppTheme.primary.withValues(alpha: 0.08),
+                          borderRadius: BorderRadius.circular(10),
+                          border: Border.all(
+                            color: AppTheme.primary.withValues(alpha: 0.25),
+                          ),
+                        ),
+                        child: Row(
+                          children: [
+                            Container(
+                              padding: const EdgeInsets.all(8),
+                              decoration: BoxDecoration(
+                                color: AppTheme.primary.withValues(alpha: 0.15),
+                                shape: BoxShape.circle,
+                              ),
+                              child: Icon(
+                                Icons.mark_email_read_rounded,
+                                size: 18,
+                                color: AppTheme.primary,
+                              ),
+                            ),
+                            const SizedBox(width: 12),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    'SMTP Email Verification',
+                                    style: TextStyle(
+                                      fontSize: 12,
+                                      fontWeight: FontWeight.bold,
+                                      color: AppTheme.primary,
+                                      letterSpacing: 0.3,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 2),
+                                  Text(
+                                    currentUser.email.isNotEmpty
+                                        ? 'A 6-digit code will be sent to ${OtpService.maskEmail(currentUser.email)} via SMTP to verify and unlock your account.'
+                                        : 'A 6-digit verification code will be sent via SMTP to verify your account.',
+                                    style: TextStyle(
+                                      fontSize: 11.5,
+                                      color: AppTheme.textSecondary,
+                                      height: 1.3,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
                       TextField(
                         key: ValueKey('admin_mand_new_pass_$_obscureNewPassword'),
                         focusNode: _newPasswordFocusNode,

@@ -36,6 +36,18 @@ service cloud.firestore {
       match /modules/{moduleId} {
         allow read, write: if true;
       }
+
+      match /{allSubcollections=**} {
+        allow read, write: if true;
+      }
+    }
+
+    match /enrollment_keys/{keyId} {
+      allow read, write: if true;
+    }
+
+    match /reg_links/{keyId} {
+      allow read, write: if true;
     }
 
     match /curriculum_subjects/{subjectId} {

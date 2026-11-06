@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import '../../../core/components/aira_action_toast.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/theme/theme_provider.dart';
 import '../../auth/application/auth_provider.dart';
@@ -656,8 +657,16 @@ class _SubjectsMgmtScreenState extends ConsumerState<SubjectsMgmtScreen> {
           ),
           TextButton(
             onPressed: () {
+              final subName = subject['name']?.toString() ?? 'Subject';
               ref.read(subjectsProvider.notifier).deleteSubject(subject['id']);
               Navigator.pop(context);
+              if (context.mounted) {
+                AiraActionToast.showDeleted(
+                  context,
+                  title: 'Subject Deleted',
+                  message: 'Subject "$subName" was permanently deleted.',
+                );
+              }
             },
             child: Text('Delete', style: TextStyle(color: AppTheme.error)),
           ),
@@ -759,11 +768,10 @@ class _SubjectsMgmtScreenState extends ConsumerState<SubjectsMgmtScreen> {
                     Navigator.pop(ctx);
                     await ref.read(subjectsProvider.notifier).updateUnlockType(subjectId, selected);
                     if (context.mounted) {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(
-                          content: Text('Progression mode set to "$selected"'),
-                          backgroundColor: AppTheme.success,
-                        ),
+                      AiraActionToast.showSuccess(
+                        context,
+                        title: 'Progression Mode Set',
+                        message: 'Progression mode set to "$selected"',
                       );
                     }
                   },
@@ -1021,8 +1029,10 @@ class _CreateSubjectSheetState extends ConsumerState<_CreateSubjectSheet> {
   void _saveSubject({String? code, String? name, String? desc}) {
     final sName = (name ?? _nameController.text).trim();
     if (sName.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Please enter a subject name')),
+      AiraActionToast.showWarning(
+        context,
+        title: 'Subject Name Required',
+        message: 'Please enter a subject name before saving.',
       );
       return;
     }

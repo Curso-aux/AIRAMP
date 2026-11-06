@@ -1,8 +1,11 @@
+import 'dart:convert';
 import 'package:dio/dio.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:sqflite/sqflite.dart';
 import '../../../core/database/database_helper.dart';
-import '../../../core/api/api_client.dart';
+
 import '../../../core/utils/section_key_helper.dart';
 import '../../../core/utils/csv_helper.dart';
 
@@ -124,8 +127,7 @@ final subjectsProvider = NotifierProvider<SubjectsNotifier, List<Map<String, dyn
 });
 
 class SubjectsNotifier extends Notifier<List<Map<String, dynamic>>> {
-  final Dio? _dio;
-  SubjectsNotifier({Dio? dio}) : _dio = dio ?? (ApiClient.isCloudAvailable ? ApiClient.instance : null);
+  SubjectsNotifier({Dio? dio});
   @override
   List<Map<String, dynamic>> build() {
     _loadSubjects();
@@ -134,52 +136,236 @@ class SubjectsNotifier extends Notifier<List<Map<String, dynamic>>> {
 
   Future<void> _loadSubjects() async {
     final db = await DatabaseHelper().database;
-    final List<Map<String, dynamic>> maps = await db.query('subjects', orderBy: 'id DESC');
-    if (_dio != null && ApiClient.isCloudAvailable) {
-      try {
-        final resp = await _dio.get('/v1/api/subjects');
-        final remote = resp.data;
-        if (remote is Map && remote['subjects'] is List) {
-          final remoteList = (remote['subjects'] as List).cast<Map<String, dynamic>>();
-          for (final s in remoteList) {
-            await db.insert('subjects', s, conflictAlgorithm: ConflictAlgorithm.replace);
+    final prefs = await SharedPreferences.getInstance();
+    final deletedSubjects = prefs.getStringList('permanently_deleted_subjects') ?? [];
+
+    // 1. If SQLite in-memory is empty (e.g. Web reload), restore from local persistent cache (localStorage)
+    final existingLocal = await db.query('subjects');
+    if (existingLocal.isEmpty) {
+      final cachedStr = prefs.getString('local_cached_subjects_v1');
+      if (cachedStr != null && cachedStr.isNotEmpty) {
+        try {
+          final List<dynamic> decoded = jsonDecode(cachedStr);
+          for (final item in decoded) {
+            if (item is Map) {
+              final m = Map<String, dynamic>.from(item);
+              final code = m['subject_code']?.toString().toUpperCase() ?? '';
+              final name = m['name']?.toString() ?? '';
+              if (!deletedSubjects.contains(code) && !deletedSubjects.contains(name)) {
+                await db.insert('subjects', m, conflictAlgorithm: ConflictAlgorithm.replace);
+              }
+            }
           }
-          if (!ref.mounted) return;
-          state = await db.query('subjects', orderBy: 'id DESC');
-          return;
-        }
-      } on DioException {
-        // fall through to local data
+        } catch (_) {}
       }
     }
+
+    // 2. Fetch from Cloud Firestore if available and merge
+    try {
+      final cloudDocs = await FirestoreService().fetchAllDocuments('subjects');
+      if (cloudDocs.isNotEmpty) {
+        for (final doc in cloudDocs) {
+          final subCode = doc['subject_code']?.toString().toUpperCase() ?? doc['id']?.toString().toUpperCase() ?? '';
+          final subName = doc['name']?.toString() ?? '';
+          if (deletedSubjects.contains(subCode) || deletedSubjects.contains(subName)) {
+            continue;
+          }
+          final existing = await db.query('subjects',
+              where: 'subject_code = ? OR name = ?',
+              whereArgs: [subCode, subName]);
+          if (existing.isEmpty) {
+            await db.insert('subjects', {
+              'name': subName,
+              'subject_code': subCode,
+              'description': doc['description']?.toString() ?? '',
+              'grade_level': doc['grade_level']?.toString() ?? doc['grade']?.toString() ?? 'Grade 10',
+              'semester': doc['semester']?.toString() ?? '1st Semester',
+              'unlock_type': doc['unlock_type']?.toString() ?? 'Flexible',
+              'teacher_id': doc['teacher_id']?.toString(),
+              'teacher_name': doc['teacher_name']?.toString(),
+              'created_at': doc['created_at']?.toString() ?? DateTime.now().toIso8601String(),
+            }, conflictAlgorithm: ConflictAlgorithm.replace);
+          }
+        }
+      }
+    } catch (e) {
+      debugPrint('[SubjectsNotifier] Cloud sync note: $e');
+    }
+
+    // 3. Filter out any deleted tombstones and save active subjects to local cache
+    for (final del in deletedSubjects) {
+      await db.delete('subjects', where: 'subject_code = ? OR name = ?', whereArgs: [del, del]);
+    }
+    final List<Map<String, dynamic>> maps = await db.query('subjects', orderBy: 'id DESC');
+    try {
+      await prefs.setString('local_cached_subjects_v1', jsonEncode(maps));
+    } catch (_) {}
+
     if (!ref.mounted) return;
     state = maps;
   }
 
   Future<int> addSubject(Map<String, dynamic> subject) async {
     final db = await DatabaseHelper().database;
-    final id = await db.insert('subjects', subject);
+    final mutableSubject = Map<String, dynamic>.from(subject);
+    mutableSubject['created_at'] ??= DateTime.now().toIso8601String();
+
+    final id = await db.insert('subjects', mutableSubject);
+    mutableSubject['id'] = id;
     await DatabaseHelper().autoEnrollAllStudentsInSubject(id);
-    await _loadSubjects();
+
+    final subCode = mutableSubject['subject_code']?.toString().trim().toUpperCase() ?? '';
+    final subName = mutableSubject['name']?.toString().trim() ?? '';
+    final docId = subCode.isNotEmpty ? subCode : 'SUBJ_$id';
+
+    // Remove from tombstone if re-created
+    final prefs = await SharedPreferences.getInstance();
+    final deleted = prefs.getStringList('permanently_deleted_subjects') ?? [];
+    if (deleted.contains(subCode) || deleted.contains(subName) || deleted.contains(docId)) {
+      deleted.remove(subCode);
+      deleted.remove(subName);
+      deleted.remove(docId);
+      await prefs.setStringList('permanently_deleted_subjects', deleted);
+    }
+    await prefs.setBool('cloud_subjects_initialized', true);
+
+    // Save immediately to persistent local cache!
+    final currentMaps = await db.query('subjects', orderBy: 'id DESC');
+    try {
+      await prefs.setString('local_cached_subjects_v1', jsonEncode(currentMaps));
+    } catch (_) {}
+
+    // Save to Cloud Firestore
+    try {
+      final cloudData = {
+        'id': docId,
+        'name': subName,
+        'subject_code': subCode,
+        'description': mutableSubject['description']?.toString() ?? '',
+        'grade_level': mutableSubject['grade_level']?.toString() ?? 'Grade 10',
+        'semester': mutableSubject['semester']?.toString() ?? '1st Semester',
+        'unlock_type': mutableSubject['unlock_type']?.toString() ?? 'Flexible',
+        'teacher_id': mutableSubject['teacher_id']?.toString(),
+        'teacher_name': mutableSubject['teacher_name']?.toString(),
+        'created_at': mutableSubject['created_at'],
+      };
+      await FirestoreService().saveDocument('subjects', docId, cloudData);
+    } catch (_) {}
+
+    if (ref.mounted) {
+      state = currentMaps;
+    }
     return id;
   }
 
   Future<void> updateSubject(int id, Map<String, dynamic> data) async {
     final db = await DatabaseHelper().database;
     await db.update('subjects', data, where: 'id = ?', whereArgs: [id]);
-    await _loadSubjects();
+
+    final updated = (await db.query('subjects', where: 'id = ?', whereArgs: [id])).firstOrNull;
+    if (updated != null) {
+      final prefs = await SharedPreferences.getInstance();
+      final currentMaps = await db.query('subjects', orderBy: 'id DESC');
+      try {
+        await prefs.setString('local_cached_subjects_v1', jsonEncode(currentMaps));
+      } catch (_) {}
+
+      final subCode = updated['subject_code']?.toString().trim().toUpperCase() ?? '';
+      final docId = subCode.isNotEmpty ? subCode : 'SUBJ_$id';
+      try {
+        final cloudData = {
+          'id': docId,
+          'name': updated['name']?.toString() ?? '',
+          'subject_code': subCode,
+          'description': updated['description']?.toString() ?? '',
+          'grade_level': updated['grade_level']?.toString() ?? 'Grade 10',
+          'semester': updated['semester']?.toString() ?? '1st Semester',
+          'unlock_type': updated['unlock_type']?.toString() ?? 'Flexible',
+          'teacher_id': updated['teacher_id']?.toString(),
+          'teacher_name': updated['teacher_name']?.toString(),
+          'created_at': updated['created_at']?.toString() ?? DateTime.now().toIso8601String(),
+        };
+        await FirestoreService().saveDocument('subjects', docId, cloudData);
+      } catch (_) {}
+    }
+
+    final List<Map<String, dynamic>> maps = await db.query('subjects', orderBy: 'id DESC');
+    if (ref.mounted) state = maps;
   }
 
   Future<void> updateUnlockType(int id, String unlockType) async {
     final db = await DatabaseHelper().database;
     await db.update('subjects', {'unlock_type': unlockType}, where: 'id = ?', whereArgs: [id]);
-    await _loadSubjects();
+
+    final updated = (await db.query('subjects', where: 'id = ?', whereArgs: [id])).firstOrNull;
+    if (updated != null) {
+      final prefs = await SharedPreferences.getInstance();
+      final currentMaps = await db.query('subjects', orderBy: 'id DESC');
+      try {
+        await prefs.setString('local_cached_subjects_v1', jsonEncode(currentMaps));
+      } catch (_) {}
+
+      final subCode = updated['subject_code']?.toString().trim().toUpperCase() ?? '';
+      final docId = subCode.isNotEmpty ? subCode : 'SUBJ_$id';
+      try {
+        await FirestoreService().saveDocument('subjects', docId, {'unlock_type': unlockType});
+      } catch (_) {}
+    }
+
+    final List<Map<String, dynamic>> maps = await db.query('subjects', orderBy: 'id DESC');
+    if (ref.mounted) state = maps;
   }
 
   Future<void> deleteSubject(int id) async {
     final db = await DatabaseHelper().database;
+    final existing = await db.query('subjects', where: 'id = ?', whereArgs: [id]);
+
+    String? subCode;
+    String? subName;
+    if (existing.isNotEmpty) {
+      subCode = existing.first['subject_code']?.toString().trim().toUpperCase();
+      subName = existing.first['name']?.toString().trim();
+    }
+
     await db.delete('subjects', where: 'id = ?', whereArgs: [id]);
-    await _loadSubjects();
+    await db.delete('topics', where: 'subject_id = ?', whereArgs: [id]);
+    await db.delete('enrollments', where: 'subject_id = ?', whereArgs: [id]);
+    await db.delete('quizzes', where: 'subject_id = ?', whereArgs: [id]);
+
+    final docId = (subCode != null && subCode.isNotEmpty) ? subCode : 'SUBJ_$id';
+
+    // Delete from Cloud Firestore
+    try {
+      await FirestoreService().deleteDocument('subjects', docId);
+      if (subCode != null && subCode.isNotEmpty && subCode != docId) {
+        await FirestoreService().deleteDocument('subjects', subCode);
+      }
+      if (subName != null && subName.isNotEmpty) {
+        await FirestoreService().deleteDocument('subjects', subName);
+      }
+    } catch (_) {}
+
+    // Save tombstone in SharedPreferences so it NEVER resurrects!
+    final prefs = await SharedPreferences.getInstance();
+    final deleted = prefs.getStringList('permanently_deleted_subjects') ?? [];
+    if (subCode != null && subCode.isNotEmpty && !deleted.contains(subCode)) {
+      deleted.add(subCode);
+    }
+    if (subName != null && subName.isNotEmpty && !deleted.contains(subName)) {
+      deleted.add(subName);
+    }
+    if (!deleted.contains(docId)) {
+      deleted.add(docId);
+    }
+    await prefs.setStringList('permanently_deleted_subjects', deleted);
+    await prefs.setBool('cloud_subjects_initialized', true);
+
+    final currentMaps = await db.query('subjects', orderBy: 'id DESC');
+    try {
+      await prefs.setString('local_cached_subjects_v1', jsonEncode(currentMaps));
+    } catch (_) {}
+
+    if (ref.mounted) state = currentMaps;
   }
 
   Future<void> reload() async => _loadSubjects();
@@ -188,6 +374,25 @@ class SubjectsNotifier extends Notifier<List<Map<String, dynamic>>> {
     final db = await DatabaseHelper().database;
     final results = await db.query('subjects', where: 'id = ?', whereArgs: [id]);
     if (results.isNotEmpty) return results.first;
+
+    // Check local persistent cache in SharedPreferences as fallback
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final cachedStr = prefs.getString('local_cached_subjects_v1');
+      if (cachedStr != null && cachedStr.isNotEmpty) {
+        final List<dynamic> decoded = jsonDecode(cachedStr);
+        for (final item in decoded) {
+          if (item is Map) {
+            final m = Map<String, dynamic>.from(item);
+            if (m['id'] == id || m['id']?.toString() == id.toString()) {
+              await db.insert('subjects', m, conflictAlgorithm: ConflictAlgorithm.replace);
+              return m;
+            }
+          }
+        }
+      }
+    } catch (_) {}
+
     return null;
   }
 }
@@ -206,7 +411,90 @@ class SectionsNotifier extends Notifier<List<Map<String, dynamic>>> {
 
   Future<void> _loadSections() async {
     final db = await DatabaseHelper().database;
+    final prefs = await SharedPreferences.getInstance();
+    final deletedSections = prefs.getStringList('permanently_deleted_sections') ?? [];
+
+    // 1. If SQLite in-memory is empty (e.g. Web reload), restore from local persistent cache
+    final existingLocal = await db.query('sections');
+    if (existingLocal.isEmpty) {
+      final cachedStr = prefs.getString('local_cached_sections_v1');
+      if (cachedStr != null && cachedStr.isNotEmpty) {
+        try {
+          final List<dynamic> decoded = jsonDecode(cachedStr);
+          for (final item in decoded) {
+            if (item is Map) {
+              final m = Map<String, dynamic>.from(item);
+              final secKey = m['enrollment_key']?.toString().toUpperCase() ?? '';
+              final secName = m['name']?.toString() ?? '';
+              if (!deletedSections.contains(secKey) && !deletedSections.contains(secName)) {
+                await db.insert('sections', m, conflictAlgorithm: ConflictAlgorithm.replace);
+                if (secKey.isNotEmpty && secName.isNotEmpty) {
+                  await db.insert('reg_links', {
+                    'code': secKey,
+                    'section': secName,
+                    'max_uses': int.tryParse(m['max_uses']?.toString() ?? '50') ?? 50,
+                    'used_count': int.tryParse(m['used_count']?.toString() ?? '0') ?? 0,
+                    'expiration': m['expiration']?.toString() ?? '2026-12-31',
+                    'created_at': m['created_at']?.toString() ?? DateTime.now().toIso8601String(),
+                  }, conflictAlgorithm: ConflictAlgorithm.replace);
+                }
+              }
+            }
+          }
+        } catch (_) {}
+      }
+    }
+
+    // 2. Fetch from Cloud Firestore if available and merge
+    try {
+      final cloudDocs = await FirestoreService().fetchAllDocuments('sections');
+      if (cloudDocs.isNotEmpty) {
+        for (final doc in cloudDocs) {
+          final secName = doc['name']?.toString() ?? '';
+          final secKey = doc['enrollment_key']?.toString().toUpperCase() ?? doc['id']?.toString().toUpperCase() ?? '';
+          if (deletedSections.contains(secName) || deletedSections.contains(secKey)) {
+            continue;
+          }
+          final existing = await db.query('sections',
+              where: 'enrollment_key = ? OR name = ?',
+              whereArgs: [secKey, secName]);
+          if (existing.isEmpty) {
+            await db.insert('sections', {
+              'name': secName,
+              'description': doc['description']?.toString() ?? '',
+              'grade': doc['grade']?.toString() ?? 'Grade 10',
+              'room': doc['room']?.toString() ?? '',
+              'student_count': int.tryParse(doc['student_count']?.toString() ?? '0') ?? 0,
+              'enrollment_key': secKey,
+              'created_at': doc['created_at']?.toString() ?? DateTime.now().toIso8601String(),
+            }, conflictAlgorithm: ConflictAlgorithm.replace);
+          }
+          if (secKey.isNotEmpty && secName.isNotEmpty) {
+            await db.insert('reg_links', {
+              'code': secKey,
+              'section': secName,
+              'max_uses': int.tryParse(doc['max_uses']?.toString() ?? '50') ?? 50,
+              'used_count': int.tryParse(doc['used_count']?.toString() ?? '0') ?? 0,
+              'expiration': doc['expiration']?.toString() ?? '2026-12-31',
+              'created_at': doc['created_at']?.toString() ?? DateTime.now().toIso8601String(),
+            }, conflictAlgorithm: ConflictAlgorithm.replace);
+          }
+        }
+      }
+    } catch (e) {
+      debugPrint('[SectionsNotifier] Cloud sync note: $e');
+    }
+
+    // 3. Filter out any deleted tombstones and save active sections to local cache
+    for (final del in deletedSections) {
+      await db.delete('sections', where: 'enrollment_key = ? OR name = ?', whereArgs: [del, del]);
+      await db.delete('reg_links', where: 'code = ? OR section = ?', whereArgs: [del, del]);
+    }
     final List<Map<String, dynamic>> maps = await db.query('sections', orderBy: 'id DESC');
+    try {
+      await prefs.setString('local_cached_sections_v1', jsonEncode(maps));
+    } catch (_) {}
+
     if (!ref.mounted) return;
     state = maps;
   }
@@ -217,7 +505,6 @@ class SectionsNotifier extends Notifier<List<Map<String, dynamic>>> {
     final db = await DatabaseHelper().database;
     final mutableSection = Map<String, dynamic>.from(section);
 
-    // Auto-generate key if empty
     final rawKey = mutableSection['enrollment_key']?.toString().trim().toUpperCase() ?? '';
     final sectionName = mutableSection['name']?.toString() ?? 'Section';
     final gradeLevel = mutableSection['grade']?.toString() ?? 'Grade 10';
@@ -226,17 +513,59 @@ class SectionsNotifier extends Notifier<List<Map<String, dynamic>>> {
         : SectionKeyHelper.generateKey(sectionName: sectionName, gradeLevel: gradeLevel);
 
     mutableSection['enrollment_key'] = resolvedKey;
+    mutableSection['created_at'] ??= DateTime.now().toIso8601String();
 
-    await db.insert('sections', mutableSection);
+    final id = await db.insert('sections', mutableSection);
+    mutableSection['id'] = id;
 
-    // Automatically sync to reg_links so it appears in Enrollment Keys table
     await DatabaseHelper().generateEnrollmentKey(
       code: resolvedKey,
       section: sectionName,
       maxUses: 50,
     );
 
-    await _loadSections();
+    // Remove from tombstone if re-created
+    final prefs = await SharedPreferences.getInstance();
+    final deleted = prefs.getStringList('permanently_deleted_sections') ?? [];
+    if (deleted.contains(resolvedKey) || deleted.contains(sectionName)) {
+      deleted.remove(resolvedKey);
+      deleted.remove(sectionName);
+      await prefs.setStringList('permanently_deleted_sections', deleted);
+    }
+    await prefs.setBool('cloud_sections_initialized', true);
+
+    // Save immediately to persistent local cache!
+    final currentMaps = await db.query('sections', orderBy: 'id DESC');
+    try {
+      await prefs.setString('local_cached_sections_v1', jsonEncode(currentMaps));
+    } catch (_) {}
+
+    // Save to Cloud Firestore
+    try {
+      final cloudSection = {
+        'id': resolvedKey,
+        'name': sectionName,
+        'description': mutableSection['description']?.toString() ?? '',
+        'grade': gradeLevel,
+        'room': mutableSection['room']?.toString() ?? '',
+        'student_count': mutableSection['student_count'] ?? 0,
+        'enrollment_key': resolvedKey,
+        'created_at': mutableSection['created_at'],
+      };
+      await FirestoreService().saveDocument('sections', resolvedKey, cloudSection);
+      await FirestoreService().saveDocument('enrollment_keys', resolvedKey, {
+        'code': resolvedKey,
+        'section': sectionName,
+        'max_uses': 50,
+        'used_count': 0,
+        'expiration': '2026-12-31',
+        'created_at': mutableSection['created_at'],
+      });
+    } catch (_) {}
+
+    if (ref.mounted) {
+      state = currentMaps;
+    }
     ref.invalidate(availableSectionsProvider);
     ref.read(adminKeysProvider.notifier).loadKeys();
     ref.read(adminTeachersProvider.notifier).loadTeachers();
@@ -246,17 +575,51 @@ class SectionsNotifier extends Notifier<List<Map<String, dynamic>>> {
     final db = await DatabaseHelper().database;
     await db.update('sections', section, where: 'id = ?', whereArgs: [id]);
 
-    final rawKey = section['enrollment_key']?.toString().trim().toUpperCase();
-    final secName = section['name']?.toString();
-    if (rawKey != null && rawKey.isNotEmpty && secName != null && secName.isNotEmpty) {
-      await DatabaseHelper().generateEnrollmentKey(
-        code: rawKey,
-        section: secName,
-        maxUses: 50,
-      );
+    final updatedSec = (await db.query('sections', where: 'id = ?', whereArgs: [id])).firstOrNull;
+    final resolvedKey = updatedSec?['enrollment_key']?.toString().trim().toUpperCase() ??
+        section['enrollment_key']?.toString().trim().toUpperCase();
+    final secName = updatedSec?['name']?.toString() ?? section['name']?.toString();
+
+    final prefs = await SharedPreferences.getInstance();
+    final currentMaps = await db.query('sections', orderBy: 'id DESC');
+    try {
+      await prefs.setString('local_cached_sections_v1', jsonEncode(currentMaps));
+    } catch (_) {}
+
+    if (resolvedKey != null && resolvedKey.isNotEmpty) {
+      if (secName != null && secName.isNotEmpty) {
+        await DatabaseHelper().generateEnrollmentKey(
+          code: resolvedKey,
+          section: secName,
+          maxUses: 50,
+        );
+      }
+      try {
+        final cloudSection = {
+          'id': resolvedKey,
+          'name': secName ?? '',
+          'description': updatedSec?['description']?.toString() ?? section['description']?.toString() ?? '',
+          'grade': updatedSec?['grade']?.toString() ?? section['grade']?.toString() ?? 'Grade 10',
+          'room': updatedSec?['room']?.toString() ?? section['room']?.toString() ?? '',
+          'student_count': updatedSec?['student_count'] ?? 0,
+          'enrollment_key': resolvedKey,
+          'created_at': updatedSec?['created_at']?.toString() ?? DateTime.now().toIso8601String(),
+        };
+        await FirestoreService().saveDocument('sections', resolvedKey, cloudSection);
+        if (secName != null && secName.isNotEmpty) {
+          await FirestoreService().saveDocument('enrollment_keys', resolvedKey, {
+            'code': resolvedKey,
+            'section': secName,
+            'max_uses': 50,
+            'used_count': updatedSec?['student_count'] ?? 0,
+            'expiration': '2026-12-31',
+            'created_at': DateTime.now().toIso8601String(),
+          });
+        }
+      } catch (_) {}
     }
 
-    await _loadSections();
+    if (ref.mounted) state = currentMaps;
     ref.invalidate(availableSectionsProvider);
     ref.read(adminKeysProvider.notifier).loadKeys();
     ref.read(adminTeachersProvider.notifier).loadTeachers();
@@ -264,9 +627,54 @@ class SectionsNotifier extends Notifier<List<Map<String, dynamic>>> {
   
   Future<void> deleteSection(int id) async {
     final db = await DatabaseHelper().database;
+    final existing = await db.query('sections', where: 'id = ?', whereArgs: [id]);
+
+    String? secKey;
+    String? secName;
+    if (existing.isNotEmpty) {
+      secKey = existing.first['enrollment_key']?.toString().trim().toUpperCase();
+      secName = existing.first['name']?.toString().trim();
+    }
+
     await db.delete('sections', where: 'id = ?', whereArgs: [id]);
-    await _loadSections();
+
+    if (secKey != null && secKey.isNotEmpty) {
+      await db.delete('reg_links', where: 'code = ?', whereArgs: [secKey]);
+    }
+    if (secName != null && secName.isNotEmpty) {
+      await db.delete('reg_links', where: 'section = ?', whereArgs: [secName]);
+    }
+
+    try {
+      if (secKey != null && secKey.isNotEmpty) {
+        await FirestoreService().deleteDocument('sections', secKey);
+        await FirestoreService().deleteDocument('enrollment_keys', secKey);
+        await FirestoreService().deleteDocument('reg_links', secKey);
+      }
+      if (secName != null && secName.isNotEmpty) {
+        await FirestoreService().deleteDocument('sections', secName);
+      }
+    } catch (_) {}
+
+    final prefs = await SharedPreferences.getInstance();
+    final deleted = prefs.getStringList('permanently_deleted_sections') ?? [];
+    if (secKey != null && secKey.isNotEmpty && !deleted.contains(secKey)) {
+      deleted.add(secKey);
+    }
+    if (secName != null && secName.isNotEmpty && !deleted.contains(secName)) {
+      deleted.add(secName);
+    }
+    await prefs.setStringList('permanently_deleted_sections', deleted);
+    await prefs.setBool('cloud_sections_initialized', true);
+
+    final currentMaps = await db.query('sections', orderBy: 'id DESC');
+    try {
+      await prefs.setString('local_cached_sections_v1', jsonEncode(currentMaps));
+    } catch (_) {}
+
+    if (ref.mounted) state = currentMaps;
     ref.invalidate(availableSectionsProvider);
+    ref.read(adminKeysProvider.notifier).loadKeys();
     ref.read(adminTeachersProvider.notifier).loadTeachers();
   }
 }
@@ -799,6 +1207,35 @@ class AdminKeysNotifier extends Notifier<List<Map<String, dynamic>>> {
   }
 
   Future<void> loadKeys() async {
+    final db = await DatabaseHelper().database;
+    final prefs = await SharedPreferences.getInstance();
+    final deletedSections = prefs.getStringList('permanently_deleted_sections') ?? [];
+
+    try {
+      final cloudKeys = await FirestoreService().fetchAllDocuments('enrollment_keys');
+      if (cloudKeys.isNotEmpty) {
+        for (final k in cloudKeys) {
+          final code = k['code']?.toString().toUpperCase() ?? k['id']?.toString().toUpperCase() ?? '';
+          final sec = k['section']?.toString() ?? '';
+          if (deletedSections.contains(code) || deletedSections.contains(sec)) {
+            continue;
+          }
+          if (code.isNotEmpty) {
+            await db.insert('reg_links', {
+              'code': code,
+              'section': sec,
+              'max_uses': int.tryParse(k['max_uses']?.toString() ?? '50') ?? 50,
+              'used_count': int.tryParse(k['used_count']?.toString() ?? '0') ?? 0,
+              'expiration': k['expiration']?.toString() ?? '2026-12-31',
+              'created_at': k['created_at']?.toString() ?? DateTime.now().toIso8601String(),
+            }, conflictAlgorithm: ConflictAlgorithm.replace);
+          }
+        }
+      }
+    } catch (e) {
+      debugPrint('[AdminKeysNotifier] Cloud loadKeys note: $e');
+    }
+
     final keys = await DatabaseHelper().getEnrollmentKeysList();
     if (!ref.mounted) return;
     state = keys;
@@ -810,17 +1247,47 @@ class AdminKeysNotifier extends Notifier<List<Map<String, dynamic>>> {
     int maxUses = 50,
     String? expiration,
   }) async {
+    final cleanCode = code.trim().toUpperCase();
     await DatabaseHelper().generateEnrollmentKey(
-      code: code,
+      code: cleanCode,
       section: section,
       maxUses: maxUses,
       expiration: expiration,
     );
+
+    // Save directly to Cloud Firestore!
+    await FirestoreService().saveDocument('enrollment_keys', cleanCode, {
+      'code': cleanCode,
+      'section': section,
+      'max_uses': maxUses,
+      'used_count': 0,
+      'expiration': expiration ?? '2026-12-31',
+      'created_at': DateTime.now().toIso8601String(),
+    });
+
+    final prefs = await SharedPreferences.getInstance();
+    final deleted = prefs.getStringList('permanently_deleted_sections') ?? [];
+    if (deleted.contains(cleanCode)) {
+      deleted.remove(cleanCode);
+      await prefs.setStringList('permanently_deleted_sections', deleted);
+    }
+
     await loadKeys();
   }
 
   Future<void> deleteKey(String code) async {
-    await DatabaseHelper().deleteEnrollmentKey(code);
+    final cleanCode = code.trim().toUpperCase();
+    await DatabaseHelper().deleteEnrollmentKey(cleanCode);
+    await FirestoreService().deleteDocument('enrollment_keys', cleanCode);
+    await FirestoreService().deleteDocument('reg_links', cleanCode);
+
+    final prefs = await SharedPreferences.getInstance();
+    final deleted = prefs.getStringList('permanently_deleted_sections') ?? [];
+    if (!deleted.contains(cleanCode)) {
+      deleted.add(cleanCode);
+      await prefs.setStringList('permanently_deleted_sections', deleted);
+    }
+
     await loadKeys();
   }
 }

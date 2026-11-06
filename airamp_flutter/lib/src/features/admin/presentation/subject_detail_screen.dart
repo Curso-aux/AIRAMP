@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import '../../../core/components/aira_action_toast.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/theme/theme_provider.dart';
 import '../../../core/database/database_helper.dart';
@@ -32,14 +33,31 @@ class _SubjectDetailScreenState extends ConsumerState<SubjectDetailScreen> {
 
   Future<void> _loadSubject() async {
     final id = int.tryParse(widget.subjectId);
-    if (id == null) return;
-    final subject = await ref.read(subjectsProvider.notifier).getSubjectById(id);
+    Map<String, dynamic>? subject;
+    if (id != null) {
+      subject = await ref.read(subjectsProvider.notifier).getSubjectById(id);
+    }
+    // Fallback: search in active subjectsProvider list by id or code
+    if (subject == null) {
+      final all = ref.read(subjectsProvider);
+      subject = all.where((s) =>
+          s['id'] == id ||
+          s['id']?.toString() == widget.subjectId ||
+          s['subject_code'] == widget.subjectId).firstOrNull;
+    }
     if (mounted) {
       setState(() {
         _subject = subject;
         _loading = false;
       });
-      ref.read(subjectDetailProvider.notifier).loadHierarchy(id);
+      if (subject != null) {
+        final resolvedId = subject['id'] is int
+            ? subject['id'] as int
+            : (int.tryParse(subject['id']?.toString() ?? '') ?? (id ?? 0));
+        if (resolvedId > 0) {
+          ref.read(subjectDetailProvider.notifier).loadHierarchy(resolvedId);
+        }
+      }
     }
   }
 
@@ -122,11 +140,10 @@ class _SubjectDetailScreenState extends ConsumerState<SubjectDetailScreen> {
                     await ref.read(subjectsProvider.notifier).updateUnlockType(subjectId, selected);
                     await _loadSubject();
                     if (mounted) {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(
-                          content: Text('Progression mode updated to "$selected"'),
-                          backgroundColor: AppTheme.success,
-                        ),
+                      AiraActionToast.showSuccess(
+                        context,
+                        title: 'Progression Mode Updated',
+                        message: 'Progression mode updated to "$selected"',
                       );
                     }
                   },
@@ -230,7 +247,7 @@ class _SubjectDetailScreenState extends ConsumerState<SubjectDetailScreen> {
       );
     }
 
-    final subjectId = int.parse(widget.subjectId);
+    final subjectId = int.tryParse(widget.subjectId) ?? (_subject?['id'] as int? ?? 0);
     final subjectName = _subject!['name'] ?? 'Untitled';
     final unlockType = _subject!['unlock_type'] ?? 'Sequential';
     final semester = _subject!['semester']?.toString() ?? '';
@@ -886,11 +903,10 @@ class _SubjectDetailScreenState extends ConsumerState<SubjectDetailScreen> {
     );
     if (result == true && mounted) {
       ref.read(subjectDetailProvider.notifier).loadHierarchy(subjectId);
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: const Text('PDF Module imported and practice quizzes generated successfully!'),
-          backgroundColor: AppTheme.success,
-        ),
+      AiraActionToast.showSuccess(
+        context,
+        title: 'PDF Module Imported',
+        message: 'PDF Module imported and practice quizzes generated successfully!',
       );
     }
   }
@@ -2363,23 +2379,10 @@ class _ScheduleQuizSheetState extends ConsumerState<_ScheduleQuizSheet> {
       'allow_extend': _allowExtend ? 1 : 0,
     });
     Navigator.pop(context);
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Row(
-          children: [
-            Icon(Icons.check_circle_outline, color: Theme.of(context).colorScheme.primary),
-            SizedBox(width: 8),
-            Text('Quiz schedule saved successfully!', style: TextStyle(color: Theme.of(context).colorScheme.onSurface)),
-          ],
-        ),
-        backgroundColor: Theme.of(context).colorScheme.surface,
-        behavior: SnackBarBehavior.floating,
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(8),
-          side: BorderSide(color: Theme.of(context).colorScheme.primary),
-        ),
-        margin: const EdgeInsets.only(bottom: 20, left: 20, right: 20),
-      ),
+    AiraActionToast.showSuccess(
+      context,
+      title: 'Schedule Saved',
+      message: 'Quiz schedule saved successfully!',
     );
   }
 

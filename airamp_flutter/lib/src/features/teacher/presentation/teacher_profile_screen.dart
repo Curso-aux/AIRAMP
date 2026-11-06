@@ -2478,25 +2478,6 @@ class _TeacherProfileScreenState extends ConsumerState<TeacherProfileScreen>
       return;
     }
 
-    // First-login password setup: save new password directly without blocking on OTP
-    if (user.mustChangePassword) {
-      setState(() => _isSavingPassword = true);
-      try {
-        await ref.read(authProvider.notifier).updateProfile(password: newPass);
-        if (!mounted) return;
-        setState(() => _showPasswordForm = false);
-        _newPasswordController.clear();
-        _confirmPasswordController.clear();
-        _showSuccessUnlockedDialog(isTeacher: true);
-      } catch (e) {
-        if (!mounted) return;
-        _showAlert('Error', 'Failed to update password: $e');
-      } finally {
-        if (mounted) setState(() => _isSavingPassword = false);
-      }
-      return;
-    }
-
     String targetEmail = user.email.trim();
     if (targetEmail.isEmpty) {
       final inputEmail = await _promptForEmailDialog(context);

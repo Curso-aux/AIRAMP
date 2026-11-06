@@ -1783,6 +1783,28 @@ class DatabaseHelper {
       }
     }
 
+    // Authoritative Cloud Firestore fallback: Check if key exists in Firestore
+    if (section == null) {
+      try {
+        final cloudSec = await FirestoreService().getDocument('sections', keyUpper);
+        if (cloudSec != null && cloudSec.isNotEmpty) {
+          section = cloudSec;
+        } else {
+          final cloudKey = await FirestoreService().getDocument('enrollment_keys', keyUpper);
+          if (cloudKey != null && cloudKey.isNotEmpty) {
+            final secName = cloudKey['section']?.toString() ?? '';
+            section = {
+              'name': secName,
+              'grade': cloudKey['grade']?.toString() ?? 'Grade 10',
+              'room': cloudKey['room']?.toString() ?? 'Assigned Room',
+              'description': 'Curriculum Section',
+              'enrollment_key': keyUpper,
+            };
+          }
+        }
+      } catch (_) {}
+    }
+
     if (section == null) return null;
 
     final grade = section['grade']?.toString() ?? '';
@@ -4039,6 +4061,22 @@ class DatabaseHelper {
     }
 
     // Ensure core curriculum subjects CS101 and CS202 exist
+    List<String> deletedSubjects = [];
+    List<String> deletedSections = [];
+    bool subjectsInitialized = false;
+    bool sectionsInitialized = false;
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      deletedSubjects = prefs.getStringList('permanently_deleted_subjects') ?? [];
+      deletedSections = prefs.getStringList('permanently_deleted_sections') ?? [];
+      subjectsInitialized = prefs.getBool('cloud_subjects_initialized') ?? false;
+      sectionsInitialized = prefs.getBool('cloud_sections_initialized') ?? false;
+    } catch (_) {}
+
+    final shouldSeedCs101 = !subjectsInitialized &&
+        !deletedSubjects.contains('CS101') &&
+        !deletedSubjects.contains('Introduction to Flutter & Dart');
+
     final existingCs101 = await db.query(
       'subjects',
       where: 'subject_code = ?',
@@ -4046,7 +4084,7 @@ class DatabaseHelper {
     );
     int cs101Id = 0;
     int lo1Id = 0;
-    if (existingCs101.isEmpty) {
+    if (existingCs101.isEmpty && shouldSeedCs101) {
       cs101Id = await db.insert('subjects', {
         'name': 'Introduction to Flutter & Dart',
         'subject_code': 'CS101',
@@ -4262,7 +4300,7 @@ class DatabaseHelper {
             .subtract(const Duration(days: 3))
             .toIso8601String(),
       });
-    } else {
+    } else if (existingCs101.isNotEmpty) {
       cs101Id = existingCs101.first['id'] as int;
       await db.update(
         'subjects',
@@ -4275,13 +4313,17 @@ class DatabaseHelper {
     }
 
     // Ensure Subject 2: CS202 exists
+    final shouldSeedCs202 = !subjectsInitialized &&
+        !deletedSubjects.contains('CS202') &&
+        !deletedSubjects.contains('Mobile UI & State Management');
+
     final existingCs202 = await db.query(
       'subjects',
       where: 'subject_code = ?',
       whereArgs: ['CS202'],
     );
     int cs202Id = 0;
-    if (existingCs202.isEmpty) {
+    if (existingCs202.isEmpty && shouldSeedCs202) {
       cs202Id = await db.insert('subjects', {
         'name': 'Mobile UI & State Management',
         'subject_code': 'CS202',
@@ -4361,7 +4403,7 @@ class DatabaseHelper {
             .subtract(const Duration(days: 2))
             .toIso8601String(),
       });
-    } else {
+    } else if (existingCs202.isNotEmpty) {
       cs202Id = existingCs202.first['id'] as int;
       await db.update(
         'subjects',
@@ -4380,34 +4422,40 @@ class DatabaseHelper {
     // Seed Sections if empty and ensure enrollment_key is populated
     try {
       final existingSections = await db.query('sections');
-      if (existingSections.isEmpty) {
-        await db.insert('sections', {
-          'name': 'Grade 10 - Emerald',
-          'description': 'Junior High Class Emerald',
-          'grade': 'Grade 10',
-          'room': 'Room 201 - Main Bldg',
-          'student_count': 2,
-          'enrollment_key': 'SEC-EMR10',
-          'created_at': DateTime.now().toIso8601String(),
-        });
-        await db.insert('sections', {
-          'name': 'Grade 11 - STEM B',
-          'description': 'STEM Strand Section B - Senior High',
-          'grade': 'Grade 11',
-          'room': 'Room 304 - Science Bldg',
-          'student_count': 1,
-          'enrollment_key': 'SEC-STEM11',
-          'created_at': DateTime.now().toIso8601String(),
-        });
-        await db.insert('sections', {
-          'name': 'Grade 12 - Gold',
-          'description': 'Senior High Class Gold',
-          'grade': 'Grade 12',
-          'room': 'Room 402 - Tech Bldg',
-          'student_count': 0,
-          'enrollment_key': 'SEC-GOLD12',
-          'created_at': DateTime.now().toIso8601String(),
-        });
+      if (existingSections.isEmpty && !sectionsInitialized) {
+        if (!deletedSections.contains('SEC-EMR10') && !deletedSections.contains('Grade 10 - Emerald')) {
+          await db.insert('sections', {
+            'name': 'Grade 10 - Emerald',
+            'description': 'Junior High Class Emerald',
+            'grade': 'Grade 10',
+            'room': 'Room 201 - Main Bldg',
+            'student_count': 0,
+            'enrollment_key': 'SEC-EMR10',
+            'created_at': DateTime.now().toIso8601String(),
+          });
+        }
+        if (!deletedSections.contains('SEC-STEM11') && !deletedSections.contains('Grade 11 - STEM B')) {
+          await db.insert('sections', {
+            'name': 'Grade 11 - STEM B',
+            'description': 'STEM Strand Section B - Senior High',
+            'grade': 'Grade 11',
+            'room': 'Room 304 - Science Bldg',
+            'student_count': 0,
+            'enrollment_key': 'SEC-STEM11',
+            'created_at': DateTime.now().toIso8601String(),
+          });
+        }
+        if (!deletedSections.contains('SEC-GOLD12') && !deletedSections.contains('Grade 12 - Gold')) {
+          await db.insert('sections', {
+            'name': 'Grade 12 - Gold',
+            'description': 'Senior High Class Gold',
+            'grade': 'Grade 12',
+            'room': 'Room 402 - Tech Bldg',
+            'student_count': 0,
+            'enrollment_key': 'SEC-GOLD12',
+            'created_at': DateTime.now().toIso8601String(),
+          });
+        }
       } else {
         // Backfill any sections missing enrollment keys
         for (final sec in existingSections) {
@@ -4479,33 +4527,20 @@ class DatabaseHelper {
         where:
             "role = 'student' AND (section IN ('Diamond', 'STEM B') OR id = 'student_3')",
       );
-      // Remove any test section from sections table that isn't standard
-      await db.delete(
-        'sections',
-        where:
-            "name NOT IN ('Grade 10 - Emerald', 'Grade 11 - STEM B') AND name LIKE 'Sapphire%'",
-      );
-      // Update section student counts accurately based only on active students
-      final emCount =
-          Sqflite.firstIntValue(
+      // Update section student counts accurately based dynamically on active students
+      final allSecs = await db.query('sections');
+      for (final s in allSecs) {
+        final sName = s['name'] as String? ?? '';
+        if (sName.isNotEmpty) {
+          final count = Sqflite.firstIntValue(
             await db.rawQuery(
-              "SELECT COUNT(*) FROM users WHERE section = 'Grade 10 - Emerald' AND role = 'student' AND (is_archived IS NULL OR is_archived = 0)",
+              "SELECT COUNT(*) FROM users WHERE section = ? AND role = 'student' AND (is_archived IS NULL OR is_archived = 0)",
+              [sName],
             ),
-          ) ??
-          0;
-      final stemCount =
-          Sqflite.firstIntValue(
-            await db.rawQuery(
-              "SELECT COUNT(*) FROM users WHERE section = 'Grade 11 - STEM B' AND role = 'student' AND (is_archived IS NULL OR is_archived = 0)",
-            ),
-          ) ??
-          0;
-      await db.update('sections', {
-        'student_count': emCount,
-      }, where: "name = 'Grade 10 - Emerald'");
-      await db.update('sections', {
-        'student_count': stemCount,
-      }, where: "name = 'Grade 11 - STEM B'");
+          ) ?? 0;
+          await db.update('sections', {'student_count': count}, where: 'id = ?', whereArgs: [s['id']]);
+        }
+      }
 
       // Migrate any remaining unhashed passwords to salted SHA-256
       try {
