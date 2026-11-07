@@ -7,6 +7,7 @@ import 'package:path/path.dart';
 import 'package:sqflite/sqflite.dart';
 import 'package:sqflite_common_ffi_web/sqflite_ffi_web.dart';
 import '../utils/cache_manager.dart';
+import '../utils/institutional_id_helper.dart';
 import '../utils/section_key_helper.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'firestore_service.dart';
@@ -490,6 +491,54 @@ class DatabaseHelper {
       ''');
     } catch (_) {}
     await _seedInitialData(db);
+    try {
+      // Auto-heal any role conflicts based on Institutional ID standard prefixes
+      await db.execute('''
+        UPDATE users SET role = 'teacher', category = 'teacher'
+        WHERE (id LIKE 'T-%' OR id LIKE '002-%' OR id LIKE 'TCH_%') AND role != 'teacher'
+      ''');
+      await db.execute('''
+        UPDATE users SET role = 'student', category = 'student'
+        WHERE (id LIKE 'S-%' OR id LIKE '001-%' OR id LIKE 'STD_%') AND role != 'student'
+      ''');
+      await db.execute('''
+        UPDATE users SET role = 'admin', category = 'admin'
+        WHERE (id LIKE 'A-%' OR id LIKE 'ADM-%' OR id LIKE 'ADMIN_%') AND role NOT IN ('admin', 'super_admin')
+      ''');
+      await db.execute('''
+        UPDATE users SET role = 'super_admin', category = 'super_admin'
+        WHERE (id LIKE 'SA-%' OR id LIKE 'SA_%') AND role != 'super_admin'
+      ''');
+    } catch (_) {}
+
+    // On Web (in-memory SQLite), fast-restore cached users from localStorage in 0ms on startup
+    if (kIsWeb) {
+      try {
+        final prefs = await SharedPreferences.getInstance();
+        final cachedStr = prefs.getString('local_cached_users_v1');
+        if (cachedStr != null && cachedStr.isNotEmpty) {
+          final List<dynamic> decoded = jsonDecode(cachedStr);
+          for (final item in decoded) {
+            if (item is Map) {
+              await db.insert(
+                'users',
+                Map<String, dynamic>.from(item),
+                conflictAlgorithm: ConflictAlgorithm.replace,
+              );
+            }
+          }
+          // Re-heal roles on restored users immediately
+          await db.execute('''
+            UPDATE users SET role = 'teacher', category = 'teacher'
+            WHERE (id LIKE 'T-%' OR id LIKE '002-%' OR id LIKE 'TCH_%') AND role != 'teacher'
+          ''');
+          await db.execute('''
+            UPDATE users SET role = 'student', category = 'student'
+            WHERE (id LIKE 'S-%' OR id LIKE '001-%' OR id LIKE 'STD_%') AND role != 'student'
+          ''');
+        }
+      } catch (_) {}
+    }
   }
 
   Future<Database> _initDatabase() async {
@@ -943,6 +992,54 @@ class DatabaseHelper {
 
     // Seed initial curriculum data
     await _seedInitialData(db);
+    try {
+      // Auto-heal any role conflicts based on Institutional ID standard prefixes
+      await db.execute('''
+        UPDATE users SET role = 'teacher', category = 'teacher'
+        WHERE (id LIKE 'T-%' OR id LIKE '002-%' OR id LIKE 'TCH_%') AND role != 'teacher'
+      ''');
+      await db.execute('''
+        UPDATE users SET role = 'student', category = 'student'
+        WHERE (id LIKE 'S-%' OR id LIKE '001-%' OR id LIKE 'STD_%') AND role != 'student'
+      ''');
+      await db.execute('''
+        UPDATE users SET role = 'admin', category = 'admin'
+        WHERE (id LIKE 'A-%' OR id LIKE 'ADM-%' OR id LIKE 'ADMIN_%') AND role NOT IN ('admin', 'super_admin')
+      ''');
+      await db.execute('''
+        UPDATE users SET role = 'super_admin', category = 'super_admin'
+        WHERE (id LIKE 'SA-%' OR id LIKE 'SA_%') AND role != 'super_admin'
+      ''');
+    } catch (_) {}
+
+    // On Web (in-memory SQLite), fast-restore cached users from localStorage in 0ms on startup
+    if (kIsWeb) {
+      try {
+        final prefs = await SharedPreferences.getInstance();
+        final cachedStr = prefs.getString('local_cached_users_v1');
+        if (cachedStr != null && cachedStr.isNotEmpty) {
+          final List<dynamic> decoded = jsonDecode(cachedStr);
+          for (final item in decoded) {
+            if (item is Map) {
+              await db.insert(
+                'users',
+                Map<String, dynamic>.from(item),
+                conflictAlgorithm: ConflictAlgorithm.replace,
+              );
+            }
+          }
+          // Re-heal roles on restored users immediately
+          await db.execute('''
+            UPDATE users SET role = 'teacher', category = 'teacher'
+            WHERE (id LIKE 'T-%' OR id LIKE '002-%' OR id LIKE 'TCH_%') AND role != 'teacher'
+          ''');
+          await db.execute('''
+            UPDATE users SET role = 'student', category = 'student'
+            WHERE (id LIKE 'S-%' OR id LIKE '001-%' OR id LIKE 'STD_%') AND role != 'student'
+          ''');
+        }
+      } catch (_) {}
+    }
   }
 
   Future<void> _onUpgrade(Database db, int oldVersion, int newVersion) async {
@@ -2804,8 +2901,10 @@ class DatabaseHelper {
 
     // 1. Filter Users by role, section, and student category
     final users = allUsers.where((u) {
-      final uRole = u['role'] as String? ?? 'student';
-      if (role != null && role != 'all' && role.isNotEmpty && uRole != role) {
+      final uRole = (u['role'] as String? ?? '').toLowerCase().trim();
+      final uId = (u['id'] as String? ?? '').trim();
+      final effectiveRole = InstitutionalIdHelper.detectRole(uId) ?? (uRole.isNotEmpty ? uRole : 'student');
+      if (role != null && role != 'all' && role.isNotEmpty && effectiveRole != role) {
         return false;
       }
 
@@ -2885,15 +2984,26 @@ class DatabaseHelper {
     }).toList();
 
     final totalUsers = users.length;
-    final totalStudents = users.where((u) => u['role'] == 'student').length;
-    final totalTeachers = users.where((u) => u['role'] == 'teacher').length;
-    final totalAdmins = users
-        .where((u) => u['role'] == 'admin' || u['role'] == 'super_admin')
-        .length;
-    final matchingStudentIds = users
-        .where((u) => u['role'] == 'student')
-        .map((u) => u['id'] as String)
-        .toSet();
+    final totalStudents = users.where((u) {
+      final r = (u['role'] as String? ?? '').toLowerCase().trim();
+      final id = (u['id'] as String? ?? '').trim();
+      return r == 'student' || id.startsWith('S-') || id.startsWith('001-') || id.startsWith('STD_');
+    }).length;
+    final totalTeachers = users.where((u) {
+      final r = (u['role'] as String? ?? '').toLowerCase().trim();
+      final id = (u['id'] as String? ?? '').trim();
+      return r == 'teacher' || id.startsWith('T-') || id.startsWith('002-') || id.startsWith('TCH_');
+    }).length;
+    final totalAdmins = users.where((u) {
+      final r = (u['role'] as String? ?? '').toLowerCase().trim();
+      final id = (u['id'] as String? ?? '').trim();
+      return r == 'admin' || r == 'super_admin' || id.startsWith('A-') || id.startsWith('SA-');
+    }).length;
+    final matchingStudentIds = users.where((u) {
+      final r = (u['role'] as String? ?? '').toLowerCase().trim();
+      final id = (u['id'] as String? ?? '').trim();
+      return r == 'student' || id.startsWith('S-') || id.startsWith('001-') || id.startsWith('STD_');
+    }).map((u) => u['id'] as String).toSet();
 
     // 2. Filter Subjects
     final allSubjects = await db.query('subjects');
@@ -3017,7 +3127,10 @@ class DatabaseHelper {
     int spedCount = 0;
 
     for (final u in users) {
-      if (u['role'] == 'student') {
+      final r = (u['role'] as String? ?? '').toLowerCase().trim();
+      final id = (u['id'] as String? ?? '').trim();
+      final isStudent = r == 'student' || id.startsWith('S-') || id.startsWith('001-') || id.startsWith('STD_');
+      if (isStudent) {
         final sec = (u['section'] as String?)?.trim();
         final label = (sec != null && sec.isNotEmpty) ? sec : 'Unassigned';
         sectionMap[label] = (sectionMap[label] ?? 0) + 1;
@@ -3122,7 +3235,7 @@ class DatabaseHelper {
 
     final users = await db.query(
       'users',
-      where: "role = 'student' AND (is_archived IS NULL OR is_archived = 0)",
+      where: "(role = 'student' OR (role IS NULL AND id NOT LIKE 'T-%' AND id NOT LIKE 'A-%' AND id NOT LIKE 'SA-%')) AND (is_archived IS NULL OR is_archived = 0) AND id NOT LIKE 'T-%' AND id NOT LIKE '002-%' AND id NOT LIKE 'TCH_%' AND id NOT LIKE 'A-%' AND id NOT LIKE 'ADM-%' AND id NOT LIKE 'ADMIN_%' AND id NOT LIKE 'SA-%' AND id NOT LIKE 'SA_%'",
       orderBy: 'full_name ASC',
     );
     final enrollments = await db.query('enrollments');
@@ -3197,7 +3310,7 @@ class DatabaseHelper {
 
     final users = await db.query(
       'users',
-      where: "role = 'student' AND is_archived = 1",
+      where: "role = 'student' AND is_archived = 1 AND id NOT LIKE 'T-%' AND id NOT LIKE '002-%' AND id NOT LIKE 'TCH_%' AND id NOT LIKE 'A-%' AND id NOT LIKE 'ADM-%' AND id NOT LIKE 'ADMIN_%' AND id NOT LIKE 'SA-%' AND id NOT LIKE 'SA_%'",
       orderBy: 'archived_at DESC, full_name ASC',
     );
     final enrollments = await db.query('enrollments');
@@ -3594,13 +3707,15 @@ class DatabaseHelper {
       final row = usersToImport[i];
       final fullName = (row['full_name'] as String? ?? '').trim();
       final email = (row['email'] as String? ?? '').trim().toLowerCase();
+      final rawId = (row['id'] as String? ?? '').trim();
+      final detectedRole = InstitutionalIdHelper.detectRole(rawId);
       final rawRole = (row['role'] as String? ?? '').trim().toLowerCase();
-      final role =
-          (rawRole == 'teacher' ||
+      final role = detectedRole ??
+          ((rawRole == 'teacher' ||
               rawRole == 'admin' ||
               rawRole == 'super_admin')
           ? rawRole
-          : 'student';
+          : 'student');
       final rawSection = (row['section'] as String? ?? '').trim();
       final rawGrade = (row['grade'] as String? ?? '').trim();
       final studentType = (row['student_type'] as String? ?? 'regular')
@@ -4745,8 +4860,7 @@ class DatabaseHelper {
     final db = await database;
     final teachers = await db.query(
       'users',
-      where: 'role = ? AND (is_archived IS NULL OR is_archived = 0)',
-      whereArgs: ['teacher'],
+      where: "(role = 'teacher' OR id LIKE 'T-%' OR id LIKE '002-%' OR id LIKE 'TCH_%') AND (is_archived IS NULL OR is_archived = 0)",
       orderBy: 'full_name ASC',
     );
 
@@ -4790,8 +4904,7 @@ class DatabaseHelper {
     final db = await database;
     final teachers = await db.query(
       'users',
-      where: 'role = ? AND is_archived = 1',
-      whereArgs: ['teacher'],
+      where: "(role = 'teacher' OR id LIKE 'T-%' OR id LIKE '002-%' OR id LIKE 'TCH_%') AND is_archived = 1",
       orderBy: 'archived_at DESC, full_name ASC',
     );
 
@@ -5211,6 +5324,14 @@ class DatabaseHelper {
       } catch (_) {}
     }
 
+    final detectedExistingRole = existingId != null ? InstitutionalIdHelper.detectRole(existingId) : null;
+    final detectedProposedRole = id != null ? InstitutionalIdHelper.detectRole(id) : null;
+    if (detectedProposedRole == 'student' || (detectedProposedRole == null && detectedExistingRole == 'student')) {
+      throw Exception(
+        'Cannot register account "$cleanEmail" as teacher: ID "${id ?? existingId}" is a student identifier.',
+      );
+    }
+
     String finalTeacherId;
     if (existingId != null && existingId.isNotEmpty) {
       finalTeacherId = existingId;
@@ -5358,6 +5479,20 @@ class DatabaseHelper {
           existingId = cloudMatch['id']?.toString();
         }
       } catch (_) {}
+    }
+
+    final detectedExistingRole = existingId != null ? InstitutionalIdHelper.detectRole(existingId) : null;
+    final detectedProposedRole = id != null ? InstitutionalIdHelper.detectRole(id) : null;
+    if (detectedProposedRole == 'teacher' ||
+        detectedProposedRole == 'admin' ||
+        detectedProposedRole == 'super_admin' ||
+        (detectedProposedRole == null &&
+            (detectedExistingRole == 'teacher' ||
+                detectedExistingRole == 'admin' ||
+                detectedExistingRole == 'super_admin'))) {
+      throw Exception(
+        'Cannot register or convert account "$cleanEmail" as a student: ID "${id ?? existingId}" is assigned to faculty/administrator ($detectedExistingRole).',
+      );
     }
 
     String finalStudentId;
@@ -7688,12 +7823,19 @@ class DatabaseHelper {
   }
 
   /// Sync all assignments from Cloud Firestore down to local SQLite cache
-  Future<void> syncCloudAssignmentsToLocal() async {
+  /// Uses delta querying via 'last_synced_at_assignments' so 0 reads are consumed if nothing changed!
+  Future<void> syncCloudAssignmentsToLocal({bool force = false}) async {
     try {
-      final cloudDocs = await FirestoreService().fetchAllDocuments(
+      final prefs = await SharedPreferences.getInstance();
+      final lastSync = force ? null : prefs.getString('last_synced_at_assignments');
+      final cloudDocs = await FirestoreService().fetchDeltaDocuments(
         'assignments',
+        since: lastSync,
       );
-      if (cloudDocs.isEmpty) return;
+      if (cloudDocs.isEmpty) {
+        await prefs.setString('last_synced_at_assignments', DateTime.now().toIso8601String());
+        return;
+      }
       final db = await database;
       for (final doc in cloudDocs) {
         final title = doc['title']?.toString() ?? 'Assignment';
@@ -7814,6 +7956,7 @@ class DatabaseHelper {
       debugPrint(
         '[DatabaseHelper] Synced ${cloudDocs.length} Cloud assignments to local SQLite',
       );
+      await prefs.setString('last_synced_at_assignments', DateTime.now().toIso8601String());
     } catch (e) {
       debugPrint('[DatabaseHelper] syncCloudAssignmentsToLocal note: $e');
     }
@@ -7941,12 +8084,23 @@ class DatabaseHelper {
   }
 
   /// Syncs all quizzes and quiz assignments from Cloud Firestore down to SQLite
-  Future<void> syncCloudQuizzesToLocal() async {
+  /// Uses delta querying via 'last_synced_at_quizzes' so 0 reads are consumed if nothing changed!
+  Future<void> syncCloudQuizzesToLocal({bool force = false}) async {
     try {
-      final cloudQuizzes = await FirestoreService().fetchAllDocuments(
+      final prefs = await SharedPreferences.getInstance();
+      final lastSync = force ? null : prefs.getString('last_synced_at_quizzes');
+      final cloudQuizzes = await FirestoreService().fetchDeltaDocuments(
         'quizzes',
+        since: lastSync,
       );
-      if (cloudQuizzes.isEmpty) return;
+      final cloudAssignments = await FirestoreService().fetchDeltaDocuments(
+        'quiz_assignments',
+        since: lastSync,
+      );
+      if (cloudQuizzes.isEmpty && cloudAssignments.isEmpty) {
+        await prefs.setString('last_synced_at_quizzes', DateTime.now().toIso8601String());
+        return;
+      }
       final db = await database;
 
       for (final doc in cloudQuizzes) {
@@ -8101,10 +8255,7 @@ class DatabaseHelper {
         }
       }
 
-      // Sync explicit quiz assignments from Cloud Firestore
-      final cloudAssignments = await FirestoreService().fetchAllDocuments(
-        'quiz_assignments',
-      );
+      // Process delta quiz assignments already fetched above
       for (final qa in cloudAssignments) {
         final qTitle = qa['quiz_title']?.toString();
         final studentId = qa['student_id']?.toString();
@@ -8145,6 +8296,7 @@ class DatabaseHelper {
       debugPrint(
         '[DatabaseHelper] Synced ${cloudQuizzes.length} Cloud quizzes to local SQLite',
       );
+      await prefs.setString('last_synced_at_quizzes', DateTime.now().toIso8601String());
     } catch (e) {
       debugPrint('[DatabaseHelper] syncCloudQuizzesToLocal note: $e');
     }
@@ -8257,12 +8409,19 @@ class DatabaseHelper {
   }
 
   /// Pulls all subjects, topics, and learning outcomes from Cloud Firestore and caches in SQLite
-  Future<void> syncCloudCurriculumToLocal() async {
+  /// Uses delta querying via 'last_synced_at_curriculum' so 0 reads are consumed if nothing changed!
+  Future<void> syncCloudCurriculumToLocal({bool force = false}) async {
     try {
-      final cloudSubjects = await FirestoreService().fetchAllDocuments(
+      final prefs = await SharedPreferences.getInstance();
+      final lastSync = force ? null : prefs.getString('last_synced_at_curriculum');
+      final cloudSubjects = await FirestoreService().fetchDeltaDocuments(
         'curriculum_subjects',
+        since: lastSync,
       );
-      if (cloudSubjects.isEmpty) return;
+      if (cloudSubjects.isEmpty) {
+        await prefs.setString('last_synced_at_curriculum', DateTime.now().toIso8601String());
+        return;
+      }
       final db = await database;
 
       for (final doc in cloudSubjects) {
@@ -8406,6 +8565,7 @@ class DatabaseHelper {
           }
         }
       }
+      await prefs.setString('last_synced_at_curriculum', DateTime.now().toIso8601String());
     } catch (e) {
       debugPrint('[DatabaseHelper] syncCloudCurriculumToLocal note: $e');
     }
@@ -8434,18 +8594,18 @@ class DatabaseHelper {
 
   DateTime? _lastFullSyncTime;
 
-  /// Bidirectional synchronization: pulls all cloud records and pushes queued creations.
-  /// Throttled to 10 minutes unless [force] is true to prevent exceeding Firestore quotas.
+  /// Bidirectional synchronization: pulls cloud records and pushes queued creations.
+  /// Throttled to 30 minutes unless [force] is true to prevent exceeding Firestore quotas.
   Future<void> syncAllCloudData({bool force = false}) async {
     final now = DateTime.now();
-    if (!force && _lastFullSyncTime != null && now.difference(_lastFullSyncTime!) < const Duration(minutes: 10)) {
+    if (!force && _lastFullSyncTime != null && now.difference(_lastFullSyncTime!) < const Duration(minutes: 30)) {
       debugPrint('[DatabaseHelper] syncAllCloudData throttled (last full sync ${now.difference(_lastFullSyncTime!).inMinutes}m ago)');
       return;
     }
     _lastFullSyncTime = now;
 
     try {
-      // 1. Sync User Directory with highest priority for immediate cross-device identity
+      // 1. Sync User Directory with delta querying
       try {
         await FirestoreService().syncLocalUsersToCloud();
         await FirestoreService().syncCloudUsersToLocal(force: force);
@@ -8464,25 +8624,48 @@ class DatabaseHelper {
         ]);
       }
 
-      // 3. Pull latest curriculum, quizzes, assignments, and submissions in background
+      // 3. Pull latest curriculum, quizzes, assignments, and submissions in background via lightweight delta
       await Future.wait([
-        syncCloudCurriculumToLocal(),
-        syncCloudQuizzesToLocal(),
-        syncCloudAssignmentsToLocal(),
-        syncCloudSubmissionsToLocal(),
+        syncCloudCurriculumToLocal(force: force),
+        syncCloudQuizzesToLocal(force: force),
+        syncCloudAssignmentsToLocal(force: force),
+        syncCloudSubmissionsToLocal(force: force),
       ]);
     } catch (e) {
       debugPrint('[DatabaseHelper] syncAllCloudData note: $e');
     }
   }
 
-  /// Sync student submissions from Cloud Firestore down to local SQLite cache
-  Future<void> syncCloudSubmissionsToLocal({int? assignmentId}) async {
+  /// Sync student submissions from Cloud Firestore down to local SQLite cache.
+  /// Uses role-scoping: students ONLY pull their own submissions, not the entire school!
+  /// Uses delta querying via 'last_synced_at_submissions' so 0 reads are consumed if nothing changed!
+  Future<void> syncCloudSubmissionsToLocal({int? assignmentId, bool force = false}) async {
     try {
-      final cloudDocs = await FirestoreService().fetchAllDocuments(
-        'submissions',
-      );
-      if (cloudDocs.isEmpty) return;
+      final prefs = await SharedPreferences.getInstance();
+      final currentRole = prefs.getString('auth_session_role');
+      final currentUserId = prefs.getString('auth_session_user_id');
+      final lastSync = force ? null : prefs.getString('last_synced_at_submissions');
+
+      List<Map<String, dynamic>> cloudDocs = [];
+      // Role-scoped fetch: Students only pull their own submissions!
+      if (currentRole == 'student' && currentUserId != null && currentUserId.isNotEmpty) {
+        cloudDocs = await FirestoreService().fetchDeltaDocuments(
+          'submissions',
+          whereField: 'student_id',
+          whereValue: currentUserId,
+          since: lastSync,
+        );
+      } else {
+        cloudDocs = await FirestoreService().fetchDeltaDocuments(
+          'submissions',
+          since: lastSync,
+        );
+      }
+
+      if (cloudDocs.isEmpty) {
+        await prefs.setString('last_synced_at_submissions', DateTime.now().toIso8601String());
+        return;
+      }
       final db = await database;
       for (final doc in cloudDocs) {
         final rawAId = (doc['assignment_id'] as num?)?.toInt();
@@ -8554,6 +8737,7 @@ class DatabaseHelper {
           'graded_by': gradedBy,
         }, conflictAlgorithm: ConflictAlgorithm.replace);
       }
+      await prefs.setString('last_synced_at_submissions', DateTime.now().toIso8601String());
     } catch (e) {
       debugPrint('[DatabaseHelper] syncCloudSubmissionsToLocal note: $e');
     }

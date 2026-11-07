@@ -13,9 +13,10 @@ import '../../../core/services/email_service.dart';
 import '../../../core/database/firestore_service.dart';
 
 // --- Announcements ---
-final announcementsProvider = NotifierProvider<AnnouncementsNotifier, List<Map<String, dynamic>>>(() {
-  return AnnouncementsNotifier();
-});
+final announcementsProvider =
+    NotifierProvider<AnnouncementsNotifier, List<Map<String, dynamic>>>(() {
+      return AnnouncementsNotifier();
+    });
 
 class AnnouncementsNotifier extends Notifier<List<Map<String, dynamic>>> {
   @override
@@ -26,7 +27,10 @@ class AnnouncementsNotifier extends Notifier<List<Map<String, dynamic>>> {
 
   Future<void> _loadAnnouncements() async {
     final db = await DatabaseHelper().database;
-    final List<Map<String, dynamic>> maps = await db.query('announcements', orderBy: 'id DESC');
+    final List<Map<String, dynamic>> maps = await db.query(
+      'announcements',
+      orderBy: 'id DESC',
+    );
     if (!ref.mounted) return;
     state = maps;
   }
@@ -37,9 +41,17 @@ class AnnouncementsNotifier extends Notifier<List<Map<String, dynamic>>> {
     await _loadAnnouncements();
   }
 
-  Future<void> updateAnnouncement(int id, Map<String, dynamic> announcement) async {
+  Future<void> updateAnnouncement(
+    int id,
+    Map<String, dynamic> announcement,
+  ) async {
     final db = await DatabaseHelper().database;
-    await db.update('announcements', announcement, where: 'id = ?', whereArgs: [id]);
+    await db.update(
+      'announcements',
+      announcement,
+      where: 'id = ?',
+      whereArgs: [id],
+    );
     await _loadAnnouncements();
   }
 
@@ -51,9 +63,10 @@ class AnnouncementsNotifier extends Notifier<List<Map<String, dynamic>>> {
 }
 
 // --- Inquiries & Helpdesk ---
-final inquiriesProvider = NotifierProvider<InquiriesNotifier, List<Map<String, dynamic>>>(() {
-  return InquiriesNotifier();
-});
+final inquiriesProvider =
+    NotifierProvider<InquiriesNotifier, List<Map<String, dynamic>>>(() {
+      return InquiriesNotifier();
+    });
 
 final pendingInquiriesCountProvider = FutureProvider<int>((ref) async {
   ref.watch(inquiriesProvider);
@@ -122,9 +135,10 @@ class InquiriesNotifier extends Notifier<List<Map<String, dynamic>>> {
 }
 
 // --- Subjects ---
-final subjectsProvider = NotifierProvider<SubjectsNotifier, List<Map<String, dynamic>>>(() {
-  return SubjectsNotifier();
-});
+final subjectsProvider =
+    NotifierProvider<SubjectsNotifier, List<Map<String, dynamic>>>(() {
+      return SubjectsNotifier();
+    });
 
 class SubjectsNotifier extends Notifier<List<Map<String, dynamic>>> {
   SubjectsNotifier({Dio? dio});
@@ -137,7 +151,8 @@ class SubjectsNotifier extends Notifier<List<Map<String, dynamic>>> {
   Future<void> _loadSubjects() async {
     final db = await DatabaseHelper().database;
     final prefs = await SharedPreferences.getInstance();
-    final deletedSubjects = prefs.getStringList('permanently_deleted_subjects') ?? [];
+    final deletedSubjects =
+        prefs.getStringList('permanently_deleted_subjects') ?? [];
 
     // 1. If SQLite in-memory is empty (e.g. Web reload), restore from local persistent cache (localStorage)
     final existingLocal = await db.query('subjects');
@@ -151,8 +166,13 @@ class SubjectsNotifier extends Notifier<List<Map<String, dynamic>>> {
               final m = Map<String, dynamic>.from(item);
               final code = m['subject_code']?.toString().toUpperCase() ?? '';
               final name = m['name']?.toString() ?? '';
-              if (!deletedSubjects.contains(code) && !deletedSubjects.contains(name)) {
-                await db.insert('subjects', m, conflictAlgorithm: ConflictAlgorithm.replace);
+              if (!deletedSubjects.contains(code) &&
+                  !deletedSubjects.contains(name)) {
+                await db.insert(
+                  'subjects',
+                  m,
+                  conflictAlgorithm: ConflictAlgorithm.replace,
+                );
               }
             }
           }
@@ -167,29 +187,42 @@ class SubjectsNotifier extends Notifier<List<Map<String, dynamic>>> {
 
     if (isStale || existingLocal.isEmpty) {
       try {
-        final cloudDocs = await FirestoreService().fetchAllDocuments('subjects');
+        final cloudDocs = await FirestoreService().fetchAllDocuments(
+          'subjects',
+        );
         if (cloudDocs.isNotEmpty) {
           await prefs.setInt('last_cloud_fetch_subjects', nowMs);
           for (final doc in cloudDocs) {
-            final subCode = doc['subject_code']?.toString().toUpperCase() ?? doc['id']?.toString().toUpperCase() ?? '';
+            final subCode =
+                doc['subject_code']?.toString().toUpperCase() ??
+                doc['id']?.toString().toUpperCase() ??
+                '';
             final subName = doc['name']?.toString() ?? '';
-            if (deletedSubjects.contains(subCode) || deletedSubjects.contains(subName)) {
+            if (deletedSubjects.contains(subCode) ||
+                deletedSubjects.contains(subName)) {
               continue;
             }
-            final existing = await db.query('subjects',
-                where: 'subject_code = ? OR name = ?',
-                whereArgs: [subCode, subName]);
+            final existing = await db.query(
+              'subjects',
+              where: 'subject_code = ? OR name = ?',
+              whereArgs: [subCode, subName],
+            );
             if (existing.isEmpty) {
               await db.insert('subjects', {
                 'name': subName,
                 'subject_code': subCode,
                 'description': doc['description']?.toString() ?? '',
-                'grade_level': doc['grade_level']?.toString() ?? doc['grade']?.toString() ?? 'Grade 10',
+                'grade_level':
+                    doc['grade_level']?.toString() ??
+                    doc['grade']?.toString() ??
+                    'Grade 10',
                 'semester': doc['semester']?.toString() ?? '1st Semester',
                 'unlock_type': doc['unlock_type']?.toString() ?? 'Flexible',
                 'teacher_id': doc['teacher_id']?.toString(),
                 'teacher_name': doc['teacher_name']?.toString(),
-                'created_at': doc['created_at']?.toString() ?? DateTime.now().toIso8601String(),
+                'created_at':
+                    doc['created_at']?.toString() ??
+                    DateTime.now().toIso8601String(),
               }, conflictAlgorithm: ConflictAlgorithm.replace);
             }
           }
@@ -201,9 +234,16 @@ class SubjectsNotifier extends Notifier<List<Map<String, dynamic>>> {
 
     // 3. Filter out any deleted tombstones and save active subjects to local cache
     for (final del in deletedSubjects) {
-      await db.delete('subjects', where: 'subject_code = ? OR name = ?', whereArgs: [del, del]);
+      await db.delete(
+        'subjects',
+        where: 'subject_code = ? OR name = ?',
+        whereArgs: [del, del],
+      );
     }
-    final List<Map<String, dynamic>> maps = await db.query('subjects', orderBy: 'id DESC');
+    final List<Map<String, dynamic>> maps = await db.query(
+      'subjects',
+      orderBy: 'id DESC',
+    );
     try {
       await prefs.setString('local_cached_subjects_v1', jsonEncode(maps));
     } catch (_) {}
@@ -221,14 +261,17 @@ class SubjectsNotifier extends Notifier<List<Map<String, dynamic>>> {
     mutableSubject['id'] = id;
     await DatabaseHelper().autoEnrollAllStudentsInSubject(id);
 
-    final subCode = mutableSubject['subject_code']?.toString().trim().toUpperCase() ?? '';
+    final subCode =
+        mutableSubject['subject_code']?.toString().trim().toUpperCase() ?? '';
     final subName = mutableSubject['name']?.toString().trim() ?? '';
     final docId = subCode.isNotEmpty ? subCode : 'SUBJ_$id';
 
     // Remove from tombstone if re-created
     final prefs = await SharedPreferences.getInstance();
     final deleted = prefs.getStringList('permanently_deleted_subjects') ?? [];
-    if (deleted.contains(subCode) || deleted.contains(subName) || deleted.contains(docId)) {
+    if (deleted.contains(subCode) ||
+        deleted.contains(subName) ||
+        deleted.contains(docId)) {
       deleted.remove(subCode);
       deleted.remove(subName);
       deleted.remove(docId);
@@ -239,7 +282,10 @@ class SubjectsNotifier extends Notifier<List<Map<String, dynamic>>> {
     // Save immediately to persistent local cache!
     final currentMaps = await db.query('subjects', orderBy: 'id DESC');
     try {
-      await prefs.setString('local_cached_subjects_v1', jsonEncode(currentMaps));
+      await prefs.setString(
+        'local_cached_subjects_v1',
+        jsonEncode(currentMaps),
+      );
       await prefs.remove('last_cloud_fetch_subjects');
     } catch (_) {}
 
@@ -270,15 +316,23 @@ class SubjectsNotifier extends Notifier<List<Map<String, dynamic>>> {
     final db = await DatabaseHelper().database;
     await db.update('subjects', data, where: 'id = ?', whereArgs: [id]);
 
-    final updated = (await db.query('subjects', where: 'id = ?', whereArgs: [id])).firstOrNull;
+    final updated = (await db.query(
+      'subjects',
+      where: 'id = ?',
+      whereArgs: [id],
+    )).firstOrNull;
     if (updated != null) {
       final prefs = await SharedPreferences.getInstance();
       final currentMaps = await db.query('subjects', orderBy: 'id DESC');
       try {
-        await prefs.setString('local_cached_subjects_v1', jsonEncode(currentMaps));
+        await prefs.setString(
+          'local_cached_subjects_v1',
+          jsonEncode(currentMaps),
+        );
       } catch (_) {}
 
-      final subCode = updated['subject_code']?.toString().trim().toUpperCase() ?? '';
+      final subCode =
+          updated['subject_code']?.toString().trim().toUpperCase() ?? '';
       final docId = subCode.isNotEmpty ? subCode : 'SUBJ_$id';
       try {
         final cloudData = {
@@ -291,42 +345,69 @@ class SubjectsNotifier extends Notifier<List<Map<String, dynamic>>> {
           'unlock_type': updated['unlock_type']?.toString() ?? 'Flexible',
           'teacher_id': updated['teacher_id']?.toString(),
           'teacher_name': updated['teacher_name']?.toString(),
-          'created_at': updated['created_at']?.toString() ?? DateTime.now().toIso8601String(),
+          'created_at':
+              updated['created_at']?.toString() ??
+              DateTime.now().toIso8601String(),
         };
         await FirestoreService().saveDocument('subjects', docId, cloudData);
       } catch (_) {}
     }
 
-    final List<Map<String, dynamic>> maps = await db.query('subjects', orderBy: 'id DESC');
+    final List<Map<String, dynamic>> maps = await db.query(
+      'subjects',
+      orderBy: 'id DESC',
+    );
     if (ref.mounted) state = maps;
   }
 
   Future<void> updateUnlockType(int id, String unlockType) async {
     final db = await DatabaseHelper().database;
-    await db.update('subjects', {'unlock_type': unlockType}, where: 'id = ?', whereArgs: [id]);
+    await db.update(
+      'subjects',
+      {'unlock_type': unlockType},
+      where: 'id = ?',
+      whereArgs: [id],
+    );
 
-    final updated = (await db.query('subjects', where: 'id = ?', whereArgs: [id])).firstOrNull;
+    final updated = (await db.query(
+      'subjects',
+      where: 'id = ?',
+      whereArgs: [id],
+    )).firstOrNull;
     if (updated != null) {
       final prefs = await SharedPreferences.getInstance();
       final currentMaps = await db.query('subjects', orderBy: 'id DESC');
       try {
-        await prefs.setString('local_cached_subjects_v1', jsonEncode(currentMaps));
+        await prefs.setString(
+          'local_cached_subjects_v1',
+          jsonEncode(currentMaps),
+        );
       } catch (_) {}
 
-      final subCode = updated['subject_code']?.toString().trim().toUpperCase() ?? '';
+      final subCode =
+          updated['subject_code']?.toString().trim().toUpperCase() ?? '';
       final docId = subCode.isNotEmpty ? subCode : 'SUBJ_$id';
       try {
-        await FirestoreService().saveDocument('subjects', docId, {'unlock_type': unlockType});
+        await FirestoreService().saveDocument('subjects', docId, {
+          'unlock_type': unlockType,
+        });
       } catch (_) {}
     }
 
-    final List<Map<String, dynamic>> maps = await db.query('subjects', orderBy: 'id DESC');
+    final List<Map<String, dynamic>> maps = await db.query(
+      'subjects',
+      orderBy: 'id DESC',
+    );
     if (ref.mounted) state = maps;
   }
 
   Future<void> deleteSubject(int id) async {
     final db = await DatabaseHelper().database;
-    final existing = await db.query('subjects', where: 'id = ?', whereArgs: [id]);
+    final existing = await db.query(
+      'subjects',
+      where: 'id = ?',
+      whereArgs: [id],
+    );
 
     String? subCode;
     String? subName;
@@ -340,7 +421,9 @@ class SubjectsNotifier extends Notifier<List<Map<String, dynamic>>> {
     await db.delete('enrollments', where: 'subject_id = ?', whereArgs: [id]);
     await db.delete('quizzes', where: 'subject_id = ?', whereArgs: [id]);
 
-    final docId = (subCode != null && subCode.isNotEmpty) ? subCode : 'SUBJ_$id';
+    final docId = (subCode != null && subCode.isNotEmpty)
+        ? subCode
+        : 'SUBJ_$id';
 
     // Delete from Cloud Firestore
     try {
@@ -370,7 +453,10 @@ class SubjectsNotifier extends Notifier<List<Map<String, dynamic>>> {
 
     final currentMaps = await db.query('subjects', orderBy: 'id DESC');
     try {
-      await prefs.setString('local_cached_subjects_v1', jsonEncode(currentMaps));
+      await prefs.setString(
+        'local_cached_subjects_v1',
+        jsonEncode(currentMaps),
+      );
       await prefs.remove('last_cloud_fetch_subjects');
     } catch (_) {}
 
@@ -381,7 +467,11 @@ class SubjectsNotifier extends Notifier<List<Map<String, dynamic>>> {
 
   Future<Map<String, dynamic>?> getSubjectById(int id) async {
     final db = await DatabaseHelper().database;
-    final results = await db.query('subjects', where: 'id = ?', whereArgs: [id]);
+    final results = await db.query(
+      'subjects',
+      where: 'id = ?',
+      whereArgs: [id],
+    );
     if (results.isNotEmpty) return results.first;
 
     // Check local persistent cache in SharedPreferences as fallback
@@ -394,7 +484,11 @@ class SubjectsNotifier extends Notifier<List<Map<String, dynamic>>> {
           if (item is Map) {
             final m = Map<String, dynamic>.from(item);
             if (m['id'] == id || m['id']?.toString() == id.toString()) {
-              await db.insert('subjects', m, conflictAlgorithm: ConflictAlgorithm.replace);
+              await db.insert(
+                'subjects',
+                m,
+                conflictAlgorithm: ConflictAlgorithm.replace,
+              );
               return m;
             }
           }
@@ -407,9 +501,10 @@ class SubjectsNotifier extends Notifier<List<Map<String, dynamic>>> {
 }
 
 // --- Sections ---
-final sectionsProvider = NotifierProvider<SectionsNotifier, List<Map<String, dynamic>>>(() {
-  return SectionsNotifier();
-});
+final sectionsProvider =
+    NotifierProvider<SectionsNotifier, List<Map<String, dynamic>>>(() {
+      return SectionsNotifier();
+    });
 
 class SectionsNotifier extends Notifier<List<Map<String, dynamic>>> {
   @override
@@ -421,7 +516,8 @@ class SectionsNotifier extends Notifier<List<Map<String, dynamic>>> {
   Future<void> _loadSections() async {
     final db = await DatabaseHelper().database;
     final prefs = await SharedPreferences.getInstance();
-    final deletedSections = prefs.getStringList('permanently_deleted_sections') ?? [];
+    final deletedSections =
+        prefs.getStringList('permanently_deleted_sections') ?? [];
 
     // 1. If SQLite in-memory is empty (e.g. Web reload), restore from local persistent cache
     final existingLocal = await db.query('sections');
@@ -433,18 +529,28 @@ class SectionsNotifier extends Notifier<List<Map<String, dynamic>>> {
           for (final item in decoded) {
             if (item is Map) {
               final m = Map<String, dynamic>.from(item);
-              final secKey = m['enrollment_key']?.toString().toUpperCase() ?? '';
+              final secKey =
+                  m['enrollment_key']?.toString().toUpperCase() ?? '';
               final secName = m['name']?.toString() ?? '';
-              if (!deletedSections.contains(secKey) && !deletedSections.contains(secName)) {
-                await db.insert('sections', m, conflictAlgorithm: ConflictAlgorithm.replace);
+              if (!deletedSections.contains(secKey) &&
+                  !deletedSections.contains(secName)) {
+                await db.insert(
+                  'sections',
+                  m,
+                  conflictAlgorithm: ConflictAlgorithm.replace,
+                );
                 if (secKey.isNotEmpty && secName.isNotEmpty) {
                   await db.insert('reg_links', {
                     'code': secKey,
                     'section': secName,
-                    'max_uses': int.tryParse(m['max_uses']?.toString() ?? '50') ?? 50,
-                    'used_count': int.tryParse(m['used_count']?.toString() ?? '0') ?? 0,
+                    'max_uses':
+                        int.tryParse(m['max_uses']?.toString() ?? '50') ?? 50,
+                    'used_count':
+                        int.tryParse(m['used_count']?.toString() ?? '0') ?? 0,
                     'expiration': m['expiration']?.toString() ?? '2026-12-31',
-                    'created_at': m['created_at']?.toString() ?? DateTime.now().toIso8601String(),
+                    'created_at':
+                        m['created_at']?.toString() ??
+                        DateTime.now().toIso8601String(),
                   }, conflictAlgorithm: ConflictAlgorithm.replace);
                 }
               }
@@ -461,37 +567,52 @@ class SectionsNotifier extends Notifier<List<Map<String, dynamic>>> {
 
     if (isStale || existingLocal.isEmpty) {
       try {
-        final cloudDocs = await FirestoreService().fetchAllDocuments('sections');
+        final cloudDocs = await FirestoreService().fetchAllDocuments(
+          'sections',
+        );
         if (cloudDocs.isNotEmpty) {
           await prefs.setInt('last_cloud_fetch_sections', nowMs);
           for (final doc in cloudDocs) {
             final secName = doc['name']?.toString() ?? '';
-            final secKey = doc['enrollment_key']?.toString().toUpperCase() ?? doc['id']?.toString().toUpperCase() ?? '';
-            if (deletedSections.contains(secName) || deletedSections.contains(secKey)) {
+            final secKey =
+                doc['enrollment_key']?.toString().toUpperCase() ??
+                doc['id']?.toString().toUpperCase() ??
+                '';
+            if (deletedSections.contains(secName) ||
+                deletedSections.contains(secKey)) {
               continue;
             }
-            final existing = await db.query('sections',
-                where: 'enrollment_key = ? OR name = ?',
-                whereArgs: [secKey, secName]);
+            final existing = await db.query(
+              'sections',
+              where: 'enrollment_key = ? OR name = ?',
+              whereArgs: [secKey, secName],
+            );
             if (existing.isEmpty) {
               await db.insert('sections', {
                 'name': secName,
                 'description': doc['description']?.toString() ?? '',
                 'grade': doc['grade']?.toString() ?? 'Grade 10',
                 'room': doc['room']?.toString() ?? '',
-                'student_count': int.tryParse(doc['student_count']?.toString() ?? '0') ?? 0,
+                'student_count':
+                    int.tryParse(doc['student_count']?.toString() ?? '0') ?? 0,
                 'enrollment_key': secKey,
-                'created_at': doc['created_at']?.toString() ?? DateTime.now().toIso8601String(),
+                'created_at':
+                    doc['created_at']?.toString() ??
+                    DateTime.now().toIso8601String(),
               }, conflictAlgorithm: ConflictAlgorithm.replace);
             }
             if (secKey.isNotEmpty && secName.isNotEmpty) {
               await db.insert('reg_links', {
                 'code': secKey,
                 'section': secName,
-                'max_uses': int.tryParse(doc['max_uses']?.toString() ?? '50') ?? 50,
-                'used_count': int.tryParse(doc['used_count']?.toString() ?? '0') ?? 0,
+                'max_uses':
+                    int.tryParse(doc['max_uses']?.toString() ?? '50') ?? 50,
+                'used_count':
+                    int.tryParse(doc['used_count']?.toString() ?? '0') ?? 0,
                 'expiration': doc['expiration']?.toString() ?? '2026-12-31',
-                'created_at': doc['created_at']?.toString() ?? DateTime.now().toIso8601String(),
+                'created_at':
+                    doc['created_at']?.toString() ??
+                    DateTime.now().toIso8601String(),
               }, conflictAlgorithm: ConflictAlgorithm.replace);
             }
           }
@@ -503,10 +624,21 @@ class SectionsNotifier extends Notifier<List<Map<String, dynamic>>> {
 
     // 3. Filter out any deleted tombstones and save active sections to local cache
     for (final del in deletedSections) {
-      await db.delete('sections', where: 'enrollment_key = ? OR name = ?', whereArgs: [del, del]);
-      await db.delete('reg_links', where: 'code = ? OR section = ?', whereArgs: [del, del]);
+      await db.delete(
+        'sections',
+        where: 'enrollment_key = ? OR name = ?',
+        whereArgs: [del, del],
+      );
+      await db.delete(
+        'reg_links',
+        where: 'code = ? OR section = ?',
+        whereArgs: [del, del],
+      );
     }
-    final List<Map<String, dynamic>> maps = await db.query('sections', orderBy: 'id DESC');
+    final List<Map<String, dynamic>> maps = await db.query(
+      'sections',
+      orderBy: 'id DESC',
+    );
     try {
       await prefs.setString('local_cached_sections_v1', jsonEncode(maps));
     } catch (_) {}
@@ -521,12 +653,16 @@ class SectionsNotifier extends Notifier<List<Map<String, dynamic>>> {
     final db = await DatabaseHelper().database;
     final mutableSection = Map<String, dynamic>.from(section);
 
-    final rawKey = mutableSection['enrollment_key']?.toString().trim().toUpperCase() ?? '';
+    final rawKey =
+        mutableSection['enrollment_key']?.toString().trim().toUpperCase() ?? '';
     final sectionName = mutableSection['name']?.toString() ?? 'Section';
     final gradeLevel = mutableSection['grade']?.toString() ?? 'Grade 10';
     final resolvedKey = rawKey.isNotEmpty
         ? rawKey
-        : SectionKeyHelper.generateKey(sectionName: sectionName, gradeLevel: gradeLevel);
+        : SectionKeyHelper.generateKey(
+            sectionName: sectionName,
+            gradeLevel: gradeLevel,
+          );
 
     mutableSection['enrollment_key'] = resolvedKey;
     mutableSection['created_at'] ??= DateTime.now().toIso8601String();
@@ -554,7 +690,10 @@ class SectionsNotifier extends Notifier<List<Map<String, dynamic>>> {
     // Save immediately to persistent local cache!
     final currentMaps = await db.query('sections', orderBy: 'id DESC');
     try {
-      await prefs.setString('local_cached_sections_v1', jsonEncode(currentMaps));
+      await prefs.setString(
+        'local_cached_sections_v1',
+        jsonEncode(currentMaps),
+      );
       await prefs.remove('last_cloud_fetch_sections');
       await prefs.remove('last_cloud_fetch_keys');
     } catch (_) {}
@@ -571,7 +710,11 @@ class SectionsNotifier extends Notifier<List<Map<String, dynamic>>> {
         'enrollment_key': resolvedKey,
         'created_at': mutableSection['created_at'],
       };
-      await FirestoreService().saveDocument('sections', resolvedKey, cloudSection);
+      await FirestoreService().saveDocument(
+        'sections',
+        resolvedKey,
+        cloudSection,
+      );
       await FirestoreService().saveDocument('enrollment_keys', resolvedKey, {
         'code': resolvedKey,
         'section': sectionName,
@@ -594,15 +737,24 @@ class SectionsNotifier extends Notifier<List<Map<String, dynamic>>> {
     final db = await DatabaseHelper().database;
     await db.update('sections', section, where: 'id = ?', whereArgs: [id]);
 
-    final updatedSec = (await db.query('sections', where: 'id = ?', whereArgs: [id])).firstOrNull;
-    final resolvedKey = updatedSec?['enrollment_key']?.toString().trim().toUpperCase() ??
+    final updatedSec = (await db.query(
+      'sections',
+      where: 'id = ?',
+      whereArgs: [id],
+    )).firstOrNull;
+    final resolvedKey =
+        updatedSec?['enrollment_key']?.toString().trim().toUpperCase() ??
         section['enrollment_key']?.toString().trim().toUpperCase();
-    final secName = updatedSec?['name']?.toString() ?? section['name']?.toString();
+    final secName =
+        updatedSec?['name']?.toString() ?? section['name']?.toString();
 
     final prefs = await SharedPreferences.getInstance();
     final currentMaps = await db.query('sections', orderBy: 'id DESC');
     try {
-      await prefs.setString('local_cached_sections_v1', jsonEncode(currentMaps));
+      await prefs.setString(
+        'local_cached_sections_v1',
+        jsonEncode(currentMaps),
+      );
       await prefs.remove('last_cloud_fetch_sections');
       await prefs.remove('last_cloud_fetch_keys');
     } catch (_) {}
@@ -619,23 +771,39 @@ class SectionsNotifier extends Notifier<List<Map<String, dynamic>>> {
         final cloudSection = {
           'id': resolvedKey,
           'name': secName ?? '',
-          'description': updatedSec?['description']?.toString() ?? section['description']?.toString() ?? '',
-          'grade': updatedSec?['grade']?.toString() ?? section['grade']?.toString() ?? 'Grade 10',
-          'room': updatedSec?['room']?.toString() ?? section['room']?.toString() ?? '',
+          'description':
+              updatedSec?['description']?.toString() ??
+              section['description']?.toString() ??
+              '',
+          'grade':
+              updatedSec?['grade']?.toString() ??
+              section['grade']?.toString() ??
+              'Grade 10',
+          'room':
+              updatedSec?['room']?.toString() ??
+              section['room']?.toString() ??
+              '',
           'student_count': updatedSec?['student_count'] ?? 0,
           'enrollment_key': resolvedKey,
-          'created_at': updatedSec?['created_at']?.toString() ?? DateTime.now().toIso8601String(),
+          'created_at':
+              updatedSec?['created_at']?.toString() ??
+              DateTime.now().toIso8601String(),
         };
-        await FirestoreService().saveDocument('sections', resolvedKey, cloudSection);
+        await FirestoreService().saveDocument(
+          'sections',
+          resolvedKey,
+          cloudSection,
+        );
         if (secName != null && secName.isNotEmpty) {
-          await FirestoreService().saveDocument('enrollment_keys', resolvedKey, {
-            'code': resolvedKey,
-            'section': secName,
-            'max_uses': 50,
-            'used_count': updatedSec?['student_count'] ?? 0,
-            'expiration': '2026-12-31',
-            'created_at': DateTime.now().toIso8601String(),
-          });
+          await FirestoreService()
+              .saveDocument('enrollment_keys', resolvedKey, {
+                'code': resolvedKey,
+                'section': secName,
+                'max_uses': 50,
+                'used_count': updatedSec?['student_count'] ?? 0,
+                'expiration': '2026-12-31',
+                'created_at': DateTime.now().toIso8601String(),
+              });
         }
       } catch (_) {}
     }
@@ -645,15 +813,22 @@ class SectionsNotifier extends Notifier<List<Map<String, dynamic>>> {
     ref.read(adminKeysProvider.notifier).loadKeys();
     ref.read(adminTeachersProvider.notifier).loadTeachers();
   }
-  
+
   Future<void> deleteSection(int id) async {
     final db = await DatabaseHelper().database;
-    final existing = await db.query('sections', where: 'id = ?', whereArgs: [id]);
+    final existing = await db.query(
+      'sections',
+      where: 'id = ?',
+      whereArgs: [id],
+    );
 
     String? secKey;
     String? secName;
     if (existing.isNotEmpty) {
-      secKey = existing.first['enrollment_key']?.toString().trim().toUpperCase();
+      secKey = existing.first['enrollment_key']
+          ?.toString()
+          .trim()
+          .toUpperCase();
       secName = existing.first['name']?.toString().trim();
     }
 
@@ -691,7 +866,10 @@ class SectionsNotifier extends Notifier<List<Map<String, dynamic>>> {
 
     final currentMaps = await db.query('sections', orderBy: 'id DESC');
     try {
-      await prefs.setString('local_cached_sections_v1', jsonEncode(currentMaps));
+      await prefs.setString(
+        'local_cached_sections_v1',
+        jsonEncode(currentMaps),
+      );
       await prefs.remove('last_cloud_fetch_sections');
       await prefs.remove('last_cloud_fetch_keys');
     } catch (_) {}
@@ -704,7 +882,9 @@ class SectionsNotifier extends Notifier<List<Map<String, dynamic>>> {
 }
 
 // --- Teachers List (for subject assignment) ---
-final teachersListProvider = FutureProvider<List<Map<String, dynamic>>>((ref) async {
+final teachersListProvider = FutureProvider<List<Map<String, dynamic>>>((
+  ref,
+) async {
   return await DatabaseHelper().getTeachersList();
 });
 
@@ -720,9 +900,10 @@ final sectionsCountProvider = Provider<int>((ref) {
 });
 
 // --- Registration Links ---
-final regLinksProvider = NotifierProvider<RegLinksNotifier, List<Map<String, dynamic>>>(() {
-  return RegLinksNotifier();
-});
+final regLinksProvider =
+    NotifierProvider<RegLinksNotifier, List<Map<String, dynamic>>>(() {
+      return RegLinksNotifier();
+    });
 
 class RegLinksNotifier extends Notifier<List<Map<String, dynamic>>> {
   @override
@@ -733,7 +914,10 @@ class RegLinksNotifier extends Notifier<List<Map<String, dynamic>>> {
 
   Future<void> _loadLinks() async {
     final db = await DatabaseHelper().database;
-    final List<Map<String, dynamic>> maps = await db.query('reg_links', orderBy: 'created_at DESC');
+    final List<Map<String, dynamic>> maps = await db.query(
+      'reg_links',
+      orderBy: 'created_at DESC',
+    );
     if (!ref.mounted) return;
     state = maps;
   }
@@ -743,7 +927,7 @@ class RegLinksNotifier extends Notifier<List<Map<String, dynamic>>> {
     await db.insert('reg_links', link);
     await _loadLinks();
   }
-  
+
   Future<void> deleteLink(String code) async {
     final db = await DatabaseHelper().database;
     await db.delete('reg_links', where: 'code = ?', whereArgs: [code]);
@@ -752,9 +936,10 @@ class RegLinksNotifier extends Notifier<List<Map<String, dynamic>>> {
 }
 
 // --- Subject Detail Hierarchy ---
-final subjectDetailProvider = NotifierProvider<SubjectDetailNotifier, List<Map<String, dynamic>>>(() {
-  return SubjectDetailNotifier();
-});
+final subjectDetailProvider =
+    NotifierProvider<SubjectDetailNotifier, List<Map<String, dynamic>>>(() {
+      return SubjectDetailNotifier();
+    });
 
 class SubjectDetailNotifier extends Notifier<List<Map<String, dynamic>>> {
   int? _subjectId;
@@ -767,32 +952,45 @@ class SubjectDetailNotifier extends Notifier<List<Map<String, dynamic>>> {
   Future<void> loadHierarchy(int subjectId) async {
     _subjectId = subjectId;
     final db = await DatabaseHelper().database;
-    
-    final topics = await db.query('topics', where: 'subject_id = ?', whereArgs: [subjectId], orderBy: 'id ASC');
-    
+
+    final topics = await db.query(
+      'topics',
+      where: 'subject_id = ?',
+      whereArgs: [subjectId],
+      orderBy: 'id ASC',
+    );
+
     List<Map<String, dynamic>> fullTopics = [];
     for (var topic in topics) {
       final topicId = topic['id'] as int;
-      final los = await db.query('learning_outcomes', where: 'topic_id = ?', whereArgs: [topicId], orderBy: 'id ASC');
-      
+      final los = await db.query(
+        'learning_outcomes',
+        where: 'topic_id = ?',
+        whereArgs: [topicId],
+        orderBy: 'id ASC',
+      );
+
       List<Map<String, dynamic>> fullLos = [];
       for (var lo in los) {
         final loId = lo['id'] as int;
-        final contents = await db.query('contents', where: 'lo_id = ?', whereArgs: [loId], orderBy: 'id ASC');
-        final questions = await db.query('questions', where: 'lo_id = ?', whereArgs: [loId], orderBy: 'id ASC');
-        fullLos.add({
-          ...lo,
-          'contents': contents,
-          'questions': questions,
-        });
+        final contents = await db.query(
+          'contents',
+          where: 'lo_id = ?',
+          whereArgs: [loId],
+          orderBy: 'id ASC',
+        );
+        final questions = await db.query(
+          'questions',
+          where: 'lo_id = ?',
+          whereArgs: [loId],
+          orderBy: 'id ASC',
+        );
+        fullLos.add({...lo, 'contents': contents, 'questions': questions});
       }
-      
-      fullTopics.add({
-        ...topic,
-        'learning_outcomes': fullLos,
-      });
+
+      fullTopics.add({...topic, 'learning_outcomes': fullLos});
     }
-    
+
     state = fullTopics;
   }
 
@@ -830,10 +1028,18 @@ class SubjectDetailNotifier extends Notifier<List<Map<String, dynamic>>> {
     await loadHierarchy(_subjectId!);
   }
 
-  Future<void> updateLearningOutcome(int loId, Map<String, dynamic> data) async {
+  Future<void> updateLearningOutcome(
+    int loId,
+    Map<String, dynamic> data,
+  ) async {
     if (_subjectId == null) return;
     final db = await DatabaseHelper().database;
-    await db.update('learning_outcomes', data, where: 'id = ?', whereArgs: [loId]);
+    await db.update(
+      'learning_outcomes',
+      data,
+      where: 'id = ?',
+      whereArgs: [loId],
+    );
     await loadHierarchy(_subjectId!);
   }
 
@@ -878,10 +1084,18 @@ class SubjectDetailNotifier extends Notifier<List<Map<String, dynamic>>> {
     await loadHierarchy(_subjectId!);
   }
 
-  Future<void> updateQuestion(int questionId, Map<String, dynamic> question) async {
+  Future<void> updateQuestion(
+    int questionId,
+    Map<String, dynamic> question,
+  ) async {
     if (_subjectId == null) return;
     final db = await DatabaseHelper().database;
-    await db.update('questions', question, where: 'id = ?', whereArgs: [questionId]);
+    await db.update(
+      'questions',
+      question,
+      where: 'id = ?',
+      whereArgs: [questionId],
+    );
     await loadHierarchy(_subjectId!);
   }
 
@@ -899,7 +1113,8 @@ class AnalyticsFilter {
   final String? subjectName;
   final String? section;
   final String timeframe; // 'all', 'today', '7days', '30days', 'this_month'
-  final String category; // 'all', 'regular', 'irregular', 'transferee', 'sped', 'unassigned'
+  final String
+  category; // 'all', 'regular', 'irregular', 'transferee', 'sped', 'unassigned'
 
   final String academicYear;
   final String departmentGradeLevel;
@@ -925,7 +1140,8 @@ class AnalyticsFilter {
   int get activeFilterCount {
     int count = 0;
     if (subjectId != null) count++;
-    if (section != null && section != 'All Sections' && section!.isNotEmpty) count++;
+    if (section != null && section != 'All Sections' && section!.isNotEmpty)
+      count++;
     if (timeframe != 'all') count++;
     if (category != 'all') count++;
     if (academicYear != 'AY 2025-2026') count++;
@@ -956,9 +1172,10 @@ class AnalyticsFilter {
   }
 }
 
-final analyticsFilterProvider = NotifierProvider<AnalyticsFilterNotifier, AnalyticsFilter>(() {
-  return AnalyticsFilterNotifier();
-});
+final analyticsFilterProvider =
+    NotifierProvider<AnalyticsFilterNotifier, AnalyticsFilter>(() {
+      return AnalyticsFilterNotifier();
+    });
 
 class AnalyticsFilterNotifier extends Notifier<AnalyticsFilter> {
   @override
@@ -970,12 +1187,19 @@ class AnalyticsFilterNotifier extends Notifier<AnalyticsFilter> {
   }
 
   void updateSubject(int? id, String? name) {
-    final next = state.copyWith(subjectId: id, subjectName: name, clearSubject: id == null);
+    final next = state.copyWith(
+      subjectId: id,
+      subjectName: name,
+      clearSubject: id == null,
+    );
     setFilter(next);
   }
 
   void updateSection(String? sec) {
-    final next = state.copyWith(section: sec, clearSection: sec == null || sec == 'All Sections');
+    final next = state.copyWith(
+      section: sec,
+      clearSection: sec == null || sec == 'All Sections',
+    );
     setFilter(next);
   }
 
@@ -1002,21 +1226,55 @@ class AnalyticsFilterNotifier extends Notifier<AnalyticsFilter> {
   void reset() {
     const defaultFilter = AnalyticsFilter();
     state = defaultFilter;
-    ref.read(adminAnalyticsProvider.notifier).loadAnalytics(filter: defaultFilter);
+    ref
+        .read(adminAnalyticsProvider.notifier)
+        .loadAnalytics(filter: defaultFilter);
   }
 }
 
 // --- Admin Web Analytics Provider ---
-final adminAnalyticsProvider = NotifierProvider<AdminAnalyticsNotifier, Map<String, dynamic>>(() {
-  return AdminAnalyticsNotifier();
-});
+final adminAnalyticsProvider =
+    NotifierProvider<AdminAnalyticsNotifier, Map<String, dynamic>>(() {
+      return AdminAnalyticsNotifier();
+    });
 
 class AdminAnalyticsNotifier extends Notifier<Map<String, dynamic>> {
   AnalyticsFilter _currentFilter = const AnalyticsFilter();
+  VoidCallback? _syncListener;
 
   @override
   Map<String, dynamic> build() {
+    ref.onDispose(() {
+      if (_syncListener != null) {
+        FirestoreService.removeSyncListener(_syncListener!);
+      }
+    });
+
+    _syncListener = () {
+      if (ref.mounted) {
+        loadAnalytics(syncCloud: false);
+      }
+    };
+    FirestoreService.addSyncListener(_syncListener!);
+
     loadAnalytics();
+
+    // Auto-pull users if local summary is empty or only has the self admin
+    Future.microtask(() async {
+      try {
+        final summary = await DatabaseHelper().getAdminAnalyticsSummary();
+        final usersCount = summary['totalUsers'] as int? ?? 0;
+        final studentsCount = summary['totalStudents'] as int? ?? 0;
+        final teachersCount = summary['totalTeachers'] as int? ?? 0;
+        if (usersCount <= 1 || (studentsCount == 0 && teachersCount == 0)) {
+          await FirestoreService().syncCloudUsersToLocal(force: true);
+          if (ref.mounted) {
+            await loadAnalytics(syncCloud: false);
+          }
+        }
+      } catch (_) {}
+    });
+
     return {
       'totalUsers': 0,
       'totalStudents': 0,
@@ -1038,13 +1296,16 @@ class AdminAnalyticsNotifier extends Notifier<Map<String, dynamic>> {
     };
   }
 
-  Future<void> loadAnalytics({AnalyticsFilter? filter, bool syncCloud = false}) async {
+  Future<void> loadAnalytics({
+    AnalyticsFilter? filter,
+    bool syncCloud = false,
+  }) async {
     if (filter != null) {
       _currentFilter = filter;
     }
     if (syncCloud) {
       try {
-        await FirestoreService().syncCloudUsersToLocal();
+        await FirestoreService().syncCloudUsersToLocal(force: true);
       } catch (_) {}
     }
     final summary = await DatabaseHelper().getAdminAnalyticsSummary(
@@ -1061,22 +1322,41 @@ class AdminAnalyticsNotifier extends Notifier<Map<String, dynamic>> {
 }
 
 // --- Admin Students Provider ---
-final adminStudentsProvider = NotifierProvider<AdminStudentsNotifier, List<Map<String, dynamic>>>(() {
-  return AdminStudentsNotifier();
-});
+final adminStudentsProvider =
+    NotifierProvider<AdminStudentsNotifier, List<Map<String, dynamic>>>(() {
+      return AdminStudentsNotifier();
+    });
 
 class AdminStudentsNotifier extends Notifier<List<Map<String, dynamic>>> {
   String _selectedSection = 'All';
   String _selectedGrade = 'All';
   String _searchQuery = '';
+  VoidCallback? _syncListener;
 
   @override
   List<Map<String, dynamic>> build() {
+    ref.onDispose(() {
+      if (_syncListener != null) {
+        FirestoreService.removeSyncListener(_syncListener!);
+      }
+    });
+
+    _syncListener = () {
+      if (ref.mounted) {
+        loadStudents();
+      }
+    };
+    FirestoreService.addSyncListener(_syncListener!);
+
     loadStudents();
     return [];
   }
 
-  Future<void> loadStudents({String? section, String? grade, String? query}) async {
+  Future<void> loadStudents({
+    String? section,
+    String? grade,
+    String? query,
+  }) async {
     if (section != null) _selectedSection = section;
     if (grade != null) _selectedGrade = grade;
     if (query != null) _searchQuery = query;
@@ -1089,16 +1369,22 @@ class AdminStudentsNotifier extends Notifier<List<Map<String, dynamic>>> {
     if (!ref.mounted) return;
     state = results;
 
-    // Non-blocking background cloud freshness pull
-    FirestoreService().syncCloudUsersToLocal().then((_) async {
-      if (!ref.mounted) return;
-      final fresh = await DatabaseHelper().getAdminStudentsList(
-        section: _selectedSection,
-        grade: _selectedGrade,
-        query: _searchQuery,
-      );
-      if (ref.mounted) state = fresh;
-    }).catchError((_) {});
+    // Non-blocking background cloud freshness pull (only on initial/unfiltered load)
+    if (query == null || query.isEmpty) {
+      final shouldForce = results.isEmpty;
+      FirestoreService()
+          .syncCloudUsersToLocal(force: shouldForce)
+          .then((_) async {
+            if (!ref.mounted) return;
+            final fresh = await DatabaseHelper().getAdminStudentsList(
+              section: _selectedSection,
+              grade: _selectedGrade,
+              query: _searchQuery,
+            );
+            if (ref.mounted) state = fresh;
+          })
+          .catchError((_) {});
+    }
   }
 
   Future<String> addStudent({
@@ -1131,19 +1417,38 @@ class AdminStudentsNotifier extends Notifier<List<Map<String, dynamic>>> {
     return sid;
   }
 
-  Future<void> reassignSection(String studentId, String newSection, {String? newGrade}) async {
-    await DatabaseHelper().updateStudentSection(studentId, newSection, grade: newGrade);
+  Future<void> reassignSection(
+    String studentId,
+    String newSection, {
+    String? newGrade,
+  }) async {
+    await DatabaseHelper().updateStudentSection(
+      studentId,
+      newSection,
+      grade: newGrade,
+    );
     await loadStudents();
     ref.read(adminAnalyticsProvider.notifier).loadAnalytics();
   }
 
-  Future<void> updateStudentClassification(String studentId, String studentType, {String? notes}) async {
-    await DatabaseHelper().updateStudentClassification(studentId, studentType, notes: notes);
+  Future<void> updateStudentClassification(
+    String studentId,
+    String studentType, {
+    String? notes,
+  }) async {
+    await DatabaseHelper().updateStudentClassification(
+      studentId,
+      studentType,
+      notes: notes,
+    );
     await loadStudents();
     ref.read(adminAnalyticsProvider.notifier).loadAnalytics();
   }
 
-  Future<void> updateStudentEnrollments(String studentId, List<int> subjectIds) async {
+  Future<void> updateStudentEnrollments(
+    String studentId,
+    List<int> subjectIds,
+  ) async {
     await DatabaseHelper().setStudentEnrollments(studentId, subjectIds);
     await loadStudents();
     ref.read(adminAnalyticsProvider.notifier).loadAnalytics();
@@ -1161,7 +1466,10 @@ class AdminStudentsNotifier extends Notifier<List<Map<String, dynamic>>> {
     List<String> studentIds, {
     void Function(double progress, String statusMessage)? onProgress,
   }) async {
-    await DatabaseHelper().bulkArchiveStudents(studentIds, onProgress: onProgress);
+    await DatabaseHelper().bulkArchiveStudents(
+      studentIds,
+      onProgress: onProgress,
+    );
     await loadStudents();
     ref.read(adminArchivedStudentsProvider.notifier).loadArchived();
     ref.read(adminAnalyticsProvider.notifier).loadAnalytics();
@@ -1176,7 +1484,9 @@ class AdminStudentsNotifier extends Notifier<List<Map<String, dynamic>>> {
     ref.read(sectionsProvider.notifier).reload();
   }
 
-  Future<Map<String, dynamic>> bulkImportUsers(List<Map<String, dynamic>> rows) async {
+  Future<Map<String, dynamic>> bulkImportUsers(
+    List<Map<String, dynamic>> rows,
+  ) async {
     final result = await DatabaseHelper().bulkImportUsers(rows);
     await loadStudents();
     ref.read(adminAnalyticsProvider.notifier).loadAnalytics();
@@ -1219,9 +1529,10 @@ class AdminStudentsNotifier extends Notifier<List<Map<String, dynamic>>> {
 }
 
 // --- Admin Enrollment Keys Provider ---
-final adminKeysProvider = NotifierProvider<AdminKeysNotifier, List<Map<String, dynamic>>>(() {
-  return AdminKeysNotifier();
-});
+final adminKeysProvider =
+    NotifierProvider<AdminKeysNotifier, List<Map<String, dynamic>>>(() {
+      return AdminKeysNotifier();
+    });
 
 class AdminKeysNotifier extends Notifier<List<Map<String, dynamic>>> {
   @override
@@ -1233,7 +1544,8 @@ class AdminKeysNotifier extends Notifier<List<Map<String, dynamic>>> {
   Future<void> loadKeys() async {
     final db = await DatabaseHelper().database;
     final prefs = await SharedPreferences.getInstance();
-    final deletedSections = prefs.getStringList('permanently_deleted_sections') ?? [];
+    final deletedSections =
+        prefs.getStringList('permanently_deleted_sections') ?? [];
 
     final lastFetch = prefs.getInt('last_cloud_fetch_keys') ?? 0;
     final nowMs = DateTime.now().millisecondsSinceEpoch;
@@ -1241,23 +1553,33 @@ class AdminKeysNotifier extends Notifier<List<Map<String, dynamic>>> {
 
     if (isStale) {
       try {
-        final cloudKeys = await FirestoreService().fetchAllDocuments('enrollment_keys');
+        final cloudKeys = await FirestoreService().fetchAllDocuments(
+          'enrollment_keys',
+        );
         if (cloudKeys.isNotEmpty) {
           await prefs.setInt('last_cloud_fetch_keys', nowMs);
           for (final k in cloudKeys) {
-            final code = k['code']?.toString().toUpperCase() ?? k['id']?.toString().toUpperCase() ?? '';
+            final code =
+                k['code']?.toString().toUpperCase() ??
+                k['id']?.toString().toUpperCase() ??
+                '';
             final sec = k['section']?.toString() ?? '';
-            if (deletedSections.contains(code) || deletedSections.contains(sec)) {
+            if (deletedSections.contains(code) ||
+                deletedSections.contains(sec)) {
               continue;
             }
             if (code.isNotEmpty) {
               await db.insert('reg_links', {
                 'code': code,
                 'section': sec,
-                'max_uses': int.tryParse(k['max_uses']?.toString() ?? '50') ?? 50,
-                'used_count': int.tryParse(k['used_count']?.toString() ?? '0') ?? 0,
+                'max_uses':
+                    int.tryParse(k['max_uses']?.toString() ?? '50') ?? 50,
+                'used_count':
+                    int.tryParse(k['used_count']?.toString() ?? '0') ?? 0,
                 'expiration': k['expiration']?.toString() ?? '2026-12-31',
-                'created_at': k['created_at']?.toString() ?? DateTime.now().toIso8601String(),
+                'created_at':
+                    k['created_at']?.toString() ??
+                    DateTime.now().toIso8601String(),
               }, conflictAlgorithm: ConflictAlgorithm.replace);
             }
           }
@@ -1332,11 +1654,14 @@ final availableSectionsProvider = FutureProvider<List<String>>((ref) async {
 
 // --- Admin Archived Students Provider ---
 final adminArchivedStudentsProvider =
-    NotifierProvider<AdminArchivedStudentsNotifier, List<Map<String, dynamic>>>(() {
-  return AdminArchivedStudentsNotifier();
-});
+    NotifierProvider<AdminArchivedStudentsNotifier, List<Map<String, dynamic>>>(
+      () {
+        return AdminArchivedStudentsNotifier();
+      },
+    );
 
-class AdminArchivedStudentsNotifier extends Notifier<List<Map<String, dynamic>>> {
+class AdminArchivedStudentsNotifier
+    extends Notifier<List<Map<String, dynamic>>> {
   @override
   List<Map<String, dynamic>> build() {
     loadArchived();
@@ -1377,7 +1702,10 @@ class AdminArchivedStudentsNotifier extends Notifier<List<Map<String, dynamic>>>
     List<String> studentIds, {
     void Function(double progress, String statusMessage)? onProgress,
   }) async {
-    await DatabaseHelper().bulkPermanentDeleteStudents(studentIds, onProgress: onProgress);
+    await DatabaseHelper().bulkPermanentDeleteStudents(
+      studentIds,
+      onProgress: onProgress,
+    );
     await loadArchived();
     ref.read(adminStudentsProvider.notifier).loadStudents();
     ref.read(adminAnalyticsProvider.notifier).loadAnalytics();
@@ -1386,13 +1714,29 @@ class AdminArchivedStudentsNotifier extends Notifier<List<Map<String, dynamic>>>
 }
 
 // --- Admin Faculty / Teachers Provider ---
-final adminTeachersProvider = NotifierProvider<AdminTeachersNotifier, List<Map<String, dynamic>>>(() {
-  return AdminTeachersNotifier();
-});
+final adminTeachersProvider =
+    NotifierProvider<AdminTeachersNotifier, List<Map<String, dynamic>>>(() {
+      return AdminTeachersNotifier();
+    });
 
 class AdminTeachersNotifier extends Notifier<List<Map<String, dynamic>>> {
+  VoidCallback? _syncListener;
+
   @override
   List<Map<String, dynamic>> build() {
+    ref.onDispose(() {
+      if (_syncListener != null) {
+        FirestoreService.removeSyncListener(_syncListener!);
+      }
+    });
+
+    _syncListener = () {
+      if (ref.mounted) {
+        loadTeachers();
+      }
+    };
+    FirestoreService.addSyncListener(_syncListener!);
+
     loadTeachers();
     return [];
   }
@@ -1402,12 +1746,16 @@ class AdminTeachersNotifier extends Notifier<List<Map<String, dynamic>>> {
     if (!ref.mounted) return;
     state = teachers;
 
+    final shouldForce = teachers.isEmpty;
     // Non-blocking background cloud freshness pull
-    FirestoreService().syncCloudUsersToLocal().then((_) async {
-      if (!ref.mounted) return;
-      final fresh = await DatabaseHelper().getTeachersList();
-      if (ref.mounted) state = fresh;
-    }).catchError((_) {});
+    FirestoreService()
+        .syncCloudUsersToLocal(force: shouldForce)
+        .then((_) async {
+          if (!ref.mounted) return;
+          final fresh = await DatabaseHelper().getTeachersList();
+          if (ref.mounted) state = fresh;
+        })
+        .catchError((_) {});
   }
 
   Future<String> addTeacher({
@@ -1436,7 +1784,11 @@ class AdminTeachersNotifier extends Notifier<List<Map<String, dynamic>>> {
     Map<String, dynamic> data, {
     List<int>? assignSubjectIds,
   }) async {
-    await DatabaseHelper().updateTeacher(teacherId, data, assignSubjectIds: assignSubjectIds);
+    await DatabaseHelper().updateTeacher(
+      teacherId,
+      data,
+      assignSubjectIds: assignSubjectIds,
+    );
     await loadTeachers();
     ref.read(subjectsProvider.notifier).reload();
   }
@@ -1458,7 +1810,10 @@ class AdminTeachersNotifier extends Notifier<List<Map<String, dynamic>>> {
     List<String> teacherIds, {
     void Function(double progress, String statusMessage)? onProgress,
   }) async {
-    await DatabaseHelper().bulkArchiveTeachers(teacherIds, onProgress: onProgress);
+    await DatabaseHelper().bulkArchiveTeachers(
+      teacherIds,
+      onProgress: onProgress,
+    );
     await loadTeachers();
     ref.read(adminArchivedTeachersProvider.notifier).loadArchivedTeachers();
     ref.read(subjectsProvider.notifier).reload();
@@ -1480,11 +1835,14 @@ class AdminTeachersNotifier extends Notifier<List<Map<String, dynamic>>> {
 
 // --- Admin Archived Faculty / Teachers Provider ---
 final adminArchivedTeachersProvider =
-    NotifierProvider<AdminArchivedTeachersNotifier, List<Map<String, dynamic>>>(() {
-  return AdminArchivedTeachersNotifier();
-});
+    NotifierProvider<AdminArchivedTeachersNotifier, List<Map<String, dynamic>>>(
+      () {
+        return AdminArchivedTeachersNotifier();
+      },
+    );
 
-class AdminArchivedTeachersNotifier extends Notifier<List<Map<String, dynamic>>> {
+class AdminArchivedTeachersNotifier
+    extends Notifier<List<Map<String, dynamic>>> {
   @override
   List<Map<String, dynamic>> build() {
     loadArchivedTeachers();
@@ -1522,7 +1880,10 @@ class AdminArchivedTeachersNotifier extends Notifier<List<Map<String, dynamic>>>
     List<String> teacherIds, {
     void Function(double progress, String statusMessage)? onProgress,
   }) async {
-    await DatabaseHelper().bulkPermanentDeleteTeachers(teacherIds, onProgress: onProgress);
+    await DatabaseHelper().bulkPermanentDeleteTeachers(
+      teacherIds,
+      onProgress: onProgress,
+    );
     await loadArchivedTeachers();
     ref.read(adminTeachersProvider.notifier).loadTeachers();
     ref.read(subjectsProvider.notifier).reload();
@@ -1530,9 +1891,10 @@ class AdminArchivedTeachersNotifier extends Notifier<List<Map<String, dynamic>>>
 }
 
 // --- School Administrators Provider (Super Admin Console) ---
-final schoolAdminsProvider = NotifierProvider<SchoolAdminsNotifier, List<Map<String, dynamic>>>(() {
-  return SchoolAdminsNotifier();
-});
+final schoolAdminsProvider =
+    NotifierProvider<SchoolAdminsNotifier, List<Map<String, dynamic>>>(() {
+      return SchoolAdminsNotifier();
+    });
 
 class SchoolAdminsNotifier extends Notifier<List<Map<String, dynamic>>> {
   String? _selectedSchoolId;
@@ -1555,15 +1917,20 @@ class SchoolAdminsNotifier extends Notifier<List<Map<String, dynamic>>> {
     if (!ref.mounted) return;
     state = admins;
 
-    // Non-blocking background cloud freshness pull
-    FirestoreService().syncCloudUsersToLocal().then((_) async {
-      if (!ref.mounted) return;
-      final fresh = await DatabaseHelper().getAdminsList(
-        schoolId: _selectedSchoolId,
-        query: _searchQuery,
-      );
-      if (ref.mounted) state = fresh;
-    }).catchError((_) {});
+    // Non-blocking background cloud freshness pull (only on initial/unfiltered load)
+    if (query == null || query.isEmpty) {
+      FirestoreService()
+          .syncCloudUsersToLocal()
+          .then((_) async {
+            if (!ref.mounted) return;
+            final fresh = await DatabaseHelper().getAdminsList(
+              schoolId: _selectedSchoolId,
+              query: _searchQuery,
+            );
+            if (ref.mounted) state = fresh;
+          })
+          .catchError((_) {});
+    }
   }
 
   Future<String> addAdmin({
@@ -1587,10 +1954,7 @@ class SchoolAdminsNotifier extends Notifier<List<Map<String, dynamic>>> {
     return aid;
   }
 
-  Future<void> updateAdmin(
-    String adminId,
-    Map<String, dynamic> data,
-  ) async {
+  Future<void> updateAdmin(String adminId, Map<String, dynamic> data) async {
     await DatabaseHelper().updateAdmin(adminId, data);
     await loadAdmins();
   }
@@ -1609,7 +1973,10 @@ class SchoolAdminsNotifier extends Notifier<List<Map<String, dynamic>>> {
     ref.read(adminAnalyticsProvider.notifier).loadAnalytics();
   }
 
-  Future<EmailResult> resendCredentials(String adminId, {String? newPassword}) async {
+  Future<EmailResult> resendCredentials(
+    String adminId, {
+    String? newPassword,
+  }) async {
     final result = await DatabaseHelper().resetAndSendAdminCredentials(
       adminId: adminId,
       newPassword: newPassword,
@@ -1621,11 +1988,14 @@ class SchoolAdminsNotifier extends Notifier<List<Map<String, dynamic>>> {
 
 // --- Archived / Deactivated School Administrators Provider ---
 final archivedSchoolAdminsProvider =
-    NotifierProvider<ArchivedSchoolAdminsNotifier, List<Map<String, dynamic>>>(() {
-  return ArchivedSchoolAdminsNotifier();
-});
+    NotifierProvider<ArchivedSchoolAdminsNotifier, List<Map<String, dynamic>>>(
+      () {
+        return ArchivedSchoolAdminsNotifier();
+      },
+    );
 
-class ArchivedSchoolAdminsNotifier extends Notifier<List<Map<String, dynamic>>> {
+class ArchivedSchoolAdminsNotifier
+    extends Notifier<List<Map<String, dynamic>>> {
   String? _selectedSchoolId;
   String _searchQuery = '';
 
@@ -1646,15 +2016,20 @@ class ArchivedSchoolAdminsNotifier extends Notifier<List<Map<String, dynamic>>> 
     if (!ref.mounted) return;
     state = admins;
 
-    // Non-blocking background cloud freshness pull
-    FirestoreService().syncCloudUsersToLocal().then((_) async {
-      if (!ref.mounted) return;
-      final fresh = await DatabaseHelper().getArchivedAdminsList(
-        schoolId: _selectedSchoolId,
-        query: _searchQuery,
-      );
-      if (ref.mounted) state = fresh;
-    }).catchError((_) {});
+    // Non-blocking background cloud freshness pull (only on initial/unfiltered load)
+    if (query == null || query.isEmpty) {
+      FirestoreService()
+          .syncCloudUsersToLocal()
+          .then((_) async {
+            if (!ref.mounted) return;
+            final fresh = await DatabaseHelper().getArchivedAdminsList(
+              schoolId: _selectedSchoolId,
+              query: _searchQuery,
+            );
+            if (ref.mounted) state = fresh;
+          })
+          .catchError((_) {});
+    }
   }
 
   Future<void> restoreAdmin(String adminId) async {
@@ -1732,9 +2107,10 @@ class SchoolsNotifier extends Notifier<List<Map<String, dynamic>>> {
   }
 }
 
-final schoolsListProvider = NotifierProvider<SchoolsNotifier, List<Map<String, dynamic>>>(() {
-  return SchoolsNotifier();
-});
+final schoolsListProvider =
+    NotifierProvider<SchoolsNotifier, List<Map<String, dynamic>>>(() {
+      return SchoolsNotifier();
+    });
 
 // Backward-compatible AsyncValue provider
 final schoolsProvider = FutureProvider<List<Map<String, dynamic>>>((ref) async {
@@ -1750,10 +2126,7 @@ class SuperAdminCampusFilterNotifier extends Notifier<String?> {
   set state(String? val) => super.state = val;
 }
 
-final superAdminSelectedSchoolProvider = NotifierProvider<SuperAdminCampusFilterNotifier, String?>(() {
-  return SuperAdminCampusFilterNotifier();
-});
-
-
-
-
+final superAdminSelectedSchoolProvider =
+    NotifierProvider<SuperAdminCampusFilterNotifier, String?>(() {
+      return SuperAdminCampusFilterNotifier();
+    });

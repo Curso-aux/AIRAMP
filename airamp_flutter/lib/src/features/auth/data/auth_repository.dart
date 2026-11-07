@@ -8,6 +8,7 @@ import '../../../core/database/database_helper.dart';
 import '../../../core/database/firestore_service.dart';
 import '../../../core/services/otp_service.dart';
 import '../../../core/api/api_client.dart';
+import '../../../core/utils/institutional_id_helper.dart';
 import '../../../core/utils/web_session_helper.dart';
 
 class AuthSession {
@@ -171,6 +172,20 @@ class AuthRepository {
         userId == 'SA-000-0001' ||
         (user['email'] as String? ?? '').toLowerCase() == 'evangelistachristian88@gmail.com') {
       user['role'] = 'super_admin';
+    } else {
+      final detectedRole = InstitutionalIdHelper.detectRole(userId);
+      if (detectedRole != null && user['role'] != detectedRole) {
+        user['role'] = detectedRole;
+        user['category'] = detectedRole;
+        try {
+          await db.update(
+            'users',
+            {'role': detectedRole, 'category': detectedRole},
+            where: 'id = ?',
+            whereArgs: [userId],
+          );
+        } catch (_) {}
+      }
     }
     final role = user['role'] as String;
 
@@ -298,6 +313,9 @@ class AuthRepository {
 
     await _persistSession(userId: userId, role: role, token: token, mustChangePassword: mustChange);
     ApiClient.setSession(session: token, userId: userId);
+
+    // Pre-warm local cache with all users for instant display across directories and analytics
+    unawaited(FirestoreService().syncCloudUsersToLocal(force: true));
 
     return {
       'user': {

@@ -10,6 +10,7 @@ import '../../../../core/theme/theme_provider.dart';
 import '../../../../core/database/database_helper.dart';
 import '../../../../core/services/email_service.dart';
 import '../../../../core/utils/file_download_helper.dart';
+import '../../../../core/utils/institutional_id_helper.dart';
 import '../../data/admin_repository.dart';
 import 'components/bulk_import_modal.dart';
 
@@ -3612,7 +3613,15 @@ void _resendStudentCredentialsDialog(BuildContext context, Map<String, dynamic> 
                             fillColor: AppTheme.background,
                             border: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: BorderSide(color: AppTheme.border)),
                           ),
-                          validator: (v) => v == null || v.trim().isEmpty ? 'Please enter student ID' : null,
+                          validator: (v) {
+                            if (v == null || v.trim().isEmpty) return 'Please enter student ID';
+                            final clean = InstitutionalIdHelper.normalize(v.trim());
+                            final detected = InstitutionalIdHelper.detectRole(clean);
+                            if (detected != null && detected != 'student') {
+                              return 'ID "$clean" is a $detected ID. Student IDs must start with "S-" (e.g. S-100-0001)';
+                            }
+                            return null;
+                          },
                         ),
                         const SizedBox(height: 14),
                         TextFormField(

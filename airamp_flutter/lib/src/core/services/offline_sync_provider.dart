@@ -72,19 +72,7 @@ class OfflineSyncNotifier extends Notifier<OfflineSyncState> {
       FirestoreService.removeSyncListener(handleSync);
     });
 
-    // Activate Firestore real-time live listener
-    FirestoreService().startRealtimeUserSync();
-
-    // On native mobile/desktop (!kIsWeb), periodic sync checks connectivity for queued offline actions.
-    // Throttled to 15 minutes to preserve battery and remain well within Firebase free tier quotas.
-    if (!kIsWeb) {
-      _periodicSyncTimer = Timer.periodic(const Duration(minutes: 15), (_) {
-        syncNow();
-      });
-      // Proactively perform initial sync in background on mobile
-      Future.microtask(() => syncNow());
-    }
-
+    // Cloud sync listeners hooked without full-collection streaming
     return OfflineSyncState(
       status: SyncConnectivityStatus.onlineSynced,
       lastSyncedAt: DateTime.now().subtract(const Duration(minutes: 2)),

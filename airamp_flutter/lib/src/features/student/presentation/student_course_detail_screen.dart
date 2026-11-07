@@ -54,19 +54,30 @@ class _StudentCourseDetailScreenState
     super.dispose();
   }
 
-  Future<void> _loadData() async {
+  Future<void> _loadData({bool syncCloud = false}) async {
     final id = int.tryParse(widget.courseId);
     if (id == null) return;
 
-    try {
-      await DatabaseHelper().syncCloudCurriculumToLocal();
-      await Future.wait([
-        DatabaseHelper().syncCloudAssignmentsToLocal(),
-        DatabaseHelper().syncCloudQuizzesToLocal(),
-        DatabaseHelper().syncCloudSubmissionsToLocal(),
-      ]);
-    } catch (_) {}
+    await _loadFromLocal(id);
 
+    if (syncCloud) {
+      unawaited(() async {
+        try {
+          await DatabaseHelper().syncCloudCurriculumToLocal();
+          await Future.wait([
+            DatabaseHelper().syncCloudAssignmentsToLocal(),
+            DatabaseHelper().syncCloudQuizzesToLocal(),
+            DatabaseHelper().syncCloudSubmissionsToLocal(),
+          ]);
+          if (mounted) {
+            await _loadFromLocal(id);
+          }
+        } catch (_) {}
+      }());
+    }
+  }
+
+  Future<void> _loadFromLocal(int id) async {
     final subject = await ref
         .read(subjectsProvider.notifier)
         .getSubjectById(id);
@@ -197,7 +208,7 @@ class _StudentCourseDetailScreenState
       backgroundColor: AppTheme.background,
       body: SafeArea(
         child: RefreshIndicator(
-          onRefresh: () async => await _loadData(),
+          onRefresh: () async => await _loadData(syncCloud: true),
           color: AppTheme.primary,
           child: SingleChildScrollView(
             physics: const AlwaysScrollableScrollPhysics(),

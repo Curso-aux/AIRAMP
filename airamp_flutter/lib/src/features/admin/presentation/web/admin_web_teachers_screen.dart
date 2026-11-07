@@ -9,6 +9,7 @@ import '../../../../core/theme/app_theme.dart';
 import '../../../../core/theme/theme_provider.dart';
 import '../../../../core/database/database_helper.dart';
 import '../../../../core/services/email_service.dart';
+import '../../../../core/utils/institutional_id_helper.dart';
 import '../../data/admin_repository.dart';
 import 'components/teacher_bulk_import_modal.dart';
 import 'components/teacher_schedule_modal.dart';
@@ -1328,7 +1329,15 @@ class _AdminWebTeachersScreenState extends ConsumerState<AdminWebTeachersScreen>
                             fillColor: AppTheme.background,
                             border: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: BorderSide(color: AppTheme.border)),
                           ),
-                          validator: (v) => v == null || v.trim().isEmpty ? 'Please enter teacher ID' : null,
+                          validator: (v) {
+                            if (v == null || v.trim().isEmpty) return 'Please enter teacher ID';
+                            final clean = InstitutionalIdHelper.normalize(v.trim());
+                            final detected = InstitutionalIdHelper.detectRole(clean);
+                            if (detected != null && detected != 'teacher') {
+                              return 'ID "$clean" is a $detected ID. Faculty IDs must start with "T-" (e.g. T-100-0001)';
+                            }
+                            return null;
+                          },
                         ),
                         const SizedBox(height: 14),
                         TextFormField(

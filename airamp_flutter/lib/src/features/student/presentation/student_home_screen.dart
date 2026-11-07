@@ -35,11 +35,7 @@ class _StudentHomeScreenState extends ConsumerState<StudentHomeScreen> {
   void initState() {
     super.initState();
     _startScheduleTicker();
-    _initCloudSync();
-  }
-
-  void _initCloudSync() {
-    DatabaseHelper().syncAllCloudData().then((_) {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted) {
         ref.read(studentCoursesProvider.notifier).reload();
         ref.read(studentProgressProvider.notifier).loadProgress();

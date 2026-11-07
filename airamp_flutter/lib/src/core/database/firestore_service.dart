@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:convert';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:dio/dio.dart';
 import 'package:firebase_core/firebase_core.dart';
@@ -8,6 +9,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:sqflite/sqflite.dart';
 import '../../../firebase_options.dart';
 import '../api/rate_limit_interceptor.dart';
+import '../utils/institutional_id_helper.dart';
 import 'database_helper.dart';
 
 /// Centralized service connecting AIRA with Cloud Firestore.
@@ -104,32 +106,10 @@ class FirestoreService {
     return firestore.collection('users');
   }
 
-  /// Activates real-time live synchronization of Cloud Firestore users.
-  /// Any creation, modification, archive, or deletion of users on ANY device
-  /// is instantly streamed down, cached locally, and notified to the UI.
+  /// Real-time full collection streaming was deprecated to prevent quota exhaustion (500+ reads per user).
+  /// Updates now stream on-demand or use lightweight delta synchronization.
   void startRealtimeUserSync() {
-    if (_isRealtimeSyncActive || !isAvailable) return;
-    _isRealtimeSyncActive = true;
-
-    try {
-      _usersSubscription = usersCollection.snapshots().listen(
-        (snapshot) async {
-          debugPrint('[FirestoreService] Real-time users update received: ${snapshot.docs.length} docs');
-          final cloudUsers = snapshot.docs.map((d) {
-            final data = d.data();
-            data['id'] = d.id;
-            return data;
-          }).toList();
-          await applyCloudUsersToLocal(cloudUsers);
-        },
-        onError: (e) {
-          debugPrint('[FirestoreService] Real-time users stream note: $e');
-        },
-      );
-      debugPrint('[FirestoreService] Real-time live user sync activated');
-    } catch (e) {
-      debugPrint('[FirestoreService] Could not start real-time user sync: $e');
-    }
+    // Disabled whole-collection snapshot listener to protect against 50k daily quota burn
   }
 
   void stopRealtimeUserSync() {
@@ -153,10 +133,10 @@ class FirestoreService {
           } catch (_) {}
         }
       }
+      // Lightweight probe check using limit(1) without subscribing to entire collection
       await usersCollection.limit(1).get(const GetOptions(source: Source.serverAndCache))
-          .timeout(const Duration(seconds: 8));
+          .timeout(const Duration(seconds: 5));
       debugPrint('[FirestoreService] Cloud Firestore SDK connected successfully');
-      startRealtimeUserSync();
     } catch (e) {
       debugPrint('[FirestoreService] Cloud Firestore initial probe note: $e');
     }
@@ -355,6 +335,50 @@ class FirestoreService {
       debugPrint('[FirestoreService] REST fetchAllDocuments for $collection error: $e');
       return list;
     }
+  }
+
+  /// Optimized helper to fetch documents with optional delta filtering (since) and field matching.
+  /// When [since] is provided, only documents updated/created after that timestamp are fetched,
+  /// reducing reads to 0 if nothing changed!
+  Future<List<Map<String, dynamic>>> fetchDeltaDocuments(
+    String collection, {
+    String? since,
+    String? whereField,
+    dynamic whereValue,
+    int? limit,
+  }) async {
+    final list = <Map<String, dynamic>>[];
+    if (isAvailable) {
+      try {
+        Query<Map<String, dynamic>> query = firestore.collection(collection);
+        if (whereField != null && whereValue != null) {
+          query = query.where(whereField, isEqualTo: whereValue);
+        }
+        if (since != null && since.isNotEmpty) {
+          query = query.where('updated_at', isGreaterThan: since);
+        }
+        if (limit != null && limit > 0) {
+          query = query.limit(limit);
+        }
+
+        final snap = await query.get(const GetOptions(source: Source.serverAndCache))
+            .timeout(const Duration(seconds: 8));
+        for (final doc in snap.docs) {
+          final data = Map<String, dynamic>.from(doc.data());
+          data['id'] = doc.id;
+          list.add(data);
+        }
+        return list;
+      } catch (e) {
+        debugPrint('[FirestoreService] SDK fetchDeltaDocuments for $collection error: $e');
+      }
+    }
+
+    // Fallback: If delta failed or offline, fall back to REST or standard fetch if since is null
+    if (since == null) {
+      return await fetchAllDocuments(collection);
+    }
+    return list;
   }
 
   /// Calculates the highest numeric sequence for a given ID prefix (e.g. 'S-100-', 'T-100-', 'A-100-', 'SA-000-', or legacy '001-')
@@ -673,21 +697,62 @@ class FirestoreService {
   }
 
   /// Syncs Cloud Firestore users down to local SQLite cache and prunes deleted accounts.
-  /// Throttled to at most once per 5 minutes unless [force] is true to prevent exceeding quotas.
+  /// Throttled to at most once per 15 minutes unless [force] is true or local database is empty.
+  /// Uses delta querying via 'updated_at' so that if no accounts changed, 0 reads are consumed!
   Future<void> syncCloudUsersToLocal({bool force = false}) async {
+    final db = await DatabaseHelper().database;
+    final prefs = await SharedPreferences.getInstance();
+
+    // 1. Check if local database currently has any registered students or teachers
+    int localCount = 0;
+    try {
+      localCount = Sqflite.firstIntValue(
+        await db.rawQuery("SELECT COUNT(*) FROM users WHERE role IN ('student', 'teacher') OR id LIKE 'S-%' OR id LIKE 'T-%'"),
+      ) ?? 0;
+    } catch (_) {}
+
+    // 2. If local database has 0 students/teachers (e.g. Web reload where in-memory SQLite starts clean),
+    // restore immediately from persistent localStorage cache in 0ms!
+    if (localCount == 0) {
+      final cachedStr = prefs.getString('local_cached_users_v1');
+      if (cachedStr != null && cachedStr.isNotEmpty) {
+        try {
+          final List<dynamic> decoded = jsonDecode(cachedStr);
+          final cachedUsers = decoded.map((e) => Map<String, dynamic>.from(e as Map)).toList();
+          if (cachedUsers.isNotEmpty) {
+            await applyCloudUsersToLocal(cachedUsers, persistToStorage: false);
+            localCount = Sqflite.firstIntValue(
+              await db.rawQuery("SELECT COUNT(*) FROM users WHERE role IN ('student', 'teacher') OR id LIKE 'S-%' OR id LIKE 'T-%'"),
+            ) ?? 0;
+          }
+        } catch (_) {}
+      }
+    }
+
+    final bool isDbEmpty = localCount == 0;
+
     final now = DateTime.now();
-    if (!force && _lastUsersSyncTime != null && now.difference(_lastUsersSyncTime!) < const Duration(minutes: 5)) {
-      debugPrint('[FirestoreService] syncCloudUsersToLocal throttled (last synced ${now.difference(_lastUsersSyncTime!).inSeconds}s ago)');
+    // Do not throttle if database is empty - we must pull data for the screen to display!
+    if (!force && !isDbEmpty && _lastUsersSyncTime != null && now.difference(_lastUsersSyncTime!) < const Duration(minutes: 5)) {
+      debugPrint('[FirestoreService] syncCloudUsersToLocal throttled (last synced ${now.difference(_lastUsersSyncTime!).inMinutes}m ago)');
       return;
     }
     _lastUsersSyncTime = now;
 
     try {
+      // If local DB is empty or force sync requested, perform a full fetch (ignore lastSync) to populate the directory!
+      final lastSync = (force || isDbEmpty) ? null : prefs.getString('last_synced_at_users');
+
       List<Map<String, dynamic>> cloudUsers = [];
 
       if (isAvailable) {
         try {
-          final snapshot = await usersCollection.get().timeout(const Duration(seconds: 8));
+          Query<Map<String, dynamic>> query = usersCollection;
+          if (lastSync != null && lastSync.isNotEmpty) {
+            query = query.where('updated_at', isGreaterThan: lastSync);
+          }
+          final snapshot = await query.get(const GetOptions(source: Source.serverAndCache))
+              .timeout(const Duration(seconds: 8));
           cloudUsers = snapshot.docs.map((d) {
             final data = d.data();
             data['id'] = d.id;
@@ -698,13 +763,16 @@ class FirestoreService {
         }
       }
 
-      if (cloudUsers.isEmpty) {
+      // Fallback: If SDK returned empty, timed out, or threw an error, fetch via direct REST!
+      if (cloudUsers.isEmpty && (isDbEmpty || force || lastSync == null)) {
+        debugPrint('[FirestoreService] Using REST fallback for full user catalog fetch...');
         cloudUsers = await _fetchAllRest();
       }
 
-      if (cloudUsers.isEmpty) return;
-
-      await applyCloudUsersToLocal(cloudUsers);
+      if (cloudUsers.isNotEmpty) {
+        await applyCloudUsersToLocal(cloudUsers, persistToStorage: true);
+      }
+      await prefs.setString('last_synced_at_users', now.toIso8601String());
     } catch (e) {
       debugPrint('[FirestoreService] Error syncing cloud users to local SQLite: $e');
     }
@@ -712,7 +780,10 @@ class FirestoreService {
 
   /// Ingests a set of Cloud Firestore user documents into the local SQLite memory/disk store
   /// and synchronizes state across devices in real time.
-  Future<void> applyCloudUsersToLocal(List<Map<String, dynamic>> cloudUsers) async {
+  Future<void> applyCloudUsersToLocal(
+    List<Map<String, dynamic>> cloudUsers, {
+    bool persistToStorage = true,
+  }) async {
     try {
       if (cloudUsers.isEmpty) return;
 
@@ -723,7 +794,18 @@ class FirestoreService {
       final cloudIds = <String>{};
       final cloudEmails = <String>{};
 
-      for (final data in cloudUsers) {
+      // Prioritize canonical institutional ID records (SA-, A-, T-, S-) over legacy email-keyed records
+      final sortedCloudUsers = List<Map<String, dynamic>>.from(cloudUsers)..sort((a, b) {
+        final aId = a['id']?.toString() ?? '';
+        final bId = b['id']?.toString() ?? '';
+        final aIsCanonical = aId.startsWith('SA-') || aId.startsWith('A-') || aId.startsWith('T-') || aId.startsWith('S-');
+        final bIsCanonical = bId.startsWith('SA-') || bId.startsWith('A-') || bId.startsWith('T-') || bId.startsWith('S-');
+        if (aIsCanonical && !bIsCanonical) return -1;
+        if (!aIsCanonical && bIsCanonical) return 1;
+        return 0;
+      });
+
+      for (final data in sortedCloudUsers) {
         try {
           final userId = data['id']?.toString() ?? '';
           final email = (data['email']?.toString() ?? '').toLowerCase().trim();
@@ -814,24 +896,79 @@ class FirestoreService {
               data['is_archived'] == '1';
           final archivedAt = data['archived_at']?.toString();
 
+          // Authoritative role resolution: Institutional ID prefix always dictates role!
+          final detectedRole = InstitutionalIdHelper.detectRole(targetId) ??
+              InstitutionalIdHelper.detectRole(userId);
+          final rawRole = data['role']?.toString().toLowerCase().trim();
+          final resolvedRole = detectedRole ?? (rawRole != null && rawRole.isNotEmpty ? rawRole : 'student');
+
+          // If Cloud Firestore had an erroneous role (e.g. T-100-0001 saved as student), auto-repair Cloud!
+          if (detectedRole != null && data['role'] != detectedRole) {
+            debugPrint('[FirestoreService] Auto-repairing role in Cloud Firestore for $targetId from "${data['role']}" to "$detectedRole"');
+            unawaited(saveUser({
+              'id': targetId,
+              if (email.isNotEmpty) 'email': email,
+              'role': detectedRole,
+              'category': detectedRole,
+              'updated_at': DateTime.now().toIso8601String(),
+            }));
+          }
+
+          // Safely merge fields: do not let a secondary document overwrite populated values with null/empty
+          final old = existing.isNotEmpty ? existing.first : <String, dynamic>{};
+          final fullNameVal = (data['full_name'] != null && data['full_name'].toString().isNotEmpty)
+              ? data['full_name']
+              : (data['name'] != null && data['name'].toString().isNotEmpty)
+                  ? data['name']
+                  : (old['full_name'] ?? '');
+
+          final usernameVal = (data['username'] != null && data['username'].toString().isNotEmpty)
+              ? data['username']
+              : (old['username'] ?? '');
+
+          final passwordVal = (data['password'] != null && data['password'].toString().isNotEmpty)
+              ? data['password']
+              : (old['password'] ?? '');
+
+          final passwordSaltVal = data['password_salt'] ?? old['password_salt'];
+
+          final sectionVal = (resolvedRole == 'teacher' || resolvedRole == 'admin' || resolvedRole == 'super_admin')
+              ? null
+              : (data['section'] != null && data['section'].toString().isNotEmpty)
+                  ? data['section']
+                  : old['section'];
+
+          final gradeVal = (resolvedRole == 'teacher' || resolvedRole == 'admin' || resolvedRole == 'super_admin')
+              ? null
+              : (data['grade'] != null && data['grade'].toString().isNotEmpty)
+                  ? data['grade']
+                  : old['grade'];
+
+          final studentTypeVal = (resolvedRole == 'student')
+              ? (data['student_type'] ?? old['student_type'] ?? 'regular')
+              : null;
+
+          final profileImgVal = data['profile_image'] ?? data['profileImage'] ?? old['profile_image'];
+
           final dbRow = {
             'id': targetId,
-            'email': data['email'] ?? '',
-            'username': data['username'] ?? '',
-            'password': data['password'] ?? '',
-            'password_salt': data['password_salt'],
-            'role': data['role'] ?? 'student',
-            'full_name': data['full_name'] ?? data['name'] ?? '',
-            'profile_image': data['profile_image'] ?? data['profileImage'] ?? (existing.isNotEmpty ? existing.first['profile_image'] : null),
-            'section': data['section'],
-            'grade': data['grade'],
-            'student_type': data['student_type'] ?? 'regular',
-            'special_notes': data['special_notes'],
-            'school_id': data['school_id'] ?? 'sch_main',
+            'email': (data['email'] != null && data['email'].toString().isNotEmpty) ? data['email'] : (old['email'] ?? ''),
+            'username': usernameVal,
+            'password': passwordVal,
+            'password_salt': passwordSaltVal,
+            'role': resolvedRole,
+            'category': resolvedRole,
+            'full_name': fullNameVal,
+            'profile_image': profileImgVal,
+            'section': sectionVal,
+            'grade': gradeVal,
+            'student_type': studentTypeVal,
+            'special_notes': data['special_notes'] ?? old['special_notes'],
+            'school_id': data['school_id'] ?? old['school_id'] ?? 'sch_main',
             'must_change_password': mustChangeVal,
             'is_archived': isArchived ? 1 : 0,
             'archived_at': isArchived ? (archivedAt ?? DateTime.now().toIso8601String()) : null,
-            'created_at': data['created_at'] ?? DateTime.now().toIso8601String(),
+            'created_at': data['created_at'] ?? old['created_at'] ?? DateTime.now().toIso8601String(),
           };
 
           if (existing.isEmpty) {
@@ -872,26 +1009,16 @@ class FirestoreService {
           debugPrint('[FirestoreService] Pruned permanently deleted user: $localId ($localEmail)');
           continue;
         }
-
-        // Cloud Firestore is authoritative across all platforms. If a user exists locally in SQLite/memory
-        // but is absent from Cloud Firestore, it was deleted in the cloud or previously.
-        // Prune it immediately from local cache so it NEVER resurrects into Cloud Firestore!
-        if (!isPermanentSeed &&
-            !cloudIds.contains(localId) &&
-            !cloudEmails.contains(localEmail)) {
-          await db.delete('users', where: 'id = ?', whereArgs: [localId]);
-          try {
-            await db.delete('enrollments', where: 'student_id = ?', whereArgs: [localId]);
-            await db.delete('quiz_attempts', where: 'student_id = ?', whereArgs: [localId]);
-            await db.delete('student_progress', where: 'student_id = ?', whereArgs: [localId]);
-            await db.delete('submissions', where: 'student_id = ?', whereArgs: [localId]);
-          } catch (_) {}
-          debugPrint('[FirestoreService] Pruned cloud-deleted user from local cache: $localId ($localEmail)');
-          continue;
-        }
       }
 
-      debugPrint('[FirestoreService] Applied ${cloudUsers.length} Cloud Firestore users to local store');
+      if (persistToStorage) {
+        try {
+          final allUsers = await db.query('users');
+          await prefs.setString('local_cached_users_v1', jsonEncode(allUsers));
+        } catch (_) {}
+      }
+
+      debugPrint('[FirestoreService] Applied ${cloudUsers.length} users to local store');
       notifySyncListeners();
     } catch (e) {
       debugPrint('[FirestoreService] Error applying cloud users to local SQLite: $e');

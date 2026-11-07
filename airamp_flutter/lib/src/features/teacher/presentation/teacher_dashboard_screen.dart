@@ -43,7 +43,6 @@ class _TeacherDashboardScreenState extends ConsumerState<TeacherDashboardScreen>
   @override
   void initState() {
     super.initState();
-    unawaited(DatabaseHelper().syncAllCloudData());
     _loadAnalyticsPreferences();
     WidgetsBinding.instance.addPostFrameCallback((_) {
       ref.invalidate(teacherHandledSectionsDetailsProvider);
