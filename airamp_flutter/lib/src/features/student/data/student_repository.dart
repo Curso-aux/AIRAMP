@@ -9,16 +9,19 @@ import '../../teacher/data/teacher_repository.dart';
 import '../../notifications/application/notification_provider.dart';
 
 // --- Student Section Details ---
-final studentSectionDetailsProvider = FutureProvider<Map<String, dynamic>?>((ref) async {
+final studentSectionDetailsProvider = FutureProvider<Map<String, dynamic>?>((
+  ref,
+) async {
   final user = ref.watch(authProvider);
   if (user == null) return null;
   return await DatabaseHelper().getSectionDetailsForStudent(user.id);
 });
 
 // --- Student Enrolled Courses ---
-final studentCoursesProvider = NotifierProvider<StudentCoursesNotifier, List<Map<String, dynamic>>>(() {
-  return StudentCoursesNotifier();
-});
+final studentCoursesProvider =
+    NotifierProvider<StudentCoursesNotifier, List<Map<String, dynamic>>>(() {
+      return StudentCoursesNotifier();
+    });
 
 class StudentCoursesNotifier extends Notifier<List<Map<String, dynamic>>> {
   @override
@@ -44,7 +47,10 @@ class StudentCoursesNotifier extends Notifier<List<Map<String, dynamic>>> {
       try {
         await FirestoreService().syncCloudSubjectsToLocal();
         await FirestoreService().syncCloudSectionsToLocal();
-        await DatabaseHelper().ensureStudentEnrolledInSectionSubjects(studentId, sec);
+        await DatabaseHelper().ensureStudentEnrolledInSectionSubjects(
+          studentId,
+          sec,
+        );
       } catch (e) {
         debugPrint('[StudentCourses] Auto-sync enroll error: $e');
       }
@@ -63,7 +69,10 @@ class StudentCoursesNotifier extends Notifier<List<Map<String, dynamic>>> {
         try {
           await FirestoreService().syncCloudSubjectsToLocal(force: true);
           await FirestoreService().syncCloudSectionsToLocal(force: true);
-          await DatabaseHelper().ensureStudentEnrolledInSectionSubjects(studentId, sec);
+          await DatabaseHelper().ensureStudentEnrolledInSectionSubjects(
+            studentId,
+            sec,
+          );
         } catch (e) {
           debugPrint('[StudentCourses] Reload sync error: $e');
         }
@@ -82,15 +91,22 @@ class StudentCoursesNotifier extends Notifier<List<Map<String, dynamic>>> {
     final studentId = _getStudentId();
     if (studentId == null) return false;
 
-    final success = await DatabaseHelper().enrollStudentBySectionKey(studentId, key);
+    final success = await DatabaseHelper().enrollStudentBySectionKey(
+      studentId,
+      key,
+    );
     if (!success) return false;
 
     // Retrieve updated section info and update in-memory auth user
-    final secDetails = await DatabaseHelper().getSectionDetailsForStudent(studentId);
+    final secDetails = await DatabaseHelper().getSectionDetailsForStudent(
+      studentId,
+    );
     if (secDetails != null) {
       final secName = secDetails['name']?.toString() ?? '';
       final grade = secDetails['grade']?.toString() ?? '';
-      ref.read(authProvider.notifier).updateUserSection(section: secName, grade: grade);
+      ref
+          .read(authProvider.notifier)
+          .updateUserSection(section: secName, grade: grade);
     }
 
     await _loadCourses();
@@ -134,9 +150,10 @@ class StudentCoursesNotifier extends Notifier<List<Map<String, dynamic>>> {
 }
 
 // --- Available Courses for Student ---
-final availableCoursesProvider = NotifierProvider<AvailableCoursesNotifier, List<Map<String, dynamic>>>(() {
-  return AvailableCoursesNotifier();
-});
+final availableCoursesProvider =
+    NotifierProvider<AvailableCoursesNotifier, List<Map<String, dynamic>>>(() {
+      return AvailableCoursesNotifier();
+    });
 
 class AvailableCoursesNotifier extends Notifier<List<Map<String, dynamic>>> {
   @override
@@ -167,9 +184,10 @@ class AvailableCoursesNotifier extends Notifier<List<Map<String, dynamic>>> {
 }
 
 // --- Student Progress Summary ---
-final studentProgressProvider = NotifierProvider<StudentProgressNotifier, Map<String, dynamic>>(() {
-  return StudentProgressNotifier();
-});
+final studentProgressProvider =
+    NotifierProvider<StudentProgressNotifier, Map<String, dynamic>>(() {
+      return StudentProgressNotifier();
+    });
 
 class StudentProgressNotifier extends Notifier<Map<String, dynamic>> {
   @override
@@ -209,18 +227,26 @@ class StudentProgressNotifier extends Notifier<Map<String, dynamic>> {
       }
       return;
     }
-    final summary = await DatabaseHelper().getStudentProgressSummary(studentId, subjectId: subjectId);
+    final summary = await DatabaseHelper().getStudentProgressSummary(
+      studentId,
+      subjectId: subjectId,
+    );
     if (!ref.mounted) return;
     state = summary;
   }
 }
 
 // --- Student Quiz Assignments (Active / Pending Quizzes) ---
-final studentQuizAssignmentsProvider = NotifierProvider<StudentQuizAssignmentsNotifier, List<Map<String, dynamic>>>(() {
-  return StudentQuizAssignmentsNotifier();
-});
+final studentQuizAssignmentsProvider =
+    NotifierProvider<
+      StudentQuizAssignmentsNotifier,
+      List<Map<String, dynamic>>
+    >(() {
+      return StudentQuizAssignmentsNotifier();
+    });
 
-class StudentQuizAssignmentsNotifier extends Notifier<List<Map<String, dynamic>>> {
+class StudentQuizAssignmentsNotifier
+    extends Notifier<List<Map<String, dynamic>>> {
   int? _activeSubjectFilter;
 
   @override
@@ -241,18 +267,25 @@ class StudentQuizAssignmentsNotifier extends Notifier<List<Map<String, dynamic>>
       if (ref.mounted) state = [];
       return;
     }
-    final results = await DatabaseHelper().getAssignedQuizzesForStudent(studentId, subjectId: subjectId);
+    final results = await DatabaseHelper().getAssignedQuizzesForStudent(
+      studentId,
+      subjectId: subjectId,
+    );
     if (!ref.mounted) return;
     state = results;
   }
 
-  Future<void> reload() async => loadAssignedQuizzes(subjectId: _activeSubjectFilter);
+  Future<void> reload() async =>
+      loadAssignedQuizzes(subjectId: _activeSubjectFilter);
 }
 
 // --- Student Quiz Attempts & History ---
-final studentQuizAttemptsProvider = NotifierProvider<StudentQuizAttemptsNotifier, List<Map<String, dynamic>>>(() {
-  return StudentQuizAttemptsNotifier();
-});
+final studentQuizAttemptsProvider =
+    NotifierProvider<StudentQuizAttemptsNotifier, List<Map<String, dynamic>>>(
+      () {
+        return StudentQuizAttemptsNotifier();
+      },
+    );
 
 class StudentQuizAttemptsNotifier extends Notifier<List<Map<String, dynamic>>> {
   int? _activeSubjectFilter;
@@ -275,7 +308,10 @@ class StudentQuizAttemptsNotifier extends Notifier<List<Map<String, dynamic>>> {
       if (ref.mounted) state = [];
       return;
     }
-    final results = await DatabaseHelper().getStudentQuizAttempts(studentId, subjectId: subjectId);
+    final results = await DatabaseHelper().getStudentQuizAttempts(
+      studentId,
+      subjectId: subjectId,
+    );
     if (!ref.mounted) return;
     state = results;
   }
@@ -287,16 +323,24 @@ class StudentQuizAttemptsNotifier extends Notifier<List<Map<String, dynamic>>> {
   }) async {
     final user = ref.read(authProvider);
     if (user == null || (user.role != 'teacher' && user.role != 'admin')) {
-      throw Exception('Only instructors or administrators are permitted to reset quiz attempts.');
+      throw Exception(
+        'Only instructors or administrators are permitted to reset quiz attempts.',
+      );
     }
 
     final studentId = _getStudentId();
     if (studentId == null) return;
 
     if (quizId > 0) {
-      await DatabaseHelper().resetStudentQuizAttempt(quizId: quizId, studentId: studentId);
+      await DatabaseHelper().resetStudentQuizAttempt(
+        quizId: quizId,
+        studentId: studentId,
+      );
     } else if (loId != null && loId > 0) {
-      await DatabaseHelper().resetStudentLoQuizAttempt(loId: loId, studentId: studentId);
+      await DatabaseHelper().resetStudentLoQuizAttempt(
+        loId: loId,
+        studentId: studentId,
+      );
     }
 
     await loadAttempts(subjectId: _activeSubjectFilter);
@@ -330,14 +374,24 @@ class StudentQuizAttemptsNotifier extends Notifier<List<Map<String, dynamic>>> {
 
     // Validate quiz attempt - check if student already completed
     if (quizId != null && quizId > 0) {
-      final canAttempt = await DatabaseHelper().hasStudentCompletedQuiz(studentId: studentId, quizId: quizId);
+      final canAttempt = await DatabaseHelper().hasStudentCompletedQuiz(
+        studentId: studentId,
+        quizId: quizId,
+      );
       if (!canAttempt) {
-        throw Exception('You have already completed this quiz. Contact your teacher for a reset if needed.');
+        throw Exception(
+          'You have already completed this quiz. Contact your teacher for a reset if needed.',
+        );
       }
     } else if (loId > 0) {
-      final canAttempt = await DatabaseHelper().hasStudentCompletedLoQuiz(studentId: studentId, loId: loId);
+      final canAttempt = await DatabaseHelper().hasStudentCompletedLoQuiz(
+        studentId: studentId,
+        loId: loId,
+      );
       if (!canAttempt) {
-        throw Exception('You have already completed this assessment. Contact your teacher for a reset if needed.');
+        throw Exception(
+          'You have already completed this assessment. Contact your teacher for a reset if needed.',
+        );
       }
     }
 
@@ -355,15 +409,18 @@ class StudentQuizAttemptsNotifier extends Notifier<List<Map<String, dynamic>>> {
     );
 
     // Notify student of completed assessment
-    ref.read(notificationsProvider.notifier).addNotification(
-      userId: studentId,
-      type: 'quiz',
-      title: isPassed ? 'Assessment Passed! 🎉' : 'Assessment Submitted',
-      message: 'You scored $score / $totalQuestions (${percentage.toStringAsFixed(0)}%) on your assessment.',
-      targetRoute: '/student/history',
-      relatedId: quizId?.toString(),
-      showBanner: true,
-    );
+    ref
+        .read(notificationsProvider.notifier)
+        .addNotification(
+          userId: studentId,
+          type: 'quiz',
+          title: isPassed ? 'Assessment Passed! 🎉' : 'Assessment Submitted',
+          message:
+              'You scored $score / $totalQuestions (${percentage.toStringAsFixed(0)}%) on your assessment.',
+          targetRoute: '/student/history',
+          relatedId: quizId?.toString(),
+          showBanner: true,
+        );
 
     await loadAttempts(subjectId: _activeSubjectFilter);
     ref.invalidate(studentQuizAssignmentsProvider);
@@ -411,15 +468,18 @@ class StudentQuizAttemptsNotifier extends Notifier<List<Map<String, dynamic>>> {
     );
 
     // Notify student of completed assessment
-    ref.read(notificationsProvider.notifier).addNotification(
-      userId: studentId,
-      type: 'quiz',
-      title: isPassed ? 'Assessment Passed! 🎉' : 'Assessment Submitted',
-      message: 'You scored $score / $totalQuestions (${percentage.toStringAsFixed(0)}%) on your assessment.',
-      targetRoute: '/student/history',
-      relatedId: quizId?.toString(),
-      showBanner: true,
-    );
+    ref
+        .read(notificationsProvider.notifier)
+        .addNotification(
+          userId: studentId,
+          type: 'quiz',
+          title: isPassed ? 'Assessment Passed! 🎉' : 'Assessment Submitted',
+          message:
+              'You scored $score / $totalQuestions (${percentage.toStringAsFixed(0)}%) on your assessment.',
+          targetRoute: '/student/history',
+          relatedId: quizId?.toString(),
+          showBanner: true,
+        );
 
     await loadAttempts(subjectId: _activeSubjectFilter);
     ref.invalidate(studentQuizAssignmentsProvider);
@@ -440,9 +500,10 @@ class StudentQuizAttemptsNotifier extends Notifier<List<Map<String, dynamic>>> {
 }
 
 // --- Teacher Scores Provider ---
-final teacherScoresProvider = NotifierProvider<TeacherScoresNotifier, List<Map<String, dynamic>>>(() {
-  return TeacherScoresNotifier();
-});
+final teacherScoresProvider =
+    NotifierProvider<TeacherScoresNotifier, List<Map<String, dynamic>>>(() {
+      return TeacherScoresNotifier();
+    });
 
 class TeacherScoresNotifier extends Notifier<List<Map<String, dynamic>>> {
   String _selectedSection = 'All Sections';
@@ -454,7 +515,11 @@ class TeacherScoresNotifier extends Notifier<List<Map<String, dynamic>>> {
     return [];
   }
 
-  Future<void> loadScores({String? section, String? query, bool forceRefresh = false}) async {
+  Future<void> loadScores({
+    String? section,
+    String? query,
+    bool forceRefresh = false,
+  }) async {
     if (section != null) _selectedSection = section;
     if (query != null) _searchQuery = query;
 
@@ -464,7 +529,9 @@ class TeacherScoresNotifier extends Notifier<List<Map<String, dynamic>>> {
         await FirestoreService().syncCloudUsersToLocal(force: true);
         await FirestoreService().syncCloudSubjectsToLocal(force: true);
       }
-      await DatabaseHelper().syncCloudQuizzesToLocal(force: forceRefresh || kIsWeb);
+      await DatabaseHelper().syncCloudQuizzesToLocal(
+        force: forceRefresh || kIsWeb,
+      );
     } catch (_) {}
 
     final cacheKey = 'teacher_scores_${_selectedSection}_$_searchQuery';
@@ -483,7 +550,9 @@ class TeacherScoresNotifier extends Notifier<List<Map<String, dynamic>>> {
 }
 
 // --- Specific LO Quiz Provider ---
-final loQuizProvider = FutureProvider.family<Map<String, dynamic>?, int>((ref, loId) async {
+final loQuizProvider = FutureProvider.family<Map<String, dynamic>?, int>((
+  ref,
+  loId,
+) async {
   return await DatabaseHelper().getLoQuiz(loId);
 });
-
