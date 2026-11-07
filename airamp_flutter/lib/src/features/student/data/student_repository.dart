@@ -1,5 +1,7 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/database/database_helper.dart';
+import '../../../core/database/firestore_service.dart';
 import '../../../core/utils/cache_manager.dart';
 import '../../auth/application/auth_provider.dart';
 import '../../admin/data/admin_repository.dart';
@@ -36,12 +38,37 @@ class StudentCoursesNotifier extends Notifier<List<Map<String, dynamic>>> {
       if (ref.mounted) state = [];
       return;
     }
+    final user = ref.read(authProvider);
+    final sec = user?.section?.trim();
+    if (sec != null && sec.isNotEmpty) {
+      try {
+        await FirestoreService().syncCloudSubjectsToLocal();
+        await FirestoreService().syncCloudSectionsToLocal();
+        await DatabaseHelper().ensureStudentEnrolledInSectionSubjects(studentId, sec);
+      } catch (e) {
+        debugPrint('[StudentCourses] Auto-sync enroll error: $e');
+      }
+    }
     final results = await DatabaseHelper().getEnrolledSubjects(studentId);
     if (!ref.mounted) return;
     state = results;
   }
 
   Future<void> reload() async {
+    final studentId = _getStudentId();
+    if (studentId != null) {
+      final user = ref.read(authProvider);
+      final sec = user?.section?.trim();
+      if (sec != null && sec.isNotEmpty) {
+        try {
+          await FirestoreService().syncCloudSubjectsToLocal(force: true);
+          await FirestoreService().syncCloudSectionsToLocal(force: true);
+          await DatabaseHelper().ensureStudentEnrolledInSectionSubjects(studentId, sec);
+        } catch (e) {
+          debugPrint('[StudentCourses] Reload sync error: $e');
+        }
+      }
+    }
     await _loadCourses();
   }
 
@@ -431,6 +458,15 @@ class TeacherScoresNotifier extends Notifier<List<Map<String, dynamic>>> {
     if (section != null) _selectedSection = section;
     if (query != null) _searchQuery = query;
 
+    AppCacheManager.instance.invalidatePrefix('teacher_scores_');
+    try {
+      if (kIsWeb || forceRefresh) {
+        await FirestoreService().syncCloudUsersToLocal(force: true);
+        await FirestoreService().syncCloudSubjectsToLocal(force: true);
+      }
+      await DatabaseHelper().syncCloudQuizzesToLocal(force: forceRefresh || kIsWeb);
+    } catch (_) {}
+
     final cacheKey = 'teacher_scores_${_selectedSection}_$_searchQuery';
     final results = await AppCacheManager.instance.getOrFetch(
       cacheKey,
@@ -439,7 +475,7 @@ class TeacherScoresNotifier extends Notifier<List<Map<String, dynamic>>> {
         query: _searchQuery,
       ),
       ttl: const Duration(minutes: 2),
-      forceRefresh: forceRefresh,
+      forceRefresh: true,
     );
     if (!ref.mounted) return;
     state = results;

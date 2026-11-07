@@ -481,7 +481,7 @@ packages:
     source: hosted
     version: "4.2.5"
   flutter_web_plugins:
-    dependency: transitive
+    dependency: "direct main"
     description: flutter
     source: sdk
     version: "0.0.0"
@@ -910,7 +910,7 @@ packages:
     source: hosted
     version: "2.4.1"
   shared_preferences_platform_interface:
-    dependency: transitive
+    dependency: "direct main"
     description:
       name: shared_preferences_platform_interface
       sha256: "649dc798a33931919ea356c4305c2d1f81619ea6e92244070b520187b5140ef9"
@@ -918,7 +918,7 @@ packages:
     source: hosted
     version: "2.4.2"
   shared_preferences_web:
-    dependency: transitive
+    dependency: "direct main"
     description:
       name: shared_preferences_web
       sha256: c49bd060261c9a3f0ff445892695d6212ff603ef3115edbb448509d407600019

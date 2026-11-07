@@ -28,8 +28,12 @@ class _AdminWebStudentsScreenState extends ConsumerState<AdminWebStudentsScreen>
   String _selectedGrade = 'Grade 10';
   String _selectedSection = 'All';
   bool _isSpecialView = false;
-  bool _isAllDirectoryView = false;
-  bool _isArchiveView = false; // Archive vault mode
+  bool _isAllDirectoryView = true;
+  String _statusFilter = 'all'; // 'all', 'active', 'inactive'
+  bool get _isArchiveView => _statusFilter == 'inactive';
+  set _isArchiveView(bool val) {
+    _statusFilter = val ? 'inactive' : 'active';
+  }
   String _specialSubFilter = 'All'; // 'All', 'Irregular', 'Transferee', 'SPED', 'Unassigned'
 
   // Multi-select state
@@ -79,25 +83,30 @@ class _AdminWebStudentsScreenState extends ConsumerState<AdminWebStudentsScreen>
         final section = uri.queryParameters['section'];
         final grade = uri.queryParameters['grade'];
 
-        if (filter == 'archived') {
-          _isArchiveView = true;
+        if (filter == 'archived' || filter == 'inactive') {
+          _statusFilter = 'inactive';
           _isSpecialView = false;
           _isAllDirectoryView = false;
           _selectedStudentIds.clear();
+        } else if (filter == 'active') {
+          _statusFilter = 'active';
+          _isSpecialView = false;
+          _isAllDirectoryView = true;
+          _selectedStudentIds.clear();
         } else if (filter == 'unassigned') {
-          _isArchiveView = false;
+          _statusFilter = 'all';
           _isSpecialView = true;
           _isAllDirectoryView = false;
           _specialSubFilter = 'Unassigned';
           _selectedStudentIds.clear();
         } else if (filter == 'special') {
-          _isArchiveView = false;
+          _statusFilter = 'all';
           _isSpecialView = true;
           _isAllDirectoryView = false;
           _specialSubFilter = 'All';
           _selectedStudentIds.clear();
         } else if (filter == 'all') {
-          _isArchiveView = false;
+          _statusFilter = 'all';
           _isAllDirectoryView = true;
           _isSpecialView = false;
           _selectedStudentIds.clear();
@@ -318,24 +327,22 @@ class _AdminWebStudentsScreenState extends ConsumerState<AdminWebStudentsScreen>
       return type != 'regular' || sec == 'unassigned' || sec.isEmpty || hasSpecialNotes;
     }).toList();
 
+    // Determine base pool by status filter (All, Active, Inactive)
+    final List<Map<String, dynamic>> baseStudents;
+    if (_statusFilter == 'inactive') {
+      baseStudents = archivedStudents;
+    } else if (_statusFilter == 'active') {
+      baseStudents = allStudents;
+    } else {
+      baseStudents = [...allStudents, ...archivedStudents];
+    }
+
     // Determine current filtered student list
-    List<Map<String, dynamic>> filteredStudents;
+    List<Map<String, dynamic>> filteredStudents = baseStudents;
     final query = _searchController.text.trim().toLowerCase();
 
-    if (_isArchiveView) {
-      if (query.isNotEmpty) {
-        filteredStudents = archivedStudents.where((s) {
-          final name = (s['full_name'] as String? ?? '').toLowerCase();
-          final email = (s['email'] as String? ?? '').toLowerCase();
-          final sec = (s['section'] as String? ?? '').toLowerCase();
-          final grade = (s['grade'] as String? ?? '').toLowerCase();
-          return name.contains(query) || email.contains(query) || sec.contains(query) || grade.contains(query);
-        }).toList();
-      } else {
-        filteredStudents = archivedStudents;
-      }
-    } else if (query.isNotEmpty) {
-      filteredStudents = allStudents.where((s) {
+    if (query.isNotEmpty) {
+      filteredStudents = baseStudents.where((s) {
         final name = (s['full_name'] as String? ?? '').toLowerCase();
         final email = (s['email'] as String? ?? '').toLowerCase();
         final sec = (s['section'] as String? ?? '').toLowerCase();
@@ -343,7 +350,7 @@ class _AdminWebStudentsScreenState extends ConsumerState<AdminWebStudentsScreen>
         return name.contains(query) || email.contains(query) || sec.contains(query) || grade.contains(query);
       }).toList();
     } else if (_isSpecialView) {
-      filteredStudents = specialStudents.where((s) {
+      filteredStudents = baseStudents.where((s) {
         if (_specialSubFilter == 'All') return true;
         final type = (s['student_type'] as String? ?? '').toLowerCase();
         final sec = (s['section'] as String? ?? '').toLowerCase();
@@ -354,10 +361,10 @@ class _AdminWebStudentsScreenState extends ConsumerState<AdminWebStudentsScreen>
         return true;
       }).toList();
     } else if (_isAllDirectoryView) {
-      filteredStudents = allStudents;
+      filteredStudents = baseStudents;
     } else {
       // Scoped exclusively to the chosen Year Level
-      filteredStudents = allStudents.where((s) {
+      filteredStudents = baseStudents.where((s) {
         final g = s['grade'] as String? ?? '';
         final sec = s['section'] as String? ?? '';
         final matchesGrade = g == _selectedGrade || sec.contains(_selectedGrade);
@@ -515,10 +522,11 @@ class _AdminWebStudentsScreenState extends ConsumerState<AdminWebStudentsScreen>
                         child: Row(
                           mainAxisSize: MainAxisSize.min,
                           children: [
+                            // All Students
                             InkWell(
                               onTap: () {
                                 setState(() {
-                                  _isArchiveView = false;
+                                  _statusFilter = 'all';
                                   _isSelectionMode = false;
                                   _selectedStudentIds.clear();
                                 });
@@ -526,11 +534,59 @@ class _AdminWebStudentsScreenState extends ConsumerState<AdminWebStudentsScreen>
                               borderRadius: BorderRadius.circular(9),
                               child: AnimatedContainer(
                                 duration: const Duration(milliseconds: 180),
-                                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
                                 decoration: BoxDecoration(
-                                  color: !_isArchiveView ? AppTheme.surface : Colors.transparent,
+                                  color: _statusFilter == 'all' ? AppTheme.surface : Colors.transparent,
                                   borderRadius: BorderRadius.circular(9),
-                                  boxShadow: !_isArchiveView
+                                  boxShadow: _statusFilter == 'all'
+                                      ? [
+                                          BoxShadow(
+                                            color: Colors.black.withValues(alpha: 0.06),
+                                            blurRadius: 4,
+                                            offset: const Offset(0, 2),
+                                          ),
+                                        ]
+                                      : null,
+                                ),
+                                child: Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    Icon(
+                                      Icons.school_outlined,
+                                      size: 16,
+                                      color: _statusFilter == 'all' ? AppTheme.primary : AppTheme.textMuted,
+                                    ),
+                                    const SizedBox(width: 8),
+                                    Text(
+                                      'All Students (${allStudents.length + archivedStudents.length})',
+                                      style: TextStyle(
+                                        fontSize: 13,
+                                        fontWeight: _statusFilter == 'all' ? FontWeight.bold : FontWeight.w500,
+                                        color: _statusFilter == 'all' ? AppTheme.text : AppTheme.textMuted,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ),
+                            const SizedBox(width: 4),
+                            // Active Students
+                            InkWell(
+                              onTap: () {
+                                setState(() {
+                                  _statusFilter = 'active';
+                                  _isSelectionMode = false;
+                                  _selectedStudentIds.clear();
+                                });
+                              },
+                              borderRadius: BorderRadius.circular(9),
+                              child: AnimatedContainer(
+                                duration: const Duration(milliseconds: 180),
+                                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                                decoration: BoxDecoration(
+                                  color: _statusFilter == 'active' ? AppTheme.surface : Colors.transparent,
+                                  borderRadius: BorderRadius.circular(9),
+                                  boxShadow: _statusFilter == 'active'
                                       ? [
                                           BoxShadow(
                                             color: Colors.black.withValues(alpha: 0.06),
@@ -546,15 +602,15 @@ class _AdminWebStudentsScreenState extends ConsumerState<AdminWebStudentsScreen>
                                     Icon(
                                       Icons.people_alt_rounded,
                                       size: 16,
-                                      color: !_isArchiveView ? AppTheme.primary : AppTheme.textMuted,
+                                      color: _statusFilter == 'active' ? AppTheme.primary : AppTheme.textMuted,
                                     ),
                                     const SizedBox(width: 8),
                                     Text(
                                       'Active Students (${allStudents.length})',
                                       style: TextStyle(
                                         fontSize: 13,
-                                        fontWeight: !_isArchiveView ? FontWeight.bold : FontWeight.w500,
-                                        color: !_isArchiveView ? AppTheme.text : AppTheme.textMuted,
+                                        fontWeight: _statusFilter == 'active' ? FontWeight.bold : FontWeight.w500,
+                                        color: _statusFilter == 'active' ? AppTheme.text : AppTheme.textMuted,
                                       ),
                                     ),
                                   ],
@@ -562,10 +618,11 @@ class _AdminWebStudentsScreenState extends ConsumerState<AdminWebStudentsScreen>
                               ),
                             ),
                             const SizedBox(width: 4),
+                            // Inactive / Deactivated Accounts
                             InkWell(
                               onTap: () {
                                 setState(() {
-                                  _isArchiveView = true;
+                                  _statusFilter = 'inactive';
                                   _isSelectionMode = false;
                                   _selectedStudentIds.clear();
                                 });
@@ -573,11 +630,11 @@ class _AdminWebStudentsScreenState extends ConsumerState<AdminWebStudentsScreen>
                               borderRadius: BorderRadius.circular(9),
                               child: AnimatedContainer(
                                 duration: const Duration(milliseconds: 180),
-                                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
                                 decoration: BoxDecoration(
-                                  color: _isArchiveView ? AppTheme.surface : Colors.transparent,
+                                  color: _statusFilter == 'inactive' ? AppTheme.surface : Colors.transparent,
                                   borderRadius: BorderRadius.circular(9),
-                                  boxShadow: _isArchiveView
+                                  boxShadow: _statusFilter == 'inactive'
                                       ? [
                                           BoxShadow(
                                             color: Colors.black.withValues(alpha: 0.06),
@@ -593,15 +650,15 @@ class _AdminWebStudentsScreenState extends ConsumerState<AdminWebStudentsScreen>
                                     Icon(
                                       Icons.person_off_outlined,
                                       size: 16,
-                                      color: _isArchiveView ? const Color(0xFFD97706) : AppTheme.textMuted,
+                                      color: _statusFilter == 'inactive' ? const Color(0xFFD97706) : AppTheme.textMuted,
                                     ),
                                     const SizedBox(width: 8),
                                     Text(
-                                      'Deactivated Accounts (${archivedStudents.length})',
+                                      'Inactive Accounts (${archivedStudents.length})',
                                       style: TextStyle(
                                         fontSize: 13,
-                                        fontWeight: _isArchiveView ? FontWeight.bold : FontWeight.w500,
-                                        color: _isArchiveView ? const Color(0xFFD97706) : AppTheme.textMuted,
+                                        fontWeight: _statusFilter == 'inactive' ? FontWeight.bold : FontWeight.w500,
+                                        color: _statusFilter == 'inactive' ? const Color(0xFFD97706) : AppTheme.textMuted,
                                       ),
                                     ),
                                   ],
@@ -914,7 +971,7 @@ class _AdminWebStudentsScreenState extends ConsumerState<AdminWebStudentsScreen>
                           ),
                         ),
                       ),
-                      if (_selectedSection != 'All' || _isSpecialView || _isAllDirectoryView || _selectedGrade != 'Grade 10') ...[
+                      if (_selectedSection != 'All' || _isSpecialView || !_isAllDirectoryView || _searchController.text.isNotEmpty) ...[
                         TextButton.icon(
                           icon: const Icon(Icons.restart_alt, size: 16),
                           label: const Text('Reset Filter', style: TextStyle(fontSize: 12)),
@@ -926,7 +983,7 @@ class _AdminWebStudentsScreenState extends ConsumerState<AdminWebStudentsScreen>
                               _selectedGrade = 'Grade 10';
                               _selectedSection = 'All';
                               _isSpecialView = false;
-                              _isAllDirectoryView = false;
+                              _isAllDirectoryView = true;
                               _specialSubFilter = 'All';
                               _selectedStudentIds.clear();
                               _isSelectionMode = false;
@@ -1650,6 +1707,7 @@ class _AdminWebStudentsScreenState extends ConsumerState<AdminWebStudentsScreen>
               columnSpacing: 18,
               columns: [
                 DataColumn(label: Text(_isArchiveView ? 'DEACTIVATED STUDENT' : 'STUDENT', style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold))),
+                const DataColumn(label: Text('STATUS', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold))),
                 DataColumn(label: Text(_isArchiveView ? 'LAST SECTION' : 'ASSIGNED SECTION', style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold))),
                 const DataColumn(label: Text('GRADE LEVEL', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold))),
                 const DataColumn(label: Text('CLASSIFICATION', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold))),
@@ -1670,6 +1728,7 @@ class _AdminWebStudentsScreenState extends ConsumerState<AdminWebStudentsScreen>
                 final enrolledCount = s['enrolled_courses'] as int? ?? 0;
                 final avgScore = s['avg_score'] as int? ?? 0;
                 final archivedAt = s['archived_at'] as String?;
+                final bool isArchived = s['is_archived'] == 1 || s['is_archived'] == true || s['is_archived'] == '1';
 
                 final hasSection = section != 'Unassigned';
                 final isSelected = _selectedStudentIds.contains(studentId);
@@ -1712,6 +1771,34 @@ class _AdminWebStudentsScreenState extends ConsumerState<AdminWebStudentsScreen>
                             ],
                           ),
                         ],
+                      ),
+                    ),
+
+                    // Status Badge
+                    DataCell(
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                        decoration: BoxDecoration(
+                          color: !isArchived
+                              ? (isDark ? const Color(0xFF064E3B).withValues(alpha: 0.4) : const Color(0xFFECFDF5))
+                              : (isDark ? const Color(0xFF78350F).withValues(alpha: 0.4) : const Color(0xFFFEF3C7)),
+                          borderRadius: BorderRadius.circular(6),
+                          border: Border.all(
+                            color: !isArchived
+                                ? (isDark ? const Color(0xFF059669) : const Color(0xFFA7F3D0))
+                                : (isDark ? const Color(0xFFD97706) : const Color(0xFFFDE68A)),
+                          ),
+                        ),
+                        child: Text(
+                          !isArchived ? 'ACTIVE' : 'INACTIVE',
+                          style: TextStyle(
+                            fontSize: 10.5,
+                            fontWeight: FontWeight.bold,
+                            color: !isArchived
+                                ? (isDark ? const Color(0xFF6EE7B7) : const Color(0xFF047857))
+                                : (isDark ? const Color(0xFFFBBF24) : const Color(0xFFB45309)),
+                          ),
+                        ),
                       ),
                     ),
 
@@ -1826,7 +1913,7 @@ class _AdminWebStudentsScreenState extends ConsumerState<AdminWebStudentsScreen>
                       Row(
                         mainAxisSize: MainAxisSize.min,
                         children: [
-                          if (_isArchiveView) ...[
+                          if (isArchived) ...[
                             OutlinedButton.icon(
                               onPressed: () async {
                                 await ref.read(adminArchivedStudentsProvider.notifier).restoreStudent(studentId);
@@ -1944,6 +2031,7 @@ class _AdminWebStudentsScreenState extends ConsumerState<AdminWebStudentsScreen>
         final enrolledCount = s['enrolled_courses'] as int? ?? 0;
         final avgScore = s['avg_score'] as int? ?? 0;
         final archivedAt = s['archived_at'] as String?;
+        final bool isArchived = s['is_archived'] == 1 || s['is_archived'] == true || s['is_archived'] == '1';
 
         final hasSection = section != 'Unassigned';
         final isSelected = _selectedStudentIds.contains(studentId);
@@ -2017,7 +2105,7 @@ class _AdminWebStudentsScreenState extends ConsumerState<AdminWebStudentsScreen>
               const SizedBox(height: 12),
               Divider(height: 1, color: AppTheme.border),
               const SizedBox(height: 12),
-              if (_isArchiveView) ...[
+              if (isArchived) ...[
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [

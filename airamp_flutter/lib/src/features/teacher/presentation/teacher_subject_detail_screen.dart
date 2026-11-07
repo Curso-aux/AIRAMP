@@ -26,10 +26,12 @@ class TeacherSubjectDetailScreen extends ConsumerStatefulWidget {
   const TeacherSubjectDetailScreen({super.key, required this.subjectId});
 
   @override
-  ConsumerState<TeacherSubjectDetailScreen> createState() => _TeacherSubjectDetailScreenState();
+  ConsumerState<TeacherSubjectDetailScreen> createState() =>
+      _TeacherSubjectDetailScreenState();
 }
 
-class _TeacherSubjectDetailScreenState extends ConsumerState<TeacherSubjectDetailScreen> {
+class _TeacherSubjectDetailScreenState
+    extends ConsumerState<TeacherSubjectDetailScreen> {
   int _selectedTab = 0; // 0 = Curriculum, 1 = My Quizzes
   Map<String, dynamic>? _subject;
   bool _loading = true;
@@ -43,7 +45,9 @@ class _TeacherSubjectDetailScreenState extends ConsumerState<TeacherSubjectDetai
   Future<void> _loadSubject() async {
     final id = int.tryParse(widget.subjectId);
     if (id == null) return;
-    final subject = await ref.read(teacherSubjectsProvider.notifier).getSubjectById(id);
+    final subject = await ref
+        .read(teacherSubjectsProvider.notifier)
+        .getSubjectById(id);
     if (mounted) {
       setState(() {
         _subject = subject;
@@ -120,7 +124,8 @@ class _TeacherSubjectDetailScreenState extends ConsumerState<TeacherSubjectDetai
         body: SafeArea(
           child: AppErrorState(
             title: 'Subject Not Found',
-            message: 'This subject could not be located or may have been deleted.',
+            message:
+                'This subject could not be located or may have been deleted.',
             retryLabel: 'Go Back',
             onRetry: () => Navigator.pop(context),
           ),
@@ -143,7 +148,11 @@ class _TeacherSubjectDetailScreenState extends ConsumerState<TeacherSubjectDetai
         ),
         title: Text(
           subjectName,
-          style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18, color: AppTheme.text),
+          style: TextStyle(
+            fontWeight: FontWeight.bold,
+            fontSize: 18,
+            color: AppTheme.text,
+          ),
         ),
         actions: [
           if (_selectedTab == 1)
@@ -212,7 +221,11 @@ class _TeacherSubjectDetailScreenState extends ConsumerState<TeacherSubjectDetai
                       color: AppTheme.primary.withValues(alpha: 0.12),
                       borderRadius: BorderRadius.circular(12),
                     ),
-                    child: Icon(Icons.menu_book_rounded, color: AppTheme.primary, size: 22),
+                    child: Icon(
+                      Icons.menu_book_rounded,
+                      color: AppTheme.primary,
+                      size: 22,
+                    ),
                   ),
                   const SizedBox(width: 14),
                   Expanded(
@@ -232,14 +245,21 @@ class _TeacherSubjectDetailScreenState extends ConsumerState<TeacherSubjectDetai
                             ),
                             const Spacer(),
                             Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 8,
+                                vertical: 2,
+                              ),
                               decoration: BoxDecoration(
                                 color: AppTheme.primary.withValues(alpha: 0.1),
                                 borderRadius: BorderRadius.circular(6),
                               ),
                               child: Text(
                                 'Teacher Console',
-                                style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: AppTheme.primary),
+                                style: TextStyle(
+                                  fontSize: 10,
+                                  fontWeight: FontWeight.bold,
+                                  color: AppTheme.primary,
+                                ),
                               ),
                             ),
                           ],
@@ -303,8 +323,8 @@ class _TeacherSubjectDetailScreenState extends ConsumerState<TeacherSubjectDetai
             child: _selectedTab == 0
                 ? _buildCurriculumTab()
                 : _selectedTab == 1
-                    ? _buildQuizzesTab()
-                    : _buildAssignmentsTab(),
+                ? _buildQuizzesTab()
+                : _buildAssignmentsTab(),
           ),
         ],
       ),
@@ -323,7 +343,11 @@ class _TeacherSubjectDetailScreenState extends ConsumerState<TeacherSubjectDetai
     );
   }
 
-  Widget _buildTabPill({required int index, required String label, required IconData icon}) {
+  Widget _buildTabPill({
+    required int index,
+    required String label,
+    required IconData icon,
+  }) {
     final isSelected = _selectedTab == index;
     return Expanded(
       child: GestureDetector(
@@ -401,18 +425,30 @@ class _TeacherSubjectDetailScreenState extends ConsumerState<TeacherSubjectDetai
                   color: AppTheme.primary.withValues(alpha: 0.12),
                   shape: BoxShape.circle,
                 ),
-                child: Icon(Icons.menu_book_outlined, size: 40, color: AppTheme.primary),
+                child: Icon(
+                  Icons.menu_book_outlined,
+                  size: 40,
+                  color: AppTheme.primary,
+                ),
               ),
               const SizedBox(height: 20),
               Text(
                 'No Curriculum Topics Yet',
-                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: AppTheme.text),
+                style: TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.bold,
+                  color: AppTheme.text,
+                ),
               ),
               const SizedBox(height: 8),
               Text(
                 'Create course topics, define learning outcomes, and upload real lecture materials (PDF, PPT, Word, Video).',
                 textAlign: TextAlign.center,
-                style: TextStyle(color: AppTheme.textSecondary, fontSize: 13, height: 1.4),
+                style: TextStyle(
+                  color: AppTheme.textSecondary,
+                  fontSize: 13,
+                  height: 1.4,
+                ),
               ),
               const SizedBox(height: 24),
               Wrap(
@@ -423,23 +459,43 @@ class _TeacherSubjectDetailScreenState extends ConsumerState<TeacherSubjectDetai
                   OutlinedButton.icon(
                     onPressed: _openAddTopic,
                     icon: const Icon(Icons.add, size: 18),
-                    label: const Text('Add First Topic', style: TextStyle(fontWeight: FontWeight.bold)),
+                    label: const Text(
+                      'Add First Topic',
+                      style: TextStyle(fontWeight: FontWeight.bold),
+                    ),
                     style: OutlinedButton.styleFrom(
                       foregroundColor: AppTheme.primary,
                       side: BorderSide(color: AppTheme.primary),
-                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 16,
+                        vertical: 12,
+                      ),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
                     ),
                   ),
                   ElevatedButton.icon(
                     onPressed: () => _openPdfUpload(),
-                    icon: const Icon(Icons.picture_as_pdf, color: Colors.white, size: 18),
-                    label: const Text('Upload PDF Module (AI Scan)', style: TextStyle(fontWeight: FontWeight.bold)),
+                    icon: const Icon(
+                      Icons.picture_as_pdf,
+                      color: Colors.white,
+                      size: 18,
+                    ),
+                    label: const Text(
+                      'Upload PDF Module (AI Scan)',
+                      style: TextStyle(fontWeight: FontWeight.bold),
+                    ),
                     style: ElevatedButton.styleFrom(
                       backgroundColor: const Color(0xFFE11D48),
                       foregroundColor: Colors.white,
-                      padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 12),
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 18,
+                        vertical: 12,
+                      ),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
                     ),
                   ),
                 ],
@@ -477,11 +533,18 @@ class _TeacherSubjectDetailScreenState extends ConsumerState<TeacherSubjectDetai
                     children: [
                       Text(
                         'Course Curriculum',
-                        style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: AppTheme.text),
+                        style: TextStyle(
+                          fontSize: 13,
+                          fontWeight: FontWeight.bold,
+                          color: AppTheme.text,
+                        ),
                       ),
                       Text(
                         '${topics.length} Topic${topics.length == 1 ? '' : 's'} · Topics, Outcomes & Materials',
-                        style: TextStyle(fontSize: 11, color: AppTheme.textSecondary),
+                        style: TextStyle(
+                          fontSize: 11,
+                          color: AppTheme.textSecondary,
+                        ),
                       ),
                     ],
                   ),
@@ -489,14 +552,22 @@ class _TeacherSubjectDetailScreenState extends ConsumerState<TeacherSubjectDetai
                 ElevatedButton.icon(
                   onPressed: _openAddTopic,
                   icon: const Icon(Icons.add, size: 14),
-                  label: const Text('Add Topic', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
+                  label: const Text(
+                    'Add Topic',
+                    style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
+                  ),
                   style: ElevatedButton.styleFrom(
                     backgroundColor: AppTheme.primary,
                     foregroundColor: Colors.black,
-                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 12,
+                      vertical: 6,
+                    ),
                     minimumSize: const Size(0, 32),
                     elevation: 0,
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(8),
+                    ),
                   ),
                 ),
                 const SizedBox(width: 8),
@@ -511,15 +582,27 @@ class _TeacherSubjectDetailScreenState extends ConsumerState<TeacherSubjectDetai
                       ),
                     );
                   },
-                  icon: const Icon(Icons.picture_as_pdf, size: 14, color: Colors.white),
-                  label: const Text('Upload PDF', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
+                  icon: const Icon(
+                    Icons.picture_as_pdf,
+                    size: 14,
+                    color: Colors.white,
+                  ),
+                  label: const Text(
+                    'Upload PDF',
+                    style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
+                  ),
                   style: ElevatedButton.styleFrom(
                     backgroundColor: const Color(0xFFE11D48),
                     foregroundColor: Colors.white,
-                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 12,
+                      vertical: 6,
+                    ),
                     minimumSize: const Size(0, 32),
                     elevation: 0,
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(8),
+                    ),
                   ),
                 ),
               ],
@@ -535,7 +618,9 @@ class _TeacherSubjectDetailScreenState extends ConsumerState<TeacherSubjectDetai
               isDialog: false,
               onCompleted: (result) {
                 if (result.success && mounted) {
-                  ref.read(subjectDetailProvider.notifier).loadHierarchy(subjectId);
+                  ref
+                      .read(subjectDetailProvider.notifier)
+                      .loadHierarchy(subjectId);
                 }
               },
             ),
@@ -586,18 +671,30 @@ class _TeacherSubjectDetailScreenState extends ConsumerState<TeacherSubjectDetai
                       color: AppTheme.primary.withValues(alpha: 0.1),
                       shape: BoxShape.circle,
                     ),
-                    child: Icon(Icons.assignment_outlined, size: 44, color: AppTheme.primary),
+                    child: Icon(
+                      Icons.assignment_outlined,
+                      size: 44,
+                      color: AppTheme.primary,
+                    ),
                   ),
                   const SizedBox(height: 20),
                   Text(
                     'No quizzes yet',
-                    style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: AppTheme.text),
+                    style: TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.bold,
+                      color: AppTheme.text,
+                    ),
                   ),
                   const SizedBox(height: 8),
                   Text(
                     'Create your first quiz to assess students, automate grading, and track subject performance.',
                     textAlign: TextAlign.center,
-                    style: TextStyle(color: AppTheme.textSecondary, fontSize: 13, height: 1.4),
+                    style: TextStyle(
+                      color: AppTheme.textSecondary,
+                      fontSize: 13,
+                      height: 1.4,
+                    ),
                   ),
                   const SizedBox(height: 24),
                   ElevatedButton.icon(
@@ -607,8 +704,13 @@ class _TeacherSubjectDetailScreenState extends ConsumerState<TeacherSubjectDetai
                     style: ElevatedButton.styleFrom(
                       backgroundColor: AppTheme.primary,
                       foregroundColor: Colors.black,
-                      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 24,
+                        vertical: 12,
+                      ),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
                       elevation: 2,
                     ),
                   ),
@@ -629,14 +731,23 @@ class _TeacherSubjectDetailScreenState extends ConsumerState<TeacherSubjectDetai
                   children: [
                     Text(
                       'Quizzes (${quizzes.length})',
-                      style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15, color: AppTheme.text),
+                      style: TextStyle(
+                        fontWeight: FontWeight.bold,
+                        fontSize: 15,
+                        color: AppTheme.text,
+                      ),
                     ),
                     ElevatedButton.icon(
                       style: ElevatedButton.styleFrom(
                         backgroundColor: AppTheme.primary,
                         foregroundColor: Colors.black,
-                        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 14,
+                          vertical: 8,
+                        ),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(10),
+                        ),
                         elevation: 1,
                       ),
                       onPressed: () {
@@ -646,7 +757,13 @@ class _TeacherSubjectDetailScreenState extends ConsumerState<TeacherSubjectDetai
                         );
                       },
                       icon: const Icon(Icons.analytics_outlined, size: 16),
-                      label: const Text('Item Analysis', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12)),
+                      label: const Text(
+                        'Item Analysis',
+                        style: TextStyle(
+                          fontWeight: FontWeight.bold,
+                          fontSize: 12,
+                        ),
+                      ),
                     ),
                   ],
                 ),
@@ -688,54 +805,99 @@ class _TeacherSubjectDetailScreenState extends ConsumerState<TeacherSubjectDetai
                           color: AppTheme.primary.withValues(alpha: 0.15),
                           borderRadius: BorderRadius.circular(10),
                         ),
-                        child: Icon(Icons.quiz_outlined, color: AppTheme.primary, size: 20),
+                        child: Icon(
+                          Icons.quiz_outlined,
+                          color: AppTheme.primary,
+                          size: 20,
+                        ),
                       ),
                       const SizedBox(width: 12),
                       Expanded(
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            Text(title, style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: AppTheme.text)),
+                            Text(
+                              title,
+                              style: TextStyle(
+                                fontWeight: FontWeight.bold,
+                                fontSize: 14,
+                                color: AppTheme.text,
+                              ),
+                            ),
                             const SizedBox(height: 2),
                             Text(
                               '$qCount Questions · Pass: $passingScore% · ${timeLimit > 0 ? '$timeLimit mins' : 'No time limit'}',
-                              style: TextStyle(fontSize: 11, color: AppTheme.textSecondary),
+                              style: TextStyle(
+                                fontSize: 11,
+                                color: AppTheme.textSecondary,
+                              ),
                             ),
                           ],
                         ),
                       ),
                       if (status == 'draft')
                         Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 8,
+                            vertical: 3,
+                          ),
                           decoration: BoxDecoration(
                             color: AppTheme.warning.withValues(alpha: 0.15),
                             borderRadius: BorderRadius.circular(4),
                           ),
-                          child: Text('Draft', style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: AppTheme.warning)),
+                          child: Text(
+                            'Draft',
+                            style: TextStyle(
+                              fontSize: 10,
+                              fontWeight: FontWeight.bold,
+                              color: AppTheme.warning,
+                            ),
+                          ),
                         ),
                       IconButton(
-                        icon: Icon(Icons.edit_outlined, color: AppTheme.accent, size: 20),
+                        icon: Icon(
+                          Icons.edit_outlined,
+                          color: AppTheme.accent,
+                          size: 20,
+                        ),
                         tooltip: 'Edit Quiz',
                         onPressed: () async {
-                          final edited = await Navigator.of(context, rootNavigator: true).push<bool>(
-                            MaterialPageRoute(
-                              fullscreenDialog: true,
-                              builder: (ctx) => CreateQuizDialog(
-                                initialSubjectId: int.parse(widget.subjectId),
-                                subjectName: _subject?['name']?.toString() ?? 'Subject',
-                                quizId: qId,
-                              ),
-                            ),
-                          );
+                          final edited =
+                              await Navigator.of(
+                                context,
+                                rootNavigator: true,
+                              ).push<bool>(
+                                MaterialPageRoute(
+                                  fullscreenDialog: true,
+                                  builder: (ctx) => CreateQuizDialog(
+                                    initialSubjectId: int.parse(
+                                      widget.subjectId,
+                                    ),
+                                    subjectName:
+                                        _subject?['name']?.toString() ??
+                                        'Subject',
+                                    quizId: qId,
+                                  ),
+                                ),
+                              );
                           if (edited == true && mounted) {
-                            ref.invalidate(subjectQuizzesProvider(int.parse(widget.subjectId)));
+                            ref.invalidate(
+                              subjectQuizzesProvider(
+                                int.parse(widget.subjectId),
+                              ),
+                            );
                             ref.invalidate(teacherDashboardProvider);
                           }
                         },
                       ),
                       IconButton(
-                        icon: Icon(Icons.delete_outline, color: AppTheme.error, size: 20),
-                        onPressed: () => _confirmDeleteQuiz(context, qId, title, subjectId),
+                        icon: Icon(
+                          Icons.delete_outline,
+                          color: AppTheme.error,
+                          size: 20,
+                        ),
+                        onPressed: () =>
+                            _confirmDeleteQuiz(context, qId, title, subjectId),
                       ),
                     ],
                   ),
@@ -746,9 +908,13 @@ class _TeacherSubjectDetailScreenState extends ConsumerState<TeacherSubjectDetai
                         child: ClipRRect(
                           borderRadius: BorderRadius.circular(4),
                           child: LinearProgressIndicator(
-                            value: assignedCount > 0 ? (compCount / assignedCount) : 0,
+                            value: assignedCount > 0
+                                ? (compCount / assignedCount)
+                                : 0,
                             backgroundColor: AppTheme.border,
-                            valueColor: AlwaysStoppedAnimation<Color>(AppTheme.success),
+                            valueColor: AlwaysStoppedAnimation<Color>(
+                              AppTheme.success,
+                            ),
                             minHeight: 6,
                           ),
                         ),
@@ -756,7 +922,11 @@ class _TeacherSubjectDetailScreenState extends ConsumerState<TeacherSubjectDetai
                       const SizedBox(width: 12),
                       Text(
                         '$compCount / $assignedCount completed',
-                        style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: AppTheme.text),
+                        style: TextStyle(
+                          fontSize: 11,
+                          fontWeight: FontWeight.bold,
+                          color: AppTheme.text,
+                        ),
                       ),
                     ],
                   ),
@@ -769,14 +939,22 @@ class _TeacherSubjectDetailScreenState extends ConsumerState<TeacherSubjectDetai
                             backgroundColor: AppTheme.primary,
                             foregroundColor: Colors.black,
                             padding: const EdgeInsets.symmetric(vertical: 8),
-                            textStyle: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
-                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                            textStyle: const TextStyle(
+                              fontSize: 12,
+                              fontWeight: FontWeight.bold,
+                            ),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(10),
+                            ),
                           ),
                           onPressed: () {
                             Navigator.push(
                               context,
                               MaterialPageRoute(
-                                builder: (ctx) => QuizRosterDialog(quizId: qId, quizTitle: title),
+                                builder: (ctx) => QuizRosterDialog(
+                                  quizId: qId,
+                                  quizTitle: title,
+                                ),
                               ),
                             );
                           },
@@ -791,7 +969,9 @@ class _TeacherSubjectDetailScreenState extends ConsumerState<TeacherSubjectDetai
                             foregroundColor: AppTheme.primary,
                             side: BorderSide(color: AppTheme.primary),
                             padding: const EdgeInsets.symmetric(vertical: 8),
-                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(10),
+                            ),
                           ),
                           onPressed: () {
                             showDialog(
@@ -800,11 +980,16 @@ class _TeacherSubjectDetailScreenState extends ConsumerState<TeacherSubjectDetai
                                 quizId: qId,
                                 quizTitle: title,
                                 subjectId: int.parse(widget.subjectId),
-                                subjectName: _subject?['name']?.toString() ?? 'Subject',
+                                subjectName:
+                                    _subject?['name']?.toString() ?? 'Subject',
                               ),
                             ).then((_) {
                               if (mounted) {
-                                ref.invalidate(subjectQuizzesProvider(int.parse(widget.subjectId)));
+                                ref.invalidate(
+                                  subjectQuizzesProvider(
+                                    int.parse(widget.subjectId),
+                                  ),
+                                );
                                 ref.invalidate(teacherDashboardProvider);
                               }
                             });
@@ -820,7 +1005,9 @@ class _TeacherSubjectDetailScreenState extends ConsumerState<TeacherSubjectDetai
                             foregroundColor: AppTheme.accent,
                             side: BorderSide(color: AppTheme.accent),
                             padding: const EdgeInsets.symmetric(vertical: 8),
-                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(10),
+                            ),
                           ),
                           onPressed: () {
                             QuizItemAnalysisDialog.show(
@@ -844,7 +1031,12 @@ class _TeacherSubjectDetailScreenState extends ConsumerState<TeacherSubjectDetai
     );
   }
 
-  void _confirmDeleteQuiz(BuildContext context, int quizId, String title, int subjectId) {
+  void _confirmDeleteQuiz(
+    BuildContext context,
+    int quizId,
+    String title,
+    int subjectId,
+  ) {
     showDialog(
       context: context,
       builder: (ctx) => AlertDialog(
@@ -866,11 +1058,17 @@ class _TeacherSubjectDetailScreenState extends ConsumerState<TeacherSubjectDetai
                 if (mounted && context.mounted) {
                   ref.invalidate(subjectQuizzesProvider(subjectId));
                   ref.invalidate(teacherDashboardProvider);
-                  AppToast.showSuccess(context, 'Quiz "$title" deleted successfully');
+                  AppToast.showSuccess(
+                    context,
+                    'Quiz "$title" deleted successfully',
+                  );
                 }
               } catch (e) {
                 if (mounted && context.mounted) {
-                  AppToast.showError(context, 'Failed to delete quiz: ${e.toString().replaceFirst("Exception: ", "")}');
+                  AppToast.showError(
+                    context,
+                    'Failed to delete quiz: ${e.toString().replaceFirst("Exception: ", "")}',
+                  );
                 }
               }
             },
@@ -899,14 +1097,21 @@ class _TeacherSubjectDetailScreenState extends ConsumerState<TeacherSubjectDetai
     }
   }
 
-  void _confirmDeleteAssignment(BuildContext context, int assignmentId, String title, int subjectId) {
+  void _confirmDeleteAssignment(
+    BuildContext context,
+    int assignmentId,
+    String title,
+    int subjectId,
+  ) {
     showDialog(
       context: context,
       builder: (ctx) => AlertDialog(
         backgroundColor: AppTheme.surface,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
         title: const Text('Delete Assignment'),
-        content: Text('Are you sure you want to delete "$title" and all student submissions?'),
+        content: Text(
+          'Are you sure you want to delete "$title" and all student submissions?',
+        ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx),
@@ -922,7 +1127,10 @@ class _TeacherSubjectDetailScreenState extends ConsumerState<TeacherSubjectDetai
                 AppToast.showSuccess(context, 'Assignment deleted');
               } catch (e) {
                 if (context.mounted) {
-                  AppToast.showError(context, 'Failed to delete assignment: ${e.toString().replaceFirst("Exception: ", "")}');
+                  AppToast.showError(
+                    context,
+                    'Failed to delete assignment: ${e.toString().replaceFirst("Exception: ", "")}',
+                  );
                 }
               }
             },
@@ -958,27 +1166,49 @@ class _TeacherSubjectDetailScreenState extends ConsumerState<TeacherSubjectDetai
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  Icon(Icons.assignment_outlined, size: 56, color: AppTheme.textMuted),
+                  Icon(
+                    Icons.assignment_outlined,
+                    size: 56,
+                    color: AppTheme.textMuted,
+                  ),
                   const SizedBox(height: 16),
                   Text(
                     'No Assignments Created',
-                    style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: AppTheme.text),
+                    style: TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.bold,
+                      color: AppTheme.text,
+                    ),
                   ),
                   const SizedBox(height: 8),
                   Text(
                     'Create assignments and projects for your students to submit files or project links.',
-                    style: TextStyle(color: AppTheme.textSecondary, fontSize: 13),
+                    style: TextStyle(
+                      color: AppTheme.textSecondary,
+                      fontSize: 13,
+                    ),
                     textAlign: TextAlign.center,
                   ),
                   const SizedBox(height: 24),
                   ElevatedButton.icon(
                     onPressed: _openCreateAssignment,
                     icon: const Icon(Icons.add, color: Colors.black),
-                    label: const Text('Create First Assignment', style: TextStyle(color: Colors.black, fontWeight: FontWeight.bold)),
+                    label: const Text(
+                      'Create First Assignment',
+                      style: TextStyle(
+                        color: Colors.black,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
                     style: ElevatedButton.styleFrom(
                       backgroundColor: AppTheme.primary,
-                      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 20,
+                        vertical: 12,
+                      ),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
                     ),
                   ),
                 ],
@@ -1015,7 +1245,11 @@ class _TeacherSubjectDetailScreenState extends ConsumerState<TeacherSubjectDetai
                             color: AppTheme.primary.withValues(alpha: 0.15),
                             borderRadius: BorderRadius.circular(10),
                           ),
-                          child: Icon(Icons.assignment_outlined, color: AppTheme.primary, size: 20),
+                          child: Icon(
+                            Icons.assignment_outlined,
+                            color: AppTheme.primary,
+                            size: 20,
+                          ),
                         ),
                         const SizedBox(width: 12),
                         Expanded(
@@ -1024,18 +1258,30 @@ class _TeacherSubjectDetailScreenState extends ConsumerState<TeacherSubjectDetai
                             children: [
                               Text(
                                 a.title,
-                                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15, color: AppTheme.text),
+                                style: TextStyle(
+                                  fontWeight: FontWeight.bold,
+                                  fontSize: 15,
+                                  color: AppTheme.text,
+                                ),
                               ),
                               const SizedBox(height: 3),
                               Text(
                                 '${a.totalPoints} pts · Format: ${a.submissionType.toUpperCase()}',
-                                style: TextStyle(fontSize: 12, color: AppTheme.textSecondary),
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  color: AppTheme.textSecondary,
+                                ),
                               ),
-                              if (a.targetSections != null && a.targetSections!.isNotEmpty) ...[
+                              if (a.targetSections != null &&
+                                  a.targetSections!.isNotEmpty) ...[
                                 const SizedBox(height: 4),
                                 Row(
                                   children: [
-                                    Icon(Icons.groups_outlined, size: 13, color: AppTheme.primary),
+                                    Icon(
+                                      Icons.groups_outlined,
+                                      size: 13,
+                                      color: AppTheme.primary,
+                                    ),
                                     const SizedBox(width: 4),
                                     Flexible(
                                       child: Text(
@@ -1055,28 +1301,51 @@ class _TeacherSubjectDetailScreenState extends ConsumerState<TeacherSubjectDetai
                           ),
                         ),
                         IconButton(
-                          icon: Icon(Icons.delete_outline, color: AppTheme.error, size: 20),
+                          icon: Icon(
+                            Icons.delete_outline,
+                            color: AppTheme.error,
+                            size: 20,
+                          ),
                           tooltip: 'Delete Assignment',
-                          onPressed: () => _confirmDeleteAssignment(context, a.id, a.title, subjectId),
+                          onPressed: () => _confirmDeleteAssignment(
+                            context,
+                            a.id,
+                            a.title,
+                            subjectId,
+                          ),
                         ),
                       ],
                     ),
                     const SizedBox(height: 12),
                     Row(
                       children: [
-                        Icon(Icons.people_alt_outlined, size: 14, color: AppTheme.textMuted),
+                        Icon(
+                          Icons.people_alt_outlined,
+                          size: 14,
+                          color: AppTheme.textMuted,
+                        ),
                         const SizedBox(width: 4),
                         Text(
                           '${a.submissionCount} submissions · ${a.gradedCount} graded',
-                          style: TextStyle(fontSize: 12, color: AppTheme.textMuted),
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: AppTheme.textMuted,
+                          ),
                         ),
                         const Spacer(),
                         if (a.dueDate != null && a.dueDate!.isNotEmpty) ...[
-                          Icon(Icons.calendar_today_outlined, size: 13, color: AppTheme.textMuted),
+                          Icon(
+                            Icons.calendar_today_outlined,
+                            size: 13,
+                            color: AppTheme.textMuted,
+                          ),
                           const SizedBox(width: 4),
                           Text(
                             'Due: ${a.dueDate!.substring(0, 10)}',
-                            style: TextStyle(fontSize: 11, color: AppTheme.textMuted),
+                            style: TextStyle(
+                              fontSize: 11,
+                              color: AppTheme.textMuted,
+                            ),
                           ),
                         ],
                       ],
@@ -1095,19 +1364,28 @@ class _TeacherSubjectDetailScreenState extends ConsumerState<TeacherSubjectDetai
                               dueDate: a.dueDate,
                             ),
                           ).then((_) {
-                            ref.invalidate(subjectAssignmentsProvider(subjectId));
+                            ref.invalidate(
+                              subjectAssignmentsProvider(subjectId),
+                            );
                           });
                         },
                         icon: const Icon(Icons.rate_review_outlined, size: 16),
                         label: Text(
-                          a.submissionCount > 0 ? 'Review Submissions (${a.submissionCount})' : 'Review Submissions',
-                          style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+                          a.submissionCount > 0
+                              ? 'Review Submissions (${a.submissionCount})'
+                              : 'Review Submissions',
+                          style: const TextStyle(
+                            fontWeight: FontWeight.bold,
+                            fontSize: 13,
+                          ),
                         ),
                         style: ElevatedButton.styleFrom(
                           backgroundColor: AppTheme.primary,
                           foregroundColor: Colors.black,
                           padding: const EdgeInsets.symmetric(vertical: 10),
-                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(10),
+                          ),
                         ),
                       ),
                     ),

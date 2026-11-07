@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/database/database_helper.dart';
 import '../../../core/utils/cache_manager.dart';
@@ -37,6 +38,14 @@ class TeacherDashboardNotifier extends Notifier<Map<String, dynamic>> {
       if (ref.mounted) state = {};
       return;
     }
+
+    try {
+      await Future.wait([
+        DatabaseHelper().syncCloudQuizzesToLocal(force: forceRefresh || kIsWeb),
+        DatabaseHelper().syncCloudSubmissionsToLocal(force: forceRefresh || kIsWeb),
+        DatabaseHelper().syncCloudAssignmentsToLocal(force: forceRefresh || kIsWeb),
+      ]);
+    } catch (_) {}
 
     final sFilter = (_section == null ||
             _section == 'All' ||

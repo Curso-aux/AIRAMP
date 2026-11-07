@@ -8,7 +8,6 @@ import 'src/routing/app_router.dart';
 import 'src/core/theme/app_theme.dart';
 import 'src/core/theme/theme_provider.dart';
 import 'src/core/database/firestore_service.dart';
-import 'src/core/database/database_helper.dart';
 import 'src/core/services/app_update_service.dart';
 import 'src/core/services/session_draft_service.dart';
 import 'src/core/services/aira_voice_service.dart';
@@ -16,9 +15,11 @@ import 'src/features/auth/application/auth_provider.dart';
 import 'src/features/esp32_hub/data/saved_materials_service.dart';
 import 'src/core/components/aira/global_aira_floating_overlay.dart';
 import 'src/core/components/aira/aira_splash_loading_view.dart';
+import 'src/core/utils/web_plugin_helper.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  ensureWebPluginsInitialized();
 
   // Initialize Firebase Cloud Infrastructure
   try {

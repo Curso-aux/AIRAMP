@@ -36,7 +36,7 @@ class _FakeAdminTeachersNotifier extends AdminTeachersNotifier {
   List<Map<String, dynamic>> build() => teachers;
 
   @override
-  Future<void> loadTeachers() async {}
+  Future<void> loadTeachers({bool syncCloud = true}) async {}
 }
 
 class _FakeSubjectsNotifier extends SubjectsNotifier {

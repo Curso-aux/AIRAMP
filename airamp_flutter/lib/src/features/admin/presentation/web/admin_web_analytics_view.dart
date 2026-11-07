@@ -24,7 +24,6 @@ class AdminWebAnalyticsView extends ConsumerWidget {
     final totalUsers = analytics['totalUsers'] as int? ?? 0;
     final totalStudents = analytics['totalStudents'] as int? ?? 0;
     final totalTeachers = analytics['totalTeachers'] as int? ?? 0;
-    final totalAdmins = analytics['totalAdmins'] as int? ?? 0;
     final totalEnrollments = analytics['totalEnrollments'] as int? ?? 0;
     final totalSubjects = analytics['totalSubjects'] as int? ?? 0;
     final totalLos = analytics['totalLos'] as int? ?? 0;
@@ -149,7 +148,7 @@ class AdminWebAnalyticsView extends ConsumerWidget {
                   builder: (context, constraints) {
                     final card1Subtitle = filter.hasActiveFilters
                         ? '$totalStudents Students matching filters'
-                        : '$totalStudents Students · $totalTeachers Faculty · $totalAdmins Admins';
+                        : '$totalStudents Students · $totalTeachers Faculty';
 
                     final card2Subtitle = filter.subjectName != null
                         ? 'Enrolled in ${filter.subjectName}'
@@ -175,16 +174,21 @@ class AdminWebAnalyticsView extends ConsumerWidget {
                         ? '$passedAttempts of $totalAttempts exams passed ($tfLabel · Avg: $avgScore%)'
                         : '0 exams recorded for active filters ($tfLabel)';
 
+                    final totalSectionsCount = (analytics['totalSections'] as int?) ?? sectionDistribution.length;
+                    final sectionBadge = '$totalSectionsCount ${totalSectionsCount == 1 ? 'Section' : 'Sections'}';
+                    final courseBadge = '$totalSubjects ${totalSubjects == 1 ? 'Course' : 'Courses'}';
+                    final unitBadge = '$totalLos ${totalLos == 1 ? 'Unit' : 'Units'}';
+
                     final card1 = KpiSummaryCard(
                       title: 'Total Users Registered',
                       value: '$totalUsers',
                       subtitle: card1Subtitle,
                       icon: Icons.people_alt_outlined,
                       color: AppTheme.primary,
-                      trendText: '+12.4%',
-                      isPositiveTrend: true,
-                      badgeText: '${sectionDistribution.isNotEmpty ? sectionDistribution.length : 8} Sections',
-                      progress: 0.84,
+                      trendText: totalUsers > 0 ? '$totalStudents active' : 'No records',
+                      isPositiveTrend: totalUsers > 0,
+                      badgeText: sectionBadge,
+                      progress: totalUsers > 0 ? (totalStudents / totalUsers).clamp(0.0, 1.0) : 0.0,
                       isDark: isDark,
                     );
                     final card2 = KpiSummaryCard(
@@ -193,22 +197,24 @@ class AdminWebAnalyticsView extends ConsumerWidget {
                       subtitle: card2Subtitle,
                       icon: Icons.menu_book_outlined,
                       color: AppTheme.accent,
-                      trendText: '+8.2%',
-                      isPositiveTrend: true,
-                      badgeText: '$totalSubjects Courses',
-                      progress: totalEnrollments > 0 ? (totalEnrollments / 150).clamp(0.0, 1.0) : 0.65,
+                      trendText: totalEnrollments > 0 ? '$totalEnrollments enrolled' : '0 enrolled',
+                      isPositiveTrend: totalEnrollments > 0,
+                      badgeText: courseBadge,
+                      progress: (totalSubjects > 0 && totalEnrollments > 0)
+                          ? (totalEnrollments / (totalSubjects * 30)).clamp(0.0, 1.0)
+                          : 0.0,
                       isDark: isDark,
                     );
                     final card3 = KpiSummaryCard(
                       title: 'Student Learning Progress',
-                      value: '${avgScore > 0 ? avgScore : 82}%',
+                      value: '$avgScore%',
                       subtitle: card3Subtitle,
                       icon: Icons.fact_check_outlined,
                       color: AppTheme.warning,
-                      trendText: '+4.1%',
-                      isPositiveTrend: true,
-                      badgeText: '$totalLos Units',
-                      progress: (avgScore > 0 ? avgScore : 82) / 100.0,
+                      trendText: avgScore >= 75 ? 'On Track' : (avgScore > 0 ? 'Needs Review' : 'No Data'),
+                      isPositiveTrend: avgScore >= 75,
+                      badgeText: unitBadge,
+                      progress: (avgScore / 100.0).clamp(0.0, 1.0),
                       isDark: isDark,
                     );
                     final card4 = KpiSummaryCard(
@@ -217,10 +223,10 @@ class AdminWebAnalyticsView extends ConsumerWidget {
                       subtitle: card4Subtitle,
                       icon: Icons.verified_outlined,
                       color: AppTheme.success,
-                      trendText: '+3.8%',
-                      isPositiveTrend: true,
+                      trendText: passRate >= 75 ? 'Target Met' : (totalAttempts > 0 ? 'Below Target' : 'No Exams'),
+                      isPositiveTrend: passRate >= 75,
                       badgeText: 'Target: 75%',
-                      progress: passRate / 100.0,
+                      progress: (passRate / 100.0).clamp(0.0, 1.0),
                       isDark: isDark,
                     );
 

@@ -24,7 +24,11 @@ class AdminWebTeachersScreen extends ConsumerStatefulWidget {
 class _AdminWebTeachersScreenState extends ConsumerState<AdminWebTeachersScreen> {
   final _searchController = TextEditingController();
   String _searchQuery = '';
-  bool _isArchiveView = false;
+  String _statusFilter = 'all'; // 'all', 'active', 'inactive'
+  bool get _isArchiveView => _statusFilter == 'inactive';
+  set _isArchiveView(bool val) {
+    _statusFilter = val ? 'inactive' : 'active';
+  }
   bool _isSelectionMode = false;
   final Set<String> _selectedTeacherIds = {};
 
@@ -74,7 +78,14 @@ class _AdminWebTeachersScreenState extends ConsumerState<AdminWebTeachersScreen>
     final archivedTeachers = ref.watch(adminArchivedTeachersProvider);
     final subjects = ref.watch(subjectsProvider);
 
-    final currentTeachersList = _isArchiveView ? archivedTeachers : teachers;
+    final List<Map<String, dynamic>> currentTeachersList;
+    if (_statusFilter == 'inactive') {
+      currentTeachersList = archivedTeachers;
+    } else if (_statusFilter == 'active') {
+      currentTeachersList = teachers;
+    } else {
+      currentTeachersList = [...teachers, ...archivedTeachers];
+    }
 
     final filteredTeachers = currentTeachersList.where((t) {
       if (_searchQuery.isEmpty) return true;
@@ -216,10 +227,11 @@ class _AdminWebTeachersScreenState extends ConsumerState<AdminWebTeachersScreen>
                     child: Row(
                       mainAxisSize: MainAxisSize.min,
                       children: [
+                        // All Faculty
                         InkWell(
                           onTap: () {
                             setState(() {
-                              _isArchiveView = false;
+                              _statusFilter = 'all';
                               _isSelectionMode = false;
                               _selectedTeacherIds.clear();
                             });
@@ -227,11 +239,59 @@ class _AdminWebTeachersScreenState extends ConsumerState<AdminWebTeachersScreen>
                           borderRadius: BorderRadius.circular(9),
                           child: AnimatedContainer(
                             duration: const Duration(milliseconds: 180),
-                            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
                             decoration: BoxDecoration(
-                              color: !_isArchiveView ? AppTheme.surface : Colors.transparent,
+                              color: _statusFilter == 'all' ? AppTheme.surface : Colors.transparent,
                               borderRadius: BorderRadius.circular(9),
-                              boxShadow: !_isArchiveView
+                              boxShadow: _statusFilter == 'all'
+                                  ? [
+                                      BoxShadow(
+                                        color: Colors.black.withValues(alpha: 0.06),
+                                        blurRadius: 4,
+                                        offset: const Offset(0, 2),
+                                      ),
+                                    ]
+                                  : null,
+                            ),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Icon(
+                                  Icons.school_outlined,
+                                  size: 16,
+                                  color: _statusFilter == 'all' ? AppTheme.primary : AppTheme.textMuted,
+                                ),
+                                const SizedBox(width: 8),
+                                Text(
+                                  'All Faculty (${teachers.length + archivedTeachers.length})',
+                                  style: TextStyle(
+                                    fontSize: 13,
+                                    fontWeight: _statusFilter == 'all' ? FontWeight.bold : FontWeight.w500,
+                                    color: _statusFilter == 'all' ? AppTheme.text : AppTheme.textMuted,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 4),
+                        // Active Faculty
+                        InkWell(
+                          onTap: () {
+                            setState(() {
+                              _statusFilter = 'active';
+                              _isSelectionMode = false;
+                              _selectedTeacherIds.clear();
+                            });
+                          },
+                          borderRadius: BorderRadius.circular(9),
+                          child: AnimatedContainer(
+                            duration: const Duration(milliseconds: 180),
+                            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                            decoration: BoxDecoration(
+                              color: _statusFilter == 'active' ? AppTheme.surface : Colors.transparent,
+                              borderRadius: BorderRadius.circular(9),
+                              boxShadow: _statusFilter == 'active'
                                   ? [
                                       BoxShadow(
                                         color: Colors.black.withValues(alpha: 0.06),
@@ -247,15 +307,15 @@ class _AdminWebTeachersScreenState extends ConsumerState<AdminWebTeachersScreen>
                                 Icon(
                                   Icons.badge_outlined,
                                   size: 16,
-                                  color: !_isArchiveView ? AppTheme.primary : AppTheme.textMuted,
+                                  color: _statusFilter == 'active' ? AppTheme.primary : AppTheme.textMuted,
                                 ),
                                 const SizedBox(width: 8),
                                 Text(
                                   'Active Faculty (${teachers.length})',
                                   style: TextStyle(
                                     fontSize: 13,
-                                    fontWeight: !_isArchiveView ? FontWeight.bold : FontWeight.w500,
-                                    color: !_isArchiveView ? AppTheme.text : AppTheme.textMuted,
+                                    fontWeight: _statusFilter == 'active' ? FontWeight.bold : FontWeight.w500,
+                                    color: _statusFilter == 'active' ? AppTheme.text : AppTheme.textMuted,
                                   ),
                                 ),
                               ],
@@ -263,10 +323,11 @@ class _AdminWebTeachersScreenState extends ConsumerState<AdminWebTeachersScreen>
                           ),
                         ),
                         const SizedBox(width: 4),
+                        // Inactive Faculty
                         InkWell(
                           onTap: () {
                             setState(() {
-                              _isArchiveView = true;
+                              _statusFilter = 'inactive';
                               _isSelectionMode = false;
                               _selectedTeacherIds.clear();
                             });
@@ -274,11 +335,11 @@ class _AdminWebTeachersScreenState extends ConsumerState<AdminWebTeachersScreen>
                           borderRadius: BorderRadius.circular(9),
                           child: AnimatedContainer(
                             duration: const Duration(milliseconds: 180),
-                            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
                             decoration: BoxDecoration(
-                              color: _isArchiveView ? AppTheme.surface : Colors.transparent,
+                              color: _statusFilter == 'inactive' ? AppTheme.surface : Colors.transparent,
                               borderRadius: BorderRadius.circular(9),
-                              boxShadow: _isArchiveView
+                              boxShadow: _statusFilter == 'inactive'
                                   ? [
                                       BoxShadow(
                                         color: Colors.black.withValues(alpha: 0.06),
@@ -294,15 +355,15 @@ class _AdminWebTeachersScreenState extends ConsumerState<AdminWebTeachersScreen>
                                 Icon(
                                   Icons.person_off_outlined,
                                   size: 16,
-                                  color: _isArchiveView ? const Color(0xFFD97706) : AppTheme.textMuted,
+                                  color: _statusFilter == 'inactive' ? const Color(0xFFD97706) : AppTheme.textMuted,
                                 ),
                                 const SizedBox(width: 8),
                                 Text(
-                                  'Deactivated Accounts (${archivedTeachers.length})',
+                                  'Inactive Accounts (${archivedTeachers.length})',
                                   style: TextStyle(
                                     fontSize: 13,
-                                    fontWeight: _isArchiveView ? FontWeight.bold : FontWeight.w500,
-                                    color: _isArchiveView ? const Color(0xFFD97706) : AppTheme.textMuted,
+                                    fontWeight: _statusFilter == 'inactive' ? FontWeight.bold : FontWeight.w500,
+                                    color: _statusFilter == 'inactive' ? const Color(0xFFD97706) : AppTheme.textMuted,
                                   ),
                                 ),
                               ],
@@ -719,6 +780,7 @@ class _AdminWebTeachersScreenState extends ConsumerState<AdminWebTeachersScreen>
                           columnSpacing: 24,
                           columns: [
                             const DataColumn(label: Text('FACULTY MEMBER')),
+                            const DataColumn(label: Text('STATUS')),
                             const DataColumn(label: Text('CONTACT & USERNAME')),
                             const DataColumn(label: Text('ASSIGNED SUBJECTS')),
                             const DataColumn(label: Text('HANDLED SECTIONS')),
@@ -738,6 +800,7 @@ class _AdminWebTeachersScreenState extends ConsumerState<AdminWebTeachersScreen>
                             final handledSections = (teacher['handled_sections'] as List? ?? []).map((s) => s.toString()).toList();
                             final studentCount = teacher['student_count'] as int? ?? 0;
                             final archivedAt = teacher['archived_at'] as String?;
+                            final bool isTeacherArchived = teacher['is_archived'] == 1 || teacher['is_archived'] == true || teacher['is_archived'] == '1';
 
                             return DataRow(
                               selected: _isSelectionMode && isSelected,
@@ -779,16 +842,44 @@ class _AdminWebTeachersScreenState extends ConsumerState<AdminWebTeachersScreen>
                                           ),
                                           const SizedBox(height: 2),
                                           Text(
-                                            _isArchiveView ? 'Deactivated Faculty' : 'Faculty Instructor',
+                                            isTeacherArchived ? 'Deactivated Faculty' : 'Faculty Instructor',
                                             style: TextStyle(
                                               fontSize: 11,
-                                              color: _isArchiveView ? const Color(0xFFD97706) : AppTheme.textSecondary,
+                                              color: isTeacherArchived ? const Color(0xFFD97706) : AppTheme.textSecondary,
                                               fontWeight: FontWeight.w500,
                                             ),
                                           ),
                                         ],
                                       ),
                                     ],
+                                  ),
+                                ),
+
+                                // Status Badge
+                                DataCell(
+                                  Container(
+                                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                                    decoration: BoxDecoration(
+                                      color: !isTeacherArchived
+                                          ? (isDark ? const Color(0xFF064E3B).withValues(alpha: 0.4) : const Color(0xFFECFDF5))
+                                          : (isDark ? const Color(0xFF78350F).withValues(alpha: 0.4) : const Color(0xFFFEF3C7)),
+                                      borderRadius: BorderRadius.circular(6),
+                                      border: Border.all(
+                                        color: !isTeacherArchived
+                                            ? (isDark ? const Color(0xFF059669) : const Color(0xFFA7F3D0))
+                                            : (isDark ? const Color(0xFFD97706) : const Color(0xFFFDE68A)),
+                                      ),
+                                    ),
+                                    child: Text(
+                                      !isTeacherArchived ? 'ACTIVE' : 'INACTIVE',
+                                      style: TextStyle(
+                                        fontSize: 10.5,
+                                        fontWeight: FontWeight.bold,
+                                        color: !isTeacherArchived
+                                            ? (isDark ? const Color(0xFF6EE7B7) : const Color(0xFF047857))
+                                            : (isDark ? const Color(0xFFFBBF24) : const Color(0xFFB45309)),
+                                      ),
+                                    ),
                                   ),
                                 ),
 
@@ -902,7 +993,7 @@ class _AdminWebTeachersScreenState extends ConsumerState<AdminWebTeachersScreen>
 
                                 // Students Reach / Archived At
                                 DataCell(
-                                  _isArchiveView
+                                  isTeacherArchived
                                       ? Row(
                                           mainAxisSize: MainAxisSize.min,
                                           children: [
@@ -968,7 +1059,7 @@ class _AdminWebTeachersScreenState extends ConsumerState<AdminWebTeachersScreen>
 
                                 // Action Buttons
                                 DataCell(
-                                  _isArchiveView
+                                  isTeacherArchived
                                       ? Row(
                                           mainAxisSize: MainAxisSize.min,
                                           children: [

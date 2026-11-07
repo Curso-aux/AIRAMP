@@ -11,6 +11,7 @@ import '../../../../core/database/database_helper.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../../core/theme/theme_provider.dart';
 import '../../../../core/services/session_draft_service.dart';
+import '../../../../core/utils/image_compress_helper.dart';
 import '../../../auth/application/auth_provider.dart';
 import '../../../submissions/data/submissions_repository.dart';
 
@@ -115,18 +116,45 @@ class _AssignmentRosterDialogState extends ConsumerState<AssignmentRosterDialog>
 
   void _openImagePreview(String? imagePath, String? imageBytes, String studentName) {
     Widget imageWidget;
-    if (imageBytes != null && imageBytes.isNotEmpty) {
-      try {
-        final decoded = base64Decode(imageBytes);
-        imageWidget = Image.memory(decoded, fit: BoxFit.contain);
-      } catch (_) {
-        imageWidget = const Icon(Icons.broken_image, size: 60, color: Colors.grey);
-      }
+    final decodedBytes = ImageCompressHelper.safeDecodeBase64(imageBytes);
+    if (decodedBytes != null && decodedBytes.isNotEmpty) {
+      imageWidget = Image.memory(
+        decodedBytes,
+        fit: BoxFit.contain,
+        errorBuilder: (_, _, _) => const Icon(Icons.broken_image, size: 60, color: Colors.grey),
+      );
     } else if (imagePath != null && imagePath.isNotEmpty) {
       if (!kIsWeb && File(imagePath).existsSync()) {
         imageWidget = Image.file(File(imagePath), fit: BoxFit.contain);
+      } else if (imagePath.startsWith('http://') || imagePath.startsWith('https://')) {
+        imageWidget = Image.network(
+          imagePath,
+          fit: BoxFit.contain,
+          errorBuilder: (_, _, _) => const Icon(Icons.broken_image, size: 60, color: Colors.grey),
+        );
       } else {
-        imageWidget = Image.network(imagePath, fit: BoxFit.contain, errorBuilder: (_, _, _) => const Icon(Icons.broken_image, size: 60, color: Colors.grey));
+        imageWidget = Center(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Icon(Icons.photo_outlined, size: 56, color: Colors.white70),
+              const SizedBox(height: 12),
+              Text(
+                'Submitted: ${imagePath.split("/").last}',
+                style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 13),
+              ),
+              const SizedBox(height: 6),
+              const Padding(
+                padding: EdgeInsets.symmetric(horizontal: 24),
+                child: Text(
+                  'Image file is stored on student device. Once the student device syncs with AIRAMP, the compressed image displays here automatically.',
+                  style: TextStyle(color: Colors.white70, fontSize: 12),
+                  textAlign: TextAlign.center,
+                ),
+              ),
+            ],
+          ),
+        );
       }
     } else {
       return;
@@ -167,16 +195,19 @@ class _AssignmentRosterDialogState extends ConsumerState<AssignmentRosterDialog>
 
   Future<void> _openFile(String? fileName, String? filePath, String? fileBytes) async {
     try {
-      if (fileBytes != null && fileBytes.isNotEmpty) {
+      if (fileBytes != null && fileBytes.trim().isNotEmpty) {
+        final cleanB64 = ImageCompressHelper.cleanBase64(fileBytes);
+        final isPdf = (fileName ?? '').toLowerCase().endsWith('.pdf');
+        final mimeType = isPdf ? 'application/pdf' : 'application/octet-stream';
         if (kIsWeb) {
-          final dataUri = Uri.parse('data:application/octet-stream;base64,$fileBytes');
+          final dataUri = Uri.parse('data:$mimeType;base64,$cleanB64');
           await launchUrl(dataUri);
           return;
         }
         final tempDir = await getTemporaryDirectory();
         final cleanName = (fileName != null && fileName.isNotEmpty) ? fileName : 'student_submission.pdf';
         final file = File('${tempDir.path}/$cleanName');
-        await file.writeAsBytes(base64Decode(fileBytes));
+        await file.writeAsBytes(base64Decode(cleanB64));
         final uri = Uri.file(file.path);
         await launchUrl(uri, mode: LaunchMode.externalApplication);
         return;
@@ -788,11 +819,33 @@ class _AssignmentRosterDialogState extends ConsumerState<AssignmentRosterDialog>
                                                 width: 44,
                                                 height: 44,
                                                 color: AppTheme.background,
-                                                child: imageBytes != null && imageBytes.isNotEmpty
-                                                    ? Image.memory(base64Decode(imageBytes), fit: BoxFit.cover, errorBuilder: (_, _, _) => Icon(Icons.image, color: AppTheme.primary))
-                                                    : (imagePath != null && !kIsWeb && File(imagePath).existsSync()
-                                                        ? Image.file(File(imagePath), fit: BoxFit.cover, errorBuilder: (_, _, _) => Icon(Icons.image, color: AppTheme.primary))
-                                                        : Icon(Icons.image, color: AppTheme.primary)),
+                                                child: Builder(
+                                                  builder: (context) {
+                                                    final decoded = ImageCompressHelper.safeDecodeBase64(imageBytes);
+                                                    if (decoded != null && decoded.isNotEmpty) {
+                                                      return Image.memory(
+                                                        decoded,
+                                                        fit: BoxFit.cover,
+                                                        errorBuilder: (_, _, _) => Icon(Icons.image, color: AppTheme.primary),
+                                                      );
+                                                    }
+                                                    if (imagePath != null && !kIsWeb && File(imagePath).existsSync()) {
+                                                      return Image.file(
+                                                        File(imagePath),
+                                                        fit: BoxFit.cover,
+                                                        errorBuilder: (_, _, _) => Icon(Icons.image, color: AppTheme.primary),
+                                                      );
+                                                    }
+                                                    if (imagePath != null && (imagePath.startsWith('http://') || imagePath.startsWith('https://'))) {
+                                                      return Image.network(
+                                                        imagePath,
+                                                        fit: BoxFit.cover,
+                                                        errorBuilder: (_, _, _) => Icon(Icons.image, color: AppTheme.primary),
+                                                      );
+                                                    }
+                                                    return Icon(Icons.image, color: AppTheme.primary);
+                                                  },
+                                                ),
                                               ),
                                             ),
                                             const SizedBox(width: 10),

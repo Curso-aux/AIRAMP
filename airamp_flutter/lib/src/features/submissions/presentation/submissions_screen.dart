@@ -9,6 +9,7 @@ import '../../../core/components/skeleton_loader.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/theme/theme_provider.dart';
 import '../../../core/services/session_draft_service.dart';
+import '../../../core/utils/image_compress_helper.dart';
 import '../../auth/application/auth_provider.dart';
 import '../data/submissions_repository.dart';
 
@@ -123,13 +124,14 @@ class _SubmissionsScreenState extends ConsumerState<SubmissionsScreen> {
       );
       if (files.isNotEmpty) {
         final file = files.first;
-        final size = await file.length();
-        final bytes = await file.readAsBytes();
+        final rawBytes = await file.readAsBytes();
+        // Downscale image automatically to ensure cloud sync stays well below 500KB
+        final compressedBytes = await ImageCompressHelper.compressImage(rawBytes, maxDimension: 1200);
         setState(() {
           _pickedImageName = file.name;
-          _pickedImageSize = size;
+          _pickedImageSize = compressedBytes.lengthInBytes;
           _pickedImagePath = file.path;
-          _pickedImageBytes = bytes;
+          _pickedImageBytes = compressedBytes;
         });
       }
     } catch (e) {
@@ -466,6 +468,7 @@ class _SubmissionsScreenState extends ConsumerState<SubmissionsScreen> {
             backgroundColor: AppTheme.success,
           ),
         );
+        context.go('/student/home');
       }
     } catch (e) {
       if (mounted) {

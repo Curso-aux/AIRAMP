@@ -316,6 +316,11 @@ class AuthRepository {
 
     // Pre-warm local cache with all users for instant display across directories and analytics
     unawaited(FirestoreService().syncCloudUsersToLocal(force: true));
+    unawaited(FirestoreService().syncCloudSubjectsToLocal(force: true));
+    unawaited(FirestoreService().syncCloudSectionsToLocal(force: true));
+    if (role == 'student' && user['section'] != null && user['section'].toString().isNotEmpty) {
+      unawaited(DatabaseHelper().ensureStudentEnrolledInSectionSubjects(userId, user['section'].toString()));
+    }
 
     return {
       'user': {
@@ -494,6 +499,10 @@ class AuthRepository {
               'created_at': DateTime.now().toIso8601String(),
             });
           } catch (_) {}
+          // Pre-warm local cache on Web refresh so in-memory SQLite is populated with all users, subjects, and sections
+          unawaited(FirestoreService().syncCloudUsersToLocal(force: true));
+          unawaited(FirestoreService().syncCloudSubjectsToLocal(force: true));
+          unawaited(FirestoreService().syncCloudSectionsToLocal(force: true));
           return AuthSession(
             session: savedToken,
             userId: savedUserId,

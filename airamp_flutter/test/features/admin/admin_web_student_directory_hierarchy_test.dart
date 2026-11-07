@@ -14,7 +14,7 @@ class MockAdminStudentsNotifier extends AdminStudentsNotifier {
   List<Map<String, dynamic>> build() => _mock;
 
   @override
-  Future<void> loadStudents({String? section, String? grade, String? query}) async {
+  Future<void> loadStudents({String? section, String? grade, String? query, bool syncCloud = true}) async {
     state = _mock;
   }
 }

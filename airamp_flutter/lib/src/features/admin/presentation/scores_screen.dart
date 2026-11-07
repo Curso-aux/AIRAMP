@@ -62,11 +62,12 @@ class _ScoresScreenState extends ConsumerState<ScoresScreen> {
         : 'All Sections';
     _searchController.addListener(_onSearchChanged);
 
-    if (_activeSection != 'All Sections') {
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        ref.read(teacherScoresProvider.notifier).loadScores(section: _activeSection);
-      });
-    }
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      ref.read(teacherScoresProvider.notifier).loadScores(
+            section: _activeSection,
+            forceRefresh: true,
+          );
+    });
   }
 
   @override
@@ -367,7 +368,7 @@ class _ScoresScreenState extends ConsumerState<ScoresScreen> {
                               actionLabel: 'Refresh Scores',
                               actionIcon: Icons.refresh_rounded,
                               onAction: () {
-                                ref.read(teacherScoresProvider.notifier).loadScores();
+                                ref.read(teacherScoresProvider.notifier).loadScores(forceRefresh: true);
                               },
                             )
                 else ...[

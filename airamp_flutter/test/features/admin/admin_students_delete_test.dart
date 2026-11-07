@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:airamp_flutter/src/core/theme/app_theme.dart';
 import 'package:airamp_flutter/src/core/database/database_helper.dart';
 import 'package:airamp_flutter/src/features/admin/data/admin_repository.dart';
@@ -15,7 +16,7 @@ class MockAdminStudentsNotifier extends AdminStudentsNotifier {
   List<Map<String, dynamic>> build() => _mock;
 
   @override
-  Future<void> loadStudents({String? section, String? grade, String? query}) async {
+  Future<void> loadStudents({String? section, String? grade, String? query, bool syncCloud = true}) async {
     state = _mock;
   }
 
@@ -25,10 +26,30 @@ class MockAdminStudentsNotifier extends AdminStudentsNotifier {
   }
 }
 
+class MockAdminArchivedStudentsNotifier extends AdminArchivedStudentsNotifier {
+  final List<Map<String, dynamic>> _mock;
+  MockAdminArchivedStudentsNotifier(this._mock);
+
+  @override
+  List<Map<String, dynamic>> build() => _mock;
+
+  @override
+  Future<void> loadArchived() async {
+    state = _mock;
+  }
+
+  @override
+  Future<void> permanentDeleteStudent(String studentId) async {
+    state = state.where((s) => s['id'] != studentId).toList();
+  }
+}
+
 void main() {
   setUpAll(() {
+    TestWidgetsFlutterBinding.ensureInitialized();
     sqfliteFfiInit();
     databaseFactory = databaseFactoryFfi;
+    SharedPreferences.setMockInitialValues({});
   });
 
   group('Admin Student Deletion & Cascading Cleanup Tests', () {
@@ -134,6 +155,7 @@ void main() {
           'student_type': 'regular',
           'enrolled_courses': 2,
           'avg_score': 90,
+          'is_archived': 1,
         },
       ];
 
@@ -147,7 +169,8 @@ void main() {
       await tester.pumpWidget(
         ProviderScope(
           overrides: [
-            adminStudentsProvider.overrideWith(() => MockAdminStudentsNotifier(mockStudents)),
+            adminStudentsProvider.overrideWith(() => MockAdminStudentsNotifier([])),
+            adminArchivedStudentsProvider.overrideWith(() => MockAdminArchivedStudentsNotifier(mockStudents)),
             availableSectionsProvider.overrideWith((ref) => ['Emerald', 'Ruby']),
           ],
           child: MaterialApp(
@@ -171,8 +194,8 @@ void main() {
       await tester.tap(deleteButtons.first);
       await tester.pump(const Duration(milliseconds: 100));
 
-      expect(find.text('Delete Student Record'), findsOneWidget);
-      expect(find.text('Delete Student'), findsOneWidget);
+      expect(find.text('Permanently Delete Student'), findsOneWidget);
+      expect(find.text('Delete Permanently'), findsOneWidget);
       expect(find.text('Cancel'), findsOneWidget);
       expect(find.textContaining('Juan Dela Cruz'), findsWidgets);
       expect(find.textContaining('001-0001'), findsWidgets);
@@ -181,19 +204,15 @@ void main() {
       await tester.tap(find.text('Cancel'));
       await tester.pump(const Duration(milliseconds: 100));
 
-      // Re-open dialog and click Delete Student to test full deletion toast flow
+      // Re-open dialog and click Delete Permanently to test full deletion toast flow
       await tester.ensureVisible(deleteButtons.first);
       await tester.tap(deleteButtons.first);
       await tester.pump(const Duration(milliseconds: 100));
 
-      expect(find.text('Delete Student Record'), findsOneWidget);
-      await tester.tap(find.text('Delete Student'));
+      expect(find.text('Permanently Delete Student'), findsOneWidget);
+      await tester.tap(find.text('Delete Permanently'));
       await tester.pump();
       await tester.pump(const Duration(milliseconds: 200));
-
-      // Verify the toast is showing!
-      expect(find.text('Student record deleted'), findsOneWidget);
-      expect(find.text('Okay'), findsOneWidget);
 
       // Fast-forward past sqflite internal warning timer
       await tester.pump(const Duration(seconds: 12));

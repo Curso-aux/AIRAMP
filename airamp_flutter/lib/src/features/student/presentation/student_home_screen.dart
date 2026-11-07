@@ -43,7 +43,9 @@ class _StudentHomeScreenState extends ConsumerState<StudentHomeScreen> {
         ref.invalidate(announcementsProvider);
         final user = ref.read(authProvider);
         if (user != null) {
-          ref.invalidate(studentAssignmentsProvider((studentId: user.id, subjectId: null)));
+          ref.invalidate(
+            studentAssignmentsProvider((studentId: user.id, subjectId: null)),
+          );
         }
       }
     });
@@ -77,13 +79,13 @@ class _StudentHomeScreenState extends ConsumerState<StudentHomeScreen> {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (context.mounted) context.go('/student/profile');
       });
-      return const Scaffold(
-        body: Center(child: CircularProgressIndicator()),
-      );
+      return const Scaffold(body: Center(child: CircularProgressIndicator()));
     }
 
     final assignedQuizzes = ref.watch(studentQuizAssignmentsProvider);
-    final pendingQuizzes = assignedQuizzes.where((q) => q['status'] == 'pending').toList();
+    final pendingQuizzes = assignedQuizzes
+        .where((q) => q['status'] == 'pending')
+        .toList();
 
     // Filter announcements for students (considering audience and section)
     final studentSection = currentUser.section?.trim().toLowerCase();
@@ -108,7 +110,8 @@ class _StudentHomeScreenState extends ConsumerState<StudentHomeScreen> {
     Map<String, dynamic>? activeCourse;
     if (courses.isNotEmpty) {
       activeCourse = courses.firstWhere(
-        (c) => ((c['completed_los'] as int? ?? 0) < (c['total_los'] as int? ?? 1)),
+        (c) =>
+            ((c['completed_los'] as int? ?? 0) < (c['total_los'] as int? ?? 1)),
         orElse: () => courses.first,
       );
     }
@@ -129,19 +132,27 @@ class _StudentHomeScreenState extends ConsumerState<StudentHomeScreen> {
             Expanded(
               child: RefreshIndicator(
                 onRefresh: () async {
-                  if (currentUser.section != null && currentUser.section!.isNotEmpty) {
-                    ref.invalidate(sectionSchedulesProvider(currentUser.section!.trim()));
+                  if (currentUser.section != null &&
+                      currentUser.section!.isNotEmpty) {
+                    ref.invalidate(
+                      sectionSchedulesProvider(currentUser.section!.trim()),
+                    );
                   }
                   ref.invalidate(allClassSchedulesProvider);
                   ref.invalidate(scheduledSectionsProvider);
-                  await DatabaseHelper().syncAllCloudData();
+                  await DatabaseHelper().syncAllCloudData(force: true);
                   await Future.wait([
                     ref.read(studentCoursesProvider.notifier).reload(),
                     ref.read(studentProgressProvider.notifier).loadProgress(),
                     ref.read(studentQuizAssignmentsProvider.notifier).reload(),
                   ]);
                   ref.invalidate(announcementsProvider);
-                  ref.invalidate(studentAssignmentsProvider((studentId: currentUser.id, subjectId: null)));
+                  ref.invalidate(
+                    studentAssignmentsProvider((
+                      studentId: currentUser.id,
+                      subjectId: null,
+                    )),
+                  );
                 },
                 color: AppTheme.primary,
                 child: SingleChildScrollView(
@@ -165,13 +176,22 @@ class _StudentHomeScreenState extends ConsumerState<StudentHomeScreen> {
                                 Expanded(
                                   flex: 7,
                                   child: Column(
-                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
                                     children: [
-                                      _buildEsp32OfflineHubCard(context, currentUser),
+                                      _buildEsp32OfflineHubCard(
+                                        context,
+                                        currentUser,
+                                      ),
                                       const SizedBox(height: 24),
-                                      _buildContinueLearningSection(context, activeCourse),
+                                      _buildContinueLearningSection(
+                                        context,
+                                        activeCourse,
+                                      ),
                                       const SizedBox(height: 24),
-                                      StudentScheduleWidget(sectionName: currentUser.section),
+                                      StudentScheduleWidget(
+                                        sectionName: currentUser.section,
+                                      ),
                                     ],
                                   ),
                                 ),
@@ -180,13 +200,22 @@ class _StudentHomeScreenState extends ConsumerState<StudentHomeScreen> {
                                 Expanded(
                                   flex: 5,
                                   child: Column(
-                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
                                     children: [
-                                      _buildQuizzesSection(context, pendingQuizzes),
+                                      _buildQuizzesSection(
+                                        context,
+                                        pendingQuizzes,
+                                      ),
                                       const SizedBox(height: 24),
-                                      _buildAssignmentsSection(context, currentUser.id),
+                                      _buildAssignmentsSection(
+                                        context,
+                                        currentUser.id,
+                                      ),
                                       const SizedBox(height: 24),
-                                      _buildAnnouncementsSection(studentAnnouncements),
+                                      _buildAnnouncementsSection(
+                                        studentAnnouncements,
+                                      ),
                                     ],
                                   ),
                                 ),
@@ -198,15 +227,25 @@ class _StudentHomeScreenState extends ConsumerState<StudentHomeScreen> {
                               children: [
                                 _buildEsp32OfflineHubCard(context, currentUser),
                                 const SizedBox(height: 20),
-                                StudentScheduleWidget(sectionName: currentUser.section),
+                                StudentScheduleWidget(
+                                  sectionName: currentUser.section,
+                                ),
                                 const SizedBox(height: 16),
                                 _buildQuizzesSection(context, pendingQuizzes),
                                 const SizedBox(height: 24),
-                                _buildAssignmentsSection(context, currentUser.id),
+                                _buildAssignmentsSection(
+                                  context,
+                                  currentUser.id,
+                                ),
                                 const SizedBox(height: 32),
-                                _buildAnnouncementsSection(studentAnnouncements),
+                                _buildAnnouncementsSection(
+                                  studentAnnouncements,
+                                ),
                                 const SizedBox(height: 32),
-                                _buildContinueLearningSection(context, activeCourse),
+                                _buildContinueLearningSection(
+                                  context,
+                                  activeCourse,
+                                ),
                               ],
                             ),
                           const SizedBox(height: 100),
@@ -230,10 +269,7 @@ class _StudentHomeScreenState extends ConsumerState<StudentHomeScreen> {
       decoration: BoxDecoration(
         color: AppTheme.surface,
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(
-          color: AppTheme.border,
-          width: 1.0,
-        ),
+        border: Border.all(color: AppTheme.border, width: 1.0),
         boxShadow: [
           BoxShadow(
             color: Colors.black.withValues(alpha: isDark ? 0.2 : 0.03),
@@ -252,14 +288,20 @@ class _StudentHomeScreenState extends ConsumerState<StudentHomeScreen> {
                 width: 44,
                 height: 44,
                 decoration: BoxDecoration(
-                  color: AppTheme.primary.withValues(alpha: isDark ? 0.20 : 0.10),
+                  color: AppTheme.primary.withValues(
+                    alpha: isDark ? 0.20 : 0.10,
+                  ),
                   borderRadius: BorderRadius.circular(12),
                   border: Border.all(
                     color: AppTheme.primary.withValues(alpha: 0.25),
                     width: 1,
                   ),
                 ),
-                child: Icon(Icons.wifi_tethering_rounded, color: AppTheme.primary, size: 22),
+                child: Icon(
+                  Icons.wifi_tethering_rounded,
+                  color: AppTheme.primary,
+                  size: 22,
+                ),
               ),
               const SizedBox(width: 14),
               Expanded(
@@ -282,7 +324,10 @@ class _StudentHomeScreenState extends ConsumerState<StudentHomeScreen> {
                           ),
                         ),
                         Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2.5),
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 7,
+                            vertical: 2.5,
+                          ),
                           decoration: BoxDecoration(
                             color: AppTheme.primary.withValues(alpha: 0.10),
                             borderRadius: BorderRadius.circular(6),
@@ -319,7 +364,8 @@ class _StudentHomeScreenState extends ConsumerState<StudentHomeScreen> {
           ),
           const SizedBox(height: 14),
           ValueListenableBuilder<List<HubMaterialItem>>(
-            valueListenable: SavedMaterialsService.instance.savedMaterialsNotifier,
+            valueListenable:
+                SavedMaterialsService.instance.savedMaterialsNotifier,
             builder: (context, savedList, _) {
               final count = savedList.length;
               return Row(
@@ -333,11 +379,17 @@ class _StudentHomeScreenState extends ConsumerState<StudentHomeScreen> {
                           studentSection: currentUser.section,
                         );
                       },
-                      icon: Icon(Icons.folder_outlined, size: 16, color: AppTheme.primary),
+                      icon: Icon(
+                        Icons.folder_outlined,
+                        size: 16,
+                        color: AppTheme.primary,
+                      ),
                       label: FittedBox(
                         fit: BoxFit.scaleDown,
                         child: Text(
-                          count > 0 ? 'Saved Materials ($count)' : 'Saved Materials',
+                          count > 0
+                              ? 'Saved Materials ($count)'
+                              : 'Saved Materials',
                           style: TextStyle(
                             fontWeight: FontWeight.w600,
                             fontSize: 12.5,
@@ -348,8 +400,13 @@ class _StudentHomeScreenState extends ConsumerState<StudentHomeScreen> {
                       style: OutlinedButton.styleFrom(
                         foregroundColor: AppTheme.text,
                         side: BorderSide(color: AppTheme.border),
-                        padding: const EdgeInsets.symmetric(vertical: 11, horizontal: 10),
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                        padding: const EdgeInsets.symmetric(
+                          vertical: 11,
+                          horizontal: 10,
+                        ),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(10),
+                        ),
                       ),
                     ),
                   ),
@@ -371,14 +428,22 @@ class _StudentHomeScreenState extends ConsumerState<StudentHomeScreen> {
                         fit: BoxFit.scaleDown,
                         child: Text(
                           'Access Materials',
-                          style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+                          style: TextStyle(
+                            fontWeight: FontWeight.bold,
+                            fontSize: 13,
+                          ),
                         ),
                       ),
                       style: ElevatedButton.styleFrom(
                         backgroundColor: AppTheme.primary,
                         foregroundColor: Colors.white,
-                        padding: const EdgeInsets.symmetric(vertical: 11, horizontal: 10),
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                        padding: const EdgeInsets.symmetric(
+                          vertical: 11,
+                          horizontal: 10,
+                        ),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(10),
+                        ),
                         elevation: 0,
                       ),
                     ),
@@ -394,7 +459,9 @@ class _StudentHomeScreenState extends ConsumerState<StudentHomeScreen> {
 
   Widget _buildAssignmentsSection(BuildContext context, String studentId) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    final assignmentsAsync = ref.watch(studentAssignmentsProvider((studentId: studentId, subjectId: null)));
+    final assignmentsAsync = ref.watch(
+      studentAssignmentsProvider((studentId: studentId, subjectId: null)),
+    );
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -411,7 +478,11 @@ class _StudentHomeScreenState extends ConsumerState<StudentHomeScreen> {
                       color: AppTheme.primary.withValues(alpha: 0.15),
                       borderRadius: BorderRadius.circular(10),
                     ),
-                    child: Icon(Icons.assignment_outlined, color: AppTheme.primary, size: 18),
+                    child: Icon(
+                      Icons.assignment_outlined,
+                      color: AppTheme.primary,
+                      size: 18,
+                    ),
                   ),
                   const SizedBox(width: 10),
                   Flexible(
@@ -432,18 +503,29 @@ class _StudentHomeScreenState extends ConsumerState<StudentHomeScreen> {
             ),
             assignmentsAsync.maybeWhen(
               data: (assignments) {
-                final pending = assignments.where((a) => a.submissionId == null).length;
+                final pending = assignments
+                    .where((a) => a.submissionId == null)
+                    .length;
                 if (pending == 0) return const SizedBox.shrink();
                 return Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2.5),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 8,
+                    vertical: 2.5,
+                  ),
                   decoration: BoxDecoration(
-                    color: isDark ? AppTheme.darkSurfaceLight : const Color(0xFFF1F5F9),
+                    color: isDark
+                        ? AppTheme.darkSurfaceLight
+                        : const Color(0xFFF1F5F9),
                     borderRadius: BorderRadius.circular(6),
                     border: Border.all(color: AppTheme.border),
                   ),
                   child: Text(
                     '$pending Due',
-                    style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: AppTheme.textSecondary),
+                    style: TextStyle(
+                      fontSize: 11,
+                      fontWeight: FontWeight.w600,
+                      color: AppTheme.textSecondary,
+                    ),
                   ),
                 );
               },
@@ -464,7 +546,10 @@ class _StudentHomeScreenState extends ConsumerState<StudentHomeScreen> {
               borderRadius: BorderRadius.circular(12),
               border: Border.all(color: AppTheme.border),
             ),
-            child: Text('Failed to load assignments: $e', style: TextStyle(color: AppTheme.textSecondary, fontSize: 12)),
+            child: Text(
+              'Failed to load assignments: $e',
+              style: TextStyle(color: AppTheme.textSecondary, fontSize: 12),
+            ),
           ),
           data: (assignments) {
             if (assignments.isEmpty) {
@@ -483,7 +568,10 @@ class _StudentHomeScreenState extends ConsumerState<StudentHomeScreen> {
                     Expanded(
                       child: Text(
                         'All caught up! No assignments assigned right now.',
-                        style: TextStyle(color: AppTheme.textMuted, fontSize: 13),
+                        style: TextStyle(
+                          color: AppTheme.textMuted,
+                          fontSize: 13,
+                        ),
                       ),
                     ),
                   ],
@@ -494,7 +582,9 @@ class _StudentHomeScreenState extends ConsumerState<StudentHomeScreen> {
             return Column(
               children: assignments.map((a) {
                 final isSubmitted = a.submissionId != null;
-                final isGraded = a.studentSubmissionStatus == 'graded' || a.studentGrade != null;
+                final isGraded =
+                    a.studentSubmissionStatus == 'graded' ||
+                    a.studentGrade != null;
                 final dueDateStr = a.dueDate;
                 DateTime? dueDate;
                 if (dueDateStr != null && dueDateStr.isNotEmpty) {
@@ -502,7 +592,10 @@ class _StudentHomeScreenState extends ConsumerState<StudentHomeScreen> {
                     dueDate = DateTime.parse(dueDateStr);
                   } catch (_) {}
                 }
-                final isOverdue = !isSubmitted && dueDate != null && DateTime.now().isAfter(dueDate);
+                final isOverdue =
+                    !isSubmitted &&
+                    dueDate != null &&
+                    DateTime.now().isAfter(dueDate);
 
                 return Container(
                   margin: const EdgeInsets.only(bottom: 12),
@@ -511,7 +604,9 @@ class _StudentHomeScreenState extends ConsumerState<StudentHomeScreen> {
                     color: AppTheme.surface,
                     borderRadius: BorderRadius.circular(14),
                     border: Border.all(
-                      color: isOverdue ? AppTheme.error.withValues(alpha: 0.5) : AppTheme.border,
+                      color: isOverdue
+                          ? AppTheme.error.withValues(alpha: 0.5)
+                          : AppTheme.border,
                     ),
                   ),
                   child: Column(
@@ -520,7 +615,10 @@ class _StudentHomeScreenState extends ConsumerState<StudentHomeScreen> {
                       Row(
                         children: [
                           Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 8,
+                              vertical: 3,
+                            ),
                             decoration: BoxDecoration(
                               color: AppTheme.primary.withValues(alpha: 0.12),
                               borderRadius: BorderRadius.circular(6),
@@ -537,31 +635,42 @@ class _StudentHomeScreenState extends ConsumerState<StudentHomeScreen> {
                           ),
                           const Spacer(),
                           Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 8,
+                              vertical: 3,
+                            ),
                             decoration: BoxDecoration(
                               color: isGraded
                                   ? AppTheme.success.withValues(alpha: 0.15)
                                   : (isSubmitted
-                                      ? AppTheme.primary.withValues(alpha: 0.15)
-                                      : (isOverdue
-                                          ? AppTheme.error.withValues(alpha: 0.15)
-                                          : AppTheme.border.withValues(alpha: 0.2))),
+                                        ? AppTheme.primary.withValues(
+                                            alpha: 0.15,
+                                          )
+                                        : (isOverdue
+                                              ? AppTheme.error.withValues(
+                                                  alpha: 0.15,
+                                                )
+                                              : AppTheme.border.withValues(
+                                                  alpha: 0.2,
+                                                ))),
                               borderRadius: BorderRadius.circular(6),
                             ),
                             child: Text(
                               isGraded
                                   ? 'Score: ${a.studentGrade?.toStringAsFixed(0)}/${a.totalPoints}'
                                   : (isSubmitted
-                                      ? 'Submitted'
-                                      : (isOverdue ? 'Overdue' : 'Due Soon')),
+                                        ? 'Submitted'
+                                        : (isOverdue ? 'Overdue' : 'Due Soon')),
                               style: TextStyle(
                                 fontSize: 11,
                                 fontWeight: FontWeight.bold,
                                 color: isGraded
                                     ? AppTheme.success
                                     : (isSubmitted
-                                        ? AppTheme.primary
-                                        : (isOverdue ? AppTheme.error : AppTheme.textSecondary)),
+                                          ? AppTheme.primary
+                                          : (isOverdue
+                                                ? AppTheme.error
+                                                : AppTheme.textSecondary)),
                               ),
                             ),
                           ),
@@ -570,13 +679,21 @@ class _StudentHomeScreenState extends ConsumerState<StudentHomeScreen> {
                       const SizedBox(height: 10),
                       Text(
                         a.title,
-                        style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15, color: AppTheme.text),
+                        style: TextStyle(
+                          fontWeight: FontWeight.bold,
+                          fontSize: 15,
+                          color: AppTheme.text,
+                        ),
                       ),
-                      if (a.description != null && a.description!.isNotEmpty) ...[
+                      if (a.description != null &&
+                          a.description!.isNotEmpty) ...[
                         const SizedBox(height: 4),
                         Text(
                           a.description!,
-                          style: TextStyle(fontSize: 12, color: AppTheme.textSecondary),
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: AppTheme.textSecondary,
+                          ),
                           maxLines: 2,
                           overflow: TextOverflow.ellipsis,
                         ),
@@ -584,25 +701,47 @@ class _StudentHomeScreenState extends ConsumerState<StudentHomeScreen> {
                       const SizedBox(height: 10),
                       Row(
                         children: [
-                          Icon(Icons.calendar_today_outlined, size: 12, color: AppTheme.textMuted),
+                          Icon(
+                            Icons.calendar_today_outlined,
+                            size: 12,
+                            color: AppTheme.textMuted,
+                          ),
                           const SizedBox(width: 4),
                           Text(
-                            dueDate != null ? 'Due: ${dueDateStr!.substring(0, 10)}' : 'No deadline',
-                            style: TextStyle(fontSize: 11, color: isOverdue ? AppTheme.error : AppTheme.textMuted),
+                            dueDate != null
+                                ? 'Due: ${dueDateStr!.substring(0, 10)}'
+                                : 'No deadline',
+                            style: TextStyle(
+                              fontSize: 11,
+                              color: isOverdue
+                                  ? AppTheme.error
+                                  : AppTheme.textMuted,
+                            ),
                           ),
                           const SizedBox(width: 14),
-                          Icon(Icons.star_outline, size: 13, color: AppTheme.textMuted),
+                          Icon(
+                            Icons.star_outline,
+                            size: 13,
+                            color: AppTheme.textMuted,
+                          ),
                           const SizedBox(width: 4),
                           Text(
                             '${a.totalPoints} pts',
-                            style: TextStyle(fontSize: 11, color: AppTheme.textMuted),
+                            style: TextStyle(
+                              fontSize: 11,
+                              color: AppTheme.textMuted,
+                            ),
                           ),
                         ],
                       ),
-                      if (a.attachmentName != null && a.attachmentName!.isNotEmpty) ...[
+                      if (a.attachmentName != null &&
+                          a.attachmentName!.isNotEmpty) ...[
                         const SizedBox(height: 8),
                         Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 10,
+                            vertical: 6,
+                          ),
                           decoration: BoxDecoration(
                             color: AppTheme.background,
                             borderRadius: BorderRadius.circular(8),
@@ -611,12 +750,20 @@ class _StudentHomeScreenState extends ConsumerState<StudentHomeScreen> {
                           child: Row(
                             mainAxisSize: MainAxisSize.min,
                             children: [
-                              Icon(Icons.attach_file, size: 14, color: AppTheme.primary),
+                              Icon(
+                                Icons.attach_file,
+                                size: 14,
+                                color: AppTheme.primary,
+                              ),
                               const SizedBox(width: 6),
                               Flexible(
                                 child: Text(
                                   'Handout: ${a.attachmentName}',
-                                  style: TextStyle(fontSize: 11, color: AppTheme.primary, fontWeight: FontWeight.w500),
+                                  style: TextStyle(
+                                    fontSize: 11,
+                                    color: AppTheme.primary,
+                                    fontWeight: FontWeight.w500,
+                                  ),
                                   overflow: TextOverflow.ellipsis,
                                 ),
                               ),
@@ -630,23 +777,43 @@ class _StudentHomeScreenState extends ConsumerState<StudentHomeScreen> {
                         child: ElevatedButton.icon(
                           onPressed: () {
                             context.push('/submissions/${a.id}').then((_) {
-                              ref.invalidate(studentAssignmentsProvider((studentId: studentId, subjectId: null)));
+                              ref.invalidate(
+                                studentAssignmentsProvider((
+                                  studentId: studentId,
+                                  subjectId: null,
+                                )),
+                              );
                             });
                           },
                           icon: Icon(
-                            isSubmitted ? Icons.visibility_outlined : Icons.upload_file,
+                            isSubmitted
+                                ? Icons.visibility_outlined
+                                : Icons.upload_file,
                             size: 16,
                           ),
                           label: Text(
-                            isSubmitted ? 'View / Edit Submission' : 'Submit Assignment',
-                            style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+                            isSubmitted
+                                ? 'View / Edit Submission'
+                                : 'Submit Assignment',
+                            style: const TextStyle(
+                              fontWeight: FontWeight.bold,
+                              fontSize: 13,
+                            ),
                           ),
                           style: ElevatedButton.styleFrom(
-                            backgroundColor: isSubmitted ? AppTheme.surface : AppTheme.primary,
-                            foregroundColor: isSubmitted ? AppTheme.text : Colors.black,
-                            side: isSubmitted ? BorderSide(color: AppTheme.border) : null,
+                            backgroundColor: isSubmitted
+                                ? AppTheme.surface
+                                : AppTheme.primary,
+                            foregroundColor: isSubmitted
+                                ? AppTheme.text
+                                : Colors.black,
+                            side: isSubmitted
+                                ? BorderSide(color: AppTheme.border)
+                                : null,
                             padding: const EdgeInsets.symmetric(vertical: 10),
-                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(10),
+                            ),
                           ),
                         ),
                       ),
@@ -661,7 +828,10 @@ class _StudentHomeScreenState extends ConsumerState<StudentHomeScreen> {
     );
   }
 
-  Widget _buildQuizzesSection(BuildContext context, List<Map<String, dynamic>> pendingQuizzes) {
+  Widget _buildQuizzesSection(
+    BuildContext context,
+    List<Map<String, dynamic>> pendingQuizzes,
+  ) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -678,7 +848,11 @@ class _StudentHomeScreenState extends ConsumerState<StudentHomeScreen> {
                       color: AppTheme.primary.withValues(alpha: 0.15),
                       borderRadius: BorderRadius.circular(10),
                     ),
-                    child: Icon(Icons.quiz_outlined, color: AppTheme.primary, size: 18),
+                    child: Icon(
+                      Icons.quiz_outlined,
+                      color: AppTheme.primary,
+                      size: 18,
+                    ),
                   ),
                   const SizedBox(width: 10),
                   Flexible(
@@ -699,15 +873,24 @@ class _StudentHomeScreenState extends ConsumerState<StudentHomeScreen> {
             ),
             if (pendingQuizzes.isNotEmpty)
               Container(
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2.5),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 8,
+                  vertical: 2.5,
+                ),
                 decoration: BoxDecoration(
-                  color: isDark ? AppTheme.darkSurfaceLight : const Color(0xFFF1F5F9),
+                  color: isDark
+                      ? AppTheme.darkSurfaceLight
+                      : const Color(0xFFF1F5F9),
                   borderRadius: BorderRadius.circular(6),
                   border: Border.all(color: AppTheme.border),
                 ),
                 child: Text(
                   '${pendingQuizzes.length} To Take',
-                  style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: AppTheme.textSecondary),
+                  style: TextStyle(
+                    fontSize: 11,
+                    fontWeight: FontWeight.w600,
+                    color: AppTheme.textSecondary,
+                  ),
                 ),
               ),
           ],
@@ -745,19 +928,24 @@ class _StudentHomeScreenState extends ConsumerState<StudentHomeScreen> {
               physics: const AlwaysScrollableScrollPhysics(),
               itemCount: pendingQuizzes.length,
               separatorBuilder: (context, index) => const SizedBox(height: 12),
-              itemBuilder: (context, index) => _buildQuizCard(pendingQuizzes[index]),
+              itemBuilder: (context, index) =>
+                  _buildQuizCard(pendingQuizzes[index]),
             ),
           )
         else
-          ...pendingQuizzes.map((q) => Padding(
-                padding: const EdgeInsets.only(bottom: 12),
-                child: _buildQuizCard(q),
-              )),
+          ...pendingQuizzes.map(
+            (q) => Padding(
+              padding: const EdgeInsets.only(bottom: 12),
+              child: _buildQuizCard(q),
+            ),
+          ),
       ],
     );
   }
 
-  Widget _buildAnnouncementsSection(List<Map<String, dynamic>> studentAnnouncements) {
+  Widget _buildAnnouncementsSection(
+    List<Map<String, dynamic>> studentAnnouncements,
+  ) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -767,12 +955,20 @@ class _StudentHomeScreenState extends ConsumerState<StudentHomeScreen> {
             Expanded(
               child: Row(
                 children: [
-                  Icon(Icons.campaign_outlined, color: AppTheme.primary, size: 20),
+                  Icon(
+                    Icons.campaign_outlined,
+                    color: AppTheme.primary,
+                    size: 20,
+                  ),
                   const SizedBox(width: 8),
                   Flexible(
                     child: Text(
                       'Announcements',
-                      style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: AppTheme.text),
+                      style: TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.bold,
+                        color: AppTheme.text,
+                      ),
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                     ),
@@ -782,10 +978,17 @@ class _StudentHomeScreenState extends ConsumerState<StudentHomeScreen> {
             ),
             if (studentAnnouncements.isNotEmpty)
               GestureDetector(
-                onTap: () => showStudentAnnouncementsSheet(context, studentAnnouncements),
+                onTap: () => showStudentAnnouncementsSheet(
+                  context,
+                  studentAnnouncements,
+                ),
                 child: Text(
                   'View All (${studentAnnouncements.length})',
-                  style: TextStyle(color: AppTheme.primary, fontSize: 12, fontWeight: FontWeight.bold),
+                  style: TextStyle(
+                    color: AppTheme.primary,
+                    fontSize: 12,
+                    fontWeight: FontWeight.bold,
+                  ),
                 ),
               ),
           ],
@@ -800,13 +1003,17 @@ class _StudentHomeScreenState extends ConsumerState<StudentHomeScreen> {
               borderRadius: BorderRadius.circular(12),
               border: Border.all(color: AppTheme.border),
             ),
-            child: Text('No announcements at this time.', style: TextStyle(color: AppTheme.textMuted)),
+            child: Text(
+              'No announcements at this time.',
+              style: TextStyle(color: AppTheme.textMuted),
+            ),
           )
         else
           _buildAnnouncementCard(
             title: studentAnnouncements.first['title']?.toString() ?? '',
             body: studentAnnouncements.first['message']?.toString() ?? '',
-            priority: studentAnnouncements.first['priority']?.toString() ?? 'medium',
+            priority:
+                studentAnnouncements.first['priority']?.toString() ?? 'medium',
             section: studentAnnouncements.first['section']?.toString(),
             authorName: studentAnnouncements.first['author_name']?.toString(),
           ),
@@ -814,7 +1021,10 @@ class _StudentHomeScreenState extends ConsumerState<StudentHomeScreen> {
     );
   }
 
-  Widget _buildContinueLearningSection(BuildContext context, Map<String, dynamic>? activeCourse) {
+  Widget _buildContinueLearningSection(
+    BuildContext context,
+    Map<String, dynamic>? activeCourse,
+  ) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -824,7 +1034,11 @@ class _StudentHomeScreenState extends ConsumerState<StudentHomeScreen> {
             const SizedBox(width: 8),
             Text(
               'Continue Learning',
-              style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: AppTheme.text),
+              style: TextStyle(
+                fontSize: 18,
+                fontWeight: FontWeight.bold,
+                color: AppTheme.text,
+              ),
             ),
           ],
         ),
@@ -847,11 +1061,18 @@ class _StudentHomeScreenState extends ConsumerState<StudentHomeScreen> {
             ),
             child: Column(
               children: [
-                Icon(Icons.school_outlined, size: 36, color: AppTheme.textMuted),
+                Icon(
+                  Icons.school_outlined,
+                  size: 36,
+                  color: AppTheme.textMuted,
+                ),
                 const SizedBox(height: 8),
                 Text(
                   'Enroll in a course to begin learning',
-                  style: TextStyle(color: AppTheme.text, fontWeight: FontWeight.w600),
+                  style: TextStyle(
+                    color: AppTheme.text,
+                    fontWeight: FontWeight.w600,
+                  ),
                 ),
                 const SizedBox(height: 12),
                 ElevatedButton(
@@ -859,9 +1080,14 @@ class _StudentHomeScreenState extends ConsumerState<StudentHomeScreen> {
                   style: ElevatedButton.styleFrom(
                     backgroundColor: AppTheme.primary,
                     foregroundColor: Colors.white,
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(8),
+                    ),
                   ),
-                  child: const Text('Browse Courses', style: TextStyle(fontWeight: FontWeight.bold)),
+                  child: const Text(
+                    'Browse Courses',
+                    style: TextStyle(fontWeight: FontWeight.bold),
+                  ),
                 ),
               ],
             ),
@@ -869,7 +1095,6 @@ class _StudentHomeScreenState extends ConsumerState<StudentHomeScreen> {
       ],
     );
   }
-
 
   Widget _buildAnnouncementCard({
     required String title,
@@ -880,7 +1105,11 @@ class _StudentHomeScreenState extends ConsumerState<StudentHomeScreen> {
   }) {
     final priorityUpper = AnnouncementPriorityHelper.formatUpper(priority);
     final priorityColor = AnnouncementPriorityHelper.getColor(priority);
-    final hasSpecificSec = section != null && section.isNotEmpty && section != 'All Sections' && section != 'All Handled Sections';
+    final hasSpecificSec =
+        section != null &&
+        section.isNotEmpty &&
+        section != 'All Sections' &&
+        section != 'All Handled Sections';
 
     return Container(
       padding: const EdgeInsets.all(16),
@@ -913,7 +1142,10 @@ class _StudentHomeScreenState extends ConsumerState<StudentHomeScreen> {
               if (hasSpecificSec) ...[
                 const SizedBox(width: 6),
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 6,
+                    vertical: 2,
+                  ),
                   decoration: BoxDecoration(
                     color: AppTheme.background,
                     borderRadius: BorderRadius.circular(4),
@@ -921,7 +1153,11 @@ class _StudentHomeScreenState extends ConsumerState<StudentHomeScreen> {
                   ),
                   child: Text(
                     'Section: $section',
-                    style: TextStyle(fontSize: 10, fontWeight: FontWeight.w600, color: AppTheme.textSecondary),
+                    style: TextStyle(
+                      fontSize: 10,
+                      fontWeight: FontWeight.w600,
+                      color: AppTheme.textSecondary,
+                    ),
                   ),
                 ),
               ],
@@ -929,7 +1165,11 @@ class _StudentHomeScreenState extends ConsumerState<StudentHomeScreen> {
               Expanded(
                 child: Text(
                   title,
-                  style: TextStyle(fontWeight: FontWeight.bold, color: AppTheme.text, fontSize: 16),
+                  style: TextStyle(
+                    fontWeight: FontWeight.bold,
+                    color: AppTheme.text,
+                    fontSize: 16,
+                  ),
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                 ),
@@ -993,16 +1233,33 @@ class _StudentHomeScreenState extends ConsumerState<StudentHomeScreen> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(code, style: TextStyle(color: AppTheme.primary, fontSize: 11, fontWeight: FontWeight.bold)),
+                  Text(
+                    code,
+                    style: TextStyle(
+                      color: AppTheme.primary,
+                      fontSize: 11,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
                   const SizedBox(height: 2),
                   Text(
                     subject,
-                    style: TextStyle(fontWeight: FontWeight.bold, color: AppTheme.text, fontSize: 15),
+                    style: TextStyle(
+                      fontWeight: FontWeight.bold,
+                      color: AppTheme.text,
+                      fontSize: 15,
+                    ),
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                   ),
                   const SizedBox(height: 4),
-                  Text('$progressPct% completed', style: TextStyle(color: AppTheme.textSecondary, fontSize: 12)),
+                  Text(
+                    '$progressPct% completed',
+                    style: TextStyle(
+                      color: AppTheme.textSecondary,
+                      fontSize: 12,
+                    ),
+                  ),
                 ],
               ),
             ),
@@ -1023,10 +1280,19 @@ class _StudentHomeScreenState extends ConsumerState<StudentHomeScreen> {
     final quizId = q['quiz_id'];
     final scheduleStart = q['schedule_start']?.toString();
     final scheduleEnd = q['schedule_end']?.toString();
-    final effectiveDeadline = (scheduleEnd != null && scheduleEnd.isNotEmpty) ? scheduleEnd : dueDate;
+    final effectiveDeadline = (scheduleEnd != null && scheduleEnd.isNotEmpty)
+        ? scheduleEnd
+        : dueDate;
 
-    final isDeadlinePassed = effectiveDeadline != null && effectiveDeadline.isNotEmpty && PhilippineTimeHelper.isDatePassed(effectiveDeadline);
-    final isNotYetAvailable = !isDeadlinePassed && scheduleStart != null && scheduleStart.isNotEmpty && !PhilippineTimeHelper.isDatePassed(scheduleStart);
+    final isDeadlinePassed =
+        effectiveDeadline != null &&
+        effectiveDeadline.isNotEmpty &&
+        PhilippineTimeHelper.isDatePassed(effectiveDeadline);
+    final isNotYetAvailable =
+        !isDeadlinePassed &&
+        scheduleStart != null &&
+        scheduleStart.isNotEmpty &&
+        !PhilippineTimeHelper.isDatePassed(scheduleStart);
 
     return Container(
       margin: const EdgeInsets.only(bottom: 12),
@@ -1034,9 +1300,7 @@ class _StudentHomeScreenState extends ConsumerState<StudentHomeScreen> {
       decoration: BoxDecoration(
         color: AppTheme.surface,
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(
-          color: AppTheme.border,
-        ),
+        border: Border.all(color: AppTheme.border),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -1045,14 +1309,21 @@ class _StudentHomeScreenState extends ConsumerState<StudentHomeScreen> {
             children: [
               if (subjectCode.isNotEmpty) ...[
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 6,
+                    vertical: 2,
+                  ),
                   decoration: BoxDecoration(
                     color: AppTheme.primary.withValues(alpha: 0.12),
                     borderRadius: BorderRadius.circular(4),
                   ),
                   child: Text(
                     subjectCode,
-                    style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: AppTheme.primary),
+                    style: TextStyle(
+                      fontSize: 10,
+                      fontWeight: FontWeight.bold,
+                      color: AppTheme.primary,
+                    ),
                   ),
                 ),
                 const SizedBox(width: 8),
@@ -1060,7 +1331,11 @@ class _StudentHomeScreenState extends ConsumerState<StudentHomeScreen> {
               Expanded(
                 child: Text(
                   title,
-                  style: TextStyle(fontWeight: FontWeight.bold, color: AppTheme.text, fontSize: 15),
+                  style: TextStyle(
+                    fontWeight: FontWeight.bold,
+                    color: AppTheme.text,
+                    fontSize: 15,
+                  ),
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                 ),
@@ -1092,7 +1367,10 @@ class _StudentHomeScreenState extends ConsumerState<StudentHomeScreen> {
                 Expanded(
                   child: Text(
                     teacherName,
-                    style: TextStyle(fontSize: 12, color: AppTheme.textSecondary),
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: AppTheme.textSecondary,
+                    ),
                     overflow: TextOverflow.ellipsis,
                   ),
                 ),
@@ -1105,7 +1383,10 @@ class _StudentHomeScreenState extends ConsumerState<StudentHomeScreen> {
             child: isDeadlinePassed
                 ? Container(
                     width: double.infinity,
-                    padding: const EdgeInsets.symmetric(vertical: 9, horizontal: 12),
+                    padding: const EdgeInsets.symmetric(
+                      vertical: 9,
+                      horizontal: 12,
+                    ),
                     decoration: BoxDecoration(
                       color: Theme.of(context).brightness == Brightness.dark
                           ? AppTheme.darkSurfaceLight
@@ -1120,7 +1401,11 @@ class _StudentHomeScreenState extends ConsumerState<StudentHomeScreen> {
                     child: Row(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
-                        Icon(Icons.event_busy_rounded, size: 15, color: AppTheme.textMuted),
+                        Icon(
+                          Icons.event_busy_rounded,
+                          size: 15,
+                          color: AppTheme.textMuted,
+                        ),
                         const SizedBox(width: 6),
                         Text(
                           'Submission Closed (Overdue)',
@@ -1134,58 +1419,91 @@ class _StudentHomeScreenState extends ConsumerState<StudentHomeScreen> {
                     ),
                   )
                 : isNotYetAvailable
-                    ? OutlinedButton.icon(
-                        onPressed: () async {
-                          if (PhilippineTimeHelper.isDatePassed(scheduleStart)) {
-                            if (quizId != null) {
-                              await context.push('/quiz/$quizId');
-                              if (context.mounted) {
-                                ref.read(studentQuizAssignmentsProvider.notifier).reload();
-                                ref.read(studentProgressProvider.notifier).loadProgress();
-                                ref.read(studentCoursesProvider.notifier).reload();
-                              }
-                            }
-                          } else {
-                            final remaining = PhilippineTimeHelper.timeUntil(scheduleStart);
-                            final timeStr = PhilippineTimeHelper.formatRemaining(remaining);
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              SnackBar(
-                                content: Text('Quiz unlocks in $timeStr (at ${PhilippineTimeHelper.formatDateTime(scheduleStart)}). It will automatically unlock!'),
-                                duration: const Duration(seconds: 3),
-                                behavior: SnackBarBehavior.floating,
-                              ),
-                            );
+                ? OutlinedButton.icon(
+                    onPressed: () async {
+                      if (PhilippineTimeHelper.isDatePassed(scheduleStart)) {
+                        if (quizId != null) {
+                          await context.push('/quiz/$quizId');
+                          if (context.mounted) {
+                            ref
+                                .read(studentQuizAssignmentsProvider.notifier)
+                                .reload();
+                            ref
+                                .read(studentProgressProvider.notifier)
+                                .loadProgress();
+                            ref.read(studentCoursesProvider.notifier).reload();
                           }
-                        },
-                        icon: Icon(Icons.lock_clock, size: 16, color: AppTheme.textMuted),
-                        label: Text('Locked — Opens ${PhilippineTimeHelper.formatDateTime(scheduleStart)}', style: TextStyle(fontWeight: FontWeight.bold, color: AppTheme.textMuted)),
-                        style: OutlinedButton.styleFrom(
-                          foregroundColor: AppTheme.textMuted,
-                          side: BorderSide(color: AppTheme.border.withValues(alpha: 0.6)),
-                          padding: const EdgeInsets.symmetric(vertical: 10),
-                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                        ),
-                      )
-                    : ElevatedButton.icon(
-                        onPressed: () async {
-                          if (quizId != null) {
-                            await context.push('/quiz/$quizId');
-                            if (context.mounted) {
-                              ref.read(studentQuizAssignmentsProvider.notifier).reload();
-                              ref.read(studentProgressProvider.notifier).loadProgress();
-                              ref.read(studentCoursesProvider.notifier).reload();
-                            }
-                          }
-                        },
-                        icon: const Icon(Icons.play_arrow, size: 16),
-                        label: const Text('Start Quiz', style: TextStyle(fontWeight: FontWeight.bold)),
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: AppTheme.primary,
-                          foregroundColor: Colors.white,
-                          padding: const EdgeInsets.symmetric(vertical: 10),
-                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                        ),
+                        }
+                      } else {
+                        final remaining = PhilippineTimeHelper.timeUntil(
+                          scheduleStart,
+                        );
+                        final timeStr = PhilippineTimeHelper.formatRemaining(
+                          remaining,
+                        );
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(
+                            content: Text(
+                              'Quiz unlocks in $timeStr (at ${PhilippineTimeHelper.formatDateTime(scheduleStart)}). It will automatically unlock!',
+                            ),
+                            duration: const Duration(seconds: 3),
+                            behavior: SnackBarBehavior.floating,
+                          ),
+                        );
+                      }
+                    },
+                    icon: Icon(
+                      Icons.lock_clock,
+                      size: 16,
+                      color: AppTheme.textMuted,
+                    ),
+                    label: Text(
+                      'Locked — Opens ${PhilippineTimeHelper.formatDateTime(scheduleStart)}',
+                      style: TextStyle(
+                        fontWeight: FontWeight.bold,
+                        color: AppTheme.textMuted,
                       ),
+                    ),
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: AppTheme.textMuted,
+                      side: BorderSide(
+                        color: AppTheme.border.withValues(alpha: 0.6),
+                      ),
+                      padding: const EdgeInsets.symmetric(vertical: 10),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                    ),
+                  )
+                : ElevatedButton.icon(
+                    onPressed: () async {
+                      if (quizId != null) {
+                        await context.push('/quiz/$quizId');
+                        if (context.mounted) {
+                          ref
+                              .read(studentQuizAssignmentsProvider.notifier)
+                              .reload();
+                          ref
+                              .read(studentProgressProvider.notifier)
+                              .loadProgress();
+                          ref.read(studentCoursesProvider.notifier).reload();
+                        }
+                      }
+                    },
+                    icon: const Icon(Icons.play_arrow, size: 16),
+                    label: const Text(
+                      'Start Quiz',
+                      style: TextStyle(fontWeight: FontWeight.bold),
+                    ),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: AppTheme.primary,
+                      foregroundColor: Colors.white,
+                      padding: const EdgeInsets.symmetric(vertical: 10),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                    ),
+                  ),
           ),
         ],
       ),
@@ -1204,7 +1522,20 @@ class _StudentHomeScreenState extends ConsumerState<StudentHomeScreen> {
       final now = PhilippineTimeHelper.now();
       final diff = dt.difference(now);
 
-      const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+      const months = [
+        'Jan',
+        'Feb',
+        'Mar',
+        'Apr',
+        'May',
+        'Jun',
+        'Jul',
+        'Aug',
+        'Sep',
+        'Oct',
+        'Nov',
+        'Dec',
+      ];
       final monthStr = months[dt.month - 1];
       final hour = dt.hour % 12 == 0 ? 12 : dt.hour % 12;
       final minute = dt.minute.toString().padLeft(2, '0');
@@ -1214,10 +1545,13 @@ class _StudentHomeScreenState extends ConsumerState<StudentHomeScreen> {
       if (diff.isNegative) {
         label = 'Overdue ($monthStr ${dt.day})';
         badgeColor = AppTheme.error;
-      } else if (dt.year == now.year && dt.month == now.month && dt.day == now.day) {
+      } else if (dt.year == now.year &&
+          dt.month == now.month &&
+          dt.day == now.day) {
         label = 'Due Today • $timeStr';
         badgeColor = AppTheme.warning;
-      } else if (diff.inHours < 48 && dt.day == now.add(const Duration(days: 1)).day) {
+      } else if (diff.inHours < 48 &&
+          dt.day == now.add(const Duration(days: 1)).day) {
         label = 'Due Tomorrow • $timeStr';
         badgeColor = AppTheme.warning;
       } else if (diff.inDays < 7) {
@@ -1243,7 +1577,11 @@ class _StudentHomeScreenState extends ConsumerState<StudentHomeScreen> {
           const SizedBox(width: 4),
           Text(
             label,
-            style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: badgeColor),
+            style: TextStyle(
+              fontSize: 10,
+              fontWeight: FontWeight.bold,
+              color: badgeColor,
+            ),
           ),
         ],
       ),

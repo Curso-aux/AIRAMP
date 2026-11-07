@@ -9,8 +9,8 @@ class RateLimitInterceptor extends Interceptor {
   final RateLimiter _limiter = RateLimiter();
 
   // Global thresholds across all API requests
-  static const int maxPerSecond = 10;
-  static const int maxPerMinute = 120;
+  static const int maxPerSecond = 30;
+  static const int maxPerMinute = 300;
 
   @override
   void onRequest(RequestOptions options, RequestInterceptorHandler handler) {

@@ -35,7 +35,7 @@ class _StudentCourseDetailScreenState
   @override
   void initState() {
     super.initState();
-    _loadData();
+    _loadData(syncCloud: true);
     _startScheduleTicker();
   }
 
@@ -54,7 +54,7 @@ class _StudentCourseDetailScreenState
     super.dispose();
   }
 
-  Future<void> _loadData({bool syncCloud = false}) async {
+  Future<void> _loadData({bool syncCloud = true, bool force = false}) async {
     final id = int.tryParse(widget.courseId);
     if (id == null) return;
 
@@ -63,11 +63,11 @@ class _StudentCourseDetailScreenState
     if (syncCloud) {
       unawaited(() async {
         try {
-          await DatabaseHelper().syncCloudCurriculumToLocal();
+          await DatabaseHelper().syncCloudCurriculumToLocal(force: force);
           await Future.wait([
-            DatabaseHelper().syncCloudAssignmentsToLocal(),
-            DatabaseHelper().syncCloudQuizzesToLocal(),
-            DatabaseHelper().syncCloudSubmissionsToLocal(),
+            DatabaseHelper().syncCloudAssignmentsToLocal(force: force),
+            DatabaseHelper().syncCloudQuizzesToLocal(force: force),
+            DatabaseHelper().syncCloudSubmissionsToLocal(force: force),
           ]);
           if (mounted) {
             await _loadFromLocal(id);
@@ -208,7 +208,7 @@ class _StudentCourseDetailScreenState
       backgroundColor: AppTheme.background,
       body: SafeArea(
         child: RefreshIndicator(
-          onRefresh: () async => await _loadData(syncCloud: true),
+          onRefresh: () async => await _loadData(syncCloud: true, force: true),
           color: AppTheme.primary,
           child: SingleChildScrollView(
             physics: const AlwaysScrollableScrollPhysics(),

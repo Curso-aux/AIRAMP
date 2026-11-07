@@ -330,7 +330,8 @@ final studentSubmissionProvider = FutureProvider.family<Submission?, ({int assig
 final subjectAssignmentsProvider = FutureProvider.family<List<Assignment>, int>((ref, subjectId) async {
   final repo = ref.watch(submissionsRepositoryProvider);
   try {
-    await DatabaseHelper().syncCloudAssignmentsToLocal();
+    await DatabaseHelper().syncCloudAssignmentsToLocal(force: true);
+    await DatabaseHelper().syncCloudSubmissionsToLocal(force: true);
   } catch (_) {}
   return repo.getAssignmentsForSubject(subjectId);
 });
@@ -338,7 +339,8 @@ final subjectAssignmentsProvider = FutureProvider.family<List<Assignment>, int>(
 final studentAssignmentsProvider = FutureProvider.family<List<Assignment>, ({String studentId, int? subjectId})>((ref, arg) async {
   final repo = ref.watch(submissionsRepositoryProvider);
   try {
-    await DatabaseHelper().syncCloudAssignmentsToLocal();
+    await DatabaseHelper().syncCloudAssignmentsToLocal(force: true);
+    await DatabaseHelper().syncCloudSubmissionsToLocal(force: true);
   } catch (_) {}
   return repo.getAssignmentsForStudent(arg.studentId, subjectId: arg.subjectId);
 });

@@ -142,114 +142,113 @@ final subjectsProvider =
 
 class SubjectsNotifier extends Notifier<List<Map<String, dynamic>>> {
   SubjectsNotifier({Dio? dio});
+  VoidCallback? _syncListener;
+
   @override
   List<Map<String, dynamic>> build() {
+    _syncListener = () async {
+      if (ref.mounted) {
+        final db = await DatabaseHelper().database;
+        await DatabaseHelper().deduplicateSubjects();
+        final fresh = await db.rawQuery('''
+          SELECT s.*,
+                 (SELECT COUNT(DISTINCT e.student_id) 
+                  FROM enrollments e 
+                  WHERE e.subject_id = s.id 
+                    AND (e.status IS NULL OR e.status = 'active')) as enrolled_count
+          FROM subjects s
+          ORDER BY s.id DESC
+        ''');
+        final Map<String, Map<String, dynamic>> deduped = {};
+        for (final s in fresh) {
+          final code = (s['subject_code']?.toString() ?? s['name']?.toString() ?? '').trim().toUpperCase();
+          if (code.isEmpty) continue;
+          if (!deduped.containsKey(code)) {
+            deduped[code] = s;
+          } else {
+            final curCount = (deduped[code]!['enrolled_count'] as num?)?.toInt() ?? 0;
+            final newCount = (s['enrolled_count'] as num?)?.toInt() ?? 0;
+            if (newCount > curCount) {
+              deduped[code] = s;
+            }
+          }
+        }
+        if (ref.mounted) state = deduped.values.toList();
+      }
+    };
+    FirestoreService.addSyncListener(_syncListener!);
+    ref.onDispose(() {
+      if (_syncListener != null) {
+        FirestoreService.removeSyncListener(_syncListener!);
+      }
+    });
+
     _loadSubjects();
     return [];
   }
 
   Future<void> _loadSubjects() async {
     final db = await DatabaseHelper().database;
-    final prefs = await SharedPreferences.getInstance();
-    final deletedSubjects =
-        prefs.getStringList('permanently_deleted_subjects') ?? [];
-
-    // 1. If SQLite in-memory is empty (e.g. Web reload), restore from local persistent cache (localStorage)
     final existingLocal = await db.query('subjects');
-    if (existingLocal.isEmpty) {
-      final cachedStr = prefs.getString('local_cached_subjects_v1');
-      if (cachedStr != null && cachedStr.isNotEmpty) {
-        try {
-          final List<dynamic> decoded = jsonDecode(cachedStr);
-          for (final item in decoded) {
-            if (item is Map) {
-              final m = Map<String, dynamic>.from(item);
-              final code = m['subject_code']?.toString().toUpperCase() ?? '';
-              final name = m['name']?.toString() ?? '';
-              if (!deletedSubjects.contains(code) &&
-                  !deletedSubjects.contains(name)) {
-                await db.insert(
-                  'subjects',
-                  m,
-                  conflictAlgorithm: ConflictAlgorithm.replace,
-                );
-              }
-            }
-          }
-        } catch (_) {}
-      }
-    }
 
-    // 2. Fetch from Cloud Firestore if cache is stale (> 5 mins) or local SQLite is empty
-    final lastFetch = prefs.getInt('last_cloud_fetch_subjects') ?? 0;
-    final nowMs = DateTime.now().millisecondsSinceEpoch;
-    final isStale = (nowMs - lastFetch) > 5 * 60 * 1000;
-
-    if (isStale || existingLocal.isEmpty) {
+    // 1. Instant cache restore + sync from cloud (with REST fallback)
+    await FirestoreService().syncCloudSubjectsToLocal(force: kIsWeb || existingLocal.isEmpty);
+    if (kIsWeb) {
       try {
-        final cloudDocs = await FirestoreService().fetchAllDocuments(
-          'subjects',
-        );
-        if (cloudDocs.isNotEmpty) {
-          await prefs.setInt('last_cloud_fetch_subjects', nowMs);
-          for (final doc in cloudDocs) {
-            final subCode =
-                doc['subject_code']?.toString().toUpperCase() ??
-                doc['id']?.toString().toUpperCase() ??
-                '';
-            final subName = doc['name']?.toString() ?? '';
-            if (deletedSubjects.contains(subCode) ||
-                deletedSubjects.contains(subName)) {
-              continue;
-            }
-            final existing = await db.query(
-              'subjects',
-              where: 'subject_code = ? OR name = ?',
-              whereArgs: [subCode, subName],
-            );
-            if (existing.isEmpty) {
-              await db.insert('subjects', {
-                'name': subName,
-                'subject_code': subCode,
-                'description': doc['description']?.toString() ?? '',
-                'grade_level':
-                    doc['grade_level']?.toString() ??
-                    doc['grade']?.toString() ??
-                    'Grade 10',
-                'semester': doc['semester']?.toString() ?? '1st Semester',
-                'unlock_type': doc['unlock_type']?.toString() ?? 'Flexible',
-                'teacher_id': doc['teacher_id']?.toString(),
-                'teacher_name': doc['teacher_name']?.toString(),
-                'created_at':
-                    doc['created_at']?.toString() ??
-                    DateTime.now().toIso8601String(),
-              }, conflictAlgorithm: ConflictAlgorithm.replace);
-            }
-          }
-        }
-      } catch (e) {
-        debugPrint('[SubjectsNotifier] Cloud sync note: $e');
-      }
+        await FirestoreService().syncCloudSectionsToLocal(force: true);
+        await FirestoreService().syncCloudUsersToLocal(force: true);
+        await DatabaseHelper().reconcileAllEnrollments();
+      } catch (_) {}
     }
+    await DatabaseHelper().deduplicateSubjects();
 
-    // 3. Filter out any deleted tombstones and save active subjects to local cache
+    SharedPreferences? prefs;
+    try {
+      prefs = await SharedPreferences.getInstance();
+    } catch (_) {}
+    final deletedSubjects =
+        prefs?.getStringList('permanently_deleted_subjects') ?? [];
+
+    // 2. Filter out any deleted tombstones and save active subjects to local cache
     for (final del in deletedSubjects) {
       await db.delete(
         'subjects',
-        where: 'subject_code = ? OR name = ?',
-        whereArgs: [del, del],
+        where: 'UPPER(subject_code) = ? OR UPPER(name) = ?',
+        whereArgs: [del.toUpperCase(), del.toUpperCase()],
       );
     }
-    final List<Map<String, dynamic>> maps = await db.query(
-      'subjects',
-      orderBy: 'id DESC',
-    );
-    try {
-      await prefs.setString('local_cached_subjects_v1', jsonEncode(maps));
-    } catch (_) {}
+    final List<Map<String, dynamic>> maps = await db.rawQuery('''
+      SELECT s.*,
+             (SELECT COUNT(DISTINCT e.student_id) 
+              FROM enrollments e 
+              WHERE e.subject_id = s.id 
+                AND (e.status IS NULL OR e.status = 'active')) as enrolled_count
+      FROM subjects s
+      ORDER BY s.id DESC
+    ''');
+    final Map<String, Map<String, dynamic>> deduped = {};
+    for (final s in maps) {
+      final code = (s['subject_code']?.toString() ?? s['name']?.toString() ?? '').trim().toUpperCase();
+      if (code.isEmpty) continue;
+      if (!deduped.containsKey(code)) {
+        deduped[code] = s;
+      } else {
+        final curCount = (deduped[code]!['enrolled_count'] as num?)?.toInt() ?? 0;
+        final newCount = (s['enrolled_count'] as num?)?.toInt() ?? 0;
+        if (newCount > curCount) {
+          deduped[code] = s;
+        }
+      }
+    }
+    final finalSubjects = deduped.values.toList();
+    if (prefs != null) {
+      try {
+        await prefs.setString('local_cached_subjects_v1', jsonEncode(finalSubjects));
+      } catch (_) {}
+    }
 
     if (!ref.mounted) return;
-    state = maps;
+    state = finalSubjects;
   }
 
   Future<int> addSubject(Map<String, dynamic> subject) async {
@@ -266,22 +265,23 @@ class SubjectsNotifier extends Notifier<List<Map<String, dynamic>>> {
     final subName = mutableSubject['name']?.toString().trim() ?? '';
     final docId = subCode.isNotEmpty ? subCode : 'SUBJ_$id';
 
-    // Remove from tombstone if re-created
-    final prefs = await SharedPreferences.getInstance();
-    final deleted = prefs.getStringList('permanently_deleted_subjects') ?? [];
-    if (deleted.contains(subCode) ||
-        deleted.contains(subName) ||
-        deleted.contains(docId)) {
-      deleted.remove(subCode);
-      deleted.remove(subName);
-      deleted.remove(docId);
-      await prefs.setStringList('permanently_deleted_subjects', deleted);
-    }
-    await prefs.setBool('cloud_subjects_initialized', true);
-
-    // Save immediately to persistent local cache!
     final currentMaps = await db.query('subjects', orderBy: 'id DESC');
+
+    // Remove from tombstone if re-created
     try {
+      final prefs = await SharedPreferences.getInstance();
+      final deleted = prefs.getStringList('permanently_deleted_subjects') ?? [];
+      if (deleted.contains(subCode) ||
+          deleted.contains(subName) ||
+          deleted.contains(docId)) {
+        deleted.remove(subCode);
+        deleted.remove(subName);
+        deleted.remove(docId);
+        await prefs.setStringList('permanently_deleted_subjects', deleted);
+      }
+      await prefs.setBool('cloud_subjects_initialized', true);
+
+      // Save immediately to persistent local cache!
       await prefs.setString(
         'local_cached_subjects_v1',
         jsonEncode(currentMaps),
@@ -353,11 +353,20 @@ class SubjectsNotifier extends Notifier<List<Map<String, dynamic>>> {
       } catch (_) {}
     }
 
-    final List<Map<String, dynamic>> maps = await db.query(
-      'subjects',
-      orderBy: 'id DESC',
-    );
-    if (ref.mounted) state = maps;
+    final List<Map<String, dynamic>> maps = await db.rawQuery('''
+      SELECT s.*,
+             (SELECT COUNT(DISTINCT e.student_id) 
+              FROM enrollments e 
+              WHERE e.subject_id = s.id 
+                AND (e.status IS NULL OR e.status = 'active')) as enrolled_count
+      FROM subjects s
+      ORDER BY s.id DESC
+    ''');
+    if (ref.mounted) {
+      state = maps;
+      ref.invalidate(adminTeachersProvider);
+      ref.read(adminAnalyticsProvider.notifier).loadAnalytics();
+    }
   }
 
   Future<void> updateUnlockType(int id, String unlockType) async {
@@ -394,11 +403,20 @@ class SubjectsNotifier extends Notifier<List<Map<String, dynamic>>> {
       } catch (_) {}
     }
 
-    final List<Map<String, dynamic>> maps = await db.query(
-      'subjects',
-      orderBy: 'id DESC',
-    );
-    if (ref.mounted) state = maps;
+    final List<Map<String, dynamic>> maps = await db.rawQuery('''
+      SELECT s.*,
+             (SELECT COUNT(DISTINCT e.student_id) 
+              FROM enrollments e 
+              WHERE e.subject_id = s.id 
+                AND (e.status IS NULL OR e.status = 'active')) as enrolled_count
+      FROM subjects s
+      ORDER BY s.id DESC
+    ''');
+    if (ref.mounted) {
+      state = maps;
+      ref.invalidate(adminTeachersProvider);
+      ref.read(adminAnalyticsProvider.notifier).loadAnalytics();
+    }
   }
 
   Future<void> deleteSubject(int id) async {
@@ -437,22 +455,22 @@ class SubjectsNotifier extends Notifier<List<Map<String, dynamic>>> {
     } catch (_) {}
 
     // Save tombstone in SharedPreferences so it NEVER resurrects!
-    final prefs = await SharedPreferences.getInstance();
-    final deleted = prefs.getStringList('permanently_deleted_subjects') ?? [];
-    if (subCode != null && subCode.isNotEmpty && !deleted.contains(subCode)) {
-      deleted.add(subCode);
-    }
-    if (subName != null && subName.isNotEmpty && !deleted.contains(subName)) {
-      deleted.add(subName);
-    }
-    if (!deleted.contains(docId)) {
-      deleted.add(docId);
-    }
-    await prefs.setStringList('permanently_deleted_subjects', deleted);
-    await prefs.setBool('cloud_subjects_initialized', true);
-
-    final currentMaps = await db.query('subjects', orderBy: 'id DESC');
+    List<Map<String, dynamic>> currentMaps = await db.query('subjects', orderBy: 'id DESC');
     try {
+      final prefs = await SharedPreferences.getInstance();
+      final deleted = prefs.getStringList('permanently_deleted_subjects') ?? [];
+      if (subCode != null && subCode.isNotEmpty && !deleted.contains(subCode)) {
+        deleted.add(subCode);
+      }
+      if (subName != null && subName.isNotEmpty && !deleted.contains(subName)) {
+        deleted.add(subName);
+      }
+      if (!deleted.contains(docId)) {
+        deleted.add(docId);
+      }
+      await prefs.setStringList('permanently_deleted_subjects', deleted);
+      await prefs.setBool('cloud_subjects_initialized', true);
+
       await prefs.setString(
         'local_cached_subjects_v1',
         jsonEncode(currentMaps),
@@ -463,7 +481,10 @@ class SubjectsNotifier extends Notifier<List<Map<String, dynamic>>> {
     if (ref.mounted) state = currentMaps;
   }
 
-  Future<void> reload() async => _loadSubjects();
+  Future<void> reload() async {
+    await FirestoreService().syncCloudSubjectsToLocal(force: true);
+    await _loadSubjects();
+  }
 
   Future<Map<String, dynamic>?> getSubjectById(int id) async {
     final db = await DatabaseHelper().database;
@@ -507,147 +528,73 @@ final sectionsProvider =
     });
 
 class SectionsNotifier extends Notifier<List<Map<String, dynamic>>> {
+  VoidCallback? _syncListener;
+
   @override
   List<Map<String, dynamic>> build() {
+    _syncListener = () async {
+      if (ref.mounted) {
+        final db = await DatabaseHelper().database;
+        final fresh = await db.query('sections', orderBy: 'id DESC');
+        if (ref.mounted) state = fresh;
+      }
+    };
+    FirestoreService.addSyncListener(_syncListener!);
+    ref.onDispose(() {
+      if (_syncListener != null) {
+        FirestoreService.removeSyncListener(_syncListener!);
+      }
+    });
+
     _loadSections();
     return [];
   }
 
   Future<void> _loadSections() async {
     final db = await DatabaseHelper().database;
-    final prefs = await SharedPreferences.getInstance();
-    final deletedSections =
-        prefs.getStringList('permanently_deleted_sections') ?? [];
-
-    // 1. If SQLite in-memory is empty (e.g. Web reload), restore from local persistent cache
     final existingLocal = await db.query('sections');
-    if (existingLocal.isEmpty) {
-      final cachedStr = prefs.getString('local_cached_sections_v1');
-      if (cachedStr != null && cachedStr.isNotEmpty) {
-        try {
-          final List<dynamic> decoded = jsonDecode(cachedStr);
-          for (final item in decoded) {
-            if (item is Map) {
-              final m = Map<String, dynamic>.from(item);
-              final secKey =
-                  m['enrollment_key']?.toString().toUpperCase() ?? '';
-              final secName = m['name']?.toString() ?? '';
-              if (!deletedSections.contains(secKey) &&
-                  !deletedSections.contains(secName)) {
-                await db.insert(
-                  'sections',
-                  m,
-                  conflictAlgorithm: ConflictAlgorithm.replace,
-                );
-                if (secKey.isNotEmpty && secName.isNotEmpty) {
-                  await db.insert('reg_links', {
-                    'code': secKey,
-                    'section': secName,
-                    'max_uses':
-                        int.tryParse(m['max_uses']?.toString() ?? '50') ?? 50,
-                    'used_count':
-                        int.tryParse(m['used_count']?.toString() ?? '0') ?? 0,
-                    'expiration': m['expiration']?.toString() ?? '2026-12-31',
-                    'created_at':
-                        m['created_at']?.toString() ??
-                        DateTime.now().toIso8601String(),
-                  }, conflictAlgorithm: ConflictAlgorithm.replace);
-                }
-              }
-            }
-          }
-        } catch (_) {}
-      }
-    }
 
-    // 2. Fetch from Cloud Firestore if cache is stale (> 5 mins) or local SQLite is empty
-    final lastFetch = prefs.getInt('last_cloud_fetch_sections') ?? 0;
-    final nowMs = DateTime.now().millisecondsSinceEpoch;
-    final isStale = (nowMs - lastFetch) > 5 * 60 * 1000;
+    // 1. Instant cache restore + sync from cloud (with REST fallback)
+    await FirestoreService().syncCloudSectionsToLocal(force: kIsWeb || existingLocal.isEmpty);
 
-    if (isStale || existingLocal.isEmpty) {
-      try {
-        final cloudDocs = await FirestoreService().fetchAllDocuments(
-          'sections',
-        );
-        if (cloudDocs.isNotEmpty) {
-          await prefs.setInt('last_cloud_fetch_sections', nowMs);
-          for (final doc in cloudDocs) {
-            final secName = doc['name']?.toString() ?? '';
-            final secKey =
-                doc['enrollment_key']?.toString().toUpperCase() ??
-                doc['id']?.toString().toUpperCase() ??
-                '';
-            if (deletedSections.contains(secName) ||
-                deletedSections.contains(secKey)) {
-              continue;
-            }
-            final existing = await db.query(
-              'sections',
-              where: 'enrollment_key = ? OR name = ?',
-              whereArgs: [secKey, secName],
-            );
-            if (existing.isEmpty) {
-              await db.insert('sections', {
-                'name': secName,
-                'description': doc['description']?.toString() ?? '',
-                'grade': doc['grade']?.toString() ?? 'Grade 10',
-                'room': doc['room']?.toString() ?? '',
-                'student_count':
-                    int.tryParse(doc['student_count']?.toString() ?? '0') ?? 0,
-                'enrollment_key': secKey,
-                'created_at':
-                    doc['created_at']?.toString() ??
-                    DateTime.now().toIso8601String(),
-              }, conflictAlgorithm: ConflictAlgorithm.replace);
-            }
-            if (secKey.isNotEmpty && secName.isNotEmpty) {
-              await db.insert('reg_links', {
-                'code': secKey,
-                'section': secName,
-                'max_uses':
-                    int.tryParse(doc['max_uses']?.toString() ?? '50') ?? 50,
-                'used_count':
-                    int.tryParse(doc['used_count']?.toString() ?? '0') ?? 0,
-                'expiration': doc['expiration']?.toString() ?? '2026-12-31',
-                'created_at':
-                    doc['created_at']?.toString() ??
-                    DateTime.now().toIso8601String(),
-              }, conflictAlgorithm: ConflictAlgorithm.replace);
-            }
-          }
-        }
-      } catch (e) {
-        debugPrint('[SectionsNotifier] Cloud sync note: $e');
-      }
-    }
+    SharedPreferences? prefs;
+    try {
+      prefs = await SharedPreferences.getInstance();
+    } catch (_) {}
+    final deletedSections =
+        prefs?.getStringList('permanently_deleted_sections') ?? [];
 
-    // 3. Filter out any deleted tombstones and save active sections to local cache
+    // 2. Filter out any deleted tombstones and save active sections to local cache
     for (final del in deletedSections) {
       await db.delete(
         'sections',
-        where: 'enrollment_key = ? OR name = ?',
-        whereArgs: [del, del],
+        where: 'UPPER(enrollment_key) = ? OR UPPER(name) = ?',
+        whereArgs: [del.toUpperCase(), del.toUpperCase()],
       );
       await db.delete(
         'reg_links',
-        where: 'code = ? OR section = ?',
-        whereArgs: [del, del],
+        where: 'UPPER(code) = ? OR UPPER(section) = ?',
+        whereArgs: [del.toUpperCase(), del.toUpperCase()],
       );
     }
     final List<Map<String, dynamic>> maps = await db.query(
       'sections',
       orderBy: 'id DESC',
     );
-    try {
-      await prefs.setString('local_cached_sections_v1', jsonEncode(maps));
-    } catch (_) {}
+    if (prefs != null) {
+      try {
+        await prefs.setString('local_cached_sections_v1', jsonEncode(maps));
+      } catch (_) {}
+    }
 
     if (!ref.mounted) return;
     state = maps;
   }
 
-  Future<void> reload() async => _loadSections();
+  Future<void> reload() async {
+    await FirestoreService().syncCloudSectionsToLocal(force: true);
+    await _loadSections();
+  }
 
   Future<void> addSection(Map<String, dynamic> section) async {
     final db = await DatabaseHelper().database;
@@ -667,6 +614,36 @@ class SectionsNotifier extends Notifier<List<Map<String, dynamic>>> {
     mutableSection['enrollment_key'] = resolvedKey;
     mutableSection['created_at'] ??= DateTime.now().toIso8601String();
 
+    List<String> subjectCodes = [];
+    if (mutableSection['subject_ids'] != null) {
+      if (mutableSection['subject_ids'] is List) {
+        subjectCodes = (mutableSection['subject_ids'] as List)
+            .map((e) => e.toString().trim().toUpperCase())
+            .where((e) => e.isNotEmpty)
+            .toList();
+        mutableSection['subject_ids'] = jsonEncode(subjectCodes);
+      } else if (mutableSection['subject_ids'] is String &&
+          (mutableSection['subject_ids'] as String).isNotEmpty) {
+        try {
+          final decoded = jsonDecode(mutableSection['subject_ids'] as String);
+          if (decoded is List) {
+            subjectCodes = decoded
+                .map((e) => e.toString().trim().toUpperCase())
+                .where((e) => e.isNotEmpty)
+                .toList();
+            mutableSection['subject_ids'] = jsonEncode(subjectCodes);
+          }
+        } catch (_) {
+          subjectCodes = (mutableSection['subject_ids'] as String)
+              .split(',')
+              .map((e) => e.trim().toUpperCase())
+              .where((e) => e.isNotEmpty)
+              .toList();
+          mutableSection['subject_ids'] = jsonEncode(subjectCodes);
+        }
+      }
+    }
+
     final id = await db.insert('sections', mutableSection);
     mutableSection['id'] = id;
 
@@ -676,20 +653,24 @@ class SectionsNotifier extends Notifier<List<Map<String, dynamic>>> {
       maxUses: 50,
     );
 
-    // Remove from tombstone if re-created
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.remove('last_cloud_fetch_keys');
-    final deleted = prefs.getStringList('permanently_deleted_sections') ?? [];
-    if (deleted.contains(resolvedKey) || deleted.contains(sectionName)) {
-      deleted.remove(resolvedKey);
-      deleted.remove(sectionName);
-      await prefs.setStringList('permanently_deleted_sections', deleted);
-    }
-    await prefs.setBool('cloud_sections_initialized', true);
+    // Auto-enroll any students in this section into its assigned subjects
+    await DatabaseHelper().autoEnrollAllStudentsInSection(sectionName);
 
-    // Save immediately to persistent local cache!
     final currentMaps = await db.query('sections', orderBy: 'id DESC');
+
+    // Remove from tombstone if re-created
     try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.remove('last_cloud_fetch_keys');
+      final deleted = prefs.getStringList('permanently_deleted_sections') ?? [];
+      if (deleted.contains(resolvedKey) || deleted.contains(sectionName)) {
+        deleted.remove(resolvedKey);
+        deleted.remove(sectionName);
+        await prefs.setStringList('permanently_deleted_sections', deleted);
+      }
+      await prefs.setBool('cloud_sections_initialized', true);
+
+      // Save immediately to persistent local cache!
       await prefs.setString(
         'local_cached_sections_v1',
         jsonEncode(currentMaps),
@@ -708,6 +689,7 @@ class SectionsNotifier extends Notifier<List<Map<String, dynamic>>> {
         'room': mutableSection['room']?.toString() ?? '',
         'student_count': mutableSection['student_count'] ?? 0,
         'enrollment_key': resolvedKey,
+        'subject_ids': subjectCodes,
         'created_at': mutableSection['created_at'],
       };
       await FirestoreService().saveDocument(
@@ -735,7 +717,39 @@ class SectionsNotifier extends Notifier<List<Map<String, dynamic>>> {
 
   Future<void> updateSection(int id, Map<String, dynamic> section) async {
     final db = await DatabaseHelper().database;
-    await db.update('sections', section, where: 'id = ?', whereArgs: [id]);
+    final mutableSection = Map<String, dynamic>.from(section);
+
+    List<String>? subjectCodes;
+    if (mutableSection['subject_ids'] != null) {
+      if (mutableSection['subject_ids'] is List) {
+        subjectCodes = (mutableSection['subject_ids'] as List)
+            .map((e) => e.toString().trim().toUpperCase())
+            .where((e) => e.isNotEmpty)
+            .toList();
+        mutableSection['subject_ids'] = jsonEncode(subjectCodes);
+      } else if (mutableSection['subject_ids'] is String &&
+          (mutableSection['subject_ids'] as String).isNotEmpty) {
+        try {
+          final decoded = jsonDecode(mutableSection['subject_ids'] as String);
+          if (decoded is List) {
+            subjectCodes = decoded
+                .map((e) => e.toString().trim().toUpperCase())
+                .where((e) => e.isNotEmpty)
+                .toList();
+            mutableSection['subject_ids'] = jsonEncode(subjectCodes);
+          }
+        } catch (_) {
+          subjectCodes = (mutableSection['subject_ids'] as String)
+              .split(',')
+              .map((e) => e.trim().toUpperCase())
+              .where((e) => e.isNotEmpty)
+              .toList();
+          mutableSection['subject_ids'] = jsonEncode(subjectCodes);
+        }
+      }
+    }
+
+    await db.update('sections', mutableSection, where: 'id = ?', whereArgs: [id]);
 
     final updatedSec = (await db.query(
       'sections',
@@ -748,9 +762,14 @@ class SectionsNotifier extends Notifier<List<Map<String, dynamic>>> {
     final secName =
         updatedSec?['name']?.toString() ?? section['name']?.toString();
 
-    final prefs = await SharedPreferences.getInstance();
-    final currentMaps = await db.query('sections', orderBy: 'id DESC');
+    // Auto-enroll students in section into assigned subjects
+    if (secName != null && secName.isNotEmpty) {
+      await DatabaseHelper().autoEnrollAllStudentsInSection(secName);
+    }
+
+    List<Map<String, dynamic>> currentMaps = await db.query('sections', orderBy: 'id DESC');
     try {
+      final prefs = await SharedPreferences.getInstance();
       await prefs.setString(
         'local_cached_sections_v1',
         jsonEncode(currentMaps),
@@ -768,6 +787,19 @@ class SectionsNotifier extends Notifier<List<Map<String, dynamic>>> {
         );
       }
       try {
+        List<String> finalSubjectCodes = subjectCodes ?? [];
+        if (subjectCodes == null && updatedSec?['subject_ids'] != null) {
+          final sStr = updatedSec!['subject_ids'].toString();
+          try {
+            final dec = jsonDecode(sStr);
+            if (dec is List) {
+              finalSubjectCodes = dec.map((e) => e.toString()).toList();
+            }
+          } catch (_) {
+            finalSubjectCodes = sStr.split(',').map((e) => e.trim()).where((e) => e.isNotEmpty).toList();
+          }
+        }
+
         final cloudSection = {
           'id': resolvedKey,
           'name': secName ?? '',
@@ -785,6 +817,7 @@ class SectionsNotifier extends Notifier<List<Map<String, dynamic>>> {
               '',
           'student_count': updatedSec?['student_count'] ?? 0,
           'enrollment_key': resolvedKey,
+          'subject_ids': finalSubjectCodes,
           'created_at':
               updatedSec?['created_at']?.toString() ??
               DateTime.now().toIso8601String(),
@@ -812,6 +845,37 @@ class SectionsNotifier extends Notifier<List<Map<String, dynamic>>> {
     ref.invalidate(availableSectionsProvider);
     ref.read(adminKeysProvider.notifier).loadKeys();
     ref.read(adminTeachersProvider.notifier).loadTeachers();
+  }
+
+  /// Assign subjects to a specific section and auto-enroll enrolled students
+  Future<void> assignSubjectsToSection(int id, List<String> subjectCodes) async {
+    final db = await DatabaseHelper().database;
+    final jsonStr = jsonEncode(subjectCodes);
+    await db.update('sections', {'subject_ids': jsonStr}, where: 'id = ?', whereArgs: [id]);
+
+    final updatedSec = (await db.query(
+      'sections',
+      where: 'id = ?',
+      whereArgs: [id],
+    )).firstOrNull;
+    final resolvedKey =
+        updatedSec?['enrollment_key']?.toString().trim().toUpperCase();
+    final secName = updatedSec?['name']?.toString();
+
+    if (resolvedKey != null && resolvedKey.isNotEmpty) {
+      try {
+        await FirestoreService().saveDocument('sections', resolvedKey, {
+          'subject_ids': subjectCodes,
+        });
+      } catch (_) {}
+    }
+
+    if (secName != null && secName.isNotEmpty) {
+      await DatabaseHelper().autoEnrollAllStudentsInSection(secName);
+    }
+
+    await _loadSections();
+    ref.invalidate(availableSectionsProvider);
   }
 
   Future<void> deleteSection(int id) async {
@@ -852,20 +916,20 @@ class SectionsNotifier extends Notifier<List<Map<String, dynamic>>> {
       }
     } catch (_) {}
 
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.remove('last_cloud_fetch_keys');
-    final deleted = prefs.getStringList('permanently_deleted_sections') ?? [];
-    if (secKey != null && secKey.isNotEmpty && !deleted.contains(secKey)) {
-      deleted.add(secKey);
-    }
-    if (secName != null && secName.isNotEmpty && !deleted.contains(secName)) {
-      deleted.add(secName);
-    }
-    await prefs.setStringList('permanently_deleted_sections', deleted);
-    await prefs.setBool('cloud_sections_initialized', true);
-
-    final currentMaps = await db.query('sections', orderBy: 'id DESC');
+    List<Map<String, dynamic>> currentMaps = await db.query('sections', orderBy: 'id DESC');
     try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.remove('last_cloud_fetch_keys');
+      final deleted = prefs.getStringList('permanently_deleted_sections') ?? [];
+      if (secKey != null && secKey.isNotEmpty && !deleted.contains(secKey)) {
+        deleted.add(secKey);
+      }
+      if (secName != null && secName.isNotEmpty && !deleted.contains(secName)) {
+        deleted.add(secName);
+      }
+      await prefs.setStringList('permanently_deleted_sections', deleted);
+      await prefs.setBool('cloud_sections_initialized', true);
+
       await prefs.setString(
         'local_cached_sections_v1',
         jsonEncode(currentMaps),
@@ -885,6 +949,8 @@ class SectionsNotifier extends Notifier<List<Map<String, dynamic>>> {
 final teachersListProvider = FutureProvider<List<Map<String, dynamic>>>((
   ref,
 ) async {
+  final teachers = ref.watch(adminTeachersProvider);
+  if (teachers.isNotEmpty) return teachers;
   return await DatabaseHelper().getTeachersList();
 });
 
@@ -1140,8 +1206,9 @@ class AnalyticsFilter {
   int get activeFilterCount {
     int count = 0;
     if (subjectId != null) count++;
-    if (section != null && section != 'All Sections' && section!.isNotEmpty)
+    if (section != null && section != 'All Sections' && section!.isNotEmpty) {
       count++;
+    }
     if (timeframe != 'all') count++;
     if (category != 'all') count++;
     if (academicYear != 'AY 2025-2026') count++;
@@ -1266,8 +1333,10 @@ class AdminAnalyticsNotifier extends Notifier<Map<String, dynamic>> {
         final usersCount = summary['totalUsers'] as int? ?? 0;
         final studentsCount = summary['totalStudents'] as int? ?? 0;
         final teachersCount = summary['totalTeachers'] as int? ?? 0;
-        if (usersCount <= 1 || (studentsCount == 0 && teachersCount == 0)) {
+        if (usersCount <= 1 || (studentsCount == 0 && teachersCount == 0) || kIsWeb) {
           await FirestoreService().syncCloudUsersToLocal(force: true);
+          await FirestoreService().syncCloudSubjectsToLocal(force: true);
+          await FirestoreService().syncCloudSectionsToLocal(force: true);
           if (ref.mounted) {
             await loadAnalytics(syncCloud: false);
           }
@@ -1306,6 +1375,10 @@ class AdminAnalyticsNotifier extends Notifier<Map<String, dynamic>> {
     if (syncCloud) {
       try {
         await FirestoreService().syncCloudUsersToLocal(force: true);
+        await FirestoreService().syncCloudSubjectsToLocal(force: true);
+        await FirestoreService().syncCloudSectionsToLocal(force: true);
+        ref.read(subjectsProvider.notifier).reload();
+        ref.read(sectionsProvider.notifier).reload();
       } catch (_) {}
     }
     final summary = await DatabaseHelper().getAdminAnalyticsSummary(
@@ -1341,9 +1414,14 @@ class AdminStudentsNotifier extends Notifier<List<Map<String, dynamic>>> {
       }
     });
 
-    _syncListener = () {
+    _syncListener = () async {
       if (ref.mounted) {
-        loadStudents();
+        final fresh = await DatabaseHelper().getAdminStudentsList(
+          section: _selectedSection,
+          grade: _selectedGrade,
+          query: _searchQuery,
+        );
+        if (ref.mounted) state = fresh;
       }
     };
     FirestoreService.addSyncListener(_syncListener!);
@@ -1356,6 +1434,7 @@ class AdminStudentsNotifier extends Notifier<List<Map<String, dynamic>>> {
     String? section,
     String? grade,
     String? query,
+    bool syncCloud = true,
   }) async {
     if (section != null) _selectedSection = section;
     if (grade != null) _selectedGrade = grade;
@@ -1369,8 +1448,8 @@ class AdminStudentsNotifier extends Notifier<List<Map<String, dynamic>>> {
     if (!ref.mounted) return;
     state = results;
 
-    // Non-blocking background cloud freshness pull (only on initial/unfiltered load)
-    if (query == null || query.isEmpty) {
+    // Non-blocking background cloud freshness pull (only on initial/unfiltered load when syncCloud is requested)
+    if (syncCloud && (query == null || query.isEmpty)) {
       final shouldForce = results.isEmpty;
       FirestoreService()
           .syncCloudUsersToLocal(force: shouldForce)
@@ -1428,6 +1507,8 @@ class AdminStudentsNotifier extends Notifier<List<Map<String, dynamic>>> {
       grade: newGrade,
     );
     await loadStudents();
+    ref.read(sectionsProvider.notifier).reload();
+    ref.invalidate(adminTeachersProvider);
     ref.read(adminAnalyticsProvider.notifier).loadAnalytics();
   }
 
@@ -1543,11 +1624,14 @@ class AdminKeysNotifier extends Notifier<List<Map<String, dynamic>>> {
 
   Future<void> loadKeys() async {
     final db = await DatabaseHelper().database;
-    final prefs = await SharedPreferences.getInstance();
+    SharedPreferences? prefs;
+    try {
+      prefs = await SharedPreferences.getInstance();
+    } catch (_) {}
     final deletedSections =
-        prefs.getStringList('permanently_deleted_sections') ?? [];
+        prefs?.getStringList('permanently_deleted_sections') ?? [];
 
-    final lastFetch = prefs.getInt('last_cloud_fetch_keys') ?? 0;
+    final lastFetch = prefs?.getInt('last_cloud_fetch_keys') ?? 0;
     final nowMs = DateTime.now().millisecondsSinceEpoch;
     final isStale = (nowMs - lastFetch) > 5 * 60 * 1000;
 
@@ -1557,7 +1641,9 @@ class AdminKeysNotifier extends Notifier<List<Map<String, dynamic>>> {
           'enrollment_keys',
         );
         if (cloudKeys.isNotEmpty) {
-          await prefs.setInt('last_cloud_fetch_keys', nowMs);
+          try {
+            await prefs?.setInt('last_cloud_fetch_keys', nowMs);
+          } catch (_) {}
           for (final k in cloudKeys) {
             final code =
                 k['code']?.toString().toUpperCase() ??
@@ -1618,13 +1704,15 @@ class AdminKeysNotifier extends Notifier<List<Map<String, dynamic>>> {
       'created_at': DateTime.now().toIso8601String(),
     });
 
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.remove('last_cloud_fetch_keys');
-    final deleted = prefs.getStringList('permanently_deleted_sections') ?? [];
-    if (deleted.contains(cleanCode)) {
-      deleted.remove(cleanCode);
-      await prefs.setStringList('permanently_deleted_sections', deleted);
-    }
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.remove('last_cloud_fetch_keys');
+      final deleted = prefs.getStringList('permanently_deleted_sections') ?? [];
+      if (deleted.contains(cleanCode)) {
+        deleted.remove(cleanCode);
+        await prefs.setStringList('permanently_deleted_sections', deleted);
+      }
+    } catch (_) {}
 
     await loadKeys();
   }
@@ -1635,13 +1723,15 @@ class AdminKeysNotifier extends Notifier<List<Map<String, dynamic>>> {
     await FirestoreService().deleteDocument('enrollment_keys', cleanCode);
     await FirestoreService().deleteDocument('reg_links', cleanCode);
 
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.remove('last_cloud_fetch_keys');
-    final deleted = prefs.getStringList('permanently_deleted_sections') ?? [];
-    if (!deleted.contains(cleanCode)) {
-      deleted.add(cleanCode);
-      await prefs.setStringList('permanently_deleted_sections', deleted);
-    }
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.remove('last_cloud_fetch_keys');
+      final deleted = prefs.getStringList('permanently_deleted_sections') ?? [];
+      if (!deleted.contains(cleanCode)) {
+        deleted.add(cleanCode);
+        await prefs.setStringList('permanently_deleted_sections', deleted);
+      }
+    } catch (_) {}
 
     await loadKeys();
   }
@@ -1649,7 +1739,13 @@ class AdminKeysNotifier extends Notifier<List<Map<String, dynamic>>> {
 
 // --- Available Sections Provider ---
 final availableSectionsProvider = FutureProvider<List<String>>((ref) async {
-  return await DatabaseHelper().getAvailableSectionsList();
+  ref.watch(sectionsProvider);
+  var list = await DatabaseHelper().getAvailableSectionsList();
+  if (list.isEmpty) {
+    await FirestoreService().syncCloudSectionsToLocal(force: true);
+    list = await DatabaseHelper().getAvailableSectionsList();
+  }
+  return list;
 });
 
 // --- Admin Archived Students Provider ---
@@ -1730,9 +1826,11 @@ class AdminTeachersNotifier extends Notifier<List<Map<String, dynamic>>> {
       }
     });
 
-    _syncListener = () {
+    _syncListener = () async {
       if (ref.mounted) {
-        loadTeachers();
+        final fresh = await DatabaseHelper().getTeachersList();
+        if (ref.mounted) state = fresh;
+        ref.invalidate(teachersListProvider);
       }
     };
     FirestoreService.addSyncListener(_syncListener!);
@@ -1741,21 +1839,24 @@ class AdminTeachersNotifier extends Notifier<List<Map<String, dynamic>>> {
     return [];
   }
 
-  Future<void> loadTeachers() async {
+  Future<void> loadTeachers({bool syncCloud = true}) async {
     final teachers = await DatabaseHelper().getTeachersList();
     if (!ref.mounted) return;
     state = teachers;
 
     final shouldForce = teachers.isEmpty;
     // Non-blocking background cloud freshness pull
-    FirestoreService()
-        .syncCloudUsersToLocal(force: shouldForce)
-        .then((_) async {
-          if (!ref.mounted) return;
-          final fresh = await DatabaseHelper().getTeachersList();
-          if (ref.mounted) state = fresh;
-        })
-        .catchError((_) {});
+    if (syncCloud) {
+      FirestoreService()
+          .syncCloudUsersToLocal(force: shouldForce)
+          .then((_) async {
+            if (!ref.mounted) return;
+            final fresh = await DatabaseHelper().getTeachersList();
+            if (ref.mounted) state = fresh;
+            ref.invalidate(teachersListProvider);
+          })
+          .catchError((_) {});
+    }
   }
 
   Future<String> addTeacher({
@@ -1791,6 +1892,8 @@ class AdminTeachersNotifier extends Notifier<List<Map<String, dynamic>>> {
     );
     await loadTeachers();
     ref.read(subjectsProvider.notifier).reload();
+    ref.read(sectionsProvider.notifier).reload();
+    ref.read(adminAnalyticsProvider.notifier).loadAnalytics();
   }
 
   Future<void> deleteTeacher(String teacherId) async {

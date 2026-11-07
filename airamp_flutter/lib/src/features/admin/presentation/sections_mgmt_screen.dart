@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -61,6 +62,32 @@ class _SectionsMgmtScreenState extends ConsumerState<SectionsMgmtScreen> {
     final editRoomController = TextEditingController(text: section['room'] ?? '');
     final editKeyController = TextEditingController(text: section['enrollment_key'] ?? '');
     String editSelectedGrade = section['grade'] ?? '';
+
+    final initialSubjectCodes = <String>{};
+    final rawSecSubs = section['subject_ids'];
+    if (rawSecSubs is List) {
+      for (final s in rawSecSubs) {
+        if (s != null && s.toString().trim().isNotEmpty) {
+          initialSubjectCodes.add(s.toString().trim().toUpperCase());
+        }
+      }
+    } else if (rawSecSubs is String && rawSecSubs.isNotEmpty && rawSecSubs != 'null') {
+      try {
+        final dec = jsonDecode(rawSecSubs);
+        if (dec is List) {
+          for (final s in dec) {
+            if (s != null && s.toString().trim().isNotEmpty) {
+              initialSubjectCodes.add(s.toString().trim().toUpperCase());
+            }
+          }
+        }
+      } catch (_) {
+        for (final s in rawSecSubs.split(',')) {
+          if (s.trim().isNotEmpty) initialSubjectCodes.add(s.trim().toUpperCase());
+        }
+      }
+    }
+    final editSelectedSubjectCodes = Set<String>.from(initialSubjectCodes);
 
     showDialog(
       context: context,
@@ -163,6 +190,71 @@ class _SectionsMgmtScreenState extends ConsumerState<SectionsMgmtScreen> {
                         );
                       }).toList(),
                     ),
+                    const SizedBox(height: 16),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Text(
+                          'Assign Curriculum Subjects',
+                          style: TextStyle(color: AppTheme.textSecondary, fontSize: 13, fontWeight: FontWeight.bold),
+                        ),
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                          decoration: BoxDecoration(
+                            color: Theme.of(context).colorScheme.primary.withValues(alpha: 0.12),
+                            borderRadius: BorderRadius.circular(6),
+                          ),
+                          child: Text(
+                            '${editSelectedSubjectCodes.length} selected',
+                            style: TextStyle(color: Theme.of(context).colorScheme.primary, fontSize: 11, fontWeight: FontWeight.bold),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 8),
+                    Consumer(
+                      builder: (context, cRef, _) {
+                        final subjects = cRef.watch(subjectsProvider);
+                        if (subjects.isEmpty) {
+                          return Padding(
+                            padding: const EdgeInsets.symmetric(vertical: 8),
+                            child: Text(
+                              'No subjects found in database. Create subjects under Subjects & Courses first.',
+                              style: TextStyle(color: AppTheme.textSecondary, fontSize: 12, fontStyle: FontStyle.italic),
+                            ),
+                          );
+                        }
+                        return Wrap(
+                          spacing: 8,
+                          runSpacing: 8,
+                          children: subjects.map((sub) {
+                            final code = sub['subject_code']?.toString().toUpperCase() ?? sub['id']?.toString().toUpperCase() ?? '';
+                            final name = sub['name']?.toString() ?? code;
+                            final isSelected = editSelectedSubjectCodes.contains(code);
+                            return FilterChip(
+                              label: Text('$code ($name)'),
+                              selected: isSelected,
+                              onSelected: (val) {
+                                setDialogState(() {
+                                  if (val) {
+                                    editSelectedSubjectCodes.add(code);
+                                  } else {
+                                    editSelectedSubjectCodes.remove(code);
+                                  }
+                                });
+                              },
+                              selectedColor: Theme.of(context).colorScheme.primary.withValues(alpha: 0.2),
+                              checkmarkColor: Theme.of(context).colorScheme.primary,
+                              labelStyle: TextStyle(
+                                color: isSelected ? Theme.of(context).colorScheme.primary : AppTheme.text,
+                                fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+                                fontSize: 12,
+                              ),
+                            );
+                          }).toList(),
+                        );
+                      },
+                    ),
                   ],
                 ),
               ),
@@ -192,6 +284,7 @@ class _SectionsMgmtScreenState extends ConsumerState<SectionsMgmtScreen> {
                                   'grade': editSelectedGrade.isNotEmpty ? editSelectedGrade : (section['grade'] ?? 'Grade 11'),
                                   'room': editRoomController.text.trim(),
                                   'enrollment_key': key,
+                                  'subject_ids': editSelectedSubjectCodes.toList(),
                                 },
                               );
                               if (mounted) {
@@ -236,6 +329,7 @@ class _SectionsMgmtScreenState extends ConsumerState<SectionsMgmtScreen> {
     final addDescController = TextEditingController();
     final addRoomController = TextEditingController();
     final addKeyController = TextEditingController();
+    final addSelectedSubjectCodes = <String>{};
     String addSelectedGrade = (initialGrade != null && _grades.contains(initialGrade))
         ? initialGrade
         : (_selectedGradeFilter != 'All' && _grades.contains(_selectedGradeFilter)
@@ -509,6 +603,71 @@ class _SectionsMgmtScreenState extends ConsumerState<SectionsMgmtScreen> {
                             );
                           }).toList(),
                         ),
+                        const SizedBox(height: 16),
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            Text(
+                              'Assign Curriculum Subjects',
+                              style: TextStyle(color: AppTheme.textSecondary, fontSize: 13, fontWeight: FontWeight.bold),
+                            ),
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                              decoration: BoxDecoration(
+                                color: Theme.of(context).colorScheme.primary.withValues(alpha: 0.12),
+                                borderRadius: BorderRadius.circular(6),
+                              ),
+                              child: Text(
+                                '${addSelectedSubjectCodes.length} selected',
+                                style: TextStyle(color: Theme.of(context).colorScheme.primary, fontSize: 11, fontWeight: FontWeight.bold),
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 8),
+                        Consumer(
+                          builder: (context, cRef, _) {
+                            final subjects = cRef.watch(subjectsProvider);
+                            if (subjects.isEmpty) {
+                              return Padding(
+                                padding: const EdgeInsets.symmetric(vertical: 8),
+                                child: Text(
+                                  'No subjects found in database. Create subjects under Subjects & Courses first.',
+                                  style: TextStyle(color: AppTheme.textSecondary, fontSize: 12, fontStyle: FontStyle.italic),
+                                ),
+                              );
+                            }
+                            return Wrap(
+                              spacing: 8,
+                              runSpacing: 8,
+                              children: subjects.map((sub) {
+                                final code = sub['subject_code']?.toString().toUpperCase() ?? sub['id']?.toString().toUpperCase() ?? '';
+                                final name = sub['name']?.toString() ?? code;
+                                final isSelected = addSelectedSubjectCodes.contains(code);
+                                return FilterChip(
+                                  label: Text('$code ($name)'),
+                                  selected: isSelected,
+                                  onSelected: (val) {
+                                    setDialogState(() {
+                                      if (val) {
+                                        addSelectedSubjectCodes.add(code);
+                                      } else {
+                                        addSelectedSubjectCodes.remove(code);
+                                      }
+                                    });
+                                  },
+                                  selectedColor: Theme.of(context).colorScheme.primary.withValues(alpha: 0.2),
+                                  checkmarkColor: Theme.of(context).colorScheme.primary,
+                                  labelStyle: TextStyle(
+                                    color: isSelected ? Theme.of(context).colorScheme.primary : AppTheme.text,
+                                    fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+                                    fontSize: 12,
+                                  ),
+                                );
+                              }).toList(),
+                            );
+                          },
+                        ),
                       ],
                     ),
                   ),
@@ -536,6 +695,7 @@ class _SectionsMgmtScreenState extends ConsumerState<SectionsMgmtScreen> {
                           'grade': addSelectedGrade.isNotEmpty ? addSelectedGrade : 'Grade 10',
                           'room': addRoomController.text.trim(),
                           'enrollment_key': enrollmentKey,
+                          'subject_ids': addSelectedSubjectCodes.toList(),
                           'student_count': 0,
                           'created_at': DateTime.now().toIso8601String(),
                         });
@@ -796,11 +956,14 @@ class _SectionsMgmtScreenState extends ConsumerState<SectionsMgmtScreen> {
 
     return Scaffold(
       body: SafeArea(
-        child: SingleChildScrollView(
-          padding: const EdgeInsets.all(20),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
+        child: RefreshIndicator(
+          onRefresh: () async => ref.read(sectionsProvider.notifier).reload(),
+          child: SingleChildScrollView(
+            physics: const AlwaysScrollableScrollPhysics(),
+            padding: const EdgeInsets.all(20),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
               // Header
               LayoutBuilder(
                 builder: (context, headerConstraints) {
@@ -997,7 +1160,8 @@ class _SectionsMgmtScreenState extends ConsumerState<SectionsMgmtScreen> {
           ),
         ),
       ),
-    );
+    ),
+  );
   }
 }
 
@@ -1014,14 +1178,71 @@ class _SectionCard extends ConsumerStatefulWidget {
 
 class _SectionCardState extends ConsumerState<_SectionCard> {
   bool _isExpanded = false;
-  int _selectedTab = 0; // 0 for Students, 1 for Progress Chart
+  int _selectedTab = 0; // 0 for Students, 1 for Subjects, 2 for Progress Chart
   List<Map<String, dynamic>> _sectionStudents = [];
   bool _isLoadingStudents = false;
+  List<Map<String, dynamic>> _assignedSubjects = [];
+  bool _isLoadingSubjects = false;
+
+  Future<void> _showConfirmation({
+    required String title,
+    required String content,
+    required VoidCallback onConfirm,
+  }) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        backgroundColor: Theme.of(context).colorScheme.surface,
+        title: Text(title, style: TextStyle(color: AppTheme.text)),
+        content: Text(content, style: TextStyle(color: AppTheme.textSecondary)),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Cancel'),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text('Confirm'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed == true) {
+      onConfirm();
+    }
+  }
 
   @override
   void initState() {
     super.initState();
     _loadStudents();
+    _loadSubjects();
+  }
+
+  @override
+  void didUpdateWidget(covariant _SectionCard oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.section != widget.section) {
+      _loadStudents();
+      _loadSubjects();
+    }
+  }
+
+  Future<void> _loadSubjects() async {
+    setState(() => _isLoadingSubjects = true);
+    try {
+      final sectionName = widget.section['name']?.toString() ?? '';
+      final list = await DatabaseHelper().getSubjectsForSection(sectionName);
+      if (mounted) {
+        setState(() {
+          _assignedSubjects = list;
+          _isLoadingSubjects = false;
+        });
+      }
+    } catch (_) {
+      if (mounted) setState(() => _isLoadingSubjects = false);
+    }
   }
 
   Future<void> _loadStudents() async {
@@ -1117,6 +1338,17 @@ class _SectionCardState extends ConsumerState<_SectionCard> {
                             Text(
                               '$studentCount students',
                               style: TextStyle(color: AppTheme.primary, fontSize: 12, fontWeight: FontWeight.bold),
+                            ),
+                          ],
+                        ),
+                        Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(Icons.menu_book_outlined, size: 14, color: AppTheme.accent),
+                            const SizedBox(width: 4),
+                            Text(
+                              '${_assignedSubjects.length} subjects',
+                              style: TextStyle(color: AppTheme.accent, fontSize: 12, fontWeight: FontWeight.bold),
                             ),
                           ],
                         ),
@@ -1222,8 +1454,8 @@ class _SectionCardState extends ConsumerState<_SectionCard> {
                           mainAxisAlignment: MainAxisAlignment.center,
                           children: [
                             Icon(Icons.people_outline, size: 16, color: _selectedTab == 0 ? Colors.black : AppTheme.textSecondary),
-                            const SizedBox(width: 8),
-                            Text('Students', style: TextStyle(
+                            const SizedBox(width: 6),
+                            Text('Students (${_sectionStudents.length})', style: TextStyle(
                               color: _selectedTab == 0 ? Colors.black : AppTheme.textSecondary,
                               fontWeight: FontWeight.bold,
                               fontSize: 12,
@@ -1245,10 +1477,34 @@ class _SectionCardState extends ConsumerState<_SectionCard> {
                         child: Row(
                           mainAxisAlignment: MainAxisAlignment.center,
                           children: [
-                            Icon(Icons.bar_chart, size: 16, color: _selectedTab == 1 ? Colors.black : AppTheme.textSecondary),
-                            const SizedBox(width: 8),
-                            Text('Progress Chart', style: TextStyle(
+                            Icon(Icons.menu_book_outlined, size: 16, color: _selectedTab == 1 ? Colors.black : AppTheme.textSecondary),
+                            const SizedBox(width: 6),
+                            Text('Subjects (${_assignedSubjects.length})', style: TextStyle(
                               color: _selectedTab == 1 ? Colors.black : AppTheme.textSecondary,
+                              fontWeight: FontWeight.bold,
+                              fontSize: 12,
+                            )),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
+                  Expanded(
+                    child: GestureDetector(
+                      onTap: () => setState(() => _selectedTab = 2),
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(vertical: 10),
+                        decoration: BoxDecoration(
+                          color: _selectedTab == 2 ? AppTheme.primary : Colors.transparent,
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Icon(Icons.bar_chart, size: 16, color: _selectedTab == 2 ? Colors.black : AppTheme.textSecondary),
+                            const SizedBox(width: 6),
+                            Text('Progress', style: TextStyle(
+                              color: _selectedTab == 2 ? Colors.black : AppTheme.textSecondary,
                               fontWeight: FontWeight.bold,
                               fontSize: 12,
                             )),
@@ -1262,10 +1518,306 @@ class _SectionCardState extends ConsumerState<_SectionCard> {
             ),
             const SizedBox(height: 16),
             
-            if (_selectedTab == 0) _buildStudentsList() else _buildProgressChart(),
+            if (_selectedTab == 0)
+              _buildStudentsList()
+            else if (_selectedTab == 1)
+              _buildSubjectsList()
+            else
+              _buildProgressChart(),
           ],
         ],
       ),
+    );
+  }
+
+  Widget _buildSubjectsList() {
+    if (_isLoadingSubjects) {
+      return const Padding(
+        padding: EdgeInsets.all(16.0),
+        child: Center(child: CircularProgressIndicator(strokeWidth: 2)),
+      );
+    }
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Assigned Curriculum Subjects',
+                  style: TextStyle(color: AppTheme.text, fontWeight: FontWeight.bold, fontSize: 13),
+                ),
+                Text(
+                  'Enrolled students will have these courses loaded',
+                  style: TextStyle(color: AppTheme.textSecondary, fontSize: 11),
+                ),
+              ],
+            ),
+            ElevatedButton.icon(
+              onPressed: () => _showAssignSubjectsModal(context),
+              icon: const Icon(Icons.add_task_rounded, size: 14),
+              label: const Text('Manage Subjects'),
+              style: ElevatedButton.styleFrom(
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                textStyle: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold),
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 12),
+        if (_assignedSubjects.isEmpty) ...[
+          Container(
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: AppTheme.background,
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: AppTheme.border),
+            ),
+            child: Center(
+              child: Column(
+                children: [
+                  Icon(Icons.auto_stories_outlined, size: 32, color: AppTheme.textSecondary.withValues(alpha: 0.5)),
+                  const SizedBox(height: 8),
+                  Text(
+                    'No subjects assigned to this section yet.',
+                    style: TextStyle(color: AppTheme.text, fontWeight: FontWeight.bold, fontSize: 13),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    'Students in this section cannot see courses until subjects are assigned.',
+                    textAlign: TextAlign.center,
+                    style: TextStyle(color: AppTheme.textSecondary, fontSize: 11),
+                  ),
+                  const SizedBox(height: 10),
+                  OutlinedButton.icon(
+                    onPressed: () => _showAssignSubjectsModal(context),
+                    icon: const Icon(Icons.add, size: 14),
+                    label: const Text('Assign Subjects Now'),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ] else ...[
+          ..._assignedSubjects.map((sub) {
+            final code = sub['subject_code']?.toString().toUpperCase() ?? sub['id']?.toString().toUpperCase() ?? '';
+            final name = sub['name']?.toString() ?? code;
+            final teacherName = sub['teacher_name']?.toString();
+            final grade = sub['grade_level']?.toString() ?? '';
+
+            return Container(
+              margin: const EdgeInsets.only(bottom: 8),
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+              decoration: BoxDecoration(
+                color: AppTheme.background,
+                borderRadius: BorderRadius.circular(10),
+                border: Border.all(color: AppTheme.border),
+              ),
+              child: Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                    decoration: BoxDecoration(
+                      color: Theme.of(context).colorScheme.primary.withValues(alpha: 0.15),
+                      borderRadius: BorderRadius.circular(6),
+                    ),
+                    child: Text(
+                      code,
+                      style: TextStyle(
+                        color: Theme.of(context).colorScheme.primary,
+                        fontWeight: FontWeight.bold,
+                        fontSize: 11,
+                        letterSpacing: 0.5,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          name,
+                          style: TextStyle(color: AppTheme.text, fontWeight: FontWeight.bold, fontSize: 13),
+                        ),
+                        const SizedBox(height: 2),
+                        Row(
+                          children: [
+                            if (grade.isNotEmpty) ...[
+                              Text(grade, style: TextStyle(color: AppTheme.textSecondary, fontSize: 11)),
+                              const SizedBox(width: 6),
+                              Text('·', style: TextStyle(color: AppTheme.textSecondary)),
+                              const SizedBox(width: 6),
+                            ],
+                            Icon(Icons.person_outline, size: 12, color: AppTheme.textSecondary),
+                            const SizedBox(width: 4),
+                            Text(
+                              teacherName != null && teacherName.isNotEmpty ? teacherName : 'No teacher assigned',
+                              style: TextStyle(color: AppTheme.textSecondary, fontSize: 11),
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
+                  ),
+                  IconButton(
+                    tooltip: 'Remove subject from section',
+                    icon: Icon(Icons.close, size: 16, color: AppTheme.textSecondary),
+                    onPressed: () {
+                      _showConfirmation(
+                        title: 'Unassign Subject',
+                        content: 'Remove "$code - $name" from this section?',
+                        onConfirm: () async {
+                          final sectionId = widget.section['id'];
+                          if (sectionId is int) {
+                            final currentCodes = _assignedSubjects
+                                .map((s) => s['subject_code']?.toString().toUpperCase() ?? s['id']?.toString().toUpperCase() ?? '')
+                                .where((c) => c != code && c.isNotEmpty)
+                                .toList();
+                            await ref.read(sectionsProvider.notifier).assignSubjectsToSection(sectionId, currentCodes);
+                            await _loadSubjects();
+                            await _loadStudents();
+                          }
+                        },
+                      );
+                    },
+                  ),
+                ],
+              ),
+            );
+          }),
+        ],
+      ],
+    );
+  }
+
+  Future<void> _showAssignSubjectsModal(BuildContext context) async {
+    final sectionId = widget.section['id'];
+    if (sectionId is! int) return;
+
+    final currentSelected = _assignedSubjects
+        .map((s) => s['subject_code']?.toString().toUpperCase() ?? s['id']?.toString().toUpperCase() ?? '')
+        .where((c) => c.isNotEmpty)
+        .toSet();
+
+    await showDialog(
+      context: context,
+      builder: (dialogCtx) {
+        return StatefulBuilder(
+          builder: (context, setModalState) {
+            final allSubjects = ref.watch(subjectsProvider);
+            return AlertDialog(
+              backgroundColor: Theme.of(context).colorScheme.surface,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+              title: Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(8),
+                    decoration: BoxDecoration(
+                      color: Theme.of(context).colorScheme.primary.withValues(alpha: 0.12),
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: Icon(Icons.menu_book_outlined, size: 20, color: Theme.of(context).colorScheme.primary),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text('Assign Subjects', style: TextStyle(color: AppTheme.text, fontWeight: FontWeight.bold, fontSize: 16)),
+                        Text('Section: ${widget.section['name']}', style: TextStyle(color: AppTheme.textSecondary, fontSize: 12)),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+              content: SizedBox(
+                width: 480,
+                child: allSubjects.isEmpty
+                    ? Padding(
+                        padding: const EdgeInsets.all(20),
+                        child: Text('No subjects found. Please create subjects under Subjects & Courses first.', style: TextStyle(color: AppTheme.textSecondary)),
+                      )
+                    : SingleChildScrollView(
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              'Select the curriculum subjects that belong to this section. All students will immediately be enrolled in them.',
+                              style: TextStyle(color: AppTheme.textSecondary, fontSize: 12),
+                            ),
+                            const SizedBox(height: 12),
+                            ...allSubjects.map((sub) {
+                              final code = sub['subject_code']?.toString().toUpperCase() ?? sub['id']?.toString().toUpperCase() ?? '';
+                              final name = sub['name']?.toString() ?? code;
+                              final teacher = sub['teacher_name']?.toString();
+                              final isChecked = currentSelected.contains(code);
+
+                              return CheckboxListTile(
+                                value: isChecked,
+                                activeColor: Theme.of(context).colorScheme.primary,
+                                checkColor: Colors.white,
+                                title: Text('$code - $name', style: TextStyle(color: AppTheme.text, fontWeight: FontWeight.bold, fontSize: 13)),
+                                subtitle: Text(
+                                  teacher != null && teacher.isNotEmpty ? 'Teacher: $teacher · ${sub['grade_level'] ?? ''}' : '${sub['grade_level'] ?? ''}',
+                                  style: TextStyle(color: AppTheme.textSecondary, fontSize: 11),
+                                ),
+                                onChanged: (val) {
+                                  setModalState(() {
+                                    if (val == true) {
+                                      currentSelected.add(code);
+                                    } else {
+                                      currentSelected.remove(code);
+                                    }
+                                  });
+                                },
+                              );
+                            }),
+                          ],
+                        ),
+                      ),
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.pop(dialogCtx),
+                  child: const Text('Cancel'),
+                ),
+                ElevatedButton(
+                  onPressed: () async {
+                    Navigator.pop(dialogCtx);
+                    try {
+                      await ref.read(sectionsProvider.notifier).assignSubjectsToSection(sectionId, currentSelected.toList());
+                      await _loadSubjects();
+                      await _loadStudents();
+                      if (context.mounted) {
+                        AiraActionToast.showSuccess(
+                          context,
+                          title: 'Subjects Assigned',
+                          message: 'Assigned ${currentSelected.length} subjects to ${widget.section['name']}. Students auto-enrolled.',
+                        );
+                      }
+                    } catch (e) {
+                      if (context.mounted) {
+                        AiraActionToast.showError(
+                          context,
+                          title: 'Failed to Assign Subjects',
+                          message: e.toString().replaceFirst("Exception: ", ""),
+                        );
+                      }
+                    }
+                  },
+                  child: const Text('Save & Auto-Enroll Students'),
+                ),
+              ],
+            );
+          },
+        );
+      },
     );
   }
 
