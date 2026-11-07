@@ -76,12 +76,12 @@ class OfflineSyncNotifier extends Notifier<OfflineSyncState> {
     FirestoreService().startRealtimeUserSync();
 
     // On native mobile/desktop (!kIsWeb), periodic sync checks connectivity for queued offline actions.
-    // On Web (kIsWeb), Firestore streams real-time updates via WebSockets, so polling timers are unnecessary.
+    // Throttled to 15 minutes to preserve battery and remain well within Firebase free tier quotas.
     if (!kIsWeb) {
-      _periodicSyncTimer = Timer.periodic(const Duration(seconds: 60), (_) {
+      _periodicSyncTimer = Timer.periodic(const Duration(minutes: 15), (_) {
         syncNow();
       });
-      // Proactively perform full bidirectional sync in background on mobile
+      // Proactively perform initial sync in background on mobile
       Future.microtask(() => syncNow());
     }
 
@@ -93,9 +93,13 @@ class OfflineSyncNotifier extends Notifier<OfflineSyncState> {
     );
   }
 
-  /// Triggers an immediate cloud synchronization cycle
-  Future<void> syncNow() async {
+  /// Triggers a cloud synchronization cycle. Pass [force] = true on manual button clicks.
+  Future<void> syncNow({bool force = false}) async {
     if (state.isSyncing) return;
+
+    if (force) {
+      FirestoreService().invalidateUsersSyncCache();
+    }
 
     state = state.copyWith(
       status: SyncConnectivityStatus.syncing,
@@ -103,8 +107,8 @@ class OfflineSyncNotifier extends Notifier<OfflineSyncState> {
     );
 
     try {
-      // Perform full bidirectional Cloud Firestore to local SQLite sync roundtrip
-      await DatabaseHelper().syncAllCloudData();
+      // Perform bidirectional Cloud Firestore to local SQLite sync roundtrip
+      await DatabaseHelper().syncAllCloudData(force: force);
 
       state = state.copyWith(
         status: SyncConnectivityStatus.onlineSynced,

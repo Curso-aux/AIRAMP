@@ -160,36 +160,43 @@ class SubjectsNotifier extends Notifier<List<Map<String, dynamic>>> {
       }
     }
 
-    // 2. Fetch from Cloud Firestore if available and merge
-    try {
-      final cloudDocs = await FirestoreService().fetchAllDocuments('subjects');
-      if (cloudDocs.isNotEmpty) {
-        for (final doc in cloudDocs) {
-          final subCode = doc['subject_code']?.toString().toUpperCase() ?? doc['id']?.toString().toUpperCase() ?? '';
-          final subName = doc['name']?.toString() ?? '';
-          if (deletedSubjects.contains(subCode) || deletedSubjects.contains(subName)) {
-            continue;
-          }
-          final existing = await db.query('subjects',
-              where: 'subject_code = ? OR name = ?',
-              whereArgs: [subCode, subName]);
-          if (existing.isEmpty) {
-            await db.insert('subjects', {
-              'name': subName,
-              'subject_code': subCode,
-              'description': doc['description']?.toString() ?? '',
-              'grade_level': doc['grade_level']?.toString() ?? doc['grade']?.toString() ?? 'Grade 10',
-              'semester': doc['semester']?.toString() ?? '1st Semester',
-              'unlock_type': doc['unlock_type']?.toString() ?? 'Flexible',
-              'teacher_id': doc['teacher_id']?.toString(),
-              'teacher_name': doc['teacher_name']?.toString(),
-              'created_at': doc['created_at']?.toString() ?? DateTime.now().toIso8601String(),
-            }, conflictAlgorithm: ConflictAlgorithm.replace);
+    // 2. Fetch from Cloud Firestore if cache is stale (> 5 mins) or local SQLite is empty
+    final lastFetch = prefs.getInt('last_cloud_fetch_subjects') ?? 0;
+    final nowMs = DateTime.now().millisecondsSinceEpoch;
+    final isStale = (nowMs - lastFetch) > 5 * 60 * 1000;
+
+    if (isStale || existingLocal.isEmpty) {
+      try {
+        final cloudDocs = await FirestoreService().fetchAllDocuments('subjects');
+        if (cloudDocs.isNotEmpty) {
+          await prefs.setInt('last_cloud_fetch_subjects', nowMs);
+          for (final doc in cloudDocs) {
+            final subCode = doc['subject_code']?.toString().toUpperCase() ?? doc['id']?.toString().toUpperCase() ?? '';
+            final subName = doc['name']?.toString() ?? '';
+            if (deletedSubjects.contains(subCode) || deletedSubjects.contains(subName)) {
+              continue;
+            }
+            final existing = await db.query('subjects',
+                where: 'subject_code = ? OR name = ?',
+                whereArgs: [subCode, subName]);
+            if (existing.isEmpty) {
+              await db.insert('subjects', {
+                'name': subName,
+                'subject_code': subCode,
+                'description': doc['description']?.toString() ?? '',
+                'grade_level': doc['grade_level']?.toString() ?? doc['grade']?.toString() ?? 'Grade 10',
+                'semester': doc['semester']?.toString() ?? '1st Semester',
+                'unlock_type': doc['unlock_type']?.toString() ?? 'Flexible',
+                'teacher_id': doc['teacher_id']?.toString(),
+                'teacher_name': doc['teacher_name']?.toString(),
+                'created_at': doc['created_at']?.toString() ?? DateTime.now().toIso8601String(),
+              }, conflictAlgorithm: ConflictAlgorithm.replace);
+            }
           }
         }
+      } catch (e) {
+        debugPrint('[SubjectsNotifier] Cloud sync note: $e');
       }
-    } catch (e) {
-      debugPrint('[SubjectsNotifier] Cloud sync note: $e');
     }
 
     // 3. Filter out any deleted tombstones and save active subjects to local cache
@@ -233,6 +240,7 @@ class SubjectsNotifier extends Notifier<List<Map<String, dynamic>>> {
     final currentMaps = await db.query('subjects', orderBy: 'id DESC');
     try {
       await prefs.setString('local_cached_subjects_v1', jsonEncode(currentMaps));
+      await prefs.remove('last_cloud_fetch_subjects');
     } catch (_) {}
 
     // Save to Cloud Firestore
@@ -363,6 +371,7 @@ class SubjectsNotifier extends Notifier<List<Map<String, dynamic>>> {
     final currentMaps = await db.query('subjects', orderBy: 'id DESC');
     try {
       await prefs.setString('local_cached_subjects_v1', jsonEncode(currentMaps));
+      await prefs.remove('last_cloud_fetch_subjects');
     } catch (_) {}
 
     if (ref.mounted) state = currentMaps;
@@ -445,44 +454,51 @@ class SectionsNotifier extends Notifier<List<Map<String, dynamic>>> {
       }
     }
 
-    // 2. Fetch from Cloud Firestore if available and merge
-    try {
-      final cloudDocs = await FirestoreService().fetchAllDocuments('sections');
-      if (cloudDocs.isNotEmpty) {
-        for (final doc in cloudDocs) {
-          final secName = doc['name']?.toString() ?? '';
-          final secKey = doc['enrollment_key']?.toString().toUpperCase() ?? doc['id']?.toString().toUpperCase() ?? '';
-          if (deletedSections.contains(secName) || deletedSections.contains(secKey)) {
-            continue;
-          }
-          final existing = await db.query('sections',
-              where: 'enrollment_key = ? OR name = ?',
-              whereArgs: [secKey, secName]);
-          if (existing.isEmpty) {
-            await db.insert('sections', {
-              'name': secName,
-              'description': doc['description']?.toString() ?? '',
-              'grade': doc['grade']?.toString() ?? 'Grade 10',
-              'room': doc['room']?.toString() ?? '',
-              'student_count': int.tryParse(doc['student_count']?.toString() ?? '0') ?? 0,
-              'enrollment_key': secKey,
-              'created_at': doc['created_at']?.toString() ?? DateTime.now().toIso8601String(),
-            }, conflictAlgorithm: ConflictAlgorithm.replace);
-          }
-          if (secKey.isNotEmpty && secName.isNotEmpty) {
-            await db.insert('reg_links', {
-              'code': secKey,
-              'section': secName,
-              'max_uses': int.tryParse(doc['max_uses']?.toString() ?? '50') ?? 50,
-              'used_count': int.tryParse(doc['used_count']?.toString() ?? '0') ?? 0,
-              'expiration': doc['expiration']?.toString() ?? '2026-12-31',
-              'created_at': doc['created_at']?.toString() ?? DateTime.now().toIso8601String(),
-            }, conflictAlgorithm: ConflictAlgorithm.replace);
+    // 2. Fetch from Cloud Firestore if cache is stale (> 5 mins) or local SQLite is empty
+    final lastFetch = prefs.getInt('last_cloud_fetch_sections') ?? 0;
+    final nowMs = DateTime.now().millisecondsSinceEpoch;
+    final isStale = (nowMs - lastFetch) > 5 * 60 * 1000;
+
+    if (isStale || existingLocal.isEmpty) {
+      try {
+        final cloudDocs = await FirestoreService().fetchAllDocuments('sections');
+        if (cloudDocs.isNotEmpty) {
+          await prefs.setInt('last_cloud_fetch_sections', nowMs);
+          for (final doc in cloudDocs) {
+            final secName = doc['name']?.toString() ?? '';
+            final secKey = doc['enrollment_key']?.toString().toUpperCase() ?? doc['id']?.toString().toUpperCase() ?? '';
+            if (deletedSections.contains(secName) || deletedSections.contains(secKey)) {
+              continue;
+            }
+            final existing = await db.query('sections',
+                where: 'enrollment_key = ? OR name = ?',
+                whereArgs: [secKey, secName]);
+            if (existing.isEmpty) {
+              await db.insert('sections', {
+                'name': secName,
+                'description': doc['description']?.toString() ?? '',
+                'grade': doc['grade']?.toString() ?? 'Grade 10',
+                'room': doc['room']?.toString() ?? '',
+                'student_count': int.tryParse(doc['student_count']?.toString() ?? '0') ?? 0,
+                'enrollment_key': secKey,
+                'created_at': doc['created_at']?.toString() ?? DateTime.now().toIso8601String(),
+              }, conflictAlgorithm: ConflictAlgorithm.replace);
+            }
+            if (secKey.isNotEmpty && secName.isNotEmpty) {
+              await db.insert('reg_links', {
+                'code': secKey,
+                'section': secName,
+                'max_uses': int.tryParse(doc['max_uses']?.toString() ?? '50') ?? 50,
+                'used_count': int.tryParse(doc['used_count']?.toString() ?? '0') ?? 0,
+                'expiration': doc['expiration']?.toString() ?? '2026-12-31',
+                'created_at': doc['created_at']?.toString() ?? DateTime.now().toIso8601String(),
+              }, conflictAlgorithm: ConflictAlgorithm.replace);
+            }
           }
         }
+      } catch (e) {
+        debugPrint('[SectionsNotifier] Cloud sync note: $e');
       }
-    } catch (e) {
-      debugPrint('[SectionsNotifier] Cloud sync note: $e');
     }
 
     // 3. Filter out any deleted tombstones and save active sections to local cache
@@ -526,6 +542,7 @@ class SectionsNotifier extends Notifier<List<Map<String, dynamic>>> {
 
     // Remove from tombstone if re-created
     final prefs = await SharedPreferences.getInstance();
+    await prefs.remove('last_cloud_fetch_keys');
     final deleted = prefs.getStringList('permanently_deleted_sections') ?? [];
     if (deleted.contains(resolvedKey) || deleted.contains(sectionName)) {
       deleted.remove(resolvedKey);
@@ -538,6 +555,8 @@ class SectionsNotifier extends Notifier<List<Map<String, dynamic>>> {
     final currentMaps = await db.query('sections', orderBy: 'id DESC');
     try {
       await prefs.setString('local_cached_sections_v1', jsonEncode(currentMaps));
+      await prefs.remove('last_cloud_fetch_sections');
+      await prefs.remove('last_cloud_fetch_keys');
     } catch (_) {}
 
     // Save to Cloud Firestore
@@ -584,6 +603,8 @@ class SectionsNotifier extends Notifier<List<Map<String, dynamic>>> {
     final currentMaps = await db.query('sections', orderBy: 'id DESC');
     try {
       await prefs.setString('local_cached_sections_v1', jsonEncode(currentMaps));
+      await prefs.remove('last_cloud_fetch_sections');
+      await prefs.remove('last_cloud_fetch_keys');
     } catch (_) {}
 
     if (resolvedKey != null && resolvedKey.isNotEmpty) {
@@ -657,6 +678,7 @@ class SectionsNotifier extends Notifier<List<Map<String, dynamic>>> {
     } catch (_) {}
 
     final prefs = await SharedPreferences.getInstance();
+    await prefs.remove('last_cloud_fetch_keys');
     final deleted = prefs.getStringList('permanently_deleted_sections') ?? [];
     if (secKey != null && secKey.isNotEmpty && !deleted.contains(secKey)) {
       deleted.add(secKey);
@@ -670,6 +692,8 @@ class SectionsNotifier extends Notifier<List<Map<String, dynamic>>> {
     final currentMaps = await db.query('sections', orderBy: 'id DESC');
     try {
       await prefs.setString('local_cached_sections_v1', jsonEncode(currentMaps));
+      await prefs.remove('last_cloud_fetch_sections');
+      await prefs.remove('last_cloud_fetch_keys');
     } catch (_) {}
 
     if (ref.mounted) state = currentMaps;
@@ -1211,29 +1235,36 @@ class AdminKeysNotifier extends Notifier<List<Map<String, dynamic>>> {
     final prefs = await SharedPreferences.getInstance();
     final deletedSections = prefs.getStringList('permanently_deleted_sections') ?? [];
 
-    try {
-      final cloudKeys = await FirestoreService().fetchAllDocuments('enrollment_keys');
-      if (cloudKeys.isNotEmpty) {
-        for (final k in cloudKeys) {
-          final code = k['code']?.toString().toUpperCase() ?? k['id']?.toString().toUpperCase() ?? '';
-          final sec = k['section']?.toString() ?? '';
-          if (deletedSections.contains(code) || deletedSections.contains(sec)) {
-            continue;
-          }
-          if (code.isNotEmpty) {
-            await db.insert('reg_links', {
-              'code': code,
-              'section': sec,
-              'max_uses': int.tryParse(k['max_uses']?.toString() ?? '50') ?? 50,
-              'used_count': int.tryParse(k['used_count']?.toString() ?? '0') ?? 0,
-              'expiration': k['expiration']?.toString() ?? '2026-12-31',
-              'created_at': k['created_at']?.toString() ?? DateTime.now().toIso8601String(),
-            }, conflictAlgorithm: ConflictAlgorithm.replace);
+    final lastFetch = prefs.getInt('last_cloud_fetch_keys') ?? 0;
+    final nowMs = DateTime.now().millisecondsSinceEpoch;
+    final isStale = (nowMs - lastFetch) > 5 * 60 * 1000;
+
+    if (isStale) {
+      try {
+        final cloudKeys = await FirestoreService().fetchAllDocuments('enrollment_keys');
+        if (cloudKeys.isNotEmpty) {
+          await prefs.setInt('last_cloud_fetch_keys', nowMs);
+          for (final k in cloudKeys) {
+            final code = k['code']?.toString().toUpperCase() ?? k['id']?.toString().toUpperCase() ?? '';
+            final sec = k['section']?.toString() ?? '';
+            if (deletedSections.contains(code) || deletedSections.contains(sec)) {
+              continue;
+            }
+            if (code.isNotEmpty) {
+              await db.insert('reg_links', {
+                'code': code,
+                'section': sec,
+                'max_uses': int.tryParse(k['max_uses']?.toString() ?? '50') ?? 50,
+                'used_count': int.tryParse(k['used_count']?.toString() ?? '0') ?? 0,
+                'expiration': k['expiration']?.toString() ?? '2026-12-31',
+                'created_at': k['created_at']?.toString() ?? DateTime.now().toIso8601String(),
+              }, conflictAlgorithm: ConflictAlgorithm.replace);
+            }
           }
         }
+      } catch (e) {
+        debugPrint('[AdminKeysNotifier] Cloud loadKeys note: $e');
       }
-    } catch (e) {
-      debugPrint('[AdminKeysNotifier] Cloud loadKeys note: $e');
     }
 
     final keys = await DatabaseHelper().getEnrollmentKeysList();
@@ -1266,6 +1297,7 @@ class AdminKeysNotifier extends Notifier<List<Map<String, dynamic>>> {
     });
 
     final prefs = await SharedPreferences.getInstance();
+    await prefs.remove('last_cloud_fetch_keys');
     final deleted = prefs.getStringList('permanently_deleted_sections') ?? [];
     if (deleted.contains(cleanCode)) {
       deleted.remove(cleanCode);
@@ -1282,6 +1314,7 @@ class AdminKeysNotifier extends Notifier<List<Map<String, dynamic>>> {
     await FirestoreService().deleteDocument('reg_links', cleanCode);
 
     final prefs = await SharedPreferences.getInstance();
+    await prefs.remove('last_cloud_fetch_keys');
     final deleted = prefs.getStringList('permanently_deleted_sections') ?? [];
     if (!deleted.contains(cleanCode)) {
       deleted.add(cleanCode);

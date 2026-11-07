@@ -358,14 +358,45 @@ class FirestoreService {
   }
 
   /// Calculates the highest numeric sequence for a given ID prefix (e.g. 'S-100-', 'T-100-', 'A-100-', 'SA-000-', or legacy '001-')
+  /// Efficiently checks local SQLite first (0 Firestore reads) before querying Cloud Firestore with limit(1).
   Future<int> getHighestSequence(String prefix) async {
     int maxSeq = 0;
     final cleanPrefix = prefix.toUpperCase();
+
+    // 1. Check local SQLite first - costs 0 Cloud Firestore reads!
     try {
-      final allUsers = await fetchAllUsers();
-      for (final u in allUsers) {
-        final uid = (u['id']?.toString() ?? '').toUpperCase();
-        if (uid.startsWith(cleanPrefix)) {
+      final db = await DatabaseHelper().database;
+      final localMatches = await db.rawQuery(
+        "SELECT id FROM users WHERE UPPER(id) LIKE ? ORDER BY id DESC LIMIT 50",
+        ['$cleanPrefix%'],
+      );
+      for (final row in localMatches) {
+        final uid = (row['id']?.toString() ?? '').toUpperCase();
+        final parts = uid.split('-');
+        if (parts.isNotEmpty) {
+          final num = int.tryParse(parts.last);
+          if (num != null && num > maxSeq) {
+            maxSeq = num;
+          }
+        }
+      }
+    } catch (_) {}
+
+    // If local database has records for this prefix, return immediately!
+    if (maxSeq > 0) return maxSeq;
+
+    // 2. Only query Cloud Firestore if local database has 0 records, using limit(1) instead of fetching all users!
+    if (isAvailable) {
+      try {
+        final snap = await usersCollection
+            .where(FieldPath.documentId, isGreaterThanOrEqualTo: cleanPrefix)
+            .where(FieldPath.documentId, isLessThan: '$cleanPrefix\uf8ff')
+            .orderBy(FieldPath.documentId, descending: true)
+            .limit(1)
+            .get(const GetOptions(source: Source.serverAndCache))
+            .timeout(const Duration(seconds: 4));
+        if (snap.docs.isNotEmpty) {
+          final uid = snap.docs.first.id.toUpperCase();
           final parts = uid.split('-');
           if (parts.isNotEmpty) {
             final num = int.tryParse(parts.last);
@@ -374,15 +405,16 @@ class FirestoreService {
             }
           }
         }
+      } catch (e) {
+        debugPrint('[FirestoreService] getHighestSequence query note: $e');
       }
-    } catch (e) {
-      debugPrint('[FirestoreService] getHighestSequence note: $e');
     }
     return maxSeq;
   }
 
   /// Saves or updates a user document in Cloud Firestore
   Future<void> saveUser(Map<String, dynamic> userData) async {
+    invalidateUsersSyncCache();
     final id = userData['id']?.toString();
     if (id == null || id.isEmpty) return;
 
@@ -633,8 +665,23 @@ class FirestoreService {
     return;
   }
 
-  /// Syncs Cloud Firestore users down to local SQLite cache and prunes deleted accounts
-  Future<void> syncCloudUsersToLocal() async {
+  DateTime? _lastUsersSyncTime;
+
+  /// Invalidates the users sync throttle cache so next sync requests Cloud Firestore immediately.
+  void invalidateUsersSyncCache() {
+    _lastUsersSyncTime = null;
+  }
+
+  /// Syncs Cloud Firestore users down to local SQLite cache and prunes deleted accounts.
+  /// Throttled to at most once per 5 minutes unless [force] is true to prevent exceeding quotas.
+  Future<void> syncCloudUsersToLocal({bool force = false}) async {
+    final now = DateTime.now();
+    if (!force && _lastUsersSyncTime != null && now.difference(_lastUsersSyncTime!) < const Duration(minutes: 5)) {
+      debugPrint('[FirestoreService] syncCloudUsersToLocal throttled (last synced ${now.difference(_lastUsersSyncTime!).inSeconds}s ago)');
+      return;
+    }
+    _lastUsersSyncTime = now;
+
     try {
       List<Map<String, dynamic>> cloudUsers = [];
 
@@ -949,6 +996,7 @@ class FirestoreService {
 
   /// Deletes a user document from Cloud Firestore, ensuring both direct ID and email matches are purged
   Future<void> deleteUser(String userId, {String? email, String? username}) async {
+    invalidateUsersSyncCache();
     final cleanId = userId.trim();
     final cleanEmail = email?.trim().toLowerCase() ?? '';
     final cleanUser = username?.trim().toLowerCase() ?? '';

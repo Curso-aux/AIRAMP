@@ -54,7 +54,7 @@ class _OfflineSyncStatusPillState extends ConsumerState<OfflineSyncStatusPill>
   void _triggerManualSync() async {
     final syncNotifier = ref.read(offlineSyncProvider.notifier);
     _rotationController.repeat();
-    await syncNotifier.syncNow();
+    await syncNotifier.syncNow(force: true);
     if (mounted) {
       _rotationController.stop();
       _rotationController.reset();

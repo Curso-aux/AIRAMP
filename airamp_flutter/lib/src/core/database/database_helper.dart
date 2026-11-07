@@ -8432,23 +8432,40 @@ class DatabaseHelper {
     }
   }
 
-  /// Full bidirectional synchronization: pushes local creations first, then pulls all cloud records
-  Future<void> syncAllCloudData() async {
+  DateTime? _lastFullSyncTime;
+
+  /// Bidirectional synchronization: pulls all cloud records and pushes queued creations.
+  /// Throttled to 10 minutes unless [force] is true to prevent exceeding Firestore quotas.
+  Future<void> syncAllCloudData({bool force = false}) async {
+    final now = DateTime.now();
+    if (!force && _lastFullSyncTime != null && now.difference(_lastFullSyncTime!) < const Duration(minutes: 10)) {
+      debugPrint('[DatabaseHelper] syncAllCloudData throttled (last full sync ${now.difference(_lastFullSyncTime!).inMinutes}m ago)');
+      return;
+    }
+    _lastFullSyncTime = now;
+
     try {
       // 1. Sync User Directory with highest priority for immediate cross-device identity
       try {
         await FirestoreService().syncLocalUsersToCloud();
-        await FirestoreService().syncCloudUsersToLocal();
+        await FirestoreService().syncCloudUsersToLocal(force: force);
       } catch (e) {
         debugPrint('[DatabaseHelper] User sync note: $e');
       }
 
-      // 2. Curriculum, quizzes, assignments, and submissions in background
+      // 2. Only push local curriculum/quizzes/assignments if explicitly forced (manual sync)
+      // because individual mutations already push to Cloud Firestore upon creation!
+      if (force) {
+        await Future.wait([
+          pushLocalCurriculumToCloud(),
+          pushLocalQuizzesToCloud(),
+          pushLocalAssignmentsToCloud(),
+          pushLocalSubmissionsToCloud(),
+        ]);
+      }
+
+      // 3. Pull latest curriculum, quizzes, assignments, and submissions in background
       await Future.wait([
-        pushLocalCurriculumToCloud(),
-        pushLocalQuizzesToCloud(),
-        pushLocalAssignmentsToCloud(),
-        pushLocalSubmissionsToCloud(),
         syncCloudCurriculumToLocal(),
         syncCloudQuizzesToLocal(),
         syncCloudAssignmentsToLocal(),
