@@ -146,49 +146,44 @@ class _AdminWebTeachersScreenState extends ConsumerState<AdminWebTeachersScreen>
                     ],
                   );
 
-                  final actionButtons = Wrap(
-                    spacing: 10,
-                    runSpacing: 8,
-                    crossAxisAlignment: WrapCrossAlignment.center,
-                    children: [
-                      OutlinedButton.icon(
-                        onPressed: () => context.go('/admin/schedules'),
-                        icon: const Icon(Icons.calendar_month_outlined, size: 18),
-                        label: const Text('Master Timetable', style: TextStyle(fontWeight: FontWeight.w600)),
-                        style: OutlinedButton.styleFrom(
-                          foregroundColor: AppTheme.text,
-                          side: BorderSide(color: AppTheme.border),
-                          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                          minimumSize: const Size(0, 42),
-                        ),
-                      ),
-                      OutlinedButton.icon(
-                        onPressed: () => TeacherBulkImportModal.show(context),
-                        icon: const Icon(Icons.upload_file_outlined, size: 18),
-                        label: const Text('Bulk Import (CSV)', style: TextStyle(fontWeight: FontWeight.w600)),
-                        style: OutlinedButton.styleFrom(
-                          foregroundColor: AppTheme.text,
-                          side: BorderSide(color: AppTheme.border),
-                          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                          minimumSize: const Size(0, 42),
-                        ),
-                      ),
-                      ElevatedButton.icon(
-                        onPressed: () => _openAddTeacherDialog(context, subjects),
-                        icon: const Icon(Icons.person_add_alt_1, size: 18),
-                        label: const Text('Add New Faculty'),
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: AppTheme.primary,
-                          foregroundColor: Colors.white,
-                          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                          elevation: 0,
-                          minimumSize: const Size(0, 42),
-                        ),
-                      ),
-                    ],
+                  final timetableBtn = OutlinedButton.icon(
+                    onPressed: () => context.go('/admin/schedules'),
+                    icon: const Icon(Icons.calendar_month_outlined, size: 18),
+                    label: const Text('Master Timetable', style: TextStyle(fontWeight: FontWeight.w600)),
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: AppTheme.text,
+                      side: BorderSide(color: AppTheme.border),
+                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                      minimumSize: const Size(0, 42),
+                    ),
+                  );
+
+                  final importBtn = OutlinedButton.icon(
+                    onPressed: () => TeacherBulkImportModal.show(context),
+                    icon: const Icon(Icons.upload_file_outlined, size: 18),
+                    label: const Text('Bulk Import (CSV)', style: TextStyle(fontWeight: FontWeight.w600)),
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: AppTheme.text,
+                      side: BorderSide(color: AppTheme.border),
+                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                      minimumSize: const Size(0, 42),
+                    ),
+                  );
+
+                  final addFacultyBtn = ElevatedButton.icon(
+                    onPressed: () => _openAddTeacherDialog(context, subjects),
+                    icon: const Icon(Icons.person_add_alt_1, size: 18),
+                    label: const Text('Add New Faculty', style: TextStyle(fontWeight: FontWeight.w600)),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: AppTheme.primary,
+                      foregroundColor: Colors.white,
+                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                      elevation: 0,
+                      minimumSize: const Size(0, 42),
+                    ),
                   );
 
                   if (isNarrow) {
@@ -197,7 +192,18 @@ class _AdminWebTeachersScreenState extends ConsumerState<AdminWebTeachersScreen>
                       children: [
                         titleSection,
                         const SizedBox(height: 14),
-                        actionButtons,
+                        SizedBox(
+                          width: double.infinity,
+                          child: addFacultyBtn,
+                        ),
+                        const SizedBox(height: 10),
+                        Row(
+                          children: [
+                            Expanded(child: timetableBtn),
+                            const SizedBox(width: 10),
+                            Expanded(child: importBtn),
+                          ],
+                        ),
                       ],
                     );
                   }
@@ -207,7 +213,16 @@ class _AdminWebTeachersScreenState extends ConsumerState<AdminWebTeachersScreen>
                     children: [
                       Expanded(child: titleSection),
                       const SizedBox(width: 16),
-                      actionButtons,
+                      Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          timetableBtn,
+                          const SizedBox(width: 10),
+                          importBtn,
+                          const SizedBox(width: 10),
+                          addFacultyBtn,
+                        ],
+                      ),
                     ],
                   );
                 },
@@ -215,165 +230,175 @@ class _AdminWebTeachersScreenState extends ConsumerState<AdminWebTeachersScreen>
               const SizedBox(height: 18),
 
               // View Mode Switcher: Active Faculty vs Archive Vault
-              Row(
-                children: [
-                  Container(
-                    padding: const EdgeInsets.all(4),
-                    decoration: BoxDecoration(
-                      color: isDark ? const Color(0xFF1E293B) : const Color(0xFFF1F5F9),
-                      borderRadius: BorderRadius.circular(12),
-                      border: Border.all(color: AppTheme.border),
-                    ),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        // All Faculty
-                        InkWell(
-                          onTap: () {
-                            setState(() {
-                              _statusFilter = 'all';
-                              _isSelectionMode = false;
-                              _selectedTeacherIds.clear();
-                            });
-                          },
-                          borderRadius: BorderRadius.circular(9),
-                          child: AnimatedContainer(
-                            duration: const Duration(milliseconds: 180),
-                            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-                            decoration: BoxDecoration(
-                              color: _statusFilter == 'all' ? AppTheme.surface : Colors.transparent,
-                              borderRadius: BorderRadius.circular(9),
-                              boxShadow: _statusFilter == 'all'
-                                  ? [
-                                      BoxShadow(
-                                        color: Colors.black.withValues(alpha: 0.06),
-                                        blurRadius: 4,
-                                        offset: const Offset(0, 2),
-                                      ),
-                                    ]
-                                  : null,
-                            ),
-                            child: Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                Icon(
-                                  Icons.school_outlined,
-                                  size: 16,
-                                  color: _statusFilter == 'all' ? AppTheme.primary : AppTheme.textMuted,
-                                ),
-                                const SizedBox(width: 8),
-                                Text(
-                                  'All Faculty (${teachers.length + archivedTeachers.length})',
-                                  style: TextStyle(
-                                    fontSize: 13,
-                                    fontWeight: _statusFilter == 'all' ? FontWeight.bold : FontWeight.w500,
-                                    color: _statusFilter == 'all' ? AppTheme.text : AppTheme.textMuted,
+              LayoutBuilder(
+                builder: (context, switcherConstraints) {
+                  final isCompact = switcherConstraints.maxWidth < 520;
+                  final allCount = teachers.length + archivedTeachers.length;
+                  final allLabel = isCompact ? 'All ($allCount)' : 'All Faculty ($allCount)';
+                  final activeLabel = isCompact ? 'Active (${teachers.length})' : 'Active Faculty (${teachers.length})';
+                  final inactiveLabel = isCompact ? 'Inactive (${archivedTeachers.length})' : 'Inactive Accounts (${archivedTeachers.length})';
+
+                  return SingleChildScrollView(
+                    scrollDirection: Axis.horizontal,
+                    physics: const BouncingScrollPhysics(),
+                    child: Container(
+                      padding: const EdgeInsets.all(4),
+                      decoration: BoxDecoration(
+                        color: isDark ? const Color(0xFF1E293B) : const Color(0xFFF1F5F9),
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(color: AppTheme.border),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          // All Faculty
+                          InkWell(
+                            onTap: () {
+                              setState(() {
+                                _statusFilter = 'all';
+                                _isSelectionMode = false;
+                                _selectedTeacherIds.clear();
+                              });
+                            },
+                            borderRadius: BorderRadius.circular(9),
+                            child: AnimatedContainer(
+                              duration: const Duration(milliseconds: 180),
+                              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                              decoration: BoxDecoration(
+                                color: _statusFilter == 'all' ? AppTheme.surface : Colors.transparent,
+                                borderRadius: BorderRadius.circular(9),
+                                boxShadow: _statusFilter == 'all'
+                                    ? [
+                                        BoxShadow(
+                                          color: Colors.black.withValues(alpha: 0.06),
+                                          blurRadius: 4,
+                                          offset: const Offset(0, 2),
+                                        ),
+                                      ]
+                                    : null,
+                              ),
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Icon(
+                                    Icons.school_outlined,
+                                    size: 16,
+                                    color: _statusFilter == 'all' ? AppTheme.primary : AppTheme.textMuted,
                                   ),
-                                ),
-                              ],
+                                  const SizedBox(width: 8),
+                                  Text(
+                                    allLabel,
+                                    style: TextStyle(
+                                      fontSize: 13,
+                                      fontWeight: _statusFilter == 'all' ? FontWeight.bold : FontWeight.w500,
+                                      color: _statusFilter == 'all' ? AppTheme.text : AppTheme.textMuted,
+                                    ),
+                                  ),
+                                ],
+                              ),
                             ),
                           ),
-                        ),
-                        const SizedBox(width: 4),
-                        // Active Faculty
-                        InkWell(
-                          onTap: () {
-                            setState(() {
-                              _statusFilter = 'active';
-                              _isSelectionMode = false;
-                              _selectedTeacherIds.clear();
-                            });
-                          },
-                          borderRadius: BorderRadius.circular(9),
-                          child: AnimatedContainer(
-                            duration: const Duration(milliseconds: 180),
-                            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-                            decoration: BoxDecoration(
-                              color: _statusFilter == 'active' ? AppTheme.surface : Colors.transparent,
-                              borderRadius: BorderRadius.circular(9),
-                              boxShadow: _statusFilter == 'active'
-                                  ? [
-                                      BoxShadow(
-                                        color: Colors.black.withValues(alpha: 0.06),
-                                        blurRadius: 4,
-                                        offset: const Offset(0, 2),
-                                      ),
-                                    ]
-                                  : null,
-                            ),
-                            child: Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                Icon(
-                                  Icons.badge_outlined,
-                                  size: 16,
-                                  color: _statusFilter == 'active' ? AppTheme.primary : AppTheme.textMuted,
-                                ),
-                                const SizedBox(width: 8),
-                                Text(
-                                  'Active Faculty (${teachers.length})',
-                                  style: TextStyle(
-                                    fontSize: 13,
-                                    fontWeight: _statusFilter == 'active' ? FontWeight.bold : FontWeight.w500,
-                                    color: _statusFilter == 'active' ? AppTheme.text : AppTheme.textMuted,
+                          const SizedBox(width: 4),
+                          // Active Faculty
+                          InkWell(
+                            onTap: () {
+                              setState(() {
+                                _statusFilter = 'active';
+                                _isSelectionMode = false;
+                                _selectedTeacherIds.clear();
+                              });
+                            },
+                            borderRadius: BorderRadius.circular(9),
+                            child: AnimatedContainer(
+                              duration: const Duration(milliseconds: 180),
+                              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                              decoration: BoxDecoration(
+                                color: _statusFilter == 'active' ? AppTheme.surface : Colors.transparent,
+                                borderRadius: BorderRadius.circular(9),
+                                boxShadow: _statusFilter == 'active'
+                                    ? [
+                                        BoxShadow(
+                                          color: Colors.black.withValues(alpha: 0.06),
+                                          blurRadius: 4,
+                                          offset: const Offset(0, 2),
+                                        ),
+                                      ]
+                                    : null,
+                              ),
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Icon(
+                                    Icons.badge_outlined,
+                                    size: 16,
+                                    color: _statusFilter == 'active' ? AppTheme.primary : AppTheme.textMuted,
                                   ),
-                                ),
-                              ],
+                                  const SizedBox(width: 8),
+                                  Text(
+                                    activeLabel,
+                                    style: TextStyle(
+                                      fontSize: 13,
+                                      fontWeight: _statusFilter == 'active' ? FontWeight.bold : FontWeight.w500,
+                                      color: _statusFilter == 'active' ? AppTheme.text : AppTheme.textMuted,
+                                    ),
+                                  ),
+                                ],
+                              ),
                             ),
                           ),
-                        ),
-                        const SizedBox(width: 4),
-                        // Inactive Faculty
-                        InkWell(
-                          onTap: () {
-                            setState(() {
-                              _statusFilter = 'inactive';
-                              _isSelectionMode = false;
-                              _selectedTeacherIds.clear();
-                            });
-                          },
-                          borderRadius: BorderRadius.circular(9),
-                          child: AnimatedContainer(
-                            duration: const Duration(milliseconds: 180),
-                            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-                            decoration: BoxDecoration(
-                              color: _statusFilter == 'inactive' ? AppTheme.surface : Colors.transparent,
-                              borderRadius: BorderRadius.circular(9),
-                              boxShadow: _statusFilter == 'inactive'
-                                  ? [
-                                      BoxShadow(
-                                        color: Colors.black.withValues(alpha: 0.06),
-                                        blurRadius: 4,
-                                        offset: const Offset(0, 2),
-                                      ),
-                                    ]
-                                  : null,
-                            ),
-                            child: Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                Icon(
-                                  Icons.person_off_outlined,
-                                  size: 16,
-                                  color: _statusFilter == 'inactive' ? const Color(0xFFD97706) : AppTheme.textMuted,
-                                ),
-                                const SizedBox(width: 8),
-                                Text(
-                                  'Inactive Accounts (${archivedTeachers.length})',
-                                  style: TextStyle(
-                                    fontSize: 13,
-                                    fontWeight: _statusFilter == 'inactive' ? FontWeight.bold : FontWeight.w500,
+                          const SizedBox(width: 4),
+                          // Inactive Faculty
+                          InkWell(
+                            onTap: () {
+                              setState(() {
+                                _statusFilter = 'inactive';
+                                _isSelectionMode = false;
+                                _selectedTeacherIds.clear();
+                              });
+                            },
+                            borderRadius: BorderRadius.circular(9),
+                            child: AnimatedContainer(
+                              duration: const Duration(milliseconds: 180),
+                              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                              decoration: BoxDecoration(
+                                color: _statusFilter == 'inactive' ? AppTheme.surface : Colors.transparent,
+                                borderRadius: BorderRadius.circular(9),
+                                boxShadow: _statusFilter == 'inactive'
+                                    ? [
+                                        BoxShadow(
+                                          color: Colors.black.withValues(alpha: 0.06),
+                                          blurRadius: 4,
+                                          offset: const Offset(0, 2),
+                                        ),
+                                      ]
+                                    : null,
+                              ),
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Icon(
+                                    Icons.person_off_outlined,
+                                    size: 16,
                                     color: _statusFilter == 'inactive' ? const Color(0xFFD97706) : AppTheme.textMuted,
                                   ),
-                                ),
-                              ],
+                                  const SizedBox(width: 8),
+                                  Text(
+                                    inactiveLabel,
+                                    style: TextStyle(
+                                      fontSize: 13,
+                                      fontWeight: _statusFilter == 'inactive' ? FontWeight.bold : FontWeight.w500,
+                                      color: _statusFilter == 'inactive' ? const Color(0xFFD97706) : AppTheme.textMuted,
+                                    ),
+                                  ),
+                                ],
+                              ),
                             ),
                           ),
-                        ),
-                      ],
+                        ],
+                      ),
                     ),
-                  ),
-                ],
+                  );
+                },
               ),
               const SizedBox(height: 20),
 
@@ -420,79 +445,111 @@ class _AdminWebTeachersScreenState extends ConsumerState<AdminWebTeachersScreen>
                 ),
               ] else ...[
                 // Faculty Archive Vault Banner
-                Container(
-                  padding: const EdgeInsets.all(20),
-                  decoration: BoxDecoration(
-                    color: isDark ? const Color(0xFF1E293B) : const Color(0xFFFFFBEB),
-                    borderRadius: BorderRadius.circular(16),
-                    border: Border.all(
-                      color: const Color(0xFFF59E0B).withValues(alpha: 0.5),
-                      width: 1.2,
-                    ),
-                  ),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Row(
-                        children: [
-                          Container(
-                            padding: const EdgeInsets.all(10),
-                            decoration: BoxDecoration(
-                              color: const Color(0xFFD97706).withValues(alpha: 0.15),
-                              borderRadius: BorderRadius.circular(10),
-                            ),
-                            child: const Icon(Icons.person_off_outlined, color: Color(0xFFD97706), size: 22),
+                LayoutBuilder(
+                  builder: (context, bannerConstraints) {
+                    final isNarrow = bannerConstraints.maxWidth < 640;
+
+                    final headerIcon = Container(
+                      padding: const EdgeInsets.all(10),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFD97706).withValues(alpha: 0.15),
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      child: const Icon(Icons.person_off_outlined, color: Color(0xFFD97706), size: 22),
+                    );
+
+                    final titleAndCount = Wrap(
+                      spacing: 8,
+                      runSpacing: 4,
+                      crossAxisAlignment: WrapCrossAlignment.center,
+                      children: [
+                        Text(
+                          'Deactivated Faculty Accounts',
+                          style: TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.bold,
+                            color: isDark ? Colors.white : const Color(0xFF92400E),
                           ),
-                          const SizedBox(width: 12),
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
+                        ),
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFFD97706),
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          child: Text(
+                            '${filteredTeachers.length} Record${filteredTeachers.length == 1 ? '' : 's'}',
+                            style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Colors.white),
+                          ),
+                        ),
+                      ],
+                    );
+
+                    final descriptionText = Text(
+                      'Deactivated faculty accounts are safely preserved here with their profile and teaching history intact. You can reactivate them to active status or delete them permanently.',
+                      style: TextStyle(fontSize: 12.5, color: isDark ? const Color(0xFFCBD5E1) : const Color(0xFF78350F)),
+                    );
+
+                    final backButton = TextButton.icon(
+                      onPressed: () {
+                        setState(() {
+                          _isArchiveView = false;
+                          _selectedTeacherIds.clear();
+                        });
+                      },
+                      icon: const Icon(Icons.arrow_back, size: 14),
+                      label: const Text('Back to Active Faculty', style: TextStyle(fontSize: 12)),
+                      style: TextButton.styleFrom(foregroundColor: const Color(0xFFD97706)),
+                    );
+
+                    return Container(
+                      padding: const EdgeInsets.all(16),
+                      decoration: BoxDecoration(
+                        color: isDark ? const Color(0xFF1E293B) : const Color(0xFFFFFBEB),
+                        borderRadius: BorderRadius.circular(16),
+                        border: Border.all(
+                          color: const Color(0xFFF59E0B).withValues(alpha: 0.5),
+                          width: 1.2,
+                        ),
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          if (isNarrow) ...[
+                            Row(
                               children: [
-                                Row(
-                                  children: [
-                                    Text(
-                                      'Deactivated Faculty Accounts',
-                                      style: TextStyle(
-                                        fontSize: 16,
-                                        fontWeight: FontWeight.bold,
-                                        color: isDark ? Colors.white : const Color(0xFF92400E),
-                                      ),
-                                    ),
-                                    const SizedBox(width: 8),
-                                    Container(
-                                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                                      decoration: BoxDecoration(
-                                        color: const Color(0xFFD97706),
-                                        borderRadius: BorderRadius.circular(12),
-                                      ),
-                                      child: Text(
-                                        '${filteredTeachers.length} Record${filteredTeachers.length == 1 ? '' : 's'}',
-                                        style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Colors.white),
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                                const SizedBox(height: 3),
-                                Text(
-                                  'Deactivated faculty accounts are safely preserved here with their profile and teaching history intact. You can reactivate them to active status or delete them permanently.',
-                                  style: TextStyle(fontSize: 12.5, color: isDark ? const Color(0xFFCBD5E1) : const Color(0xFF78350F)),
-                                ),
+                                headerIcon,
+                                const SizedBox(width: 12),
+                                Expanded(child: titleAndCount),
                               ],
                             ),
-                          ),
-                          TextButton.icon(
-                            onPressed: () {
-                              setState(() {
-                                _isArchiveView = false;
-                                _selectedTeacherIds.clear();
-                              });
-                            },
-                            icon: const Icon(Icons.arrow_back, size: 14),
-                            label: const Text('Back to Active Faculty', style: TextStyle(fontSize: 12)),
-                            style: TextButton.styleFrom(foregroundColor: const Color(0xFFD97706)),
-                          ),
-                        ],
-                      ),
+                            const SizedBox(height: 8),
+                            descriptionText,
+                            const SizedBox(height: 4),
+                            Align(
+                              alignment: Alignment.centerLeft,
+                              child: backButton,
+                            ),
+                          ] else
+                            Row(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                headerIcon,
+                                const SizedBox(width: 12),
+                                Expanded(
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      titleAndCount,
+                                      const SizedBox(height: 3),
+                                      descriptionText,
+                                    ],
+                                  ),
+                                ),
+                                const SizedBox(width: 12),
+                                backButton,
+                              ],
+                            ),
                       if (filteredTeachers.isNotEmpty) ...[
                         const SizedBox(height: 14),
                         Wrap(
@@ -569,108 +626,148 @@ class _AdminWebTeachersScreenState extends ConsumerState<AdminWebTeachersScreen>
                       ],
                     ],
                   ),
-                ),
+                );
+              },
+            ),
               ],
               const SizedBox(height: 24),
 
               // Search & Filter Toolbar
-              Container(
-                padding: const EdgeInsets.all(16),
-                decoration: BoxDecoration(
-                  color: AppTheme.surface,
-                  borderRadius: BorderRadius.circular(16),
-                  border: Border.all(color: AppTheme.border),
-                ),
-                child: Row(
-                  children: [
-                    Expanded(
-                      child: TextField(
-                        controller: _searchController,
-                        maxLength: 60,
-                        buildCounter: (context, {required currentLength, required isFocused, maxLength}) => null,
-                        style: TextStyle(color: AppTheme.text, fontSize: 14),
-                        decoration: InputDecoration(
-                          hintText: _isArchiveView
-                              ? 'Search deactivated faculty by name, email, or username...'
-                              : 'Search faculty by name, email, username, or assigned subject...',
-                          hintStyle: TextStyle(color: AppTheme.textMuted, fontSize: 14),
-                          counterText: '',
-                          prefixIcon: Icon(Icons.search, size: 20, color: AppTheme.textMuted),
-                          suffixIcon: _searchQuery.isNotEmpty
-                              ? IconButton(
-                                  icon: Icon(Icons.close, size: 18, color: AppTheme.textMuted),
-                                  onPressed: () => _searchController.clear(),
-                                )
-                              : null,
-                          isDense: true,
-                          contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-                          filled: true,
-                          fillColor: AppTheme.background,
-                          border: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(10),
-                            borderSide: BorderSide(color: AppTheme.border),
-                          ),
-                          enabledBorder: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(10),
-                            borderSide: BorderSide(color: AppTheme.border),
-                          ),
-                          focusedBorder: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(10),
-                            borderSide: BorderSide(color: AppTheme.primary, width: 1.5),
-                          ),
-                        ),
+              LayoutBuilder(
+                builder: (context, toolbarConstraints) {
+                  final isNarrow = toolbarConstraints.maxWidth < 650;
+
+                  final searchField = TextField(
+                    controller: _searchController,
+                    maxLength: 60,
+                    buildCounter: (context, {required currentLength, required isFocused, maxLength}) => null,
+                    style: TextStyle(color: AppTheme.text, fontSize: 14),
+                    decoration: InputDecoration(
+                      hintText: _isArchiveView
+                          ? 'Search deactivated faculty by name, email, or username...'
+                          : 'Search faculty by name, email, username, or assigned subject...',
+                      hintStyle: TextStyle(color: AppTheme.textMuted, fontSize: 14),
+                      counterText: '',
+                      prefixIcon: Icon(Icons.search, size: 20, color: AppTheme.textMuted),
+                      suffixIcon: _searchQuery.isNotEmpty
+                          ? IconButton(
+                              icon: Icon(Icons.close, size: 18, color: AppTheme.textMuted),
+                              onPressed: () => _searchController.clear(),
+                            )
+                          : null,
+                      isDense: true,
+                      contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                      filled: true,
+                      fillColor: AppTheme.background,
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(10),
+                        borderSide: BorderSide(color: AppTheme.border),
+                      ),
+                      enabledBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(10),
+                        borderSide: BorderSide(color: AppTheme.border),
+                      ),
+                      focusedBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(10),
+                        borderSide: BorderSide(color: AppTheme.primary, width: 1.5),
                       ),
                     ),
-                    const SizedBox(width: 16),
-                    Container(
+                  );
+
+                  final countWidget = Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                    decoration: BoxDecoration(
+                      color: AppTheme.surface,
+                      borderRadius: BorderRadius.circular(10),
+                      border: Border.all(color: AppTheme.border),
+                    ),
+                    child: Text(
+                      '${filteredTeachers.length} ${_isArchiveView ? 'Deactivated Records' : 'Faculty Members'}',
+                      style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: AppTheme.textSecondary),
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  );
+
+                  final selectMultipleBtn = OutlinedButton.icon(
+                    onPressed: () {
+                      setState(() {
+                        _isSelectionMode = !_isSelectionMode;
+                        if (!_isSelectionMode) {
+                          _selectedTeacherIds.clear();
+                        }
+                      });
+                    },
+                    icon: Icon(
+                      _isSelectionMode ? Icons.close_rounded : Icons.checklist_rounded,
+                      size: 16,
+                      color: _isSelectionMode ? AppTheme.error : AppTheme.primary,
+                    ),
+                    label: Text(
+                      _isSelectionMode ? 'Cancel Selection' : 'Select Multiple',
+                      style: TextStyle(
+                        fontSize: 12.5,
+                        fontWeight: FontWeight.w600,
+                        color: _isSelectionMode ? AppTheme.error : AppTheme.text,
+                      ),
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                    style: OutlinedButton.styleFrom(
+                      side: BorderSide(
+                        color: _isSelectionMode ? AppTheme.error.withValues(alpha: 0.4) : AppTheme.border,
+                      ),
+                      backgroundColor: _isSelectionMode
+                          ? (isDark ? Colors.red.withValues(alpha: 0.1) : const Color(0xFFFEF2F2))
+                          : AppTheme.surface,
                       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                      minimumSize: const Size(0, 42),
+                    ),
+                  );
+
+                  if (isNarrow) {
+                    return Container(
+                      padding: const EdgeInsets.all(12),
                       decoration: BoxDecoration(
                         color: AppTheme.surface,
-                        borderRadius: BorderRadius.circular(10),
+                        borderRadius: BorderRadius.circular(16),
                         border: Border.all(color: AppTheme.border),
                       ),
-                      child: Text(
-                        '${filteredTeachers.length} ${_isArchiveView ? 'Deactivated Records' : 'Faculty Members'}',
-                        style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: AppTheme.textSecondary),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          searchField,
+                          const SizedBox(height: 10),
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              Flexible(child: countWidget),
+                              const SizedBox(width: 8),
+                              Flexible(child: selectMultipleBtn),
+                            ],
+                          ),
+                        ],
                       ),
+                    );
+                  }
+
+                  return Container(
+                    padding: const EdgeInsets.all(16),
+                    decoration: BoxDecoration(
+                      color: AppTheme.surface,
+                      borderRadius: BorderRadius.circular(16),
+                      border: Border.all(color: AppTheme.border),
                     ),
-                    const SizedBox(width: 10),
-                    OutlinedButton.icon(
-                      onPressed: () {
-                        setState(() {
-                          _isSelectionMode = !_isSelectionMode;
-                          if (!_isSelectionMode) {
-                            _selectedTeacherIds.clear();
-                          }
-                        });
-                      },
-                      icon: Icon(
-                        _isSelectionMode ? Icons.close_rounded : Icons.checklist_rounded,
-                        size: 16,
-                        color: _isSelectionMode ? AppTheme.error : AppTheme.primary,
-                      ),
-                      label: Text(
-                        _isSelectionMode ? 'Cancel Selection' : 'Select Multiple',
-                        style: TextStyle(
-                          fontSize: 12.5,
-                          fontWeight: FontWeight.w600,
-                          color: _isSelectionMode ? AppTheme.error : AppTheme.text,
-                        ),
-                      ),
-                      style: OutlinedButton.styleFrom(
-                        side: BorderSide(
-                          color: _isSelectionMode ? AppTheme.error.withValues(alpha: 0.4) : AppTheme.border,
-                        ),
-                        backgroundColor: _isSelectionMode
-                            ? (isDark ? Colors.red.withValues(alpha: 0.1) : const Color(0xFFFEF2F2))
-                            : AppTheme.surface,
-                        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                        minimumSize: const Size(0, 42),
-                      ),
+                    child: Row(
+                      children: [
+                        Expanded(child: searchField),
+                        const SizedBox(width: 16),
+                        countWidget,
+                        const SizedBox(width: 10),
+                        selectMultipleBtn,
+                      ],
                     ),
-                  ],
-                ),
+                  );
+                },
               ),
               const SizedBox(height: 18),
 
@@ -737,7 +834,29 @@ class _AdminWebTeachersScreenState extends ConsumerState<AdminWebTeachersScreen>
                   ),
                 )
               else
-                Container(
+                LayoutBuilder(
+                  builder: (context, constraints) {
+                    final isWide = constraints.maxWidth >= 800;
+                    if (isWide) {
+                      return _buildDesktopTeacherTable(filteredTeachers, subjects, isDark);
+                    } else {
+                      return _buildMobileTeacherCards(filteredTeachers, subjects, isDark);
+                    }
+                  },
+                ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildDesktopTeacherTable(
+    List<Map<String, dynamic>> filteredTeachers,
+    List<Map<String, dynamic>> subjects,
+    bool isDark,
+  ) {
+    return Container(
                   decoration: BoxDecoration(
                     color: AppTheme.surface,
                     borderRadius: BorderRadius.circular(16),
@@ -1066,7 +1185,7 @@ class _AdminWebTeachersScreenState extends ConsumerState<AdminWebTeachersScreen>
                                             OutlinedButton.icon(
                                               onPressed: () async {
                                                 await ref.read(adminArchivedTeachersProvider.notifier).restoreTeacher(teacherId);
-                                                if (context.mounted) {
+                                                if (mounted) {
                                                   AiraActionToast.showRestored(
                                                     context,
                                                     title: 'Faculty Account Restored',
@@ -1156,11 +1275,355 @@ class _AdminWebTeachersScreenState extends ConsumerState<AdminWebTeachersScreen>
                       ),
                     ),
                   ),
+                );
+  }
+
+  Widget _buildMobileTeacherCards(
+    List<Map<String, dynamic>> filteredTeachers,
+    List<Map<String, dynamic>> subjects,
+    bool isDark,
+  ) {
+    return ListView.separated(
+      shrinkWrap: true,
+      physics: const NeverScrollableScrollPhysics(),
+      itemCount: filteredTeachers.length,
+      separatorBuilder: (_, _) => const SizedBox(height: 12),
+      itemBuilder: (context, index) {
+        final teacher = filteredTeachers[index];
+        final teacherId = teacher['id'] as String? ?? '';
+        final isSelected = _selectedTeacherIds.contains(teacherId);
+        final rawName = teacher['full_name'] as String? ?? teacher['name'] as String? ?? '';
+        final email = teacher['email'] as String? ?? '';
+        final username = teacher['username'] as String? ?? '';
+        final safeName = rawName.trim().isNotEmpty
+            ? rawName.trim()
+            : (email.isNotEmpty ? email : (teacherId.isNotEmpty ? teacherId : 'Teacher'));
+        final assignedSubjects = (teacher['assigned_subjects'] as List? ?? []).cast<Map<String, dynamic>>();
+        final handledSections = (teacher['handled_sections'] as List? ?? []).map((s) => s.toString()).toList();
+        final studentCount = teacher['student_count'] as int? ?? 0;
+        final archivedAt = teacher['archived_at'] as String?;
+        final bool isTeacherArchived = teacher['is_archived'] == 1 || teacher['is_archived'] == true || teacher['is_archived'] == '1';
+
+        return Container(
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            color: AppTheme.surface,
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(
+              color: isSelected ? AppTheme.primary : AppTheme.border,
+              width: isSelected ? 1.8 : 1.0,
+            ),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  UserAvatarWidget(
+                    imageSource: (teacher['profile_image'] ?? teacher['profileImage']) as String?,
+                    fallbackInitial: safeName,
+                    size: 40,
+                    fontSize: 16,
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          children: [
+                            Flexible(
+                              child: Text(
+                                safeName,
+                                style: TextStyle(
+                                  fontWeight: FontWeight.bold,
+                                  fontSize: 15,
+                                  color: AppTheme.text,
+                                ),
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ),
+                            const SizedBox(width: 6),
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                              decoration: BoxDecoration(
+                                color: (isTeacherArchived ? const Color(0xFFD97706) : AppTheme.primary).withValues(alpha: 0.1),
+                                borderRadius: BorderRadius.circular(4),
+                                border: Border.all(
+                                  color: (isTeacherArchived ? const Color(0xFFD97706) : AppTheme.primary).withValues(alpha: 0.25),
+                                ),
+                              ),
+                              child: Text(
+                                isTeacherArchived ? 'ARCHIVED' : 'ACTIVE',
+                                style: TextStyle(
+                                  fontSize: 9.5,
+                                  fontWeight: FontWeight.bold,
+                                  color: isTeacherArchived ? const Color(0xFFD97706) : AppTheme.primary,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 2),
+                        Text(
+                          '$email • @$username',
+                          style: TextStyle(fontSize: 12, color: AppTheme.textSecondary),
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ],
+                    ),
+                  ),
+                  if (_isSelectionMode)
+                    Checkbox(
+                      value: isSelected,
+                      activeColor: AppTheme.primary,
+                      onChanged: (val) {
+                        setState(() {
+                          if (val == true) {
+                            _selectedTeacherIds.add(teacherId);
+                          } else {
+                            _selectedTeacherIds.remove(teacherId);
+                          }
+                        });
+                      },
+                    ),
+                ],
+              ),
+              const SizedBox(height: 12),
+
+              Wrap(
+                spacing: 8,
+                runSpacing: 6,
+                children: [
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                    decoration: BoxDecoration(
+                      color: AppTheme.background,
+                      borderRadius: BorderRadius.circular(6),
+                      border: Border.all(color: AppTheme.border),
+                    ),
+                    child: Text(
+                      'ID: $teacherId',
+                      style: TextStyle(fontSize: 11, color: AppTheme.textMuted, fontFamily: 'monospace'),
+                    ),
+                  ),
+                  if (isTeacherArchived)
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFD97706).withValues(alpha: 0.1),
+                        borderRadius: BorderRadius.circular(6),
+                        border: Border.all(color: const Color(0xFFD97706).withValues(alpha: 0.3)),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          const Icon(Icons.history_rounded, size: 12, color: Color(0xFFD97706)),
+                          const SizedBox(width: 4),
+                          Text(
+                            _formatArchivedDate(archivedAt),
+                            style: const TextStyle(fontSize: 11, color: Color(0xFFD97706), fontWeight: FontWeight.w600),
+                          ),
+                        ],
+                      ),
+                    )
+                  else
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                      decoration: BoxDecoration(
+                        color: AppTheme.primary.withValues(alpha: 0.08),
+                        borderRadius: BorderRadius.circular(6),
+                        border: Border.all(color: AppTheme.primary.withValues(alpha: 0.2)),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(Icons.people_alt_outlined, size: 12, color: AppTheme.primary),
+                          const SizedBox(width: 4),
+                          Text(
+                            '$studentCount Enrolled Students',
+                            style: TextStyle(fontSize: 11, color: AppTheme.primary, fontWeight: FontWeight.w600),
+                          ),
+                        ],
+                      ),
+                    ),
+                ],
+              ),
+              const SizedBox(height: 10),
+
+              Text(
+                'Assigned Subjects:',
+                style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: AppTheme.textMuted),
+              ),
+              const SizedBox(height: 4),
+              if (assignedSubjects.isEmpty)
+                Text(
+                  'No subjects assigned',
+                  style: TextStyle(fontSize: 12, color: AppTheme.textMuted, fontStyle: FontStyle.italic),
+                )
+              else
+                Wrap(
+                  spacing: 6,
+                  runSpacing: 4,
+                  children: assignedSubjects.map((sub) {
+                    final subName = sub['name'] as String? ?? 'Subject';
+                    final subCode = sub['code'] as String? ?? '';
+                    return Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                      decoration: BoxDecoration(
+                        color: AppTheme.primary.withValues(alpha: 0.08),
+                        borderRadius: BorderRadius.circular(6),
+                        border: Border.all(color: AppTheme.primary.withValues(alpha: 0.2)),
+                      ),
+                      child: Text(
+                        subCode.isNotEmpty ? '$subCode • $subName' : subName,
+                        style: TextStyle(fontSize: 11, fontWeight: FontWeight.w500, color: AppTheme.primary),
+                      ),
+                    );
+                  }).toList(),
+                ),
+              const SizedBox(height: 10),
+
+              Text(
+                'Handled Class Sections:',
+                style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: AppTheme.textMuted),
+              ),
+              const SizedBox(height: 4),
+              if (handledSections.isEmpty)
+                Text(
+                  'No sections handled',
+                  style: TextStyle(fontSize: 12, color: AppTheme.textMuted, fontStyle: FontStyle.italic),
+                )
+              else
+                Wrap(
+                  spacing: 6,
+                  runSpacing: 4,
+                  children: handledSections.map((sec) {
+                    return Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                      decoration: BoxDecoration(
+                        color: AppTheme.background,
+                        borderRadius: BorderRadius.circular(6),
+                        border: Border.all(color: AppTheme.border),
+                      ),
+                      child: Text(
+                        sec,
+                        style: TextStyle(fontSize: 11, color: AppTheme.textSecondary),
+                      ),
+                    );
+                  }).toList(),
+                ),
+
+              const SizedBox(height: 12),
+              Divider(height: 1, color: AppTheme.border),
+              const SizedBox(height: 8),
+
+              if (isTeacherArchived)
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.end,
+                  children: [
+                    OutlinedButton.icon(
+                      onPressed: () async {
+                        await ref.read(adminArchivedTeachersProvider.notifier).restoreTeacher(teacherId);
+                        if (context.mounted) {
+                          AiraActionToast.showRestored(
+                            context,
+                            title: 'Faculty Account Restored',
+                            message: 'Faculty member "$safeName" ($teacherId) was restored to active directory.',
+                          );
+                        }
+                      },
+                      icon: const Icon(Icons.restore_rounded, size: 14),
+                      label: const Text('Restore', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600)),
+                      style: OutlinedButton.styleFrom(
+                        foregroundColor: const Color(0xFF047857),
+                        backgroundColor: const Color(0xFFECFDF5),
+                        side: const BorderSide(color: Color(0xFFA7F3D0)),
+                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(6)),
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    IconButton(
+                      tooltip: 'Permanently Delete Faculty',
+                      icon: const Icon(Icons.delete_outline_rounded, size: 18),
+                      color: AppTheme.error,
+                      onPressed: () => _confirmPermanentDeleteTeacher(context, teacher),
+                    ),
+                  ],
+                )
+              else
+                Align(
+                  alignment: Alignment.centerRight,
+                  child: Container(
+                    height: 38,
+                    padding: const EdgeInsets.symmetric(horizontal: 4),
+                    decoration: BoxDecoration(
+                      color: isDark ? AppTheme.darkSurfaceLight : const Color(0xFFF8FAFC),
+                      borderRadius: BorderRadius.circular(9),
+                      border: Border.all(color: AppTheme.border),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        IconButton(
+                          icon: const Icon(Icons.calendar_month_outlined, size: 17),
+                          tooltip: 'Manage Teacher Schedule',
+                          color: AppTheme.textSecondary,
+                          visualDensity: VisualDensity.compact,
+                          padding: const EdgeInsets.all(6),
+                          constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
+                          onPressed: () => TeacherScheduleModal.show(context, teacher),
+                        ),
+                        Container(width: 1, height: 18, color: AppTheme.border),
+                        IconButton(
+                          icon: const Icon(Icons.assignment_ind_outlined, size: 17),
+                          tooltip: 'Assign Courses',
+                          color: AppTheme.textSecondary,
+                          visualDensity: VisualDensity.compact,
+                          padding: const EdgeInsets.all(6),
+                          constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
+                          onPressed: () => _openAssignCoursesDialog(context, teacher, subjects),
+                        ),
+                        Container(width: 1, height: 18, color: AppTheme.border),
+                        IconButton(
+                          icon: const Icon(Icons.edit_outlined, size: 17),
+                          tooltip: 'Edit Profile',
+                          color: AppTheme.textSecondary,
+                          visualDensity: VisualDensity.compact,
+                          padding: const EdgeInsets.all(6),
+                          constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
+                          onPressed: () => _openEditTeacherDialog(context, teacher),
+                        ),
+                        Container(width: 1, height: 18, color: AppTheme.border),
+                        IconButton(
+                          icon: const Icon(Icons.forward_to_inbox_rounded, size: 17),
+                          tooltip: 'Resend Credentials Email',
+                          color: AppTheme.textSecondary,
+                          visualDensity: VisualDensity.compact,
+                          padding: const EdgeInsets.all(6),
+                          constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
+                          onPressed: () => _resendTeacherCredentialsDialog(context, teacher),
+                        ),
+                        Container(width: 1, height: 18, color: AppTheme.border),
+                        IconButton(
+                          icon: const Icon(Icons.person_off_outlined, size: 17),
+                          tooltip: 'Deactivate Account',
+                          color: const Color(0xFFD97706),
+                          visualDensity: VisualDensity.compact,
+                          padding: const EdgeInsets.all(6),
+                          constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
+                          onPressed: () => _confirmArchiveTeacher(context, teacher),
+                        ),
+                      ],
+                    ),
+                  ),
                 ),
             ],
           ),
-        ),
-      ),
+        );
+      },
     );
   }
 
@@ -1371,16 +1834,18 @@ class _AdminWebTeachersScreenState extends ConsumerState<AdminWebTeachersScreen>
     final formKey = GlobalKey<FormState>();
     bool obscurePassword = false;
 
-    if (!context.mounted) return;
+    if (!mounted || !context.mounted) return;
 
     showDialog(
       context: context,
       builder: (dialogCtx) {
+        final isMobile = MediaQuery.sizeOf(dialogCtx).width < 560;
         return StatefulBuilder(
           builder: (context, setDialogState) {
             return AlertDialog(
               backgroundColor: AppTheme.surface,
               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+              insetPadding: EdgeInsets.symmetric(horizontal: isMobile ? 16 : 40, vertical: 24),
               title: Row(
                 children: [
                   Container(
@@ -1392,11 +1857,13 @@ class _AdminWebTeachersScreenState extends ConsumerState<AdminWebTeachersScreen>
                     child: Icon(Icons.person_add_alt_1, color: AppTheme.primary, size: 22),
                   ),
                   const SizedBox(width: 12),
-                  Text('Add New Faculty Member', style: TextStyle(color: AppTheme.text, fontSize: 18, fontWeight: FontWeight.bold)),
+                  Expanded(
+                    child: Text('Add New Faculty Member', style: TextStyle(color: AppTheme.text, fontSize: 18, fontWeight: FontWeight.bold)),
+                  ),
                 ],
               ),
-              content: SizedBox(
-                width: 520,
+              content: ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 520),
                 child: Form(
                   key: formKey,
                   child: SingleChildScrollView(
@@ -1469,82 +1936,152 @@ class _AdminWebTeachersScreenState extends ConsumerState<AdminWebTeachersScreen>
                           },
                         ),
                         const SizedBox(height: 14),
-                        Row(
-                          children: [
-                            Expanded(
-                              child: TextFormField(
-                                controller: usernameCtrl,
-                                maxLength: 30,
-                                buildCounter: (context, {required currentLength, required isFocused, maxLength}) => null,
-                                style: TextStyle(color: AppTheme.text, fontSize: 14),
-                                decoration: InputDecoration(
-                                  labelText: 'Username (Optional)',
-                                  labelStyle: TextStyle(color: AppTheme.textSecondary, fontSize: 13),
-                                  counterText: '',
-                                  prefixIcon: Icon(Icons.alternate_email, size: 20, color: AppTheme.textMuted),
-                                  filled: true,
-                                  fillColor: AppTheme.background,
-                                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: BorderSide(color: AppTheme.border)),
-                                ),
-                              ),
+                        if (isMobile) ...[
+                          TextFormField(
+                            controller: usernameCtrl,
+                            maxLength: 30,
+                            buildCounter: (context, {required currentLength, required isFocused, maxLength}) => null,
+                            style: TextStyle(color: AppTheme.text, fontSize: 14),
+                            decoration: InputDecoration(
+                              labelText: 'Username (Optional)',
+                              labelStyle: TextStyle(color: AppTheme.textSecondary, fontSize: 13),
+                              counterText: '',
+                              prefixIcon: Icon(Icons.alternate_email, size: 20, color: AppTheme.textMuted),
+                              filled: true,
+                              fillColor: AppTheme.background,
+                              border: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: BorderSide(color: AppTheme.border)),
                             ),
-                            const SizedBox(width: 12),
-                            Expanded(
-                              child: TextFormField(
-                                controller: passwordCtrl,
-                                maxLength: 24,
-                                buildCounter: (context, {required currentLength, required isFocused, maxLength}) => null,
-                                obscureText: obscurePassword,
-                                style: TextStyle(
-                                  color: AppTheme.text,
-                                  fontSize: 13.5,
-                                  fontWeight: FontWeight.w600,
-                                  fontFamily: obscurePassword ? null : 'monospace',
-                                ),
-                                decoration: InputDecoration(
-                                  labelText: 'Initial Password (Auto-Generated)',
-                                  labelStyle: TextStyle(color: AppTheme.primary, fontSize: 13, fontWeight: FontWeight.w600),
-                                  helperText: 'Auto-generated secure password',
-                                  helperStyle: TextStyle(color: AppTheme.textMuted, fontSize: 11),
-                                  counterText: '',
-                                  prefixIcon: Icon(Icons.lock_outline, size: 20, color: AppTheme.primary),
-                                  suffixIcon: Row(
-                                    mainAxisSize: MainAxisSize.min,
-                                    children: [
-                                      IconButton(
-                                        icon: const Icon(Icons.refresh_rounded, size: 18),
-                                        tooltip: 'Regenerate Password',
-                                        color: AppTheme.primary,
-                                        visualDensity: VisualDensity.compact,
-                                        onPressed: () {
-                                          setDialogState(() {
-                                            passwordCtrl.text = _generateAutoTeacherPassword();
-                                          });
-                                        },
-                                      ),
-                                      IconButton(
-                                        icon: Icon(
-                                          obscurePassword ? Icons.visibility_off_outlined : Icons.visibility_outlined,
-                                          size: 18,
-                                          color: AppTheme.textMuted,
-                                        ),
-                                        tooltip: obscurePassword ? 'Show Password' : 'Hide Password',
-                                        visualDensity: VisualDensity.compact,
-                                        onPressed: () => setDialogState(() => obscurePassword = !obscurePassword),
-                                      ),
-                                      const SizedBox(width: 4),
-                                    ],
+                          ),
+                          const SizedBox(height: 14),
+                          TextFormField(
+                            controller: passwordCtrl,
+                            maxLength: 24,
+                            buildCounter: (context, {required currentLength, required isFocused, maxLength}) => null,
+                            obscureText: obscurePassword,
+                            style: TextStyle(
+                              color: AppTheme.text,
+                              fontSize: 13.5,
+                              fontWeight: FontWeight.w600,
+                              fontFamily: obscurePassword ? null : 'monospace',
+                            ),
+                            decoration: InputDecoration(
+                              labelText: 'Initial Password (Auto-Generated)',
+                              labelStyle: TextStyle(color: AppTheme.primary, fontSize: 13, fontWeight: FontWeight.w600),
+                              helperText: 'Auto-generated secure password',
+                              helperStyle: TextStyle(color: AppTheme.textMuted, fontSize: 11),
+                              counterText: '',
+                              prefixIcon: Icon(Icons.lock_outline, size: 20, color: AppTheme.primary),
+                              suffixIcon: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  IconButton(
+                                    icon: const Icon(Icons.refresh_rounded, size: 18),
+                                    tooltip: 'Regenerate Password',
+                                    color: AppTheme.primary,
+                                    visualDensity: VisualDensity.compact,
+                                    onPressed: () {
+                                      setDialogState(() {
+                                        passwordCtrl.text = _generateAutoTeacherPassword();
+                                      });
+                                    },
                                   ),
-                                  filled: true,
-                                  fillColor: AppTheme.background,
-                                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: BorderSide(color: AppTheme.border)),
-                                  focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: BorderSide(color: AppTheme.primary, width: 1.5)),
-                                ),
-                                validator: (v) => v == null || v.trim().length < 6 ? 'Minimum 6 characters' : null,
+                                  IconButton(
+                                    icon: Icon(
+                                      obscurePassword ? Icons.visibility_off_outlined : Icons.visibility_outlined,
+                                      size: 18,
+                                      color: AppTheme.textMuted,
+                                    ),
+                                    tooltip: obscurePassword ? 'Show Password' : 'Hide Password',
+                                    visualDensity: VisualDensity.compact,
+                                    onPressed: () => setDialogState(() => obscurePassword = !obscurePassword),
+                                  ),
+                                  const SizedBox(width: 4),
+                                ],
                               ),
+                              filled: true,
+                              fillColor: AppTheme.background,
+                              border: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: BorderSide(color: AppTheme.border)),
+                              focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: BorderSide(color: AppTheme.primary, width: 1.5)),
                             ),
-                          ],
-                        ),
+                            validator: (v) => v == null || v.trim().length < 6 ? 'Minimum 6 characters' : null,
+                          ),
+                        ] else
+                          Row(
+                            children: [
+                              Expanded(
+                                child: TextFormField(
+                                  controller: usernameCtrl,
+                                  maxLength: 30,
+                                  buildCounter: (context, {required currentLength, required isFocused, maxLength}) => null,
+                                  style: TextStyle(color: AppTheme.text, fontSize: 14),
+                                  decoration: InputDecoration(
+                                    labelText: 'Username (Optional)',
+                                    labelStyle: TextStyle(color: AppTheme.textSecondary, fontSize: 13),
+                                    counterText: '',
+                                    prefixIcon: Icon(Icons.alternate_email, size: 20, color: AppTheme.textMuted),
+                                    filled: true,
+                                    fillColor: AppTheme.background,
+                                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: BorderSide(color: AppTheme.border)),
+                                  ),
+                                ),
+                              ),
+                              const SizedBox(width: 12),
+                              Expanded(
+                                child: TextFormField(
+                                  controller: passwordCtrl,
+                                  maxLength: 24,
+                                  buildCounter: (context, {required currentLength, required isFocused, maxLength}) => null,
+                                  obscureText: obscurePassword,
+                                  style: TextStyle(
+                                    color: AppTheme.text,
+                                    fontSize: 13.5,
+                                    fontWeight: FontWeight.w600,
+                                    fontFamily: obscurePassword ? null : 'monospace',
+                                  ),
+                                  decoration: InputDecoration(
+                                    labelText: 'Initial Password (Auto-Generated)',
+                                    labelStyle: TextStyle(color: AppTheme.primary, fontSize: 13, fontWeight: FontWeight.w600),
+                                    helperText: 'Auto-generated secure password',
+                                    helperStyle: TextStyle(color: AppTheme.textMuted, fontSize: 11),
+                                    counterText: '',
+                                    prefixIcon: Icon(Icons.lock_outline, size: 20, color: AppTheme.primary),
+                                    suffixIcon: Row(
+                                      mainAxisSize: MainAxisSize.min,
+                                      children: [
+                                        IconButton(
+                                          icon: const Icon(Icons.refresh_rounded, size: 18),
+                                          tooltip: 'Regenerate Password',
+                                          color: AppTheme.primary,
+                                          visualDensity: VisualDensity.compact,
+                                          onPressed: () {
+                                            setDialogState(() {
+                                              passwordCtrl.text = _generateAutoTeacherPassword();
+                                            });
+                                          },
+                                        ),
+                                        IconButton(
+                                          icon: Icon(
+                                            obscurePassword ? Icons.visibility_off_outlined : Icons.visibility_outlined,
+                                            size: 18,
+                                            color: AppTheme.textMuted,
+                                          ),
+                                          tooltip: obscurePassword ? 'Show Password' : 'Hide Password',
+                                          visualDensity: VisualDensity.compact,
+                                          onPressed: () => setDialogState(() => obscurePassword = !obscurePassword),
+                                        ),
+                                        const SizedBox(width: 4),
+                                      ],
+                                    ),
+                                    filled: true,
+                                    fillColor: AppTheme.background,
+                                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: BorderSide(color: AppTheme.border)),
+                                    focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: BorderSide(color: AppTheme.primary, width: 1.5)),
+                                  ),
+                                  validator: (v) => v == null || v.trim().length < 6 ? 'Minimum 6 characters' : null,
+                                ),
+                              ),
+                            ],
+                          ),
                         const SizedBox(height: 20),
 
                         Text('Initial Course Assignments (Optional)', style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: AppTheme.textSecondary)),

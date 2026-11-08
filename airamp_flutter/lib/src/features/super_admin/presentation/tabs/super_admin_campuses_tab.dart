@@ -66,9 +66,11 @@ class _SuperAdminCampusesTabState extends ConsumerState<SuperAdminCampusesTab> {
                     child: Icon(Icons.business_rounded, color: gTheme.primary, size: 20),
                   ),
                   const SizedBox(width: 12),
-                  Text(
-                    'Edit Campus Details',
-                    style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18, color: gTheme.textPrimary),
+                  Expanded(
+                    child: Text(
+                      'Edit Campus Details',
+                      style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18, color: gTheme.textPrimary),
+                    ),
                   ),
                 ],
               ),
@@ -124,52 +126,69 @@ class _SuperAdminCampusesTabState extends ConsumerState<SuperAdminCampusesTab> {
                         ),
                       ),
                       const SizedBox(height: 12),
-                      Row(
-                        children: [
-                          Expanded(
-                            child: DropdownButtonFormField<String>(
-                              initialValue: selectedStatus,
-                              dropdownColor: gTheme.surfaceElevated,
-                              style: TextStyle(color: gTheme.textPrimary, fontSize: 13),
-                              decoration: InputDecoration(
-                                labelText: 'Operational Status',
-                                labelStyle: TextStyle(color: gTheme.textSecondary),
-                                border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
-                                contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
-                              ),
-                              items: const [
-                                DropdownMenuItem(value: 'active', child: Text('Active Campus')),
-                                DropdownMenuItem(value: 'inactive', child: Text('Inactive / Onboarding')),
-                              ],
-                              onChanged: (val) => setDialogState(() => selectedStatus = val ?? 'active'),
+                      Builder(
+                        builder: (context) {
+                          final isNarrowForm = MediaQuery.sizeOf(context).width < 500;
+                          final statusField = DropdownButtonFormField<String>(
+                            initialValue: selectedStatus,
+                            isExpanded: true,
+                            dropdownColor: gTheme.surfaceElevated,
+                            style: TextStyle(color: gTheme.textPrimary, fontSize: 13),
+                            decoration: InputDecoration(
+                              labelText: 'Operational Status',
+                              labelStyle: TextStyle(color: gTheme.textSecondary),
+                              border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+                              contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
                             ),
-                          ),
-                          const SizedBox(width: 12),
-                          Expanded(
-                            child: DropdownButtonFormField<String?>(
-                              initialValue: selectedAdminId,
-                              dropdownColor: gTheme.surfaceElevated,
-                              style: TextStyle(color: gTheme.textPrimary, fontSize: 13),
-                              decoration: InputDecoration(
-                                labelText: 'Assigned Administrator',
-                                labelStyle: TextStyle(color: gTheme.textSecondary),
-                                border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
-                                contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
-                              ),
-                              items: [
-                                const DropdownMenuItem(value: null, child: Text('None (Assign Later)')),
-                                ...admins.map((a) => DropdownMenuItem(
-                                  value: a['id'] as String,
-                                  child: Text(
-                                    a['full_name'] as String? ?? 'Admin',
-                                    overflow: TextOverflow.ellipsis,
-                                  ),
-                                )),
-                              ],
-                              onChanged: (val) => setDialogState(() => selectedAdminId = val),
+                            items: const [
+                              DropdownMenuItem(value: 'active', child: Text('Active Campus', overflow: TextOverflow.ellipsis)),
+                              DropdownMenuItem(value: 'inactive', child: Text('Inactive / Onboarding', overflow: TextOverflow.ellipsis)),
+                            ],
+                            onChanged: (val) => setDialogState(() => selectedStatus = val ?? 'active'),
+                          );
+
+                          final adminField = DropdownButtonFormField<String?>(
+                            initialValue: selectedAdminId,
+                            isExpanded: true,
+                            dropdownColor: gTheme.surfaceElevated,
+                            style: TextStyle(color: gTheme.textPrimary, fontSize: 13),
+                            decoration: InputDecoration(
+                              labelText: 'Assigned Administrator',
+                              labelStyle: TextStyle(color: gTheme.textSecondary),
+                              border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+                              contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
                             ),
-                          ),
-                        ],
+                            items: [
+                              const DropdownMenuItem(value: null, child: Text('None (Assign Later)', overflow: TextOverflow.ellipsis)),
+                              ...admins.map((a) => DropdownMenuItem(
+                                value: a['id'] as String,
+                                child: Text(
+                                  a['full_name'] as String? ?? 'Admin',
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                              )),
+                            ],
+                            onChanged: (val) => setDialogState(() => selectedAdminId = val),
+                          );
+
+                          if (isNarrowForm) {
+                            return Column(
+                              children: [
+                                statusField,
+                                const SizedBox(height: 12),
+                                adminField,
+                              ],
+                            );
+                          }
+
+                          return Row(
+                            children: [
+                              Expanded(child: statusField),
+                              const SizedBox(width: 12),
+                              Expanded(child: adminField),
+                            ],
+                          );
+                        },
                       ),
                     ],
                   ),
@@ -247,55 +266,211 @@ class _SuperAdminCampusesTabState extends ConsumerState<SuperAdminCampusesTab> {
 
     showDialog(
       context: context,
-      builder: (dialogCtx) => AlertDialog(
-        backgroundColor: gTheme.surfaceElevated,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-        title: Row(
-          children: [
-            Icon(Icons.warning_amber_rounded, color: gTheme.dangerText, size: 24),
-            const SizedBox(width: 8),
-            Text('Delete Campus', style: TextStyle(color: gTheme.textPrimary, fontWeight: FontWeight.bold)),
-          ],
-        ),
-        content: Text(
-          'Are you sure you want to permanently delete "${school['name']}"? This action cannot be undone.',
-          style: TextStyle(color: gTheme.textSecondary),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(dialogCtx).pop(),
-            child: Text('Cancel', style: TextStyle(color: gTheme.textSecondary)),
-          ),
-          ElevatedButton(
-            style: ElevatedButton.styleFrom(backgroundColor: gTheme.dangerText, foregroundColor: Colors.white),
-            onPressed: () async {
-              Navigator.of(dialogCtx).pop();
-              try {
-                await ref.read(schoolsListProvider.notifier).deleteSchool(schoolId);
-                if (context.mounted) {
-                  AiraActionToast.showDeleted(
-                    context,
-                    title: 'Campus Deleted',
-                    message: 'Campus "${school['name']}" was permanently deleted.',
-                    duration: const Duration(seconds: 8),
-                  );
-                }
-              } catch (e) {
-                if (context.mounted) {
-                  AiraActionToast.showError(
-                    context,
-                    title: 'Deletion Failed',
-                    message: 'Error deleting campus: $e',
-                  );
-                }
-              }
-            },
-            child: const Text('Delete'),
-          ),
-        ],
-      ),
-    );
-  }
+      builder: (dialogCtx) {
+        bool isProcessing = false;
+        return StatefulBuilder(
+          builder: (ctx, setModalState) {
+            return Dialog(
+            backgroundColor: gTheme.surfaceElevated,
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+            insetPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 24),
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 440),
+              child: SingleChildScrollView(
+                padding: const EdgeInsets.fromLTRB(22, 22, 22, 20),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    // 1. Header with Circular Hero Badge
+                    Row(
+                      crossAxisAlignment: CrossAxisAlignment.center,
+                      children: [
+                        Container(
+                          width: 44,
+                          height: 44,
+                          decoration: BoxDecoration(
+                            color: gTheme.dangerBg,
+                            shape: BoxShape.circle,
+                            border: Border.all(color: gTheme.dangerBorder, width: 1.5),
+                          ),
+                          child: Center(
+                            child: Icon(Icons.domain_disabled_rounded, color: gTheme.dangerText, size: 22),
+                          ),
+                        ),
+                        const SizedBox(width: 14),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                'Delete Campus',
+                                style: TextStyle(
+                                  fontSize: 17,
+                                  fontWeight: FontWeight.bold,
+                                  color: gTheme.textPrimary,
+                                  letterSpacing: -0.2,
+                                ),
+                              ),
+                              const SizedBox(height: 2),
+                              Text(
+                                'Irreversible tenant removal',
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  color: gTheme.textMuted,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 18),
+
+                    // 2. Campus Profile Card
+                    Container(
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: gTheme.surfaceSubtle,
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(color: gTheme.border),
+                      ),
+                      child: Row(
+                        children: [
+                          Container(
+                            padding: const EdgeInsets.all(8),
+                            decoration: BoxDecoration(
+                              color: gTheme.primarySubtle,
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                            child: Icon(Icons.business_rounded, color: gTheme.primary, size: 20),
+                          ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  school['name'] as String? ?? 'Campus',
+                                  style: TextStyle(
+                                    fontSize: 14,
+                                    fontWeight: FontWeight.bold,
+                                    color: gTheme.textPrimary,
+                                  ),
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                                const SizedBox(height: 2),
+                                Text(
+                                  'Code: ${school['code'] ?? ""} • ID: $schoolId',
+                                  style: TextStyle(
+                                    fontSize: 12,
+                                    color: gTheme.textSecondary,
+                                  ),
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 14),
+
+                    // 3. Impact Notice Box
+                    Container(
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: gTheme.dangerBg,
+                        borderRadius: BorderRadius.circular(10),
+                        border: Border.all(color: gTheme.dangerBorder),
+                      ),
+                      child: Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Icon(Icons.warning_amber_rounded, size: 16, color: gTheme.dangerText),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: Text(
+                              'Permanently removing this campus purges its isolated tenant registry, curriculum scoping, and linked access scopes. This action cannot be reversed.',
+                              style: TextStyle(
+                                fontSize: 12,
+                                color: gTheme.dangerText,
+                                height: 1.4,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 20),
+
+                    // 4. Action Button Stack
+                    ElevatedButton.icon(
+                      onPressed: isProcessing
+                          ? null
+                          : () async {
+                              setModalState(() => isProcessing = true);
+                              try {
+                                await ref.read(schoolsListProvider.notifier).deleteSchool(schoolId);
+                                if (context.mounted) {
+                                  Navigator.of(dialogCtx).pop();
+                                  AiraActionToast.showDeleted(
+                                    context,
+                                    title: 'Campus Deleted',
+                                    message: 'Campus "${school['name']}" was permanently deleted.',
+                                    duration: const Duration(seconds: 8),
+                                  );
+                                }
+                              } catch (e) {
+                                if (context.mounted) {
+                                  Navigator.of(dialogCtx).pop();
+                                  AiraActionToast.showError(
+                                    context,
+                                    title: 'Deletion Failed',
+                                    message: 'Error deleting campus: $e',
+                                  );
+                                }
+                              }
+                            },
+                      icon: isProcessing
+                          ? const SizedBox(
+                              width: 16,
+                              height: 16,
+                              child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                            )
+                          : const Icon(Icons.delete_forever_rounded, size: 17),
+                      label: const Text('Permanently Delete Campus'),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: gTheme.dangerText,
+                        foregroundColor: Colors.white,
+                        elevation: 0,
+                        minimumSize: const Size(double.infinity, 44),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                        textStyle: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13.5),
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    TextButton(
+                      onPressed: isProcessing ? null : () => Navigator.of(dialogCtx).pop(),
+                      style: TextButton.styleFrom(
+                        minimumSize: const Size(double.infinity, 38),
+                        foregroundColor: gTheme.textSecondary,
+                        textStyle: const TextStyle(fontWeight: FontWeight.w500, fontSize: 13),
+                      ),
+                      child: const Text('Cancel, keep campus'),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          );
+        },
+      );
+    },
+  );
+}
 
   @override
   Widget build(BuildContext context) {
@@ -313,8 +488,13 @@ class _SuperAdminCampusesTabState extends ConsumerState<SuperAdminCampusesTab> {
       return (s['status'] as String? ?? 'active') == _statusFilter;
     }).toList();
 
+    final isMobile = MediaQuery.sizeOf(context).width < 600;
+
     return SingleChildScrollView(
-      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 24),
+      padding: EdgeInsets.symmetric(
+        horizontal: isMobile ? 16 : 24,
+        vertical: isMobile ? 16 : 24,
+      ),
       child: Center(
         child: ConstrainedBox(
           constraints: const BoxConstraints(maxWidth: 1200),
@@ -341,13 +521,15 @@ class _SuperAdminCampusesTabState extends ConsumerState<SuperAdminCampusesTab> {
                             child: Icon(Icons.account_balance_outlined, color: gTheme.primary, size: 20),
                           ),
                           const SizedBox(width: 12),
-                          Text(
-                            'Institutional Campuses & Multi-Tenant Registry',
-                            style: TextStyle(
-                              fontSize: isNarrow ? 17 : 20,
-                              fontWeight: FontWeight.bold,
-                              color: gTheme.textPrimary,
-                              letterSpacing: -0.2,
+                          Expanded(
+                            child: Text(
+                              'Institutional Campuses & Multi-Tenant Registry',
+                              style: TextStyle(
+                                fontSize: isNarrow ? 17 : 20,
+                                fontWeight: FontWeight.bold,
+                                color: gTheme.textPrimary,
+                                letterSpacing: -0.2,
+                              ),
                             ),
                           ),
                         ],
@@ -405,31 +587,31 @@ class _SuperAdminCampusesTabState extends ConsumerState<SuperAdminCampusesTab> {
                   borderRadius: BorderRadius.circular(12),
                   border: Border.all(color: gTheme.border),
                 ),
-                child: Row(
-                  children: [
-                    Expanded(
-                      child: TextField(
-                        controller: _searchController,
-                        style: TextStyle(fontSize: 13, color: gTheme.textPrimary),
-                        decoration: InputDecoration(
-                          hintText: 'Search campus by name or code (e.g. QCS-01)...',
-                          hintStyle: TextStyle(color: gTheme.textMuted, fontSize: 13),
-                          prefixIcon: Icon(Icons.search, size: 18, color: gTheme.textMuted),
-                          contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-                          border: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(8),
-                            borderSide: BorderSide(color: gTheme.border),
-                          ),
-                          enabledBorder: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(8),
-                            borderSide: BorderSide(color: gTheme.border),
-                          ),
-                          isDense: true,
+                child: LayoutBuilder(
+                  builder: (context, filterConstraints) {
+                    final isSmallScreen = filterConstraints.maxWidth < 560;
+
+                    final searchInput = TextField(
+                      controller: _searchController,
+                      style: TextStyle(fontSize: 13, color: gTheme.textPrimary),
+                      decoration: InputDecoration(
+                        hintText: 'Search campus by name or code (e.g. QCS-01)...',
+                        hintStyle: TextStyle(color: gTheme.textMuted, fontSize: 13),
+                        prefixIcon: Icon(Icons.search, size: 18, color: gTheme.textMuted),
+                        contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(8),
+                          borderSide: BorderSide(color: gTheme.border),
                         ),
+                        enabledBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(8),
+                          borderSide: BorderSide(color: gTheme.border),
+                        ),
+                        isDense: true,
                       ),
-                    ),
-                    const SizedBox(width: 12),
-                    Container(
+                    );
+
+                    final statusDropdown = Container(
                       padding: const EdgeInsets.symmetric(horizontal: 10),
                       decoration: BoxDecoration(
                         color: gTheme.surfaceSubtle,
@@ -438,6 +620,7 @@ class _SuperAdminCampusesTabState extends ConsumerState<SuperAdminCampusesTab> {
                       ),
                       child: DropdownButton<String>(
                         value: _statusFilter,
+                        isExpanded: isSmallScreen,
                         underline: const SizedBox.shrink(),
                         dropdownColor: gTheme.surfaceElevated,
                         style: TextStyle(fontSize: 13, color: gTheme.textPrimary),
@@ -450,8 +633,27 @@ class _SuperAdminCampusesTabState extends ConsumerState<SuperAdminCampusesTab> {
                           if (val != null) setState(() => _statusFilter = val);
                         },
                       ),
-                    ),
-                  ],
+                    );
+
+                    if (isSmallScreen) {
+                      return Column(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          searchInput,
+                          const SizedBox(height: 10),
+                          statusDropdown,
+                        ],
+                      );
+                    }
+
+                    return Row(
+                      children: [
+                        Expanded(child: searchInput),
+                        const SizedBox(width: 12),
+                        statusDropdown,
+                      ],
+                    );
+                  },
                 ),
               ),
               const SizedBox(height: 20),
@@ -618,24 +820,26 @@ class _SuperAdminCampusesTabState extends ConsumerState<SuperAdminCampusesTab> {
                                               style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: gTheme.textPrimary),
                                               overflow: TextOverflow.ellipsis,
                                             ),
+                                            if (adminEmail.isNotEmpty)
+                                              Text(
+                                                adminEmail,
+                                                style: TextStyle(fontSize: 11, color: gTheme.textMuted),
+                                                overflow: TextOverflow.ellipsis,
+                                              ),
                                           ],
                                         ),
                                       ),
-                                      if (adminEmail.isNotEmpty)
-                                        Text(
-                                          adminEmail,
-                                          style: TextStyle(fontSize: 11, color: gTheme.textMuted),
-                                        ),
                                     ],
                                   ),
                                 ),
                                 const SizedBox(height: 16),
                                 Divider(height: 1, color: gTheme.border),
                                 const SizedBox(height: 12),
-                                Row(
-                                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                                  children: [
-                                    Row(
+                                LayoutBuilder(
+                                  builder: (context, actionConstraints) {
+                                    final isNarrowCard = actionConstraints.maxWidth < 340;
+                                    final iconActions = Row(
+                                      mainAxisSize: MainAxisSize.min,
                                       children: [
                                         IconButton(
                                           icon: Icon(Icons.edit_outlined, size: 18, color: gTheme.textSecondary),
@@ -648,8 +852,9 @@ class _SuperAdminCampusesTabState extends ConsumerState<SuperAdminCampusesTab> {
                                           onPressed: isMain ? null : () => _confirmDeleteSchool(context, gTheme, school),
                                         ),
                                       ],
-                                    ),
-                                    ElevatedButton.icon(
+                                    );
+
+                                    final enterBtn = ElevatedButton.icon(
                                       onPressed: () {
                                         ref.read(superAdminSelectedSchoolProvider.notifier).state = schoolId;
                                         context.go('/admin/dashboard');
@@ -664,8 +869,30 @@ class _SuperAdminCampusesTabState extends ConsumerState<SuperAdminCampusesTab> {
                                         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(6)),
                                         textStyle: const TextStyle(fontWeight: FontWeight.w600, fontSize: 11),
                                       ),
-                                    ),
-                                  ],
+                                    );
+
+                                    if (isNarrowCard) {
+                                      return Column(
+                                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                                        children: [
+                                          Row(
+                                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                            children: [iconActions],
+                                          ),
+                                          const SizedBox(height: 8),
+                                          enterBtn,
+                                        ],
+                                      );
+                                    }
+
+                                    return Row(
+                                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                      children: [
+                                        iconActions,
+                                        enterBtn,
+                                      ],
+                                    );
+                                  },
                                 ),
                               ],
                             ),

@@ -275,7 +275,7 @@ class _AdminWebStudentsScreenState extends ConsumerState<AdminWebStudentsScreen>
 
     final csvString = ref.read(adminStudentsProvider.notifier).exportStudentsCsv(studentsToExport: students);
     downloadCsvFile(csvString, fileName);
-    if (!mounted) return;
+    if (!mounted || !context.mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: Row(
@@ -441,46 +441,44 @@ class _AdminWebStudentsScreenState extends ConsumerState<AdminWebStudentsScreen>
                     ],
                   );
 
-                  final actionButtons = Wrap(
-                    spacing: 10,
-                    runSpacing: 8,
-                    crossAxisAlignment: WrapCrossAlignment.center,
-                    children: [
-                      OutlinedButton.icon(
-                        onPressed: () => _handleExportCsv(filteredStudents),
-                        icon: const Icon(Icons.download_rounded, size: 16),
-                        label: const Text('Export CSV', style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold)),
-                        style: OutlinedButton.styleFrom(
-                          foregroundColor: AppTheme.text,
-                          side: BorderSide(color: AppTheme.border),
-                          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                        ),
-                      ),
-                      OutlinedButton.icon(
-                        onPressed: () => BulkImportModal.show(context),
-                        icon: const Icon(Icons.upload_file_rounded, size: 16),
-                        label: const Text('Import CSV', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
-                        style: OutlinedButton.styleFrom(
-                          foregroundColor: AppTheme.text,
-                          side: BorderSide(color: AppTheme.border),
-                          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                        ),
-                      ),
-                      ElevatedButton.icon(
-                        onPressed: () => _openAddStudentDialog(context, availableSections, subjects),
-                        icon: const Icon(Icons.person_add_alt_1_rounded, size: 16),
-                        label: const Text('Add New Student', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: AppTheme.primary,
-                          foregroundColor: Colors.white,
-                          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                          elevation: 0,
-                        ),
-                      ),
-                    ],
+                  final exportBtn = OutlinedButton.icon(
+                    onPressed: () => _handleExportCsv(filteredStudents),
+                    icon: const Icon(Icons.download_rounded, size: 16),
+                    label: const Text('Export CSV', style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold)),
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: AppTheme.text,
+                      side: BorderSide(color: AppTheme.border),
+                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                      minimumSize: const Size(0, 42),
+                    ),
+                  );
+
+                  final importBtn = OutlinedButton.icon(
+                    onPressed: () => BulkImportModal.show(context),
+                    icon: const Icon(Icons.upload_file_rounded, size: 16),
+                    label: const Text('Import CSV', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: AppTheme.text,
+                      side: BorderSide(color: AppTheme.border),
+                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                      minimumSize: const Size(0, 42),
+                    ),
+                  );
+
+                  final addStudentBtn = ElevatedButton.icon(
+                    onPressed: () => _openAddStudentDialog(context, availableSections, subjects),
+                    icon: const Icon(Icons.person_add_alt_1_rounded, size: 16),
+                    label: const Text('Add New Student', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: AppTheme.primary,
+                      foregroundColor: Colors.white,
+                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                      elevation: 0,
+                      minimumSize: const Size(0, 42),
+                    ),
                   );
 
                   if (isNarrow) {
@@ -489,7 +487,18 @@ class _AdminWebStudentsScreenState extends ConsumerState<AdminWebStudentsScreen>
                       children: [
                         titleSection,
                         const SizedBox(height: 14),
-                        actionButtons,
+                        SizedBox(
+                          width: double.infinity,
+                          child: addStudentBtn,
+                        ),
+                        const SizedBox(height: 10),
+                        Row(
+                          children: [
+                            Expanded(child: exportBtn),
+                            const SizedBox(width: 10),
+                            Expanded(child: importBtn),
+                          ],
+                        ),
                       ],
                     );
                   }
@@ -499,7 +508,16 @@ class _AdminWebStudentsScreenState extends ConsumerState<AdminWebStudentsScreen>
                     children: [
                       Expanded(child: titleSection),
                       const SizedBox(width: 16),
-                      actionButtons,
+                      Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          exportBtn,
+                          const SizedBox(width: 10),
+                          importBtn,
+                          const SizedBox(width: 10),
+                          addStudentBtn,
+                        ],
+                      ),
                     ],
                   );
                 },
@@ -507,168 +525,174 @@ class _AdminWebStudentsScreenState extends ConsumerState<AdminWebStudentsScreen>
               const SizedBox(height: 18),
 
               // View Mode Switcher: Active Directory vs Archive Vault
-              Builder(
-                builder: (context) {
+              LayoutBuilder(
+                builder: (context, switcherConstraints) {
                   final isDark = Theme.of(context).brightness == Brightness.dark;
-                  return Row(
-                    children: [
-                      Container(
-                        padding: const EdgeInsets.all(4),
-                        decoration: BoxDecoration(
-                          color: isDark ? const Color(0xFF1E293B) : const Color(0xFFF1F5F9),
-                          borderRadius: BorderRadius.circular(12),
-                          border: Border.all(color: AppTheme.border),
-                        ),
-                        child: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            // All Students
-                            InkWell(
-                              onTap: () {
-                                setState(() {
-                                  _statusFilter = 'all';
-                                  _isSelectionMode = false;
-                                  _selectedStudentIds.clear();
-                                });
-                              },
-                              borderRadius: BorderRadius.circular(9),
-                              child: AnimatedContainer(
-                                duration: const Duration(milliseconds: 180),
-                                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-                                decoration: BoxDecoration(
-                                  color: _statusFilter == 'all' ? AppTheme.surface : Colors.transparent,
-                                  borderRadius: BorderRadius.circular(9),
-                                  boxShadow: _statusFilter == 'all'
-                                      ? [
-                                          BoxShadow(
-                                            color: Colors.black.withValues(alpha: 0.06),
-                                            blurRadius: 4,
-                                            offset: const Offset(0, 2),
-                                          ),
-                                        ]
-                                      : null,
-                                ),
-                                child: Row(
-                                  mainAxisSize: MainAxisSize.min,
-                                  children: [
-                                    Icon(
-                                      Icons.school_outlined,
-                                      size: 16,
-                                      color: _statusFilter == 'all' ? AppTheme.primary : AppTheme.textMuted,
+                  final isCompact = switcherConstraints.maxWidth < 520;
+                  final allCount = allStudents.length + archivedStudents.length;
+                  final allLabel = isCompact ? 'All ($allCount)' : 'All Students ($allCount)';
+                  final activeLabel = isCompact ? 'Active (${allStudents.length})' : 'Active Students (${allStudents.length})';
+                  final inactiveLabel = isCompact ? 'Inactive (${archivedStudents.length})' : 'Inactive Accounts (${archivedStudents.length})';
+
+                  return SingleChildScrollView(
+                    scrollDirection: Axis.horizontal,
+                    physics: const BouncingScrollPhysics(),
+                    child: Container(
+                      padding: const EdgeInsets.all(4),
+                      decoration: BoxDecoration(
+                        color: isDark ? const Color(0xFF1E293B) : const Color(0xFFF1F5F9),
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(color: AppTheme.border),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          // All Students
+                          InkWell(
+                            onTap: () {
+                              setState(() {
+                                _statusFilter = 'all';
+                                _isSelectionMode = false;
+                                _selectedStudentIds.clear();
+                              });
+                            },
+                            borderRadius: BorderRadius.circular(9),
+                            child: AnimatedContainer(
+                              duration: const Duration(milliseconds: 180),
+                              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                              decoration: BoxDecoration(
+                                color: _statusFilter == 'all' ? AppTheme.surface : Colors.transparent,
+                                borderRadius: BorderRadius.circular(9),
+                                boxShadow: _statusFilter == 'all'
+                                    ? [
+                                        BoxShadow(
+                                          color: Colors.black.withValues(alpha: 0.06),
+                                          blurRadius: 4,
+                                          offset: const Offset(0, 2),
+                                        ),
+                                      ]
+                                    : null,
+                              ),
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Icon(
+                                    Icons.school_outlined,
+                                    size: 16,
+                                    color: _statusFilter == 'all' ? AppTheme.primary : AppTheme.textMuted,
+                                  ),
+                                  const SizedBox(width: 8),
+                                  Text(
+                                    allLabel,
+                                    style: TextStyle(
+                                      fontSize: 13,
+                                      fontWeight: _statusFilter == 'all' ? FontWeight.bold : FontWeight.w500,
+                                      color: _statusFilter == 'all' ? AppTheme.text : AppTheme.textMuted,
                                     ),
-                                    const SizedBox(width: 8),
-                                    Text(
-                                      'All Students (${allStudents.length + archivedStudents.length})',
-                                      style: TextStyle(
-                                        fontSize: 13,
-                                        fontWeight: _statusFilter == 'all' ? FontWeight.bold : FontWeight.w500,
-                                        color: _statusFilter == 'all' ? AppTheme.text : AppTheme.textMuted,
-                                      ),
-                                    ),
-                                  ],
-                                ),
+                                  ),
+                                ],
                               ),
                             ),
-                            const SizedBox(width: 4),
-                            // Active Students
-                            InkWell(
-                              onTap: () {
-                                setState(() {
-                                  _statusFilter = 'active';
-                                  _isSelectionMode = false;
-                                  _selectedStudentIds.clear();
-                                });
-                              },
-                              borderRadius: BorderRadius.circular(9),
-                              child: AnimatedContainer(
-                                duration: const Duration(milliseconds: 180),
-                                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-                                decoration: BoxDecoration(
-                                  color: _statusFilter == 'active' ? AppTheme.surface : Colors.transparent,
-                                  borderRadius: BorderRadius.circular(9),
-                                  boxShadow: _statusFilter == 'active'
-                                      ? [
-                                          BoxShadow(
-                                            color: Colors.black.withValues(alpha: 0.06),
-                                            blurRadius: 4,
-                                            offset: const Offset(0, 2),
-                                          ),
-                                        ]
-                                      : null,
-                                ),
-                                child: Row(
-                                  mainAxisSize: MainAxisSize.min,
-                                  children: [
-                                    Icon(
-                                      Icons.people_alt_rounded,
-                                      size: 16,
-                                      color: _statusFilter == 'active' ? AppTheme.primary : AppTheme.textMuted,
+                          ),
+                          const SizedBox(width: 4),
+                          // Active Students
+                          InkWell(
+                            onTap: () {
+                              setState(() {
+                                _statusFilter = 'active';
+                                _isSelectionMode = false;
+                                _selectedStudentIds.clear();
+                              });
+                            },
+                            borderRadius: BorderRadius.circular(9),
+                            child: AnimatedContainer(
+                              duration: const Duration(milliseconds: 180),
+                              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                              decoration: BoxDecoration(
+                                color: _statusFilter == 'active' ? AppTheme.surface : Colors.transparent,
+                                borderRadius: BorderRadius.circular(9),
+                                boxShadow: _statusFilter == 'active'
+                                    ? [
+                                        BoxShadow(
+                                          color: Colors.black.withValues(alpha: 0.06),
+                                          blurRadius: 4,
+                                          offset: const Offset(0, 2),
+                                        ),
+                                      ]
+                                    : null,
+                              ),
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Icon(
+                                    Icons.people_alt_rounded,
+                                    size: 16,
+                                    color: _statusFilter == 'active' ? AppTheme.primary : AppTheme.textMuted,
+                                  ),
+                                  const SizedBox(width: 8),
+                                  Text(
+                                    activeLabel,
+                                    style: TextStyle(
+                                      fontSize: 13,
+                                      fontWeight: _statusFilter == 'active' ? FontWeight.bold : FontWeight.w500,
+                                      color: _statusFilter == 'active' ? AppTheme.text : AppTheme.textMuted,
                                     ),
-                                    const SizedBox(width: 8),
-                                    Text(
-                                      'Active Students (${allStudents.length})',
-                                      style: TextStyle(
-                                        fontSize: 13,
-                                        fontWeight: _statusFilter == 'active' ? FontWeight.bold : FontWeight.w500,
-                                        color: _statusFilter == 'active' ? AppTheme.text : AppTheme.textMuted,
-                                      ),
-                                    ),
-                                  ],
-                                ),
+                                  ),
+                                ],
                               ),
                             ),
-                            const SizedBox(width: 4),
-                            // Inactive / Deactivated Accounts
-                            InkWell(
-                              onTap: () {
-                                setState(() {
-                                  _statusFilter = 'inactive';
-                                  _isSelectionMode = false;
-                                  _selectedStudentIds.clear();
-                                });
-                              },
-                              borderRadius: BorderRadius.circular(9),
-                              child: AnimatedContainer(
-                                duration: const Duration(milliseconds: 180),
-                                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-                                decoration: BoxDecoration(
-                                  color: _statusFilter == 'inactive' ? AppTheme.surface : Colors.transparent,
-                                  borderRadius: BorderRadius.circular(9),
-                                  boxShadow: _statusFilter == 'inactive'
-                                      ? [
-                                          BoxShadow(
-                                            color: Colors.black.withValues(alpha: 0.06),
-                                            blurRadius: 4,
-                                            offset: const Offset(0, 2),
-                                          ),
-                                        ]
-                                      : null,
-                                ),
-                                child: Row(
-                                  mainAxisSize: MainAxisSize.min,
-                                  children: [
-                                    Icon(
-                                      Icons.person_off_outlined,
-                                      size: 16,
+                          ),
+                          const SizedBox(width: 4),
+                          // Inactive / Deactivated Accounts
+                          InkWell(
+                            onTap: () {
+                              setState(() {
+                                _statusFilter = 'inactive';
+                                _isSelectionMode = false;
+                                _selectedStudentIds.clear();
+                              });
+                            },
+                            borderRadius: BorderRadius.circular(9),
+                            child: AnimatedContainer(
+                              duration: const Duration(milliseconds: 180),
+                              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                              decoration: BoxDecoration(
+                                color: _statusFilter == 'inactive' ? AppTheme.surface : Colors.transparent,
+                                borderRadius: BorderRadius.circular(9),
+                                boxShadow: _statusFilter == 'inactive'
+                                    ? [
+                                        BoxShadow(
+                                          color: Colors.black.withValues(alpha: 0.06),
+                                          blurRadius: 4,
+                                          offset: const Offset(0, 2),
+                                        ),
+                                      ]
+                                    : null,
+                              ),
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Icon(
+                                    Icons.person_off_outlined,
+                                    size: 16,
+                                    color: _statusFilter == 'inactive' ? const Color(0xFFD97706) : AppTheme.textMuted,
+                                  ),
+                                  const SizedBox(width: 8),
+                                  Text(
+                                    inactiveLabel,
+                                    style: TextStyle(
+                                      fontSize: 13,
+                                      fontWeight: _statusFilter == 'inactive' ? FontWeight.bold : FontWeight.w500,
                                       color: _statusFilter == 'inactive' ? const Color(0xFFD97706) : AppTheme.textMuted,
                                     ),
-                                    const SizedBox(width: 8),
-                                    Text(
-                                      'Inactive Accounts (${archivedStudents.length})',
-                                      style: TextStyle(
-                                        fontSize: 13,
-                                        fontWeight: _statusFilter == 'inactive' ? FontWeight.bold : FontWeight.w500,
-                                        color: _statusFilter == 'inactive' ? const Color(0xFFD97706) : AppTheme.textMuted,
-                                      ),
-                                    ),
-                                  ],
-                                ),
+                                  ),
+                                ],
                               ),
                             ),
-                          ],
-                        ),
+                          ),
+                        ],
                       ),
-                    ],
+                    ),
                   );
                 },
               ),
@@ -755,79 +779,111 @@ class _AdminWebStudentsScreenState extends ConsumerState<AdminWebStudentsScreen>
 
               // Hierarchy or Archive Vault Header
               if (_isArchiveView)
-                Container(
-                  padding: const EdgeInsets.all(20),
-                  decoration: BoxDecoration(
-                    color: isDark ? const Color(0xFF1E293B) : const Color(0xFFFFFBEB),
-                    borderRadius: BorderRadius.circular(16),
-                    border: Border.all(
-                      color: const Color(0xFFF59E0B).withValues(alpha: 0.5),
-                      width: 1.2,
-                    ),
-                  ),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Row(
-                        children: [
-                          Container(
-                            padding: const EdgeInsets.all(10),
-                            decoration: BoxDecoration(
-                              color: const Color(0xFFD97706).withValues(alpha: 0.15),
-                              borderRadius: BorderRadius.circular(10),
-                            ),
-                            child: const Icon(Icons.person_off_outlined, color: Color(0xFFD97706), size: 22),
+                LayoutBuilder(
+                  builder: (context, bannerConstraints) {
+                    final isNarrow = bannerConstraints.maxWidth < 640;
+
+                    final headerIcon = Container(
+                      padding: const EdgeInsets.all(10),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFD97706).withValues(alpha: 0.15),
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      child: const Icon(Icons.person_off_outlined, color: Color(0xFFD97706), size: 22),
+                    );
+
+                    final titleAndCount = Wrap(
+                      spacing: 8,
+                      runSpacing: 4,
+                      crossAxisAlignment: WrapCrossAlignment.center,
+                      children: [
+                        Text(
+                          'Deactivated Student Accounts',
+                          style: TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.bold,
+                            color: isDark ? Colors.white : const Color(0xFF92400E),
                           ),
-                          const SizedBox(width: 12),
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
+                        ),
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFFD97706),
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          child: Text(
+                            '${filteredStudents.length} Deactivated Record${filteredStudents.length == 1 ? '' : 's'}',
+                            style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Colors.white),
+                          ),
+                        ),
+                      ],
+                    );
+
+                    final descriptionText = Text(
+                      'Deactivated student accounts are safely preserved here with their course enrollments and quiz history intact. You can reactivate them back to the active directory or delete them permanently.',
+                      style: TextStyle(fontSize: 12.5, color: isDark ? const Color(0xFFCBD5E1) : const Color(0xFF78350F)),
+                    );
+
+                    final backButton = TextButton.icon(
+                      onPressed: () {
+                        setState(() {
+                          _isArchiveView = false;
+                          _selectedStudentIds.clear();
+                        });
+                      },
+                      icon: const Icon(Icons.arrow_back, size: 14),
+                      label: const Text('Back to Active Directory', style: TextStyle(fontSize: 12)),
+                      style: TextButton.styleFrom(foregroundColor: const Color(0xFFD97706)),
+                    );
+
+                    return Container(
+                      padding: const EdgeInsets.all(16),
+                      decoration: BoxDecoration(
+                        color: isDark ? const Color(0xFF1E293B) : const Color(0xFFFFFBEB),
+                        borderRadius: BorderRadius.circular(16),
+                        border: Border.all(
+                          color: const Color(0xFFF59E0B).withValues(alpha: 0.5),
+                          width: 1.2,
+                        ),
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          if (isNarrow) ...[
+                            Row(
                               children: [
-                                Row(
-                                  children: [
-                                    Text(
-                                      'Deactivated Student Accounts',
-                                      style: TextStyle(
-                                        fontSize: 16,
-                                        fontWeight: FontWeight.bold,
-                                        color: isDark ? Colors.white : const Color(0xFF92400E),
-                                      ),
-                                    ),
-                                    const SizedBox(width: 8),
-                                    Container(
-                                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                                      decoration: BoxDecoration(
-                                        color: const Color(0xFFD97706),
-                                        borderRadius: BorderRadius.circular(12),
-                                      ),
-                                      child: Text(
-                                        '${filteredStudents.length} Deactivated Record${filteredStudents.length == 1 ? '' : 's'}',
-                                        style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Colors.white),
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                                const SizedBox(height: 3),
-                                Text(
-                                  'Deactivated student accounts are safely preserved here with their course enrollments and quiz history intact. You can reactivate them back to the active directory or delete them permanently.',
-                                  style: TextStyle(fontSize: 12.5, color: isDark ? const Color(0xFFCBD5E1) : const Color(0xFF78350F)),
-                                ),
+                                headerIcon,
+                                const SizedBox(width: 12),
+                                Expanded(child: titleAndCount),
                               ],
                             ),
-                          ),
-                          TextButton.icon(
-                            onPressed: () {
-                              setState(() {
-                                _isArchiveView = false;
-                                _selectedStudentIds.clear();
-                              });
-                            },
-                            icon: const Icon(Icons.arrow_back, size: 14),
-                            label: const Text('Back to Active Directory', style: TextStyle(fontSize: 12)),
-                            style: TextButton.styleFrom(foregroundColor: const Color(0xFFD97706)),
-                          ),
-                        ],
-                      ),
+                            const SizedBox(height: 8),
+                            descriptionText,
+                            const SizedBox(height: 4),
+                            Align(
+                              alignment: Alignment.centerLeft,
+                              child: backButton,
+                            ),
+                          ] else
+                            Row(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                headerIcon,
+                                const SizedBox(width: 12),
+                                Expanded(
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      titleAndCount,
+                                      const SizedBox(height: 3),
+                                      descriptionText,
+                                    ],
+                                  ),
+                                ),
+                                const SizedBox(width: 12),
+                                backButton,
+                              ],
+                            ),
                       if (filteredStudents.isNotEmpty) ...[
                         const SizedBox(height: 14),
                         Wrap(
@@ -937,7 +993,9 @@ class _AdminWebStudentsScreenState extends ConsumerState<AdminWebStudentsScreen>
                       ],
                     ],
                   ),
-                )
+                );
+              },
+            )
               else ...[
                 // Active Scoped Scope Banner
                 Container(
@@ -1289,12 +1347,16 @@ class _AdminWebStudentsScreenState extends ConsumerState<AdminWebStudentsScreen>
               color: isFiltered ? AppTheme.primary : AppTheme.textMuted,
             ),
             const SizedBox(width: 8),
-            Text(
-              currentYearLabel,
-              style: TextStyle(
-                fontSize: 13,
-                fontWeight: isFiltered ? FontWeight.bold : FontWeight.w500,
-                color: isFiltered ? AppTheme.primary : AppTheme.text,
+            Flexible(
+              child: Text(
+                currentYearLabel,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(
+                  fontSize: 13,
+                  fontWeight: isFiltered ? FontWeight.bold : FontWeight.w500,
+                  color: isFiltered ? AppTheme.primary : AppTheme.text,
+                ),
               ),
             ),
             const SizedBox(width: 6),
@@ -1515,12 +1577,16 @@ class _AdminWebStudentsScreenState extends ConsumerState<AdminWebStudentsScreen>
               color: isFiltered ? AppTheme.primary : AppTheme.textMuted,
             ),
             const SizedBox(width: 8),
-            Text(
-              currentSectionLabel,
-              style: TextStyle(
-                fontSize: 13,
-                fontWeight: isFiltered ? FontWeight.bold : FontWeight.w500,
-                color: isFiltered ? AppTheme.primary : AppTheme.text,
+            Flexible(
+              child: Text(
+                currentSectionLabel,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(
+                  fontSize: 13,
+                  fontWeight: isFiltered ? FontWeight.bold : FontWeight.w500,
+                  color: isFiltered ? AppTheme.primary : AppTheme.text,
+                ),
               ),
             ),
             const SizedBox(width: 6),
@@ -2167,8 +2233,10 @@ class _AdminWebStudentsScreenState extends ConsumerState<AdminWebStudentsScreen>
                   ],
                 ),
               ] else ...[
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                Wrap(
+                  spacing: 12,
+                  runSpacing: 6,
+                  crossAxisAlignment: WrapCrossAlignment.center,
                   children: [
                     Text('Grade: $grade', style: TextStyle(fontSize: 12, color: AppTheme.textSecondary)),
                     InkWell(
@@ -2195,11 +2263,13 @@ class _AdminWebStudentsScreenState extends ConsumerState<AdminWebStudentsScreen>
                       child: OutlinedButton.icon(
                         onPressed: () => _showManageCoursesDialog(studentId, name),
                         icon: const Icon(Icons.menu_book_outlined, size: 15),
-                        label: const Text('Courses', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w500)),
+                        label: const Text('Courses', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w500), overflow: TextOverflow.ellipsis),
                         style: OutlinedButton.styleFrom(
                           foregroundColor: AppTheme.text,
                           side: BorderSide(color: AppTheme.border),
+                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
                           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                          minimumSize: const Size(0, 36),
                         ),
                       ),
                     ),
@@ -2208,28 +2278,48 @@ class _AdminWebStudentsScreenState extends ConsumerState<AdminWebStudentsScreen>
                       child: OutlinedButton.icon(
                         onPressed: () => _showArrangeSectionDialog(studentId, name, section, grade, availableSections),
                         icon: const Icon(Icons.swap_horiz, size: 15),
-                        label: const Text('Move / Assign', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w500)),
+                        label: const Text('Move / Assign', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w500), overflow: TextOverflow.ellipsis),
                         style: OutlinedButton.styleFrom(
                           foregroundColor: AppTheme.text,
                           side: BorderSide(color: AppTheme.border),
+                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
                           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                          minimumSize: const Size(0, 36),
                         ),
                       ),
                     ),
-                    const SizedBox(width: 4),
-                    IconButton(
-                      onPressed: () => _resendStudentCredentialsDialog(cardCtx, s),
-                      tooltip: 'Resend Credentials Email',
-                      icon: const Icon(Icons.forward_to_inbox_rounded, size: 17),
-                      color: AppTheme.textSecondary,
-                      visualDensity: VisualDensity.compact,
-                    ),
-                    IconButton(
-                      onPressed: () => _confirmArchiveStudent(cardCtx, s),
-                      tooltip: 'Deactivate Account',
-                      icon: const Icon(Icons.person_off_outlined, size: 17),
-                      color: const Color(0xFFD97706),
-                      visualDensity: VisualDensity.compact,
+                    const SizedBox(width: 8),
+                    Container(
+                      height: 36,
+                      decoration: BoxDecoration(
+                        color: isDark ? AppTheme.darkSurfaceLight : const Color(0xFFF8FAFC),
+                        borderRadius: BorderRadius.circular(8),
+                        border: Border.all(color: AppTheme.border),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          IconButton(
+                            onPressed: () => _resendStudentCredentialsDialog(cardCtx, s),
+                            tooltip: 'Resend Credentials Email',
+                            icon: const Icon(Icons.forward_to_inbox_rounded, size: 16),
+                            color: AppTheme.textSecondary,
+                            visualDensity: VisualDensity.compact,
+                            padding: const EdgeInsets.all(6),
+                            constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
+                          ),
+                          Container(width: 1, height: 18, color: AppTheme.border),
+                          IconButton(
+                            onPressed: () => _confirmArchiveStudent(cardCtx, s),
+                            tooltip: 'Deactivate Account',
+                            icon: const Icon(Icons.person_off_outlined, size: 16),
+                            color: const Color(0xFFD97706),
+                            visualDensity: VisualDensity.compact,
+                            padding: const EdgeInsets.all(6),
+                            constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
+                          ),
+                        ],
+                      ),
                     ),
                   ],
                 ),
@@ -2520,7 +2610,7 @@ class _AdminWebStudentsScreenState extends ConsumerState<AdminWebStudentsScreen>
 
   Future<void> _showManageCoursesDialog(String studentId, String studentName) async {
     final details = await DatabaseHelper().getStudentEnrollmentsWithDetails(studentId);
-    if (!mounted) return;
+    if (!mounted || !context.mounted) return;
 
     final selectedSubjectIds = details
         .where((d) => d['is_enrolled'] == true)
@@ -3619,7 +3709,7 @@ void _resendStudentCredentialsDialog(BuildContext context, Map<String, dynamic> 
     final customSectionCtrl = TextEditingController();
     final notesCtrl = TextEditingController();
 
-    if (!context.mounted) return;
+    if (!mounted || !context.mounted) return;
 
     // Default grade & section based on currently active filter
     String selectedGrade = _selectedGrade != 'All' ? _selectedGrade : 'Grade 10';
@@ -3643,11 +3733,13 @@ void _resendStudentCredentialsDialog(BuildContext context, Map<String, dynamic> 
     showDialog(
       context: context,
       builder: (dialogCtx) {
+        final isMobile = MediaQuery.sizeOf(dialogCtx).width < 580;
         return StatefulBuilder(
           builder: (context, setDialogState) {
             return AlertDialog(
               backgroundColor: AppTheme.surface,
               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+              insetPadding: EdgeInsets.symmetric(horizontal: isMobile ? 16 : 40, vertical: 24),
               title: Row(
                 children: [
                   Container(
@@ -3676,8 +3768,8 @@ void _resendStudentCredentialsDialog(BuildContext context, Map<String, dynamic> 
                   ),
                 ],
               ),
-              content: SizedBox(
-                width: 560,
+              content: ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 560),
                 child: Form(
                   key: formKey,
                   child: SingleChildScrollView(
@@ -3750,139 +3842,262 @@ void _resendStudentCredentialsDialog(BuildContext context, Map<String, dynamic> 
                           },
                         ),
                         const SizedBox(height: 14),
-                        Row(
-                          children: [
-                            Expanded(
-                              child: TextFormField(
-                                controller: usernameCtrl,
-                                maxLength: 30,
-                                buildCounter: (context, {required currentLength, required isFocused, maxLength}) => null,
-                                style: TextStyle(color: AppTheme.text, fontSize: 14),
-                                decoration: InputDecoration(
-                                  labelText: 'Username (Optional)',
-                                  labelStyle: TextStyle(color: AppTheme.textSecondary, fontSize: 13),
-                                  counterText: '',
-                                  prefixIcon: Icon(Icons.alternate_email, size: 20, color: AppTheme.textMuted),
-                                  filled: true,
-                                  fillColor: AppTheme.background,
-                                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: BorderSide(color: AppTheme.border)),
-                                ),
-                              ),
+                        if (isMobile) ...[
+                          TextFormField(
+                            controller: usernameCtrl,
+                            maxLength: 30,
+                            buildCounter: (context, {required currentLength, required isFocused, maxLength}) => null,
+                            style: TextStyle(color: AppTheme.text, fontSize: 14),
+                            decoration: InputDecoration(
+                              labelText: 'Username (Optional)',
+                              labelStyle: TextStyle(color: AppTheme.textSecondary, fontSize: 13),
+                              counterText: '',
+                              prefixIcon: Icon(Icons.alternate_email, size: 20, color: AppTheme.textMuted),
+                              filled: true,
+                              fillColor: AppTheme.background,
+                              border: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: BorderSide(color: AppTheme.border)),
                             ),
-                            const SizedBox(width: 12),
-                            Expanded(
-                              child: TextFormField(
-                                controller: passwordCtrl,
-                                maxLength: 24,
-                                buildCounter: (context, {required currentLength, required isFocused, maxLength}) => null,
-                                obscureText: obscurePassword,
-                                style: TextStyle(
-                                  color: AppTheme.text,
-                                  fontSize: 13.5,
-                                  fontWeight: FontWeight.w600,
-                                  fontFamily: obscurePassword ? null : 'monospace',
-                                ),
-                                decoration: InputDecoration(
-                                  labelText: 'Initial Password (Auto-Generated)',
-                                  labelStyle: TextStyle(color: AppTheme.primary, fontSize: 13, fontWeight: FontWeight.w600),
-                                  helperText: 'Auto-generated secure password',
-                                  helperStyle: TextStyle(color: AppTheme.textMuted, fontSize: 11),
-                                  counterText: '',
-                                  prefixIcon: Icon(Icons.lock_outline, size: 20, color: AppTheme.primary),
-                                  suffixIcon: Row(
-                                    mainAxisSize: MainAxisSize.min,
-                                    children: [
-                                      IconButton(
-                                        icon: const Icon(Icons.refresh_rounded, size: 18),
-                                        tooltip: 'Regenerate Password',
-                                        color: AppTheme.primary,
-                                        visualDensity: VisualDensity.compact,
-                                        onPressed: () {
-                                          setDialogState(() {
-                                            passwordCtrl.text = _generateAutoStudentPassword();
-                                          });
-                                        },
-                                      ),
-                                      IconButton(
-                                        icon: Icon(
-                                          obscurePassword ? Icons.visibility_off_outlined : Icons.visibility_outlined,
-                                          size: 18,
-                                          color: AppTheme.textMuted,
-                                        ),
-                                        tooltip: obscurePassword ? 'Show Password' : 'Hide Password',
-                                        visualDensity: VisualDensity.compact,
-                                        onPressed: () => setDialogState(() => obscurePassword = !obscurePassword),
-                                      ),
-                                      const SizedBox(width: 4),
-                                    ],
+                          ),
+                          const SizedBox(height: 14),
+                          TextFormField(
+                            controller: passwordCtrl,
+                            maxLength: 24,
+                            buildCounter: (context, {required currentLength, required isFocused, maxLength}) => null,
+                            obscureText: obscurePassword,
+                            style: TextStyle(
+                              color: AppTheme.text,
+                              fontSize: 13.5,
+                              fontWeight: FontWeight.w600,
+                              fontFamily: obscurePassword ? null : 'monospace',
+                            ),
+                            decoration: InputDecoration(
+                              labelText: 'Initial Password (Auto-Generated)',
+                              labelStyle: TextStyle(color: AppTheme.primary, fontSize: 13, fontWeight: FontWeight.w600),
+                              helperText: 'Auto-generated secure password',
+                              helperStyle: TextStyle(color: AppTheme.textMuted, fontSize: 11),
+                              counterText: '',
+                              prefixIcon: Icon(Icons.lock_outline, size: 20, color: AppTheme.primary),
+                              suffixIcon: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  IconButton(
+                                    icon: const Icon(Icons.refresh_rounded, size: 18),
+                                    tooltip: 'Regenerate Password',
+                                    color: AppTheme.primary,
+                                    visualDensity: VisualDensity.compact,
+                                    onPressed: () {
+                                      setDialogState(() {
+                                        passwordCtrl.text = _generateAutoStudentPassword();
+                                      });
+                                    },
                                   ),
-                                  filled: true,
-                                  fillColor: AppTheme.background,
-                                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: BorderSide(color: AppTheme.border)),
-                                  focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: BorderSide(color: AppTheme.primary, width: 1.5)),
-                                ),
-                                validator: (v) => v == null || v.trim().length < 6 ? 'Minimum 6 characters' : null,
+                                  IconButton(
+                                    icon: Icon(
+                                      obscurePassword ? Icons.visibility_off_outlined : Icons.visibility_outlined,
+                                      size: 18,
+                                      color: AppTheme.textMuted,
+                                    ),
+                                    tooltip: obscurePassword ? 'Show Password' : 'Hide Password',
+                                    visualDensity: VisualDensity.compact,
+                                    onPressed: () => setDialogState(() => obscurePassword = !obscurePassword),
+                                  ),
+                                  const SizedBox(width: 4),
+                                ],
                               ),
+                              filled: true,
+                              fillColor: AppTheme.background,
+                              border: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: BorderSide(color: AppTheme.border)),
+                              focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: BorderSide(color: AppTheme.primary, width: 1.5)),
                             ),
-                          ],
-                        ),
+                            validator: (v) => v == null || v.trim().length < 6 ? 'Minimum 6 characters' : null,
+                          ),
+                        ] else ...[
+                          Row(
+                            children: [
+                              Expanded(
+                                child: TextFormField(
+                                  controller: usernameCtrl,
+                                  maxLength: 30,
+                                  buildCounter: (context, {required currentLength, required isFocused, maxLength}) => null,
+                                  style: TextStyle(color: AppTheme.text, fontSize: 14),
+                                  decoration: InputDecoration(
+                                    labelText: 'Username (Optional)',
+                                    labelStyle: TextStyle(color: AppTheme.textSecondary, fontSize: 13),
+                                    counterText: '',
+                                    prefixIcon: Icon(Icons.alternate_email, size: 20, color: AppTheme.textMuted),
+                                    filled: true,
+                                    fillColor: AppTheme.background,
+                                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: BorderSide(color: AppTheme.border)),
+                                  ),
+                                ),
+                              ),
+                              const SizedBox(width: 12),
+                              Expanded(
+                                child: TextFormField(
+                                  controller: passwordCtrl,
+                                  maxLength: 24,
+                                  buildCounter: (context, {required currentLength, required isFocused, maxLength}) => null,
+                                  obscureText: obscurePassword,
+                                  style: TextStyle(
+                                    color: AppTheme.text,
+                                    fontSize: 13.5,
+                                    fontWeight: FontWeight.w600,
+                                    fontFamily: obscurePassword ? null : 'monospace',
+                                  ),
+                                  decoration: InputDecoration(
+                                    labelText: 'Initial Password (Auto-Generated)',
+                                    labelStyle: TextStyle(color: AppTheme.primary, fontSize: 13, fontWeight: FontWeight.w600),
+                                    helperText: 'Auto-generated secure password',
+                                    helperStyle: TextStyle(color: AppTheme.textMuted, fontSize: 11),
+                                    counterText: '',
+                                    prefixIcon: Icon(Icons.lock_outline, size: 20, color: AppTheme.primary),
+                                    suffixIcon: Row(
+                                      mainAxisSize: MainAxisSize.min,
+                                      children: [
+                                        IconButton(
+                                          icon: const Icon(Icons.refresh_rounded, size: 18),
+                                          tooltip: 'Regenerate Password',
+                                          color: AppTheme.primary,
+                                          visualDensity: VisualDensity.compact,
+                                          onPressed: () {
+                                            setDialogState(() {
+                                              passwordCtrl.text = _generateAutoStudentPassword();
+                                            });
+                                          },
+                                        ),
+                                        IconButton(
+                                          icon: Icon(
+                                            obscurePassword ? Icons.visibility_off_outlined : Icons.visibility_outlined,
+                                            size: 18,
+                                            color: AppTheme.textMuted,
+                                          ),
+                                          tooltip: obscurePassword ? 'Show Password' : 'Hide Password',
+                                          visualDensity: VisualDensity.compact,
+                                          onPressed: () => setDialogState(() => obscurePassword = !obscurePassword),
+                                        ),
+                                        const SizedBox(width: 4),
+                                      ],
+                                    ),
+                                    filled: true,
+                                    fillColor: AppTheme.background,
+                                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: BorderSide(color: AppTheme.border)),
+                                    focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: BorderSide(color: AppTheme.primary, width: 1.5)),
+                                  ),
+                                  validator: (v) => v == null || v.trim().length < 6 ? 'Minimum 6 characters' : null,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ],
                         const SizedBox(height: 20),
 
                         Text('Academic Placement & Classroom', style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: AppTheme.textSecondary)),
                         const SizedBox(height: 12),
-                        Row(
-                          children: [
-                            Expanded(
-                              child: DropdownButtonFormField<String>(
-                                initialValue: selectedGrade,
-                                dropdownColor: AppTheme.surface,
-                                style: TextStyle(color: AppTheme.text, fontSize: 13),
-                                decoration: InputDecoration(
-                                  labelText: 'Grade Level',
-                                  labelStyle: TextStyle(color: AppTheme.textSecondary, fontSize: 13),
-                                  prefixIcon: Icon(Icons.school_outlined, size: 20, color: AppTheme.textMuted),
-                                  filled: true,
-                                  fillColor: AppTheme.background,
-                                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: BorderSide(color: AppTheme.border)),
-                                ),
-                                items: const [
-                                  DropdownMenuItem(value: 'Grade 7', child: Text('Grade 7')),
-                                  DropdownMenuItem(value: 'Grade 8', child: Text('Grade 8')),
-                                  DropdownMenuItem(value: 'Grade 9', child: Text('Grade 9')),
-                                  DropdownMenuItem(value: 'Grade 10', child: Text('Grade 10')),
-                                  DropdownMenuItem(value: 'Grade 11', child: Text('Grade 11')),
-                                  DropdownMenuItem(value: 'Grade 12', child: Text('Grade 12')),
-                                ],
-                                onChanged: (val) {
-                                  if (val != null) setDialogState(() => selectedGrade = val);
-                                },
-                              ),
+                        if (isMobile) ...[
+                          DropdownButtonFormField<String>(
+                            isExpanded: true,
+                            initialValue: selectedGrade,
+                            dropdownColor: AppTheme.surface,
+                            style: TextStyle(color: AppTheme.text, fontSize: 13),
+                            decoration: InputDecoration(
+                              labelText: 'Grade Level',
+                              labelStyle: TextStyle(color: AppTheme.textSecondary, fontSize: 13),
+                              prefixIcon: Icon(Icons.school_outlined, size: 20, color: AppTheme.textMuted),
+                              filled: true,
+                              fillColor: AppTheme.background,
+                              border: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: BorderSide(color: AppTheme.border)),
                             ),
-                            const SizedBox(width: 12),
-                            Expanded(
-                              child: DropdownButtonFormField<String>(
-                                initialValue: sectionOptions.contains(selectedSection) ? selectedSection : null,
-                                dropdownColor: AppTheme.surface,
-                                style: TextStyle(color: AppTheme.text, fontSize: 13),
-                                decoration: InputDecoration(
-                                  labelText: 'Classroom / Section',
-                                  labelStyle: TextStyle(color: AppTheme.textSecondary, fontSize: 13),
-                                  prefixIcon: Icon(Icons.meeting_room_outlined, size: 20, color: AppTheme.textMuted),
-                                  filled: true,
-                                  fillColor: AppTheme.background,
-                                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: BorderSide(color: AppTheme.border)),
-                                ),
-                                items: [
-                                  ...sectionOptions.map((sec) => DropdownMenuItem(value: sec, child: Text(sec))),
-                                  const DropdownMenuItem(value: '__custom__', child: Text('+ Custom Section...')),
-                                ],
-                                onChanged: (val) {
-                                  if (val != null) setDialogState(() => selectedSection = val);
-                                },
-                              ),
+                            items: const [
+                              DropdownMenuItem(value: 'Grade 7', child: Text('Grade 7', overflow: TextOverflow.ellipsis)),
+                              DropdownMenuItem(value: 'Grade 8', child: Text('Grade 8', overflow: TextOverflow.ellipsis)),
+                              DropdownMenuItem(value: 'Grade 9', child: Text('Grade 9', overflow: TextOverflow.ellipsis)),
+                              DropdownMenuItem(value: 'Grade 10', child: Text('Grade 10', overflow: TextOverflow.ellipsis)),
+                              DropdownMenuItem(value: 'Grade 11', child: Text('Grade 11', overflow: TextOverflow.ellipsis)),
+                              DropdownMenuItem(value: 'Grade 12', child: Text('Grade 12', overflow: TextOverflow.ellipsis)),
+                            ],
+                            onChanged: (val) {
+                              if (val != null) setDialogState(() => selectedGrade = val);
+                            },
+                          ),
+                          const SizedBox(height: 14),
+                          DropdownButtonFormField<String>(
+                            isExpanded: true,
+                            initialValue: sectionOptions.contains(selectedSection) ? selectedSection : null,
+                            dropdownColor: AppTheme.surface,
+                            style: TextStyle(color: AppTheme.text, fontSize: 13),
+                            decoration: InputDecoration(
+                              labelText: 'Classroom / Section',
+                              labelStyle: TextStyle(color: AppTheme.textSecondary, fontSize: 13),
+                              prefixIcon: Icon(Icons.meeting_room_outlined, size: 20, color: AppTheme.textMuted),
+                              filled: true,
+                              fillColor: AppTheme.background,
+                              border: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: BorderSide(color: AppTheme.border)),
                             ),
-                          ],
-                        ),
+                            items: [
+                              ...sectionOptions.map((sec) => DropdownMenuItem(value: sec, child: Text(sec, overflow: TextOverflow.ellipsis))),
+                              const DropdownMenuItem(value: '__custom__', child: Text('+ Custom Section...', overflow: TextOverflow.ellipsis)),
+                            ],
+                            onChanged: (val) {
+                              if (val != null) setDialogState(() => selectedSection = val);
+                            },
+                          ),
+                        ] else ...[
+                          Row(
+                            children: [
+                              Expanded(
+                                child: DropdownButtonFormField<String>(
+                                  isExpanded: true,
+                                  initialValue: selectedGrade,
+                                  dropdownColor: AppTheme.surface,
+                                  style: TextStyle(color: AppTheme.text, fontSize: 13),
+                                  decoration: InputDecoration(
+                                    labelText: 'Grade Level',
+                                    labelStyle: TextStyle(color: AppTheme.textSecondary, fontSize: 13),
+                                    prefixIcon: Icon(Icons.school_outlined, size: 20, color: AppTheme.textMuted),
+                                    filled: true,
+                                    fillColor: AppTheme.background,
+                                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: BorderSide(color: AppTheme.border)),
+                                  ),
+                                  items: const [
+                                    DropdownMenuItem(value: 'Grade 7', child: Text('Grade 7', overflow: TextOverflow.ellipsis)),
+                                    DropdownMenuItem(value: 'Grade 8', child: Text('Grade 8', overflow: TextOverflow.ellipsis)),
+                                    DropdownMenuItem(value: 'Grade 9', child: Text('Grade 9', overflow: TextOverflow.ellipsis)),
+                                    DropdownMenuItem(value: 'Grade 10', child: Text('Grade 10', overflow: TextOverflow.ellipsis)),
+                                    DropdownMenuItem(value: 'Grade 11', child: Text('Grade 11', overflow: TextOverflow.ellipsis)),
+                                    DropdownMenuItem(value: 'Grade 12', child: Text('Grade 12', overflow: TextOverflow.ellipsis)),
+                                  ],
+                                  onChanged: (val) {
+                                    if (val != null) setDialogState(() => selectedGrade = val);
+                                  },
+                                ),
+                              ),
+                              const SizedBox(width: 12),
+                              Expanded(
+                                child: DropdownButtonFormField<String>(
+                                  isExpanded: true,
+                                  initialValue: sectionOptions.contains(selectedSection) ? selectedSection : null,
+                                  dropdownColor: AppTheme.surface,
+                                  style: TextStyle(color: AppTheme.text, fontSize: 13),
+                                  decoration: InputDecoration(
+                                    labelText: 'Classroom / Section',
+                                    labelStyle: TextStyle(color: AppTheme.textSecondary, fontSize: 13),
+                                    prefixIcon: Icon(Icons.meeting_room_outlined, size: 20, color: AppTheme.textMuted),
+                                    filled: true,
+                                    fillColor: AppTheme.background,
+                                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: BorderSide(color: AppTheme.border)),
+                                  ),
+                                  items: [
+                                    ...sectionOptions.map((sec) => DropdownMenuItem(value: sec, child: Text(sec, overflow: TextOverflow.ellipsis))),
+                                    const DropdownMenuItem(value: '__custom__', child: Text('+ Custom Section...', overflow: TextOverflow.ellipsis)),
+                                  ],
+                                  onChanged: (val) {
+                                    if (val != null) setDialogState(() => selectedSection = val);
+                                  },
+                                ),
+                              ),
+                            ],
+                          ),
+                        ],
                         if (selectedSection == '__custom__') ...[
                           const SizedBox(height: 12),
                           TextFormField(
@@ -3907,6 +4122,7 @@ void _resendStudentCredentialsDialog(BuildContext context, Map<String, dynamic> 
                         const SizedBox(height: 14),
 
                         DropdownButtonFormField<String>(
+                          isExpanded: true,
                           initialValue: selectedType,
                           dropdownColor: AppTheme.surface,
                           style: TextStyle(color: AppTheme.text, fontSize: 13),
@@ -3919,10 +4135,10 @@ void _resendStudentCredentialsDialog(BuildContext context, Map<String, dynamic> 
                             border: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: BorderSide(color: AppTheme.border)),
                           ),
                           items: const [
-                            DropdownMenuItem(value: 'regular', child: Text('Regular Student (Standard Curriculum)')),
-                            DropdownMenuItem(value: 'irregular', child: Text('Irregular / Cross-Enrollee')),
-                            DropdownMenuItem(value: 'transferee', child: Text('Transferee Student')),
-                            DropdownMenuItem(value: 'sped', child: Text('SPED / Accommodated Student')),
+                            DropdownMenuItem(value: 'regular', child: Text('Regular Student (Standard Curriculum)', overflow: TextOverflow.ellipsis)),
+                            DropdownMenuItem(value: 'irregular', child: Text('Irregular / Cross-Enrollee', overflow: TextOverflow.ellipsis)),
+                            DropdownMenuItem(value: 'transferee', child: Text('Transferee Student', overflow: TextOverflow.ellipsis)),
+                            DropdownMenuItem(value: 'sped', child: Text('SPED / Accommodated Student', overflow: TextOverflow.ellipsis)),
                           ],
                           onChanged: (val) {
                             if (val != null) setDialogState(() => selectedType = val);

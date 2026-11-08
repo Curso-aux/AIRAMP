@@ -469,7 +469,7 @@ class FirestoreService {
     if (maxSeq > 0) return maxSeq;
 
     // 2. Query Cloud Firestore if local database has 0 records
-    if (isAvailable) {
+    if (isAvailable && !_isTestEnv) {
       try {
         final snap = await usersCollection
             .where('id', isGreaterThanOrEqualTo: cleanPrefix)
@@ -616,7 +616,7 @@ class FirestoreService {
   Future<Map<String, dynamic>?> findUserByIdentifier(String identifier) async {
     final rawTrimmed = identifier.trim();
     final idLower = rawTrimmed.toLowerCase();
-    if (rawTrimmed.isEmpty) return null;
+    if (rawTrimmed.isEmpty || _isTestEnv) return null;
 
     try {
       return await _findUserInternal(idLower, rawTrimmed)

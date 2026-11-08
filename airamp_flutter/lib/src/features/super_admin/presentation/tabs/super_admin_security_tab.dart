@@ -13,9 +13,13 @@ class SuperAdminSecurityTab extends ConsumerWidget {
     final gTheme = GovernanceTheme(themeState.isDark);
     final auditLogsAsync = ref.watch(superAdminAuditLogsProvider);
     final statsAsync = ref.watch(superAdminStatsProvider);
+    final isMobile = MediaQuery.sizeOf(context).width < 600;
 
     return SingleChildScrollView(
-      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 24),
+      padding: EdgeInsets.symmetric(
+        horizontal: isMobile ? 16 : 24,
+        vertical: isMobile ? 16 : 24,
+      ),
       child: Center(
         child: ConstrainedBox(
           constraints: const BoxConstraints(maxWidth: 1200),
@@ -24,6 +28,7 @@ class SuperAdminSecurityTab extends ConsumerWidget {
             children: [
               // ── Formal Institutional Header ──
               Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Container(
                     padding: const EdgeInsets.all(10),
@@ -32,27 +37,36 @@ class SuperAdminSecurityTab extends ConsumerWidget {
                       borderRadius: BorderRadius.circular(10),
                       border: Border.all(color: gTheme.primaryBorder),
                     ),
-                    child: Icon(Icons.shield_outlined, color: gTheme.primary, size: 22),
+                    child: Icon(
+                      Icons.shield_outlined,
+                      color: gTheme.primary,
+                      size: 22,
+                    ),
                   ),
                   const SizedBox(width: 14),
-                  Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        'Security Architecture & System Audit Trail',
-                        style: TextStyle(
-                          fontSize: 20,
-                          fontWeight: FontWeight.bold,
-                          color: gTheme.textPrimary,
-                          letterSpacing: -0.3,
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'Security Architecture & System Audit Trail',
+                          style: TextStyle(
+                            fontSize: isMobile ? 17 : 20,
+                            fontWeight: FontWeight.bold,
+                            color: gTheme.textPrimary,
+                            letterSpacing: -0.3,
+                          ),
                         ),
-                      ),
-                      const SizedBox(height: 3),
-                      Text(
-                        'Real-time cryptographic integrity, multi-tenant RBAC boundaries, and governance event stream.',
-                        style: TextStyle(fontSize: 13, color: gTheme.textSecondary),
-                      ),
-                    ],
+                        const SizedBox(height: 3),
+                        Text(
+                          'Real-time cryptographic integrity, multi-tenant RBAC boundaries, and governance event stream.',
+                          style: TextStyle(
+                            fontSize: 12.5,
+                            color: gTheme.textSecondary,
+                          ),
+                        ),
+                      ],
+                    ),
                   ),
                 ],
               ),
@@ -67,7 +81,9 @@ class SuperAdminSecurityTab extends ConsumerWidget {
                   border: Border.all(color: gTheme.border),
                   boxShadow: [
                     BoxShadow(
-                      color: Colors.black.withValues(alpha: gTheme.isDark ? 0.2 : 0.03),
+                      color: Colors.black.withValues(
+                        alpha: gTheme.isDark ? 0.2 : 0.03,
+                      ),
                       blurRadius: 10,
                       offset: const Offset(0, 2),
                     ),
@@ -79,7 +95,8 @@ class SuperAdminSecurityTab extends ConsumerWidget {
                       gTheme: gTheme,
                       icon: Icons.admin_panel_settings_outlined,
                       title: 'Hierarchical Multi-Tenant RBAC Governance',
-                      description: 'Super Admin manages Campuses, Administrator Accounts, and Access Scopes across all institutions.',
+                      description:
+                          'Super Admin manages Campuses, Administrator Accounts, and Access Scopes across all institutions.',
                       statusBadge: 'ACTIVE',
                     ),
                     Divider(height: 26, color: gTheme.border),
@@ -87,7 +104,8 @@ class SuperAdminSecurityTab extends ConsumerWidget {
                       gTheme: gTheme,
                       icon: Icons.lock_outline_rounded,
                       title: 'Cryptographic Salted Password Security (SHA-256)',
-                      description: 'Unique 16-byte cryptographically secure salts per user generated via Random.secure(), auto-upgrading on legacy authentication.',
+                      description:
+                          'Unique 16-byte cryptographically secure salts per user generated via Random.secure(), auto-upgrading on legacy authentication.',
                       statusBadge: 'ENFORCED',
                     ),
                     Divider(height: 26, color: gTheme.border),
@@ -95,7 +113,8 @@ class SuperAdminSecurityTab extends ConsumerWidget {
                       gTheme: gTheme,
                       icon: Icons.domain_verification_outlined,
                       title: 'Multi-Tenant Database Isolation Scoping',
-                      description: 'Tables automatically partitioned and foreign-keyed by school_id across students, teachers, subjects, sections, and schedules.',
+                      description:
+                          'Tables automatically partitioned and foreign-keyed by school_id across students, teachers, subjects, sections, and schedules.',
                       statusBadge: 'ISOLATED',
                     ),
                     Divider(height: 26, color: gTheme.border),
@@ -103,7 +122,8 @@ class SuperAdminSecurityTab extends ConsumerWidget {
                       gTheme: gTheme,
                       icon: Icons.mark_email_read_outlined,
                       title: 'Two-Factor Authentication (2FA) & SMTP Bridge',
-                      description: 'Administrative 2FA email challenge verification with safe sandboxed bypass fallback for demonstration environments.',
+                      description:
+                          'Administrative 2FA email challenge verification with safe sandboxed bypass fallback for demonstration environments.',
                       statusBadge: 'ENABLED',
                     ),
                   ],
@@ -127,33 +147,74 @@ class SuperAdminSecurityTab extends ConsumerWidget {
                     children: [
                       Row(
                         children: [
-                          Icon(Icons.storage_outlined, size: 18, color: gTheme.primary),
+                          Icon(
+                            Icons.storage_outlined,
+                            size: 18,
+                            color: gTheme.primary,
+                          ),
                           const SizedBox(width: 8),
-                          Text(
-                            'Database Table Record Distribution (v21 Schema)',
-                            style: TextStyle(
-                              fontSize: 14,
-                              fontWeight: FontWeight.bold,
-                              color: gTheme.textPrimary,
+                          Expanded(
+                            child: Text(
+                              'Database Table Record Distribution (v21 Schema)',
+                              style: TextStyle(
+                                fontSize: isMobile ? 13 : 14,
+                                fontWeight: FontWeight.bold,
+                                color: gTheme.textPrimary,
+                              ),
                             ),
                           ),
                         ],
                       ),
                       const SizedBox(height: 16),
-                      Row(
-                        children: [
-                          _buildTableStat(gTheme, 'Users', stats['total_users']?.toString() ?? '0'),
-                          const SizedBox(width: 12),
-                          _buildTableStat(gTheme, 'Schools', stats['total_schools']?.toString() ?? '1'),
-                          const SizedBox(width: 12),
-                          _buildTableStat(gTheme, 'Subjects', stats['total_subjects']?.toString() ?? '0'),
-                          const SizedBox(width: 12),
-                          _buildTableStat(gTheme, 'Sections', stats['total_sections']?.toString() ?? '0'),
-                          const SizedBox(width: 12),
-                          _buildTableStat(gTheme, 'Schedules', stats['total_schedules']?.toString() ?? '0'),
-                          const SizedBox(width: 12),
-                          _buildTableStat(gTheme, 'Admin Accounts', stats['total_admins']?.toString() ?? '1'),
-                        ],
+                      LayoutBuilder(
+                        builder: (context, constraints) {
+                          final count = constraints.maxWidth >= 900
+                              ? 6
+                              : (constraints.maxWidth >= 540 ? 3 : 2);
+                          final spacing = 10.0;
+                          final itemWidth =
+                              (constraints.maxWidth - (spacing * (count - 1))) /
+                              count;
+
+                          final statItems = [
+                            ('Users', stats['total_users']?.toString() ?? '0'),
+                            (
+                              'Schools',
+                              stats['total_schools']?.toString() ?? '1',
+                            ),
+                            (
+                              'Subjects',
+                              stats['total_subjects']?.toString() ?? '0',
+                            ),
+                            (
+                              'Sections',
+                              stats['total_sections']?.toString() ?? '0',
+                            ),
+                            (
+                              'Schedules',
+                              stats['total_schedules']?.toString() ?? '0',
+                            ),
+                            (
+                              'Admin Accounts',
+                              stats['total_admins']?.toString() ?? '1',
+                            ),
+                          ];
+
+                          return Wrap(
+                            spacing: spacing,
+                            runSpacing: spacing,
+                            children: statItems.map((stat) {
+                              return SizedBox(
+                                width: itemWidth,
+                                child: _buildTableStatBox(
+                                  gTheme,
+                                  stat.$1,
+                                  stat.$2,
+                                ),
+                              );
+                            }).toList(),
+                          );
+                        },
                       ),
                     ],
                   ),
@@ -165,24 +226,38 @@ class SuperAdminSecurityTab extends ConsumerWidget {
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  Row(
-                    children: [
-                      Icon(Icons.history_edu_rounded, size: 20, color: gTheme.textPrimary),
-                      const SizedBox(width: 8),
-                      Text(
-                        'Governance Audit Trail & Event Stream',
-                        style: TextStyle(
-                          fontSize: 16,
-                          fontWeight: FontWeight.bold,
+                  Expanded(
+                    child: Row(
+                      children: [
+                        Icon(
+                          Icons.history_edu_rounded,
+                          size: 20,
                           color: gTheme.textPrimary,
                         ),
-                      ),
-                    ],
+                        const SizedBox(width: 8),
+                        Flexible(
+                          child: Text(
+                            'Governance Audit Trail & Event Stream',
+                            style: TextStyle(
+                              fontSize: 16,
+                              fontWeight: FontWeight.bold,
+                              color: gTheme.textPrimary,
+                            ),
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                      ],
+                    ),
                   ),
                   IconButton(
-                    icon: Icon(Icons.refresh_rounded, size: 18, color: gTheme.textSecondary),
+                    icon: Icon(
+                      Icons.refresh_rounded,
+                      size: 18,
+                      color: gTheme.textSecondary,
+                    ),
                     tooltip: 'Refresh Audit Trail',
-                    onPressed: () => ref.invalidate(superAdminAuditLogsProvider),
+                    onPressed: () =>
+                        ref.invalidate(superAdminAuditLogsProvider),
                   ),
                 ],
               ),
@@ -200,13 +275,21 @@ class SuperAdminSecurityTab extends ConsumerWidget {
                   ),
                   error: (e, _) => Padding(
                     padding: const EdgeInsets.all(24),
-                    child: Text('Error loading audit log: $e', style: TextStyle(color: gTheme.dangerText)),
+                    child: Text(
+                      'Error loading audit log: $e',
+                      style: TextStyle(color: gTheme.dangerText),
+                    ),
                   ),
                   data: (logs) {
                     if (logs.isEmpty) {
                       return Padding(
                         padding: const EdgeInsets.all(32),
-                        child: Center(child: Text('No audit events logged yet.', style: TextStyle(color: gTheme.textMuted))),
+                        child: Center(
+                          child: Text(
+                            'No audit events logged yet.',
+                            style: TextStyle(color: gTheme.textMuted),
+                          ),
+                        ),
                       );
                     }
 
@@ -214,7 +297,8 @@ class SuperAdminSecurityTab extends ConsumerWidget {
                       shrinkWrap: true,
                       physics: const NeverScrollableScrollPhysics(),
                       itemCount: logs.length,
-                      separatorBuilder: (_, _) => Divider(height: 1, color: gTheme.border),
+                      separatorBuilder: (_, _) =>
+                          Divider(height: 1, color: gTheme.border),
                       itemBuilder: (context, index) {
                         final log = logs[index];
                         final action = log['action'] as String? ?? 'EVENT';
@@ -223,12 +307,18 @@ class SuperAdminSecurityTab extends ConsumerWidget {
                         final time = log['created_at'] as String? ?? '';
 
                         return Padding(
-                          padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 14),
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 18,
+                            vertical: 14,
+                          ),
                           child: Row(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
                               Container(
-                                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 8,
+                                  vertical: 4,
+                                ),
                                 decoration: BoxDecoration(
                                   color: gTheme.surfaceSubtle,
                                   borderRadius: BorderRadius.circular(6),
@@ -251,12 +341,19 @@ class SuperAdminSecurityTab extends ConsumerWidget {
                                   children: [
                                     Text(
                                       details,
-                                      style: TextStyle(fontSize: 13, color: gTheme.textPrimary, height: 1.35),
+                                      style: TextStyle(
+                                        fontSize: 13,
+                                        color: gTheme.textPrimary,
+                                        height: 1.35,
+                                      ),
                                     ),
                                     const SizedBox(height: 3),
                                     Text(
                                       'Actor: $actor • $time',
-                                      style: TextStyle(fontSize: 11, color: gTheme.textMuted),
+                                      style: TextStyle(
+                                        fontSize: 11,
+                                        color: gTheme.textMuted,
+                                      ),
                                     ),
                                   ],
                                 ),
@@ -311,7 +408,11 @@ class SuperAdminSecurityTab extends ConsumerWidget {
               const SizedBox(height: 3),
               Text(
                 description,
-                style: TextStyle(fontSize: 12, color: gTheme.textSecondary, height: 1.35),
+                style: TextStyle(
+                  fontSize: 12,
+                  color: gTheme.textSecondary,
+                  height: 1.35,
+                ),
               ),
             ],
           ),
@@ -338,33 +439,36 @@ class SuperAdminSecurityTab extends ConsumerWidget {
     );
   }
 
-  Widget _buildTableStat(GovernanceTheme gTheme, String label, String count) {
-    return Expanded(
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 12),
-        decoration: BoxDecoration(
-          color: gTheme.surfaceSubtle,
-          borderRadius: BorderRadius.circular(8),
-          border: Border.all(color: gTheme.border),
-        ),
-        child: Column(
-          children: [
-            Text(
-              count,
-              style: TextStyle(
-                fontSize: 17,
-                fontWeight: FontWeight.bold,
-                color: gTheme.textPrimary,
-              ),
+  Widget _buildTableStatBox(
+    GovernanceTheme gTheme,
+    String label,
+    String count,
+  ) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 12),
+      decoration: BoxDecoration(
+        color: gTheme.surfaceSubtle,
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: gTheme.border),
+      ),
+      child: Column(
+        children: [
+          Text(
+            count,
+            style: TextStyle(
+              fontSize: 17,
+              fontWeight: FontWeight.bold,
+              color: gTheme.textPrimary,
             ),
-            const SizedBox(height: 2),
-            Text(
-              label,
-              style: TextStyle(fontSize: 11, color: gTheme.textSecondary),
-              overflow: TextOverflow.ellipsis,
-            ),
-          ],
-        ),
+          ),
+          const SizedBox(height: 2),
+          Text(
+            label,
+            style: TextStyle(fontSize: 11, color: gTheme.textSecondary),
+            overflow: TextOverflow.ellipsis,
+            textAlign: TextAlign.center,
+          ),
+        ],
       ),
     );
   }

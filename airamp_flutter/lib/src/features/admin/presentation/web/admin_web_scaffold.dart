@@ -98,6 +98,226 @@ class _AdminWebScaffoldState extends ConsumerState<AdminWebScaffold> {
     AdminCommandPalette.show(context, onSelectTab: _onSelectTab);
   }
 
+  void _showMoreHubModal(BuildContext context) {
+    final currentIdx = widget.navigationShell.currentIndex;
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (sheetCtx) {
+        return Material(
+          color: AppTheme.surface,
+          borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
+          child: Container(
+            decoration: BoxDecoration(
+              borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
+              border: Border.all(color: AppTheme.border),
+            ),
+            child: SafeArea(
+            child: SingleChildScrollView(
+              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Center(
+                    child: Container(
+                      width: 40,
+                      height: 4,
+                      decoration: BoxDecoration(
+                        color: AppTheme.border,
+                        borderRadius: BorderRadius.circular(2),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              'Administrative Modules',
+                              style: TextStyle(
+                                fontSize: 18,
+                                fontWeight: FontWeight.bold,
+                                color: AppTheme.text,
+                              ),
+                            ),
+                            const SizedBox(height: 2),
+                            Text(
+                              'Access institutional tools and configuration',
+                              style: TextStyle(fontSize: 12, color: AppTheme.textSecondary),
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ],
+                        ),
+                      ),
+                      IconButton(
+                        icon: const Icon(Icons.close, size: 20),
+                        color: AppTheme.textSecondary,
+                        onPressed: () => Navigator.pop(sheetCtx),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 12),
+                  Divider(height: 1, color: AppTheme.border),
+                  const SizedBox(height: 8),
+                  _buildHubTile(
+                    icon: Icons.key_outlined,
+                    activeIcon: Icons.key,
+                    title: 'Enrollment Keys',
+                    subtitle: 'Class section access keys & usage limits',
+                    isSelected: currentIdx == 4,
+                    onTap: () {
+                      Navigator.pop(sheetCtx);
+                      _onSelectTab(4);
+                    },
+                  ),
+                  _buildHubTile(
+                    icon: Icons.campaign_outlined,
+                    activeIcon: Icons.campaign,
+                    title: 'Announcements & Inquiries',
+                    subtitle: 'Broadcast alerts and communications',
+                    isSelected: currentIdx == 5,
+                    onTap: () {
+                      Navigator.pop(sheetCtx);
+                      _onSelectTab(5);
+                    },
+                  ),
+                  _buildHubTile(
+                    icon: Icons.assignment_turned_in_outlined,
+                    activeIcon: Icons.assignment_turned_in,
+                    title: 'Quiz Scores & Results',
+                    subtitle: 'Academic assessment performance & grading',
+                    isSelected: currentIdx == 6,
+                    onTap: () {
+                      Navigator.pop(sheetCtx);
+                      _onSelectTab(6);
+                    },
+                  ),
+                  _buildHubTile(
+                    icon: Icons.groups_outlined,
+                    activeIcon: Icons.groups,
+                    title: 'Class Sections',
+                    subtitle: 'Section allocations, year levels & rooms',
+                    isSelected: currentIdx == 7,
+                    onTap: () {
+                      Navigator.pop(sheetCtx);
+                      _onSelectTab(7);
+                    },
+                  ),
+                  _buildHubTile(
+                    icon: Icons.calendar_month_outlined,
+                    activeIcon: Icons.calendar_month,
+                    title: 'Class Schedules',
+                    subtitle: 'Master timetable & teaching allocations',
+                    isSelected: currentIdx == 8,
+                    onTap: () {
+                      Navigator.pop(sheetCtx);
+                      _onSelectTab(8);
+                    },
+                  ),
+                  _buildHubTile(
+                    icon: Icons.person_outline,
+                    activeIcon: Icons.person,
+                    title: 'Admin Profile & Settings',
+                    subtitle: 'Credentials, personal details & preferences',
+                    isSelected: currentIdx == 9,
+                    onTap: () {
+                      Navigator.pop(sheetCtx);
+                      context.go('/admin/profile');
+                    },
+                  ),
+                  const SizedBox(height: 8),
+                  Divider(height: 1, color: AppTheme.border),
+                  const SizedBox(height: 6),
+                  ListTile(
+                    leading: Container(
+                      padding: const EdgeInsets.all(8),
+                      decoration: BoxDecoration(
+                        color: AppTheme.background,
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: Icon(Icons.menu_open_rounded, size: 20, color: AppTheme.primary),
+                    ),
+                    title: Text(
+                      'Open Full Navigation Drawer',
+                      style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: AppTheme.text),
+                    ),
+                    trailing: const Icon(Icons.chevron_right, size: 18),
+                    dense: true,
+                    contentPadding: EdgeInsets.zero,
+                    onTap: () {
+                      Navigator.pop(sheetCtx);
+                      _scaffoldKey.currentState?.openDrawer();
+                    },
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      );
+    },
+  );
+}
+
+  Widget _buildHubTile({
+    required IconData icon,
+    required IconData activeIcon,
+    required String title,
+    required String subtitle,
+    required bool isSelected,
+    required VoidCallback onTap,
+  }) {
+    return ListTile(
+      leading: Container(
+        padding: const EdgeInsets.all(8),
+        decoration: BoxDecoration(
+          color: isSelected ? AppTheme.primary.withValues(alpha: 0.12) : AppTheme.background,
+          borderRadius: BorderRadius.circular(8),
+        ),
+        child: Icon(
+          isSelected ? activeIcon : icon,
+          size: 20,
+          color: isSelected ? AppTheme.primary : AppTheme.textSecondary,
+        ),
+      ),
+      title: Text(
+        title,
+        style: TextStyle(
+          fontSize: 14,
+          fontWeight: isSelected ? FontWeight.bold : FontWeight.w600,
+          color: isSelected ? AppTheme.primary : AppTheme.text,
+        ),
+      ),
+      subtitle: Text(
+        subtitle,
+        style: TextStyle(fontSize: 11, color: AppTheme.textSecondary),
+      ),
+      trailing: isSelected
+          ? Container(
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+              decoration: BoxDecoration(
+                color: AppTheme.primary.withValues(alpha: 0.12),
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: Text(
+                'ACTIVE',
+                style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: AppTheme.primary),
+              ),
+            )
+          : const Icon(Icons.chevron_right, size: 18),
+      dense: true,
+      contentPadding: const EdgeInsets.symmetric(vertical: 2),
+      onTap: onTap,
+    );
+  }
+
   String _getPageTitle() {
     final currentIndex = widget.navigationShell.currentIndex;
     if (currentIndex >= 0 && currentIndex < _navItems.length) {
@@ -197,7 +417,7 @@ class _AdminWebScaffoldState extends ConsumerState<AdminWebScaffold> {
                       currentIndex: bottomNavIndex,
                       onTap: (tabIndex) {
                         if (tabIndex == 4) {
-                          _scaffoldKey.currentState?.openDrawer();
+                          _showMoreHubModal(context);
                         } else {
                           _onSelectTab(tabIndex);
                         }

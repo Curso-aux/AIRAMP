@@ -161,9 +161,9 @@ class GlobalDashboardFilterBar extends ConsumerWidget {
                 child: Icon(Icons.filter_list_rounded, size: 16, color: AppTheme.primary),
               ),
               const SizedBox(width: 8),
-              Flexible(
+              Expanded(
                 child: Text(
-                  'Institutional Filter Controls',
+                  compact ? 'Filter Controls' : 'Institutional Filter Controls',
                   overflow: TextOverflow.ellipsis,
                   maxLines: 1,
                   style: TextStyle(

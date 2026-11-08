@@ -14,6 +14,7 @@ class KpiSummaryCard extends StatefulWidget {
   final List<double>? sparklineData;
   final VoidCallback? onTap;
   final bool? isDark;
+  final bool compact;
 
   const KpiSummaryCard({
     super.key,
@@ -29,6 +30,7 @@ class KpiSummaryCard extends StatefulWidget {
     this.sparklineData,
     this.onTap,
     this.isDark,
+    this.compact = false,
   });
 
   @override
@@ -55,7 +57,7 @@ class _KpiSummaryCardState extends State<KpiSummaryCard> {
         child: AnimatedContainer(
           duration: const Duration(milliseconds: 180),
           curve: Curves.easeOut,
-          padding: const EdgeInsets.all(18),
+          padding: EdgeInsets.all(widget.compact ? 12 : 18),
           decoration: BoxDecoration(
             color: cardColor,
             borderRadius: BorderRadius.circular(12),
@@ -88,7 +90,7 @@ class _KpiSummaryCardState extends State<KpiSummaryCard> {
                         Text(
                           widget.title,
                           style: TextStyle(
-                            fontSize: 12.5,
+                            fontSize: widget.compact ? 11.5 : 12.5,
                             fontWeight: FontWeight.w600,
                             color: effectiveIsDark ? AppTheme.darkTextSecondary : AppTheme.lightTextSecondary,
                             letterSpacing: 0.1,
@@ -97,9 +99,9 @@ class _KpiSummaryCardState extends State<KpiSummaryCard> {
                           overflow: TextOverflow.ellipsis,
                         ),
                         if (widget.badgeText != null) ...[
-                          const SizedBox(height: 4),
+                          SizedBox(height: widget.compact ? 2 : 4),
                           Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                            padding: EdgeInsets.symmetric(horizontal: widget.compact ? 4 : 6, vertical: widget.compact ? 1.5 : 2),
                             decoration: BoxDecoration(
                               color: effectiveIsDark ? AppTheme.darkSurfaceLight : const Color(0xFFF1F5F9),
                               borderRadius: BorderRadius.circular(4),
@@ -110,43 +112,45 @@ class _KpiSummaryCardState extends State<KpiSummaryCard> {
                             child: Text(
                               widget.badgeText!,
                               style: TextStyle(
-                                fontSize: 10,
+                                fontSize: widget.compact ? 9.5 : 10,
                                 fontWeight: FontWeight.w600,
                                 color: effectiveIsDark ? AppTheme.darkTextSecondary : AppTheme.lightTextSecondary,
                               ),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
                             ),
                           ),
                         ],
                       ],
                     ),
                   ),
-                  const SizedBox(width: 8),
+                  const SizedBox(width: 6),
                   Container(
-                    padding: const EdgeInsets.all(8),
+                    padding: EdgeInsets.all(widget.compact ? 5 : 8),
                     decoration: BoxDecoration(
                       color: widget.color.withValues(alpha: effectiveIsDark ? 0.12 : 0.08),
-                      borderRadius: BorderRadius.circular(8),
+                      borderRadius: BorderRadius.circular(widget.compact ? 6 : 8),
                       border: Border.all(
                         color: widget.color.withValues(alpha: effectiveIsDark ? 0.22 : 0.15),
                       ),
                     ),
-                    child: Icon(widget.icon, color: widget.color, size: 18),
+                    child: Icon(widget.icon, color: widget.color, size: widget.compact ? 15 : 18),
                   ),
                 ],
               ),
-              const SizedBox(height: 12),
+              SizedBox(height: widget.compact ? 6 : 12),
 
               // Main Metric Value
               Text(
                 widget.value,
                 style: TextStyle(
-                  fontSize: 26,
+                  fontSize: widget.compact ? 21 : 26,
                   fontWeight: FontWeight.w700,
                   color: effectiveIsDark ? AppTheme.darkText : AppTheme.lightText,
                   letterSpacing: -0.5,
                 ),
               ),
-              const SizedBox(height: 6),
+              SizedBox(height: widget.compact ? 4 : 6),
 
               // Trend Badge & Subtitle
               Row(
@@ -154,7 +158,7 @@ class _KpiSummaryCardState extends State<KpiSummaryCard> {
                   if (widget.trendText != null) ...[
                     Flexible(
                       child: Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                        padding: EdgeInsets.symmetric(horizontal: widget.compact ? 5 : 6, vertical: widget.compact ? 1.5 : 2),
                         decoration: BoxDecoration(
                           color: trendColor.withValues(alpha: effectiveIsDark ? 0.12 : 0.08),
                           borderRadius: BorderRadius.circular(4),
@@ -168,15 +172,15 @@ class _KpiSummaryCardState extends State<KpiSummaryCard> {
                           children: [
                             Icon(
                               widget.isPositiveTrend ? Icons.trending_up_rounded : Icons.trending_down_rounded,
-                              size: 12,
+                              size: widget.compact ? 10 : 12,
                               color: trendColor,
                             ),
-                            const SizedBox(width: 3),
+                            const SizedBox(width: 2),
                             Flexible(
                               child: Text(
                                 widget.trendText!,
                                 style: TextStyle(
-                                  fontSize: 10.5,
+                                  fontSize: widget.compact ? 9.5 : 10.5,
                                   fontWeight: FontWeight.w600,
                                   color: trendColor,
                                 ),
@@ -188,38 +192,39 @@ class _KpiSummaryCardState extends State<KpiSummaryCard> {
                         ),
                       ),
                     ),
-                    const SizedBox(width: 6),
+                    if (!widget.compact || widget.trendText == null) const SizedBox(width: 6),
                   ],
-                  Expanded(
-                    child: Text(
-                      widget.subtitle,
-                      style: TextStyle(
-                        fontSize: 11.5,
-                        color: effectiveIsDark ? AppTheme.darkTextMuted : AppTheme.lightTextMuted,
+                  if (!widget.compact || widget.trendText == null)
+                    Expanded(
+                      child: Text(
+                        widget.subtitle,
+                        style: TextStyle(
+                          fontSize: widget.compact ? 10 : 11.5,
+                          color: effectiveIsDark ? AppTheme.darkTextMuted : AppTheme.lightTextMuted,
+                        ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
                       ),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
                     ),
-                  ),
                 ],
               ),
 
               // Mini Progress Bar or Sparkline Track
               if (widget.progress != null) ...[
-                const SizedBox(height: 12),
+                SizedBox(height: widget.compact ? 8 : 12),
                 ClipRRect(
-                  borderRadius: BorderRadius.circular(4),
+                  borderRadius: BorderRadius.circular(widget.compact ? 2.5 : 4),
                   child: Stack(
                     children: [
                       Container(
-                        height: 5,
+                        height: widget.compact ? 3.5 : 5,
                         width: double.infinity,
                         color: effectiveIsDark ? AppTheme.darkBorder : const Color(0xFFE2E8F0),
                       ),
                       FractionallySizedBox(
                         widthFactor: widget.progress!.clamp(0.0, 1.0),
                         child: Container(
-                          height: 5,
+                          height: widget.compact ? 3.5 : 5,
                           decoration: BoxDecoration(
                             gradient: LinearGradient(
                               colors: [
@@ -227,7 +232,7 @@ class _KpiSummaryCardState extends State<KpiSummaryCard> {
                                 widget.color,
                               ],
                             ),
-                            borderRadius: BorderRadius.circular(4),
+                            borderRadius: BorderRadius.circular(widget.compact ? 2.5 : 4),
                           ),
                         ),
                       ),

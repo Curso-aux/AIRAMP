@@ -6,7 +6,6 @@ import '../../../../core/theme/theme_provider.dart';
 import '../../../../core/components/analytics_donut_chart.dart';
 import '../../data/admin_repository.dart';
 import 'components/analytics_filter_bar.dart';
-import '../../../../core/components/global_dashboard_filter_bar.dart';
 import '../../../../core/components/kpi_summary_card.dart';
 import '../../../../core/components/lo_mastery_matrix.dart';
 import '../../../../core/components/user_avatar_widget.dart';
@@ -131,23 +130,21 @@ class AdminWebAnalyticsView extends ConsumerWidget {
               ),
               const SizedBox(height: 20),
 
-              // Global Dashboard Filter Bar (Academic Year, Dept/Grade Level, Subject, Section)
-              const GlobalDashboardFilterBar(),
-              const SizedBox(height: 16),
-
-              // Advanced Popover & Multi-Dimensional Category Filter Bar
+              // Unified Responsive Multi-Dimensional Analytics Filter Bar
               const AnalyticsFilterBar(),
-              const SizedBox(height: 24),
+              const SizedBox(height: 20),
 
               // Empty State when filter yields nothing
               if (!hasData && filter.hasActiveFilters)
                 _buildEmptyFilterState(context, ref, filter, isDark)
               else ...[
-                // Executive KPI Cards (Institutional 4-Column Layout)
+                // Executive KPI Cards (Responsive 4-Tier / 2x2 Grid)
                 LayoutBuilder(
                   builder: (context, constraints) {
+                    final isMobile = constraints.maxWidth < 650;
+
                     final card1Subtitle = filter.hasActiveFilters
-                        ? '$totalStudents Students matching filters'
+                        ? '$totalStudents Students matching'
                         : '$totalStudents Students · $totalTeachers Faculty';
 
                     final card2Subtitle = filter.subjectName != null
@@ -157,22 +154,22 @@ class AdminWebAnalyticsView extends ConsumerWidget {
                             : 'Across $totalSubjects active courses';
 
                     final card3Subtitle = filter.subjectName != null
-                        ? '$totalLos competency units in course'
-                        : '$totalLos learning topics assessed';
+                        ? '$totalLos competency units'
+                        : '$totalLos topics assessed';
 
                     final tfLabel = filter.timeframe == 'today'
                         ? 'Today'
                         : filter.timeframe == '7days'
-                            ? 'Past 7 Days'
+                            ? 'Past 7d'
                             : filter.timeframe == '30days'
-                                ? 'Past 30 Days'
+                                ? 'Past 30d'
                                 : filter.timeframe == 'this_month'
                                     ? 'This Month'
                                     : 'All Time';
 
                     final card4Subtitle = totalAttempts > 0
-                        ? '$passedAttempts of $totalAttempts exams passed ($tfLabel · Avg: $avgScore%)'
-                        : '0 exams recorded for active filters ($tfLabel)';
+                        ? '$passedAttempts of $totalAttempts passed ($avgScore% avg)'
+                        : '0 exams recorded ($tfLabel)';
 
                     final totalSectionsCount = (analytics['totalSections'] as int?) ?? sectionDistribution.length;
                     final sectionBadge = '$totalSectionsCount ${totalSectionsCount == 1 ? 'Section' : 'Sections'}';
@@ -190,6 +187,7 @@ class AdminWebAnalyticsView extends ConsumerWidget {
                       badgeText: sectionBadge,
                       progress: totalUsers > 0 ? (totalStudents / totalUsers).clamp(0.0, 1.0) : 0.0,
                       isDark: isDark,
+                      compact: isMobile,
                     );
                     final card2 = KpiSummaryCard(
                       title: 'Active Course Enrollments',
@@ -204,6 +202,7 @@ class AdminWebAnalyticsView extends ConsumerWidget {
                           ? (totalEnrollments / (totalSubjects * 30)).clamp(0.0, 1.0)
                           : 0.0,
                       isDark: isDark,
+                      compact: isMobile,
                     );
                     final card3 = KpiSummaryCard(
                       title: 'Student Learning Progress',
@@ -216,6 +215,7 @@ class AdminWebAnalyticsView extends ConsumerWidget {
                       badgeText: unitBadge,
                       progress: (avgScore / 100.0).clamp(0.0, 1.0),
                       isDark: isDark,
+                      compact: isMobile,
                     );
                     final card4 = KpiSummaryCard(
                       title: 'Assessment Pass Rate',
@@ -228,9 +228,11 @@ class AdminWebAnalyticsView extends ConsumerWidget {
                       badgeText: 'Target: 75%',
                       progress: (passRate / 100.0).clamp(0.0, 1.0),
                       isDark: isDark,
+                      compact: isMobile,
                     );
 
-                    if (constraints.maxWidth >= 900) {
+                    // Desktop Wide View: 4 Columns in a single row
+                    if (constraints.maxWidth >= 950) {
                       return Row(
                         children: [
                           Expanded(child: card1),
@@ -242,21 +244,22 @@ class AdminWebAnalyticsView extends ConsumerWidget {
                           Expanded(child: card4),
                         ],
                       );
-                    } else if (constraints.maxWidth >= 550) {
+                    } else if (constraints.maxWidth >= 650) {
+                      // Tablet Mid View: 2x2 Grid with standard cards
                       return Column(
                         children: [
                           Row(
                             children: [
                               Expanded(child: card1),
-                              const SizedBox(width: 16),
+                              const SizedBox(width: 14),
                               Expanded(child: card2),
                             ],
                           ),
-                          const SizedBox(height: 16),
+                          const SizedBox(height: 14),
                           Row(
                             children: [
                               Expanded(child: card3),
-                              const SizedBox(width: 16),
+                              const SizedBox(width: 14),
                               Expanded(child: card4),
                             ],
                           ),
@@ -264,15 +267,24 @@ class AdminWebAnalyticsView extends ConsumerWidget {
                       );
                     }
 
+                    // Mobile View: 2x2 Compact Grid (cleanly fits on small phone screens)
                     return Column(
                       children: [
-                        card1,
-                        const SizedBox(height: 14),
-                        card2,
-                        const SizedBox(height: 14),
-                        card3,
-                        const SizedBox(height: 14),
-                        card4,
+                        Row(
+                          children: [
+                            Expanded(child: card1),
+                            const SizedBox(width: 10),
+                            Expanded(child: card2),
+                          ],
+                        ),
+                        const SizedBox(height: 10),
+                        Row(
+                          children: [
+                            Expanded(child: card3),
+                            const SizedBox(width: 10),
+                            Expanded(child: card4),
+                          ],
+                        ),
                       ],
                     );
                   },
@@ -396,24 +408,10 @@ class AdminWebAnalyticsView extends ConsumerWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Row(
-            children: [
-              Icon(Icons.pie_chart_outline_rounded, color: AppTheme.primary, size: 20),
-              const SizedBox(width: 8),
-              Expanded(
-                child: Text(
-                  'Exam Results & Performance Overview',
-                  style: TextStyle(
-                    fontSize: 15,
-                    fontWeight: FontWeight.bold,
-                    color: isDark ? AppTheme.darkText : AppTheme.lightText,
-                  ),
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                ),
-              ),
-              const SizedBox(width: 8),
-              Container(
+          LayoutBuilder(
+            builder: (context, headerConstraints) {
+              final isNarrow = headerConstraints.maxWidth < 480;
+              final badgeWidget = Container(
                 padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                 decoration: BoxDecoration(
                   color: (benchmarkPassed ? AppTheme.success : AppTheme.warning).withValues(alpha: isDark ? 0.18 : 0.1),
@@ -427,8 +425,60 @@ class AdminWebAnalyticsView extends ConsumerWidget {
                     color: benchmarkPassed ? AppTheme.success : AppTheme.warning,
                   ),
                 ),
-              ),
-            ],
+              );
+
+              if (isNarrow) {
+                return Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Icon(Icons.pie_chart_outline_rounded, color: AppTheme.primary, size: 20),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Text(
+                            'Exam Results & Performance Overview',
+                            style: TextStyle(
+                              fontSize: 14.5,
+                              fontWeight: FontWeight.bold,
+                              color: isDark ? AppTheme.darkText : AppTheme.lightText,
+                            ),
+                            maxLines: 2,
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 6),
+                    Padding(
+                      padding: const EdgeInsets.only(left: 28),
+                      child: badgeWidget,
+                    ),
+                  ],
+                );
+              }
+
+              return Row(
+                children: [
+                  Icon(Icons.pie_chart_outline_rounded, color: AppTheme.primary, size: 20),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      'Exam Results & Performance Overview',
+                      style: TextStyle(
+                        fontSize: 15,
+                        fontWeight: FontWeight.bold,
+                        color: isDark ? AppTheme.darkText : AppTheme.lightText,
+                      ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  badgeWidget,
+                ],
+              );
+            },
           ),
           const SizedBox(height: 18),
 
@@ -635,35 +685,81 @@ class AdminWebAnalyticsView extends ConsumerWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Expanded(
-                child: Row(
+          LayoutBuilder(
+            builder: (context, headerConstraints) {
+              final isNarrow = headerConstraints.maxWidth < 460;
+              final dirBtn = TextButton.icon(
+                onPressed: () => context.go('/admin/students'),
+                icon: Icon(Icons.arrow_forward, size: 13, color: AppTheme.primary),
+                label: Text(
+                  'Student Directory',
+                  style: TextStyle(fontSize: 12, color: AppTheme.primary, fontWeight: FontWeight.w600),
+                ),
+                style: TextButton.styleFrom(
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                  visualDensity: VisualDensity.compact,
+                ),
+              );
+
+              if (isNarrow) {
+                return Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Icon(Icons.assignment_ind_outlined, color: AppTheme.accent, size: 20),
-                    const SizedBox(width: 8),
-                    Expanded(
-                      child: Text(
-                        'Student Enrollment & Class Assignments',
-                        style: TextStyle(
-                          fontSize: 15,
-                          fontWeight: FontWeight.bold,
-                          color: isDark ? AppTheme.darkText : AppTheme.lightText,
+                    Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Icon(Icons.assignment_ind_outlined, color: AppTheme.accent, size: 20),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Text(
+                            'Student Enrollment & Class Assignments',
+                            style: TextStyle(
+                              fontSize: 14.5,
+                              fontWeight: FontWeight.bold,
+                              color: isDark ? AppTheme.darkText : AppTheme.lightText,
+                            ),
+                            maxLines: 2,
+                          ),
                         ),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                      ),
+                      ],
+                    ),
+                    const SizedBox(height: 4),
+                    Align(
+                      alignment: Alignment.centerRight,
+                      child: dirBtn,
                     ),
                   ],
-                ),
-              ),
-              const SizedBox(width: 8),
-              TextButton(
-                onPressed: () => context.go('/admin/students'),
-                child: Text('Student Directory', style: TextStyle(fontSize: 12, color: AppTheme.primary, fontWeight: FontWeight.w600)),
-              ),
-            ],
+                );
+              }
+
+              return Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Expanded(
+                    child: Row(
+                      children: [
+                        Icon(Icons.assignment_ind_outlined, color: AppTheme.accent, size: 20),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Text(
+                            'Student Enrollment & Class Assignments',
+                            style: TextStyle(
+                              fontSize: 15,
+                              fontWeight: FontWeight.bold,
+                              color: isDark ? AppTheme.darkText : AppTheme.lightText,
+                            ),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  dirBtn,
+                ],
+              );
+            },
           ),
           const SizedBox(height: 12),
 
@@ -816,31 +912,10 @@ class AdminWebAnalyticsView extends ConsumerWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Expanded(
-                child: Row(
-                  children: [
-                    Icon(Icons.bar_chart_rounded, color: AppTheme.primary, size: 20),
-                    const SizedBox(width: 8),
-                    Expanded(
-                      child: Text(
-                        'Subject Enrollment Popularity',
-                        style: TextStyle(
-                          fontSize: 15,
-                          fontWeight: FontWeight.bold,
-                          color: isDark ? AppTheme.darkText : AppTheme.lightText,
-                        ),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              const SizedBox(width: 8),
-              TextButton(
+          LayoutBuilder(
+            builder: (context, headerConstraints) {
+              final isNarrow = headerConstraints.maxWidth < 450;
+              final manageBtn = TextButton(
                 onPressed: () => context.go('/admin/subjects'),
                 child: Row(
                   mainAxisSize: MainAxisSize.min,
@@ -849,8 +924,36 @@ class AdminWebAnalyticsView extends ConsumerWidget {
                     Icon(Icons.chevron_right, size: 16, color: AppTheme.primary),
                   ],
                 ),
-              ),
-            ],
+              );
+
+              return Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Expanded(
+                    child: Row(
+                      children: [
+                        Icon(Icons.bar_chart_rounded, color: AppTheme.primary, size: 20),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Text(
+                            'Subject Enrollment Popularity',
+                            style: TextStyle(
+                              fontSize: 15,
+                              fontWeight: FontWeight.bold,
+                              color: isDark ? AppTheme.darkText : AppTheme.lightText,
+                            ),
+                            maxLines: isNarrow ? 2 : 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  manageBtn,
+                ],
+              );
+            },
           ),
           const SizedBox(height: 16),
           if (list.isEmpty)
@@ -892,63 +995,48 @@ class AdminWebAnalyticsView extends ConsumerWidget {
                   borderRadius: BorderRadius.circular(8),
                   child: Padding(
                     padding: const EdgeInsets.symmetric(vertical: 4, horizontal: 2),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                          children: [
-                            Expanded(
-                              child: Row(
-                                children: [
-                                  Container(
-                                    padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
-                                    decoration: BoxDecoration(
-                                      color: isDark ? AppTheme.darkSurfaceLight : const Color(0xFFF1F5F9),
-                                      borderRadius: BorderRadius.circular(6),
-                                      border: Border.all(color: isDark ? AppTheme.darkBorder : AppTheme.lightBorder),
-                                    ),
-                                    child: Text(
-                                      sub['code'] as String? ?? 'CRS',
-                                      style: TextStyle(
-                                        fontSize: 11,
-                                        fontWeight: FontWeight.bold,
-                                        color: isDark ? AppTheme.darkText : AppTheme.lightText,
-                                      ),
-                                    ),
-                                  ),
-                                  const SizedBox(width: 8),
-                                  Expanded(
-                                    child: Text(
-                                      sub['name'] as String? ?? '',
-                                      style: TextStyle(
-                                        fontSize: 13,
-                                        fontWeight: FontWeight.w600,
-                                        color: isDark ? AppTheme.darkText : AppTheme.lightText,
-                                      ),
-                                      maxLines: 1,
-                                      overflow: TextOverflow.ellipsis,
-                                    ),
-                                  ),
-                                ],
-                              ),
+                    child: LayoutBuilder(
+                      builder: (context, rowConstraints) {
+                        final isNarrow = rowConstraints.maxWidth < 420;
+                        final codeBadge = Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+                          decoration: BoxDecoration(
+                            color: isDark ? AppTheme.darkSurfaceLight : const Color(0xFFF1F5F9),
+                            borderRadius: BorderRadius.circular(6),
+                            border: Border.all(color: isDark ? AppTheme.darkBorder : AppTheme.lightBorder),
+                          ),
+                          child: Text(
+                            sub['code'] as String? ?? 'CRS',
+                            style: TextStyle(
+                              fontSize: 11,
+                              fontWeight: FontWeight.bold,
+                              color: isDark ? AppTheme.darkText : AppTheme.lightText,
                             ),
-                            const SizedBox(width: 8),
-                            Text(
-                              '$count students (${(percent * 100).toStringAsFixed(0)}%)'
-                              '${subAttempts > 0 ? ' · $subPassRate% Pass' : ''}',
-                              style: TextStyle(
-                                fontSize: 12,
-                                fontWeight: FontWeight.w600,
-                                color: isDark ? AppTheme.darkTextSecondary : AppTheme.lightTextSecondary,
-                              ),
-                            ),
-                            const SizedBox(width: 4),
-                            Icon(Icons.chevron_right, size: 14, color: isDark ? AppTheme.darkTextSecondary : AppTheme.lightTextSecondary),
-                          ],
-                        ),
-                        const SizedBox(height: 6),
-                        ClipRRect(
+                          ),
+                        );
+
+                        final nameText = Text(
+                          sub['name'] as String? ?? '',
+                          style: TextStyle(
+                            fontSize: 13,
+                            fontWeight: FontWeight.w600,
+                            color: isDark ? AppTheme.darkText : AppTheme.lightText,
+                          ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        );
+
+                        final statsText = Text(
+                          '$count students (${(percent * 100).toStringAsFixed(0)}%)'
+                          '${subAttempts > 0 ? ' · $subPassRate% Pass' : ''}',
+                          style: TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.w600,
+                            color: isDark ? AppTheme.darkTextSecondary : AppTheme.lightTextSecondary,
+                          ),
+                        );
+
+                        final progressBar = ClipRRect(
                           borderRadius: BorderRadius.circular(4),
                           child: LinearProgressIndicator(
                             value: percent.clamp(0.04, 1.0),
@@ -956,8 +1044,55 @@ class AdminWebAnalyticsView extends ConsumerWidget {
                             valueColor: AlwaysStoppedAnimation<Color>(progressColor),
                             minHeight: 6,
                           ),
-                        ),
-                      ],
+                        );
+
+                        if (isNarrow) {
+                          return Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Row(
+                                children: [
+                                  codeBadge,
+                                  const SizedBox(width: 8),
+                                  Expanded(child: nameText),
+                                  const SizedBox(width: 4),
+                                  Icon(Icons.chevron_right, size: 14, color: isDark ? AppTheme.darkTextSecondary : AppTheme.lightTextSecondary),
+                                ],
+                              ),
+                              const SizedBox(height: 4),
+                              statsText,
+                              const SizedBox(height: 6),
+                              progressBar,
+                            ],
+                          );
+                        }
+
+                        return Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Row(
+                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                              children: [
+                                Expanded(
+                                  child: Row(
+                                    children: [
+                                      codeBadge,
+                                      const SizedBox(width: 8),
+                                      Expanded(child: nameText),
+                                    ],
+                                  ),
+                                ),
+                                const SizedBox(width: 8),
+                                statsText,
+                                const SizedBox(width: 4),
+                                Icon(Icons.chevron_right, size: 14, color: isDark ? AppTheme.darkTextSecondary : AppTheme.lightTextSecondary),
+                              ],
+                            ),
+                            const SizedBox(height: 6),
+                            progressBar,
+                          ],
+                        );
+                      },
                     ),
                   ),
                 );
@@ -987,39 +1122,48 @@ class AdminWebAnalyticsView extends ConsumerWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Expanded(
-                child: Row(
-                  children: [
-                    Icon(Icons.groups_outlined, color: AppTheme.accent, size: 20),
-                    const SizedBox(width: 8),
-                    Expanded(
-                      child: Text(
-                        'Student Sections & Distribution',
-                        style: TextStyle(
-                          fontSize: 15,
-                          fontWeight: FontWeight.bold,
-                          color: isDark ? AppTheme.darkText : AppTheme.lightText,
-                        ),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              TextButton(
+          LayoutBuilder(
+            builder: (context, headerConstraints) {
+              final isNarrow = headerConstraints.maxWidth < 450;
+              final manageSectionsBtn = TextButton(
                 onPressed: () => context.go('/admin/sections'),
                 child: Row(
+                  mainAxisSize: MainAxisSize.min,
                   children: [
                     Text('Manage Sections', style: TextStyle(fontSize: 12, color: AppTheme.primary, fontWeight: FontWeight.w600)),
                     Icon(Icons.chevron_right, size: 16, color: AppTheme.primary),
                   ],
                 ),
-              ),
-            ],
+              );
+
+              return Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Expanded(
+                    child: Row(
+                      children: [
+                        Icon(Icons.groups_outlined, color: AppTheme.accent, size: 20),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Text(
+                            'Student Sections & Distribution',
+                            style: TextStyle(
+                              fontSize: 15,
+                              fontWeight: FontWeight.bold,
+                              color: isDark ? AppTheme.darkText : AppTheme.lightText,
+                            ),
+                            maxLines: isNarrow ? 2 : 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  manageSectionsBtn,
+                ],
+              );
+            },
           ),
           const SizedBox(height: 16),
           if (list.isEmpty)
@@ -1030,71 +1174,77 @@ class AdminWebAnalyticsView extends ConsumerWidget {
               ),
             )
           else
-            Wrap(
-              spacing: 10,
-              runSpacing: 10,
-              children: list.map((sec) {
-                final sectionName = sec['section'] as String? ?? 'Unassigned';
-                final count = sec['count'] as int? ?? 0;
-                final isUnassigned = sectionName.toLowerCase() == 'unassigned';
+            LayoutBuilder(
+              builder: (context, constraints) {
+                final isNarrow = constraints.maxWidth < 420;
+                final itemWidth = isNarrow ? (constraints.maxWidth - 10) / 2 : 140.0;
+                return Wrap(
+                  spacing: 10,
+                  runSpacing: 10,
+                  children: list.map((sec) {
+                    final sectionName = sec['section'] as String? ?? 'Unassigned';
+                    final count = sec['count'] as int? ?? 0;
+                    final isUnassigned = sectionName.toLowerCase() == 'unassigned';
 
-                return InkWell(
-                  onTap: () {
-                    if (isUnassigned) {
-                      context.go('/admin/students?filter=unassigned');
-                    } else {
-                      context.go('/admin/students?section=${Uri.encodeComponent(sectionName)}');
-                    }
-                  },
-                  borderRadius: BorderRadius.circular(8),
-                  child: Container(
-                    width: 140,
-                    padding: const EdgeInsets.all(12),
-                    decoration: BoxDecoration(
-                      color: isDark ? AppTheme.darkSurfaceLight : const Color(0xFFF8FAFC),
+                    return InkWell(
+                      onTap: () {
+                        if (isUnassigned) {
+                          context.go('/admin/students?filter=unassigned');
+                        } else {
+                          context.go('/admin/students?section=${Uri.encodeComponent(sectionName)}');
+                        }
+                      },
                       borderRadius: BorderRadius.circular(8),
-                      border: Border.all(
-                        color: isUnassigned && count > 0
-                            ? AppTheme.warning.withValues(alpha: 0.5)
-                            : (isDark ? AppTheme.darkBorder : AppTheme.lightBorder),
-                      ),
-                    ),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          sectionName,
-                          style: TextStyle(
-                            fontSize: 12.5,
-                            fontWeight: FontWeight.bold,
-                            color: isUnassigned && count > 0 ? AppTheme.warning : (isDark ? AppTheme.darkText : AppTheme.lightText),
+                      child: Container(
+                        width: itemWidth,
+                        padding: const EdgeInsets.all(12),
+                        decoration: BoxDecoration(
+                          color: isDark ? AppTheme.darkSurfaceLight : const Color(0xFFF8FAFC),
+                          borderRadius: BorderRadius.circular(8),
+                          border: Border.all(
+                            color: isUnassigned && count > 0
+                                ? AppTheme.warning.withValues(alpha: 0.5)
+                                : (isDark ? AppTheme.darkBorder : AppTheme.lightBorder),
                           ),
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
                         ),
-                        const SizedBox(height: 4),
-                        Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            Expanded(
-                              child: Text(
-                                '$count Students',
-                                style: TextStyle(
-                                  fontSize: 12,
-                                  color: isUnassigned && count > 0 ? AppTheme.warning : AppTheme.primary,
-                                  fontWeight: FontWeight.w600,
-                                ),
-                                overflow: TextOverflow.ellipsis,
+                            Text(
+                              sectionName,
+                              style: TextStyle(
+                                fontSize: 12.5,
+                                fontWeight: FontWeight.bold,
+                                color: isUnassigned && count > 0 ? AppTheme.warning : (isDark ? AppTheme.darkText : AppTheme.lightText),
                               ),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
                             ),
-                            Icon(Icons.chevron_right, size: 13, color: isDark ? AppTheme.darkTextMuted : AppTheme.lightTextMuted),
+                            const SizedBox(height: 4),
+                            Row(
+                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                              children: [
+                                Expanded(
+                                  child: Text(
+                                    '$count Students',
+                                    style: TextStyle(
+                                      fontSize: 12,
+                                      color: isUnassigned && count > 0 ? AppTheme.warning : AppTheme.primary,
+                                      fontWeight: FontWeight.w600,
+                                    ),
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
+                                ),
+                                Icon(Icons.chevron_right, size: 13, color: isDark ? AppTheme.darkTextMuted : AppTheme.lightTextMuted),
+                              ],
+                            ),
                           ],
                         ),
-                      ],
-                    ),
-                  ),
+                      ),
+                    );
+                  }).toList(),
                 );
-              }).toList(),
+              },
             ),
         ],
       ),
@@ -1120,40 +1270,48 @@ class AdminWebAnalyticsView extends ConsumerWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Expanded(
-                child: Row(
-                  children: [
-                    Icon(Icons.history_edu_outlined, color: AppTheme.warning, size: 20),
-                    const SizedBox(width: 8),
-                    Expanded(
-                      child: Text(
-                        'Recent Student Assessments',
-                        style: TextStyle(
-                          fontSize: 15,
-                          fontWeight: FontWeight.bold,
-                          color: isDark ? AppTheme.darkText : AppTheme.lightText,
-                        ),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              const SizedBox(width: 8),
-              TextButton(
+          LayoutBuilder(
+            builder: (context, headerConstraints) {
+              final isNarrow = headerConstraints.maxWidth < 450;
+              final viewAllBtn = TextButton(
                 onPressed: () => context.go('/admin/scores'),
                 child: Row(
+                  mainAxisSize: MainAxisSize.min,
                   children: [
                     Text('View All Scores', style: TextStyle(fontSize: 12, color: AppTheme.primary, fontWeight: FontWeight.w600)),
                     Icon(Icons.arrow_forward, size: 14, color: AppTheme.primary),
                   ],
                 ),
-              ),
-            ],
+              );
+
+              return Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Expanded(
+                    child: Row(
+                      children: [
+                        Icon(Icons.history_edu_outlined, color: AppTheme.warning, size: 20),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Text(
+                            'Recent Student Assessments',
+                            style: TextStyle(
+                              fontSize: 15,
+                              fontWeight: FontWeight.bold,
+                              color: isDark ? AppTheme.darkText : AppTheme.lightText,
+                            ),
+                            maxLines: isNarrow ? 2 : 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  viewAllBtn,
+                ],
+              );
+            },
           ),
           const SizedBox(height: 16),
           if (attempts.isEmpty)

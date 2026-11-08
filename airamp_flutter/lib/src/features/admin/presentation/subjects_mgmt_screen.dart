@@ -116,7 +116,6 @@ class _SubjectsMgmtScreenState extends ConsumerState<SubjectsMgmtScreen> {
                 // Header & Responsive Action Bar
                 LayoutBuilder(
                   builder: (context, constraints) {
-                    final isWide = constraints.maxWidth >= 860;
                     final titleSection = Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
@@ -141,123 +140,142 @@ class _SubjectsMgmtScreenState extends ConsumerState<SubjectsMgmtScreen> {
                       ],
                     );
 
-                    final actionButtons = isAdmin
-                        ? Wrap(
-                            spacing: 10,
-                            runSpacing: 8,
-                            crossAxisAlignment: WrapCrossAlignment.center,
-                            children: [
-                              OutlinedButton.icon(
-                                onPressed: () => _showCreateSubjectDialog(
-                                  autoExpandGlobal: true,
-                                ),
-                                icon: Icon(
-                                  Icons.public,
-                                  size: 16,
-                                  color: AppTheme.text,
-                                ),
-                                label: const Text(
-                                  'Adopt Global Subject',
-                                  style: TextStyle(
-                                    fontSize: 13,
-                                    fontWeight: FontWeight.w600,
-                                  ),
-                                ),
-                                style: OutlinedButton.styleFrom(
-                                  foregroundColor: AppTheme.text,
-                                  side: BorderSide(color: AppTheme.border),
-                                  backgroundColor: AppTheme.surface,
-                                  padding: const EdgeInsets.symmetric(
-                                    horizontal: 14,
-                                    vertical: 10,
-                                  ),
-                                  shape: RoundedRectangleBorder(
-                                    borderRadius: BorderRadius.circular(10),
-                                  ),
-                                  minimumSize: const Size(0, 40),
-                                ),
-                              ),
-                              OutlinedButton.icon(
-                                onPressed: _openCreateSubjectFromPdf,
-                                icon: Icon(
-                                  Icons.upload_file_outlined,
-                                  size: 16,
-                                  color: AppTheme.primary,
-                                ),
-                                label: const Text(
-                                  'Create Subject from PDF Module (Auto-Scan)',
-                                  style: TextStyle(
-                                    fontSize: 13,
-                                    fontWeight: FontWeight.w600,
-                                  ),
-                                ),
-                                style: OutlinedButton.styleFrom(
-                                  foregroundColor: AppTheme.primary,
-                                  side: BorderSide(
-                                    color: AppTheme.primary.withValues(
-                                      alpha: 0.4,
-                                    ),
-                                  ),
-                                  backgroundColor: AppTheme.primary.withValues(
-                                    alpha: 0.05,
-                                  ),
-                                  padding: const EdgeInsets.symmetric(
-                                    horizontal: 14,
-                                    vertical: 10,
-                                  ),
-                                  shape: RoundedRectangleBorder(
-                                    borderRadius: BorderRadius.circular(10),
-                                  ),
-                                  minimumSize: const Size(0, 40),
-                                ),
-                              ),
-                              ElevatedButton.icon(
-                                onPressed: () => _showCreateSubjectDialog(),
-                                icon: const Icon(Icons.add, size: 16),
-                                label: const Text(
-                                  'Create New Subject',
-                                  style: TextStyle(
-                                    fontSize: 13,
-                                    fontWeight: FontWeight.bold,
-                                  ),
-                                ),
-                                style: ElevatedButton.styleFrom(
-                                  backgroundColor: AppTheme.primary,
-                                  foregroundColor: Colors.white,
-                                  elevation: 0,
-                                  padding: const EdgeInsets.symmetric(
-                                    horizontal: 16,
-                                    vertical: 10,
-                                  ),
-                                  shape: RoundedRectangleBorder(
-                                    borderRadius: BorderRadius.circular(10),
-                                  ),
-                                  minimumSize: const Size(0, 40),
-                                ),
-                              ),
-                            ],
-                          )
-                        : const SizedBox.shrink();
+                    final isNarrow = constraints.maxWidth < 760;
 
-                    if (isWide) {
-                      return Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    final adoptGlobalBtn = OutlinedButton.icon(
+                      onPressed: () => _showCreateSubjectDialog(
+                        autoExpandGlobal: true,
+                      ),
+                      icon: Icon(
+                        Icons.public,
+                        size: 16,
+                        color: AppTheme.text,
+                      ),
+                      label: Text(
+                        isNarrow ? 'Adopt Global' : 'Adopt Global Subject',
+                        style: const TextStyle(
+                          fontSize: 13,
+                          fontWeight: FontWeight.w600,
+                        ),
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                      style: OutlinedButton.styleFrom(
+                        foregroundColor: AppTheme.text,
+                        side: BorderSide(color: AppTheme.border),
+                        backgroundColor: AppTheme.surface,
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 14,
+                          vertical: 12,
+                        ),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                        minimumSize: const Size(0, 42),
+                      ),
+                    );
+
+                    final pdfImportBtn = OutlinedButton.icon(
+                      onPressed: _openCreateSubjectFromPdf,
+                      icon: Icon(
+                        Icons.upload_file_outlined,
+                        size: 16,
+                        color: AppTheme.primary,
+                      ),
+                      label: Text(
+                        isNarrow ? 'PDF Auto-Scan' : 'Create from PDF Module',
+                        style: const TextStyle(
+                          fontSize: 13,
+                          fontWeight: FontWeight.w600,
+                        ),
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                      style: OutlinedButton.styleFrom(
+                        foregroundColor: AppTheme.primary,
+                        side: BorderSide(
+                          color: AppTheme.primary.withValues(
+                            alpha: 0.4,
+                          ),
+                        ),
+                        backgroundColor: AppTheme.primary.withValues(
+                          alpha: 0.05,
+                        ),
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 14,
+                          vertical: 12,
+                        ),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                        minimumSize: const Size(0, 42),
+                      ),
+                    );
+
+                    final createSubjectBtn = ElevatedButton.icon(
+                      onPressed: () => _showCreateSubjectDialog(),
+                      icon: const Icon(Icons.add, size: 16),
+                      label: const Text(
+                        'Create New Subject',
+                        style: TextStyle(
+                          fontSize: 13,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: AppTheme.primary,
+                        foregroundColor: Colors.white,
+                        elevation: 0,
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 16,
+                          vertical: 12,
+                        ),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                        minimumSize: const Size(0, 42),
+                      ),
+                    );
+
+                    if (isNarrow) {
+                      return Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Expanded(child: titleSection),
-                          const SizedBox(width: 16),
-                          actionButtons,
+                          titleSection,
+                          if (isAdmin) ...[
+                            const SizedBox(height: 14),
+                            SizedBox(
+                              width: double.infinity,
+                              child: createSubjectBtn,
+                            ),
+                            const SizedBox(height: 10),
+                            Row(
+                              children: [
+                                Expanded(child: adoptGlobalBtn),
+                                const SizedBox(width: 10),
+                                Expanded(child: pdfImportBtn),
+                              ],
+                            ),
+                          ],
                         ],
                       );
                     }
 
-                    return Column(
+                    return Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        titleSection,
+                        Expanded(child: titleSection),
                         if (isAdmin) ...[
-                          const SizedBox(height: 16),
-                          actionButtons,
+                          const SizedBox(width: 16),
+                          Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              adoptGlobalBtn,
+                              const SizedBox(width: 10),
+                              pdfImportBtn,
+                              const SizedBox(width: 10),
+                              createSubjectBtn,
+                            ],
+                          ),
                         ],
                       ],
                     );
@@ -500,6 +518,7 @@ class _SubjectsMgmtScreenState extends ConsumerState<SubjectsMgmtScreen> {
     WidgetRef ref, {
     bool isAdmin = true,
   }) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     final code = subject['subject_code']?.toString() ?? '';
     final unlockType = subject['unlock_type']?.toString() ?? 'Sequential';
     final semester = subject['semester']?.toString() ?? '';
@@ -750,59 +769,84 @@ class _SubjectsMgmtScreenState extends ConsumerState<SubjectsMgmtScreen> {
 
             // Bottom row: student count + action buttons
             Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                Icon(
-                  Icons.people_alt_outlined,
-                  size: 15,
-                  color: AppTheme.textMuted,
-                ),
-                const SizedBox(width: 6),
-                Text(
-                  '$enrolledCount ${enrolledCount == 1 ? 'student' : 'students'}',
-                  style: TextStyle(
-                    color: AppTheme.textSecondary,
-                    fontSize: 12.5,
-                  ),
-                ),
-                const Spacer(),
-                if (isAdmin) ...[
-                  if (isAdopted) ...[
-                    _actionIconButton(
-                      icon: Icons.cancel_outlined,
-                      color: AppTheme.error,
-                      tooltip: 'Remove Adapted Subject',
-                      onTap: () => _confirmDelete(context, subject, ref),
-                    ),
-                    const SizedBox(width: 8),
-                  ],
-                  _actionIconButton(
-                    icon: Icons.picture_as_pdf_outlined,
-                    color: AppTheme.primary,
-                    tooltip: 'Upload PDF Syllabus',
-                    onTap: () {
-                      showDialog(
-                        context: context,
-                        barrierDismissible: false,
-                        builder: (ctx) => PdfModuleUploadDialog(
-                          subjectId: subject['id'] as int,
-                          subjectName: subject['name']?.toString() ?? 'Subject',
+                Expanded(
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(
+                        Icons.people_alt_outlined,
+                        size: 15,
+                        color: AppTheme.textMuted,
+                      ),
+                      const SizedBox(width: 6),
+                      Flexible(
+                        child: Text(
+                          '$enrolledCount ${enrolledCount == 1 ? 'student' : 'students'}',
+                          style: TextStyle(
+                            color: AppTheme.textSecondary,
+                            fontSize: 12.5,
+                          ),
+                          overflow: TextOverflow.ellipsis,
                         ),
-                      );
-                    },
+                      ),
+                    ],
                   ),
-                  const SizedBox(width: 8),
-                  _actionIconButton(
-                    icon: Icons.edit_outlined,
-                    color: AppTheme.textSecondary,
-                    tooltip: 'Edit Subject Details',
-                    onTap: () => _showEditSubjectDialog(context, subject, ref),
-                  ),
-                  const SizedBox(width: 8),
-                  _actionIconButton(
-                    icon: Icons.delete_outline,
-                    color: AppTheme.error,
-                    tooltip: 'Delete Subject',
-                    onTap: () => _confirmDelete(context, subject, ref),
+                ),
+                const SizedBox(width: 8),
+                if (isAdmin) ...[
+                  Container(
+                    height: 36,
+                    decoration: BoxDecoration(
+                      color: isDark ? AppTheme.darkSurfaceLight : const Color(0xFFF8FAFC),
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(color: AppTheme.border),
+                    ),
+                    clipBehavior: Clip.antiAlias,
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        if (isAdopted) ...[
+                          _segmentedActionIcon(
+                            icon: Icons.cancel_outlined,
+                            color: AppTheme.error,
+                            tooltip: 'Remove Adapted Subject',
+                            onTap: () => _confirmDelete(context, subject, ref),
+                          ),
+                          Container(width: 1, height: 18, color: AppTheme.border),
+                        ],
+                        _segmentedActionIcon(
+                          icon: Icons.picture_as_pdf_outlined,
+                          color: AppTheme.primary,
+                          tooltip: 'Upload PDF Syllabus',
+                          onTap: () {
+                            showDialog(
+                              context: context,
+                              barrierDismissible: false,
+                              builder: (ctx) => PdfModuleUploadDialog(
+                                subjectId: subject['id'] as int,
+                                subjectName: subject['name']?.toString() ?? 'Subject',
+                              ),
+                            );
+                          },
+                        ),
+                        Container(width: 1, height: 18, color: AppTheme.border),
+                        _segmentedActionIcon(
+                          icon: Icons.edit_outlined,
+                          color: AppTheme.textSecondary,
+                          tooltip: 'Edit Subject Details',
+                          onTap: () => _showEditSubjectDialog(context, subject, ref),
+                        ),
+                        Container(width: 1, height: 18, color: AppTheme.border),
+                        _segmentedActionIcon(
+                          icon: Icons.delete_outline_rounded,
+                          color: AppTheme.error,
+                          tooltip: 'Delete Subject',
+                          onTap: () => _confirmDelete(context, subject, ref),
+                        ),
+                      ],
+                    ),
                   ),
                 ] else ...[
                   // Teacher Action: Direct Curriculum Navigation
@@ -847,30 +891,25 @@ class _SubjectsMgmtScreenState extends ConsumerState<SubjectsMgmtScreen> {
     );
   }
 
-  Widget _actionIconButton({
+  Widget _segmentedActionIcon({
     required IconData icon,
     required Color color,
+    required String tooltip,
     required VoidCallback onTap,
-    String? tooltip,
   }) {
-    final btn = InkWell(
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(8),
-      child: Container(
-        padding: const EdgeInsets.all(7),
-        decoration: BoxDecoration(
-          color: AppTheme.surface,
-          borderRadius: BorderRadius.circular(8),
-          border: Border.all(color: AppTheme.border),
+    return Tooltip(
+      message: tooltip,
+      child: InkWell(
+        onTap: onTap,
+        child: SizedBox(
+          width: 30,
+          height: 36,
+          child: Center(
+            child: Icon(icon, color: color, size: 16),
+          ),
         ),
-        child: Icon(icon, color: color, size: 16),
       ),
     );
-
-    if (tooltip != null && tooltip.isNotEmpty) {
-      return Tooltip(message: tooltip, child: btn);
-    }
-    return btn;
   }
 
   void _confirmDelete(

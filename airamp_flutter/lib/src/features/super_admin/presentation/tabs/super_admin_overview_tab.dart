@@ -28,8 +28,14 @@ class SuperAdminOverviewTab extends ConsumerWidget {
     final admins = ref.watch(schoolAdminsProvider);
     final currentUser = ref.watch(authProvider);
 
+    final screenWidth = MediaQuery.sizeOf(context).width;
+    final isMobile = screenWidth < 600;
+
     return SingleChildScrollView(
-      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 24),
+      padding: EdgeInsets.symmetric(
+        horizontal: isMobile ? 16 : 24,
+        vertical: isMobile ? 16 : 24,
+      ),
       child: Center(
         child: ConstrainedBox(
           constraints: const BoxConstraints(maxWidth: 1200),
@@ -44,7 +50,9 @@ class SuperAdminOverviewTab extends ConsumerWidget {
               statsAsync.when(
                 loading: () => Padding(
                   padding: const EdgeInsets.all(32),
-                  child: Center(child: CircularProgressIndicator(color: gTheme.primary)),
+                  child: Center(
+                    child: CircularProgressIndicator(color: gTheme.primary),
+                  ),
                 ),
                 error: (e, _) => Container(
                   padding: const EdgeInsets.all(16),
@@ -53,7 +61,10 @@ class SuperAdminOverviewTab extends ConsumerWidget {
                     borderRadius: BorderRadius.circular(10),
                     border: Border.all(color: gTheme.dangerBorder),
                   ),
-                  child: Text('Error loading governance metrics: $e', style: TextStyle(color: gTheme.dangerText)),
+                  child: Text(
+                    'Error loading governance metrics: $e',
+                    style: TextStyle(color: gTheme.dangerText),
+                  ),
                 ),
                 data: (stats) => _buildMetricsGrid(context, gTheme, stats),
               ),
@@ -64,23 +75,30 @@ class SuperAdminOverviewTab extends ConsumerWidget {
               const SizedBox(height: 28),
 
               // ── Multi-Tenant Campuses Fleet Overview ──
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Column(
+              LayoutBuilder(
+                builder: (context, fleetConstraints) {
+                  final isCompact = fleetConstraints.maxWidth < 620;
+                  final titleCol = Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Row(
                         children: [
-                          Icon(Icons.account_balance_outlined, size: 20, color: gTheme.primary),
+                          Icon(
+                            Icons.account_balance_outlined,
+                            size: 20,
+                            color: gTheme.primary,
+                          ),
                           const SizedBox(width: 8),
-                          Text(
-                            'Institutional Campuses & Scopes',
-                            style: TextStyle(
-                              fontSize: 18,
-                              fontWeight: FontWeight.bold,
-                              color: gTheme.textPrimary,
-                              letterSpacing: -0.2,
+                          Flexible(
+                            child: Text(
+                              'Institutional Campuses & Scopes',
+                              style: TextStyle(
+                                fontSize: isCompact ? 16 : 18,
+                                fontWeight: FontWeight.bold,
+                                color: gTheme.textPrimary,
+                                letterSpacing: -0.2,
+                              ),
+                              overflow: TextOverflow.ellipsis,
                             ),
                           ),
                         ],
@@ -88,27 +106,66 @@ class SuperAdminOverviewTab extends ConsumerWidget {
                       const SizedBox(height: 4),
                       Text(
                         'Global multi-tenant network. Inspect any institutional campus with scoped jurisdiction.',
-                        style: TextStyle(fontSize: 13, color: gTheme.textSecondary),
+                        style: TextStyle(
+                          fontSize: 13,
+                          color: gTheme.textSecondary,
+                        ),
                       ),
                     ],
-                  ),
-                  TextButton.icon(
+                  );
+
+                  final viewAllBtn = TextButton.icon(
                     onPressed: () => onNavigateTab(1), // Go to Campuses tab
-                    icon: Icon(Icons.arrow_forward_rounded, size: 16, color: gTheme.primary),
-                    label: Text('View All Campuses', style: TextStyle(color: gTheme.primary, fontWeight: FontWeight.w600)),
-                  ),
-                ],
+                    icon: Icon(
+                      Icons.arrow_forward_rounded,
+                      size: 16,
+                      color: gTheme.primary,
+                    ),
+                    label: Text(
+                      'View All Campuses',
+                      style: TextStyle(
+                        color: gTheme.primary,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  );
+
+                  if (isCompact) {
+                    return Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        titleCol,
+                        const SizedBox(height: 8),
+                        viewAllBtn,
+                      ],
+                    );
+                  }
+
+                  return Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Expanded(child: titleCol),
+                      const SizedBox(width: 12),
+                      viewAllBtn,
+                    ],
+                  );
+                },
               ),
               const SizedBox(height: 14),
 
               // Campuses Preview Grid
               if (schools.isEmpty)
-                _buildEmptyState(gTheme, 'No institutional campuses registered yet.')
+                _buildEmptyState(
+                  gTheme,
+                  'No institutional campuses registered yet.',
+                )
               else
                 LayoutBuilder(
                   builder: (context, constraints) {
                     final isWide = constraints.maxWidth >= 760;
-                    final itemWidth = isWide ? (constraints.maxWidth - 16) / 2 : constraints.maxWidth;
+                    final itemWidth = isWide
+                        ? (constraints.maxWidth - 16) / 2
+                        : constraints.maxWidth;
 
                     return Wrap(
                       spacing: 16,
@@ -116,7 +173,13 @@ class SuperAdminOverviewTab extends ConsumerWidget {
                       children: schools.take(4).map((school) {
                         return SizedBox(
                           width: itemWidth,
-                          child: _buildCampusSummaryCard(context, ref, gTheme, school, admins),
+                          child: _buildCampusSummaryCard(
+                            context,
+                            ref,
+                            gTheme,
+                            school,
+                            admins,
+                          ),
                         );
                       }).toList(),
                     );
@@ -133,10 +196,18 @@ class SuperAdminOverviewTab extends ConsumerWidget {
     );
   }
 
-  Widget _buildExecutiveBanner(BuildContext context, GovernanceTheme gTheme, User? currentUser) {
+  Widget _buildExecutiveBanner(
+    BuildContext context,
+    GovernanceTheme gTheme,
+    User? currentUser,
+  ) {
+    final isMobile = MediaQuery.sizeOf(context).width < 600;
     return Container(
       width: double.infinity,
-      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 22),
+      padding: EdgeInsets.symmetric(
+        horizontal: isMobile ? 14 : 24,
+        vertical: isMobile ? 16 : 22,
+      ),
       decoration: BoxDecoration(
         color: gTheme.surface,
         borderRadius: BorderRadius.circular(14),
@@ -166,15 +237,22 @@ class SuperAdminOverviewTab extends ConsumerWidget {
                 child: Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    Icon(Icons.shield_outlined, size: 12, color: gTheme.primary),
+                    Icon(
+                      Icons.shield_outlined,
+                      size: 12,
+                      color: gTheme.primary,
+                    ),
                     const SizedBox(width: 5),
-                    Text(
-                      'INSTITUTIONAL GOVERNANCE',
-                      style: TextStyle(
-                        fontSize: 10,
-                        fontWeight: FontWeight.w700,
-                        color: gTheme.primary,
-                        letterSpacing: 0.8,
+                    Flexible(
+                      child: Text(
+                        'INSTITUTIONAL GOVERNANCE',
+                        style: TextStyle(
+                          fontSize: 10,
+                          fontWeight: FontWeight.w700,
+                          color: gTheme.primary,
+                          letterSpacing: 0.8,
+                        ),
+                        overflow: TextOverflow.ellipsis,
                       ),
                     ),
                   ],
@@ -198,8 +276,9 @@ class SuperAdminOverviewTab extends ConsumerWidget {
             ],
           );
 
-          final addBtns = Row(
-            mainAxisSize: MainAxisSize.min,
+          final addBtns = Wrap(
+            spacing: 10,
+            runSpacing: 10,
             children: [
               ElevatedButton.icon(
                 onPressed: onOpenAddCampusDialog,
@@ -209,22 +288,44 @@ class SuperAdminOverviewTab extends ConsumerWidget {
                   backgroundColor: gTheme.primary,
                   foregroundColor: Colors.white,
                   elevation: 0,
-                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 11),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                  textStyle: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 14,
+                    vertical: 11,
+                  ),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  textStyle: const TextStyle(
+                    fontWeight: FontWeight.w600,
+                    fontSize: 13,
+                  ),
                 ),
               ),
-              const SizedBox(width: 10),
               OutlinedButton.icon(
                 onPressed: onOpenAddAdminDialog,
-                icon: Icon(Icons.person_add_outlined, size: 16, color: gTheme.textPrimary),
-                label: Text('Provision Admin', style: TextStyle(color: gTheme.textPrimary)),
+                icon: Icon(
+                  Icons.person_add_outlined,
+                  size: 16,
+                  color: gTheme.textPrimary,
+                ),
+                label: Text(
+                  'Provision Admin',
+                  style: TextStyle(color: gTheme.textPrimary),
+                ),
                 style: OutlinedButton.styleFrom(
                   backgroundColor: gTheme.surfaceSubtle,
                   side: BorderSide(color: gTheme.border),
-                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 11),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                  textStyle: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 14,
+                    vertical: 11,
+                  ),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  textStyle: const TextStyle(
+                    fontWeight: FontWeight.w600,
+                    fontSize: 13,
+                  ),
                 ),
               ),
             ],
@@ -233,11 +334,7 @@ class SuperAdminOverviewTab extends ConsumerWidget {
           if (isNarrow) {
             return Column(
               crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                headerText,
-                const SizedBox(height: 16),
-                addBtns,
-              ],
+              children: [headerText, const SizedBox(height: 16), addBtns],
             );
           }
 
@@ -254,7 +351,11 @@ class SuperAdminOverviewTab extends ConsumerWidget {
     );
   }
 
-  Widget _buildMetricsGrid(BuildContext context, GovernanceTheme gTheme, Map<String, dynamic> stats) {
+  Widget _buildMetricsGrid(
+    BuildContext context,
+    GovernanceTheme gTheme,
+    Map<String, dynamic> stats,
+  ) {
     final items = [
       _MetricTileData(
         label: 'Registered Campuses',
@@ -266,7 +367,8 @@ class SuperAdminOverviewTab extends ConsumerWidget {
         label: 'Administrator Accounts',
         value: stats['total_admins']?.toString() ?? '2',
         icon: Icons.admin_panel_settings_outlined,
-        tag: '${stats['school_admins'] ?? 0} School • ${stats['super_admins'] ?? 0} Super',
+        tag:
+            '${stats['school_admins'] ?? 0} School • ${stats['super_admins'] ?? 0} Super',
       ),
       _MetricTileData(
         label: 'Active Faculty Teachers',
@@ -303,7 +405,14 @@ class SuperAdminOverviewTab extends ConsumerWidget {
         return Wrap(
           spacing: 12,
           runSpacing: 12,
-          children: items.map((tile) => SizedBox(width: cardWidth, child: _buildMetricTile(gTheme, tile))).toList(),
+          children: items
+              .map(
+                (tile) => SizedBox(
+                  width: cardWidth,
+                  child: _buildMetricTile(gTheme, tile),
+                ),
+              )
+              .toList(),
         );
       },
     );
@@ -347,7 +456,11 @@ class SuperAdminOverviewTab extends ConsumerWidget {
                 ),
                 child: Text(
                   data.tag,
-                  style: TextStyle(fontSize: 10, fontWeight: FontWeight.w600, color: gTheme.textSecondary),
+                  style: TextStyle(
+                    fontSize: 10,
+                    fontWeight: FontWeight.w600,
+                    color: gTheme.textSecondary,
+                  ),
                 ),
               ),
             ],
@@ -365,7 +478,11 @@ class SuperAdminOverviewTab extends ConsumerWidget {
           const SizedBox(height: 2),
           Text(
             data.label,
-            style: TextStyle(fontSize: 12, color: gTheme.textSecondary, fontWeight: FontWeight.w500),
+            style: TextStyle(
+              fontSize: 12,
+              color: gTheme.textSecondary,
+              fontWeight: FontWeight.w500,
+            ),
           ),
         ],
       ),
@@ -380,45 +497,89 @@ class SuperAdminOverviewTab extends ConsumerWidget {
         borderRadius: BorderRadius.circular(12),
         border: Border.all(color: gTheme.border),
       ),
-      child: Row(
-        children: [
-          Icon(Icons.explore_outlined, size: 18, color: gTheme.textSecondary),
-          const SizedBox(width: 8),
-          Text(
-            'Quick Governance Navigation:',
-            style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: gTheme.textPrimary),
-          ),
-          const SizedBox(width: 16),
-          Expanded(
-            child: SingleChildScrollView(
-              scrollDirection: Axis.horizontal,
-              child: Row(
-                children: [
-                  _buildQuickPill(
-                    gTheme: gTheme,
-                    icon: Icons.account_balance_outlined,
-                    label: 'Campus Scopes',
-                    onTap: () => onNavigateTab(1),
-                  ),
-                  const SizedBox(width: 8),
-                  _buildQuickPill(
-                    gTheme: gTheme,
-                    icon: Icons.admin_panel_settings_outlined,
-                    label: 'Admin Directory',
-                    onTap: () => onNavigateTab(2),
-                  ),
-                  const SizedBox(width: 8),
-                  _buildQuickPill(
-                    gTheme: gTheme,
-                    icon: Icons.verified_user_outlined,
-                    label: 'Security & Access Log',
-                    onTap: () => onNavigateTab(3),
-                  ),
-                ],
-              ),
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          final isNarrow = constraints.maxWidth < 580;
+          final pills = SingleChildScrollView(
+            scrollDirection: Axis.horizontal,
+            child: Row(
+              children: [
+                _buildQuickPill(
+                  gTheme: gTheme,
+                  icon: Icons.account_balance_outlined,
+                  label: 'Campus Scopes',
+                  onTap: () => onNavigateTab(1),
+                ),
+                const SizedBox(width: 8),
+                _buildQuickPill(
+                  gTheme: gTheme,
+                  icon: Icons.admin_panel_settings_outlined,
+                  label: 'Admin Directory',
+                  onTap: () => onNavigateTab(2),
+                ),
+                const SizedBox(width: 8),
+                _buildQuickPill(
+                  gTheme: gTheme,
+                  icon: Icons.verified_user_outlined,
+                  label: 'Security & Access Log',
+                  onTap: () => onNavigateTab(3),
+                ),
+              ],
             ),
-          ),
-        ],
+          );
+
+          if (isNarrow) {
+            return Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Icon(
+                      Icons.explore_outlined,
+                      size: 18,
+                      color: gTheme.textSecondary,
+                    ),
+                    const SizedBox(width: 8),
+                    Flexible(
+                      child: Text(
+                        'Quick Governance Navigation:',
+                        style: TextStyle(
+                          fontSize: 13,
+                          fontWeight: FontWeight.w600,
+                          color: gTheme.textPrimary,
+                        ),
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 10),
+                pills,
+              ],
+            );
+          }
+
+          return Row(
+            children: [
+              Icon(
+                Icons.explore_outlined,
+                size: 18,
+                color: gTheme.textSecondary,
+              ),
+              const SizedBox(width: 8),
+              Text(
+                'Quick Governance Navigation:',
+                style: TextStyle(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w600,
+                  color: gTheme.textPrimary,
+                ),
+              ),
+              const SizedBox(width: 16),
+              Expanded(child: pills),
+            ],
+          );
+        },
       ),
     );
   }
@@ -446,7 +607,11 @@ class SuperAdminOverviewTab extends ConsumerWidget {
             const SizedBox(width: 6),
             Text(
               label,
-              style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: gTheme.textPrimary),
+              style: TextStyle(
+                fontSize: 12,
+                fontWeight: FontWeight.w600,
+                color: gTheme.textPrimary,
+              ),
             ),
           ],
         ),
@@ -472,7 +637,9 @@ class SuperAdminOverviewTab extends ConsumerWidget {
       (a) => a['id'] == adminId,
       orElse: () => <String, dynamic>{},
     );
-    final adminName = assignedAdmin['full_name'] as String? ?? (adminId != null ? 'Admin $adminId' : 'Unassigned');
+    final adminName =
+        assignedAdmin['full_name'] as String? ??
+        (adminId != null ? 'Admin $adminId' : 'Unassigned');
 
     return Container(
       padding: const EdgeInsets.all(18),
@@ -495,14 +662,22 @@ class SuperAdminOverviewTab extends ConsumerWidget {
                 ),
                 child: Text(
                   code,
-                  style: TextStyle(fontWeight: FontWeight.bold, fontSize: 11, color: gTheme.primary),
+                  style: TextStyle(
+                    fontWeight: FontWeight.bold,
+                    fontSize: 11,
+                    color: gTheme.primary,
+                  ),
                 ),
               ),
               const SizedBox(width: 8),
               Expanded(
                 child: Text(
                   name,
-                  style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: gTheme.textPrimary),
+                  style: TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.bold,
+                    color: gTheme.textPrimary,
+                  ),
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                 ),
@@ -510,16 +685,24 @@ class SuperAdminOverviewTab extends ConsumerWidget {
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
                 decoration: BoxDecoration(
-                  color: status == 'active' ? gTheme.successBg : gTheme.surfaceSubtle,
+                  color: status == 'active'
+                      ? gTheme.successBg
+                      : gTheme.surfaceSubtle,
                   borderRadius: BorderRadius.circular(4),
-                  border: Border.all(color: status == 'active' ? gTheme.successBorder : gTheme.border),
+                  border: Border.all(
+                    color: status == 'active'
+                        ? gTheme.successBorder
+                        : gTheme.border,
+                  ),
                 ),
                 child: Text(
                   status.toUpperCase(),
                   style: TextStyle(
                     fontSize: 10,
                     fontWeight: FontWeight.bold,
-                    color: status == 'active' ? gTheme.successText : gTheme.textMuted,
+                    color: status == 'active'
+                        ? gTheme.successText
+                        : gTheme.textMuted,
                   ),
                 ),
               ),
@@ -528,7 +711,11 @@ class SuperAdminOverviewTab extends ConsumerWidget {
           const SizedBox(height: 10),
           Row(
             children: [
-              Icon(Icons.location_on_outlined, size: 14, color: gTheme.textMuted),
+              Icon(
+                Icons.location_on_outlined,
+                size: 14,
+                color: gTheme.textMuted,
+              ),
               const SizedBox(width: 4),
               Expanded(
                 child: Text(
@@ -543,31 +730,50 @@ class SuperAdminOverviewTab extends ConsumerWidget {
           const SizedBox(height: 6),
           Row(
             children: [
-              Icon(Icons.manage_accounts_outlined, size: 14, color: gTheme.textMuted),
+              Icon(
+                Icons.manage_accounts_outlined,
+                size: 14,
+                color: gTheme.textMuted,
+              ),
               const SizedBox(width: 4),
               Text(
                 'Campus Admin: ',
                 style: TextStyle(fontSize: 12, color: gTheme.textMuted),
               ),
-              Text(
-                adminName,
-                style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: gTheme.textPrimary),
+              Expanded(
+                child: Text(
+                  adminName,
+                  style: TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.bold,
+                    color: gTheme.textPrimary,
+                  ),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
               ),
             ],
           ),
           const SizedBox(height: 14),
           Divider(height: 1, color: gTheme.border),
           const SizedBox(height: 10),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Text(
+          LayoutBuilder(
+            builder: (context, cardActionConstraints) {
+              final isCardNarrow = cardActionConstraints.maxWidth < 280;
+              final scopeWidget = Text(
                 'Scope: $schoolId',
-                style: TextStyle(fontSize: 11, color: gTheme.textMuted, fontFamily: 'monospace'),
-              ),
-              OutlinedButton.icon(
+                style: TextStyle(
+                  fontSize: 11,
+                  color: gTheme.textMuted,
+                  fontFamily: 'monospace',
+                ),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+              );
+              final enterBtn = OutlinedButton.icon(
                 onPressed: () {
-                  ref.read(superAdminSelectedSchoolProvider.notifier).state = schoolId;
+                  ref.read(superAdminSelectedSchoolProvider.notifier).state =
+                      schoolId;
                   context.go('/admin/dashboard');
                 },
                 icon: const Icon(Icons.open_in_new_rounded, size: 13),
@@ -575,13 +781,41 @@ class SuperAdminOverviewTab extends ConsumerWidget {
                 style: OutlinedButton.styleFrom(
                   foregroundColor: gTheme.primary,
                   side: BorderSide(color: gTheme.primaryBorder),
-                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 10,
+                    vertical: 6,
+                  ),
                   minimumSize: const Size(0, 32),
-                  textStyle: const TextStyle(fontSize: 11, fontWeight: FontWeight.w600),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(6)),
+                  textStyle: const TextStyle(
+                    fontSize: 11,
+                    fontWeight: FontWeight.w600,
+                  ),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(6),
+                  ),
                 ),
-              ),
-            ],
+              );
+
+              if (isCardNarrow) {
+                return Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    scopeWidget,
+                    const SizedBox(height: 8),
+                    enterBtn,
+                  ],
+                );
+              }
+
+              return Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Expanded(child: scopeWidget),
+                  const SizedBox(width: 8),
+                  enterBtn,
+                ],
+              );
+            },
           ),
         ],
       ),
@@ -595,9 +829,13 @@ class SuperAdminOverviewTab extends ConsumerWidget {
     List<Map<String, dynamic>> admins,
   ) {
     final schoolAdmins = admins.where((a) => a['role'] == 'admin').toList();
-    final superAdmins = admins.where((a) => a['role'] == 'super_admin').toList();
+    final superAdmins = admins
+        .where((a) => a['role'] == 'super_admin')
+        .toList();
     final assignedSchoolIds = schoolAdmins.map((a) => a['school_id']).toSet();
-    final unassignedSchools = schools.where((s) => !assignedSchoolIds.contains(s['id'])).toList();
+    final unassignedSchools = schools
+        .where((s) => !assignedSchoolIds.contains(s['id']))
+        .toList();
 
     return Container(
       padding: const EdgeInsets.all(20),
@@ -606,89 +844,137 @@ class SuperAdminOverviewTab extends ConsumerWidget {
         borderRadius: BorderRadius.circular(14),
         border: Border.all(color: gTheme.border),
       ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      child: LayoutBuilder(
+        builder: (context, accessConstraints) {
+          final isNarrow = accessConstraints.maxWidth < 680;
+
+          final titleSection = Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Row(
-                children: [
-                  Container(
-                    padding: const EdgeInsets.all(8),
-                    decoration: BoxDecoration(
-                      color: gTheme.surfaceSubtle,
-                      borderRadius: BorderRadius.circular(8),
-                      border: Border.all(color: gTheme.border),
+              Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: gTheme.surfaceSubtle,
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(color: gTheme.border),
+                ),
+                child: Icon(
+                  Icons.shield_outlined,
+                  color: gTheme.primary,
+                  size: 20,
+                ),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Campus Governance & Administrator Scoping',
+                      style: TextStyle(
+                        fontSize: 15,
+                        fontWeight: FontWeight.bold,
+                        color: gTheme.textPrimary,
+                      ),
                     ),
-                    child: Icon(Icons.shield_outlined, color: gTheme.primary, size: 20),
-                  ),
-                  const SizedBox(width: 10),
-                  Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        'Campus Governance & Administrator Scoping',
-                        style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: gTheme.textPrimary),
+                    const SizedBox(height: 2),
+                    Text(
+                      'Jurisdiction overview: each academic campus operates under an isolated administrator scope.',
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: gTheme.textSecondary,
                       ),
-                      Text(
-                        'Jurisdiction overview: each academic campus operates under an isolated administrator scope.',
-                        style: TextStyle(fontSize: 12, color: gTheme.textSecondary),
-                      ),
-                    ],
-                  ),
-                ],
-              ),
-              ElevatedButton.icon(
-                onPressed: () => onNavigateTab(2), // Navigate to Admins tab
-                icon: const Icon(Icons.manage_accounts_outlined, size: 16),
-                label: const Text('Manage Accounts & Roles'),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: gTheme.primary,
-                  foregroundColor: Colors.white,
-                  elevation: 0,
-                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 9),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                  textStyle: const TextStyle(fontWeight: FontWeight.w600, fontSize: 12),
+                    ),
+                  ],
                 ),
               ),
             ],
-          ),
-          const SizedBox(height: 16),
-          Divider(height: 1, color: gTheme.border),
-          const SizedBox(height: 16),
-          Row(
+          );
+
+          final manageBtn = ElevatedButton.icon(
+            onPressed: () => onNavigateTab(2), // Navigate to Admins tab
+            icon: const Icon(Icons.manage_accounts_outlined, size: 16),
+            label: const Text('Manage Accounts & Roles'),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: gTheme.primary,
+              foregroundColor: Colors.white,
+              elevation: 0,
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 9),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(8),
+              ),
+              textStyle: const TextStyle(
+                fontWeight: FontWeight.w600,
+                fontSize: 12,
+              ),
+            ),
+          );
+
+          final statItem1 = _buildAccessStatItem(
+            gTheme: gTheme,
+            icon: Icons.domain_rounded,
+            value: '${assignedSchoolIds.length} / ${schools.length}',
+            label: 'Campuses with Dedicated Admin',
+          );
+
+          final statItem2 = _buildAccessStatItem(
+            gTheme: gTheme,
+            icon: Icons.admin_panel_settings_outlined,
+            value: '${superAdmins.length}',
+            label: 'Root Super Admins (Master Scope)',
+          );
+
+          final statItem3 = _buildAccessStatItem(
+            gTheme: gTheme,
+            icon: Icons.help_outline_rounded,
+            value: '${unassignedSchools.length}',
+            label: 'Unassigned Campuses',
+            isWarning: unassignedSchools.isNotEmpty,
+          );
+
+          return Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Expanded(
-                child: _buildAccessStatItem(
-                  gTheme: gTheme,
-                  icon: Icons.domain_rounded,
-                  value: '${assignedSchoolIds.length} / ${schools.length}',
-                  label: 'Campuses with Dedicated Admin',
+              if (isNarrow) ...[
+                titleSection,
+                const SizedBox(height: 12),
+                manageBtn,
+              ] else ...[
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Expanded(child: titleSection),
+                    const SizedBox(width: 16),
+                    manageBtn,
+                  ],
                 ),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: _buildAccessStatItem(
-                  gTheme: gTheme,
-                  icon: Icons.admin_panel_settings_outlined,
-                  value: '${superAdmins.length}',
-                  label: 'Root Super Admins (Master Scope)',
+              ],
+              const SizedBox(height: 16),
+              Divider(height: 1, color: gTheme.border),
+              const SizedBox(height: 16),
+              if (isNarrow)
+                Column(
+                  children: [
+                    statItem1,
+                    const SizedBox(height: 10),
+                    statItem2,
+                    const SizedBox(height: 10),
+                    statItem3,
+                  ],
+                )
+              else
+                Row(
+                  children: [
+                    Expanded(child: statItem1),
+                    const SizedBox(width: 12),
+                    Expanded(child: statItem2),
+                    const SizedBox(width: 12),
+                    Expanded(child: statItem3),
+                  ],
                 ),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: _buildAccessStatItem(
-                  gTheme: gTheme,
-                  icon: Icons.help_outline_rounded,
-                  value: '${unassignedSchools.length}',
-                  label: 'Unassigned Campuses',
-                  isWarning: unassignedSchools.isNotEmpty,
-                ),
-              ),
             ],
-          ),
-        ],
+          );
+        },
       ),
     );
   }
@@ -711,7 +997,11 @@ class SuperAdminOverviewTab extends ConsumerWidget {
       ),
       child: Row(
         children: [
-          Icon(icon, color: isWarning ? gTheme.warningText : gTheme.primary, size: 24),
+          Icon(
+            icon,
+            color: isWarning ? gTheme.warningText : gTheme.primary,
+            size: 24,
+          ),
           const SizedBox(width: 12),
           Expanded(
             child: Column(
@@ -748,7 +1038,10 @@ class SuperAdminOverviewTab extends ConsumerWidget {
         border: Border.all(color: gTheme.border),
       ),
       child: Center(
-        child: Text(message, style: TextStyle(color: gTheme.textMuted, fontSize: 13)),
+        child: Text(
+          message,
+          style: TextStyle(color: gTheme.textMuted, fontSize: 13),
+        ),
       ),
     );
   }

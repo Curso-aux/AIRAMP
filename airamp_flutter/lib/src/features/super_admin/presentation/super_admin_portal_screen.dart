@@ -74,12 +74,14 @@ class _SuperAdminPortalScreenState
                     ),
                   ),
                   const SizedBox(width: 12),
-                  Text(
-                    'Register New Campus / School',
-                    style: TextStyle(
-                      fontWeight: FontWeight.bold,
-                      fontSize: 18,
-                      color: gTheme.textPrimary,
+                  Expanded(
+                    child: Text(
+                      'Register New Campus / School',
+                      style: TextStyle(
+                        fontWeight: FontWeight.bold,
+                        fontSize: 18,
+                        color: gTheme.textPrimary,
+                      ),
                     ),
                   ),
                 ],
@@ -184,86 +186,103 @@ class _SuperAdminPortalScreenState
                         ),
                       ),
                       const SizedBox(height: 12),
-                      Row(
-                        children: [
-                          Expanded(
-                            child: DropdownButtonFormField<String>(
-                              initialValue: selectedStatus,
-                              dropdownColor: gTheme.surfaceElevated,
-                              style: TextStyle(
-                                color: gTheme.textPrimary,
-                                fontSize: 13,
+                      Builder(
+                        builder: (context) {
+                          final isNarrowForm = MediaQuery.sizeOf(context).width < 500;
+                          final statusField = DropdownButtonFormField<String>(
+                            initialValue: selectedStatus,
+                            isExpanded: true,
+                            dropdownColor: gTheme.surfaceElevated,
+                            style: TextStyle(
+                              color: gTheme.textPrimary,
+                              fontSize: 13,
+                            ),
+                            decoration: InputDecoration(
+                              labelText: 'Operational Status',
+                              labelStyle: TextStyle(
+                                color: gTheme.textSecondary,
                               ),
-                              decoration: InputDecoration(
-                                labelText: 'Operational Status',
-                                labelStyle: TextStyle(
-                                  color: gTheme.textSecondary,
-                                ),
-                                border: OutlineInputBorder(
-                                  borderRadius: BorderRadius.circular(8),
-                                ),
-                                contentPadding: const EdgeInsets.symmetric(
-                                  horizontal: 12,
-                                  vertical: 12,
-                                ),
+                              border: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(8),
                               ),
-                              items: const [
-                                DropdownMenuItem(
-                                  value: 'active',
-                                  child: Text('Active Campus'),
-                                ),
-                                DropdownMenuItem(
-                                  value: 'inactive',
-                                  child: Text('Inactive / Onboarding'),
-                                ),
-                              ],
-                              onChanged: (val) => setDialogState(
-                                () => selectedStatus = val ?? 'active',
+                              contentPadding: const EdgeInsets.symmetric(
+                                horizontal: 12,
+                                vertical: 12,
                               ),
                             ),
-                          ),
-                          const SizedBox(width: 12),
-                          Expanded(
-                            child: DropdownButtonFormField<String?>(
-                              initialValue: selectedAdminId,
-                              dropdownColor: gTheme.surfaceElevated,
-                              style: TextStyle(
-                                color: gTheme.textPrimary,
-                                fontSize: 13,
+                            items: const [
+                              DropdownMenuItem(
+                                value: 'active',
+                                child: Text('Active Campus', overflow: TextOverflow.ellipsis),
                               ),
-                              decoration: InputDecoration(
-                                labelText: 'Assigned Administrator',
-                                labelStyle: TextStyle(
-                                  color: gTheme.textSecondary,
-                                ),
-                                border: OutlineInputBorder(
-                                  borderRadius: BorderRadius.circular(8),
-                                ),
-                                contentPadding: const EdgeInsets.symmetric(
-                                  horizontal: 12,
-                                  vertical: 12,
-                                ),
+                              DropdownMenuItem(
+                                value: 'inactive',
+                                child: Text('Inactive / Onboarding', overflow: TextOverflow.ellipsis),
                               ),
-                              items: [
-                                const DropdownMenuItem(
-                                  value: null,
-                                  child: Text('None (Assign Later)'),
-                                ),
-                                ...admins.map(
-                                  (a) => DropdownMenuItem(
-                                    value: a['id'] as String,
-                                    child: Text(
-                                      a['full_name'] as String? ?? 'Admin',
-                                      overflow: TextOverflow.ellipsis,
-                                    ),
+                            ],
+                            onChanged: (val) => setDialogState(
+                              () => selectedStatus = val ?? 'active',
+                            ),
+                          );
+
+                          final adminField = DropdownButtonFormField<String?>(
+                            initialValue: selectedAdminId,
+                            isExpanded: true,
+                            dropdownColor: gTheme.surfaceElevated,
+                            style: TextStyle(
+                              color: gTheme.textPrimary,
+                              fontSize: 13,
+                            ),
+                            decoration: InputDecoration(
+                              labelText: 'Assigned Administrator',
+                              labelStyle: TextStyle(
+                                color: gTheme.textSecondary,
+                              ),
+                              border: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(8),
+                              ),
+                              contentPadding: const EdgeInsets.symmetric(
+                                horizontal: 12,
+                                vertical: 12,
+                              ),
+                            ),
+                            items: [
+                              const DropdownMenuItem(
+                                value: null,
+                                child: Text('None (Assign Later)', overflow: TextOverflow.ellipsis),
+                              ),
+                              ...admins.map(
+                                (a) => DropdownMenuItem(
+                                  value: a['id'] as String,
+                                  child: Text(
+                                    a['full_name'] as String? ?? 'Admin',
+                                    overflow: TextOverflow.ellipsis,
                                   ),
                                 ),
+                              ),
+                            ],
+                            onChanged: (val) =>
+                                setDialogState(() => selectedAdminId = val),
+                          );
+
+                          if (isNarrowForm) {
+                            return Column(
+                              children: [
+                                statusField,
+                                const SizedBox(height: 12),
+                                adminField,
                               ],
-                              onChanged: (val) =>
-                                  setDialogState(() => selectedAdminId = val),
-                            ),
-                          ),
-                        ],
+                            );
+                          }
+
+                          return Row(
+                            children: [
+                              Expanded(child: statusField),
+                              const SizedBox(width: 12),
+                              Expanded(child: adminField),
+                            ],
+                          );
+                        },
                       ),
                     ],
                   ),
@@ -372,12 +391,14 @@ class _SuperAdminPortalScreenState
                     ),
                   ),
                   const SizedBox(width: 12),
-                  Text(
-                    'Provision Administrator Account',
-                    style: TextStyle(
-                      fontWeight: FontWeight.bold,
-                      fontSize: 18,
-                      color: gTheme.textPrimary,
+                  Expanded(
+                    child: Text(
+                      'Provision Administrator Account',
+                      style: TextStyle(
+                        fontWeight: FontWeight.bold,
+                        fontSize: 17,
+                        color: gTheme.textPrimary,
+                      ),
                     ),
                   ),
                 ],
@@ -542,6 +563,7 @@ class _SuperAdminPortalScreenState
                       const SizedBox(height: 14),
                       DropdownButtonFormField<String>(
                         initialValue: selectedRole,
+                        isExpanded: true,
                         dropdownColor: gTheme.surfaceElevated,
                         style: TextStyle(
                           color: gTheme.textPrimary,
@@ -562,11 +584,17 @@ class _SuperAdminPortalScreenState
                         items: const [
                           DropdownMenuItem(
                             value: 'admin',
-                            child: Text('Campus Administrator (Single Campus)'),
+                            child: Text(
+                              'Campus Administrator (Single Campus)',
+                              overflow: TextOverflow.ellipsis,
+                            ),
                           ),
                           DropdownMenuItem(
                             value: 'super_admin',
-                            child: Text('Super Administrator (Global Master)'),
+                            child: Text(
+                              'Super Administrator (Global Master)',
+                              overflow: TextOverflow.ellipsis,
+                            ),
                           ),
                         ],
                         onChanged: (val) {
@@ -582,6 +610,7 @@ class _SuperAdminPortalScreenState
                               schools.any((s) => s['id'] == selectedSchool)
                               ? selectedSchool
                               : (schools.first['id'] as String?),
+                          isExpanded: true,
                           dropdownColor: gTheme.surfaceElevated,
                           style: TextStyle(
                             color: gTheme.textPrimary,
@@ -602,7 +631,10 @@ class _SuperAdminPortalScreenState
                           items: schools.map((s) {
                             return DropdownMenuItem(
                               value: s['id'] as String,
-                              child: Text('${s['name']} (${s['code']})'),
+                              child: Text(
+                                '${s['name']} (${s['code']})',
+                                overflow: TextOverflow.ellipsis,
+                              ),
                             );
                           }).toList(),
                           onChanged: (val) {
@@ -933,12 +965,14 @@ Portal Login: https://aira-app-database.web.app/#/login?role=admin
           children: [
             Icon(Icons.logout_rounded, color: gTheme.dangerText, size: 22),
             const SizedBox(width: 10),
-            Text(
-              'Sign Out from Governance Portal',
-              style: TextStyle(
-                color: gTheme.textPrimary,
-                fontWeight: FontWeight.bold,
-                fontSize: 16,
+            Expanded(
+              child: Text(
+                'Sign Out from Governance Portal',
+                style: TextStyle(
+                  color: gTheme.textPrimary,
+                  fontWeight: FontWeight.bold,
+                  fontSize: 16,
+                ),
               ),
             ),
           ],
@@ -1017,68 +1051,189 @@ Portal Login: https://aira-app-database.web.app/#/login?role=admin
       ),
     ];
 
-    return Scaffold(
-      key: _scaffoldKey,
-      backgroundColor: gTheme.canvas,
-      body: LayoutBuilder(
-        builder: (context, constraints) {
-          final isMobile = constraints.maxWidth < 768;
-          final isTablet =
-              constraints.maxWidth >= 768 && constraints.maxWidth < 1080;
-          final effectiveCollapsed = isTablet || _isSidebarCollapsed;
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final isMobile = constraints.maxWidth < 768;
+        final isTablet =
+            constraints.maxWidth >= 768 && constraints.maxWidth < 1080;
+        final effectiveCollapsed = isTablet || _isSidebarCollapsed;
 
-          if (isMobile) {
-            return Scaffold(
-              backgroundColor: gTheme.canvas,
-              appBar: AppBar(
-                backgroundColor: gTheme.surface,
-                elevation: 0,
-                scrolledUnderElevation: 0,
-                leading: IconButton(
+        if (isMobile) {
+          return Scaffold(
+            backgroundColor: gTheme.canvas,
+            appBar: AppBar(
+              backgroundColor: gTheme.surface,
+              elevation: 0,
+              scrolledUnderElevation: 0,
+              leading: Builder(
+                builder: (drawerCtx) => IconButton(
                   icon: Icon(Icons.menu_rounded, color: gTheme.textPrimary),
-                  onPressed: () => _scaffoldKey.currentState?.openDrawer(),
+                  tooltip: 'Open Governance Navigation',
+                  onPressed: () => Scaffold.of(drawerCtx).openDrawer(),
                 ),
-                title: Text(
-                  _getTabTitle(_activeTabIndex),
-                  style: TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.bold,
-                    color: gTheme.textPrimary,
-                  ),
-                ),
-                actions: [
-                  if (!kIsWeb)
-                    const Padding(
-                      padding: EdgeInsets.symmetric(vertical: 10),
-                      child: OfflineSyncStatusPill(compact: true),
+              ),
+              title: Row(
+                children: [
+                  AppLogo.mark(size: 24, isDark: isDark),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      _getTabTitle(_activeTabIndex),
+                      style: TextStyle(
+                        fontSize: 15,
+                        fontWeight: FontWeight.bold,
+                        color: gTheme.textPrimary,
+                      ),
+                      overflow: TextOverflow.ellipsis,
                     ),
-                  IconButton(
-                    icon: Icon(
-                      isDark
-                          ? Icons.light_mode_outlined
-                          : Icons.dark_mode_outlined,
-                      color: gTheme.textPrimary,
-                    ),
-                    onPressed: () =>
-                        ref.read(themeProvider.notifier).toggleTheme(),
                   ),
                 ],
               ),
-              drawer: Drawer(
-                backgroundColor: gTheme.surface,
-                child: _buildSidebarContent(
-                  gTheme: gTheme,
-                  isCollapsed: false,
-                  isDrawer: true,
-                  currentUser: currentUser,
-                  navItems: navItems,
+              actions: [
+                if (!kIsWeb)
+                  const Padding(
+                    padding: EdgeInsets.symmetric(vertical: 10),
+                    child: OfflineSyncStatusPill(compact: true),
+                  ),
+                IconButton(
+                  icon: Icon(
+                    isDark
+                        ? Icons.light_mode_outlined
+                        : Icons.dark_mode_outlined,
+                    color: gTheme.textPrimary,
+                  ),
+                  tooltip: isDark ? 'Switch to Light Mode' : 'Switch to Dark Mode',
+                  onPressed: () =>
+                      ref.read(themeProvider.notifier).toggleTheme(),
+                ),
+                PopupMenuButton<String>(
+                  tooltip: 'Super Admin Account',
+                  offset: const Offset(0, 48),
+                  color: gTheme.surfaceElevated,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                    side: BorderSide(color: gTheme.border),
+                  ),
+                  icon: UserAvatarWidget(
+                    imageSource: currentUser?.profileImage,
+                    fallbackInitial: currentUser?.fullName.isNotEmpty == true
+                        ? currentUser!.fullName[0].toUpperCase()
+                        : 'S',
+                    size: 28,
+                    backgroundColor: gTheme.primarySubtle,
+                    textColor: gTheme.primary,
+                  ),
+                  itemBuilder: (ctx) => [
+                    PopupMenuItem(
+                      enabled: false,
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            currentUser?.fullName ?? 'Super Administrator',
+                            style: TextStyle(
+                              fontWeight: FontWeight.bold,
+                              fontSize: 13,
+                              color: gTheme.textPrimary,
+                            ),
+                          ),
+                          Text(
+                            currentUser?.email ?? 'Master Governance',
+                            style: TextStyle(
+                              fontSize: 11,
+                              color: gTheme.textMuted,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const PopupMenuDivider(),
+                    PopupMenuItem(
+                      value: 'logout',
+                      child: Row(
+                        children: [
+                          Icon(Icons.logout_rounded, size: 16, color: gTheme.dangerText),
+                          const SizedBox(width: 8),
+                          Text(
+                            'Sign Out',
+                            style: TextStyle(
+                              fontSize: 13,
+                              color: gTheme.dangerText,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                  onSelected: (val) {
+                    if (val == 'logout') {
+                      _confirmLogout(context, gTheme);
+                    }
+                  },
+                ),
+                const SizedBox(width: 4),
+              ],
+            ),
+            drawer: Drawer(
+              backgroundColor: gTheme.surface,
+              child: _buildSidebarContent(
+                gTheme: gTheme,
+                isCollapsed: false,
+                isDrawer: true,
+                currentUser: currentUser,
+                navItems: navItems,
+              ),
+            ),
+            body: _buildActiveTabContent(gTheme),
+            bottomNavigationBar: Container(
+              decoration: BoxDecoration(
+                color: gTheme.surface,
+                border: Border(
+                  top: BorderSide(color: gTheme.border, width: 1),
                 ),
               ),
-              body: _buildActiveTabContent(gTheme),
-            );
-          }
+              child: SafeArea(
+                top: false,
+                child: NavigationBar(
+                  backgroundColor: gTheme.surface,
+                  elevation: 0,
+                  selectedIndex: _activeTabIndex,
+                  onDestinationSelected: (idx) {
+                    setState(() => _activeTabIndex = idx);
+                  },
+                  destinations: const [
+                    NavigationDestination(
+                      icon: Icon(Icons.dashboard_outlined),
+                      selectedIcon: Icon(Icons.dashboard_rounded),
+                      label: 'Overview',
+                    ),
+                    NavigationDestination(
+                      icon: Icon(Icons.account_balance_outlined),
+                      selectedIcon: Icon(Icons.account_balance_rounded),
+                      label: 'Campuses',
+                    ),
+                    NavigationDestination(
+                      icon: Icon(Icons.admin_panel_settings_outlined),
+                      selectedIcon: Icon(Icons.admin_panel_settings_rounded),
+                      label: 'Admins',
+                    ),
+                    NavigationDestination(
+                      icon: Icon(Icons.verified_user_outlined),
+                      selectedIcon: Icon(Icons.verified_user_rounded),
+                      label: 'Security',
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          );
+        }
 
-          return Row(
+        return Scaffold(
+          key: _scaffoldKey,
+          backgroundColor: gTheme.canvas,
+          body: Row(
             children: [
               // ── Persistent Responsive Sidebar ──
               AnimatedContainer(
@@ -1121,9 +1276,9 @@ Portal Login: https://aira-app-database.web.app/#/login?role=admin
                 ),
               ),
             ],
-          );
-        },
-      ),
+          ),
+        );
+      },
     );
   }
 

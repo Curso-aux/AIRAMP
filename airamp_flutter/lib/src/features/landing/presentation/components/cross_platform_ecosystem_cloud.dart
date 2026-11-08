@@ -265,28 +265,20 @@ class _CrossPlatformEcosystemCloudState
 
           // ── Animated Logo Cloud Grid / Row ───────────────────────
           if (isNarrow)
-            // 2x2 layout on narrow mobile screens
+            // Full-width vertical stack on mobile screens to prevent text truncation
             Column(
               children: [
-                Row(
-                  children: [
-                    Expanded(child: _buildSlot(0)),
-                    const SizedBox(width: 12),
-                    Expanded(child: _buildSlot(1)),
-                  ],
-                ),
-                const SizedBox(height: 14),
-                Row(
-                  children: [
-                    Expanded(child: _buildSlot(2)),
-                    const SizedBox(width: 12),
-                    Expanded(child: _buildSlot(3)),
-                  ],
-                ),
+                _buildSlot(0),
+                const SizedBox(height: 10),
+                _buildSlot(1),
+                const SizedBox(height: 10),
+                _buildSlot(2),
+                const SizedBox(height: 10),
+                _buildSlot(3),
               ],
             )
           else
-            // Single sleek 4-column horizontal ticker row
+            // Single sleek 4-column horizontal ticker row on desktop / wide tablet
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
@@ -389,6 +381,7 @@ class _AnimatedSlotState extends State<_AnimatedSlot>
     final currentItem = widget.items[_currentIndex];
     final incomingItem = widget.items[_incomingIndex];
     final isDark = widget.isDark;
+    final isNarrow = MediaQuery.sizeOf(context).width < 620;
 
     return MouseRegion(
       onEnter: (_) => setState(() => _isHovered = true),
@@ -417,7 +410,7 @@ class _AnimatedSlotState extends State<_AnimatedSlot>
         waitDuration: const Duration(milliseconds: 300),
         child: AnimatedContainer(
           duration: const Duration(milliseconds: 200),
-          height: 68,
+          height: isNarrow ? 58 : 68,
           clipBehavior: Clip.hardEdge,
           decoration: BoxDecoration(
             color: isDark
@@ -454,7 +447,7 @@ class _AnimatedSlotState extends State<_AnimatedSlot>
               if (!isAnimating) {
                 // Static resting view
                 return Center(
-                  child: _buildItemContent(currentItem, isDark),
+                  child: _buildItemContent(currentItem, isDark, isNarrow),
                 );
               }
 
@@ -480,7 +473,7 @@ class _AnimatedSlotState extends State<_AnimatedSlot>
                           sigmaX: 0.0,
                           sigmaY: blurVal,
                         ),
-                        child: _buildItemContent(currentItem, isDark),
+                        child: _buildItemContent(currentItem, isDark, isNarrow),
                       ),
                     ),
                   ),
@@ -495,7 +488,7 @@ class _AnimatedSlotState extends State<_AnimatedSlot>
                           sigmaX: 0.0,
                           sigmaY: unblurVal,
                         ),
-                        child: _buildItemContent(incomingItem, isDark),
+                        child: _buildItemContent(incomingItem, isDark, isNarrow),
                       ),
                     ),
                   ),
@@ -508,7 +501,92 @@ class _AnimatedSlotState extends State<_AnimatedSlot>
     );
   }
 
-  Widget _buildItemContent(EcosystemItem item, bool isDark) {
+  Widget _buildItemContent(EcosystemItem item, bool isDark, bool isNarrow) {
+    if (isNarrow) {
+      return Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+        child: Row(
+          children: [
+            Container(
+              width: 34,
+              height: 34,
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  colors: item.gradientColors,
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                ),
+                borderRadius: BorderRadius.circular(9),
+                boxShadow: [
+                  BoxShadow(
+                    color: item.gradientColors.first.withValues(alpha: 0.35),
+                    blurRadius: 8,
+                    offset: const Offset(0, 2),
+                  ),
+                ],
+              ),
+              child: Icon(
+                item.icon,
+                color: Colors.white,
+                size: 18,
+              ),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    item.title,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      fontSize: 13.5,
+                      fontWeight: FontWeight.w700,
+                      color: isDark ? Colors.white : const Color(0xFF0F172A),
+                      letterSpacing: -0.2,
+                    ),
+                  ),
+                  const SizedBox(height: 1),
+                  Text(
+                    item.category,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      fontSize: 11,
+                      color: AppTheme.textSecondary,
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2.5),
+              decoration: BoxDecoration(
+                color: item.gradientColors.first.withValues(alpha: isDark ? 0.2 : 0.1),
+                borderRadius: BorderRadius.circular(6),
+                border: Border.all(
+                  color: item.gradientColors.first.withValues(alpha: isDark ? 0.35 : 0.2),
+                  width: 0.8,
+                ),
+              ),
+              child: Text(
+                'ACTIVE',
+                style: TextStyle(
+                  fontSize: 9,
+                  fontWeight: FontWeight.w800,
+                  color: item.gradientColors.first,
+                  letterSpacing: 0.4,
+                ),
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
       child: Row(

@@ -17,6 +17,23 @@ class AnalyticsFilterBar extends ConsumerStatefulWidget {
 class _AnalyticsFilterBarState extends ConsumerState<AnalyticsFilterBar> {
   bool _isPanelOpen = false;
 
+  static const List<String> _academicYearOptions = [
+    'AY 2025-2026',
+    'AY 2024-2025',
+    'AY 2023-2024',
+    'All Years',
+  ];
+
+  static const List<String> _gradeLevelOptions = [
+    'All Levels',
+    'Senior High (Grade 11-12)',
+    'Junior High (Grade 7-10)',
+    'STEM Strand',
+    'ABM Strand',
+    'HUMSS Strand',
+    'TVL-ICT',
+  ];
+
   static const List<Map<String, String>> _timeframeOptions = [
     {'value': 'all', 'label': 'All Time'},
     {'value': 'today', 'label': 'Today'},
@@ -42,6 +59,43 @@ class _AnalyticsFilterBarState extends ConsumerState<AnalyticsFilterBar> {
     final subjects = ref.watch(subjectsProvider);
     final sections = ref.watch(sectionsProvider);
     final isMobile = MediaQuery.of(context).size.width < 680;
+
+    // Filter subjects based on selected Department / Grade Level
+    final effectiveGrade = filter.departmentGradeLevel;
+    final filteredSubjects = subjects.where((s) {
+      if (effectiveGrade == 'All Levels') return true;
+      final subGrade = (s['grade'] as String? ?? s['grade_level'] as String? ?? '').toLowerCase();
+      final gradeLower = effectiveGrade.toLowerCase();
+      if (gradeLower.contains('senior high') || gradeLower.contains('grade 11-12')) {
+        return subGrade.contains('11') || subGrade.contains('12') || subGrade.isEmpty;
+      }
+      if (gradeLower.contains('junior high') || gradeLower.contains('grade 7-10')) {
+        return subGrade.contains('7') || subGrade.contains('8') || subGrade.contains('9') || subGrade.contains('10') || subGrade.isEmpty;
+      }
+      if (gradeLower.contains('stem')) return subGrade.contains('stem') || subGrade.isEmpty;
+      if (gradeLower.contains('abm')) return subGrade.contains('abm') || subGrade.isEmpty;
+      if (gradeLower.contains('humss')) return subGrade.contains('humss') || subGrade.isEmpty;
+      if (gradeLower.contains('tvl')) return subGrade.contains('tvl') || subGrade.isEmpty;
+      return true;
+    }).toList();
+
+    // Filter sections based on selected Department / Grade Level
+    final filteredSections = sections.where((sec) {
+      if (effectiveGrade == 'All Levels') return true;
+      final secGrade = (sec['grade'] as String? ?? sec['grade_level'] as String? ?? sec['name'] as String? ?? '').toLowerCase();
+      final gradeLower = effectiveGrade.toLowerCase();
+      if (gradeLower.contains('senior high') || gradeLower.contains('grade 11-12')) {
+        return secGrade.contains('11') || secGrade.contains('12');
+      }
+      if (gradeLower.contains('junior high') || gradeLower.contains('grade 7-10')) {
+        return secGrade.contains('7') || secGrade.contains('8') || secGrade.contains('9') || secGrade.contains('10');
+      }
+      if (gradeLower.contains('stem')) return secGrade.contains('stem');
+      if (gradeLower.contains('abm')) return secGrade.contains('abm');
+      if (gradeLower.contains('humss')) return secGrade.contains('humss');
+      if (gradeLower.contains('tvl')) return secGrade.contains('tvl');
+      return true;
+    }).toList();
 
     return Container(
       decoration: BoxDecoration(
@@ -74,7 +128,7 @@ class _AnalyticsFilterBarState extends ConsumerState<AnalyticsFilterBar> {
                     InkWell(
                       onTap: () {
                         if (isMobile) {
-                          _openMobileFilterSheet(context, filter, subjects, sections, isDark);
+                          _openMobileFilterSheet(context, filter, filteredSubjects, filteredSections, isDark);
                         } else {
                           setState(() => _isPanelOpen = !_isPanelOpen);
                         }
@@ -148,7 +202,7 @@ class _AnalyticsFilterBarState extends ConsumerState<AnalyticsFilterBar> {
 
                     const SizedBox(width: 10),
 
-                    // Quick Timeframe Presets or Active Chips (Desktop only if enough width)
+                    // Quick Timeframe Presets or Active Chips
                     if (constraints.maxWidth > 520) ...[
                       Expanded(
                         child: SingleChildScrollView(
@@ -164,6 +218,22 @@ class _AnalyticsFilterBarState extends ConsumerState<AnalyticsFilterBar> {
                               const SizedBox(width: 6),
                               _buildQuickTimeframeChip('this_month', 'This Month', filter.timeframe, isDark),
 
+                              if (filter.academicYear != 'AY 2025-2026') ...[
+                                const SizedBox(width: 8),
+                                _buildActiveRemovableChip(
+                                  label: 'Year: ${filter.academicYear}',
+                                  onRemove: () => ref.read(analyticsFilterProvider.notifier).updateAcademicYear('AY 2025-2026'),
+                                  isDark: isDark,
+                                ),
+                              ],
+                              if (filter.departmentGradeLevel != 'All Levels') ...[
+                                const SizedBox(width: 8),
+                                _buildActiveRemovableChip(
+                                  label: 'Level: ${filter.departmentGradeLevel}',
+                                  onRemove: () => ref.read(analyticsFilterProvider.notifier).updateDepartmentGradeLevel('All Levels'),
+                                  isDark: isDark,
+                                ),
+                              ],
                               if (filter.subjectName != null) ...[
                                 const SizedBox(width: 8),
                                 _buildActiveRemovableChip(
@@ -192,8 +262,70 @@ class _AnalyticsFilterBarState extends ConsumerState<AnalyticsFilterBar> {
                           ),
                         ),
                       ),
-                    ] else
-                      const Spacer(),
+                    ] else ...[
+                      // Mobile: Show active filter chips in scroll row
+                      if (filter.hasActiveFilters) ...[
+                        Expanded(
+                          child: SingleChildScrollView(
+                            scrollDirection: Axis.horizontal,
+                            physics: const BouncingScrollPhysics(),
+                            child: Row(
+                              children: [
+                                if (filter.academicYear != 'AY 2025-2026') ...[
+                                  _buildActiveRemovableChip(
+                                    label: filter.academicYear,
+                                    onRemove: () => ref.read(analyticsFilterProvider.notifier).updateAcademicYear('AY 2025-2026'),
+                                    isDark: isDark,
+                                  ),
+                                  const SizedBox(width: 6),
+                                ],
+                                if (filter.departmentGradeLevel != 'All Levels') ...[
+                                  _buildActiveRemovableChip(
+                                    label: filter.departmentGradeLevel,
+                                    onRemove: () => ref.read(analyticsFilterProvider.notifier).updateDepartmentGradeLevel('All Levels'),
+                                    isDark: isDark,
+                                  ),
+                                  const SizedBox(width: 6),
+                                ],
+                                if (filter.subjectName != null) ...[
+                                  _buildActiveRemovableChip(
+                                    label: filter.subjectName!,
+                                    onRemove: () => ref.read(analyticsFilterProvider.notifier).updateSubject(null, null),
+                                    isDark: isDark,
+                                  ),
+                                  const SizedBox(width: 6),
+                                ],
+                                if (filter.section != null && filter.section != 'All Sections') ...[
+                                  _buildActiveRemovableChip(
+                                    label: filter.section!,
+                                    onRemove: () => ref.read(analyticsFilterProvider.notifier).updateSection(null),
+                                    isDark: isDark,
+                                  ),
+                                  const SizedBox(width: 6),
+                                ],
+                                if (filter.category != 'all') ...[
+                                  _buildActiveRemovableChip(
+                                    label: _getCategoryLabel(filter.category),
+                                    onRemove: () => ref.read(analyticsFilterProvider.notifier).updateCategory('all'),
+                                    isDark: isDark,
+                                  ),
+                                  const SizedBox(width: 6),
+                                ],
+                                if (filter.timeframe != 'all') ...[
+                                  _buildActiveRemovableChip(
+                                    label: _getTimeframeLabel(filter.timeframe),
+                                    onRemove: () => ref.read(analyticsFilterProvider.notifier).updateTimeframe('all'),
+                                    isDark: isDark,
+                                  ),
+                                  const SizedBox(width: 6),
+                                ],
+                              ],
+                            ),
+                          ),
+                        ),
+                      ] else
+                        const Spacer(),
+                    ],
 
                     // Reset All Button
                     if (filter.hasActiveFilters) ...[
@@ -263,33 +395,54 @@ class _AnalyticsFilterBarState extends ConsumerState<AnalyticsFilterBar> {
                         ),
                         const SizedBox(height: 14),
 
-                        // Responsive 4-Column Dropdown Selectors Grid
+                        // Responsive Dropdown Selectors Grid (6 Dimensions)
                         LayoutBuilder(
                           builder: (context, boxConstraints) {
-                            final isWide = boxConstraints.maxWidth > 750;
+                            final isWide = boxConstraints.maxWidth > 850;
                             if (isWide) {
-                              return Row(
-                                crossAxisAlignment: CrossAxisAlignment.start,
+                              return Column(
                                 children: [
-                                  Expanded(child: _buildSubjectSelector(filter, subjects, isDark)),
-                                  const SizedBox(width: 12),
-                                  Expanded(child: _buildSectionSelector(filter, sections, isDark)),
-                                  const SizedBox(width: 12),
-                                  Expanded(child: _buildTimeframeSelector(filter, isDark)),
-                                  const SizedBox(width: 12),
-                                  Expanded(child: _buildCategorySelector(filter, isDark)),
+                                  Row(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      Expanded(child: _buildAcademicYearSelector(filter, isDark)),
+                                      const SizedBox(width: 12),
+                                      Expanded(child: _buildGradeLevelSelector(filter, isDark)),
+                                      const SizedBox(width: 12),
+                                      Expanded(child: _buildSubjectSelector(filter, filteredSubjects, isDark)),
+                                    ],
+                                  ),
+                                  const SizedBox(height: 12),
+                                  Row(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      Expanded(child: _buildSectionSelector(filter, filteredSections, isDark)),
+                                      const SizedBox(width: 12),
+                                      Expanded(child: _buildTimeframeSelector(filter, isDark)),
+                                      const SizedBox(width: 12),
+                                      Expanded(child: _buildCategorySelector(filter, isDark)),
+                                    ],
+                                  ),
                                 ],
                               );
                             }
 
-                            // 2x2 grid for mid-width
+                            // 2-column stacked grid for mid-width
                             return Column(
                               children: [
                                 Row(
                                   children: [
-                                    Expanded(child: _buildSubjectSelector(filter, subjects, isDark)),
+                                    Expanded(child: _buildAcademicYearSelector(filter, isDark)),
                                     const SizedBox(width: 12),
-                                    Expanded(child: _buildSectionSelector(filter, sections, isDark)),
+                                    Expanded(child: _buildGradeLevelSelector(filter, isDark)),
+                                  ],
+                                ),
+                                const SizedBox(height: 12),
+                                Row(
+                                  children: [
+                                    Expanded(child: _buildSubjectSelector(filter, filteredSubjects, isDark)),
+                                    const SizedBox(width: 12),
+                                    Expanded(child: _buildSectionSelector(filter, filteredSections, isDark)),
                                   ],
                                 ),
                                 const SizedBox(height: 12),
@@ -602,6 +755,109 @@ class _AnalyticsFilterBarState extends ConsumerState<AnalyticsFilterBar> {
     return found['label']!;
   }
 
+  String _getTimeframeLabel(String key) {
+    final found = _timeframeOptions.firstWhere((o) => o['value'] == key, orElse: () => {'label': key});
+    return found['label']!;
+  }
+
+  Widget _buildAcademicYearSelector(AnalyticsFilter filter, bool isDark) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          'Academic Year',
+          style: TextStyle(
+            fontSize: 11,
+            fontWeight: FontWeight.bold,
+            color: isDark ? AppTheme.darkTextSecondary : AppTheme.lightTextSecondary,
+          ),
+        ),
+        const SizedBox(height: 6),
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 12),
+          decoration: BoxDecoration(
+            color: isDark ? AppTheme.darkSurfaceLight : Colors.white,
+            borderRadius: BorderRadius.circular(8),
+            border: Border.all(
+              color: filter.academicYear != 'AY 2025-2026'
+                  ? AppTheme.primary
+                  : (isDark ? AppTheme.darkBorder : AppTheme.lightBorder),
+            ),
+          ),
+          child: DropdownButtonHideUnderline(
+            child: DropdownButton<String>(
+              isExpanded: true,
+              value: _academicYearOptions.contains(filter.academicYear) ? filter.academicYear : _academicYearOptions.first,
+              dropdownColor: isDark ? AppTheme.darkSurfaceLight : Colors.white,
+              icon: Icon(Icons.arrow_drop_down, color: isDark ? AppTheme.darkTextSecondary : AppTheme.lightTextSecondary, size: 20),
+              style: TextStyle(fontSize: 12, color: isDark ? AppTheme.darkText : AppTheme.lightText),
+              items: _academicYearOptions.map((year) {
+                return DropdownMenuItem<String>(
+                  value: year,
+                  child: Text(year, maxLines: 1, overflow: TextOverflow.ellipsis),
+                );
+              }).toList(),
+              onChanged: (val) {
+                if (val != null) {
+                  ref.read(analyticsFilterProvider.notifier).updateAcademicYear(val);
+                }
+              },
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildGradeLevelSelector(AnalyticsFilter filter, bool isDark) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          'Department / Grade',
+          style: TextStyle(
+            fontSize: 11,
+            fontWeight: FontWeight.bold,
+            color: isDark ? AppTheme.darkTextSecondary : AppTheme.lightTextSecondary,
+          ),
+        ),
+        const SizedBox(height: 6),
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 12),
+          decoration: BoxDecoration(
+            color: isDark ? AppTheme.darkSurfaceLight : Colors.white,
+            borderRadius: BorderRadius.circular(8),
+            border: Border.all(
+              color: filter.departmentGradeLevel != 'All Levels'
+                  ? AppTheme.primary
+                  : (isDark ? AppTheme.darkBorder : AppTheme.lightBorder),
+            ),
+          ),
+          child: DropdownButtonHideUnderline(
+            child: DropdownButton<String>(
+              isExpanded: true,
+              value: _gradeLevelOptions.contains(filter.departmentGradeLevel) ? filter.departmentGradeLevel : _gradeLevelOptions.first,
+              dropdownColor: isDark ? AppTheme.darkSurfaceLight : Colors.white,
+              icon: Icon(Icons.arrow_drop_down, color: isDark ? AppTheme.darkTextSecondary : AppTheme.lightTextSecondary, size: 20),
+              style: TextStyle(fontSize: 12, color: isDark ? AppTheme.darkText : AppTheme.lightText),
+              items: _gradeLevelOptions.map((lvl) {
+                return DropdownMenuItem<String>(
+                  value: lvl,
+                  child: Text(lvl, maxLines: 1, overflow: TextOverflow.ellipsis),
+                );
+              }).toList(),
+              onChanged: (val) {
+                if (val != null) {
+                  ref.read(analyticsFilterProvider.notifier).updateDepartmentGradeLevel(val);
+                }
+              },
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
   // ── Mobile Responsive Modal Bottom Sheet ──────────────────────
   void _openMobileFilterSheet(
     BuildContext context,
@@ -662,12 +918,16 @@ class _AnalyticsFilterBarState extends ConsumerState<AnalyticsFilterBar> {
                       ],
                     ),
                     const SizedBox(height: 16),
+                    _buildAcademicYearSelector(curFilter, isDark),
+                    const SizedBox(height: 14),
+                    _buildGradeLevelSelector(curFilter, isDark),
+                    const SizedBox(height: 14),
                     _buildSubjectSelector(curFilter, subjects, isDark),
-                    const SizedBox(height: 16),
+                    const SizedBox(height: 14),
                     _buildSectionSelector(curFilter, sections, isDark),
-                    const SizedBox(height: 16),
+                    const SizedBox(height: 14),
                     _buildTimeframeSelector(curFilter, isDark),
-                    const SizedBox(height: 16),
+                    const SizedBox(height: 14),
                     _buildCategorySelector(curFilter, isDark),
                     const SizedBox(height: 24),
                     SizedBox(

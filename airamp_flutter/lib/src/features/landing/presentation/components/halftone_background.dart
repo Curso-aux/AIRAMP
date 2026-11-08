@@ -203,6 +203,8 @@ class _HalftoneBackgroundState extends State<HalftoneBackground>
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final bgColor = Theme.of(context).scaffoldBackgroundColor;
+    final screenWidth = MediaQuery.sizeOf(context).width;
+    final isMobile = screenWidth < 768;
 
     return MouseRegion(
       onHover: (event) => _mouseNotifier.value = event.localPosition,
@@ -220,7 +222,9 @@ class _HalftoneBackgroundState extends State<HalftoneBackground>
           // 2. Dynamic transitioning academic photos
           Positioned.fill(
             child: Opacity(
-              opacity: isDark ? 0.18 : widget.opacity,
+              opacity: isDark
+                  ? (isMobile ? 0.09 : 0.18)
+                  : (isMobile ? math.min(widget.opacity, 0.12) : widget.opacity),
               child: ColorFiltered(
                 colorFilter: isDark
                     ? _darkHalftoneFilter
@@ -241,6 +245,7 @@ class _HalftoneBackgroundState extends State<HalftoneBackground>
                       progress: _halftoneController.value,
                       mousePos: _mouseNotifier.value,
                       isDark: isDark,
+                      isMobile: isMobile,
                     ),
                   );
                 },
@@ -253,17 +258,17 @@ class _HalftoneBackgroundState extends State<HalftoneBackground>
             child: Container(
               decoration: BoxDecoration(
                 gradient: RadialGradient(
-                  center: const Alignment(0, -0.10),
-                  radius: 0.90,
+                  center: const Alignment(0, -0.15),
+                  radius: isMobile ? 1.10 : 0.90,
                   colors: isDark
                       ? [
-                          AppTheme.darkBackground.withValues(alpha: 0.35),
-                          AppTheme.darkBackground.withValues(alpha: 0.08),
+                          AppTheme.darkBackground.withValues(alpha: isMobile ? 0.65 : 0.35),
+                          AppTheme.darkBackground.withValues(alpha: isMobile ? 0.25 : 0.08),
                           Colors.transparent,
                         ]
                       : [
-                          AppTheme.lightBackground.withValues(alpha: 0.16),
-                          AppTheme.lightBackground.withValues(alpha: 0.04),
+                          AppTheme.lightBackground.withValues(alpha: isMobile ? 0.82 : 0.18),
+                          AppTheme.lightBackground.withValues(alpha: isMobile ? 0.40 : 0.05),
                           Colors.transparent,
                         ],
                   stops: const [0.0, 0.55, 1.0],
@@ -349,6 +354,7 @@ class AnimatedHalftoneScreenPainter extends CustomPainter {
   final double progress;
   final Offset? mousePos;
   final bool isDark;
+  final bool isMobile;
 
   static const double _spacing = 15.0;
   static const double _rowHeight = 13.0; // _spacing * sqrt(3) / 2 ≈ 12.99 (fine hexagonal print lattice)
@@ -357,6 +363,7 @@ class AnimatedHalftoneScreenPainter extends CustomPainter {
     required this.progress,
     required this.mousePos,
     required this.isDark,
+    this.isMobile = false,
   });
 
   @override
@@ -421,7 +428,10 @@ class AnimatedHalftoneScreenPainter extends CustomPainter {
           }
         }
 
-        dotPaint.color = dotColor.withValues(alpha: baseAlpha.clamp(0.02, isDark ? 0.22 : 0.25));
+        final double alphaMultiplier = isMobile ? 0.55 : 1.0;
+        dotPaint.color = dotColor.withValues(
+          alpha: (baseAlpha * alphaMultiplier).clamp(0.015, isDark ? 0.16 : 0.20),
+        );
         canvas.drawCircle(Offset(x, y), radius, dotPaint);
       }
     }

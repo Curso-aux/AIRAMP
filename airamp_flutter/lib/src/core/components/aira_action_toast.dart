@@ -335,13 +335,17 @@ class _AiraActionToastOverlayState extends State<_AiraActionToastOverlay>
     final mediaQuery = MediaQuery.of(context);
     final topPadding = mediaQuery.padding.top;
     final screenWidth = mediaQuery.size.width;
+    final isMobile = screenWidth < 600;
 
     final isNarrow = screenWidth < (widget.width + 48);
-    final effectiveWidth = isNarrow ? (screenWidth - 32) : widget.width;
+    final effectiveWidth = isMobile
+        ? (screenWidth - 24)
+        : (isNarrow ? (screenWidth - 32) : widget.width);
 
     return Positioned(
-      top: topPadding + 20,
-      right: isNarrow ? 16 : 24,
+      top: isMobile ? topPadding + 10 : topPadding + 20,
+      right: isMobile ? 12 : (isNarrow ? 16 : 24),
+      left: isMobile ? 12 : null,
       child: SlideTransition(
         position: _slideAnimation,
         child: FadeTransition(
@@ -531,6 +535,132 @@ class _AiraActionToastCardState extends State<AiraActionToastCard>
           );
           break;
       }
+    }
+
+    final screenWidth = MediaQuery.sizeOf(context).width;
+    final isMobile = screenWidth < 600;
+
+    if (isMobile) {
+      return Container(
+        decoration: BoxDecoration(
+          color: cardBg,
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: cardBorder, width: 1.1),
+          boxShadow: [
+            BoxShadow(
+              color: isDark ? const Color(0x66000000) : const Color(0x140F172A),
+              blurRadius: 16,
+              offset: const Offset(0, 4),
+            ),
+          ],
+        ),
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(11),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.center,
+                  children: [
+                    badgeIcon,
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Text(
+                            widget.title,
+                            style: TextStyle(
+                              fontSize: 14,
+                              fontWeight: FontWeight.w700,
+                              color: titleColor,
+                              letterSpacing: -0.2,
+                            ),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                          const SizedBox(height: 2),
+                          Text(
+                            widget.message,
+                            style: TextStyle(
+                              fontSize: 12,
+                              color: bodyColor,
+                              height: 1.3,
+                            ),
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ],
+                      ),
+                    ),
+                    if (widget.onAction != null) ...[
+                      const SizedBox(width: 8),
+                      InkWell(
+                        borderRadius: BorderRadius.circular(6),
+                        onTap: () {
+                          _controller.stop();
+                          widget.onAction!();
+                          widget.onDismiss();
+                        },
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                          decoration: BoxDecoration(
+                            color: buttonBg,
+                            borderRadius: BorderRadius.circular(6),
+                            border: Border.all(color: buttonBorder, width: 1.0),
+                          ),
+                          child: Text(
+                            widget.actionLabel,
+                            style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.w600, color: buttonText),
+                          ),
+                        ),
+                      ),
+                    ],
+                    const SizedBox(width: 4),
+                    IconButton(
+                      icon: Icon(Icons.close_rounded, size: 16, color: footerText),
+                      padding: EdgeInsets.zero,
+                      constraints: const BoxConstraints(minWidth: 24, minHeight: 24),
+                      splashRadius: 14,
+                      tooltip: 'Dismiss',
+                      onPressed: () {
+                        _controller.stop();
+                        widget.onDismiss();
+                      },
+                    ),
+                  ],
+                ),
+              ),
+              // Slim Animated Progress Indicator
+              AnimatedBuilder(
+                animation: _controller,
+                builder: (context, _) {
+                  final progress = _isPaused
+                      ? 0.0
+                      : (1.0 - _controller.value).clamp(0.0, 1.0);
+
+                  return Container(
+                    height: 3,
+                    width: double.infinity,
+                    color: footerBg,
+                    child: FractionallySizedBox(
+                      alignment: Alignment.centerLeft,
+                      widthFactor: progress,
+                      child: Container(
+                        color: accentColor,
+                      ),
+                    ),
+                  );
+                },
+              ),
+            ],
+          ),
+        ),
+      );
     }
 
     return Container(
