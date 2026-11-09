@@ -1,14 +1,20 @@
 import 'dart:convert';
+import 'dart:io';
+import 'package:flutter/foundation.dart' show kIsWeb, Uint8List;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:file_picker/file_picker.dart';
+import 'package:path_provider/path_provider.dart';
+import 'package:url_launcher/url_launcher.dart';
 import '../../../core/components/empty_state.dart';
 import '../../../core/components/skeleton_loader.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/theme/theme_provider.dart';
+import '../../../core/services/cloud_storage_service.dart';
 import '../../../core/services/session_draft_service.dart';
+import '../../../core/utils/file_download_helper.dart';
 import '../../../core/utils/image_compress_helper.dart';
 import '../../auth/application/auth_provider.dart';
 import '../data/submissions_repository.dart';
@@ -39,6 +45,8 @@ class _SubmissionsScreenState extends ConsumerState<SubmissionsScreen> {
 
   bool _isSubmitting = false;
   bool _isEditingExisting = false;
+  double _uploadProgress = 0.0;
+  String? _uploadStatusMessage;
   final SessionDraftDisposer _draftDisposer = SessionDraftDisposer();
 
   @override
@@ -73,20 +81,31 @@ class _SubmissionsScreenState extends ConsumerState<SubmissionsScreen> {
 
   int get _parsedId => int.tryParse(widget.assignmentId) ?? 1;
 
-  int get _textWordCount {
-    final text = _textResponseController.text.trim();
-    if (text.isEmpty) return 0;
-    return text.split(RegExp(r'\s+')).length;
-  }
-
-  int get _textCharCount => _textResponseController.text.length;
-
   Future<void> _pickFile() async {
     try {
       final files = await FilePicker.pickFiles();
       if (files.isNotEmpty) {
         final file = files.first;
         final size = await file.length();
+        if (size <= 0) {
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(content: Text('Selected file is empty (0 bytes). Please choose a valid document.')),
+            );
+          }
+          return;
+        }
+        if (size > 50 * 1024 * 1024) {
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text('File size (${_formatFileSize(size)}) exceeds the 50 MB limit. Please select a document under 50 MB.'),
+                backgroundColor: AppTheme.error,
+              ),
+            );
+          }
+          return;
+        }
         Uint8List? bytes;
         try {
           bytes = await file.readAsBytes();
@@ -124,6 +143,18 @@ class _SubmissionsScreenState extends ConsumerState<SubmissionsScreen> {
       );
       if (files.isNotEmpty) {
         final file = files.first;
+        final size = await file.length();
+        if (size > 50 * 1024 * 1024) {
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text('Image size (${_formatFileSize(size)}) exceeds the 50 MB limit. Please select an image under 50 MB.'),
+                backgroundColor: AppTheme.error,
+              ),
+            );
+          }
+          return;
+        }
         final rawBytes = await file.readAsBytes();
         // Downscale image automatically to ensure cloud sync stays well below 500KB
         final compressedBytes = await ImageCompressHelper.compressImage(rawBytes, maxDimension: 1200);
@@ -421,7 +452,11 @@ class _SubmissionsScreenState extends ConsumerState<SubmissionsScreen> {
     final studentId = user?.id ?? 'student_1';
     final studentName = user?.fullName ?? 'Student';
 
-    setState(() => _isSubmitting = true);
+    setState(() {
+      _isSubmitting = true;
+      _uploadProgress = 0.0;
+      _uploadStatusMessage = null;
+    });
 
     try {
       final List<String> types = [];
@@ -431,6 +466,42 @@ class _SubmissionsScreenState extends ConsumerState<SubmissionsScreen> {
       if (link.isNotEmpty || (existing?.contentLink != null && !_isEditingExisting)) types.add('link');
 
       final submissionType = types.isEmpty ? 'both' : types.join('+');
+
+      String? uploadedStorageUrl = existing?.storageUrl;
+
+      // 1. Upload document directly to Cloud Storage if picked
+      if (_pickedFileBytes != null && _pickedFileName != null) {
+        if (mounted) setState(() => _uploadStatusMessage = 'Uploading document to cloud storage...');
+        final res = await CloudStorageService().uploadSubmissionFile(
+          assignmentId: _parsedId,
+          studentId: studentId,
+          fileName: _pickedFileName!,
+          bytes: _pickedFileBytes!,
+          onProgress: (pct) {
+            if (mounted) setState(() => _uploadProgress = pct);
+          },
+        );
+        if (res.success && res.downloadUrl != null) {
+          uploadedStorageUrl = res.downloadUrl;
+        }
+      }
+
+      // 2. Upload image directly to Cloud Storage if picked and no document url
+      if (_pickedImageBytes != null && _pickedImageName != null && uploadedStorageUrl == null) {
+        if (mounted) setState(() => _uploadStatusMessage = 'Uploading image to cloud storage...');
+        final res = await CloudStorageService().uploadSubmissionFile(
+          assignmentId: _parsedId,
+          studentId: studentId,
+          fileName: _pickedImageName!,
+          bytes: _pickedImageBytes!,
+          onProgress: (pct) {
+            if (mounted) setState(() => _uploadProgress = pct);
+          },
+        );
+        if (res.success && res.downloadUrl != null) {
+          uploadedStorageUrl = res.downloadUrl;
+        }
+      }
 
       final repo = ref.read(submissionsRepositoryProvider);
       await repo.submitAssignment(
@@ -446,6 +517,7 @@ class _SubmissionsScreenState extends ConsumerState<SubmissionsScreen> {
         textResponse: text.isNotEmpty ? text : (existing?.textResponse),
         imagePath: _pickedImageName != null ? (_pickedImagePath ?? _pickedImageName) : existing?.imagePath,
         imageBytes: _pickedImageBytes != null ? base64Encode(_pickedImageBytes!) : existing?.imageBytes,
+        storageUrl: uploadedStorageUrl,
         notes: _notesController.text.trim().isNotEmpty ? _notesController.text.trim() : existing?.notes,
       );
 
@@ -802,9 +874,16 @@ class _SubmissionsScreenState extends ConsumerState<SubmissionsScreen> {
                 'Written / Text Response',
                 style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: AppTheme.textSecondary),
               ),
-              Text(
-                '$_textWordCount words • $_textCharCount chars',
-                style: TextStyle(fontSize: 11, color: AppTheme.textMuted),
+              ValueListenableBuilder<TextEditingValue>(
+                valueListenable: _textResponseController,
+                builder: (context, value, _) {
+                  final text = value.text.trim();
+                  final wordCount = text.isEmpty ? 0 : text.split(RegExp(r'\s+')).length;
+                  return Text(
+                    '$wordCount words • ${value.text.length} chars',
+                    style: TextStyle(fontSize: 11, color: AppTheme.textMuted),
+                  );
+                },
               ),
             ],
           ),
@@ -812,7 +891,6 @@ class _SubmissionsScreenState extends ConsumerState<SubmissionsScreen> {
           TextField(
             controller: _textResponseController,
             maxLength: 5000,
-            onChanged: (_) => setState(() {}),
             style: TextStyle(color: AppTheme.text, height: 1.4),
             minLines: 4,
             maxLines: 10,
@@ -838,9 +916,26 @@ class _SubmissionsScreenState extends ConsumerState<SubmissionsScreen> {
           const SizedBox(height: 18),
 
           // 2. IMAGE ATTACHMENT SECTION
-          Text(
-            'Attach Image / Screenshot',
-            style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: AppTheme.textSecondary),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text(
+                'Attach Image / Screenshot',
+                style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: AppTheme.textSecondary),
+              ),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+                decoration: BoxDecoration(
+                  color: AppTheme.primary.withValues(alpha: 0.12),
+                  borderRadius: BorderRadius.circular(6),
+                  border: Border.all(color: AppTheme.primary.withValues(alpha: 0.3)),
+                ),
+                child: Text(
+                  'MAX 50 MB',
+                  style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: AppTheme.primary),
+                ),
+              ),
+            ],
           ),
           const SizedBox(height: 8),
           if (_pickedImageName != null) ...[
@@ -930,7 +1025,7 @@ class _SubmissionsScreenState extends ConsumerState<SubmissionsScreen> {
             OutlinedButton.icon(
               onPressed: _pickImage,
               icon: Icon(Icons.add_photo_alternate_outlined, color: AppTheme.primary, size: 20),
-              label: Text('Attach Image (JPG, PNG, WebP)', style: TextStyle(color: AppTheme.primary)),
+              label: Text('Attach Image (JPG, PNG, WebP • Max 50 MB)', style: TextStyle(color: AppTheme.primary)),
               style: OutlinedButton.styleFrom(
                 side: BorderSide(color: AppTheme.primary.withValues(alpha: 0.5)),
                 padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
@@ -943,9 +1038,26 @@ class _SubmissionsScreenState extends ConsumerState<SubmissionsScreen> {
           const SizedBox(height: 10),
 
           // 3. FILE ATTACHMENT SECTION
-          Text(
-            'Attach Document / File',
-            style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: AppTheme.textSecondary),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text(
+                'Attach Document / File',
+                style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: AppTheme.textSecondary),
+              ),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+                decoration: BoxDecoration(
+                  color: AppTheme.primary.withValues(alpha: 0.12),
+                  borderRadius: BorderRadius.circular(6),
+                  border: Border.all(color: AppTheme.primary.withValues(alpha: 0.3)),
+                ),
+                child: Text(
+                  'MAX 50 MB',
+                  style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: AppTheme.primary),
+                ),
+              ),
+            ],
           ),
           const SizedBox(height: 8),
           if (_pickedFileName != null) ...[
@@ -971,7 +1083,7 @@ class _SubmissionsScreenState extends ConsumerState<SubmissionsScreen> {
                           overflow: TextOverflow.ellipsis,
                         ),
                         Text(
-                          _formatFileSize(_pickedFileSize),
+                          '${_formatFileSize(_pickedFileSize)} • Within 50 MB limit',
                           style: TextStyle(color: AppTheme.textMuted, fontSize: 11),
                         ),
                       ],
@@ -1016,7 +1128,7 @@ class _SubmissionsScreenState extends ConsumerState<SubmissionsScreen> {
             OutlinedButton.icon(
               onPressed: _pickFile,
               icon: Icon(Icons.upload_file_outlined, color: AppTheme.primary),
-              label: Text('Browse or Pick File (PDF, DOCX, ZIP)', style: TextStyle(color: AppTheme.primary)),
+              label: Text('Browse or Pick File (PDF, DOCX, ZIP • Max 50 MB)', style: TextStyle(color: AppTheme.primary)),
               style: OutlinedButton.styleFrom(
                 side: BorderSide(color: AppTheme.primary.withValues(alpha: 0.5)),
                 padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
@@ -1058,7 +1170,28 @@ class _SubmissionsScreenState extends ConsumerState<SubmissionsScreen> {
               ),
             ),
           ),
-          const SizedBox(height: 24),
+          const SizedBox(height: 20),
+
+          // UPLOAD PROGRESS BAR (When transmitting documents/media)
+          if (_isSubmitting && _uploadStatusMessage != null) ...[
+            Text(
+              _uploadProgress > 0
+                  ? '$_uploadStatusMessage (${(_uploadProgress * 100).toInt()}%)'
+                  : _uploadStatusMessage!,
+              style: TextStyle(fontSize: 12, color: AppTheme.primary, fontWeight: FontWeight.w600),
+            ),
+            const SizedBox(height: 8),
+            ClipRRect(
+              borderRadius: BorderRadius.circular(6),
+              child: LinearProgressIndicator(
+                value: _uploadProgress > 0 ? _uploadProgress : null,
+                backgroundColor: AppTheme.border,
+                color: AppTheme.primary,
+                minHeight: 6,
+              ),
+            ),
+            const SizedBox(height: 16),
+          ],
 
           // SUBMIT ACTION BUTTON
           ElevatedButton(
@@ -1330,6 +1463,14 @@ class _SubmissionsScreenState extends ConsumerState<SubmissionsScreen> {
                           ],
                         ),
                       ),
+                      if (submission.storageUrl != null || submission.fileBytes != null || submission.filePath != null) ...[
+                        const SizedBox(width: 8),
+                        TextButton.icon(
+                          onPressed: () => _openSubmittedFile(submission),
+                          icon: const Icon(Icons.open_in_new, size: 14),
+                          label: const Text('View', style: TextStyle(fontSize: 12)),
+                        ),
+                      ],
                     ],
                   ),
                 ),
@@ -1438,5 +1579,60 @@ class _SubmissionsScreenState extends ConsumerState<SubmissionsScreen> {
         ),
       ],
     );
+  }
+
+  Future<void> _openSubmittedFile(Submission submission) async {
+    try {
+      final cleanName = submission.fileName ?? 'submission.pdf';
+      final isPdf = cleanName.toLowerCase().endsWith('.pdf');
+      final mimeType = isPdf ? 'application/pdf' : 'application/octet-stream';
+
+      // 1. If Cloud Storage URL is present
+      if (submission.storageUrl != null &&
+          (submission.storageUrl!.startsWith('http://') || submission.storageUrl!.startsWith('https://'))) {
+        if (kIsWeb) {
+          triggerWebUrlDownload(submission.storageUrl!, cleanName);
+          return;
+        }
+        final uri = Uri.parse(submission.storageUrl!);
+        await launchUrl(uri, mode: LaunchMode.externalApplication);
+        return;
+      }
+
+      // 2. If Base64 bytes are stored locally
+      if (submission.fileBytes != null && submission.fileBytes!.trim().isNotEmpty) {
+        final cleanB64 = ImageCompressHelper.cleanBase64(submission.fileBytes!);
+        final rawBytes = base64Decode(cleanB64);
+        if (kIsWeb) {
+          downloadBinaryFileWeb(rawBytes, cleanName, mimeType);
+          return;
+        }
+        final tempDir = await getTemporaryDirectory();
+        final file = File('${tempDir.path}/$cleanName');
+        await file.writeAsBytes(rawBytes);
+        final uri = Uri.file(file.path);
+        await launchUrl(uri, mode: LaunchMode.externalApplication);
+        return;
+      }
+
+      // 3. If local file path exists
+      if (!kIsWeb && submission.filePath != null && File(submission.filePath!).existsSync()) {
+        final uri = Uri.file(submission.filePath!);
+        await launchUrl(uri, mode: LaunchMode.externalApplication);
+        return;
+      }
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('File content not available')),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Could not open file: $e')),
+        );
+      }
+    }
   }
 }

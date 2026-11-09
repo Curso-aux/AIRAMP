@@ -23,6 +23,7 @@ class Assignment {
   final String? attachmentBytes;
   final String? cloudId;
   final String? targetSections;
+  final String? storageUrl;
 
   // Student specific context (if fetched for student)
   final int? submissionId;
@@ -57,6 +58,7 @@ class Assignment {
     this.attachmentBytes,
     this.cloudId,
     this.targetSections,
+    this.storageUrl,
     this.submissionId,
     this.studentSubmissionStatus,
     this.studentGrade,
@@ -91,6 +93,7 @@ class Assignment {
       attachmentBytes: map['attachment_bytes'] as String?,
       cloudId: map['cloud_id'] as String?,
       targetSections: map['target_sections'] as String?,
+      storageUrl: map['storage_url'] as String?,
       submissionId: map['submission_id'] as int?,
       studentSubmissionStatus: map['submission_status'] as String?,
       studentGrade: (map['grade'] as num?)?.toDouble(),
@@ -122,6 +125,7 @@ class Submission {
   final String? textResponse;
   final String? imagePath;
   final String? imageBytes;
+  final String? storageUrl;
   final String? notes;
   final String submittedAt;
   final String status;
@@ -148,6 +152,7 @@ class Submission {
     this.textResponse,
     this.imagePath,
     this.imageBytes,
+    this.storageUrl,
     this.notes,
     required this.submittedAt,
     this.status = 'submitted',
@@ -176,6 +181,7 @@ class Submission {
       textResponse: map['text_response'] as String?,
       imagePath: map['image_path'] as String?,
       imageBytes: map['image_bytes'] as String?,
+      storageUrl: map['storage_url'] as String?,
       notes: map['notes'] as String?,
       submittedAt: map['submitted_at'] as String? ?? '',
       status: map['status'] as String? ?? 'submitted',
@@ -242,6 +248,7 @@ class SubmissionsRepository {
     String? attachmentBytes,
     String? targetSections,
     String? cloudId,
+    String? storageUrl,
   }) {
     return _dbHelper.createAssignment(
       title: title,
@@ -258,6 +265,7 @@ class SubmissionsRepository {
       attachmentBytes: attachmentBytes,
       targetSections: targetSections,
       cloudId: cloudId,
+      storageUrl: storageUrl,
     );
   }
 
@@ -274,6 +282,7 @@ class SubmissionsRepository {
     String? textResponse,
     String? imagePath,
     String? imageBytes,
+    String? storageUrl,
     String? notes,
   }) {
     return _dbHelper.submitAssignment(
@@ -289,6 +298,7 @@ class SubmissionsRepository {
       textResponse: textResponse,
       imagePath: imagePath,
       imageBytes: imageBytes,
+      storageUrl: storageUrl,
       notes: notes,
     );
   }

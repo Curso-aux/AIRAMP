@@ -1,5 +1,4 @@
 import 'dart:convert';
-import 'dart:typed_data';
 import 'dart:ui' as ui;
 import 'package:flutter/foundation.dart';
 
@@ -10,7 +9,10 @@ import 'package:flutter/foundation.dart';
 class ImageCompressHelper {
   /// Downscales [bytes] so the maximum dimension (width or height) does not exceed [maxDimension].
   /// Returns PNG compressed bytes. If processing fails or image is already smaller, returns [bytes].
-  static Future<Uint8List> compressImage(Uint8List bytes, {int maxDimension = 1200}) async {
+  static Future<Uint8List> compressImage(
+    Uint8List bytes, {
+    int maxDimension = 1200,
+  }) async {
     if (bytes.isEmpty) return bytes;
     try {
       final codec = await ui.instantiateImageCodec(bytes);
@@ -20,7 +22,9 @@ class ImageCompressHelper {
       final width = image.width;
       final height = image.height;
 
-      if (width <= maxDimension && height <= maxDimension && bytes.lengthInBytes < 400000) {
+      if (width <= maxDimension &&
+          height <= maxDimension &&
+          bytes.lengthInBytes < 400000) {
         return bytes;
       }
 
@@ -43,10 +47,14 @@ class ImageCompressHelper {
         targetHeight: targetHeight,
       );
       final scaledFrame = await scaledCodec.getNextFrame();
-      final byteData = await scaledFrame.image.toByteData(format: ui.ImageByteFormat.png);
+      final byteData = await scaledFrame.image.toByteData(
+        format: ui.ImageByteFormat.png,
+      );
       if (byteData != null) {
         final result = byteData.buffer.asUint8List();
-        debugPrint('[ImageCompressHelper] Compressed image: ${bytes.lengthInBytes ~/ 1024} KB -> ${result.lengthInBytes ~/ 1024} KB (${targetWidth}x${targetHeight})');
+        debugPrint(
+          '[ImageCompressHelper] Compressed image: ${bytes.lengthInBytes ~/ 1024} KB -> ${result.lengthInBytes ~/ 1024} KB (${targetWidth}x$targetHeight)',
+        );
         return result;
       }
     } catch (e) {
@@ -73,4 +81,3 @@ class ImageCompressHelper {
     }
   }
 }
-

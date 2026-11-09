@@ -18,6 +18,33 @@ void downloadCsvFile(String content, String filename) {
   html.Url.revokeObjectUrl(url);
 }
 
+/// Browser-native binary file download (PDF, images, DOCX, ZIP) via Blob and AnchorElement.
+/// Safely bypasses Chrome's top-level navigation blocks for data: URIs.
+void downloadBinaryFileWeb(List<int> bytes, String filename, String mimeType) {
+  final blob = html.Blob([bytes], mimeType);
+  final url = html.Url.createObjectUrlFromBlob(blob);
+  final anchor = html.AnchorElement(href: url)
+    ..setAttribute('download', filename)
+    ..style.display = 'none';
+
+  html.document.body?.children.add(anchor);
+  anchor.click();
+  html.document.body?.children.remove(anchor);
+  html.Url.revokeObjectUrl(url);
+}
+
+/// Triggers a download of a remote URL on Web via an invisible AnchorElement.
+void triggerWebUrlDownload(String url, String filename) {
+  final anchor = html.AnchorElement(href: url)
+    ..setAttribute('download', filename)
+    ..setAttribute('target', '_blank')
+    ..style.display = 'none';
+
+  html.document.body?.children.add(anchor);
+  anchor.click();
+  html.document.body?.children.remove(anchor);
+}
+
 /// Browser-native file picker returning text content of the selected CSV file
 Future<String?> pickCsvFile() {
   final completer = Completer<String?>();

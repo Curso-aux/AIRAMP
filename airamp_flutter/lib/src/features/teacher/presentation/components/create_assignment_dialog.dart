@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:typed_data';
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -7,6 +8,7 @@ import '../../../../core/components/app_toast.dart';
 import '../../../../core/database/database_helper.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../../core/theme/theme_provider.dart';
+import '../../../../core/services/cloud_storage_service.dart';
 import '../../../../core/services/session_draft_service.dart';
 import '../../../auth/application/auth_provider.dart';
 import '../../../submissions/data/submissions_repository.dart';
@@ -44,6 +46,7 @@ class _CreateAssignmentDialogState extends ConsumerState<CreateAssignmentDialog>
   int? _attachmentSize;
   String? _attachmentPath;
   String? _attachmentBase64;
+  Uint8List? _attachmentRawBytes;
 
   String get _formId => 'teacher_create_assignment_${_selectedSubjectId ?? widget.subjectId ?? 0}';
 
@@ -71,8 +74,14 @@ class _CreateAssignmentDialogState extends ConsumerState<CreateAssignmentDialog>
       );
       if (files.isNotEmpty) {
         final file = files.first;
-        final bytes = await file.readAsBytes();
         final size = await file.length();
+        if (size > 50 * 1024 * 1024) {
+          if (mounted) {
+            AppToast.showError(context, 'Attachment (${(size / (1024 * 1024)).toStringAsFixed(1)} MB) exceeds the 50 MB limit. Please select a smaller file.');
+          }
+          return;
+        }
+        final bytes = await file.readAsBytes();
         String? b64;
         if (bytes.isNotEmpty) {
           b64 = base64Encode(bytes);
@@ -82,6 +91,7 @@ class _CreateAssignmentDialogState extends ConsumerState<CreateAssignmentDialog>
           _attachmentSize = size > 0 ? size : bytes.length;
           _attachmentPath = file.path;
           _attachmentBase64 = b64;
+          _attachmentRawBytes = bytes;
         });
       }
     } catch (e) {
@@ -186,6 +196,18 @@ class _CreateAssignmentDialogState extends ConsumerState<CreateAssignmentDialog>
     setState(() => _isSaving = true);
 
     try {
+      String? attachmentStorageUrl;
+      if (_attachmentRawBytes != null && _attachmentName != null) {
+        final res = await CloudStorageService().uploadAssignmentAttachment(
+          teacherId: teacherId,
+          fileName: _attachmentName!,
+          bytes: _attachmentRawBytes!,
+        );
+        if (res.success && res.downloadUrl != null) {
+          attachmentStorageUrl = res.downloadUrl;
+        }
+      }
+
       await DatabaseHelper().createAssignment(
         title: title,
         description: _descController.text.trim().isNotEmpty ? _descController.text.trim() : null,
@@ -200,6 +222,7 @@ class _CreateAssignmentDialogState extends ConsumerState<CreateAssignmentDialog>
         attachmentPath: _attachmentPath,
         attachmentSize: _attachmentSize,
         attachmentBytes: _attachmentBase64,
+        storageUrl: attachmentStorageUrl,
       );
 
       // Invalidate relevant providers
@@ -615,7 +638,24 @@ class _CreateAssignmentDialogState extends ConsumerState<CreateAssignmentDialog>
                     const SizedBox(height: 16),
 
                     // Teacher Reference Attachment
-                    Text('Attach Worksheet / Rubric / Handout (Optional)', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: AppTheme.textSecondary)),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Text('Attach Worksheet / Rubric / Handout', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: AppTheme.textSecondary)),
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+                          decoration: BoxDecoration(
+                            color: AppTheme.primary.withValues(alpha: 0.12),
+                            borderRadius: BorderRadius.circular(6),
+                            border: Border.all(color: AppTheme.primary.withValues(alpha: 0.3)),
+                          ),
+                          child: Text(
+                            'MAX 50 MB',
+                            style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: AppTheme.primary),
+                          ),
+                        ),
+                      ],
+                    ),
                     const SizedBox(height: 8),
                     if (_attachmentName != null) ...[
                       Container(
@@ -645,6 +685,7 @@ class _CreateAssignmentDialogState extends ConsumerState<CreateAssignmentDialog>
                                   _attachmentSize = null;
                                   _attachmentPath = null;
                                   _attachmentBase64 = null;
+                                  _attachmentRawBytes = null;
                                 });
                               },
                             ),
@@ -655,7 +696,7 @@ class _CreateAssignmentDialogState extends ConsumerState<CreateAssignmentDialog>
                       OutlinedButton.icon(
                         onPressed: _pickAttachment,
                         icon: Icon(Icons.upload_file_outlined, size: 18, color: AppTheme.primary),
-                        label: Text('Upload Assignment Handout / Brief', style: TextStyle(color: AppTheme.primary, fontSize: 12, fontWeight: FontWeight.w600)),
+                        label: Text('Upload Assignment Handout / Brief (Max 50 MB)', style: TextStyle(color: AppTheme.primary, fontSize: 12, fontWeight: FontWeight.w600)),
                         style: OutlinedButton.styleFrom(
                           padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
                           side: BorderSide(color: AppTheme.primary.withValues(alpha: 0.4)),

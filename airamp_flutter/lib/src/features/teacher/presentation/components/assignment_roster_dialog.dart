@@ -11,6 +11,7 @@ import '../../../../core/database/database_helper.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../../core/theme/theme_provider.dart';
 import '../../../../core/services/session_draft_service.dart';
+import '../../../../core/utils/file_download_helper.dart';
 import '../../../../core/utils/image_compress_helper.dart';
 import '../../../auth/application/auth_provider.dart';
 import '../../../submissions/data/submissions_repository.dart';
@@ -114,13 +115,23 @@ class _AssignmentRosterDialogState extends ConsumerState<AssignmentRosterDialog>
     }
   }
 
-  void _openImagePreview(String? imagePath, String? imageBytes, String studentName) {
+  void _openImagePreview(String? imagePath, String? imageBytes, String? storageUrl, String studentName) {
     Widget imageWidget;
     final decodedBytes = ImageCompressHelper.safeDecodeBase64(imageBytes);
     if (decodedBytes != null && decodedBytes.isNotEmpty) {
       imageWidget = Image.memory(
         decodedBytes,
         fit: BoxFit.contain,
+        errorBuilder: (_, _, _) => const Icon(Icons.broken_image, size: 60, color: Colors.grey),
+      );
+    } else if (storageUrl != null && (storageUrl.startsWith('http://') || storageUrl.startsWith('https://'))) {
+      imageWidget = Image.network(
+        storageUrl,
+        fit: BoxFit.contain,
+        loadingBuilder: (context, child, progress) {
+          if (progress == null) return child;
+          return const Center(child: CircularProgressIndicator());
+        },
         errorBuilder: (_, _, _) => const Icon(Icons.broken_image, size: 60, color: Colors.grey),
       );
     } else if (imagePath != null && imagePath.isNotEmpty) {
@@ -193,27 +204,41 @@ class _AssignmentRosterDialogState extends ConsumerState<AssignmentRosterDialog>
     );
   }
 
-  Future<void> _openFile(String? fileName, String? filePath, String? fileBytes) async {
+  Future<void> _openFile(String? fileName, String? filePath, String? fileBytes, [String? storageUrl]) async {
     try {
+      final cleanName = (fileName != null && fileName.isNotEmpty) ? fileName : 'student_submission.pdf';
+      final isPdf = cleanName.toLowerCase().endsWith('.pdf');
+      final mimeType = isPdf ? 'application/pdf' : 'application/octet-stream';
+
+      // 1. If Cloud Storage URL is available, download / open via remote URL
+      if (storageUrl != null && (storageUrl.startsWith('http://') || storageUrl.startsWith('https://'))) {
+        if (kIsWeb) {
+          triggerWebUrlDownload(storageUrl, cleanName);
+          return;
+        }
+        final uri = Uri.parse(storageUrl);
+        await launchUrl(uri, mode: LaunchMode.externalApplication);
+        return;
+      }
+
+      // 2. If Base64 bytes are present, download via Web Blob or save to temp file on native
       if (fileBytes != null && fileBytes.trim().isNotEmpty) {
         final cleanB64 = ImageCompressHelper.cleanBase64(fileBytes);
-        final isPdf = (fileName ?? '').toLowerCase().endsWith('.pdf');
-        final mimeType = isPdf ? 'application/pdf' : 'application/octet-stream';
+        final rawBytes = base64Decode(cleanB64);
         if (kIsWeb) {
-          final dataUri = Uri.parse('data:$mimeType;base64,$cleanB64');
-          await launchUrl(dataUri);
+          downloadBinaryFileWeb(rawBytes, cleanName, mimeType);
           return;
         }
         final tempDir = await getTemporaryDirectory();
-        final cleanName = (fileName != null && fileName.isNotEmpty) ? fileName : 'student_submission.pdf';
         final file = File('${tempDir.path}/$cleanName');
-        await file.writeAsBytes(base64Decode(cleanB64));
+        await file.writeAsBytes(rawBytes);
         final uri = Uri.file(file.path);
         await launchUrl(uri, mode: LaunchMode.externalApplication);
         return;
       }
 
-      if (!kIsWeb && filePath != null && filePath.isNotEmpty) {
+      // 3. Fallback to local file path on desktop/mobile if present
+      if (!kIsWeb && filePath != null && filePath.isNotEmpty && File(filePath).existsSync()) {
         final uri = Uri.file(filePath);
         await launchUrl(uri, mode: LaunchMode.externalApplication);
         return;
@@ -690,6 +715,7 @@ class _AssignmentRosterDialogState extends ConsumerState<AssignmentRosterDialog>
                             final imageBytes = student['image_bytes'] as String?;
                             final filePath = student['file_path'] as String?;
                             final fileBytes = student['file_bytes'] as String?;
+                            final storageUrl = student['storage_url'] as String?;
                             final notes = student['notes'];
                             final grade = student['grade'];
                             final feedback = student['feedback'];
@@ -859,7 +885,7 @@ class _AssignmentRosterDialogState extends ConsumerState<AssignmentRosterDialog>
                                               ),
                                             ),
                                             ElevatedButton.icon(
-                                              onPressed: () => _openImagePreview(imagePath, imageBytes, studentName),
+                                              onPressed: () => _openImagePreview(imagePath, imageBytes, storageUrl, studentName),
                                               icon: const Icon(Icons.zoom_in, size: 14),
                                               label: const Text('View Image', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold)),
                                               style: ElevatedButton.styleFrom(
@@ -907,7 +933,7 @@ class _AssignmentRosterDialogState extends ConsumerState<AssignmentRosterDialog>
                                             ),
                                             const SizedBox(width: 8),
                                             ElevatedButton.icon(
-                                              onPressed: () => _openFile(fileName, filePath, fileBytes),
+                                              onPressed: () => _openFile(fileName, filePath, fileBytes, storageUrl),
                                               icon: const Icon(Icons.open_in_new, size: 14),
                                               label: const Text('Open File', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold)),
                                               style: ElevatedButton.styleFrom(

@@ -183,6 +183,16 @@ class DatabaseHelper {
       );
     } catch (_) {}
     try {
+      await db.execute(
+        'ALTER TABLE submissions ADD COLUMN storage_url TEXT',
+      );
+    } catch (_) {}
+    try {
+      await db.execute(
+        'ALTER TABLE assignments ADD COLUMN storage_url TEXT',
+      );
+    } catch (_) {}
+    try {
       await db.execute('''
         CREATE TABLE IF NOT EXISTS notifications (
           id TEXT PRIMARY KEY,
@@ -816,6 +826,7 @@ class DatabaseHelper {
         attachment_path TEXT,
         attachment_size INTEGER,
         attachment_bytes TEXT,
+        storage_url TEXT,
         FOREIGN KEY (subject_id) REFERENCES subjects (id) ON DELETE CASCADE
       )
     ''');
@@ -839,6 +850,7 @@ class DatabaseHelper {
         text_response TEXT,
         image_path TEXT,
         image_bytes TEXT,
+        storage_url TEXT,
         submitted_at TEXT NOT NULL,
         status TEXT DEFAULT 'submitted',
         grade REAL,
@@ -7507,6 +7519,7 @@ class DatabaseHelper {
     String? attachmentBytes,
     String? targetSections,
     String? cloudId,
+    String? storageUrl,
   }) async {
     final db = await database;
     final now = DateTime.now().toIso8601String();
@@ -7533,6 +7546,7 @@ class DatabaseHelper {
       'attachment_path': attachmentPath,
       'attachment_size': attachmentSize,
       'attachment_bytes': attachmentBytes,
+      'storage_url': storageUrl,
       'status': 'active',
       'created_at': now,
     });
@@ -7576,6 +7590,7 @@ class DatabaseHelper {
         'attachment_path': attachmentPath,
         'attachment_size': attachmentSize,
         'attachment_bytes': safeAttachmentBytes,
+        'storage_url': storageUrl,
         'status': 'active',
         'created_at': now,
         'updated_at': now,
@@ -9013,6 +9028,9 @@ class DatabaseHelper {
         sub.file_name,
         sub.file_size,
         sub.file_path,
+        sub.file_bytes,
+        sub.image_bytes,
+        sub.storage_url,
         sub.text_response,
         sub.image_path,
         sub.notes,
@@ -9050,6 +9068,9 @@ class DatabaseHelper {
         sub.file_name,
         sub.file_size,
         sub.file_path,
+        sub.file_bytes,
+        sub.image_bytes,
+        sub.storage_url,
         sub.text_response,
         sub.image_path,
         sub.notes,
@@ -9125,6 +9146,7 @@ class DatabaseHelper {
     String? textResponse,
     String? imagePath,
     String? imageBytes,
+    String? storageUrl,
     String? notes,
   }) async {
     final db = await database;
@@ -9170,6 +9192,7 @@ class DatabaseHelper {
       'file_size': fileSize,
       'file_path': filePath,
       'file_bytes': fileBytes,
+      'storage_url': storageUrl,
       'text_response': textResponse,
       'image_path': imagePath,
       'image_bytes': imageBytes,

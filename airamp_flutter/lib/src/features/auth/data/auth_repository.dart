@@ -55,7 +55,16 @@ class AuthRepository {
               OR LOWER(full_name) LIKE ?
               OR LOWER(COALESCE(username, '')) LIKE ?
               OR (? = 'sa-000-0001' AND (LOWER(id) = 'super_admin_christian' OR LOWER(id) = 'sa-000-0001' OR LOWER(email) = 'evangelistachristian88@gmail.com'))''',
-        [identifierLower, identifierLower, identifierLower, identifierLower, identifierLower, '$identifierLower%', '$identifierLower%', identifierLower],
+        [
+          identifierLower,
+          identifierLower,
+          identifierLower,
+          identifierLower,
+          identifierLower,
+          '$identifierLower%',
+          '$identifierLower%',
+          identifierLower,
+        ],
       );
     } catch (_) {
       candidateRows = await db.rawQuery(
@@ -65,7 +74,13 @@ class AuthRepository {
               OR LOWER(full_name) = ?
               OR LOWER(full_name) LIKE ?
               OR (? = 'sa-000-0001' AND (LOWER(id) = 'super_admin_christian' OR LOWER(id) = 'sa-000-0001' OR LOWER(email) = 'evangelistachristian88@gmail.com'))''',
-        [identifierLower, identifierLower, identifierLower, '$identifierLower%', identifierLower],
+        [
+          identifierLower,
+          identifierLower,
+          identifierLower,
+          '$identifierLower%',
+          identifierLower,
+        ],
       );
     }
 
@@ -81,10 +96,12 @@ class AuthRepository {
         if (storedSalt == null || storedSalt.isEmpty) {
           final newSalt = DatabaseHelper.generateSalt();
           final newHash = DatabaseHelper.hashPassword(password, newSalt);
-          await db.update('users', {
-            'password': newHash,
-            'password_salt': newSalt,
-          }, where: 'id = ?', whereArgs: [candidate['id']]);
+          await db.update(
+            'users',
+            {'password': newHash, 'password_salt': newSalt},
+            where: 'id = ?',
+            whereArgs: [candidate['id']],
+          );
           candidateMap['password'] = newHash;
           candidateMap['password_salt'] = newSalt;
         }
@@ -109,8 +126,11 @@ class AuthRepository {
         final cloudSalt = cloudUser['password_salt'] as String?;
 
         if (DatabaseHelper.verifyPassword(password, cloudHash, cloudSalt)) {
-          final cloudId = cloudUser['id']?.toString() ?? 'usr_${DateTime.now().millisecondsSinceEpoch}';
-          final cloudMust = cloudUser['must_change_password'] == 1 ||
+          final cloudId =
+              cloudUser['id']?.toString() ??
+              'usr_${DateTime.now().millisecondsSinceEpoch}';
+          final cloudMust =
+              cloudUser['must_change_password'] == 1 ||
               cloudUser['must_change_password'] == true ||
               cloudUser['must_change_password'] == '1';
 
@@ -127,14 +147,20 @@ class AuthRepository {
             'student_type': cloudUser['student_type'] ?? 'regular',
             'special_notes': cloudUser['special_notes'],
             'school_id': cloudUser['school_id'] ?? 'sch_main',
-            'profile_image': cloudUser['profile_image'] ?? cloudUser['profileImage'],
+            'profile_image':
+                cloudUser['profile_image'] ?? cloudUser['profileImage'],
             'must_change_password': cloudMust ? 1 : 0,
-            'created_at': cloudUser['created_at'] ?? DateTime.now().toIso8601String(),
+            'created_at':
+                cloudUser['created_at'] ?? DateTime.now().toIso8601String(),
           };
 
           // Synchronize verified credentials to local SQLite cache so future logins are instant
           try {
-            await db.insert('users', cloudDbRow, conflictAlgorithm: ConflictAlgorithm.replace);
+            await db.insert(
+              'users',
+              cloudDbRow,
+              conflictAlgorithm: ConflictAlgorithm.replace,
+            );
           } catch (_) {}
 
           verifiedUsers.add(cloudDbRow);
@@ -170,7 +196,8 @@ class AuthRepository {
     final userId = user['id'] as String;
     if (userId == 'super_admin_christian' ||
         userId == 'SA-000-0001' ||
-        (user['email'] as String? ?? '').toLowerCase() == 'evangelistachristian88@gmail.com') {
+        (user['email'] as String? ?? '').toLowerCase() ==
+            'evangelistachristian88@gmail.com') {
       user['role'] = 'super_admin';
     } else {
       final detectedRole = InstitutionalIdHelper.detectRole(userId);
@@ -189,11 +216,14 @@ class AuthRepository {
     }
     final role = user['role'] as String;
 
-    final isArchived = user['is_archived'] == 1 ||
+    final isArchived =
+        user['is_archived'] == 1 ||
         user['is_archived'] == true ||
         user['is_archived'] == '1';
     if (isArchived) {
-      throw Exception('This account has been deactivated. Please contact your institution administrator to restore access.');
+      throw Exception(
+        'This account has been deactivated. Please contact your institution administrator to restore access.',
+      );
     }
 
     // Check Cloud Firestore for this user to restore any cloud avatar or updated profile:
@@ -203,13 +233,18 @@ class AuthRepository {
     } else {
       // If local SQLite suspects must_change_password, check Cloud Firestore synchronously
       // to ensure we never force password change if the user already updated their password on another device!
-      final localMust = user['must_change_password'] == 1 ||
+      final localMust =
+          user['must_change_password'] == 1 ||
           user['must_change_password'] == true ||
           user['must_change_password'] == '1';
       if (localMust) {
         try {
           final cu = await FirestoreService()
-              .findUserByIdentifier(user['email']?.toString() ?? user['username']?.toString() ?? userId)
+              .findUserByIdentifier(
+                user['email']?.toString() ??
+                    user['username']?.toString() ??
+                    userId,
+              )
               .timeout(const Duration(seconds: 2), onTimeout: () => null);
           if (cu != null) {
             cloudUser = cu;
@@ -221,7 +256,11 @@ class AuthRepository {
         unawaited(() async {
           try {
             final cu = await FirestoreService()
-                .findUserByIdentifier(user['email']?.toString() ?? user['username']?.toString() ?? userId)
+                .findUserByIdentifier(
+                  user['email']?.toString() ??
+                      user['username']?.toString() ??
+                      userId,
+                )
                 .timeout(const Duration(seconds: 3), onTimeout: () => null);
             if (cu != null) {
               final appDb = await DatabaseHelper().database;
@@ -232,7 +271,8 @@ class AuthRepository {
       }
     }
 
-    final mustChange = user['must_change_password'] == 1 ||
+    final mustChange =
+        user['must_change_password'] == 1 ||
         user['must_change_password'] == true ||
         user['must_change_password'] == '1';
 
@@ -242,13 +282,18 @@ class AuthRepository {
       dbUser.remove('profileImage');
       dbUser.remove('mustChangePassword');
       if (dbUser['must_change_password'] is bool) {
-        dbUser['must_change_password'] = (dbUser['must_change_password'] == true) ? 1 : 0;
+        dbUser['must_change_password'] =
+            (dbUser['must_change_password'] == true) ? 1 : 0;
       }
       if (dbUser['is_archived'] is bool) {
         dbUser['is_archived'] = (dbUser['is_archived'] == true) ? 1 : 0;
       }
 
-      final existing = await db.query('users', where: 'id = ?', whereArgs: [userId]);
+      final existing = await db.query(
+        'users',
+        where: 'id = ?',
+        whereArgs: [userId],
+      );
       if (existing.isEmpty) {
         await db.insert('users', dbUser);
       } else {
@@ -260,9 +305,15 @@ class AuthRepository {
         dbUser.remove('profileImage');
         dbUser.remove('mustChangePassword');
         if (dbUser['must_change_password'] is bool) {
-          dbUser['must_change_password'] = (dbUser['must_change_password'] == true) ? 1 : 0;
+          dbUser['must_change_password'] =
+              (dbUser['must_change_password'] == true) ? 1 : 0;
         }
-        await db.update('users', dbUser, where: 'LOWER(email) = ?', whereArgs: [(user['email'] as String? ?? '').toLowerCase()]);
+        await db.update(
+          'users',
+          dbUser,
+          where: 'LOWER(email) = ?',
+          whereArgs: [(user['email'] as String? ?? '').toLowerCase()],
+        );
       } catch (_) {}
     }
 
@@ -271,17 +322,20 @@ class AuthRepository {
     try {
       final syncData = Map<String, dynamic>.from(user);
       if (syncData['profile_image'] == null ||
-          (syncData['profile_image'] is String && (syncData['profile_image'] as String).isEmpty)) {
+          (syncData['profile_image'] is String &&
+              (syncData['profile_image'] as String).isEmpty)) {
         syncData.remove('profile_image');
         syncData.remove('profileImage');
       }
       if (cloudUser != null) {
-        final hasCloudMust = cloudUser.containsKey('must_change_password') ||
+        final hasCloudMust =
+            cloudUser.containsKey('must_change_password') ||
             cloudUser.containsKey('mustChangePassword');
         if (hasCloudMust) {
           final cm = cloudUser['must_change_password'];
           final cmCamel = cloudUser['mustChangePassword'];
-          final cloudMust = cm == 1 || cm == true || cm == '1' || cmCamel == true;
+          final cloudMust =
+              cm == 1 || cm == true || cm == '1' || cmCamel == true;
           syncData['must_change_password'] = cloudMust ? 1 : 0;
           syncData['mustChangePassword'] = cloudMust;
         }
@@ -296,10 +350,7 @@ class AuthRepository {
         final resp = await _dio.post(
           '/v1/auth/session',
           options: Options(
-            headers: {
-              'X-School-Session': token,
-              'X-School-User-Id': userId,
-            },
+            headers: {'X-School-Session': token, 'X-School-User-Id': userId},
           ),
         );
         final data = resp.data;
@@ -311,15 +362,27 @@ class AuthRepository {
       }
     }
 
-    await _persistSession(userId: userId, role: role, token: token, mustChangePassword: mustChange);
+    await _persistSession(
+      userId: userId,
+      role: role,
+      token: token,
+      mustChangePassword: mustChange,
+    );
     ApiClient.setSession(session: token, userId: userId);
 
     // Pre-warm local cache with all users for instant display across directories and analytics
     unawaited(FirestoreService().syncCloudUsersToLocal(force: true));
     unawaited(FirestoreService().syncCloudSubjectsToLocal(force: true));
     unawaited(FirestoreService().syncCloudSectionsToLocal(force: true));
-    if (role == 'student' && user['section'] != null && user['section'].toString().isNotEmpty) {
-      unawaited(DatabaseHelper().ensureStudentEnrolledInSectionSubjects(userId, user['section'].toString()));
+    if (role == 'student' &&
+        user['section'] != null &&
+        user['section'].toString().isNotEmpty) {
+      unawaited(
+        DatabaseHelper().ensureStudentEnrolledInSectionSubjects(
+          userId,
+          user['section'].toString(),
+        ),
+      );
     }
 
     return {
@@ -333,8 +396,14 @@ class AuthRepository {
         'grade': user['grade'],
         'schoolId': user['school_id'] ?? 'sch_main',
         'profileImage': user['profile_image'] ?? user['profileImage'],
-        'must_change_password': user['must_change_password'] == 1 || user['must_change_password'] == true || user['must_change_password'] == '1',
-        'mustChangePassword': user['must_change_password'] == 1 || user['must_change_password'] == true || user['must_change_password'] == '1',
+        'must_change_password':
+            user['must_change_password'] == 1 ||
+            user['must_change_password'] == true ||
+            user['must_change_password'] == '1',
+        'mustChangePassword':
+            user['must_change_password'] == 1 ||
+            user['must_change_password'] == true ||
+            user['must_change_password'] == '1',
       },
       'session': token,
     };
@@ -402,7 +471,9 @@ class AuthRepository {
     // If student and section code provided, validate and bind
     String? assignedSection;
     String? assignedGrade;
-    if (role == 'student' && sectionCode != null && sectionCode.trim().isNotEmpty) {
+    if (role == 'student' &&
+        sectionCode != null &&
+        sectionCode.trim().isNotEmpty) {
       final codeTrimmed = sectionCode.trim();
 
       // 1. Check sections table by enrollment_key or section name
@@ -413,11 +484,19 @@ class AuthRepository {
         assignedGrade = sec['grade']?.toString();
       } else {
         // 2. Fallback to reg_links table
-        final linkRow = await db.query('reg_links', where: 'code = ?', whereArgs: [codeTrimmed]);
+        final linkRow = await db.query(
+          'reg_links',
+          where: 'code = ?',
+          whereArgs: [codeTrimmed],
+        );
         if (linkRow.isNotEmpty) {
           assignedSection = linkRow.first['section'] as String?;
           if (assignedSection != null && assignedSection.isNotEmpty) {
-            final secRow = await db.query('sections', where: 'name = ?', whereArgs: [assignedSection]);
+            final secRow = await db.query(
+              'sections',
+              where: 'name = ?',
+              whereArgs: [assignedSection],
+            );
             if (secRow.isNotEmpty) {
               assignedGrade = secRow.first['grade'] as String?;
             }
@@ -440,14 +519,26 @@ class AuthRepository {
       await FirestoreService().saveUser(userData);
     } catch (_) {}
 
-    if (role == 'student' && sectionCode != null && sectionCode.trim().isNotEmpty) {
+    if (role == 'student' &&
+        sectionCode != null &&
+        sectionCode.trim().isNotEmpty) {
       // First attempt section-key enrollment (binds section + subjects atomically)
-      final enrolled = await DatabaseHelper().enrollStudentBySectionKey(id, sectionCode.trim());
+      final enrolled = await DatabaseHelper().enrollStudentBySectionKey(
+        id,
+        sectionCode.trim(),
+      );
       if (!enrolled) {
         // Fallback to legacy registration key validation
-        await DatabaseHelper().validateAndConsumeRegistrationKey(sectionCode.trim(), id);
+        await DatabaseHelper().validateAndConsumeRegistrationKey(
+          sectionCode.trim(),
+          id,
+        );
         if (assignedSection != null && assignedSection.isNotEmpty) {
-          await DatabaseHelper().autoEnrollStudentBySection(id, assignedSection, assignedGrade ?? '');
+          await DatabaseHelper().autoEnrollStudentBySection(
+            id,
+            assignedSection,
+            assignedGrade ?? '',
+          );
         }
       }
     }
@@ -484,11 +575,14 @@ class AuthRepository {
         final savedUserId = webSession['userId'] as String? ?? '';
         final savedRole = webSession['role'] as String? ?? '';
         final savedToken = webSession['token'] as String? ?? '';
-        final savedMust = webSession['mustChangePassword'] == true ||
+        final savedMust =
+            webSession['mustChangePassword'] == true ||
             webSession['must_change_password'] == 1 ||
             webSession['must_change_password'] == true;
 
-        if (savedUserId.isNotEmpty && savedRole.isNotEmpty && savedToken.isNotEmpty) {
+        if (savedUserId.isNotEmpty &&
+            savedRole.isNotEmpty &&
+            savedToken.isNotEmpty) {
           try {
             await db.delete('sessions');
             await db.insert('sessions', {
@@ -516,7 +610,8 @@ class AuthRepository {
     final rows = await db.query('sessions', orderBy: 'id DESC', limit: 1);
     if (rows.isNotEmpty) {
       final r = rows.first;
-      final mustChange = r['must_change_password'] == 1 ||
+      final mustChange =
+          r['must_change_password'] == 1 ||
           r['must_change_password'] == true ||
           r['must_change_password'] == '1';
       return AuthSession(
@@ -534,7 +629,8 @@ class AuthRepository {
         final savedUserId = prefs.getString('auth_session_user_id');
         final savedRole = prefs.getString('auth_session_role');
         final savedToken = prefs.getString('auth_session_token');
-        final savedMust = prefs.getBool('auth_session_must_change_password') ?? false;
+        final savedMust =
+            prefs.getBool('auth_session_must_change_password') ?? false;
 
         if (savedUserId != null && savedRole != null && savedToken != null) {
           try {
@@ -583,7 +679,8 @@ class AuthRepository {
         await db.update(
           'sessions',
           {'must_change_password': 0},
-          where: 'user_id = ?' + (cleanEmail.isNotEmpty ? ' OR LOWER(user_id) = ?' : ''),
+          where:
+              'user_id = ?${cleanEmail.isNotEmpty ? ' OR LOWER(user_id) = ?' : ''}',
           whereArgs: [userId, if (cleanEmail.isNotEmpty) cleanEmail],
         );
         final prefs = await SharedPreferences.getInstance();
@@ -595,9 +692,19 @@ class AuthRepository {
     }
     if (updates.isNotEmpty) {
       try {
-        final updatedRows = await db.update('users', updates, where: 'id = ?', whereArgs: [userId]);
+        final updatedRows = await db.update(
+          'users',
+          updates,
+          where: 'id = ?',
+          whereArgs: [userId],
+        );
         if (updatedRows == 0 && cleanEmail.isNotEmpty) {
-          await db.update('users', updates, where: 'LOWER(email) = ?', whereArgs: [cleanEmail]);
+          await db.update(
+            'users',
+            updates,
+            where: 'LOWER(email) = ?',
+            whereArgs: [cleanEmail],
+          );
         }
       } catch (_) {}
       try {
@@ -608,10 +715,17 @@ class AuthRepository {
           cloudUpdates['must_change_password'] = 0;
           cloudUpdates['mustChangePassword'] = false;
         }
-        await FirestoreService().saveUser({'id': userId, if (cleanEmail.isNotEmpty) 'email': cleanEmail, ...cloudUpdates});
+        await FirestoreService().saveUser({
+          'id': userId,
+          if (cleanEmail.isNotEmpty) 'email': cleanEmail,
+          ...cloudUpdates,
+        });
         if (cleanEmail.isNotEmpty && cleanEmail != userId.toLowerCase()) {
           try {
-            await FirestoreService().saveUser({'id': cleanEmail, ...cloudUpdates});
+            await FirestoreService().saveUser({
+              'id': cleanEmail,
+              ...cloudUpdates,
+            });
           } catch (_) {}
         }
       } catch (_) {}
@@ -619,13 +733,16 @@ class AuthRepository {
 
     if (ApiClient.isCloudAvailable) {
       try {
-        await _dio.put('/v1/api/users/$userId', data: {
-          'fullName': ?fullName,
-          'username': ?username,
-          'email': ?email,
-          'profileImage': ?profileImage,
-          'password': ?password,
-        });
+        await _dio.put(
+          '/v1/api/users/$userId',
+          data: {
+            'fullName': ?fullName,
+            'username': ?username,
+            'email': ?email,
+            'profileImage': ?profileImage,
+            'password': ?password,
+          },
+        );
       } on DioException {
         // Fall through; local SQLite is already updated
       }
@@ -663,7 +780,9 @@ class AuthRepository {
     }
 
     // Locate the user
-    Map<String, dynamic>? user = await FirestoreService().findUserByIdentifier(cleanIdentifier);
+    Map<String, dynamic>? user = await FirestoreService().findUserByIdentifier(
+      cleanIdentifier,
+    );
     String? resolvedUserId = user?['id']?.toString();
 
     final db = await DatabaseHelper().database;
@@ -702,8 +821,12 @@ class AuthRepository {
         where: 'id = ?',
         whereArgs: [resolvedUserId],
       );
-      await db.update('sessions', {'must_change_password': 0},
-          where: 'user_id = ?', whereArgs: [resolvedUserId]);
+      await db.update(
+        'sessions',
+        {'must_change_password': 0},
+        where: 'user_id = ?',
+        whereArgs: [resolvedUserId],
+      );
       final prefs = await SharedPreferences.getInstance();
       await prefs.remove('must_change_password_$resolvedUserId');
     } catch (e) {
@@ -741,11 +864,15 @@ class AuthRepository {
       resetTicket: resetTicket,
     );
     if (!isValidTicket) {
-      throw Exception('Verification session expired or invalid. Please verify your code again.');
+      throw Exception(
+        'Verification session expired or invalid. Please verify your code again.',
+      );
     }
 
     // Locate the user
-    Map<String, dynamic>? user = await FirestoreService().findUserByIdentifier(cleanIdentifier);
+    Map<String, dynamic>? user = await FirestoreService().findUserByIdentifier(
+      cleanIdentifier,
+    );
     String? resolvedUserId = user?['id']?.toString();
 
     final db = await DatabaseHelper().database;
@@ -784,8 +911,12 @@ class AuthRepository {
         where: 'id = ?',
         whereArgs: [resolvedUserId],
       );
-      await db.update('sessions', {'must_change_password': 0},
-          where: 'user_id = ?', whereArgs: [resolvedUserId]);
+      await db.update(
+        'sessions',
+        {'must_change_password': 0},
+        where: 'user_id = ?',
+        whereArgs: [resolvedUserId],
+      );
       final prefs = await SharedPreferences.getInstance();
       await prefs.remove('must_change_password_$resolvedUserId');
     } catch (e) {
@@ -844,7 +975,9 @@ class AuthRepository {
   }) async {
     final db = await DatabaseHelper().database;
     try {
-      await db.execute('ALTER TABLE sessions ADD COLUMN must_change_password INTEGER DEFAULT 0');
+      await db.execute(
+        'ALTER TABLE sessions ADD COLUMN must_change_password INTEGER DEFAULT 0',
+      );
     } catch (_) {}
     await db.delete('sessions');
     await db.insert('sessions', {
@@ -869,7 +1002,10 @@ class AuthRepository {
       await prefs.setString('auth_session_user_id', userId);
       await prefs.setString('auth_session_role', role);
       await prefs.setString('auth_session_token', token);
-      await prefs.setBool('auth_session_must_change_password', mustChangePassword);
+      await prefs.setBool(
+        'auth_session_must_change_password',
+        mustChangePassword,
+      );
     } catch (_) {}
   }
 
@@ -879,17 +1015,24 @@ class AuthRepository {
     String userId,
     Database db,
   ) async {
-    final cloudPhoto = (cloudUser['profileImage'] ?? cloudUser['profile_image']) as String?;
+    final cloudPhoto =
+        (cloudUser['profileImage'] ?? cloudUser['profile_image']) as String?;
     if (cloudPhoto != null && cloudPhoto.trim().isNotEmpty) {
       if (user != null) {
         user['profile_image'] = cloudPhoto;
         user['profileImage'] = cloudPhoto;
       }
       try {
-        await db.update('users', {'profile_image': cloudPhoto}, where: 'id = ?', whereArgs: [userId]);
+        await db.update(
+          'users',
+          {'profile_image': cloudPhoto},
+          where: 'id = ?',
+          whereArgs: [userId],
+        );
       } catch (_) {}
     }
-    final hasCloudMust = cloudUser.containsKey('must_change_password') ||
+    final hasCloudMust =
+        cloudUser.containsKey('must_change_password') ||
         cloudUser.containsKey('mustChangePassword');
     if (hasCloudMust) {
       final cm = cloudUser['must_change_password'];
@@ -898,18 +1041,21 @@ class AuthRepository {
       if (user != null) {
         user['must_change_password'] = cloudMust ? 1 : 0;
       }
-      final cleanEmail = (cloudUser['email']?.toString() ?? '').toLowerCase().trim();
+      final cleanEmail = (cloudUser['email']?.toString() ?? '')
+          .toLowerCase()
+          .trim();
       try {
         await db.update(
           'users',
           {'must_change_password': cloudMust ? 1 : 0},
-          where: 'id = ?' + (cleanEmail.isNotEmpty ? ' OR LOWER(email) = ?' : ''),
+          where: 'id = ?${cleanEmail.isNotEmpty ? ' OR LOWER(email) = ?' : ''}',
           whereArgs: [userId, if (cleanEmail.isNotEmpty) cleanEmail],
         );
         await db.update(
           'sessions',
           {'must_change_password': cloudMust ? 1 : 0},
-          where: 'user_id = ?' + (cleanEmail.isNotEmpty ? ' OR LOWER(user_id) = ?' : ''),
+          where:
+              'user_id = ?${cleanEmail.isNotEmpty ? ' OR LOWER(user_id) = ?' : ''}',
           whereArgs: [userId, if (cleanEmail.isNotEmpty) cleanEmail],
         );
         final prefs = await SharedPreferences.getInstance();
@@ -928,7 +1074,9 @@ class AuthRepository {
   String _localToken(String userId) {
     final rand = Random.secure();
     final bytes = List<int>.generate(32, (_) => rand.nextInt(256));
-    final tokenHex = bytes.map((b) => b.toRadixString(16).padLeft(2, '0')).join();
+    final tokenHex = bytes
+        .map((b) => b.toRadixString(16).padLeft(2, '0'))
+        .join();
     return 'aira_sec_${userId}_$tokenHex';
   }
 }

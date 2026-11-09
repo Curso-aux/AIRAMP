@@ -73,7 +73,8 @@ class User {
   }
 
   factory User.fromJson(Map<String, dynamic> json) {
-    final mustChange = json['mustChangePassword'] == true ||
+    final mustChange =
+        json['mustChangePassword'] == true ||
         json['must_change_password'] == 1 ||
         json['must_change_password'] == true ||
         json['must_change_password'] == '1';
@@ -88,7 +89,9 @@ class User {
       section: json['section'],
       grade: json['grade'],
       schoolId: json['schoolId'] ?? json['school_id'] ?? 'sch_main',
-      availableRoles: (json['availableRoles'] as List?)?.cast<String>() ?? const ['student', 'teacher'],
+      availableRoles:
+          (json['availableRoles'] as List?)?.cast<String>() ??
+          const ['student', 'teacher'],
       mustChangePassword: mustChange,
     );
   }
@@ -283,34 +286,50 @@ class AuthNotifier extends Notifier<User?> {
     bool persistentMustChange = false;
     try {
       final prefs = await SharedPreferences.getInstance();
-      persistentMustChange = prefs.getBool('must_change_password_${session.userId}') == true;
+      persistentMustChange =
+          prefs.getBool('must_change_password_${session.userId}') == true;
     } catch (_) {}
 
     // 2. Restore complete user profile from local database
     final db = await DatabaseHelper().database;
-    List<Map<String, dynamic>> userRows = await db.query('users', where: 'id = ?', whereArgs: [session.userId]);
+    List<Map<String, dynamic>> userRows = await db.query(
+      'users',
+      where: 'id = ?',
+      whereArgs: [session.userId],
+    );
     if (userRows.isEmpty) {
-      userRows = await db.query('users', where: 'LOWER(email) = ?', whereArgs: [session.userId.toLowerCase().trim()]);
+      userRows = await db.query(
+        'users',
+        where: 'LOWER(email) = ?',
+        whereArgs: [session.userId.toLowerCase().trim()],
+      );
     }
     if (userRows.isEmpty) {
-      userRows = await db.query('users', where: 'LOWER(username) = ?', whereArgs: [session.userId.toLowerCase().trim()]);
+      userRows = await db.query(
+        'users',
+        where: 'LOWER(username) = ?',
+        whereArgs: [session.userId.toLowerCase().trim()],
+      );
     }
 
     final localAvatar = userRows.isNotEmpty
-        ? (userRows.first['profile_image'] ?? userRows.first['profileImage']) as String?
+        ? (userRows.first['profile_image'] ?? userRows.first['profileImage'])
+              as String?
         : null;
 
-    final localMustChange = session.mustChangePassword ||
+    final localMustChange =
+        session.mustChangePassword ||
         persistentMustChange ||
         (userRows.isNotEmpty &&
             (userRows.first['must_change_password'] == 1 ||
-             userRows.first['must_change_password'] == true ||
-             userRows.first['must_change_password'] == '1'));
+                userRows.first['must_change_password'] == true ||
+                userRows.first['must_change_password'] == '1'));
 
     Map<String, dynamic>? cloudUser;
     // Always query Cloud Firestore if the local session suspects a password change,
     // ensuring password changes made on another machine (e.g. Laptop A) reflect immediately on Laptop B.
-    final needsCloudLookup = userRows.isEmpty ||
+    final needsCloudLookup =
+        userRows.isEmpty ||
         localAvatar == null ||
         localAvatar.trim().isEmpty ||
         localMustChange;
@@ -332,7 +351,8 @@ class AuthNotifier extends Notifier<User?> {
 
     bool mustChange = localMustChange;
     if (cloudUser != null) {
-      final hasCloudMust = cloudUser.containsKey('must_change_password') ||
+      final hasCloudMust =
+          cloudUser.containsKey('must_change_password') ||
           cloudUser.containsKey('mustChangePassword');
       if (hasCloudMust) {
         final cm = cloudUser['must_change_password'];
@@ -345,8 +365,12 @@ class AuthNotifier extends Notifier<User?> {
     if (mustChange) {
       try {
         if (userRows.isNotEmpty) {
-          await db.update('users', {'must_change_password': 1},
-              where: 'id = ?', whereArgs: [userRows.first['id']]);
+          await db.update(
+            'users',
+            {'must_change_password': 1},
+            where: 'id = ?',
+            whereArgs: [userRows.first['id']],
+          );
         }
         await db.update('sessions', {'must_change_password': 1});
         final prefs = await SharedPreferences.getInstance();
@@ -354,11 +378,23 @@ class AuthNotifier extends Notifier<User?> {
       } catch (_) {}
     } else {
       try {
-        final cleanEmail = (userRows.isNotEmpty ? (userRows.first['email'] as String? ?? '') : '').toLowerCase().trim();
+        final cleanEmail =
+            (userRows.isNotEmpty
+                    ? (userRows.first['email'] as String? ?? '')
+                    : '')
+                .toLowerCase()
+                .trim();
         if (userRows.isNotEmpty) {
-          await db.update('users', {'must_change_password': 0},
-              where: 'id = ?' + (cleanEmail.isNotEmpty ? ' OR LOWER(email) = ?' : ''),
-              whereArgs: [userRows.first['id'], if (cleanEmail.isNotEmpty) cleanEmail]);
+          await db.update(
+            'users',
+            {'must_change_password': 0},
+            where:
+                'id = ?${cleanEmail.isNotEmpty ? ' OR LOWER(email) = ?' : ''}',
+            whereArgs: [
+              userRows.first['id'],
+              if (cleanEmail.isNotEmpty) cleanEmail,
+            ],
+          );
         }
         await db.update('sessions', {'must_change_password': 0});
         final prefs = await SharedPreferences.getInstance();
@@ -374,12 +410,20 @@ class AuthNotifier extends Notifier<User?> {
       final actualRole = u['role'] as String? ?? session.role;
 
       var profileImage = (u['profile_image'] ?? u['profileImage']) as String?;
-      if ((profileImage == null || profileImage.trim().isEmpty) && cloudUser != null) {
-        final cloudPhoto = (cloudUser['profileImage'] ?? cloudUser['profile_image']) as String?;
+      if ((profileImage == null || profileImage.trim().isEmpty) &&
+          cloudUser != null) {
+        final cloudPhoto =
+            (cloudUser['profileImage'] ?? cloudUser['profile_image'])
+                as String?;
         if (cloudPhoto != null && cloudPhoto.trim().isNotEmpty) {
           profileImage = cloudPhoto;
           try {
-            await db.update('users', {'profile_image': cloudPhoto}, where: 'id = ?', whereArgs: [session.userId]);
+            await db.update(
+              'users',
+              {'profile_image': cloudPhoto},
+              where: 'id = ?',
+              whereArgs: [session.userId],
+            );
           } catch (_) {}
         }
       }
@@ -403,7 +447,9 @@ class AuthNotifier extends Notifier<User?> {
         role: cloudUser?['role'] as String? ?? session.role,
         fullName: cloudUser?['full_name'] as String? ?? session.userId,
         username: cloudUser?['username'] as String? ?? '',
-        profileImage: (cloudUser?['profileImage'] ?? cloudUser?['profile_image']) as String?,
+        profileImage:
+            (cloudUser?['profileImage'] ?? cloudUser?['profile_image'])
+                as String?,
         section: cloudUser?['section'] as String?,
         grade: cloudUser?['grade'] as String?,
         schoolId: cloudUser?['school_id'] as String? ?? 'sch_main',
@@ -460,20 +506,25 @@ class AuthNotifier extends Notifier<User?> {
       final cleanEmail = state!.email.toLowerCase().trim();
       final rows = await db.query(
         'users',
-        where: 'id = ?' + (cleanEmail.isNotEmpty ? ' OR LOWER(email) = ?' : ''),
+        where: 'id = ?${cleanEmail.isNotEmpty ? ' OR LOWER(email) = ?' : ''}',
         whereArgs: [state!.id, if (cleanEmail.isNotEmpty) cleanEmail],
       );
       if (rows.isNotEmpty) {
         final r = rows.first;
         final photo = (r['profile_image'] ?? r['profileImage']) as String?;
-        final mustChange = r['must_change_password'] == 1 ||
+        final mustChange =
+            r['must_change_password'] == 1 ||
             r['must_change_password'] == true ||
             r['must_change_password'] == '1';
         // If state already has mustChangePassword == false in this active session,
         // do not allow a stale SQLite row to revert it back to true.
-        final resolvedMustChange = state!.mustChangePassword ? mustChange : false;
+        final resolvedMustChange = state!.mustChangePassword
+            ? mustChange
+            : false;
         state = state!.copyWith(
-          profileImage: (photo != null && photo.isNotEmpty) ? photo : state!.profileImage,
+          profileImage: (photo != null && photo.isNotEmpty)
+              ? photo
+              : state!.profileImage,
           mustChangePassword: resolvedMustChange,
         );
         if (kIsWeb) {
@@ -502,20 +553,26 @@ class AuthNotifier extends Notifier<User?> {
         await prefs.remove('must_change_password_${state!.id}');
         if (state!.email.isNotEmpty) {
           await prefs.remove('must_change_password_${state!.email}');
-          await prefs.remove('must_change_password_${state!.email.toLowerCase().trim()}');
+          await prefs.remove(
+            'must_change_password_${state!.email.toLowerCase().trim()}',
+          );
         }
       } catch (_) {}
 
       // Persist security notification for user without circular provider dependency
-      DatabaseHelper().createNotification(
-        userId: state!.id,
-        type: 'security',
-        title: 'Security Alert 🔐',
-        message: 'Your account password was updated successfully.',
-        targetRoute: state!.role == 'teacher'
-            ? '/teacher/profile'
-            : (state!.role == 'student' ? '/student/profile' : '/admin/profile'),
-      ).catchError((_) => '');
+      DatabaseHelper()
+          .createNotification(
+            userId: state!.id,
+            type: 'security',
+            title: 'Security Alert 🔐',
+            message: 'Your account password was updated successfully.',
+            targetRoute: state!.role == 'teacher'
+                ? '/teacher/profile'
+                : (state!.role == 'student'
+                      ? '/student/profile'
+                      : '/admin/profile'),
+          )
+          .catchError((_) => '');
     }
 
     // Update local state immediately
@@ -577,10 +634,7 @@ class AuthNotifier extends Notifier<User?> {
   /// Update the current student's section and grade upon key enrollment
   void updateUserSection({required String section, required String grade}) {
     if (state == null) return;
-    state = state!.copyWith(
-      section: section,
-      grade: grade,
-    );
+    state = state!.copyWith(section: section, grade: grade);
     if (kIsWeb) {
       WebSessionHelper.saveUserProfile(_userToMap(state!));
     }
