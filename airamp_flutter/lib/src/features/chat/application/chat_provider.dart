@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../data/chat_repository.dart';
@@ -6,6 +7,7 @@ import '../domain/chat_models.dart';
 import '../../auth/application/auth_provider.dart';
 import '../../../core/api/api_client.dart';
 import '../../../core/database/database_helper.dart';
+import '../../../core/database/firestore_service.dart';
 import '../../notifications/application/notification_provider.dart';
 
 final chatRepositoryProvider = Provider<ChatRepository>((ref) {
@@ -42,6 +44,9 @@ class ChatState {
 
 class ChatNotifier extends Notifier<ChatState> {
   StreamSubscription? _subscription;
+  StreamSubscription? _activeMessageSubscription;
+  String? _currentSubscribedConversationId;
+  Timer? _periodicSyncTimer;
   bool _disposed = false;
 
   @override
@@ -50,6 +55,8 @@ class ChatNotifier extends Notifier<ChatState> {
     ref.onDispose(() {
       _disposed = true;
       _subscription?.cancel();
+      _activeMessageSubscription?.cancel();
+      _periodicSyncTimer?.cancel();
     });
 
     // Listen to auth changes: whenever user logs in or switches, reload everything!
@@ -81,39 +88,199 @@ class ChatNotifier extends Notifier<ChatState> {
       }
     });
 
+    // Lightweight cloud sync loop so incoming messages appear across devices automatically
+    _periodicSyncTimer = Timer.periodic(const Duration(seconds: 4), (_) async {
+      if (_disposed) return;
+      final curUser = ref.read(authProvider);
+      if (curUser != null) {
+        try {
+          await loadLocalConversations(force: false);
+        } catch (_) {}
+        if (_currentSubscribedConversationId != null && !_disposed) {
+          try {
+            await reloadMessages(_currentSubscribedConversationId!);
+          } catch (_) {}
+        }
+      }
+    });
+
     return ChatState();
   }
 
-  /// Reload messages for a specific conversation from DB (so student sees teacher's messages)
+  /// Reload messages for a specific conversation from DB and Cloud Firestore.
   Future<void> reloadMessages(String conversationId) async {
     try {
       if (_disposed) return;
-      final db = DatabaseHelper();
-      final rawMessages = await db.getMessages(conversationId);
+      // Sync latest cloud messages from Cloud Firestore first
+      try {
+        await FirestoreService().syncCloudMessagesForConversation(conversationId);
+      } catch (_) {}
       if (_disposed) return;
-      final messages = rawMessages.map((m) => ChatMessage(
-        id: m['id'] as String,
-        conversationId: conversationId,
-        senderId: m['sender_id'] as String,
-        text: m['text'] as String,
-        createdAt: m['created_at'] as String,
-        isRead: (m['is_read'] as int? ?? 0) == 1,
-      )).toList();
-      final messagesMap = Map<String, List<ChatMessage>>.from(state.messages);
-      messagesMap[conversationId] = messages;
 
-      final lastMsg = messages.isNotEmpty ? messages.last : null;
-      final updatedConvos = state.conversations.map((c) {
-        if (c.id == conversationId) {
-          return c.copyWith(lastMessage: lastMsg);
-        }
-        return c;
-      }).toList();
-
-      if (_disposed) return;
-      state = state.copyWith(messages: messagesMap, conversations: updatedConvos);
+      await _applyLocalMessages(conversationId);
     } catch (e) {
       debugPrint('[ChatNotifier] Error refreshing conversation messages: $e');
+    }
+  }
+
+  Future<void> _applyLocalMessages(String conversationId) async {
+    if (_disposed) return;
+    final db = DatabaseHelper();
+    final rawMessages = await db.getMessages(conversationId);
+    if (_disposed) return;
+    final messages = rawMessages.map((m) => ChatMessage(
+      id: m['id'] as String,
+      conversationId: conversationId,
+      senderId: m['sender_id'] as String,
+      text: m['text'] as String,
+      createdAt: m['created_at'] as String,
+      isRead: (m['is_read'] as int? ?? 0) == 1,
+    )).toList();
+
+    // De-duplicate by id & prune redundant welcome announcements
+    final Map<String, ChatMessage> byId = {};
+    bool hasSeenWelcome = false;
+    for (final m in messages) {
+      final isWelcome = m.text.startsWith('Welcome to the official group chat for ');
+      if (isWelcome) {
+        if (hasSeenWelcome) continue;
+        hasSeenWelcome = true;
+      }
+      byId[m.id] = m;
+    }
+
+    final deduped = byId.values.toList()..sort((a, b) => a.createdAt.compareTo(b.createdAt));
+
+    final messagesMap = Map<String, List<ChatMessage>>.from(state.messages);
+    messagesMap[conversationId] = deduped;
+
+    final lastMsg = deduped.isNotEmpty ? deduped.last : null;
+    final updatedConvos = state.conversations.map((c) {
+      if (c.id == conversationId) {
+        return c.copyWith(lastMessage: lastMsg);
+      }
+      return c;
+    }).toList();
+
+    if (_disposed) return;
+    state = state.copyWith(messages: messagesMap, conversations: updatedConvos);
+  }
+
+  /// Subscribes to real-time Cloud Firestore push updates for the active chat room.
+  void subscribeToConversation(String conversationId) {
+    final cleanConvId = conversationId.trim();
+    if (cleanConvId.isEmpty) return;
+
+    // Cancel previous room listener if switching rooms
+    if (_currentSubscribedConversationId != cleanConvId) {
+      _activeMessageSubscription?.cancel();
+      _activeMessageSubscription = null;
+      _currentSubscribedConversationId = cleanConvId;
+    } else if (_activeMessageSubscription != null) {
+      // Already subscribed to same conversation — just reload history
+      reloadMessages(cleanConvId);
+      return;
+    }
+
+    // Fetch cloud history immediately
+    reloadMessages(cleanConvId);
+
+    // Attach real-time Firestore snapshot listener
+    _activeMessageSubscription = FirestoreService()
+        .streamConversationMessages(cleanConvId)
+        .listen(
+      (rawMessages) async {
+        if (_disposed) return;
+        if (rawMessages.isEmpty) return;
+
+        final db = DatabaseHelper();
+        final currentUser = ref.read(authProvider);
+        final myId = currentUser?.id;
+
+        final List<ChatMessage> chatMsgs = [];
+        for (final m in rawMessages) {
+          final id = m['id']?.toString() ?? '';
+          final text = m['text']?.toString() ?? '';
+          final senderId = m['sender_id']?.toString() ?? '';
+          final createdAt = m['created_at']?.toString() ?? DateTime.now().toIso8601String();
+          final isRead = (m['is_read'] == true || m['is_read'] == 1);
+
+          if (id.isEmpty || text.isEmpty) continue;
+
+          chatMsgs.add(ChatMessage(
+            id: id,
+            conversationId: cleanConvId,
+            senderId: senderId,
+            text: text,
+            createdAt: createdAt,
+            isRead: isRead,
+          ));
+
+          // Save to local SQLite (non-blocking)
+          db.saveMessage({
+            'id': id,
+            'conversation_id': cleanConvId,
+            'sender_id': senderId,
+            'text': text,
+            'created_at': createdAt,
+            'is_read': (isRead || senderId == myId) ? 1 : 0,
+          }).catchError((_) {});
+        }
+
+        if (chatMsgs.isEmpty) return;
+
+        // MERGE with existing messages in state rather than wiping them out!
+        final existing = state.messages[cleanConvId] ?? [];
+        final Map<String, ChatMessage> byId = {};
+        for (final m in existing) {
+          byId[m.id] = m;
+        }
+
+        bool hasSeenWelcome = false;
+        for (final m in chatMsgs) {
+          final isWelcome = m.text.startsWith('Welcome to the official group chat for ');
+          if (isWelcome) {
+            if (hasSeenWelcome) continue;
+            hasSeenWelcome = true;
+          }
+          byId[m.id] = m;
+        }
+
+        final merged = byId.values.toList()..sort((a, b) => a.createdAt.compareTo(b.createdAt));
+
+        final messagesMap = Map<String, List<ChatMessage>>.from(state.messages);
+        messagesMap[cleanConvId] = merged;
+
+        final lastMsg = merged.isNotEmpty ? merged.last : null;
+        final updatedConvos = state.conversations.map((c) {
+          if (c.id == cleanConvId) return c.copyWith(lastMessage: lastMsg);
+          return c;
+        }).toList();
+
+        if (_disposed) return;
+        state = state.copyWith(
+          messages: messagesMap,
+          conversations: updatedConvos,
+          isConnected: true,
+        );
+
+        // Notify for incoming messages from others
+        final incoming = chatMsgs.where((m) => m.senderId != myId).toList();
+        if (incoming.isNotEmpty) {
+          _notifyIncomingMessage(incoming.last);
+        }
+      },
+      onError: (err) {
+        debugPrint('[ChatNotifier] Realtime stream error for $cleanConvId: $err');
+      },
+    );
+  }
+
+  void unsubscribeFromConversation([String? conversationId]) {
+    if (conversationId == null || _currentSubscribedConversationId == conversationId) {
+      _activeMessageSubscription?.cancel();
+      _activeMessageSubscription = null;
+      _currentSubscribedConversationId = null;
     }
   }
 
@@ -162,9 +329,16 @@ class ChatNotifier extends Notifier<ChatState> {
   }
 
   /// Load conversations and messages from local SQLite database.
-  Future<void> loadLocalConversations() async {
+  Future<void> loadLocalConversations({bool force = true}) async {
     try {
       if (_disposed) return;
+      // Sync cloud conversations and messages to local SQLite
+      try {
+        await FirestoreService().syncCloudConversationsToLocal(force: force);
+        await FirestoreService().syncCloudMessagesToLocal(force: force);
+        await FirestoreService().syncLocalMessagesToCloud();
+      } catch (_) {}
+
       final db = DatabaseHelper();
       await db.normalizeDirectConversations();
       if (_disposed) return;
@@ -227,10 +401,81 @@ class ChatNotifier extends Notifier<ChatState> {
           isRead: (m['is_read'] as int? ?? 0) == 1,
         )).toList();
 
-        loadedMessages[convId] = messages;
+        final Map<String, ChatMessage> byId = {};
+        bool hasSeenWelcome = false;
+        for (final m in messages) {
+          final isWelcome = m.text.startsWith('Welcome to the official group chat for ');
+          if (isWelcome) {
+            if (hasSeenWelcome) continue;
+            hasSeenWelcome = true;
+          }
+          byId[m.id] = m;
+        }
+        final deduped = byId.values.toList()..sort((a, b) => a.createdAt.compareTo(b.createdAt));
 
-        final lastMsg = messages.isNotEmpty ? messages.last : null;
+        loadedMessages[convId] = deduped;
+
+        final lastMsg = deduped.isNotEmpty ? deduped.last : null;
         final isArchived = (row['is_archived'] as int? ?? 0) == 1;
+
+        // Parse section-specific fields
+        final secKey = row['section_key']?.toString().trim().toUpperCase();
+        final secId = row['section_id'] is int ? row['section_id'] as int : int.tryParse(row['section_id']?.toString() ?? '');
+        final roomAdminId = row['room_admin_id']?.toString();
+        final roomAdminName = row['room_admin_name']?.toString();
+
+        List<String> participantIds = [];
+        final rawParticipantIds = row['participant_ids'];
+        if (rawParticipantIds is String && rawParticipantIds.isNotEmpty) {
+          try {
+            final decoded = jsonDecode(rawParticipantIds);
+            if (decoded is List) {
+              participantIds = decoded.map((e) => e.toString().trim()).where((e) => e.isNotEmpty).toList();
+            }
+          } catch (_) {
+            participantIds = rawParticipantIds.split(',').map((e) => e.trim()).where((e) => e.isNotEmpty).toList();
+          }
+        }
+
+        // Strict section access control:
+        // Only students enrolled in that section can view/join that section's group chat
+        if (!isDirect && secKey != null && secKey.isNotEmpty) {
+          if (currentUser.role == 'student') {
+            final mySec = currentUser.section?.trim().toUpperCase() ?? '';
+            final isMember = participantIds.contains(myId);
+            final keyMatches = mySec.isNotEmpty && (mySec == secKey || mySec.contains(secKey));
+            final nameMatches = mySec.isNotEmpty &&
+                row['name']?.toString().toUpperCase().contains(mySec) == true;
+
+            if (!isMember && !keyMatches && !nameMatches) {
+              // Student does NOT belong to this section; hide this group chat
+              continue;
+            }
+          } else if (currentUser.role == 'teacher') {
+            final isRoomAdmin = roomAdminId == myId;
+            final isMember = participantIds.contains(myId);
+            // Allow if teacher is room admin or explicitly a participant
+            if (!isRoomAdmin && !isMember) {
+              // Check if teacher teaches any subjects in this section
+              final mySubjects = await db.getSubjectsForTeacher(myId);
+              final mySubCodes = mySubjects.map((s) => s['subject_code']?.toString().toUpperCase() ?? '').toSet();
+              final sqliteDb = await db.database;
+              final secRow = (await sqliteDb.query('sections', where: 'UPPER(enrollment_key) = ?', whereArgs: [secKey])).firstOrNull;
+              bool teachesInSection = false;
+              if (secRow != null && secRow['subject_ids'] != null) {
+                try {
+                  final decoded = jsonDecode(secRow['subject_ids'].toString());
+                  if (decoded is List) {
+                    teachesInSection = decoded.any((c) => mySubCodes.contains(c.toString().toUpperCase()));
+                  }
+                } catch (_) {}
+              }
+              if (!teachesInSection) {
+                continue;
+              }
+            }
+          }
+        }
 
         // Display name: for direct chats, always show the OTHER participant's name!
         String displayName;
@@ -250,6 +495,11 @@ class ChatNotifier extends Notifier<ChatState> {
           lastMessage: lastMsg,
           unreadCount: unreadCount,
           isArchived: isArchived,
+          sectionKey: secKey,
+          sectionId: secId,
+          roomAdminId: roomAdminId,
+          roomAdminName: roomAdminName,
+          participantIds: participantIds,
         ));
       }
 
@@ -265,8 +515,13 @@ class ChatNotifier extends Notifier<ChatState> {
 
   void _connectAndLoad(String userId) {
     if (_disposed) return;
+    if (FirestoreService().isAvailable) {
+      state = state.copyWith(isConnected: true);
+    }
     if (!ApiClient.isCloudAvailable) {
-      state = state.copyWith(isConnected: false);
+      if (!FirestoreService().isAvailable) {
+        state = state.copyWith(isConnected: false);
+      }
       return;
     }
     final repo = ref.read(chatRepositoryProvider);
@@ -276,10 +531,14 @@ class ChatNotifier extends Notifier<ChatState> {
     _subscription = stream.listen(
       _handleWebSocketEvent,
       onError: (_) {
-        state = state.copyWith(isConnected: false);
+        if (!FirestoreService().isAvailable) {
+          state = state.copyWith(isConnected: false);
+        }
       },
       onDone: () {
-        state = state.copyWith(isConnected: false);
+        if (!FirestoreService().isAvailable) {
+          state = state.copyWith(isConnected: false);
+        }
       },
     );
     state = state.copyWith(isConnected: true);
@@ -358,7 +617,35 @@ class ChatNotifier extends Notifier<ChatState> {
       isRead: false,
     );
     
-    // Save locally: is_read is 0 so recipient sees it as unread message
+    // 1. Optimistic UI update immediately
+    final messagesMap = Map<String, List<ChatMessage>>.from(state.messages);
+    final list = messagesMap[conversationId] ?? [];
+    // De-duplicate guard: don't add if same id already present
+    if (!list.any((m) => m.id == msgId)) {
+      messagesMap[conversationId] = [...list, newMsg];
+    }
+    
+    final hasConvo = state.conversations.any((c) => c.id == conversationId);
+    List<ChatConversation> updatedConvos;
+    if (hasConvo) {
+      updatedConvos = state.conversations.map((c) {
+        if (c.id == conversationId) return c.copyWith(lastMessage: newMsg);
+        return c;
+      }).toList();
+    } else {
+      final newConvo = ChatConversation(
+        id: conversationId,
+        type: conversationId.startsWith('dm_') ? 'direct' : 'group',
+        name: 'Chat',
+        participants: const [],
+        lastMessage: newMsg,
+        unreadCount: 0,
+      );
+      updatedConvos = [newConvo, ...state.conversations];
+    }
+    state = state.copyWith(messages: messagesMap, conversations: updatedConvos);
+
+    // 2. Save locally (non-blocking)
     DatabaseHelper().saveMessage({
       'id': msgId,
       'conversation_id': conversationId,
@@ -368,7 +655,7 @@ class ChatNotifier extends Notifier<ChatState> {
       'is_read': 0,
     }).catchError((_) {});
 
-    // For direct conversations, create a notification for recipient in local DB
+    // 3. For direct conversations, notify recipient in local DB
     if (conversationId.startsWith('dm_')) {
       final parts = conversationId.replaceFirst('dm_', '').split('_');
       final recipientId = parts.firstWhere((id) => id != user.id, orElse: () => '');
@@ -386,36 +673,30 @@ class ChatNotifier extends Notifier<ChatState> {
       }
     }
 
-    final messagesMap = Map<String, List<ChatMessage>>.from(state.messages);
-    final list = messagesMap[conversationId] ?? [];
-    messagesMap[conversationId] = [...list, newMsg];
-    
-    // Update conversation lastMessage in list
-    final hasConvo = state.conversations.any((c) => c.id == conversationId);
-    List<ChatConversation> updatedConvos;
-    if (hasConvo) {
-      updatedConvos = state.conversations.map((c) {
-        if (c.id == conversationId) {
-          return c.copyWith(lastMessage: newMsg);
-        }
-        return c;
-      }).toList();
-    } else {
-      final newConvo = ChatConversation(
-        id: conversationId,
-        type: conversationId.startsWith('dm_') ? 'direct' : 'group',
-        name: 'Chat',
-        participants: const [],
-        lastMessage: newMsg,
-        unreadCount: 0,
-      );
-      updatedConvos = [newConvo, ...state.conversations];
-    }
+    // 4. Push to Cloud Firestore with guaranteed subcollection storage
+    FirestoreService().saveChatMessage(
+      conversationId: conversationId,
+      messageId: msgId,
+      data: {
+        'id': msgId,
+        'conversation_id': conversationId,
+        'sender_id': user.id,
+        'sender_name': user.fullName,
+        'sender_role': user.role,
+        'text': text.trim(),
+        'created_at': now,
+        'is_read': false,
+      },
+    ).then((_) {
+      debugPrint('[ChatNotifier] Message $msgId delivered to Cloud Firestore');
+    }).catchError((e) {
+      debugPrint('[ChatNotifier] Firestore push failed: $e');
+    });
 
-    state = state.copyWith(messages: messagesMap, conversations: updatedConvos);
-    
-    // Send over socket if available
-    ref.read(chatRepositoryProvider).sendMessage(conversationId, text.trim());
+    // 5. Send over WebSocket if available (optional fallback)
+    try {
+      ref.read(chatRepositoryProvider).sendMessage(conversationId, text.trim());
+    } catch (_) {}
   }
 
   /// Creates or retrieves a dedicated subject group chat conversation.

@@ -161,12 +161,16 @@ class SubjectsNotifier extends Notifier<List<Map<String, dynamic>>> {
         ''');
         final Map<String, Map<String, dynamic>> deduped = {};
         for (final s in fresh) {
-          final code = (s['subject_code']?.toString() ?? s['name']?.toString() ?? '').trim().toUpperCase();
+          final code =
+              (s['subject_code']?.toString() ?? s['name']?.toString() ?? '')
+                  .trim()
+                  .toUpperCase();
           if (code.isEmpty) continue;
           if (!deduped.containsKey(code)) {
             deduped[code] = s;
           } else {
-            final curCount = (deduped[code]!['enrolled_count'] as num?)?.toInt() ?? 0;
+            final curCount =
+                (deduped[code]!['enrolled_count'] as num?)?.toInt() ?? 0;
             final newCount = (s['enrolled_count'] as num?)?.toInt() ?? 0;
             if (newCount > curCount) {
               deduped[code] = s;
@@ -192,7 +196,9 @@ class SubjectsNotifier extends Notifier<List<Map<String, dynamic>>> {
     final existingLocal = await db.query('subjects');
 
     // 1. Instant cache restore + sync from cloud (with REST fallback)
-    await FirestoreService().syncCloudSubjectsToLocal(force: kIsWeb || existingLocal.isEmpty);
+    await FirestoreService().syncCloudSubjectsToLocal(
+      force: kIsWeb || existingLocal.isEmpty,
+    );
     if (kIsWeb) {
       try {
         await FirestoreService().syncCloudSectionsToLocal(force: true);
@@ -228,12 +234,16 @@ class SubjectsNotifier extends Notifier<List<Map<String, dynamic>>> {
     ''');
     final Map<String, Map<String, dynamic>> deduped = {};
     for (final s in maps) {
-      final code = (s['subject_code']?.toString() ?? s['name']?.toString() ?? '').trim().toUpperCase();
+      final code =
+          (s['subject_code']?.toString() ?? s['name']?.toString() ?? '')
+              .trim()
+              .toUpperCase();
       if (code.isEmpty) continue;
       if (!deduped.containsKey(code)) {
         deduped[code] = s;
       } else {
-        final curCount = (deduped[code]!['enrolled_count'] as num?)?.toInt() ?? 0;
+        final curCount =
+            (deduped[code]!['enrolled_count'] as num?)?.toInt() ?? 0;
         final newCount = (s['enrolled_count'] as num?)?.toInt() ?? 0;
         if (newCount > curCount) {
           deduped[code] = s;
@@ -243,7 +253,10 @@ class SubjectsNotifier extends Notifier<List<Map<String, dynamic>>> {
     final finalSubjects = deduped.values.toList();
     if (prefs != null) {
       try {
-        await prefs.setString('local_cached_subjects_v1', jsonEncode(finalSubjects));
+        await prefs.setString(
+          'local_cached_subjects_v1',
+          jsonEncode(finalSubjects),
+        );
       } catch (_) {}
     }
 
@@ -455,7 +468,10 @@ class SubjectsNotifier extends Notifier<List<Map<String, dynamic>>> {
     } catch (_) {}
 
     // Save tombstone in SharedPreferences so it NEVER resurrects!
-    List<Map<String, dynamic>> currentMaps = await db.query('subjects', orderBy: 'id DESC');
+    List<Map<String, dynamic>> currentMaps = await db.query(
+      'subjects',
+      orderBy: 'id DESC',
+    );
     try {
       final prefs = await SharedPreferences.getInstance();
       final deleted = prefs.getStringList('permanently_deleted_subjects') ?? [];
@@ -555,7 +571,9 @@ class SectionsNotifier extends Notifier<List<Map<String, dynamic>>> {
     final existingLocal = await db.query('sections');
 
     // 1. Instant cache restore + sync from cloud (with REST fallback)
-    await FirestoreService().syncCloudSectionsToLocal(force: kIsWeb || existingLocal.isEmpty);
+    await FirestoreService().syncCloudSectionsToLocal(
+      force: kIsWeb || existingLocal.isEmpty,
+    );
 
     SharedPreferences? prefs;
     try {
@@ -577,6 +595,12 @@ class SectionsNotifier extends Notifier<List<Map<String, dynamic>>> {
         whereArgs: [del.toUpperCase(), del.toUpperCase()],
       );
     }
+
+    // 3. Ensure all sections have their automated group chats provisioned
+    try {
+      await DatabaseHelper().ensureAllSectionChatsExist();
+    } catch (_) {}
+
     final List<Map<String, dynamic>> maps = await db.query(
       'sections',
       orderBy: 'id DESC',
@@ -655,6 +679,58 @@ class SectionsNotifier extends Notifier<List<Map<String, dynamic>>> {
 
     // Auto-enroll any students in this section into its assigned subjects
     await DatabaseHelper().autoEnrollAllStudentsInSection(sectionName);
+
+    // Resolve designated teacher for room administrator
+    String designatedTeacherId = mutableSection['teacher_id']?.toString() ?? '';
+    String designatedTeacherName =
+        mutableSection['teacher_name']?.toString() ?? '';
+
+    if (designatedTeacherId.isEmpty) {
+      if (subjectCodes.isNotEmpty) {
+        final subRow = await db.query(
+          'subjects',
+          where: 'UPPER(subject_code) = ?',
+          whereArgs: [subjectCodes.first.toUpperCase()],
+        );
+        if (subRow.isNotEmpty) {
+          designatedTeacherId = subRow.first['teacher_id']?.toString() ?? '';
+          designatedTeacherName =
+              subRow.first['teacher_name']?.toString() ?? '';
+        }
+      }
+    }
+
+    if (designatedTeacherId.isEmpty) {
+      final teacherRows = await db.query(
+        'users',
+        where: "role = 'teacher' OR role = 'admin'",
+      );
+      if (teacherRows.isNotEmpty) {
+        designatedTeacherId = teacherRows.first['id']?.toString() ?? '';
+        designatedTeacherName =
+            teacherRows.first['full_name']?.toString() ??
+            teacherRows.first['name']?.toString() ??
+            'Teacher';
+      }
+    }
+
+    // Automatically initialize section group chat channel with designated teacher as Room Admin
+    if (designatedTeacherId.isNotEmpty) {
+      try {
+        await DatabaseHelper().createSectionGroupChat(
+          sectionId: id,
+          sectionName: sectionName,
+          sectionKey: resolvedKey,
+          teacherId: designatedTeacherId,
+          teacherName: designatedTeacherName,
+          grade: gradeLevel,
+          room: mutableSection['room']?.toString(),
+          isInitialCreation: true,
+        );
+      } catch (e) {
+        debugPrint('[SectionsNotifier] Error auto-creating group chat: $e');
+      }
+    }
 
     final currentMaps = await db.query('sections', orderBy: 'id DESC');
 
@@ -749,7 +825,12 @@ class SectionsNotifier extends Notifier<List<Map<String, dynamic>>> {
       }
     }
 
-    await db.update('sections', mutableSection, where: 'id = ?', whereArgs: [id]);
+    await db.update(
+      'sections',
+      mutableSection,
+      where: 'id = ?',
+      whereArgs: [id],
+    );
 
     final updatedSec = (await db.query(
       'sections',
@@ -767,7 +848,10 @@ class SectionsNotifier extends Notifier<List<Map<String, dynamic>>> {
       await DatabaseHelper().autoEnrollAllStudentsInSection(secName);
     }
 
-    List<Map<String, dynamic>> currentMaps = await db.query('sections', orderBy: 'id DESC');
+    List<Map<String, dynamic>> currentMaps = await db.query(
+      'sections',
+      orderBy: 'id DESC',
+    );
     try {
       final prefs = await SharedPreferences.getInstance();
       await prefs.setString(
@@ -796,7 +880,11 @@ class SectionsNotifier extends Notifier<List<Map<String, dynamic>>> {
               finalSubjectCodes = dec.map((e) => e.toString()).toList();
             }
           } catch (_) {
-            finalSubjectCodes = sStr.split(',').map((e) => e.trim()).where((e) => e.isNotEmpty).toList();
+            finalSubjectCodes = sStr
+                .split(',')
+                .map((e) => e.trim())
+                .where((e) => e.isNotEmpty)
+                .toList();
           }
         }
 
@@ -848,18 +936,28 @@ class SectionsNotifier extends Notifier<List<Map<String, dynamic>>> {
   }
 
   /// Assign subjects to a specific section and auto-enroll enrolled students
-  Future<void> assignSubjectsToSection(int id, List<String> subjectCodes) async {
+  Future<void> assignSubjectsToSection(
+    int id,
+    List<String> subjectCodes,
+  ) async {
     final db = await DatabaseHelper().database;
     final jsonStr = jsonEncode(subjectCodes);
-    await db.update('sections', {'subject_ids': jsonStr}, where: 'id = ?', whereArgs: [id]);
+    await db.update(
+      'sections',
+      {'subject_ids': jsonStr},
+      where: 'id = ?',
+      whereArgs: [id],
+    );
 
     final updatedSec = (await db.query(
       'sections',
       where: 'id = ?',
       whereArgs: [id],
     )).firstOrNull;
-    final resolvedKey =
-        updatedSec?['enrollment_key']?.toString().trim().toUpperCase();
+    final resolvedKey = updatedSec?['enrollment_key']
+        ?.toString()
+        .trim()
+        .toUpperCase();
     final secName = updatedSec?['name']?.toString();
 
     if (resolvedKey != null && resolvedKey.isNotEmpty) {
@@ -916,7 +1014,10 @@ class SectionsNotifier extends Notifier<List<Map<String, dynamic>>> {
       }
     } catch (_) {}
 
-    List<Map<String, dynamic>> currentMaps = await db.query('sections', orderBy: 'id DESC');
+    List<Map<String, dynamic>> currentMaps = await db.query(
+      'sections',
+      orderBy: 'id DESC',
+    );
     try {
       final prefs = await SharedPreferences.getInstance();
       await prefs.remove('last_cloud_fetch_keys');
@@ -1333,7 +1434,9 @@ class AdminAnalyticsNotifier extends Notifier<Map<String, dynamic>> {
         final usersCount = summary['totalUsers'] as int? ?? 0;
         final studentsCount = summary['totalStudents'] as int? ?? 0;
         final teachersCount = summary['totalTeachers'] as int? ?? 0;
-        if (usersCount <= 1 || (studentsCount == 0 && teachersCount == 0) || kIsWeb) {
+        if (usersCount <= 1 ||
+            (studentsCount == 0 && teachersCount == 0) ||
+            kIsWeb) {
           await FirestoreService().syncCloudUsersToLocal(force: true);
           await FirestoreService().syncCloudSubjectsToLocal(force: true);
           await FirestoreService().syncCloudSectionsToLocal(force: true);

@@ -750,12 +750,19 @@ class _ChatListScreenState extends ConsumerState<ChatListScreen> {
                                   margin: const EdgeInsets.only(left: 6),
                                   padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
                                   decoration: BoxDecoration(
-                                    color: AppTheme.primarySoft,
+                                    color: convo.sectionKey != null
+                                        ? AppTheme.primary.withValues(alpha: 0.15)
+                                        : AppTheme.primarySoft,
                                     borderRadius: BorderRadius.circular(5),
-                                    border: Border.all(color: AppTheme.primary.withValues(alpha: 0.3), width: 0.8),
+                                    border: Border.all(
+                                      color: AppTheme.primary.withValues(alpha: 0.4),
+                                      width: 0.8,
+                                    ),
                                   ),
                                   child: Text(
-                                    'Group',
+                                    convo.sectionKey != null
+                                        ? 'Section · ${convo.sectionKey}'
+                                        : 'Group',
                                     style: TextStyle(
                                       color: AppTheme.primary,
                                       fontSize: 10,

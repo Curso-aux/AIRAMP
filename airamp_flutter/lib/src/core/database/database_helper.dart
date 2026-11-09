@@ -240,6 +240,21 @@ class DatabaseHelper {
       );
     } catch (_) {}
     try {
+      await db.execute('ALTER TABLE conversations ADD COLUMN section_key TEXT');
+    } catch (_) {}
+    try {
+      await db.execute('ALTER TABLE conversations ADD COLUMN section_id INTEGER');
+    } catch (_) {}
+    try {
+      await db.execute('ALTER TABLE conversations ADD COLUMN room_admin_id TEXT');
+    } catch (_) {}
+    try {
+      await db.execute('ALTER TABLE conversations ADD COLUMN room_admin_name TEXT');
+    } catch (_) {}
+    try {
+      await db.execute('ALTER TABLE conversations ADD COLUMN participant_ids TEXT');
+    } catch (_) {}
+    try {
       await db.execute('''
         CREATE TABLE IF NOT EXISTS schools (
           id TEXT PRIMARY KEY,
@@ -474,7 +489,7 @@ class DatabaseHelper {
         } catch (_) {}
         return await openDatabase(
           inMemoryDatabasePath,
-          version: 21,
+          version: 22,
           onCreate: _onCreate,
           onUpgrade: _onUpgrade,
           onOpen: _onDatabaseOpen,
@@ -489,7 +504,7 @@ class DatabaseHelper {
         } catch (_) {}
         return await openDatabase(
           inMemoryDatabasePath,
-          version: 21,
+          version: 22,
           onCreate: _onCreate,
           onUpgrade: _onUpgrade,
           onOpen: _onDatabaseOpen,
@@ -502,7 +517,7 @@ class DatabaseHelper {
 
     return await openDatabase(
       path,
-      version: 21,
+      version: 22,
       onCreate: _onCreate,
       onUpgrade: _onUpgrade,
       onOpen: _onDatabaseOpen,
@@ -704,6 +719,12 @@ class DatabaseHelper {
         name TEXT,
         subject_id INTEGER,
         is_archived INTEGER DEFAULT 0,
+        section_key TEXT,
+        section_id INTEGER,
+        room_admin_id TEXT,
+        room_admin_name TEXT,
+        participant_ids TEXT,
+        school_id TEXT DEFAULT 'sch_main',
         created_at TEXT NOT NULL
       )
     ''');
@@ -1408,6 +1429,24 @@ class DatabaseHelper {
         } catch (_) {}
       }
     }
+
+    if (oldVersion < 22) {
+      try {
+        await db.execute('ALTER TABLE conversations ADD COLUMN section_key TEXT');
+      } catch (_) {}
+      try {
+        await db.execute('ALTER TABLE conversations ADD COLUMN section_id INTEGER');
+      } catch (_) {}
+      try {
+        await db.execute('ALTER TABLE conversations ADD COLUMN room_admin_id TEXT');
+      } catch (_) {}
+      try {
+        await db.execute('ALTER TABLE conversations ADD COLUMN room_admin_name TEXT');
+      } catch (_) {}
+      try {
+        await db.execute('ALTER TABLE conversations ADD COLUMN participant_ids TEXT');
+      } catch (_) {}
+    }
   }
 
   Future<String?> getSetting(String key) async {
@@ -1448,6 +1487,326 @@ class DatabaseHelper {
       whereArgs: [subjectId],
     );
     return res.isNotEmpty ? res.first : null;
+  }
+
+  Future<Map<String, dynamic>?> getConversationBySectionKey(String sectionKey) async {
+    final cleanKey = sectionKey.trim().toUpperCase();
+    if (cleanKey.isEmpty) return null;
+    final db = await database;
+    final res = await db.query(
+      'conversations',
+      where: 'UPPER(section_key) = ? OR id = ?',
+      whereArgs: [cleanKey, 'sec_chat_$cleanKey'],
+    );
+    return res.isNotEmpty ? res.first : null;
+  }
+
+  /// Automatically creates a dedicated section group chat channel upon section creation,
+  /// assigns the designated teacher as room administrator, and posts an initial welcome announcement.
+  Future<Map<String, dynamic>> createSectionGroupChat({
+    required int sectionId,
+    required String sectionName,
+    required String sectionKey,
+    required String teacherId,
+    required String teacherName,
+    String? grade,
+    String? room,
+    bool isInitialCreation = false,
+  }) async {
+    final db = await database;
+    final cleanKey = sectionKey.trim().toUpperCase();
+    final convId = 'sec_chat_$cleanKey';
+    final now = DateTime.now().toIso8601String();
+    final displayName = '$sectionName Official Group';
+
+    final initialParticipants = [teacherId.trim()];
+    final participantIdsJson = jsonEncode(initialParticipants);
+
+    final convoData = {
+      'id': convId,
+      'type': 'group',
+      'name': displayName,
+      'section_id': sectionId,
+      'section_key': cleanKey,
+      'room_admin_id': teacherId.trim(),
+      'room_admin_name': teacherName.trim(),
+      'participant_ids': participantIdsJson,
+      'school_id': 'sch_main',
+      'is_archived': 0,
+      'created_at': now,
+    };
+
+    // 1. Save or update conversation in local SQLite
+    await db.insert(
+      'conversations',
+      convoData,
+      conflictAlgorithm: ConflictAlgorithm.replace,
+    );
+
+    // 2. ONLY post welcome message on explicit INITIAL creation by Admin if no messages exist yet
+    if (isInitialCreation) {
+      final existingMsgs = await db.query(
+        'messages',
+        where: 'conversation_id = ?',
+        whereArgs: [convId],
+      );
+
+      if (existingMsgs.isEmpty) {
+        final welcomeMsgId = 'msg_welcome_$convId';
+        final welcomeText =
+            'Welcome to the official group chat for $sectionName! Moderated by $teacherName (Room Admin). All section announcements, discussions, and updates will be posted here. Only students enrolled with key $cleanKey can access this channel.';
+
+        await db.insert(
+          'messages',
+          {
+            'id': welcomeMsgId,
+            'conversation_id': convId,
+            'sender_id': teacherId.trim(),
+            'text': welcomeText,
+            'created_at': now,
+            'is_read': 1,
+          },
+          conflictAlgorithm: ConflictAlgorithm.ignore,
+        );
+
+        try {
+          await FirestoreService().saveChatMessage(
+            conversationId: convId,
+            messageId: welcomeMsgId,
+            data: {
+              'id': welcomeMsgId,
+              'conversation_id': convId,
+              'sender_id': teacherId.trim(),
+              'sender_name': teacherName.trim(),
+              'text': welcomeText,
+              'created_at': now,
+              'is_read': true,
+            },
+          );
+        } catch (_) {}
+      }
+    }
+
+    // 3. Sync to Cloud Firestore
+    try {
+      final cloudData = {
+        'id': convId,
+        'type': 'group',
+        'group_type': 'section',
+        'name': displayName,
+        'section_id': sectionId,
+        'section_key': cleanKey,
+        'section_name': sectionName,
+        'grade': grade ?? '',
+        'room': room ?? '',
+        'room_admin_id': teacherId.trim(),
+        'room_admin_name': teacherName.trim(),
+        'participants': initialParticipants,
+        'participant_ids': initialParticipants,
+        'created_at': now,
+        'updated_at': now,
+      };
+      await FirestoreService().saveDocument('conversations', convId, cloudData);
+    } catch (e) {
+      debugPrint('[DatabaseHelper] Cloud sync createSectionGroupChat note: $e');
+    }
+
+    return convoData;
+  }
+
+  /// Auto-joins a student into their section's dedicated group chat channel.
+  Future<bool> autoJoinStudentToSectionChat({
+    required String studentId,
+    required String sectionKeyOrName,
+  }) async {
+    final cleanStudentId = studentId.trim();
+    final cleanKeyOrName = sectionKeyOrName.trim();
+    if (cleanStudentId.isEmpty || cleanKeyOrName.isEmpty) return false;
+
+    final db = await database;
+
+    // First try finding conversation by section_key
+    List<Map<String, dynamic>> convos = await db.query(
+      'conversations',
+      where: 'UPPER(section_key) = ? OR UPPER(id) = ?',
+      whereArgs: [
+        cleanKeyOrName.toUpperCase(),
+        'sec_chat_${cleanKeyOrName.toUpperCase()}',
+      ],
+    );
+
+    // If not found, try matching by section name or looking up section key in sections table
+    if (convos.isEmpty) {
+      final secRows = await db.query(
+        'sections',
+        where: 'UPPER(name) = ? OR UPPER(enrollment_key) = ?',
+        whereArgs: [cleanKeyOrName.toUpperCase(), cleanKeyOrName.toUpperCase()],
+      );
+      if (secRows.isNotEmpty) {
+        final secKey = secRows.first['enrollment_key']?.toString().trim().toUpperCase();
+        if (secKey != null && secKey.isNotEmpty) {
+          convos = await db.query(
+            'conversations',
+            where: 'UPPER(section_key) = ? OR UPPER(id) = ?',
+            whereArgs: [secKey, 'sec_chat_$secKey'],
+          );
+        }
+      }
+    }
+
+    if (convos.isEmpty) {
+      debugPrint('[DatabaseHelper] No section chat found for key/name: $cleanKeyOrName');
+      return false;
+    }
+
+    final convo = convos.first;
+    final convId = convo['id'] as String;
+
+    // Parse existing participants
+    List<String> participants = [];
+    final rawParticipants = convo['participant_ids'];
+    if (rawParticipants is String && rawParticipants.isNotEmpty) {
+      try {
+        final decoded = jsonDecode(rawParticipants);
+        if (decoded is List) {
+          participants = decoded.map((e) => e.toString().trim()).where((e) => e.isNotEmpty).toList();
+        }
+      } catch (_) {
+        participants = rawParticipants.split(',').map((e) => e.trim()).where((e) => e.isNotEmpty).toList();
+      }
+    }
+
+    // Add student if not already in roster
+    if (!participants.contains(cleanStudentId)) {
+      participants.add(cleanStudentId);
+      final updatedJson = jsonEncode(participants);
+
+      await db.update(
+        'conversations',
+        {'participant_ids': updatedJson},
+        where: 'id = ?',
+        whereArgs: [convId],
+      );
+
+      // Sync updated participant roster to Cloud Firestore
+      try {
+        await FirestoreService().saveDocument('conversations', convId, {
+          'participants': participants,
+          'participant_ids': participants,
+          'updated_at': DateTime.now().toIso8601String(),
+        });
+      } catch (e) {
+        debugPrint('[DatabaseHelper] Firestore autoJoinStudent error: $e');
+      }
+
+      // Automated announcement when a student joins the section group chat
+      try {
+        final studentRow = (await db.query('users', where: 'id = ?', whereArgs: [cleanStudentId])).firstOrNull;
+        final studentName = studentRow?['full_name']?.toString() ??
+            studentRow?['name']?.toString() ??
+            'A new student';
+        final joinMsgId = 'msg_join_${cleanStudentId}_$convId';
+        final now = DateTime.now().toIso8601String();
+        final joinText = '$studentName has joined the group chat!';
+
+        await db.insert(
+          'messages',
+          {
+            'id': joinMsgId,
+            'conversation_id': convId,
+            'sender_id': 'system',
+            'text': joinText,
+            'created_at': now,
+            'is_read': 1,
+          },
+          conflictAlgorithm: ConflictAlgorithm.ignore,
+        );
+
+        await FirestoreService().saveChatMessage(
+          conversationId: convId,
+          messageId: joinMsgId,
+          data: {
+            'id': joinMsgId,
+            'conversation_id': convId,
+            'sender_id': 'system',
+            'sender_name': 'System',
+            'text': joinText,
+            'created_at': now,
+            'is_read': true,
+          },
+        );
+      } catch (_) {}
+
+      debugPrint('[DatabaseHelper] Student $cleanStudentId successfully joined $convId');
+    }
+
+    return true;
+  }
+
+  /// Ensures all existing sections in the database have their official group chat created.
+  Future<void> ensureAllSectionChatsExist() async {
+    final db = await database;
+    final sections = await db.query('sections');
+    final teachers = await db.query('users', where: "role = 'teacher' OR role = 'admin'");
+    final defaultTeacher = teachers.isNotEmpty ? teachers.first : null;
+
+    for (final sec in sections) {
+      final secId = sec['id'] is int ? sec['id'] as int : int.tryParse(sec['id'].toString()) ?? 1;
+      final secName = sec['name'] as String? ?? 'Section';
+      final secKey = (sec['enrollment_key'] as String?)?.trim().toUpperCase() ?? '';
+      if (secKey.isEmpty) continue;
+
+      final existing = await db.query(
+        'conversations',
+        where: 'id = ? OR section_key = ?',
+        whereArgs: ['sec_chat_$secKey', secKey],
+      );
+
+      if (existing.isEmpty) {
+        String teacherId = '';
+        String teacherName = '';
+        final rawSubs = sec['subject_ids'];
+        if (rawSubs != null && rawSubs.toString().isNotEmpty) {
+          try {
+            List subCodes = [];
+            if (rawSubs is String) {
+              subCodes = jsonDecode(rawSubs);
+            } else if (rawSubs is List) {
+              subCodes = rawSubs;
+            }
+            if (subCodes.isNotEmpty) {
+              final subRow = await db.query(
+                'subjects',
+                where: 'UPPER(subject_code) = ?',
+                whereArgs: [subCodes.first.toString().trim().toUpperCase()],
+              );
+              if (subRow.isNotEmpty) {
+                teacherId = subRow.first['teacher_id']?.toString() ?? '';
+                teacherName = subRow.first['teacher_name']?.toString() ?? '';
+              }
+            }
+          } catch (_) {}
+        }
+
+        if (teacherId.isEmpty && defaultTeacher != null) {
+          teacherId = defaultTeacher['id'] as String;
+          teacherName = defaultTeacher['full_name'] as String? ?? defaultTeacher['name'] as String? ?? 'Teacher';
+        }
+
+        if (teacherId.isNotEmpty) {
+          await createSectionGroupChat(
+            sectionId: secId,
+            sectionName: secName,
+            sectionKey: secKey,
+            teacherId: teacherId,
+            teacherName: teacherName,
+            grade: sec['grade']?.toString(),
+            room: sec['room']?.toString(),
+            isInitialCreation: false, // Never send welcome messages on startup/sync
+          );
+        }
+      }
+    }
   }
 
   Future<void> saveConversation(Map<String, dynamic> convo) async {
@@ -1536,6 +1895,24 @@ class DatabaseHelper {
       msg,
       conflictAlgorithm: ConflictAlgorithm.replace,
     );
+
+    // On Web (in-memory SQLite), mirror immediately to localStorage so refresh never loses past messages
+    if (kIsWeb) {
+      try {
+        final prefs = await SharedPreferences.getInstance();
+        final cached = prefs.getString('local_cached_chat_messages_v1');
+        List<dynamic> list = [];
+        if (cached != null && cached.isNotEmpty) {
+          try {
+            list = jsonDecode(cached);
+          } catch (_) {}
+        }
+        final msgId = msg['id']?.toString() ?? '';
+        list.removeWhere((item) => item is Map && item['id'] == msgId);
+        list.add(Map<String, dynamic>.from(msg));
+        await prefs.setString('local_cached_chat_messages_v1', jsonEncode(list));
+      } catch (_) {}
+    }
   }
 
   Future<void> markMessagesAsRead(
@@ -1954,6 +2331,14 @@ class DatabaseHelper {
         'enrolled_courses': subjects.length,
         'enrolled_subjects': enrolledCodes,
       });
+    } catch (_) {}
+
+    // 4. Automatically join student to their section's official group chat
+    try {
+      await autoJoinStudentToSectionChat(
+        studentId: studentId,
+        sectionKeyOrName: rawKey,
+      );
     } catch (_) {}
 
     return true;
@@ -6429,6 +6814,14 @@ class DatabaseHelper {
         'enrolled_subjects': enrolledCodes,
       });
     } catch (_) {}
+
+    // Auto-join student to their section's official group chat
+    try {
+      await autoJoinStudentToSectionChat(
+        studentId: studentId,
+        sectionKeyOrName: sectionName,
+      );
+    } catch (_) {}
   }
 
   /// When admin updates a section's assigned subjects, auto-enroll all students currently in that section
@@ -6449,6 +6842,12 @@ class DatabaseHelper {
   /// Reconciles enrollments for all active sections and students
   Future<void> reconcileAllEnrollments() async {
     final db = await database;
+
+    // Ensure all active sections have their official group chat created
+    try {
+      await ensureAllSectionChatsExist();
+    } catch (_) {}
+
     final sections = await db.query('sections');
     for (final sec in sections) {
       final name = sec['name'] as String? ?? '';

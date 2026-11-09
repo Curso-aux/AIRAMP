@@ -1429,6 +1429,469 @@ class FirestoreService {
     }
   }
 
+  DateTime? _lastConversationsSyncTime;
+
+  /// Syncs section and group conversations from Cloud Firestore to local SQLite
+  Future<void> syncCloudConversationsToLocal({bool force = false}) async {
+    try {
+      final now = DateTime.now();
+      if (!force && _lastConversationsSyncTime != null &&
+          now.difference(_lastConversationsSyncTime!) < const Duration(seconds: 30)) {
+        return;
+      }
+      _lastConversationsSyncTime = now;
+
+      final cloudDocs = await fetchAllDocuments('conversations');
+      if (cloudDocs.isEmpty) return;
+
+      final db = await DatabaseHelper().database;
+
+      for (final doc in cloudDocs) {
+        final convId = doc['id']?.toString() ?? doc['_docId']?.toString() ?? '';
+        if (convId.isEmpty) continue;
+
+        List<String> participantIds = [];
+        final rawParts = doc['participants'] ?? doc['participant_ids'];
+        if (rawParts is List) {
+          participantIds = rawParts.map((e) => e.toString().trim()).where((e) => e.isNotEmpty).toList();
+        }
+
+        await db.insert(
+          'conversations',
+          {
+            'id': convId,
+            'type': doc['type']?.toString() ?? 'group',
+            'name': doc['name']?.toString() ?? 'Section Chat',
+            'section_id': doc['section_id'] is int ? doc['section_id'] : int.tryParse(doc['section_id']?.toString() ?? ''),
+            'section_key': doc['section_key']?.toString().toUpperCase(),
+            'room_admin_id': doc['room_admin_id']?.toString(),
+            'room_admin_name': doc['room_admin_name']?.toString(),
+            'participant_ids': jsonEncode(participantIds),
+            'school_id': doc['school_id']?.toString() ?? 'sch_main',
+            'is_archived': (doc['is_archived'] == true || doc['is_archived'] == 1) ? 1 : 0,
+            'created_at': doc['created_at']?.toString() ?? now.toIso8601String(),
+          },
+          conflictAlgorithm: ConflictAlgorithm.replace,
+        );
+
+        if (doc['last_message'] is Map) {
+          final lm = doc['last_message'] as Map;
+          final lmId = lm['id']?.toString() ?? 'msg_${DateTime.now().millisecondsSinceEpoch}';
+          final lmText = lm['text']?.toString() ?? '';
+          if (lmText.isNotEmpty) {
+            await db.insert(
+              'messages',
+              {
+                'id': lmId,
+                'conversation_id': convId,
+                'sender_id': lm['sender_id']?.toString() ?? 'system',
+                'text': lmText,
+                'created_at': lm['created_at']?.toString() ?? now.toIso8601String(),
+                'is_read': 1,
+              },
+              conflictAlgorithm: ConflictAlgorithm.ignore,
+            );
+          }
+        }
+      }
+      debugPrint('[FirestoreService] Synced ${cloudDocs.length} cloud conversations to local SQLite');
+      // Also sync all chat messages from cloud so past chats never disappear on refresh
+      await syncCloudMessagesToLocal(force: force);
+    } catch (e) {
+      debugPrint('[FirestoreService] syncCloudConversations error: $e');
+    }
+  }
+
+  DateTime? _lastMessagesSyncTime;
+
+  /// Syncs all chat messages from Cloud Firestore to local SQLite
+  Future<void> syncCloudMessagesToLocal({bool force = false}) async {
+    try {
+      final db = await DatabaseHelper().database;
+      final now = DateTime.now();
+
+      SharedPreferences? prefs;
+      try {
+        prefs = await SharedPreferences.getInstance();
+      } catch (_) {}
+
+      // Fast cache restore on Web if in-memory SQLite table is empty
+      if (kIsWeb && prefs != null) {
+        final cached = prefs.getString('local_cached_chat_messages_v1');
+        if (cached != null && cached.isNotEmpty) {
+          try {
+            final List<dynamic> list = jsonDecode(cached);
+            for (final m in list) {
+              if (m is Map) {
+                await db.insert(
+                  'messages',
+                  Map<String, dynamic>.from(m),
+                  conflictAlgorithm: ConflictAlgorithm.replace,
+                );
+              }
+            }
+          } catch (_) {}
+        }
+      }
+
+      if (!force && _lastMessagesSyncTime != null &&
+          now.difference(_lastMessagesSyncTime!) < const Duration(seconds: 10)) {
+        return;
+      }
+      _lastMessagesSyncTime = now;
+
+      // Sync messages for all conversations known in local DB
+      final convRows = await db.query('conversations', columns: ['id']);
+      for (final r in convRows) {
+        final convId = r['id']?.toString() ?? '';
+        if (convId.isNotEmpty) {
+          await syncCloudMessagesForConversation(convId);
+        }
+      }
+    } catch (e) {
+      debugPrint('[FirestoreService] syncCloudMessages error: $e');
+    }
+  }
+
+  /// Real-time stream of messages for a given conversation.
+  /// Listens to the `/conversations/{conversationId}/messages` subcollection with sub-second push updates.
+  Stream<List<Map<String, dynamic>>> streamConversationMessages(String conversationId) {
+    final cleanConvId = conversationId.trim();
+    if (cleanConvId.isEmpty) return const Stream.empty();
+
+    if (!isAvailable) {
+      return const Stream.empty();
+    }
+
+    try {
+      return firestore
+          .collection('conversations')
+          .doc(cleanConvId)
+          .collection('messages')
+          .orderBy('created_at', descending: false)
+          .snapshots()
+          .handleError((err) {
+            debugPrint('[FirestoreService] streamConversationMessages snapshot error: $err');
+          })
+          .map((snapshot) {
+            return snapshot.docs.map((doc) {
+              final data = Map<String, dynamic>.from(doc.data());
+              data['id'] = doc.id;
+              data['_docId'] = doc.id;
+              data['conversation_id'] = cleanConvId;
+              return data;
+            }).toList();
+          });
+    } catch (e) {
+      debugPrint('[FirestoreService] streamConversationMessages error: $e');
+      return const Stream.empty();
+    }
+  }
+
+  /// Fetches all messages for a specific conversation from Cloud Firestore.
+  /// Combines subcollection `/conversations/{cleanConvId}/messages` and root `/messages`
+  /// with local cache fallback so past messages are NEVER lost.
+  Future<List<Map<String, dynamic>>> fetchConversationMessages(String conversationId) async {
+    final cleanConvId = conversationId.trim();
+    if (cleanConvId.isEmpty) return [];
+
+    final Map<String, Map<String, dynamic>> combinedById = {};
+
+    if (isAvailable) {
+      // 1. Fetch from subcollection `/conversations/{cleanConvId}/messages`
+      try {
+        final snap = await firestore
+            .collection('conversations')
+            .doc(cleanConvId)
+            .collection('messages')
+            .orderBy('created_at', descending: false)
+            .get(const GetOptions(source: Source.serverAndCache))
+            .timeout(Duration(seconds: kIsWeb ? 5 : 10));
+
+        for (final doc in snap.docs) {
+          final data = Map<String, dynamic>.from(doc.data());
+          data['id'] = doc.id;
+          data['_docId'] = doc.id;
+          data['conversation_id'] = cleanConvId;
+          combinedById[doc.id] = data;
+        }
+      } catch (e) {
+        debugPrint('[FirestoreService] SDK fetch subcollection error: $e');
+      }
+
+      // 2. Fetch from root collection `/messages` where conversation_id == cleanConvId
+      try {
+        final snap = await firestore
+            .collection('messages')
+            .where('conversation_id', isEqualTo: cleanConvId)
+            .get(const GetOptions(source: Source.serverAndCache))
+            .timeout(Duration(seconds: kIsWeb ? 5 : 10));
+
+        for (final doc in snap.docs) {
+          final data = Map<String, dynamic>.from(doc.data());
+          data['id'] = doc.id;
+          data['_docId'] = doc.id;
+          data['conversation_id'] = cleanConvId;
+          combinedById[doc.id] = data;
+        }
+      } catch (e) {
+        debugPrint('[FirestoreService] SDK fetch root messages error: $e');
+      }
+    }
+
+    // 3. REST API Fallback if nothing found yet
+    if (combinedById.isEmpty) {
+      try {
+        final dio = _dio;
+        final keyParam = apiKey.isNotEmpty ? '?key=$apiKey' : '';
+        final url = 'https://firestore.googleapis.com/v1/projects/$projectId/databases/(default)/documents/conversations/$cleanConvId/messages$keyParam';
+        final response = await dio.get(url);
+        if (response.data is Map && response.data.containsKey('documents')) {
+          final docs = response.data['documents'] as List? ?? [];
+          for (final d in docs) {
+            if (d is Map && d.containsKey('fields')) {
+              final fields = d['fields'] as Map<String, dynamic>? ?? {};
+              final parsed = _parseFirestoreFields(fields);
+              final docId = (d['name'] as String? ?? '').split('/').last;
+              if (docId.isNotEmpty) {
+                parsed['id'] = parsed['id'] ?? docId;
+                parsed['conversation_id'] = cleanConvId;
+                combinedById[docId] = parsed;
+              }
+            }
+          }
+        }
+      } catch (e) {
+        debugPrint('[FirestoreService] REST fetch error: $e');
+      }
+    }
+
+    // 4. Merge SharedPreferences Cache on Web so recent/optimistic messages are never lost on refresh
+    if (kIsWeb) {
+      try {
+        final prefs = await SharedPreferences.getInstance();
+        final cached = prefs.getString('local_cached_chat_messages_v1');
+        if (cached != null && cached.isNotEmpty) {
+          final List<dynamic> list = jsonDecode(cached);
+          for (final m in list) {
+            if (m is Map && m['conversation_id']?.toString() == cleanConvId) {
+              final id = m['id']?.toString() ?? '';
+              if (id.isNotEmpty && !combinedById.containsKey(id)) {
+                combinedById[id] = Map<String, dynamic>.from(m);
+              }
+            }
+          }
+        }
+      } catch (_) {}
+    }
+
+    // 5. De-duplicate extra welcome messages (keep only the earliest)
+    final allList = combinedById.values.toList();
+    allList.sort((a, b) => (a['created_at']?.toString() ?? '').compareTo(b['created_at']?.toString() ?? ''));
+
+    final result = <Map<String, dynamic>>[];
+    bool seenWelcome = false;
+    for (final m in allList) {
+      final text = m['text']?.toString() ?? '';
+      if (text.startsWith('Welcome to the official group chat for ')) {
+        if (seenWelcome) continue;
+        seenWelcome = true;
+      }
+      result.add(m);
+    }
+
+    return result;
+  }
+
+  /// Saves a chat message to Cloud Firestore with guaranteed subcollection storage,
+  /// conversation last_message updating, REST fallback, and persistent Web cache.
+  Future<void> saveChatMessage({
+    required String conversationId,
+    required String messageId,
+    required Map<String, dynamic> data,
+  }) async {
+    final cleanConvId = conversationId.trim();
+    final cleanMsgId = messageId.trim();
+    if (cleanConvId.isEmpty || cleanMsgId.isEmpty) return;
+    if (_isTestEnv) return;
+
+    final dataToSave = Map<String, dynamic>.from(data);
+    final nowIso = DateTime.now().toIso8601String();
+    dataToSave['created_at'] ??= nowIso;
+    dataToSave['updated_at'] ??= nowIso;
+    dataToSave['conversation_id'] = cleanConvId;
+    dataToSave['id'] = cleanMsgId;
+
+    bool savedToCloud = false;
+
+    if (isAvailable) {
+      try {
+        // STEP 1: Direct, guaranteed write to the official subcollection:
+        // /conversations/{cleanConvId}/messages/{cleanMsgId}
+        // This is 100% permitted under production rules and is NOT poisoned by any other writes.
+        await firestore
+            .collection('conversations')
+            .doc(cleanConvId)
+            .collection('messages')
+            .doc(cleanMsgId)
+            .set(dataToSave, SetOptions(merge: true))
+            .timeout(const Duration(seconds: 10));
+
+        savedToCloud = true;
+        debugPrint('[FirestoreService] Successfully saved chat message $cleanConvId/$cleanMsgId to Cloud subcollection');
+
+        // STEP 2: Update conversation last_message summary and updated_at
+        try {
+          await firestore
+              .collection('conversations')
+              .doc(cleanConvId)
+              .set(
+                {
+                  'last_message': {
+                    'id': cleanMsgId,
+                    'text': dataToSave['text'] ?? '',
+                    'sender_id': dataToSave['sender_id'] ?? '',
+                    'sender_name': dataToSave['sender_name'] ?? '',
+                    'created_at': dataToSave['created_at'] ?? nowIso,
+                  },
+                  'updated_at': nowIso,
+                },
+                SetOptions(merge: true),
+              )
+              .timeout(const Duration(seconds: 6));
+        } catch (convErr) {
+          debugPrint('[FirestoreService] Non-critical conv summary update note: $convErr');
+        }
+
+        // STEP 3: Best-effort write to root collection (isolated so rules never block subcollection)
+        try {
+          await firestore
+              .collection('messages')
+              .doc(cleanMsgId)
+              .set(dataToSave, SetOptions(merge: true))
+              .timeout(const Duration(seconds: 3));
+        } catch (_) {}
+      } catch (e) {
+        debugPrint('[FirestoreService] SDK direct saveChatMessage error: $e');
+      }
+    }
+
+    // REST fallback if SDK wasn't available or failed
+    if (!savedToCloud) {
+      try {
+        // Save directly to the subcollection endpoint in Firestore REST API
+        await saveDocument('conversations/$cleanConvId/messages', cleanMsgId, dataToSave);
+        await saveDocument('conversations', cleanConvId, {
+          'last_message': {
+            'id': cleanMsgId,
+            'text': dataToSave['text'] ?? '',
+            'sender_id': dataToSave['sender_id'] ?? '',
+            'sender_name': dataToSave['sender_name'] ?? '',
+            'created_at': dataToSave['created_at'] ?? nowIso,
+          },
+          'updated_at': nowIso,
+        });
+        debugPrint('[FirestoreService] Successfully saved chat message via REST subcollection fallback');
+      } catch (e) {
+        debugPrint('[FirestoreService] REST saveChatMessage fallback error: $e');
+      }
+    }
+
+    // STEP 4: Always mirror message into SharedPreferences cache for instant persistence across Web refreshes
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final cachedStr = prefs.getString('local_cached_chat_messages_v1');
+      List<dynamic> list = [];
+      if (cachedStr != null && cachedStr.isNotEmpty) {
+        try {
+          list = jsonDecode(cachedStr);
+        } catch (_) {}
+      }
+      list.removeWhere((item) => item is Map && item['id'] == cleanMsgId);
+      list.add(dataToSave);
+      await prefs.setString('local_cached_chat_messages_v1', jsonEncode(list));
+    } catch (_) {}
+  }
+
+  /// Syncs messages for a specific conversation from Cloud Firestore into local SQLite & Web cache
+  Future<void> syncCloudMessagesForConversation(String conversationId) async {
+    final cleanConvId = conversationId.trim();
+    if (cleanConvId.isEmpty) return;
+
+    try {
+      final db = await DatabaseHelper().database;
+      final cloudDocs = await fetchConversationMessages(cleanConvId);
+
+      for (final doc in cloudDocs) {
+        final msgId = doc['id']?.toString() ?? doc['_docId']?.toString() ?? '';
+        final text = doc['text']?.toString() ?? '';
+        final senderId = doc['sender_id']?.toString() ?? '';
+        final createdAt = doc['created_at']?.toString() ?? DateTime.now().toIso8601String();
+        final isRead = (doc['is_read'] == true || doc['is_read'] == 1) ? 1 : 0;
+
+        if (msgId.isEmpty || text.isEmpty) continue;
+
+        await db.insert(
+          'messages',
+          {
+            'id': msgId,
+            'conversation_id': cleanConvId,
+            'sender_id': senderId,
+            'text': text,
+            'created_at': createdAt,
+            'is_read': isRead,
+          },
+          conflictAlgorithm: ConflictAlgorithm.replace,
+        );
+      }
+
+      // Persist to SharedPreferences cache for instant display on Web refresh
+      try {
+        final prefs = await SharedPreferences.getInstance();
+        final allMessages = await db.query('messages');
+        await prefs.setString('local_cached_chat_messages_v1', jsonEncode(allMessages));
+      } catch (_) {}
+
+      debugPrint('[FirestoreService] Synced ${cloudDocs.length} messages for $cleanConvId');
+    } catch (e) {
+      debugPrint('[FirestoreService] syncCloudMessagesForConversation error: $e');
+    }
+  }
+
+  /// Syncs all locally stored messages from SQLite up to Cloud Firestore.
+  /// Guarantees that any messages sent on physical Android devices while offline/prior
+  /// become instantly available to Web browsers.
+  Future<void> syncLocalMessagesToCloud() async {
+    try {
+      final db = await DatabaseHelper().database;
+      final localMessages = await db.query('messages');
+      if (localMessages.isEmpty) return;
+
+      for (final msg in localMessages) {
+        final msgId = msg['id']?.toString() ?? '';
+        final convId = msg['conversation_id']?.toString() ?? '';
+        final text = msg['text']?.toString() ?? '';
+        if (msgId.isEmpty || convId.isEmpty || text.isEmpty) continue;
+
+        await saveChatMessage(
+          conversationId: convId,
+          messageId: msgId,
+          data: {
+            'id': msgId,
+            'conversation_id': convId,
+            'sender_id': msg['sender_id']?.toString() ?? '',
+            'text': text,
+            'created_at': msg['created_at']?.toString() ?? DateTime.now().toIso8601String(),
+            'is_read': (msg['is_read'] == 1),
+          },
+        );
+      }
+      debugPrint('[FirestoreService] Synced ${localMessages.length} local messages up to Cloud Firestore');
+    } catch (e) {
+      debugPrint('[FirestoreService] syncLocalMessagesToCloud error: $e');
+    }
+  }
+
   bool get _isTestEnv {
     try {
       final binding = WidgetsBinding.instance;

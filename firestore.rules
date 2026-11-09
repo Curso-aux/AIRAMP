@@ -103,6 +103,10 @@ service cloud.firestore {
       }
     }
 
+    match /messages/{messageId} {
+      allow read, write: if true;
+    }
+
     // ── CLASS SCHEDULES ───────────────────────────────────────
     match /class_schedules/{scheduleId} {
       allow read, write: if true;

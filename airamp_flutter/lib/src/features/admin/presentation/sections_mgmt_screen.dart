@@ -330,6 +330,8 @@ class _SectionsMgmtScreenState extends ConsumerState<SectionsMgmtScreen> {
     final addRoomController = TextEditingController();
     final addKeyController = TextEditingController();
     final addSelectedSubjectCodes = <String>{};
+    String? addSelectedTeacherId;
+    String? addSelectedTeacherName;
     String addSelectedGrade = (initialGrade != null && _grades.contains(initialGrade))
         ? initialGrade
         : (_selectedGradeFilter != 'All' && _grades.contains(_selectedGradeFilter)
@@ -668,6 +670,74 @@ class _SectionsMgmtScreenState extends ConsumerState<SectionsMgmtScreen> {
                             );
                           },
                         ),
+                        const SizedBox(height: 16),
+                        Text(
+                          'Designated Teacher / Room Admin',
+                          style: TextStyle(color: AppTheme.textSecondary, fontSize: 13, fontWeight: FontWeight.bold),
+                        ),
+                        const SizedBox(height: 6),
+                        Consumer(
+                          builder: (context, cRef, _) {
+                            final teachers = cRef.watch(adminTeachersProvider);
+                            return DropdownButtonFormField<String>(
+                              value: addSelectedTeacherId,
+                              dropdownColor: Theme.of(context).colorScheme.surface,
+                              decoration: const InputDecoration(
+                                hintText: 'Auto-assign from curriculum subjects',
+                                prefixIcon: Icon(Icons.person_outline, size: 20),
+                              ),
+                              items: [
+                                const DropdownMenuItem<String>(
+                                  value: null,
+                                  child: Text('Auto-assign from subjects / First faculty'),
+                                ),
+                                ...teachers.map((t) {
+                                  final tId = t['id']?.toString() ?? '';
+                                  final tName = t['full_name']?.toString() ?? t['name']?.toString() ?? tId;
+                                  return DropdownMenuItem<String>(
+                                    value: tId,
+                                    child: Text('$tName (${t['email'] ?? tId})'),
+                                  );
+                                }),
+                              ],
+                              onChanged: (val) {
+                                setDialogState(() {
+                                  addSelectedTeacherId = val;
+                                  if (val != null) {
+                                    final match = teachers.where((t) => t['id']?.toString() == val);
+                                    if (match.isNotEmpty) {
+                                      addSelectedTeacherName = match.first['full_name']?.toString() ?? match.first['name']?.toString();
+                                    }
+                                  } else {
+                                    addSelectedTeacherName = null;
+                                  }
+                                });
+                              },
+                            );
+                          },
+                        ),
+                        const SizedBox(height: 12),
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                          decoration: BoxDecoration(
+                            color: Theme.of(context).colorScheme.primary.withValues(alpha: 0.08),
+                            borderRadius: BorderRadius.circular(10),
+                            border: Border.all(color: Theme.of(context).colorScheme.primary.withValues(alpha: 0.2)),
+                          ),
+                          child: Row(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Icon(Icons.forum_outlined, size: 18, color: Theme.of(context).colorScheme.primary),
+                              const SizedBox(width: 8),
+                              Expanded(
+                                child: Text(
+                                  'Automated Group Chat: An official class group chat will automatically be initialized with key "${isCustomKey && addKeyController.text.isNotEmpty ? addKeyController.text : autoEnrollmentKey}" and the assigned teacher as Room Admin. Only students enrolled in this section will auto-join.',
+                                  style: TextStyle(fontSize: 11, color: AppTheme.textSecondary, height: 1.3),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
                       ],
                     ),
                   ),
@@ -696,6 +766,8 @@ class _SectionsMgmtScreenState extends ConsumerState<SectionsMgmtScreen> {
                           'room': addRoomController.text.trim(),
                           'enrollment_key': enrollmentKey,
                           'subject_ids': addSelectedSubjectCodes.toList(),
+                          'teacher_id': addSelectedTeacherId,
+                          'teacher_name': addSelectedTeacherName,
                           'student_count': 0,
                           'created_at': DateTime.now().toIso8601String(),
                         });

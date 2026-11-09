@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/theme/app_theme.dart';
-import '../../../core/services/session_draft_service.dart';
 import '../application/chat_provider.dart';
 import '../domain/chat_models.dart';
 import '../../auth/application/auth_provider.dart';
@@ -22,38 +21,44 @@ class ChatRoomScreen extends ConsumerStatefulWidget {
 
 class _ChatRoomScreenState extends ConsumerState<ChatRoomScreen> {
   final TextEditingController _controller = TextEditingController();
-  final SessionDraftDisposer _draftDisposer = SessionDraftDisposer();
-
-  String get _formId => 'chat_draft_${widget.conversationId}';
 
   @override
   void initState() {
     super.initState();
-    _draftDisposer.add(_controller.bindSessionDraft(
-      formId: _formId,
-      fieldKey: 'msg',
-      onDraftRestored: () => setState(() {}),
-    ));
-    // Ensure latest messages are loaded from DB and marked as read
+    // Subscribe to real-time Cloud Firestore stream and mark messages as read
     Future.microtask(() async {
-      await ref.read(chatProvider.notifier).reloadMessages(widget.conversationId);
+      ref.read(chatProvider.notifier).subscribeToConversation(widget.conversationId);
       await ref.read(chatProvider.notifier).markConversationAsRead(widget.conversationId);
     });
   }
 
   @override
+  void didUpdateWidget(ChatRoomScreen oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.conversationId != widget.conversationId) {
+      _controller.clear();
+      Future.microtask(() async {
+        ref.read(chatProvider.notifier).subscribeToConversation(widget.conversationId);
+        await ref.read(chatProvider.notifier).markConversationAsRead(widget.conversationId);
+      });
+    }
+  }
+
+  @override
   void dispose() {
-    _draftDisposer.dispose();
     _controller.dispose();
+    // Always unsubscribe; notifier guards against unsubscribing a different conversation
+    ref.read(chatProvider.notifier).unsubscribeFromConversation(widget.conversationId);
     super.dispose();
   }
 
   void _sendMessage() {
     final text = _controller.text.trim();
     if (text.isNotEmpty) {
-      ref.read(chatProvider.notifier).sendMessage(widget.conversationId, text);
-      SessionDraftService.instance.clearForm(_formId);
+      _controller.value = TextEditingValue.empty;
       _controller.clear();
+      setState(() {});
+      ref.read(chatProvider.notifier).sendMessage(widget.conversationId, text);
     }
   }
 
@@ -105,6 +110,20 @@ class _ChatRoomScreenState extends ConsumerState<ChatRoomScreen> {
           subtitle = otherUser.role == 'super_admin' ? 'Super Admin' : 'Teacher';
         }
       }
+    } else if (convo != null) {
+      // Group conversation
+      final memberCount = convo.participantIds.isNotEmpty ? convo.participantIds.length : (convo.participants.length + 1);
+      final adminStr = convo.roomAdminName != null && convo.roomAdminName!.isNotEmpty
+          ? 'Admin: ${convo.roomAdminName!}'
+          : null;
+      final keyStr = convo.sectionKey != null ? 'Key: ${convo.sectionKey}' : null;
+
+      final parts = [
+        if (keyStr != null) keyStr,
+        if (adminStr != null) adminStr,
+        '$memberCount members',
+      ];
+      subtitle = parts.join(' · ');
     }
 
     return Scaffold(
@@ -177,6 +196,59 @@ class _ChatRoomScreenState extends ConsumerState<ChatRoomScreen> {
                       child: Column(
                         crossAxisAlignment: isMe ? CrossAxisAlignment.end : CrossAxisAlignment.start,
                         children: [
+                          if (!isMe && convo?.type == 'group') ...[
+                            Builder(
+                              builder: (context) {
+                                final sender = chatState.availableUsers.cast<ChatUser?>().firstWhere(
+                                  (u) => u?.id == msg.senderId,
+                                  orElse: () => null,
+                                );
+                                final senderName = sender?.fullName ??
+                                    (msg.senderId == convo?.roomAdminId
+                                        ? (convo?.roomAdminName ?? 'Teacher')
+                                        : 'Member');
+                                final isRoomAdmin = msg.senderId == convo?.roomAdminId ||
+                                    sender?.role == 'teacher' ||
+                                    sender?.role == 'admin' ||
+                                    sender?.role == 'super_admin';
+
+                                return Padding(
+                                  padding: const EdgeInsets.only(bottom: 4),
+                                  child: Row(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      Text(
+                                        senderName,
+                                        style: TextStyle(
+                                          fontSize: 12,
+                                          fontWeight: FontWeight.bold,
+                                          color: isRoomAdmin ? AppTheme.primary : AppTheme.textSecondary,
+                                        ),
+                                      ),
+                                      if (isRoomAdmin) ...[
+                                        const SizedBox(width: 6),
+                                        Container(
+                                          padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
+                                          decoration: BoxDecoration(
+                                            color: AppTheme.primary.withValues(alpha: 0.12),
+                                            borderRadius: BorderRadius.circular(4),
+                                          ),
+                                          child: Text(
+                                            'Room Admin',
+                                            style: TextStyle(
+                                              fontSize: 9,
+                                              fontWeight: FontWeight.bold,
+                                              color: AppTheme.primary,
+                                            ),
+                                          ),
+                                        ),
+                                      ],
+                                    ],
+                                  ),
+                                );
+                              },
+                            ),
+                          ],
                           Text(
                             msg.text,
                             style: TextStyle(
