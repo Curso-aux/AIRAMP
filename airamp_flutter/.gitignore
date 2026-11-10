@@ -4,6 +4,7 @@
 !.env.example
 *.keystore
 *.jks
+**/key.properties
 
 # Miscellaneous
 *.class
