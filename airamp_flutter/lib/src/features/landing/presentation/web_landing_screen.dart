@@ -632,6 +632,23 @@ class _WebLandingScreenState extends ConsumerState<WebLandingScreen> {
                                     fontSize: 11,
                                   ),
                                 ),
+                                const SizedBox(height: 10),
+                                InkWell(
+                                  onTap: () => context.push('/terms'),
+                                  borderRadius: BorderRadius.circular(6),
+                                  child: Padding(
+                                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                                    child: Text(
+                                      'More about Terms of Service / Conditions & Privacy Policy',
+                                      style: TextStyle(
+                                        color: AppTheme.primary,
+                                        fontSize: 11.5,
+                                        fontWeight: FontWeight.w600,
+                                        decoration: TextDecoration.underline,
+                                      ),
+                                    ),
+                                  ),
+                                ),
                               ],
                             ),
                           ),

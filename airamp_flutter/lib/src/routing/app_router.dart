@@ -9,6 +9,7 @@ import '../features/auth/presentation/login_screen.dart';
 import '../features/auth/presentation/signup_screen.dart';
 import '../features/auth/presentation/admin_signup_screen.dart';
 import '../features/auth/presentation/forgot_password_screen.dart';
+import '../features/auth/presentation/terms_of_service_screen.dart';
 import '../features/auth/application/auth_provider.dart';
 import '../features/student/presentation/student_home_screen.dart';
 import '../features/student/presentation/my_courses_screen.dart';
@@ -149,6 +150,20 @@ final routerProvider = Provider<GoRouter>((ref) {
         pageBuilder: (context, state) => AppPageTransitions.page(
           key: state.pageKey,
           child: const ForgotPasswordScreen(),
+        ),
+      ),
+      GoRoute(
+        path: '/terms',
+        pageBuilder: (context, state) => AppPageTransitions.fadeThrough(
+          key: state.pageKey,
+          child: const TermsOfServiceScreen(),
+        ),
+      ),
+      GoRoute(
+        path: '/privacy',
+        pageBuilder: (context, state) => AppPageTransitions.fadeThrough(
+          key: state.pageKey,
+          child: const TermsOfServiceScreen(initialSection: 8),
         ),
       ),
       // Student Routes with Bottom Navigation
@@ -550,7 +565,9 @@ final routerProvider = Provider<GoRouter>((ref) {
           matched == '/student/login' ||
           matched == '/signup' ||
           matched == '/admin-signup' ||
-          matched == '/forgot-password';
+          matched == '/forgot-password' ||
+          matched == '/terms' ||
+          matched == '/privacy';
 
       // Strict Platform Separation Guard:
       // On Mobile / Desktop (!kIsWeb): Admin is strictly forbidden. Mobile is ONLY for Students and Teachers!

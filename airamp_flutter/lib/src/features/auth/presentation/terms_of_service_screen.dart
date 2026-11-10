@@ -5,7 +5,8 @@ import '../../../core/theme/app_theme.dart';
 import '../../../core/components/app_logo.dart';
 
 class TermsOfServiceScreen extends StatefulWidget {
-  const TermsOfServiceScreen({super.key});
+  final int initialSection;
+  const TermsOfServiceScreen({super.key, this.initialSection = 0});
 
   @override
   State<TermsOfServiceScreen> createState() => _TermsOfServiceScreenState();
@@ -22,20 +23,33 @@ class _TermsOfServiceScreenState extends State<TermsOfServiceScreen> {
     5: GlobalKey(),
     6: GlobalKey(),
     7: GlobalKey(),
+    8: GlobalKey(),
   };
 
   int _selectedFilter = 0;
 
   final List<String> _quickFilters = [
     'Overview',
+    'Agreement',
     'In-Scope',
     'Non-Scope',
     'Roles & Access',
     'Offline & Sync',
     'Integrity',
     'Disclaimers',
-    'Institutional',
+    'Privacy Policy',
   ];
+
+  @override
+  void initState() {
+    super.initState();
+    _selectedFilter = widget.initialSection;
+    if (widget.initialSection > 0) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        _scrollToSection(widget.initialSection);
+      });
+    }
+  }
 
   void _scrollToSection(int index) {
     setState(() => _selectedFilter = index);
@@ -104,7 +118,7 @@ class _TermsOfServiceScreenState extends State<TermsOfServiceScreen> {
             AppLogo.mark(size: 24, isDark: isDark),
             const SizedBox(width: 10),
             Text(
-              'Terms of Service & Conditions',
+              'Terms of Service & Privacy Policy',
               style: TextStyle(
                 fontSize: 15,
                 fontWeight: FontWeight.w700,
@@ -223,7 +237,7 @@ class _TermsOfServiceScreenState extends State<TermsOfServiceScreen> {
                         content:
                             'Welcome to AIRAMP (Academic Integrated Review & Assessment Management Platform, also operating as AIRA). '
                             'By logging into, accessing, downloading, or utilizing this platform on Android, Web, or authorized local offline hubs, '
-                            'you agree to be legally bound by these Terms of Service and Conditions.\n\n'
+                            'you agree to be legally bound by these Terms of Service and Privacy Policy.\n\n'
                             'AIRAMP is engineered strictly for institutional educational use across DepEd Senior High School (SHS) curriculum competencies. '
                             'The platform coordinates classroom learning, modular reviews, quizzes, and assessment analytics between students, teachers, '
                             'school administrators, and regional oversight officers.',
@@ -406,6 +420,32 @@ class _TermsOfServiceScreenState extends State<TermsOfServiceScreen> {
                         textColor: textColor,
                         textSecondary: textSecondary,
                       ),
+                      const SizedBox(height: 20),
+
+                      // Section 8: Privacy Policy & Data Governance (RA 10173)
+                      _buildSectionCard(
+                        key: _sectionKeys[8],
+                        icon: Icons.security,
+                        badgeText: 'DATA PRIVACY & PROTECTION (RA 10173)',
+                        title: '8. Institutional Privacy Policy & Data Governance',
+                        subtitle: 'Compliance with Philippine Data Privacy Act of 2012 (DPA), Learner Rights & Zero Commercialization',
+                        content:
+                            '• Legal Framework & Compliance: AIRAMP adheres strictly to Republic Act No. 10173 (Data Privacy Act of 2012 of the Philippines) and National Privacy Commission (NPC) circulars regulating educational institutions and the protection of minor learners.\n\n'
+                            '• Categories of Personal & Academic Data Collected:\n'
+                            '   1. Account Credentials: Institutional Account IDs (e.g., S-100-XXXX for students, T-100-XXXX for teachers), full legal names, assigned grade levels, and section enrollment keys.\n'
+                            '   2. Academic Records: Quiz scores, completion timestamps, question responses, item-analysis performance, and assignment submissions (including student-written text and uploaded photo attachments of schoolwork).\n'
+                            '   3. Official Communications: Transcripts of messages sent within official section group channels and teacher-student academic consultation direct chats.\n'
+                            '   4. Local & Offline Storage: Locally encrypted SQLite databases on Android phones holding cached modules, flashcards, and draft answers; synchronized securely over TLS to Cloud Firestore.\n\n'
+                            '• Strict Zero-Commercialization Guarantee: AIRAMP does NOT sell, rent, monetize, or trade student or teacher personal information. No third-party behavioral trackers or commercial advertising networks are integrated.\n\n'
+                            '• AIRA Voice Assistive Processing: The AIRA Voice text-to-speech engine operates on-device or via ephemeral runtime processing for module accessibility. No learner or educator voice recordings are stored, retained, or utilized for generative model training.\n\n'
+                            '• Institutional Custodianship & Retention: All academic records are maintained under the custodianship of the enrolling educational institution and its designated Data Protection Officer (DPO). Data is retained solely for academic evaluation cycles and is archived or purged in accordance with school retention guidelines upon learner graduation or transfer.\n\n'
+                            '• Learner & Parental Rights: Under RA 10173, students (and parents/legal guardians of minor learners) have the right to be informed, access their personal academic records, request rectification of inaccurate scores or submission records via their assigned teachers, and request account archival.',
+                        isDark: isDark,
+                        surfaceColor: surfaceColor,
+                        borderColor: borderColor,
+                        textColor: textColor,
+                        textSecondary: textSecondary,
+                      ),
                       const SizedBox(height: 24),
 
                       // Bottom Return / Navigation Card
@@ -475,7 +515,7 @@ class _TermsOfServiceScreenState extends State<TermsOfServiceScreen> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      'Official Service Agreement & System Scope',
+                      'Official Service Agreement & Privacy Policy',
                       style: TextStyle(
                         fontSize: 16.5,
                         fontWeight: FontWeight.w800,
@@ -500,9 +540,10 @@ class _TermsOfServiceScreenState extends State<TermsOfServiceScreen> {
           const SizedBox(height: 14),
           Text(
             'This document sets forth the comprehensive terms, conditions, operational boundaries, '
-            'and explicit scope of the Academic Integrated Review & Assessment Management Platform (AIRAMP). '
-            'Please review the designated capabilities (In-Scope) and excluded responsibilities (Non-Scope) '
-            'prior to participating in classroom or administrative activities.',
+            'system scope, and official Privacy Policy (Republic Act No. 10173 compliant) of the '
+            'Academic Integrated Review & Assessment Management Platform (AIRAMP). '
+            'Please review the designated capabilities (In-Scope), excluded responsibilities (Non-Scope), '
+            'and data governance principles prior to participating in classroom or administrative activities.',
             style: TextStyle(
               fontSize: 13,
               color: textSecondary,

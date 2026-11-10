@@ -635,24 +635,61 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
     );
   }
 
-  /// Quiet, dignified institutional footnote (Registration completely removed)
+  /// Quiet, dignified institutional footnote with Terms & Privacy Policy link
   Widget _buildFooter(bool isDark) {
     final mutedColor = isDark
         ? AppTheme.darkTextMuted
         : const Color(0xFF94A3B8);
+    final linkColor = isDark
+        ? AppTheme.darkPrimaryLight
+        : AppTheme.lightPrimaryDark;
 
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.center,
+    return Column(
+      mainAxisSize: MainAxisSize.min,
       children: [
-        Icon(Icons.shield_outlined, size: 14, color: mutedColor),
-        const SizedBox(width: 6),
-        Text(
-          'DepEd Senior High School Learning Portal',
-          style: TextStyle(
-            fontSize: 12,
-            fontWeight: FontWeight.w500,
-            letterSpacing: 0.2,
-            color: mutedColor,
+        Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(Icons.shield_outlined, size: 14, color: mutedColor),
+            const SizedBox(width: 6),
+            Text(
+              'DepEd Senior High School Learning Portal',
+              style: TextStyle(
+                fontSize: 12,
+                fontWeight: FontWeight.w500,
+                letterSpacing: 0.2,
+                color: mutedColor,
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 10),
+        InkWell(
+          onTap: () => context.push('/terms'),
+          borderRadius: BorderRadius.circular(8),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(
+                  Icons.article_outlined,
+                  size: 14,
+                  color: linkColor,
+                ),
+                const SizedBox(width: 6),
+                Text(
+                  'More about Terms of Service / Conditions & Privacy Policy',
+                  style: TextStyle(
+                    fontSize: 11.5,
+                    fontWeight: FontWeight.w600,
+                    color: linkColor,
+                    decoration: TextDecoration.underline,
+                    decorationColor: linkColor.withValues(alpha: 0.5),
+                  ),
+                ),
+              ],
+            ),
           ),
         ),
       ],

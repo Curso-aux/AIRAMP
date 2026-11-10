@@ -456,6 +456,39 @@ class _AdminWebLoginScreenState extends ConsumerState<AdminWebLoginScreen> {
                                 shadowColor: accentColor.withValues(alpha: 0.4),
                               ),
                             ),
+                            const SizedBox(height: 18),
+
+                            // Footer Link: Terms of Service / Conditions & Privacy Policy
+                            Center(
+                              child: InkWell(
+                                onTap: () => context.push('/terms'),
+                                borderRadius: BorderRadius.circular(8),
+                                child: Padding(
+                                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                                  child: Row(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      Icon(
+                                        Icons.article_outlined,
+                                        size: 14,
+                                        color: accentColor,
+                                      ),
+                                      const SizedBox(width: 6),
+                                      Text(
+                                        'More about Terms of Service / Conditions & Privacy Policy',
+                                        style: TextStyle(
+                                          fontSize: 12,
+                                          fontWeight: FontWeight.w600,
+                                          color: accentColor,
+                                          decoration: TextDecoration.underline,
+                                          decorationColor: accentColor.withValues(alpha: 0.5),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ),
+                            ),
                           ],
                         ),
                       ),
