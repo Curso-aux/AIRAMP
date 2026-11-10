@@ -34,10 +34,7 @@ def create_icons():
         cropped = raw_img
 
     cw, ch = cropped.size
-    # Create a centered square version of the artwork
-    max_dim = max(cw, ch)
-    square_logo = Image.new('RGBA', (max_dim, max_dim), (0, 0, 0, 0))
-    square_logo.paste(cropped, ((max_dim - cw) // 2, (max_dim - ch) // 2), cropped)
+    print(f"Generating peeking border-hugging icons from {source_name} (artwork: {cw}x{ch})...")
 
     # Background color: Deep calm slate-charcoal #0A1420 matching AppTheme.darkBackground
     bg_color = (10, 20, 32, 255)
@@ -54,38 +51,53 @@ def create_icons():
         'mipmap-xxxhdpi': (192, 432),
     }
 
-    print(f"Generating icons from {source_name} (artwork: {cw}x{ch})...")
-
     # 1. Android Icons
     for folder, (icon_size, fg_size) in densities.items():
         folder_path = os.path.join(res_dir, folder)
         os.makedirs(folder_path, exist_ok=True)
 
-        # 1a. Legacy ic_launcher.png (Rounded/Circular with background)
+        # 1a. Legacy ic_launcher.png & ic_launcher_round.png
+        # The mascot is aligned to the right border of the circular badge so she grips the border
+        target_h = int(icon_size * 0.90)
+        scale = target_h / ch
+        target_w = int(cw * scale)
+        scaled_legacy = cropped.resize((target_w, target_h), Image.Resampling.LANCZOS)
+        
+        # Right edge aligns with circle edge (icon_size - 2)
+        right_x = icon_size - 2
+        left_x = right_x - target_w
+        top_y = (icon_size - target_h) // 2
+
+        # Legacy icon
         legacy = Image.new('RGBA', (icon_size, icon_size), (0, 0, 0, 0))
         draw = ImageDraw.Draw(legacy)
         draw.ellipse([1, 1, icon_size - 2, icon_size - 2], fill=bg_color)
-        
-        inner_size = int(icon_size * 0.82)
-        scaled_logo = square_logo.resize((inner_size, inner_size), Image.Resampling.LANCZOS)
-        offset = (icon_size - inner_size) // 2
-        legacy.paste(scaled_logo, (offset, offset), scaled_logo)
+        legacy.paste(scaled_legacy, (left_x, top_y), scaled_legacy)
         legacy.save(os.path.join(folder_path, 'ic_launcher.png'), 'PNG')
 
-        # 1b. Round ic_launcher_round.png
+        # Round icon
         round_icon = Image.new('RGBA', (icon_size, icon_size), (0, 0, 0, 0))
         r_draw = ImageDraw.Draw(round_icon)
         r_draw.ellipse([0, 0, icon_size - 1, icon_size - 1], fill=bg_color)
-        round_icon.paste(scaled_logo, (offset, offset), scaled_logo)
+        round_icon.paste(scaled_legacy, (left_x, top_y), scaled_legacy)
         round_icon.save(os.path.join(folder_path, 'ic_launcher_round.png'), 'PNG')
 
         # 1c. Adaptive icon foreground ic_launcher_foreground.png
-        # Scaled to 56% so it fits safely within Android's 66dp/72dp mask circle without any clipping
+        # Android's safe mask viewport spans from 18dp to 90dp within the 108dp canvas.
+        # Her hands are at vertical mid-height. Aligning right_x to 90dp puts her hands
+        # directly on the squircle/circle right border, giving the peeking effect!
         fg = Image.new('RGBA', (fg_size, fg_size), (0, 0, 0, 0))
-        fg_content_size = int(fg_size * 0.56)
-        scaled_fg_logo = square_logo.resize((fg_content_size, fg_content_size), Image.Resampling.LANCZOS)
-        fg_offset = (fg_size - fg_content_size) // 2
-        fg.paste(scaled_fg_logo, (fg_offset, fg_offset), scaled_fg_logo)
+        fg_target_h = int(fg_size * (72 / 108) * 0.94)
+        fg_scale = fg_target_h / ch
+        fg_target_w = int(cw * fg_scale)
+        scaled_fg = cropped.resize((fg_target_w, fg_target_h), Image.Resampling.LANCZOS)
+        
+        # 90dp border position (minus 1px so her fingers seamlessly grip the right border)
+        fg_right_x = int(fg_size * (90 / 108)) - 1
+        fg_left_x = fg_right_x - fg_target_w
+        fg_top_y = (fg_size - fg_target_h) // 2
+
+        fg.paste(scaled_fg, (fg_left_x, fg_top_y), scaled_fg)
         fg.save(os.path.join(folder_path, 'ic_launcher_foreground.png'), 'PNG')
 
     # Values colors.xml
@@ -117,26 +129,35 @@ def create_icons():
     os.makedirs(web_icons_dir, exist_ok=True)
     for size, name in [(192, 'Icon-192.png'), (512, 'Icon-512.png')]:
         web_im = Image.new('RGBA', (size, size), bg_color)
-        content_size = int(size * 0.82)
-        scaled = square_logo.resize((content_size, content_size), Image.Resampling.LANCZOS)
-        offset = (size - content_size) // 2
-        web_im.paste(scaled, (offset, offset), scaled)
+        t_h = int(size * 0.90)
+        t_w = int(cw * (t_h / ch))
+        scaled = cropped.resize((t_w, t_h), Image.Resampling.LANCZOS)
+        r_x = size - 2
+        l_x = r_x - t_w
+        t_y = (size - t_h) // 2
+        web_im.paste(scaled, (l_x, t_y), scaled)
         web_im.save(os.path.join(web_icons_dir, name), 'PNG')
 
     for size, name in [(192, 'Icon-maskable-192.png'), (512, 'Icon-maskable-512.png')]:
         web_im = Image.new('RGBA', (size, size), bg_color)
-        content_size = int(size * 0.60)
-        scaled = square_logo.resize((content_size, content_size), Image.Resampling.LANCZOS)
-        offset = (size - content_size) // 2
-        web_im.paste(scaled, (offset, offset), scaled)
+        t_h = int(size * (72 / 108) * 0.94)
+        t_w = int(cw * (t_h / ch))
+        scaled = cropped.resize((t_w, t_h), Image.Resampling.LANCZOS)
+        r_x = int(size * (90 / 108)) - 1
+        l_x = r_x - t_w
+        t_y = (size - t_h) // 2
+        web_im.paste(scaled, (l_x, t_y), scaled)
         web_im.save(os.path.join(web_icons_dir, name), 'PNG')
 
     # Web favicon
     fav = Image.new('RGBA', (64, 64), bg_color)
-    content_size = int(64 * 0.85)
-    scaled = square_logo.resize((content_size, content_size), Image.Resampling.LANCZOS)
-    offset = (64 - content_size) // 2
-    fav.paste(scaled, (offset, offset), scaled)
+    t_h = int(64 * 0.90)
+    t_w = int(cw * (t_h / ch))
+    scaled = cropped.resize((t_w, t_h), Image.Resampling.LANCZOS)
+    r_x = 64 - 2
+    l_x = r_x - t_w
+    t_y = (64 - t_h) // 2
+    fav.paste(scaled, (l_x, t_y), scaled)
     fav.save(os.path.join(repo_root, 'airamp_flutter', 'web', 'favicon.png'), 'PNG')
 
     # 3. Windows ICO
@@ -146,10 +167,17 @@ def create_icons():
         ico_images = []
         for s in ico_sizes:
             im = Image.new('RGBA', s, bg_color)
-            cs = int(s[0] * 0.82)
-            sc = square_logo.resize((cs, cs), Image.Resampling.LANCZOS)
-            off = (s[0] - cs) // 2
-            im.paste(sc, (off, off), sc)
+            t_h = int(s[0] * 0.90)
+            if t_h < 1:
+                t_h = 1
+            t_w = int(cw * (t_h / ch))
+            if t_w < 1:
+                t_w = 1
+            sc = cropped.resize((t_w, t_h), Image.Resampling.LANCZOS)
+            r_x = s[0] - 1
+            l_x = max(0, r_x - t_w)
+            t_y = (s[0] - t_h) // 2
+            im.paste(sc, (l_x, t_y), sc)
             ico_images.append(im)
         ico_images[0].save(os.path.join(win_res_dir, 'app_icon.ico'), format='ICO', sizes=ico_sizes)
 
@@ -170,12 +198,18 @@ def create_icons():
             
             # iOS requires opaque image (RGB)
             im = Image.new('RGB', (px, px), bg_color_rgb)
-            cs = int(px * 0.80)
-            if cs < 1:
-                cs = 1
-            sc = square_logo.resize((cs, cs), Image.Resampling.LANCZOS)
-            off = (px - cs) // 2
-            im.paste(sc, (off, off), sc)
+            t_h = int(px * 0.90)
+            if t_h < 1:
+                t_h = 1
+            t_w = int(cw * (t_h / ch))
+            if t_w < 1:
+                t_w = 1
+            sc = cropped.resize((t_w, t_h), Image.Resampling.LANCZOS)
+            # iOS applies squircle corner radius of ~22%. Mid-height is flat edge, right at px - 2
+            r_x = px - 2
+            l_x = max(0, r_x - t_w)
+            t_y = (px - t_h) // 2
+            im.paste(sc, (l_x, t_y), sc)
             im.save(os.path.join(ios_set_dir, fname), 'PNG')
 
     # 5. macOS icons
@@ -196,15 +230,20 @@ def create_icons():
             im = Image.new('RGBA', (px, px), (0, 0, 0, 0))
             draw = ImageDraw.Draw(im)
             draw.rounded_rectangle([0, 0, px - 1, px - 1], radius=max(2, int(px * 0.22)), fill=bg_color)
-            cs = int(px * 0.78)
-            if cs < 1:
-                cs = 1
-            sc = square_logo.resize((cs, cs), Image.Resampling.LANCZOS)
-            off = (px - cs) // 2
-            im.paste(sc, (off, off), sc)
+            t_h = int(px * 0.88)
+            if t_h < 1:
+                t_h = 1
+            t_w = int(cw * (t_h / ch))
+            if t_w < 1:
+                t_w = 1
+            sc = cropped.resize((t_w, t_h), Image.Resampling.LANCZOS)
+            r_x = px - 2
+            l_x = max(0, r_x - t_w)
+            t_y = (px - t_h) // 2
+            im.paste(sc, (l_x, t_y), sc)
             im.save(os.path.join(macos_set_dir, fname), 'PNG')
 
-    print("Successfully generated all launcher icons from aira_mascot_logo.png across Android, Web, Windows, iOS, and macOS!")
+    print("Successfully generated peeking border-hugging launcher icons across Android, Web, Windows, iOS, and macOS!")
 
 if __name__ == '__main__':
     create_icons()
