@@ -93,7 +93,14 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
 
     if (identifier.isEmpty || password.isEmpty) {
       setState(() {
-        _error = 'Please enter your Account ID and password.';
+        _error = 'Please enter your User ID and password.';
+      });
+      return;
+    }
+
+    if (identifier.contains('@')) {
+      setState(() {
+        _error = 'Wrong User ID. ID only.';
       });
       return;
     }
@@ -386,7 +393,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
           ],
 
           // Identifier Field Label
-          _buildFieldLabel('Account ID', isDark),
+          _buildFieldLabel('User ID', isDark),
           const SizedBox(height: 6),
           TextField(
             controller: _identifierController,

@@ -47,7 +47,12 @@ class _AdminWebLoginScreenState extends ConsumerState<AdminWebLoginScreen> {
     final password = _passwordController.text;
 
     if (identifier.isEmpty || password.isEmpty) {
-      setState(() => _error = 'Please enter your Account ID and password.');
+      setState(() => _error = 'Please enter your User ID and password.');
+      return;
+    }
+
+    if (identifier.contains('@')) {
+      setState(() => _error = 'Wrong User ID. ID only.');
       return;
     }
 
@@ -322,7 +327,7 @@ class _AdminWebLoginScreenState extends ConsumerState<AdminWebLoginScreen> {
 
                             // Identifier Input
                             Text(
-                              'Account ID',
+                              'User ID',
                               style: TextStyle(
                                 fontSize: 13,
                                 fontWeight: FontWeight.w700,
@@ -335,7 +340,7 @@ class _AdminWebLoginScreenState extends ConsumerState<AdminWebLoginScreen> {
                               maxLength: 80,
                               buildCounter: (context, {required currentLength, required isFocused, maxLength}) => null,
                               keyboardType: TextInputType.text,
-                              autofillHints: const [AutofillHints.username, AutofillHints.email],
+                              autofillHints: const [AutofillHints.username],
                               textInputAction: TextInputAction.next,
                               autofocus: true,
                               decoration: InputDecoration(
@@ -467,6 +472,7 @@ class _AdminWebLoginScreenState extends ConsumerState<AdminWebLoginScreen> {
                                   padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
                                   child: Row(
                                     mainAxisSize: MainAxisSize.min,
+                                    mainAxisAlignment: MainAxisAlignment.center,
                                     children: [
                                       Icon(
                                         Icons.article_outlined,
@@ -474,14 +480,17 @@ class _AdminWebLoginScreenState extends ConsumerState<AdminWebLoginScreen> {
                                         color: accentColor,
                                       ),
                                       const SizedBox(width: 6),
-                                      Text(
-                                        'More about Terms of Service / Conditions & Privacy Policy',
-                                        style: TextStyle(
-                                          fontSize: 12,
-                                          fontWeight: FontWeight.w600,
-                                          color: accentColor,
-                                          decoration: TextDecoration.underline,
-                                          decorationColor: accentColor.withValues(alpha: 0.5),
+                                      Flexible(
+                                        child: Text(
+                                          'Terms of Service & Privacy Policy',
+                                          textAlign: TextAlign.center,
+                                          style: TextStyle(
+                                            fontSize: 12,
+                                            fontWeight: FontWeight.w600,
+                                            color: accentColor,
+                                            decoration: TextDecoration.underline,
+                                            decorationColor: accentColor.withValues(alpha: 0.5),
+                                          ),
                                         ),
                                       ),
                                     ],

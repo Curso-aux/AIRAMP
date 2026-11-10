@@ -611,6 +611,60 @@ class FirestoreService {
     return null;
   }
 
+  /// Finds user in Cloud Firestore strictly by institutional User ID (e.g. S-100-0001, T-100-0001, A-100-0001, SA-000-0001).
+  /// Never matches by email.
+  Future<Map<String, dynamic>?> findUserById(String id) async {
+    final rawTrimmed = id.trim();
+    final idLower = rawTrimmed.toLowerCase();
+    if (rawTrimmed.isEmpty || rawTrimmed.contains('@') || _isTestEnv) return null;
+
+    try {
+      // 1. FAST PATH: Direct REST query by Document ID (~100-250ms)
+      final directUser = await _fetchDocRest(rawTrimmed)
+          .timeout(const Duration(milliseconds: 2000), onTimeout: () => null);
+      if (directUser != null && directUser.isNotEmpty) {
+        return directUser;
+      }
+
+      // Direct doc fetch lowercase if different (e.g. sa-000-0001)
+      if (idLower != rawTrimmed) {
+        final directUserLower = await _fetchDocRest(idLower)
+            .timeout(const Duration(milliseconds: 1500), onTimeout: () => null);
+        if (directUserLower != null && directUserLower.isNotEmpty) {
+          return directUserLower;
+        }
+      }
+
+      // Fast parallel structured query strictly by 'id'
+      final restResults = await Future.wait([
+        _queryRest('id', rawTrimmed).timeout(const Duration(milliseconds: 2000), onTimeout: () => null),
+        _queryRest('id', idLower).timeout(const Duration(milliseconds: 2000), onTimeout: () => null),
+      ]);
+      for (final r in restResults) {
+        if (r != null && r.isNotEmpty) return r;
+      }
+
+      // 2. FALLBACK: Native/Web SDK query
+      if (isAvailable) {
+        final docSnap = await usersCollection.doc(rawTrimmed).get().timeout(const Duration(seconds: 2));
+        if (docSnap.exists && docSnap.data() != null) {
+          final d = docSnap.data()!;
+          if (!d.containsKey('id')) d['id'] = docSnap.id;
+          return d;
+        }
+        final querySnap = await usersCollection.where('id', isEqualTo: rawTrimmed).limit(1).get().timeout(const Duration(seconds: 2));
+        if (querySnap.docs.isNotEmpty) {
+          final d = querySnap.docs.first.data();
+          if (!d.containsKey('id')) d['id'] = querySnap.docs.first.id;
+          return d;
+        }
+      }
+    } catch (e) {
+      debugPrint('[FirestoreService] findUserById note: $e');
+    }
+    return null;
+  }
+
   /// Searches Cloud Firestore for an account by email, ID, or username.
   /// Uses ultra-fast REST direct fetches first (<200ms) with SDK fallback.
   Future<Map<String, dynamic>?> findUserByIdentifier(String identifier) async {

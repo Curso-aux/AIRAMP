@@ -35,6 +35,11 @@ class AuthRepository {
     final db = await DatabaseHelper().database;
     final identifierLower = identifier.toLowerCase().trim();
 
+    // Strict School Policy: Authentication is strictly by institutional User ID only.
+    if (identifierLower.contains('@')) {
+      throw Exception('Wrong User ID. ID only.');
+    }
+
     try {
       await db.execute('ALTER TABLE users ADD COLUMN username TEXT');
     } catch (_) {}
@@ -42,27 +47,15 @@ class AuthRepository {
       await db.execute('ALTER TABLE users ADD COLUMN password_salt TEXT');
     } catch (_) {}
 
-    // Find candidate accounts by ID (e.g. 001-0001, SA-000-0001), email, username, full name, or prefix
+    // Find candidate accounts strictly by User ID (e.g. S-100-0001, T-100-0001, A-100-0001, SA-000-0001)
     List<Map<String, Object?>> candidateRows = [];
     try {
       candidateRows = await db.rawQuery(
         '''SELECT * FROM users
            WHERE LOWER(id) = ?
-              OR LOWER(email) = ? 
-              OR LOWER(COALESCE(username, '')) = ?
-              OR LOWER(full_name) = ?
-              OR LOWER(REPLACE(REPLACE(COALESCE(username, ''), '.', ' '), '_', ' ')) = ?
-              OR LOWER(full_name) LIKE ?
-              OR LOWER(COALESCE(username, '')) LIKE ?
-              OR (? = 'sa-000-0001' AND (LOWER(id) = 'super_admin_christian' OR LOWER(id) = 'sa-000-0001' OR LOWER(email) = 'evangelistachristian88@gmail.com'))''',
+              OR (? = 'sa-000-0001' AND LOWER(id) = 'super_admin_christian')''',
         [
           identifierLower,
-          identifierLower,
-          identifierLower,
-          identifierLower,
-          identifierLower,
-          '$identifierLower%',
-          '$identifierLower%',
           identifierLower,
         ],
       );
@@ -70,15 +63,9 @@ class AuthRepository {
       candidateRows = await db.rawQuery(
         '''SELECT * FROM users
            WHERE LOWER(id) = ?
-              OR LOWER(email) = ? 
-              OR LOWER(full_name) = ?
-              OR LOWER(full_name) LIKE ?
-              OR (? = 'sa-000-0001' AND (LOWER(id) = 'super_admin_christian' OR LOWER(id) = 'sa-000-0001' OR LOWER(email) = 'evangelistachristian88@gmail.com'))''',
+              OR (? = 'sa-000-0001' AND LOWER(id) = 'super_admin_christian')''',
         [
           identifierLower,
-          identifierLower,
-          identifierLower,
-          '$identifierLower%',
           identifierLower,
         ],
       );
@@ -115,7 +102,7 @@ class AuthRepository {
     if (verifiedUsers.isEmpty) {
       try {
         cloudUser = await FirestoreService()
-            .findUserByIdentifier(identifier)
+            .findUserById(identifier)
             .timeout(const Duration(seconds: 4), onTimeout: () => null);
       } catch (e) {
         debugPrint('[AuthRepository] Cloud lookup note: $e');
@@ -169,19 +156,17 @@ class AuthRepository {
     }
 
     if (verifiedUsers.isEmpty) {
-      throw Exception('Invalid email/username or password.');
+      throw Exception('Wrong User ID or password.');
     }
 
-    // If multiple accounts match, prioritize exact email/username and faculty roles over student
+    // If multiple accounts match, prioritize exact ID and faculty roles over student
     final sorted = List<Map<String, Object?>>.from(verifiedUsers);
     if (sorted.length > 1) {
       sorted.sort((a, b) {
-        final aEmail = (a['email'] as String? ?? '').toLowerCase();
-        final bEmail = (b['email'] as String? ?? '').toLowerCase();
-        final aUser = (a['username'] as String? ?? '').toLowerCase();
-        final bUser = (b['username'] as String? ?? '').toLowerCase();
-        final aExact = aEmail == identifierLower || aUser == identifierLower;
-        final bExact = bEmail == identifierLower || bUser == identifierLower;
+        final aId = (a['id'] as String? ?? '').toLowerCase();
+        final bId = (b['id'] as String? ?? '').toLowerCase();
+        final aExact = aId == identifierLower;
+        final bExact = bId == identifierLower;
         if (aExact && !bExact) return -1;
         if (!aExact && bExact) return 1;
         final aRole = a['role'] as String? ?? '';
