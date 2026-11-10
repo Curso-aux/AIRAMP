@@ -23,8 +23,12 @@ class _SectionsMgmtScreenState extends ConsumerState<SectionsMgmtScreen> {
   String _selectedGradeFilter = 'All';
 
   final List<String> _grades = [
-    'Grade 7', 'Grade 8', 'Grade 9', 'Grade 10',
-    'Grade 11', 'Grade 12',
+    'Grade 7',
+    'Grade 8',
+    'Grade 9',
+    'Grade 10',
+    'Grade 11',
+    'Grade 12',
   ];
 
   Future<void> _showConfirmation({
@@ -58,9 +62,15 @@ class _SectionsMgmtScreenState extends ConsumerState<SectionsMgmtScreen> {
 
   void _showEditDialog(Map<String, dynamic> section) {
     final editNameController = TextEditingController(text: section['name']);
-    final editDescController = TextEditingController(text: section['description'] ?? '');
-    final editRoomController = TextEditingController(text: section['room'] ?? '');
-    final editKeyController = TextEditingController(text: section['enrollment_key'] ?? '');
+    final editDescController = TextEditingController(
+      text: section['description'] ?? '',
+    );
+    final editRoomController = TextEditingController(
+      text: section['room'] ?? '',
+    );
+    final editKeyController = TextEditingController(
+      text: section['enrollment_key'] ?? '',
+    );
     String editSelectedGrade = section['grade'] ?? '';
 
     final initialSubjectCodes = <String>{};
@@ -71,7 +81,9 @@ class _SectionsMgmtScreenState extends ConsumerState<SectionsMgmtScreen> {
           initialSubjectCodes.add(s.toString().trim().toUpperCase());
         }
       }
-    } else if (rawSecSubs is String && rawSecSubs.isNotEmpty && rawSecSubs != 'null') {
+    } else if (rawSecSubs is String &&
+        rawSecSubs.isNotEmpty &&
+        rawSecSubs != 'null') {
       try {
         final dec = jsonDecode(rawSecSubs);
         if (dec is List) {
@@ -83,7 +95,8 @@ class _SectionsMgmtScreenState extends ConsumerState<SectionsMgmtScreen> {
         }
       } catch (_) {
         for (final s in rawSecSubs.split(',')) {
-          if (s.trim().isNotEmpty) initialSubjectCodes.add(s.trim().toUpperCase());
+          if (s.trim().isNotEmpty)
+            initialSubjectCodes.add(s.trim().toUpperCase());
         }
       }
     }
@@ -96,7 +109,10 @@ class _SectionsMgmtScreenState extends ConsumerState<SectionsMgmtScreen> {
           builder: (context, setDialogState) {
             return AlertDialog(
               backgroundColor: Theme.of(context).colorScheme.surface,
-              title: Text('Edit Section', style: TextStyle(color: AppTheme.text)),
+              title: Text(
+                'Edit Section',
+                style: TextStyle(color: AppTheme.text),
+              ),
               content: SingleChildScrollView(
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
@@ -105,7 +121,13 @@ class _SectionsMgmtScreenState extends ConsumerState<SectionsMgmtScreen> {
                     TextField(
                       controller: editNameController,
                       maxLength: 40,
-                      buildCounter: (context, {required currentLength, required isFocused, maxLength}) => null,
+                      buildCounter:
+                          (
+                            context, {
+                            required currentLength,
+                            required isFocused,
+                            maxLength,
+                          }) => null,
                       style: TextStyle(color: AppTheme.text),
                       decoration: const InputDecoration(
                         labelText: 'Section Name',
@@ -117,7 +139,13 @@ class _SectionsMgmtScreenState extends ConsumerState<SectionsMgmtScreen> {
                     TextField(
                       controller: editRoomController,
                       maxLength: 30,
-                      buildCounter: (context, {required currentLength, required isFocused, maxLength}) => null,
+                      buildCounter:
+                          (
+                            context, {
+                            required currentLength,
+                            required isFocused,
+                            maxLength,
+                          }) => null,
                       style: TextStyle(color: AppTheme.text),
                       decoration: const InputDecoration(
                         labelText: 'Room / Building',
@@ -130,21 +158,38 @@ class _SectionsMgmtScreenState extends ConsumerState<SectionsMgmtScreen> {
                     TextField(
                       controller: editKeyController,
                       maxLength: 15,
-                      buildCounter: (context, {required currentLength, required isFocused, maxLength}) => null,
+                      buildCounter:
+                          (
+                            context, {
+                            required currentLength,
+                            required isFocused,
+                            maxLength,
+                          }) => null,
                       style: TextStyle(color: AppTheme.text),
                       textCapitalization: TextCapitalization.characters,
                       decoration: InputDecoration(
                         labelText: 'Enrollment Key (for Students)',
                         counterText: '',
                         hintText: 'e.g., SEC-EMR10',
-                        prefixIcon: const Icon(Icons.vpn_key_outlined, size: 20),
+                        prefixIcon: const Icon(
+                          Icons.vpn_key_outlined,
+                          size: 20,
+                        ),
                         suffixIcon: IconButton(
                           tooltip: 'Auto-generate standard key',
-                          icon: const Icon(Icons.auto_fix_high_rounded, size: 18),
+                          icon: const Icon(
+                            Icons.auto_fix_high_rounded,
+                            size: 18,
+                          ),
                           onPressed: () {
-                            editKeyController.text = SectionKeyHelper.generateKey(
-                              sectionName: editNameController.text.isNotEmpty ? editNameController.text : (section['name'] ?? 'Section'),
-                              gradeLevel: editSelectedGrade.isNotEmpty ? editSelectedGrade : section['grade'],
+                            editKeyController
+                                .text = SectionKeyHelper.generateKey(
+                              sectionName: editNameController.text.isNotEmpty
+                                  ? editNameController.text
+                                  : (section['name'] ?? 'Section'),
+                              gradeLevel: editSelectedGrade.isNotEmpty
+                                  ? editSelectedGrade
+                                  : section['grade'],
                             );
                           },
                         ),
@@ -164,7 +209,10 @@ class _SectionsMgmtScreenState extends ConsumerState<SectionsMgmtScreen> {
                     const SizedBox(height: 16),
                     Text(
                       'Assign Grade Level',
-                      style: TextStyle(color: AppTheme.textSecondary, fontSize: 14),
+                      style: TextStyle(
+                        color: AppTheme.textSecondary,
+                        fontSize: 14,
+                      ),
                     ),
                     const SizedBox(height: 10),
                     Wrap(
@@ -176,17 +224,29 @@ class _SectionsMgmtScreenState extends ConsumerState<SectionsMgmtScreen> {
                           label: Text(grade),
                           selected: isSelected,
                           onSelected: (selected) {
-                            setDialogState(() => editSelectedGrade = selected ? grade : '');
+                            setDialogState(
+                              () => editSelectedGrade = selected ? grade : '',
+                            );
                           },
                           selectedColor: Theme.of(context).colorScheme.primary,
-                          backgroundColor: Theme.of(context).colorScheme.surface,
+                          backgroundColor: Theme.of(
+                            context,
+                          ).colorScheme.surface,
                           labelStyle: TextStyle(
-                            color: isSelected ? Colors.white : AppTheme.textSecondary,
+                            color: isSelected
+                                ? Colors.white
+                                : AppTheme.textSecondary,
                             fontWeight: FontWeight.w600,
                             fontSize: 12,
                           ),
-                          side: BorderSide(color: isSelected ? AppTheme.primary : AppTheme.border),
-                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+                          side: BorderSide(
+                            color: isSelected
+                                ? AppTheme.primary
+                                : AppTheme.border,
+                          ),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(20),
+                          ),
                         );
                       }).toList(),
                     ),
@@ -196,17 +256,30 @@ class _SectionsMgmtScreenState extends ConsumerState<SectionsMgmtScreen> {
                       children: [
                         Text(
                           'Assign Curriculum Subjects',
-                          style: TextStyle(color: AppTheme.textSecondary, fontSize: 13, fontWeight: FontWeight.bold),
+                          style: TextStyle(
+                            color: AppTheme.textSecondary,
+                            fontSize: 13,
+                            fontWeight: FontWeight.bold,
+                          ),
                         ),
                         Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 8,
+                            vertical: 2,
+                          ),
                           decoration: BoxDecoration(
-                            color: Theme.of(context).colorScheme.primary.withValues(alpha: 0.12),
+                            color: Theme.of(
+                              context,
+                            ).colorScheme.primary.withValues(alpha: 0.12),
                             borderRadius: BorderRadius.circular(6),
                           ),
                           child: Text(
                             '${editSelectedSubjectCodes.length} selected',
-                            style: TextStyle(color: Theme.of(context).colorScheme.primary, fontSize: 11, fontWeight: FontWeight.bold),
+                            style: TextStyle(
+                              color: Theme.of(context).colorScheme.primary,
+                              fontSize: 11,
+                              fontWeight: FontWeight.bold,
+                            ),
                           ),
                         ),
                       ],
@@ -220,7 +293,11 @@ class _SectionsMgmtScreenState extends ConsumerState<SectionsMgmtScreen> {
                             padding: const EdgeInsets.symmetric(vertical: 8),
                             child: Text(
                               'No subjects found in database. Create subjects under Subjects & Courses first.',
-                              style: TextStyle(color: AppTheme.textSecondary, fontSize: 12, fontStyle: FontStyle.italic),
+                              style: TextStyle(
+                                color: AppTheme.textSecondary,
+                                fontSize: 12,
+                                fontStyle: FontStyle.italic,
+                              ),
                             ),
                           );
                         }
@@ -228,9 +305,13 @@ class _SectionsMgmtScreenState extends ConsumerState<SectionsMgmtScreen> {
                           spacing: 8,
                           runSpacing: 8,
                           children: subjects.map((sub) {
-                            final code = sub['subject_code']?.toString().toUpperCase() ?? sub['id']?.toString().toUpperCase() ?? '';
+                            final code =
+                                sub['subject_code']?.toString().toUpperCase() ??
+                                sub['id']?.toString().toUpperCase() ??
+                                '';
                             final name = sub['name']?.toString() ?? code;
-                            final isSelected = editSelectedSubjectCodes.contains(code);
+                            final isSelected = editSelectedSubjectCodes
+                                .contains(code);
                             return FilterChip(
                               label: Text('$code ($name)'),
                               selected: isSelected,
@@ -243,11 +324,19 @@ class _SectionsMgmtScreenState extends ConsumerState<SectionsMgmtScreen> {
                                   }
                                 });
                               },
-                              selectedColor: Theme.of(context).colorScheme.primary.withValues(alpha: 0.2),
-                              checkmarkColor: Theme.of(context).colorScheme.primary,
+                              selectedColor: Theme.of(
+                                context,
+                              ).colorScheme.primary.withValues(alpha: 0.2),
+                              checkmarkColor: Theme.of(
+                                context,
+                              ).colorScheme.primary,
                               labelStyle: TextStyle(
-                                color: isSelected ? Theme.of(context).colorScheme.primary : AppTheme.text,
-                                fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+                                color: isSelected
+                                    ? Theme.of(context).colorScheme.primary
+                                    : AppTheme.text,
+                                fontWeight: isSelected
+                                    ? FontWeight.bold
+                                    : FontWeight.normal,
                                 fontSize: 12,
                               ),
                             );
@@ -268,36 +357,48 @@ class _SectionsMgmtScreenState extends ConsumerState<SectionsMgmtScreen> {
                     if (editNameController.text.isNotEmpty) {
                       _showConfirmation(
                         title: 'Save Changes',
-                        content: 'Are you sure you want to update this section?',
+                        content:
+                            'Are you sure you want to update this section?',
                         onConfirm: () async {
                           final sectionId = section['id'];
                           final nav = Navigator.of(context);
                           if (sectionId is int) {
-                            final rawKey = editKeyController.text.trim().toUpperCase();
-                            final key = rawKey.isNotEmpty ? rawKey : (section['enrollment_key'] ?? 'SEC-${section['id']}');
+                            final rawKey = editKeyController.text
+                                .trim()
+                                .toUpperCase();
+                            final key = rawKey.isNotEmpty
+                                ? rawKey
+                                : (section['enrollment_key'] ??
+                                      'SEC-${section['id']}');
                             try {
-                              await ref.read(sectionsProvider.notifier).updateSection(
-                                sectionId,
-                                {
-                                  'name': editNameController.text.trim(),
-                                  'description': editDescController.text.trim(),
-                                  'grade': editSelectedGrade.isNotEmpty ? editSelectedGrade : (section['grade'] ?? 'Grade 11'),
-                                  'room': editRoomController.text.trim(),
-                                  'enrollment_key': key,
-                                  'subject_ids': editSelectedSubjectCodes.toList(),
-                                },
-                              );
+                              await ref
+                                  .read(sectionsProvider.notifier)
+                                  .updateSection(sectionId, {
+                                    'name': editNameController.text.trim(),
+                                    'description': editDescController.text
+                                        .trim(),
+                                    'grade': editSelectedGrade.isNotEmpty
+                                        ? editSelectedGrade
+                                        : (section['grade'] ?? 'Grade 11'),
+                                    'room': editRoomController.text.trim(),
+                                    'enrollment_key': key,
+                                    'subject_ids': editSelectedSubjectCodes
+                                        .toList(),
+                                  });
                               if (mounted) {
                                 AiraActionToast.showSuccess(
                                   context,
                                   title: 'Section Updated',
-                                  message: 'Section "${editNameController.text.trim()}" updated successfully.',
+                                  message:
+                                      'Section "${editNameController.text.trim()}" updated successfully.',
                                 );
                               }
                             } catch (e) {
                               if (mounted) {
                                 final errStr = e.toString();
-                                final displayMsg = errStr.contains('UNIQUE constraint') || errStr.contains('already exists')
+                                final displayMsg =
+                                    errStr.contains('UNIQUE constraint') ||
+                                        errStr.contains('already exists')
                                     ? 'A section with this enrollment key or name already exists.'
                                     : 'Failed to update section: ${errStr.replaceFirst("Exception: ", "")}';
                                 AiraActionToast.showError(
@@ -332,11 +433,13 @@ class _SectionsMgmtScreenState extends ConsumerState<SectionsMgmtScreen> {
     final addSelectedSubjectCodes = <String>{};
     String? addSelectedTeacherId;
     String? addSelectedTeacherName;
-    String addSelectedGrade = (initialGrade != null && _grades.contains(initialGrade))
+    String addSelectedGrade =
+        (initialGrade != null && _grades.contains(initialGrade))
         ? initialGrade
-        : (_selectedGradeFilter != 'All' && _grades.contains(_selectedGradeFilter)
-            ? _selectedGradeFilter
-            : 'Grade 10');
+        : (_selectedGradeFilter != 'All' &&
+                  _grades.contains(_selectedGradeFilter)
+              ? _selectedGradeFilter
+              : 'Grade 10');
     String autoEnrollmentKey = SectionKeyHelper.generateKey(
       sectionName: 'Section',
       gradeLevel: addSelectedGrade,
@@ -350,21 +453,33 @@ class _SectionsMgmtScreenState extends ConsumerState<SectionsMgmtScreen> {
           builder: (context, setDialogState) {
             return AlertDialog(
               backgroundColor: Theme.of(context).colorScheme.surface,
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(16),
+              ),
               title: Row(
                 children: [
                   Container(
                     padding: const EdgeInsets.all(8),
                     decoration: BoxDecoration(
-                      color: Theme.of(context).colorScheme.primary.withValues(alpha: 0.12),
+                      color: Theme.of(
+                        context,
+                      ).colorScheme.primary.withValues(alpha: 0.12),
                       borderRadius: BorderRadius.circular(10),
                     ),
-                    child: Icon(Icons.groups_outlined, size: 20, color: Theme.of(context).colorScheme.primary),
+                    child: Icon(
+                      Icons.groups_outlined,
+                      size: 20,
+                      color: Theme.of(context).colorScheme.primary,
+                    ),
                   ),
                   const SizedBox(width: 12),
                   Text(
                     'Add New Section',
-                    style: TextStyle(color: AppTheme.text, fontWeight: FontWeight.bold, fontSize: 18),
+                    style: TextStyle(
+                      color: AppTheme.text,
+                      fontWeight: FontWeight.bold,
+                      fontSize: 18,
+                    ),
                   ),
                 ],
               ),
@@ -380,7 +495,13 @@ class _SectionsMgmtScreenState extends ConsumerState<SectionsMgmtScreen> {
                         TextFormField(
                           controller: addNameController,
                           maxLength: 40,
-                          buildCounter: (context, {required currentLength, required isFocused, maxLength}) => null,
+                          buildCounter:
+                              (
+                                context, {
+                                required currentLength,
+                                required isFocused,
+                                maxLength,
+                              }) => null,
                           style: TextStyle(color: AppTheme.text),
                           decoration: const InputDecoration(
                             labelText: 'Section Name',
@@ -391,10 +512,13 @@ class _SectionsMgmtScreenState extends ConsumerState<SectionsMgmtScreen> {
                           onChanged: (val) {
                             if (!isCustomKey) {
                               setDialogState(() {
-                                autoEnrollmentKey = SectionKeyHelper.generateKey(
-                                  sectionName: val.trim().isNotEmpty ? val.trim() : 'Section',
-                                  gradeLevel: addSelectedGrade,
-                                );
+                                autoEnrollmentKey =
+                                    SectionKeyHelper.generateKey(
+                                      sectionName: val.trim().isNotEmpty
+                                          ? val.trim()
+                                          : 'Section',
+                                      gradeLevel: addSelectedGrade,
+                                    );
                               });
                             }
                           },
@@ -410,24 +534,42 @@ class _SectionsMgmtScreenState extends ConsumerState<SectionsMgmtScreen> {
                         TextFormField(
                           controller: addRoomController,
                           maxLength: 30,
-                          buildCounter: (context, {required currentLength, required isFocused, maxLength}) => null,
+                          buildCounter:
+                              (
+                                context, {
+                                required currentLength,
+                                required isFocused,
+                                maxLength,
+                              }) => null,
                           style: TextStyle(color: AppTheme.text),
                           decoration: const InputDecoration(
                             labelText: 'Room / Building',
                             counterText: '',
                             hintText: 'e.g., Room 304 - Science Bldg',
-                            prefixIcon: Icon(Icons.meeting_room_outlined, size: 20),
+                            prefixIcon: Icon(
+                              Icons.meeting_room_outlined,
+                              size: 20,
+                            ),
                           ),
                         ),
                         const SizedBox(height: 14),
 
                         // Auto-Generated Enrollment Key Card - Zero typing required!
                         Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 14,
+                            vertical: 12,
+                          ),
                           decoration: BoxDecoration(
-                            color: Theme.of(context).colorScheme.primary.withValues(alpha: 0.08),
+                            color: Theme.of(
+                              context,
+                            ).colorScheme.primary.withValues(alpha: 0.08),
                             borderRadius: BorderRadius.circular(12),
-                            border: Border.all(color: Theme.of(context).colorScheme.primary.withValues(alpha: 0.25)),
+                            border: Border.all(
+                              color: Theme.of(
+                                context,
+                              ).colorScheme.primary.withValues(alpha: 0.25),
+                            ),
                           ),
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
@@ -441,12 +583,20 @@ class _SectionsMgmtScreenState extends ConsumerState<SectionsMgmtScreen> {
                                   Row(
                                     mainAxisSize: MainAxisSize.min,
                                     children: [
-                                      Icon(Icons.vpn_key_rounded, size: 16, color: Theme.of(context).colorScheme.primary),
+                                      Icon(
+                                        Icons.vpn_key_rounded,
+                                        size: 16,
+                                        color: Theme.of(
+                                          context,
+                                        ).colorScheme.primary,
+                                      ),
                                       const SizedBox(width: 6),
                                       Text(
                                         'Enrollment Key (optional)', // Exact text preserved for widget test compatibility
                                         style: TextStyle(
-                                          color: Theme.of(context).colorScheme.primary,
+                                          color: Theme.of(
+                                            context,
+                                          ).colorScheme.primary,
                                           fontWeight: FontWeight.bold,
                                           fontSize: 12,
                                         ),
@@ -454,15 +604,23 @@ class _SectionsMgmtScreenState extends ConsumerState<SectionsMgmtScreen> {
                                     ],
                                   ),
                                   Container(
-                                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                                    padding: const EdgeInsets.symmetric(
+                                      horizontal: 8,
+                                      vertical: 2,
+                                    ),
                                     decoration: BoxDecoration(
-                                      color: Theme.of(context).colorScheme.primary.withValues(alpha: 0.15),
+                                      color: Theme.of(context)
+                                          .colorScheme
+                                          .primary
+                                          .withValues(alpha: 0.15),
                                       borderRadius: BorderRadius.circular(10),
                                     ),
                                     child: Text(
                                       'AUTO-GENERATED',
                                       style: TextStyle(
-                                        color: Theme.of(context).colorScheme.primary,
+                                        color: Theme.of(
+                                          context,
+                                        ).colorScheme.primary,
                                         fontWeight: FontWeight.w700,
                                         fontSize: 10,
                                         letterSpacing: 0.5,
@@ -476,7 +634,10 @@ class _SectionsMgmtScreenState extends ConsumerState<SectionsMgmtScreen> {
                                 children: [
                                   Expanded(
                                     child: SelectableText(
-                                      isCustomKey && addKeyController.text.isNotEmpty ? addKeyController.text : autoEnrollmentKey,
+                                      isCustomKey &&
+                                              addKeyController.text.isNotEmpty
+                                          ? addKeyController.text
+                                          : autoEnrollmentKey,
                                       style: TextStyle(
                                         color: AppTheme.text,
                                         fontFamily: 'monospace',
@@ -488,28 +649,52 @@ class _SectionsMgmtScreenState extends ConsumerState<SectionsMgmtScreen> {
                                   ),
                                   IconButton(
                                     tooltip: 'Shuffle variant suffix',
-                                    icon: Icon(Icons.shuffle_rounded, size: 18, color: Theme.of(context).colorScheme.primary),
+                                    icon: Icon(
+                                      Icons.shuffle_rounded,
+                                      size: 18,
+                                      color: Theme.of(
+                                        context,
+                                      ).colorScheme.primary,
+                                    ),
                                     onPressed: () {
                                       setDialogState(() {
                                         isCustomKey = false;
                                         addKeyController.clear();
-                                        autoEnrollmentKey = SectionKeyHelper.generateRandomVariation(
-                                          sectionName: addNameController.text.trim().isNotEmpty ? addNameController.text.trim() : 'Section',
-                                          gradeLevel: addSelectedGrade,
-                                        );
+                                        autoEnrollmentKey =
+                                            SectionKeyHelper.generateRandomVariation(
+                                              sectionName:
+                                                  addNameController.text
+                                                      .trim()
+                                                      .isNotEmpty
+                                                  ? addNameController.text
+                                                        .trim()
+                                                  : 'Section',
+                                              gradeLevel: addSelectedGrade,
+                                            );
                                       });
                                     },
                                   ),
                                   IconButton(
                                     tooltip: 'Copy key',
-                                    icon: Icon(Icons.copy_rounded, size: 16, color: AppTheme.textSecondary),
+                                    icon: Icon(
+                                      Icons.copy_rounded,
+                                      size: 16,
+                                      color: AppTheme.textSecondary,
+                                    ),
                                     onPressed: () {
-                                      final keyToCopy = isCustomKey && addKeyController.text.isNotEmpty ? addKeyController.text : autoEnrollmentKey;
-                                      Clipboard.setData(ClipboardData(text: keyToCopy));
+                                      final keyToCopy =
+                                          isCustomKey &&
+                                              addKeyController.text.isNotEmpty
+                                          ? addKeyController.text
+                                          : autoEnrollmentKey;
+                                      Clipboard.setData(
+                                        ClipboardData(text: keyToCopy),
+                                      );
                                       AiraActionToast.show(
                                         context,
                                         title: 'Key Copied',
-                                        message: 'Copied key "$keyToCopy" to clipboard',
+                                        message:
+                                            'Copied key "$keyToCopy" to clipboard',
                                         type: AiraToastType.info,
                                         customIcon: Icons.copy_rounded,
                                         duration: const Duration(seconds: 3),
@@ -521,7 +706,10 @@ class _SectionsMgmtScreenState extends ConsumerState<SectionsMgmtScreen> {
                               const SizedBox(height: 2),
                               Text(
                                 'Generated automatically when creating this section. Zero typing needed.',
-                                style: TextStyle(fontSize: 11, color: AppTheme.textSecondary),
+                                style: TextStyle(
+                                  fontSize: 11,
+                                  color: AppTheme.textSecondary,
+                                ),
                               ),
                             ],
                           ),
@@ -537,14 +725,24 @@ class _SectionsMgmtScreenState extends ConsumerState<SectionsMgmtScreen> {
                             },
                             child: Text(
                               '+ Customize key manually (optional)',
-                              style: TextStyle(fontSize: 11, color: AppTheme.primary, decoration: TextDecoration.underline),
+                              style: TextStyle(
+                                fontSize: 11,
+                                color: AppTheme.primary,
+                                decoration: TextDecoration.underline,
+                              ),
                             ),
                           )
                         else
                           TextFormField(
                             controller: addKeyController,
                             maxLength: 15,
-                            buildCounter: (context, {required currentLength, required isFocused, maxLength}) => null,
+                            buildCounter:
+                                (
+                                  context, {
+                                  required currentLength,
+                                  required isFocused,
+                                  maxLength,
+                                }) => null,
                             style: TextStyle(color: AppTheme.text),
                             textCapitalization: TextCapitalization.characters,
                             decoration: const InputDecoration(
@@ -569,7 +767,11 @@ class _SectionsMgmtScreenState extends ConsumerState<SectionsMgmtScreen> {
                         const SizedBox(height: 16),
                         Text(
                           'Assign Grade Level',
-                          style: TextStyle(color: AppTheme.textSecondary, fontSize: 13, fontWeight: FontWeight.w600),
+                          style: TextStyle(
+                            color: AppTheme.textSecondary,
+                            fontSize: 13,
+                            fontWeight: FontWeight.w600,
+                          ),
                         ),
                         const SizedBox(height: 10),
                         Wrap(
@@ -585,23 +787,41 @@ class _SectionsMgmtScreenState extends ConsumerState<SectionsMgmtScreen> {
                                   setDialogState(() {
                                     addSelectedGrade = grade;
                                     if (!isCustomKey) {
-                                      autoEnrollmentKey = SectionKeyHelper.generateKey(
-                                        sectionName: addNameController.text.trim().isNotEmpty ? addNameController.text.trim() : 'Section',
-                                        gradeLevel: grade,
-                                      );
+                                      autoEnrollmentKey =
+                                          SectionKeyHelper.generateKey(
+                                            sectionName:
+                                                addNameController.text
+                                                    .trim()
+                                                    .isNotEmpty
+                                                ? addNameController.text.trim()
+                                                : 'Section',
+                                            gradeLevel: grade,
+                                          );
                                     }
                                   });
                                 }
                               },
-                              selectedColor: Theme.of(context).colorScheme.primary,
-                              backgroundColor: Theme.of(context).colorScheme.surface,
+                              selectedColor: Theme.of(
+                                context,
+                              ).colorScheme.primary,
+                              backgroundColor: Theme.of(
+                                context,
+                              ).colorScheme.surface,
                               labelStyle: TextStyle(
-                                color: isSelected ? Colors.white : AppTheme.textSecondary,
+                                color: isSelected
+                                    ? Colors.white
+                                    : AppTheme.textSecondary,
                                 fontWeight: FontWeight.w600,
                                 fontSize: 12,
                               ),
-                              side: BorderSide(color: isSelected ? AppTheme.primary : AppTheme.border),
-                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+                              side: BorderSide(
+                                color: isSelected
+                                    ? AppTheme.primary
+                                    : AppTheme.border,
+                              ),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(20),
+                              ),
                             );
                           }).toList(),
                         ),
@@ -611,17 +831,30 @@ class _SectionsMgmtScreenState extends ConsumerState<SectionsMgmtScreen> {
                           children: [
                             Text(
                               'Assign Curriculum Subjects',
-                              style: TextStyle(color: AppTheme.textSecondary, fontSize: 13, fontWeight: FontWeight.bold),
+                              style: TextStyle(
+                                color: AppTheme.textSecondary,
+                                fontSize: 13,
+                                fontWeight: FontWeight.bold,
+                              ),
                             ),
                             Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 8,
+                                vertical: 2,
+                              ),
                               decoration: BoxDecoration(
-                                color: Theme.of(context).colorScheme.primary.withValues(alpha: 0.12),
+                                color: Theme.of(
+                                  context,
+                                ).colorScheme.primary.withValues(alpha: 0.12),
                                 borderRadius: BorderRadius.circular(6),
                               ),
                               child: Text(
                                 '${addSelectedSubjectCodes.length} selected',
-                                style: TextStyle(color: Theme.of(context).colorScheme.primary, fontSize: 11, fontWeight: FontWeight.bold),
+                                style: TextStyle(
+                                  color: Theme.of(context).colorScheme.primary,
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.bold,
+                                ),
                               ),
                             ),
                           ],
@@ -632,10 +865,16 @@ class _SectionsMgmtScreenState extends ConsumerState<SectionsMgmtScreen> {
                             final subjects = cRef.watch(subjectsProvider);
                             if (subjects.isEmpty) {
                               return Padding(
-                                padding: const EdgeInsets.symmetric(vertical: 8),
+                                padding: const EdgeInsets.symmetric(
+                                  vertical: 8,
+                                ),
                                 child: Text(
                                   'No subjects found in database. Create subjects under Subjects & Courses first.',
-                                  style: TextStyle(color: AppTheme.textSecondary, fontSize: 12, fontStyle: FontStyle.italic),
+                                  style: TextStyle(
+                                    color: AppTheme.textSecondary,
+                                    fontSize: 12,
+                                    fontStyle: FontStyle.italic,
+                                  ),
                                 ),
                               );
                             }
@@ -643,9 +882,15 @@ class _SectionsMgmtScreenState extends ConsumerState<SectionsMgmtScreen> {
                               spacing: 8,
                               runSpacing: 8,
                               children: subjects.map((sub) {
-                                final code = sub['subject_code']?.toString().toUpperCase() ?? sub['id']?.toString().toUpperCase() ?? '';
+                                final code =
+                                    sub['subject_code']
+                                        ?.toString()
+                                        .toUpperCase() ??
+                                    sub['id']?.toString().toUpperCase() ??
+                                    '';
                                 final name = sub['name']?.toString() ?? code;
-                                final isSelected = addSelectedSubjectCodes.contains(code);
+                                final isSelected = addSelectedSubjectCodes
+                                    .contains(code);
                                 return FilterChip(
                                   label: Text('$code ($name)'),
                                   selected: isSelected,
@@ -658,11 +903,19 @@ class _SectionsMgmtScreenState extends ConsumerState<SectionsMgmtScreen> {
                                       }
                                     });
                                   },
-                                  selectedColor: Theme.of(context).colorScheme.primary.withValues(alpha: 0.2),
-                                  checkmarkColor: Theme.of(context).colorScheme.primary,
+                                  selectedColor: Theme.of(
+                                    context,
+                                  ).colorScheme.primary.withValues(alpha: 0.2),
+                                  checkmarkColor: Theme.of(
+                                    context,
+                                  ).colorScheme.primary,
                                   labelStyle: TextStyle(
-                                    color: isSelected ? Theme.of(context).colorScheme.primary : AppTheme.text,
-                                    fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+                                    color: isSelected
+                                        ? Theme.of(context).colorScheme.primary
+                                        : AppTheme.text,
+                                    fontWeight: isSelected
+                                        ? FontWeight.bold
+                                        : FontWeight.normal,
                                     fontSize: 12,
                                   ),
                                 );
@@ -673,30 +926,47 @@ class _SectionsMgmtScreenState extends ConsumerState<SectionsMgmtScreen> {
                         const SizedBox(height: 16),
                         Text(
                           'Designated Teacher / Room Admin',
-                          style: TextStyle(color: AppTheme.textSecondary, fontSize: 13, fontWeight: FontWeight.bold),
+                          style: TextStyle(
+                            color: AppTheme.textSecondary,
+                            fontSize: 13,
+                            fontWeight: FontWeight.bold,
+                          ),
                         ),
                         const SizedBox(height: 6),
                         Consumer(
                           builder: (context, cRef, _) {
                             final teachers = cRef.watch(adminTeachersProvider);
                             return DropdownButtonFormField<String>(
-                              value: addSelectedTeacherId,
-                              dropdownColor: Theme.of(context).colorScheme.surface,
+                              initialValue: addSelectedTeacherId,
+                              dropdownColor: Theme.of(
+                                context,
+                              ).colorScheme.surface,
                               decoration: const InputDecoration(
-                                hintText: 'Auto-assign from curriculum subjects',
-                                prefixIcon: Icon(Icons.person_outline, size: 20),
+                                hintText:
+                                    'Auto-assign from curriculum subjects',
+                                prefixIcon: Icon(
+                                  Icons.person_outline,
+                                  size: 20,
+                                ),
                               ),
                               items: [
                                 const DropdownMenuItem<String>(
                                   value: null,
-                                  child: Text('Auto-assign from subjects / First faculty'),
+                                  child: Text(
+                                    'Auto-assign from subjects / First faculty',
+                                  ),
                                 ),
                                 ...teachers.map((t) {
                                   final tId = t['id']?.toString() ?? '';
-                                  final tName = t['full_name']?.toString() ?? t['name']?.toString() ?? tId;
+                                  final tName =
+                                      t['full_name']?.toString() ??
+                                      t['name']?.toString() ??
+                                      tId;
                                   return DropdownMenuItem<String>(
                                     value: tId,
-                                    child: Text('$tName (${t['email'] ?? tId})'),
+                                    child: Text(
+                                      '$tName (${t['email'] ?? tId})',
+                                    ),
                                   );
                                 }),
                               ],
@@ -704,9 +974,14 @@ class _SectionsMgmtScreenState extends ConsumerState<SectionsMgmtScreen> {
                                 setDialogState(() {
                                   addSelectedTeacherId = val;
                                   if (val != null) {
-                                    final match = teachers.where((t) => t['id']?.toString() == val);
+                                    final match = teachers.where(
+                                      (t) => t['id']?.toString() == val,
+                                    );
                                     if (match.isNotEmpty) {
-                                      addSelectedTeacherName = match.first['full_name']?.toString() ?? match.first['name']?.toString();
+                                      addSelectedTeacherName =
+                                          match.first['full_name']
+                                              ?.toString() ??
+                                          match.first['name']?.toString();
                                     }
                                   } else {
                                     addSelectedTeacherName = null;
@@ -718,21 +993,38 @@ class _SectionsMgmtScreenState extends ConsumerState<SectionsMgmtScreen> {
                         ),
                         const SizedBox(height: 12),
                         Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 12,
+                            vertical: 10,
+                          ),
                           decoration: BoxDecoration(
-                            color: Theme.of(context).colorScheme.primary.withValues(alpha: 0.08),
+                            color: Theme.of(
+                              context,
+                            ).colorScheme.primary.withValues(alpha: 0.08),
                             borderRadius: BorderRadius.circular(10),
-                            border: Border.all(color: Theme.of(context).colorScheme.primary.withValues(alpha: 0.2)),
+                            border: Border.all(
+                              color: Theme.of(
+                                context,
+                              ).colorScheme.primary.withValues(alpha: 0.2),
+                            ),
                           ),
                           child: Row(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              Icon(Icons.forum_outlined, size: 18, color: Theme.of(context).colorScheme.primary),
+                              Icon(
+                                Icons.forum_outlined,
+                                size: 18,
+                                color: Theme.of(context).colorScheme.primary,
+                              ),
                               const SizedBox(width: 8),
                               Expanded(
                                 child: Text(
                                   'Automated Group Chat: An official class group chat will automatically be initialized with key "${isCustomKey && addKeyController.text.isNotEmpty ? addKeyController.text : autoEnrollmentKey}" and the assigned teacher as Room Admin. Only students enrolled in this section will auto-join.',
-                                  style: TextStyle(fontSize: 11, color: AppTheme.textSecondary, height: 1.3),
+                                  style: TextStyle(
+                                    fontSize: 11,
+                                    color: AppTheme.textSecondary,
+                                    height: 1.3,
+                                  ),
                                 ),
                               ),
                             ],
@@ -753,7 +1045,9 @@ class _SectionsMgmtScreenState extends ConsumerState<SectionsMgmtScreen> {
                     if (formKey.currentState?.validate() ?? false) {
                       final name = addNameController.text.trim();
                       final rawKey = addKeyController.text.trim().toUpperCase();
-                      final enrollmentKey = (isCustomKey && rawKey.isNotEmpty) ? rawKey : autoEnrollmentKey;
+                      final enrollmentKey = (isCustomKey && rawKey.isNotEmpty)
+                          ? rawKey
+                          : autoEnrollmentKey;
 
                       final rootContext = context;
                       final router = GoRouter.maybeOf(context);
@@ -762,7 +1056,9 @@ class _SectionsMgmtScreenState extends ConsumerState<SectionsMgmtScreen> {
                         await ref.read(sectionsProvider.notifier).addSection({
                           'name': name,
                           'description': addDescController.text.trim(),
-                          'grade': addSelectedGrade.isNotEmpty ? addSelectedGrade : 'Grade 10',
+                          'grade': addSelectedGrade.isNotEmpty
+                              ? addSelectedGrade
+                              : 'Grade 10',
                           'room': addRoomController.text.trim(),
                           'enrollment_key': enrollmentKey,
                           'subject_ids': addSelectedSubjectCodes.toList(),
@@ -775,7 +1071,8 @@ class _SectionsMgmtScreenState extends ConsumerState<SectionsMgmtScreen> {
                           AiraActionToast.showSuccess(
                             rootContext,
                             title: 'Section Created',
-                            message: 'Created section "$name" with Key: $enrollmentKey',
+                            message:
+                                'Created section "$name" with Key: $enrollmentKey',
                           );
                           try {
                             router?.go('/admin/keys');
@@ -784,7 +1081,9 @@ class _SectionsMgmtScreenState extends ConsumerState<SectionsMgmtScreen> {
                       } catch (e) {
                         if (rootContext.mounted) {
                           final errStr = e.toString();
-                          final displayMsg = errStr.contains('UNIQUE constraint') || errStr.contains('already exists')
+                          final displayMsg =
+                              errStr.contains('UNIQUE constraint') ||
+                                  errStr.contains('already exists')
                               ? 'A section with this enrollment key or name already exists. Please choose a different key.'
                               : 'Failed to create section: ${errStr.replaceFirst("Exception: ", "")}';
                           AiraActionToast.showError(
@@ -826,7 +1125,9 @@ class _SectionsMgmtScreenState extends ConsumerState<SectionsMgmtScreen> {
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 1),
               decoration: BoxDecoration(
-                color: isSelected ? Colors.white.withValues(alpha: 0.25) : primary.withValues(alpha: 0.12),
+                color: isSelected
+                    ? Colors.white.withValues(alpha: 0.25)
+                    : primary.withValues(alpha: 0.12),
                 borderRadius: BorderRadius.circular(10),
               ),
               child: Text(
@@ -863,9 +1164,16 @@ class _SectionsMgmtScreenState extends ConsumerState<SectionsMgmtScreen> {
   }
 
   Widget _buildGradeGroupHeader(String grade, int sectionCount) {
-    final isJuniorHigh = ['Grade 7', 'Grade 8', 'Grade 9', 'Grade 10'].contains(grade);
+    final isJuniorHigh = [
+      'Grade 7',
+      'Grade 8',
+      'Grade 9',
+      'Grade 10',
+    ].contains(grade);
     final isSeniorHigh = ['Grade 11', 'Grade 12'].contains(grade);
-    final division = isJuniorHigh ? 'Junior High School' : (isSeniorHigh ? 'Senior High School' : 'Classroom Department');
+    final division = isJuniorHigh
+        ? 'Junior High School'
+        : (isSeniorHigh ? 'Senior High School' : 'Classroom Department');
 
     return Container(
       margin: const EdgeInsets.only(top: 16, bottom: 12),
@@ -880,10 +1188,16 @@ class _SectionsMgmtScreenState extends ConsumerState<SectionsMgmtScreen> {
           Container(
             padding: const EdgeInsets.all(8),
             decoration: BoxDecoration(
-              color: Theme.of(context).colorScheme.primary.withValues(alpha: 0.12),
+              color: Theme.of(
+                context,
+              ).colorScheme.primary.withValues(alpha: 0.12),
               borderRadius: BorderRadius.circular(10),
             ),
-            child: Icon(Icons.school_outlined, size: 20, color: Theme.of(context).colorScheme.primary),
+            child: Icon(
+              Icons.school_outlined,
+              size: 20,
+              color: Theme.of(context).colorScheme.primary,
+            ),
           ),
           const SizedBox(width: 12),
           Expanded(
@@ -902,9 +1216,14 @@ class _SectionsMgmtScreenState extends ConsumerState<SectionsMgmtScreen> {
                     ),
                     const SizedBox(width: 8),
                     Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 8,
+                        vertical: 2,
+                      ),
                       decoration: BoxDecoration(
-                        color: Theme.of(context).colorScheme.primary.withValues(alpha: 0.12),
+                        color: Theme.of(
+                          context,
+                        ).colorScheme.primary.withValues(alpha: 0.12),
                         borderRadius: BorderRadius.circular(12),
                       ),
                       child: Text(
@@ -930,7 +1249,9 @@ class _SectionsMgmtScreenState extends ConsumerState<SectionsMgmtScreen> {
             onPressed: () => _showAddSectionDialog(initialGrade: grade),
             icon: const Icon(Icons.add, size: 14),
             label: Text(
-              MediaQuery.sizeOf(context).width < 600 ? 'Add' : 'Add $grade Section',
+              MediaQuery.sizeOf(context).width < 600
+                  ? 'Add'
+                  : 'Add $grade Section',
               style: const TextStyle(fontSize: 12),
             ),
             style: ElevatedButton.styleFrom(
@@ -941,7 +1262,9 @@ class _SectionsMgmtScreenState extends ConsumerState<SectionsMgmtScreen> {
                 vertical: 8,
               ),
               minimumSize: const Size(0, 34),
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(8),
+              ),
               elevation: 0,
             ),
           ),
@@ -963,11 +1286,19 @@ class _SectionsMgmtScreenState extends ConsumerState<SectionsMgmtScreen> {
       ),
       child: Column(
         children: [
-          Icon(Icons.groups_outlined, size: 48, color: AppTheme.textMuted.withValues(alpha: 0.5)),
+          Icon(
+            Icons.groups_outlined,
+            size: 48,
+            color: AppTheme.textMuted.withValues(alpha: 0.5),
+          ),
           const SizedBox(height: 12),
           Text(
             'No sections created for $grade yet',
-            style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: AppTheme.text),
+            style: TextStyle(
+              fontSize: 16,
+              fontWeight: FontWeight.bold,
+              color: AppTheme.text,
+            ),
           ),
           const SizedBox(height: 4),
           Text(
@@ -984,7 +1315,9 @@ class _SectionsMgmtScreenState extends ConsumerState<SectionsMgmtScreen> {
               foregroundColor: Colors.white,
               minimumSize: const Size(0, 38),
               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(8),
+              ),
               elevation: 0,
             ),
           ),
@@ -1036,204 +1369,264 @@ class _SectionsMgmtScreenState extends ConsumerState<SectionsMgmtScreen> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-              // Header
-              LayoutBuilder(
-                builder: (context, headerConstraints) {
-                  final isNarrow = headerConstraints.maxWidth < 600;
+                // Header
+                LayoutBuilder(
+                  builder: (context, headerConstraints) {
+                    final isNarrow = headerConstraints.maxWidth < 600;
 
-                  final titleSection = Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        'Manage Sections',
-                        style: TextStyle(
-                          fontSize: isNarrow ? 20 : 24,
-                          fontWeight: FontWeight.bold,
-                          color: Theme.of(context).colorScheme.onSurface,
-                        ),
-                      ),
-                      const SizedBox(height: 4),
-                      Text(
-                        '${sections.length} active sections · Separated by grade level',
-                        style: TextStyle(color: AppTheme.textSecondary, fontSize: isNarrow ? 12.5 : 14),
-                      ),
-                    ],
-                  );
-
-                  final actionBtn = ElevatedButton.icon(
-                    onPressed: () => _showAddSectionDialog(
-                      initialGrade: _selectedGradeFilter != 'All' ? _selectedGradeFilter : 'Grade 10',
-                    ),
-                    icon: const Icon(Icons.add, size: 18),
-                    label: const Text('Add Section'),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: Theme.of(context).colorScheme.primary,
-                      foregroundColor: Colors.white,
-                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                      elevation: 0,
-                      minimumSize: const Size(0, 42),
-                    ),
-                  );
-
-                  if (isNarrow) {
-                    return Column(
+                    final titleSection = Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        titleSection,
-                        const SizedBox(height: 12),
+                        Text(
+                          'Manage Sections',
+                          style: TextStyle(
+                            fontSize: isNarrow ? 20 : 24,
+                            fontWeight: FontWeight.bold,
+                            color: Theme.of(context).colorScheme.onSurface,
+                          ),
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          '${sections.length} active sections · Separated by grade level',
+                          style: TextStyle(
+                            color: AppTheme.textSecondary,
+                            fontSize: isNarrow ? 12.5 : 14,
+                          ),
+                        ),
+                      ],
+                    );
+
+                    final actionBtn = ElevatedButton.icon(
+                      onPressed: () => _showAddSectionDialog(
+                        initialGrade: _selectedGradeFilter != 'All'
+                            ? _selectedGradeFilter
+                            : 'Grade 10',
+                      ),
+                      icon: const Icon(Icons.add, size: 18),
+                      label: const Text('Add Section'),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: Theme.of(context).colorScheme.primary,
+                        foregroundColor: Colors.white,
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 16,
+                          vertical: 12,
+                        ),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                        elevation: 0,
+                        minimumSize: const Size(0, 42),
+                      ),
+                    );
+
+                    if (isNarrow) {
+                      return Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          titleSection,
+                          const SizedBox(height: 12),
+                          actionBtn,
+                        ],
+                      );
+                    }
+
+                    return Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Expanded(child: titleSection),
+                        const SizedBox(width: 16),
                         actionBtn,
                       ],
                     );
-                  }
-
-                  return Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Expanded(child: titleSection),
-                      const SizedBox(width: 16),
-                      actionBtn,
-                    ],
-                  );
-                },
-              ),
-              const SizedBox(height: 20),
-
-              // Grade Level Filter Chips Bar
-              SingleChildScrollView(
-                scrollDirection: Axis.horizontal,
-                child: Row(
-                  children: [
-                    _buildGradeFilterChip('All', sections.length),
-                    ..._grades.map((g) => _buildGradeFilterChip(g, gradeSectionCounts[g] ?? 0)),
-                  ],
+                  },
                 ),
-              ),
-              const SizedBox(height: 20),
+                const SizedBox(height: 20),
 
-              // Empty state when no sections exist overall
-              if (sections.isEmpty)
-                Container(
-                  padding: const EdgeInsets.symmetric(vertical: 40, horizontal: 20),
-                  alignment: Alignment.center,
-                  child: Column(
+                // Grade Level Filter Chips Bar
+                SingleChildScrollView(
+                  scrollDirection: Axis.horizontal,
+                  child: Row(
                     children: [
-                      Icon(Icons.groups_outlined, size: 48, color: AppTheme.textMuted),
-                      const SizedBox(height: 12),
-                      Text('No class sections created yet.', style: TextStyle(color: AppTheme.textSecondary, fontSize: 16)),
-                      const SizedBox(height: 4),
-                      Text('Click "+ Add Section" above to add your first classroom section with room assignment.', style: TextStyle(color: AppTheme.textMuted, fontSize: 13)),
-                      const SizedBox(height: 16),
-                      ElevatedButton.icon(
-                        onPressed: () => _showAddSectionDialog(initialGrade: 'Grade 10'),
-                        icon: const Icon(Icons.add, size: 18),
-                        label: const Text('Create First Section'),
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: Theme.of(context).colorScheme.primary,
-                          foregroundColor: Colors.white,
-                          minimumSize: const Size(0, 40),
+                      _buildGradeFilterChip('All', sections.length),
+                      ..._grades.map(
+                        (g) => _buildGradeFilterChip(
+                          g,
+                          gradeSectionCounts[g] ?? 0,
                         ),
                       ),
                     ],
                   ),
-                )
-              else if (_selectedGradeFilter == 'All') ...[
-                // Render sections separated into Grade Level groups
-                ...sortedGrades.expand((grade) {
-                  final gradeSecs = groupedSections[grade] ?? [];
-                  return [
-                    _buildGradeGroupHeader(grade, gradeSecs.length),
-                    ...gradeSecs.map((section) => _SectionCard(
-                      section: section,
-                      onEdit: () => _showEditDialog(section),
-                      onDelete: () {
-                        _showConfirmation(
-                          title: 'Delete Section',
-                          content: 'Are you sure you want to delete "${section['name']}"?',
-                          onConfirm: () async {
-                            final sectionId = section['id'];
-                            final secName = section['name']?.toString() ?? 'Section';
-                            if (sectionId is int) {
-                              try {
-                                await ref.read(sectionsProvider.notifier).deleteSection(sectionId);
-                                if (mounted) {
-                                  AiraActionToast.showDeleted(
-                                    context,
-                                    title: 'Section Deleted',
-                                    message: 'Section "$secName" was permanently deleted.',
-                                  );
+                ),
+                const SizedBox(height: 20),
+
+                // Empty state when no sections exist overall
+                if (sections.isEmpty)
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                      vertical: 40,
+                      horizontal: 20,
+                    ),
+                    alignment: Alignment.center,
+                    child: Column(
+                      children: [
+                        Icon(
+                          Icons.groups_outlined,
+                          size: 48,
+                          color: AppTheme.textMuted,
+                        ),
+                        const SizedBox(height: 12),
+                        Text(
+                          'No class sections created yet.',
+                          style: TextStyle(
+                            color: AppTheme.textSecondary,
+                            fontSize: 16,
+                          ),
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          'Click "+ Add Section" above to add your first classroom section with room assignment.',
+                          style: TextStyle(
+                            color: AppTheme.textMuted,
+                            fontSize: 13,
+                          ),
+                        ),
+                        const SizedBox(height: 16),
+                        ElevatedButton.icon(
+                          onPressed: () =>
+                              _showAddSectionDialog(initialGrade: 'Grade 10'),
+                          icon: const Icon(Icons.add, size: 18),
+                          label: const Text('Create First Section'),
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: Theme.of(
+                              context,
+                            ).colorScheme.primary,
+                            foregroundColor: Colors.white,
+                            minimumSize: const Size(0, 40),
+                          ),
+                        ),
+                      ],
+                    ),
+                  )
+                else if (_selectedGradeFilter == 'All') ...[
+                  // Render sections separated into Grade Level groups
+                  ...sortedGrades.expand((grade) {
+                    final gradeSecs = groupedSections[grade] ?? [];
+                    return [
+                      _buildGradeGroupHeader(grade, gradeSecs.length),
+                      ...gradeSecs.map(
+                        (section) => _SectionCard(
+                          section: section,
+                          onEdit: () => _showEditDialog(section),
+                          onDelete: () {
+                            _showConfirmation(
+                              title: 'Delete Section',
+                              content:
+                                  'Are you sure you want to delete "${section['name']}"?',
+                              onConfirm: () async {
+                                final sectionId = section['id'];
+                                final secName =
+                                    section['name']?.toString() ?? 'Section';
+                                if (sectionId is int) {
+                                  try {
+                                    await ref
+                                        .read(sectionsProvider.notifier)
+                                        .deleteSection(sectionId);
+                                    if (mounted) {
+                                      AiraActionToast.showDeleted(
+                                        context,
+                                        title: 'Section Deleted',
+                                        message:
+                                            'Section "$secName" was permanently deleted.',
+                                      );
+                                    }
+                                  } catch (e) {
+                                    if (mounted) {
+                                      AiraActionToast.showError(
+                                        context,
+                                        title: 'Failed to Delete Section',
+                                        message:
+                                            'Failed to delete section: ${e.toString().replaceFirst("Exception: ", "")}',
+                                      );
+                                    }
+                                  }
                                 }
-                              } catch (e) {
-                                if (mounted) {
-                                  AiraActionToast.showError(
-                                    context,
-                                    title: 'Failed to Delete Section',
-                                    message: 'Failed to delete section: ${e.toString().replaceFirst("Exception: ", "")}',
-                                  );
-                                }
-                              }
-                            }
+                              },
+                            );
                           },
-                        );
-                      },
-                    )),
-                  ];
-                }),
-              ] else ...[
-                // Render only selected grade level
-                () {
-                  final specificSecs = sections.where((s) => s['grade']?.toString() == _selectedGradeFilter).toList();
-                  if (specificSecs.isEmpty) {
-                    return _buildEmptyGradeState(_selectedGradeFilter);
-                  }
-                  return Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      _buildGradeGroupHeader(_selectedGradeFilter, specificSecs.length),
-                      ...specificSecs.map((section) => _SectionCard(
-                        section: section,
-                        onEdit: () => _showEditDialog(section),
-                        onDelete: () {
-                          _showConfirmation(
-                            title: 'Delete Section',
-                            content: 'Are you sure you want to delete "${section['name']}"?',
-                            onConfirm: () async {
-                              final sectionId = section['id'];
-                              final secName = section['name']?.toString() ?? 'Section';
-                              if (sectionId is int) {
-                                try {
-                                  await ref.read(sectionsProvider.notifier).deleteSection(sectionId);
-                                  if (mounted) {
-                                    AiraActionToast.showDeleted(
-                                      context,
-                                      title: 'Section Deleted',
-                                      message: 'Section "$secName" was permanently deleted.',
-                                    );
+                        ),
+                      ),
+                    ];
+                  }),
+                ] else ...[
+                  // Render only selected grade level
+                  () {
+                    final specificSecs = sections
+                        .where(
+                          (s) => s['grade']?.toString() == _selectedGradeFilter,
+                        )
+                        .toList();
+                    if (specificSecs.isEmpty) {
+                      return _buildEmptyGradeState(_selectedGradeFilter);
+                    }
+                    return Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        _buildGradeGroupHeader(
+                          _selectedGradeFilter,
+                          specificSecs.length,
+                        ),
+                        ...specificSecs.map(
+                          (section) => _SectionCard(
+                            section: section,
+                            onEdit: () => _showEditDialog(section),
+                            onDelete: () {
+                              _showConfirmation(
+                                title: 'Delete Section',
+                                content:
+                                    'Are you sure you want to delete "${section['name']}"?',
+                                onConfirm: () async {
+                                  final sectionId = section['id'];
+                                  final secName =
+                                      section['name']?.toString() ?? 'Section';
+                                  if (sectionId is int) {
+                                    try {
+                                      await ref
+                                          .read(sectionsProvider.notifier)
+                                          .deleteSection(sectionId);
+                                      if (mounted) {
+                                        AiraActionToast.showDeleted(
+                                          context,
+                                          title: 'Section Deleted',
+                                          message:
+                                              'Section "$secName" was permanently deleted.',
+                                        );
+                                      }
+                                    } catch (e) {
+                                      if (mounted) {
+                                        AiraActionToast.showError(
+                                          context,
+                                          title: 'Failed to Delete Section',
+                                          message:
+                                              'Failed to delete section: ${e.toString().replaceFirst("Exception: ", "")}',
+                                        );
+                                      }
+                                    }
                                   }
-                                } catch (e) {
-                                  if (mounted) {
-                                    AiraActionToast.showError(
-                                      context,
-                                      title: 'Failed to Delete Section',
-                                      message: 'Failed to delete section: ${e.toString().replaceFirst("Exception: ", "")}',
-                                    );
-                                  }
-                                }
-                              }
+                                },
+                              );
                             },
-                          );
-                        },
-                      )),
-                    ],
-                  );
-                }(),
+                          ),
+                        ),
+                      ],
+                    );
+                  }(),
+                ],
               ],
-            ],
+            ),
           ),
         ),
       ),
-    ),
-  );
+    );
   }
 }
 
@@ -1242,7 +1635,11 @@ class _SectionCard extends ConsumerStatefulWidget {
   final VoidCallback onEdit;
   final VoidCallback onDelete;
 
-  const _SectionCard({required this.section, required this.onEdit, required this.onDelete});
+  const _SectionCard({
+    required this.section,
+    required this.onEdit,
+    required this.onDelete,
+  });
 
   @override
   ConsumerState<_SectionCard> createState() => _SectionCardState();
@@ -1321,7 +1718,8 @@ class _SectionCardState extends ConsumerState<_SectionCard> {
     setState(() => _isLoadingStudents = true);
     try {
       final allStudents = await DatabaseHelper().getAdminStudentsList();
-      final sectionName = widget.section['name']?.toString().toLowerCase().trim() ?? '';
+      final sectionName =
+          widget.section['name']?.toString().toLowerCase().trim() ?? '';
       final matched = allStudents.where((s) {
         final sSection = s['section']?.toString().toLowerCase().trim() ?? '';
         if (sSection.isEmpty) return false;
@@ -1345,7 +1743,9 @@ class _SectionCardState extends ConsumerState<_SectionCard> {
     final room = widget.section['room']?.toString() ?? '';
     final studentCount = _sectionStudents.isNotEmpty
         ? _sectionStudents.length
-        : (widget.section['student_count'] ?? widget.section['studentCount'] ?? 0);
+        : (widget.section['student_count'] ??
+              widget.section['studentCount'] ??
+              0);
 
     return Container(
       margin: const EdgeInsets.only(bottom: 12),
@@ -1365,13 +1765,23 @@ class _SectionCardState extends ConsumerState<_SectionCard> {
                   children: [
                     Text(
                       widget.section['name'] ?? '',
-                      style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Theme.of(context).colorScheme.onSurface),
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.bold,
+                        color: Theme.of(context).colorScheme.onSurface,
+                      ),
                     ),
-                    if (widget.section['description'] != null && widget.section['description'].toString().isNotEmpty) ...[
+                    if (widget.section['description'] != null &&
+                        widget.section['description']
+                            .toString()
+                            .isNotEmpty) ...[
                       const SizedBox(height: 4),
                       Text(
                         widget.section['description'],
-                        style: TextStyle(color: AppTheme.textSecondary, fontSize: 13),
+                        style: TextStyle(
+                          color: AppTheme.textSecondary,
+                          fontSize: 13,
+                        ),
                       ),
                     ],
                     const SizedBox(height: 8),
@@ -1382,11 +1792,19 @@ class _SectionCardState extends ConsumerState<_SectionCard> {
                         Row(
                           mainAxisSize: MainAxisSize.min,
                           children: [
-                            Icon(Icons.school_outlined, size: 14, color: Theme.of(context).colorScheme.primary),
+                            Icon(
+                              Icons.school_outlined,
+                              size: 14,
+                              color: Theme.of(context).colorScheme.primary,
+                            ),
                             const SizedBox(width: 4),
                             Text(
                               widget.section['grade'] ?? 'No grade',
-                              style: TextStyle(color: AppTheme.primary, fontSize: 12, fontWeight: FontWeight.bold),
+                              style: TextStyle(
+                                color: AppTheme.primary,
+                                fontSize: 12,
+                                fontWeight: FontWeight.bold,
+                              ),
                             ),
                           ],
                         ),
@@ -1394,46 +1812,74 @@ class _SectionCardState extends ConsumerState<_SectionCard> {
                           Row(
                             mainAxisSize: MainAxisSize.min,
                             children: [
-                              Icon(Icons.meeting_room_outlined, size: 14, color: AppTheme.accent),
+                              Icon(
+                                Icons.meeting_room_outlined,
+                                size: 14,
+                                color: AppTheme.accent,
+                              ),
                               const SizedBox(width: 4),
                               Text(
                                 room,
-                                style: TextStyle(color: AppTheme.accent, fontSize: 12, fontWeight: FontWeight.bold),
+                                style: TextStyle(
+                                  color: AppTheme.accent,
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.bold,
+                                ),
                               ),
                             ],
                           ),
                         Row(
                           mainAxisSize: MainAxisSize.min,
                           children: [
-                            Icon(Icons.people_outline, size: 14, color: Theme.of(context).colorScheme.primary),
+                            Icon(
+                              Icons.people_outline,
+                              size: 14,
+                              color: Theme.of(context).colorScheme.primary,
+                            ),
                             const SizedBox(width: 4),
                             Text(
                               '$studentCount students',
-                              style: TextStyle(color: AppTheme.primary, fontSize: 12, fontWeight: FontWeight.bold),
+                              style: TextStyle(
+                                color: AppTheme.primary,
+                                fontSize: 12,
+                                fontWeight: FontWeight.bold,
+                              ),
                             ),
                           ],
                         ),
                         Row(
                           mainAxisSize: MainAxisSize.min,
                           children: [
-                            Icon(Icons.menu_book_outlined, size: 14, color: AppTheme.accent),
+                            Icon(
+                              Icons.menu_book_outlined,
+                              size: 14,
+                              color: AppTheme.accent,
+                            ),
                             const SizedBox(width: 4),
                             Text(
                               '${_assignedSubjects.length} subjects',
-                              style: TextStyle(color: AppTheme.accent, fontSize: 12, fontWeight: FontWeight.bold),
+                              style: TextStyle(
+                                color: AppTheme.accent,
+                                fontSize: 12,
+                                fontWeight: FontWeight.bold,
+                              ),
                             ),
                           ],
                         ),
                         if (widget.section['enrollment_key'] != null &&
-                            widget.section['enrollment_key'].toString().isNotEmpty) ...[
+                            widget.section['enrollment_key']
+                                .toString()
+                                .isNotEmpty) ...[
                           InkWell(
                             onTap: () {
-                              final key = widget.section['enrollment_key'].toString();
+                              final key = widget.section['enrollment_key']
+                                  .toString();
                               Clipboard.setData(ClipboardData(text: key));
                               AiraActionToast.show(
                                 context,
                                 title: 'Key Copied',
-                                message: 'Section Key "$key" copied to clipboard! Provide this to students.',
+                                message:
+                                    'Section Key "$key" copied to clipboard! Provide this to students.',
                                 type: AiraToastType.info,
                                 customIcon: Icons.copy_rounded,
                                 duration: const Duration(seconds: 3),
@@ -1441,28 +1887,51 @@ class _SectionCardState extends ConsumerState<_SectionCard> {
                             },
                             borderRadius: BorderRadius.circular(6),
                             child: Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 8,
+                                vertical: 2,
+                              ),
                               decoration: BoxDecoration(
-                                color: Theme.of(context).colorScheme.primary.withValues(alpha: 0.12),
+                                color: Theme.of(
+                                  context,
+                                ).colorScheme.primary.withValues(alpha: 0.12),
                                 borderRadius: BorderRadius.circular(6),
-                                border: Border.all(color: Theme.of(context).colorScheme.primary.withValues(alpha: 0.35)),
+                                border: Border.all(
+                                  color: Theme.of(
+                                    context,
+                                  ).colorScheme.primary.withValues(alpha: 0.35),
+                                ),
                               ),
                               child: Row(
                                 mainAxisSize: MainAxisSize.min,
                                 children: [
-                                  Icon(Icons.vpn_key, size: 12, color: Theme.of(context).colorScheme.primary),
+                                  Icon(
+                                    Icons.vpn_key,
+                                    size: 12,
+                                    color: Theme.of(
+                                      context,
+                                    ).colorScheme.primary,
+                                  ),
                                   const SizedBox(width: 4),
                                   Text(
                                     'Key: ${widget.section['enrollment_key']}',
                                     style: TextStyle(
-                                      color: Theme.of(context).colorScheme.primary,
+                                      color: Theme.of(
+                                        context,
+                                      ).colorScheme.primary,
                                       fontSize: 11,
                                       fontWeight: FontWeight.bold,
                                       letterSpacing: 0.5,
                                     ),
                                   ),
                                   const SizedBox(width: 4),
-                                  Icon(Icons.copy, size: 11, color: Theme.of(context).colorScheme.primary),
+                                  Icon(
+                                    Icons.copy,
+                                    size: 11,
+                                    color: Theme.of(
+                                      context,
+                                    ).colorScheme.primary,
+                                  ),
                                 ],
                               ),
                             ),
@@ -1478,31 +1947,49 @@ class _SectionCardState extends ConsumerState<_SectionCard> {
                 children: [
                   IconButton(
                     onPressed: widget.onEdit,
-                    icon: Icon(Icons.edit_outlined, color: Theme.of(context).colorScheme.primary, size: 18),
+                    icon: Icon(
+                      Icons.edit_outlined,
+                      color: Theme.of(context).colorScheme.primary,
+                      size: 18,
+                    ),
                     style: IconButton.styleFrom(
                       backgroundColor: AppTheme.primarySoft,
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(8),
+                      ),
                     ),
                   ),
                   const SizedBox(width: 4),
                   IconButton(
                     onPressed: widget.onDelete,
-                    icon: Icon(Icons.delete_outline, color: Theme.of(context).colorScheme.error, size: 18),
+                    icon: Icon(
+                      Icons.delete_outline,
+                      color: Theme.of(context).colorScheme.error,
+                      size: 18,
+                    ),
                     style: IconButton.styleFrom(
                       backgroundColor: AppTheme.errorSoft,
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(8),
+                      ),
                     ),
                   ),
                   const SizedBox(width: 4),
                   IconButton(
                     onPressed: () => setState(() => _isExpanded = !_isExpanded),
-                    icon: Icon(_isExpanded ? Icons.expand_less : Icons.expand_more, color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6), size: 20),
+                    icon: Icon(
+                      _isExpanded ? Icons.expand_less : Icons.expand_more,
+                      color: Theme.of(
+                        context,
+                      ).colorScheme.onSurface.withValues(alpha: 0.6),
+                      size: 20,
+                    ),
                   ),
                 ],
               ),
             ],
           ),
-          
+
           if (_isExpanded) ...[
             const SizedBox(height: 16),
             // Tabs
@@ -1519,19 +2006,32 @@ class _SectionCardState extends ConsumerState<_SectionCard> {
                       child: Container(
                         padding: const EdgeInsets.symmetric(vertical: 10),
                         decoration: BoxDecoration(
-                          color: _selectedTab == 0 ? AppTheme.primary : Colors.transparent,
+                          color: _selectedTab == 0
+                              ? AppTheme.primary
+                              : Colors.transparent,
                           borderRadius: BorderRadius.circular(8),
                         ),
                         child: Row(
                           mainAxisAlignment: MainAxisAlignment.center,
                           children: [
-                            Icon(Icons.people_outline, size: 16, color: _selectedTab == 0 ? Colors.black : AppTheme.textSecondary),
+                            Icon(
+                              Icons.people_outline,
+                              size: 16,
+                              color: _selectedTab == 0
+                                  ? Colors.black
+                                  : AppTheme.textSecondary,
+                            ),
                             const SizedBox(width: 6),
-                            Text('Students (${_sectionStudents.length})', style: TextStyle(
-                              color: _selectedTab == 0 ? Colors.black : AppTheme.textSecondary,
-                              fontWeight: FontWeight.bold,
-                              fontSize: 12,
-                            )),
+                            Text(
+                              'Students (${_sectionStudents.length})',
+                              style: TextStyle(
+                                color: _selectedTab == 0
+                                    ? Colors.black
+                                    : AppTheme.textSecondary,
+                                fontWeight: FontWeight.bold,
+                                fontSize: 12,
+                              ),
+                            ),
                           ],
                         ),
                       ),
@@ -1543,19 +2043,32 @@ class _SectionCardState extends ConsumerState<_SectionCard> {
                       child: Container(
                         padding: const EdgeInsets.symmetric(vertical: 10),
                         decoration: BoxDecoration(
-                          color: _selectedTab == 1 ? AppTheme.primary : Colors.transparent,
+                          color: _selectedTab == 1
+                              ? AppTheme.primary
+                              : Colors.transparent,
                           borderRadius: BorderRadius.circular(8),
                         ),
                         child: Row(
                           mainAxisAlignment: MainAxisAlignment.center,
                           children: [
-                            Icon(Icons.menu_book_outlined, size: 16, color: _selectedTab == 1 ? Colors.black : AppTheme.textSecondary),
+                            Icon(
+                              Icons.menu_book_outlined,
+                              size: 16,
+                              color: _selectedTab == 1
+                                  ? Colors.black
+                                  : AppTheme.textSecondary,
+                            ),
                             const SizedBox(width: 6),
-                            Text('Subjects (${_assignedSubjects.length})', style: TextStyle(
-                              color: _selectedTab == 1 ? Colors.black : AppTheme.textSecondary,
-                              fontWeight: FontWeight.bold,
-                              fontSize: 12,
-                            )),
+                            Text(
+                              'Subjects (${_assignedSubjects.length})',
+                              style: TextStyle(
+                                color: _selectedTab == 1
+                                    ? Colors.black
+                                    : AppTheme.textSecondary,
+                                fontWeight: FontWeight.bold,
+                                fontSize: 12,
+                              ),
+                            ),
                           ],
                         ),
                       ),
@@ -1567,19 +2080,32 @@ class _SectionCardState extends ConsumerState<_SectionCard> {
                       child: Container(
                         padding: const EdgeInsets.symmetric(vertical: 10),
                         decoration: BoxDecoration(
-                          color: _selectedTab == 2 ? AppTheme.primary : Colors.transparent,
+                          color: _selectedTab == 2
+                              ? AppTheme.primary
+                              : Colors.transparent,
                           borderRadius: BorderRadius.circular(8),
                         ),
                         child: Row(
                           mainAxisAlignment: MainAxisAlignment.center,
                           children: [
-                            Icon(Icons.bar_chart, size: 16, color: _selectedTab == 2 ? Colors.black : AppTheme.textSecondary),
+                            Icon(
+                              Icons.bar_chart,
+                              size: 16,
+                              color: _selectedTab == 2
+                                  ? Colors.black
+                                  : AppTheme.textSecondary,
+                            ),
                             const SizedBox(width: 6),
-                            Text('Progress', style: TextStyle(
-                              color: _selectedTab == 2 ? Colors.black : AppTheme.textSecondary,
-                              fontWeight: FontWeight.bold,
-                              fontSize: 12,
-                            )),
+                            Text(
+                              'Progress',
+                              style: TextStyle(
+                                color: _selectedTab == 2
+                                    ? Colors.black
+                                    : AppTheme.textSecondary,
+                                fontWeight: FontWeight.bold,
+                                fontSize: 12,
+                              ),
+                            ),
                           ],
                         ),
                       ),
@@ -1589,7 +2115,7 @@ class _SectionCardState extends ConsumerState<_SectionCard> {
               ),
             ),
             const SizedBox(height: 16),
-            
+
             if (_selectedTab == 0)
               _buildStudentsList()
             else if (_selectedTab == 1)
@@ -1621,7 +2147,11 @@ class _SectionCardState extends ConsumerState<_SectionCard> {
               children: [
                 Text(
                   'Assigned Curriculum Subjects',
-                  style: TextStyle(color: AppTheme.text, fontWeight: FontWeight.bold, fontSize: 13),
+                  style: TextStyle(
+                    color: AppTheme.text,
+                    fontWeight: FontWeight.bold,
+                    fontSize: 13,
+                  ),
                 ),
                 Text(
                   'Enrolled students will have these courses loaded',
@@ -1634,8 +2164,14 @@ class _SectionCardState extends ConsumerState<_SectionCard> {
               icon: const Icon(Icons.add_task_rounded, size: 14),
               label: const Text('Manage Subjects'),
               style: ElevatedButton.styleFrom(
-                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                textStyle: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 10,
+                  vertical: 6,
+                ),
+                textStyle: const TextStyle(
+                  fontSize: 11,
+                  fontWeight: FontWeight.bold,
+                ),
               ),
             ),
           ],
@@ -1652,17 +2188,28 @@ class _SectionCardState extends ConsumerState<_SectionCard> {
             child: Center(
               child: Column(
                 children: [
-                  Icon(Icons.auto_stories_outlined, size: 32, color: AppTheme.textSecondary.withValues(alpha: 0.5)),
+                  Icon(
+                    Icons.auto_stories_outlined,
+                    size: 32,
+                    color: AppTheme.textSecondary.withValues(alpha: 0.5),
+                  ),
                   const SizedBox(height: 8),
                   Text(
                     'No subjects assigned to this section yet.',
-                    style: TextStyle(color: AppTheme.text, fontWeight: FontWeight.bold, fontSize: 13),
+                    style: TextStyle(
+                      color: AppTheme.text,
+                      fontWeight: FontWeight.bold,
+                      fontSize: 13,
+                    ),
                   ),
                   const SizedBox(height: 4),
                   Text(
                     'Students in this section cannot see courses until subjects are assigned.',
                     textAlign: TextAlign.center,
-                    style: TextStyle(color: AppTheme.textSecondary, fontSize: 11),
+                    style: TextStyle(
+                      color: AppTheme.textSecondary,
+                      fontSize: 11,
+                    ),
                   ),
                   const SizedBox(height: 10),
                   OutlinedButton.icon(
@@ -1676,7 +2223,10 @@ class _SectionCardState extends ConsumerState<_SectionCard> {
           ),
         ] else ...[
           ..._assignedSubjects.map((sub) {
-            final code = sub['subject_code']?.toString().toUpperCase() ?? sub['id']?.toString().toUpperCase() ?? '';
+            final code =
+                sub['subject_code']?.toString().toUpperCase() ??
+                sub['id']?.toString().toUpperCase() ??
+                '';
             final name = sub['name']?.toString() ?? code;
             final teacherName = sub['teacher_name']?.toString();
             final grade = sub['grade_level']?.toString() ?? '';
@@ -1692,9 +2242,14 @@ class _SectionCardState extends ConsumerState<_SectionCard> {
               child: Row(
                 children: [
                   Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 8,
+                      vertical: 4,
+                    ),
                     decoration: BoxDecoration(
-                      color: Theme.of(context).colorScheme.primary.withValues(alpha: 0.15),
+                      color: Theme.of(
+                        context,
+                      ).colorScheme.primary.withValues(alpha: 0.15),
                       borderRadius: BorderRadius.circular(6),
                     ),
                     child: Text(
@@ -1714,22 +2269,44 @@ class _SectionCardState extends ConsumerState<_SectionCard> {
                       children: [
                         Text(
                           name,
-                          style: TextStyle(color: AppTheme.text, fontWeight: FontWeight.bold, fontSize: 13),
+                          style: TextStyle(
+                            color: AppTheme.text,
+                            fontWeight: FontWeight.bold,
+                            fontSize: 13,
+                          ),
                         ),
                         const SizedBox(height: 2),
                         Row(
                           children: [
                             if (grade.isNotEmpty) ...[
-                              Text(grade, style: TextStyle(color: AppTheme.textSecondary, fontSize: 11)),
+                              Text(
+                                grade,
+                                style: TextStyle(
+                                  color: AppTheme.textSecondary,
+                                  fontSize: 11,
+                                ),
+                              ),
                               const SizedBox(width: 6),
-                              Text('·', style: TextStyle(color: AppTheme.textSecondary)),
+                              Text(
+                                '·',
+                                style: TextStyle(color: AppTheme.textSecondary),
+                              ),
                               const SizedBox(width: 6),
                             ],
-                            Icon(Icons.person_outline, size: 12, color: AppTheme.textSecondary),
+                            Icon(
+                              Icons.person_outline,
+                              size: 12,
+                              color: AppTheme.textSecondary,
+                            ),
                             const SizedBox(width: 4),
                             Text(
-                              teacherName != null && teacherName.isNotEmpty ? teacherName : 'No teacher assigned',
-                              style: TextStyle(color: AppTheme.textSecondary, fontSize: 11),
+                              teacherName != null && teacherName.isNotEmpty
+                                  ? teacherName
+                                  : 'No teacher assigned',
+                              style: TextStyle(
+                                color: AppTheme.textSecondary,
+                                fontSize: 11,
+                              ),
                             ),
                           ],
                         ),
@@ -1738,7 +2315,11 @@ class _SectionCardState extends ConsumerState<_SectionCard> {
                   ),
                   IconButton(
                     tooltip: 'Remove subject from section',
-                    icon: Icon(Icons.close, size: 16, color: AppTheme.textSecondary),
+                    icon: Icon(
+                      Icons.close,
+                      size: 16,
+                      color: AppTheme.textSecondary,
+                    ),
                     onPressed: () {
                       _showConfirmation(
                         title: 'Unassign Subject',
@@ -1747,10 +2328,22 @@ class _SectionCardState extends ConsumerState<_SectionCard> {
                           final sectionId = widget.section['id'];
                           if (sectionId is int) {
                             final currentCodes = _assignedSubjects
-                                .map((s) => s['subject_code']?.toString().toUpperCase() ?? s['id']?.toString().toUpperCase() ?? '')
+                                .map(
+                                  (s) =>
+                                      s['subject_code']
+                                          ?.toString()
+                                          .toUpperCase() ??
+                                      s['id']?.toString().toUpperCase() ??
+                                      '',
+                                )
                                 .where((c) => c != code && c.isNotEmpty)
                                 .toList();
-                            await ref.read(sectionsProvider.notifier).assignSubjectsToSection(sectionId, currentCodes);
+                            await ref
+                                .read(sectionsProvider.notifier)
+                                .assignSubjectsToSection(
+                                  sectionId,
+                                  currentCodes,
+                                );
                             await _loadSubjects();
                             await _loadStudents();
                           }
@@ -1772,7 +2365,12 @@ class _SectionCardState extends ConsumerState<_SectionCard> {
     if (sectionId is! int) return;
 
     final currentSelected = _assignedSubjects
-        .map((s) => s['subject_code']?.toString().toUpperCase() ?? s['id']?.toString().toUpperCase() ?? '')
+        .map(
+          (s) =>
+              s['subject_code']?.toString().toUpperCase() ??
+              s['id']?.toString().toUpperCase() ??
+              '',
+        )
         .where((c) => c.isNotEmpty)
         .toSet();
 
@@ -1784,24 +2382,45 @@ class _SectionCardState extends ConsumerState<_SectionCard> {
             final allSubjects = ref.watch(subjectsProvider);
             return AlertDialog(
               backgroundColor: Theme.of(context).colorScheme.surface,
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(16),
+              ),
               title: Row(
                 children: [
                   Container(
                     padding: const EdgeInsets.all(8),
                     decoration: BoxDecoration(
-                      color: Theme.of(context).colorScheme.primary.withValues(alpha: 0.12),
+                      color: Theme.of(
+                        context,
+                      ).colorScheme.primary.withValues(alpha: 0.12),
                       borderRadius: BorderRadius.circular(10),
                     ),
-                    child: Icon(Icons.menu_book_outlined, size: 20, color: Theme.of(context).colorScheme.primary),
+                    child: Icon(
+                      Icons.menu_book_outlined,
+                      size: 20,
+                      color: Theme.of(context).colorScheme.primary,
+                    ),
                   ),
                   const SizedBox(width: 12),
                   Expanded(
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text('Assign Subjects', style: TextStyle(color: AppTheme.text, fontWeight: FontWeight.bold, fontSize: 16)),
-                        Text('Section: ${widget.section['name']}', style: TextStyle(color: AppTheme.textSecondary, fontSize: 12)),
+                        Text(
+                          'Assign Subjects',
+                          style: TextStyle(
+                            color: AppTheme.text,
+                            fontWeight: FontWeight.bold,
+                            fontSize: 16,
+                          ),
+                        ),
+                        Text(
+                          'Section: ${widget.section['name']}',
+                          style: TextStyle(
+                            color: AppTheme.textSecondary,
+                            fontSize: 12,
+                          ),
+                        ),
                       ],
                     ),
                   ),
@@ -1812,7 +2431,10 @@ class _SectionCardState extends ConsumerState<_SectionCard> {
                 child: allSubjects.isEmpty
                     ? Padding(
                         padding: const EdgeInsets.all(20),
-                        child: Text('No subjects found. Please create subjects under Subjects & Courses first.', style: TextStyle(color: AppTheme.textSecondary)),
+                        child: Text(
+                          'No subjects found. Please create subjects under Subjects & Courses first.',
+                          style: TextStyle(color: AppTheme.textSecondary),
+                        ),
                       )
                     : SingleChildScrollView(
                         child: Column(
@@ -1821,23 +2443,45 @@ class _SectionCardState extends ConsumerState<_SectionCard> {
                           children: [
                             Text(
                               'Select the curriculum subjects that belong to this section. All students will immediately be enrolled in them.',
-                              style: TextStyle(color: AppTheme.textSecondary, fontSize: 12),
+                              style: TextStyle(
+                                color: AppTheme.textSecondary,
+                                fontSize: 12,
+                              ),
                             ),
                             const SizedBox(height: 12),
                             ...allSubjects.map((sub) {
-                              final code = sub['subject_code']?.toString().toUpperCase() ?? sub['id']?.toString().toUpperCase() ?? '';
+                              final code =
+                                  sub['subject_code']
+                                      ?.toString()
+                                      .toUpperCase() ??
+                                  sub['id']?.toString().toUpperCase() ??
+                                  '';
                               final name = sub['name']?.toString() ?? code;
                               final teacher = sub['teacher_name']?.toString();
                               final isChecked = currentSelected.contains(code);
 
                               return CheckboxListTile(
                                 value: isChecked,
-                                activeColor: Theme.of(context).colorScheme.primary,
+                                activeColor: Theme.of(
+                                  context,
+                                ).colorScheme.primary,
                                 checkColor: Colors.white,
-                                title: Text('$code - $name', style: TextStyle(color: AppTheme.text, fontWeight: FontWeight.bold, fontSize: 13)),
+                                title: Text(
+                                  '$code - $name',
+                                  style: TextStyle(
+                                    color: AppTheme.text,
+                                    fontWeight: FontWeight.bold,
+                                    fontSize: 13,
+                                  ),
+                                ),
                                 subtitle: Text(
-                                  teacher != null && teacher.isNotEmpty ? 'Teacher: $teacher · ${sub['grade_level'] ?? ''}' : '${sub['grade_level'] ?? ''}',
-                                  style: TextStyle(color: AppTheme.textSecondary, fontSize: 11),
+                                  teacher != null && teacher.isNotEmpty
+                                      ? 'Teacher: $teacher · ${sub['grade_level'] ?? ''}'
+                                      : '${sub['grade_level'] ?? ''}',
+                                  style: TextStyle(
+                                    color: AppTheme.textSecondary,
+                                    fontSize: 11,
+                                  ),
                                 ),
                                 onChanged: (val) {
                                   setModalState(() {
@@ -1863,14 +2507,20 @@ class _SectionCardState extends ConsumerState<_SectionCard> {
                   onPressed: () async {
                     Navigator.pop(dialogCtx);
                     try {
-                      await ref.read(sectionsProvider.notifier).assignSubjectsToSection(sectionId, currentSelected.toList());
+                      await ref
+                          .read(sectionsProvider.notifier)
+                          .assignSubjectsToSection(
+                            sectionId,
+                            currentSelected.toList(),
+                          );
                       await _loadSubjects();
                       await _loadStudents();
                       if (context.mounted) {
                         AiraActionToast.showSuccess(
                           context,
                           title: 'Subjects Assigned',
-                          message: 'Assigned ${currentSelected.length} subjects to ${widget.section['name']}. Students auto-enrolled.',
+                          message:
+                              'Assigned ${currentSelected.length} subjects to ${widget.section['name']}. Students auto-enrolled.',
                         );
                       }
                     } catch (e) {
@@ -1904,20 +2554,27 @@ class _SectionCardState extends ConsumerState<_SectionCard> {
     if (_sectionStudents.isEmpty) {
       return Padding(
         padding: const EdgeInsets.all(16.0),
-        child: Text('No students currently assigned to this section.', style: TextStyle(color: AppTheme.textSecondary, fontSize: 13)),
+        child: Text(
+          'No students currently assigned to this section.',
+          style: TextStyle(color: AppTheme.textSecondary, fontSize: 13),
+        ),
       );
     }
 
     return Column(
       children: _sectionStudents.map((student) {
         final name = student['full_name'] ?? student['name'] ?? 'Student';
-        final initials = name.toString().isNotEmpty ? name.toString()[0].toUpperCase() : '?';
+        final initials = name.toString().isNotEmpty
+            ? name.toString()[0].toUpperCase()
+            : '?';
         return Column(
           children: [
             Row(
               children: [
                 UserAvatarWidget(
-                  imageSource: (student['profile_image'] ?? student['profileImage']) as String?,
+                  imageSource:
+                      (student['profile_image'] ?? student['profileImage'])
+                          as String?,
                   fallbackInitial: initials,
                   size: 36,
                   fontSize: 14,
@@ -1927,9 +2584,22 @@ class _SectionCardState extends ConsumerState<_SectionCard> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(name, style: TextStyle(color: AppTheme.text, fontWeight: FontWeight.bold, fontSize: 14)),
+                      Text(
+                        name,
+                        style: TextStyle(
+                          color: AppTheme.text,
+                          fontWeight: FontWeight.bold,
+                          fontSize: 14,
+                        ),
+                      ),
                       const SizedBox(height: 2),
-                      Text('${student['email'] ?? ''} · ${student['grade'] ?? widget.section['grade'] ?? ''}', style: TextStyle(color: AppTheme.textSecondary, fontSize: 11)),
+                      Text(
+                        '${student['email'] ?? ''} · ${student['grade'] ?? widget.section['grade'] ?? ''}',
+                        style: TextStyle(
+                          color: AppTheme.textSecondary,
+                          fontSize: 11,
+                        ),
+                      ),
                     ],
                   ),
                 ),
@@ -1945,8 +2615,17 @@ class _SectionCardState extends ConsumerState<_SectionCard> {
                       ),
                     );
                   },
-                  icon: Icon(Icons.visibility_outlined, size: 16, color: Theme.of(context).colorScheme.primary),
-                  style: IconButton.styleFrom(backgroundColor: AppTheme.background, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8))),
+                  icon: Icon(
+                    Icons.visibility_outlined,
+                    size: 16,
+                    color: Theme.of(context).colorScheme.primary,
+                  ),
+                  style: IconButton.styleFrom(
+                    backgroundColor: AppTheme.background,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                  ),
                 ),
               ],
             ),
@@ -1970,21 +2649,41 @@ class _SectionCardState extends ConsumerState<_SectionCard> {
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Text('Section Cohort Mastery', style: TextStyle(color: AppTheme.text, fontWeight: FontWeight.bold, fontSize: 13)),
+              Text(
+                'Section Cohort Mastery',
+                style: TextStyle(
+                  color: AppTheme.text,
+                  fontWeight: FontWeight.bold,
+                  fontSize: 13,
+                ),
+              ),
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
                 decoration: BoxDecoration(
                   color: AppTheme.success.withValues(alpha: 0.15),
                   borderRadius: BorderRadius.circular(6),
                 ),
-                child: Text('Live Stats', style: TextStyle(color: AppTheme.success, fontSize: 11, fontWeight: FontWeight.bold)),
+                child: Text(
+                  'Live Stats',
+                  style: TextStyle(
+                    color: AppTheme.success,
+                    fontSize: 11,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
               ),
             ],
           ),
           const SizedBox(height: 12),
-          Text('Assigned Room: ${widget.section['room'] ?? 'Not specified'}', style: TextStyle(color: AppTheme.textSecondary, fontSize: 12)),
+          Text(
+            'Assigned Room: ${widget.section['room'] ?? 'Not specified'}',
+            style: TextStyle(color: AppTheme.textSecondary, fontSize: 12),
+          ),
           const SizedBox(height: 6),
-          Text('Grade Level: ${widget.section['grade'] ?? 'Not specified'}', style: TextStyle(color: AppTheme.textSecondary, fontSize: 12)),
+          Text(
+            'Grade Level: ${widget.section['grade'] ?? 'Not specified'}',
+            style: TextStyle(color: AppTheme.textSecondary, fontSize: 12),
+          ),
           const SizedBox(height: 12),
           ClipRRect(
             borderRadius: BorderRadius.circular(6),
@@ -1996,7 +2695,10 @@ class _SectionCardState extends ConsumerState<_SectionCard> {
             ),
           ),
           const SizedBox(height: 6),
-          Text('75% curriculum completion target reached', style: TextStyle(color: AppTheme.textMuted, fontSize: 11)),
+          Text(
+            '75% curriculum completion target reached',
+            style: TextStyle(color: AppTheme.textMuted, fontSize: 11),
+          ),
         ],
       ),
     );

@@ -6,7 +6,7 @@ class ChatUser {
   final String? section;
   final String? grade;
   final String? profileImage;
-  
+
   ChatUser({
     required this.id,
     required this.fullName,
@@ -132,17 +132,24 @@ class ChatConversation {
 
   factory ChatConversation.fromJson(Map<String, dynamic> json) {
     List<String> parsedParticipantIds = [];
-    final rawIds = json['participant_ids'] ?? json['participantIds'] ?? json['participants'];
+    final rawIds =
+        json['participant_ids'] ??
+        json['participantIds'] ??
+        json['participants'];
     if (rawIds is List) {
-      parsedParticipantIds = rawIds.map((e) => e is Map ? (e['id']?.toString() ?? '') : e.toString()).where((e) => e.isNotEmpty).toList();
+      parsedParticipantIds = rawIds
+          .map((e) => e is Map ? (e['id']?.toString() ?? '') : e.toString())
+          .where((e) => e.isNotEmpty)
+          .toList();
     }
 
     return ChatConversation(
       id: json['id'] ?? '',
       type: json['type'] ?? 'direct',
       name: json['name'],
-      participants: (json['participants'] as List?)
-              ?.where((e) => e is Map)
+      participants:
+          (json['participants'] as List?)
+              ?.whereType<Map>()
               .map((e) => ChatUser.fromJson(e as Map<String, dynamic>))
               .toList() ??
           [],
@@ -150,9 +157,13 @@ class ChatConversation {
           ? ChatMessage.fromJson(json['lastMessage'])
           : null,
       unreadCount: json['unreadCount'] ?? 0,
-      isArchived: (json['isArchived'] ?? json['is_archived']) == 1 || (json['isArchived'] == true),
+      isArchived:
+          (json['isArchived'] ?? json['is_archived']) == 1 ||
+          (json['isArchived'] == true),
       sectionKey: json['section_key'] ?? json['sectionKey'],
-      sectionId: json['section_id'] is int ? json['section_id'] : int.tryParse(json['section_id']?.toString() ?? ''),
+      sectionId: json['section_id'] is int
+          ? json['section_id']
+          : int.tryParse(json['section_id']?.toString() ?? ''),
       roomAdminId: json['room_admin_id'] ?? json['roomAdminId'],
       roomAdminName: json['room_admin_name'] ?? json['roomAdminName'],
       participantIds: parsedParticipantIds,

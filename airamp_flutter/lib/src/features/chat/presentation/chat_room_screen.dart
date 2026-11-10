@@ -27,8 +27,12 @@ class _ChatRoomScreenState extends ConsumerState<ChatRoomScreen> {
     super.initState();
     // Subscribe to real-time Cloud Firestore stream and mark messages as read
     Future.microtask(() async {
-      ref.read(chatProvider.notifier).subscribeToConversation(widget.conversationId);
-      await ref.read(chatProvider.notifier).markConversationAsRead(widget.conversationId);
+      ref
+          .read(chatProvider.notifier)
+          .subscribeToConversation(widget.conversationId);
+      await ref
+          .read(chatProvider.notifier)
+          .markConversationAsRead(widget.conversationId);
     });
   }
 
@@ -38,8 +42,12 @@ class _ChatRoomScreenState extends ConsumerState<ChatRoomScreen> {
     if (oldWidget.conversationId != widget.conversationId) {
       _controller.clear();
       Future.microtask(() async {
-        ref.read(chatProvider.notifier).subscribeToConversation(widget.conversationId);
-        await ref.read(chatProvider.notifier).markConversationAsRead(widget.conversationId);
+        ref
+            .read(chatProvider.notifier)
+            .subscribeToConversation(widget.conversationId);
+        await ref
+            .read(chatProvider.notifier)
+            .markConversationAsRead(widget.conversationId);
       });
     }
   }
@@ -48,7 +56,9 @@ class _ChatRoomScreenState extends ConsumerState<ChatRoomScreen> {
   void dispose() {
     _controller.dispose();
     // Always unsubscribe; notifier guards against unsubscribing a different conversation
-    ref.read(chatProvider.notifier).unsubscribeFromConversation(widget.conversationId);
+    ref
+        .read(chatProvider.notifier)
+        .unsubscribeFromConversation(widget.conversationId);
     super.dispose();
   }
 
@@ -76,7 +86,7 @@ class _ChatRoomScreenState extends ConsumerState<ChatRoomScreen> {
     final chatState = ref.watch(chatProvider);
     final user = ref.watch(authProvider);
     final messages = chatState.messages[widget.conversationId] ?? [];
-    
+
     // Find conversation
     final convo = chatState.conversations.cast<ChatConversation?>().firstWhere(
       (c) => c?.id == widget.conversationId,
@@ -89,10 +99,14 @@ class _ChatRoomScreenState extends ConsumerState<ChatRoomScreen> {
       ChatUser? otherUser;
       if (convo.participants.isNotEmpty) {
         final filtered = convo.participants.where((p) => p.id != user?.id);
-        otherUser = filtered.isNotEmpty ? filtered.first : convo.participants.first;
+        otherUser = filtered.isNotEmpty
+            ? filtered.first
+            : convo.participants.first;
       }
       if (otherUser == null && convo.id.startsWith('dm_')) {
-        final matches = chatState.availableUsers.where((u) => u.id != user?.id && convo.id.contains(u.id));
+        final matches = chatState.availableUsers.where(
+          (u) => u.id != user?.id && convo.id.contains(u.id),
+        );
         if (matches.isNotEmpty) {
           otherUser = matches.first;
         }
@@ -102,27 +116,32 @@ class _ChatRoomScreenState extends ConsumerState<ChatRoomScreen> {
         if (otherUser.role == 'student') {
           final parts = [
             'Student',
-            if (otherUser.grade != null && otherUser.grade!.isNotEmpty) otherUser.grade!,
-            if (otherUser.section != null && otherUser.section!.isNotEmpty) 'Sec. ${otherUser.section!}',
+            if (otherUser.grade != null && otherUser.grade!.isNotEmpty)
+              otherUser.grade!,
+            if (otherUser.section != null && otherUser.section!.isNotEmpty)
+              'Sec. ${otherUser.section!}',
           ];
           subtitle = parts.join(' · ');
         } else {
-          subtitle = otherUser.role == 'super_admin' ? 'Super Admin' : 'Teacher';
+          subtitle = otherUser.role == 'super_admin'
+              ? 'Super Admin'
+              : 'Teacher';
         }
       }
     } else if (convo != null) {
       // Group conversation
-      final memberCount = convo.participantIds.isNotEmpty ? convo.participantIds.length : (convo.participants.length + 1);
-      final adminStr = convo.roomAdminName != null && convo.roomAdminName!.isNotEmpty
+      final memberCount = convo.participantIds.isNotEmpty
+          ? convo.participantIds.length
+          : (convo.participants.length + 1);
+      final adminStr =
+          convo.roomAdminName != null && convo.roomAdminName!.isNotEmpty
           ? 'Admin: ${convo.roomAdminName!}'
           : null;
-      final keyStr = convo.sectionKey != null ? 'Key: ${convo.sectionKey}' : null;
+      final keyStr = convo.sectionKey != null
+          ? 'Key: ${convo.sectionKey}'
+          : null;
 
-      final parts = [
-        if (keyStr != null) keyStr,
-        if (adminStr != null) adminStr,
-        '$memberCount members',
-      ];
+      final parts = [?keyStr, ?adminStr, '$memberCount members'];
       subtitle = parts.join(' · ');
     }
 
@@ -135,7 +154,11 @@ class _ChatRoomScreenState extends ConsumerState<ChatRoomScreen> {
           children: [
             Text(
               displayName,
-              style: TextStyle(color: AppTheme.text, fontSize: 16, fontWeight: FontWeight.bold),
+              style: TextStyle(
+                color: AppTheme.text,
+                fontSize: 16,
+                fontWeight: FontWeight.bold,
+              ),
             ),
             if (subtitle != null)
               Text(
@@ -162,29 +185,49 @@ class _ChatRoomScreenState extends ConsumerState<ChatRoomScreen> {
                 final timeStr = _formatTime(msg.createdAt);
 
                 return Align(
-                  alignment: isMe ? Alignment.centerRight : Alignment.centerLeft,
+                  alignment: isMe
+                      ? Alignment.centerRight
+                      : Alignment.centerLeft,
                   child: GestureDetector(
                     onLongPress: () => _showMessageOptions(msg, isMe),
                     child: Container(
-                      constraints: BoxConstraints(maxWidth: MediaQuery.of(context).size.width * 0.78),
+                      constraints: BoxConstraints(
+                        maxWidth: MediaQuery.of(context).size.width * 0.78,
+                      ),
                       margin: const EdgeInsets.only(bottom: 10),
-                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 14,
+                        vertical: 10,
+                      ),
                       decoration: BoxDecoration(
                         gradient: isMe
                             ? LinearGradient(
-                                colors: [AppTheme.primary, AppTheme.primaryDark],
+                                colors: [
+                                  AppTheme.primary,
+                                  AppTheme.primaryDark,
+                                ],
                                 begin: Alignment.topLeft,
                                 end: Alignment.bottomRight,
                               )
                             : null,
-                        color: !isMe ? Theme.of(context).colorScheme.surface : null,
+                        color: !isMe
+                            ? Theme.of(context).colorScheme.surface
+                            : null,
                         borderRadius: BorderRadius.only(
                           topLeft: const Radius.circular(16),
                           topRight: const Radius.circular(16),
-                          bottomLeft: isMe ? const Radius.circular(16) : const Radius.circular(3),
-                          bottomRight: isMe ? const Radius.circular(3) : const Radius.circular(16),
+                          bottomLeft: isMe
+                              ? const Radius.circular(16)
+                              : const Radius.circular(3),
+                          bottomRight: isMe
+                              ? const Radius.circular(3)
+                              : const Radius.circular(16),
                         ),
-                        border: !isMe ? Border.all(color: AppTheme.border.withValues(alpha: 0.7)) : null,
+                        border: !isMe
+                            ? Border.all(
+                                color: AppTheme.border.withValues(alpha: 0.7),
+                              )
+                            : null,
                         boxShadow: [
                           BoxShadow(
                             color: Colors.black.withValues(alpha: 0.04),
@@ -194,20 +237,26 @@ class _ChatRoomScreenState extends ConsumerState<ChatRoomScreen> {
                         ],
                       ),
                       child: Column(
-                        crossAxisAlignment: isMe ? CrossAxisAlignment.end : CrossAxisAlignment.start,
+                        crossAxisAlignment: isMe
+                            ? CrossAxisAlignment.end
+                            : CrossAxisAlignment.start,
                         children: [
                           if (!isMe && convo?.type == 'group') ...[
                             Builder(
                               builder: (context) {
-                                final sender = chatState.availableUsers.cast<ChatUser?>().firstWhere(
-                                  (u) => u?.id == msg.senderId,
-                                  orElse: () => null,
-                                );
-                                final senderName = sender?.fullName ??
+                                final sender = chatState.availableUsers
+                                    .cast<ChatUser?>()
+                                    .firstWhere(
+                                      (u) => u?.id == msg.senderId,
+                                      orElse: () => null,
+                                    );
+                                final senderName =
+                                    sender?.fullName ??
                                     (msg.senderId == convo?.roomAdminId
                                         ? (convo?.roomAdminName ?? 'Teacher')
                                         : 'Member');
-                                final isRoomAdmin = msg.senderId == convo?.roomAdminId ||
+                                final isRoomAdmin =
+                                    msg.senderId == convo?.roomAdminId ||
                                     sender?.role == 'teacher' ||
                                     sender?.role == 'admin' ||
                                     sender?.role == 'super_admin';
@@ -222,16 +271,25 @@ class _ChatRoomScreenState extends ConsumerState<ChatRoomScreen> {
                                         style: TextStyle(
                                           fontSize: 12,
                                           fontWeight: FontWeight.bold,
-                                          color: isRoomAdmin ? AppTheme.primary : AppTheme.textSecondary,
+                                          color: isRoomAdmin
+                                              ? AppTheme.primary
+                                              : AppTheme.textSecondary,
                                         ),
                                       ),
                                       if (isRoomAdmin) ...[
                                         const SizedBox(width: 6),
                                         Container(
-                                          padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
+                                          padding: const EdgeInsets.symmetric(
+                                            horizontal: 5,
+                                            vertical: 1,
+                                          ),
                                           decoration: BoxDecoration(
-                                            color: AppTheme.primary.withValues(alpha: 0.12),
-                                            borderRadius: BorderRadius.circular(4),
+                                            color: AppTheme.primary.withValues(
+                                              alpha: 0.12,
+                                            ),
+                                            borderRadius: BorderRadius.circular(
+                                              4,
+                                            ),
                                           ),
                                           child: Text(
                                             'Room Admin',
@@ -265,7 +323,9 @@ class _ChatRoomScreenState extends ConsumerState<ChatRoomScreen> {
                                 Text(
                                   timeStr,
                                   style: TextStyle(
-                                    color: isMe ? Colors.white.withValues(alpha: 0.7) : AppTheme.textMuted,
+                                    color: isMe
+                                        ? Colors.white.withValues(alpha: 0.7)
+                                        : AppTheme.textMuted,
                                     fontSize: 10,
                                     fontWeight: FontWeight.w500,
                                   ),
@@ -273,7 +333,9 @@ class _ChatRoomScreenState extends ConsumerState<ChatRoomScreen> {
                                 if (isMe) ...[
                                   const SizedBox(width: 3),
                                   Icon(
-                                    msg.isRead ? Icons.done_all_rounded : Icons.done_rounded,
+                                    msg.isRead
+                                        ? Icons.done_all_rounded
+                                        : Icons.done_rounded,
                                     size: 13,
                                     color: Colors.white.withValues(alpha: 0.75),
                                   ),
@@ -290,10 +352,16 @@ class _ChatRoomScreenState extends ConsumerState<ChatRoomScreen> {
             ),
           ),
           Container(
-            padding: const EdgeInsets.all(12).copyWith(bottom: MediaQuery.of(context).padding.bottom + 12),
+            padding: const EdgeInsets.all(
+              12,
+            ).copyWith(bottom: MediaQuery.of(context).padding.bottom + 12),
             decoration: BoxDecoration(
               color: Theme.of(context).colorScheme.surface,
-              border: Border(top: BorderSide(color: Theme.of(context).dividerColor.withValues(alpha: 0.6))),
+              border: Border(
+                top: BorderSide(
+                  color: Theme.of(context).dividerColor.withValues(alpha: 0.6),
+                ),
+              ),
             ),
             child: Row(
               children: [
@@ -301,7 +369,13 @@ class _ChatRoomScreenState extends ConsumerState<ChatRoomScreen> {
                   child: TextField(
                     controller: _controller,
                     maxLength: 1000,
-                    buildCounter: (context, {required currentLength, required isFocused, maxLength}) => null,
+                    buildCounter:
+                        (
+                          context, {
+                          required currentLength,
+                          required isFocused,
+                          maxLength,
+                        }) => null,
                     style: TextStyle(color: AppTheme.text),
                     decoration: InputDecoration(
                       hintText: 'Type a message...',
@@ -311,17 +385,27 @@ class _ChatRoomScreenState extends ConsumerState<ChatRoomScreen> {
                       fillColor: AppTheme.background,
                       border: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(24),
-                        borderSide: BorderSide(color: AppTheme.border.withValues(alpha: 0.5)),
+                        borderSide: BorderSide(
+                          color: AppTheme.border.withValues(alpha: 0.5),
+                        ),
                       ),
                       enabledBorder: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(24),
-                        borderSide: BorderSide(color: AppTheme.border.withValues(alpha: 0.5)),
+                        borderSide: BorderSide(
+                          color: AppTheme.border.withValues(alpha: 0.5),
+                        ),
                       ),
                       focusedBorder: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(24),
-                        borderSide: BorderSide(color: AppTheme.primary, width: 1.2),
+                        borderSide: BorderSide(
+                          color: AppTheme.primary,
+                          width: 1.2,
+                        ),
                       ),
-                      contentPadding: const EdgeInsets.symmetric(horizontal: 18, vertical: 11),
+                      contentPadding: const EdgeInsets.symmetric(
+                        horizontal: 18,
+                        vertical: 11,
+                      ),
                     ),
                     onSubmitted: (_) => _sendMessage(),
                   ),
@@ -346,7 +430,11 @@ class _ChatRoomScreenState extends ConsumerState<ChatRoomScreen> {
                           ),
                         ],
                       ),
-                      child: const Icon(Icons.send_rounded, color: Colors.white, size: 20),
+                      child: const Icon(
+                        Icons.send_rounded,
+                        color: Colors.white,
+                        size: 20,
+                      ),
                     ),
                   ),
                 ),
@@ -381,8 +469,18 @@ class _ChatRoomScreenState extends ConsumerState<ChatRoomScreen> {
               ),
               const SizedBox(height: 12),
               ListTile(
-                leading: Icon(Icons.copy_outlined, color: AppTheme.textSecondary, size: 20),
-                title: Text('Copy Message', style: TextStyle(color: AppTheme.text, fontWeight: FontWeight.w500)),
+                leading: Icon(
+                  Icons.copy_outlined,
+                  color: AppTheme.textSecondary,
+                  size: 20,
+                ),
+                title: Text(
+                  'Copy Message',
+                  style: TextStyle(
+                    color: AppTheme.text,
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
                 onTap: () {
                   Navigator.pop(ctx);
                   ScaffoldMessenger.of(context).showSnackBar(
@@ -392,16 +490,36 @@ class _ChatRoomScreenState extends ConsumerState<ChatRoomScreen> {
               ),
               if (isMe) ...[
                 ListTile(
-                  leading: Icon(Icons.edit_outlined, color: AppTheme.textSecondary, size: 20),
-                  title: Text('Edit Message', style: TextStyle(color: AppTheme.text, fontWeight: FontWeight.w500)),
+                  leading: Icon(
+                    Icons.edit_outlined,
+                    color: AppTheme.textSecondary,
+                    size: 20,
+                  ),
+                  title: Text(
+                    'Edit Message',
+                    style: TextStyle(
+                      color: AppTheme.text,
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
                   onTap: () {
                     Navigator.pop(ctx);
                     _showEditMessageDialog(msg);
                   },
                 ),
                 ListTile(
-                  leading: Icon(Icons.delete_outline_rounded, color: AppTheme.error, size: 20),
-                  title: Text('Delete Message', style: TextStyle(color: AppTheme.error, fontWeight: FontWeight.w500)),
+                  leading: Icon(
+                    Icons.delete_outline_rounded,
+                    color: AppTheme.error,
+                    size: 20,
+                  ),
+                  title: Text(
+                    'Delete Message',
+                    style: TextStyle(
+                      color: AppTheme.error,
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
                   onTap: () {
                     Navigator.pop(ctx);
                     _showDeleteMessageConfirm(msg);
@@ -429,12 +547,17 @@ class _ChatRoomScreenState extends ConsumerState<ChatRoomScreen> {
           decoration: const InputDecoration(hintText: 'Edit your message'),
         ),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancel')),
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('Cancel'),
+          ),
           ElevatedButton(
             onPressed: () async {
               final newText = controller.text.trim();
               if (newText.isNotEmpty) {
-                await ref.read(chatProvider.notifier).editMessage(widget.conversationId, msg.id, newText);
+                await ref
+                    .read(chatProvider.notifier)
+                    .editMessage(widget.conversationId, msg.id, newText);
               }
               if (ctx.mounted) Navigator.pop(ctx);
             },
@@ -452,11 +575,16 @@ class _ChatRoomScreenState extends ConsumerState<ChatRoomScreen> {
         title: const Text('Delete Message?'),
         content: const Text('Are you sure you want to delete this message?'),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancel')),
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('Cancel'),
+          ),
           ElevatedButton(
             style: ElevatedButton.styleFrom(backgroundColor: AppTheme.error),
             onPressed: () async {
-              await ref.read(chatProvider.notifier).deleteMessage(widget.conversationId, msg.id);
+              await ref
+                  .read(chatProvider.notifier)
+                  .deleteMessage(widget.conversationId, msg.id);
               if (ctx.mounted) Navigator.pop(ctx);
             },
             child: const Text('Delete', style: TextStyle(color: Colors.white)),
