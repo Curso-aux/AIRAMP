@@ -1,51 +1,42 @@
-[debug] [2026-11-09T17:21:36.687Z] ----------------------------------------------------------------------
-[debug] [2026-11-09T17:21:36.691Z] Command:       C:\Program Files\nodejs\node.exe C:\Users\EL\AppData\Roaming\npm\node_modules\firebase-tools\lib\bin\firebase.js projects:list
-[debug] [2026-11-09T17:21:36.691Z] CLI Version:   15.32.1
-[debug] [2026-11-09T17:21:36.691Z] Platform:      win32
-[debug] [2026-11-09T17:21:36.691Z] Node Version:  v24.14.0
-[debug] [2026-11-09T17:21:36.691Z] Detected Agent: antigravity
-[debug] [2026-11-09T17:21:36.691Z] Time:          Tue Nov 10 2026 01:21:36 GMT+0800 (Singapore Standard Time)
-[debug] [2026-11-09T17:21:36.691Z] ----------------------------------------------------------------------
+[debug] [2026-11-10T07:18:52.154Z] ----------------------------------------------------------------------
+[debug] [2026-11-10T07:18:52.157Z] Command:       C:\Program Files\nodejs\node.exe C:\Users\Neil\AppData\Roaming\npm\node_modules\firebase-tools\lib\bin\firebase.js deploy --only hosting
+[debug] [2026-11-10T07:18:52.157Z] CLI Version:   15.35.0
+[debug] [2026-11-10T07:18:52.157Z] Platform:      win32
+[debug] [2026-11-10T07:18:52.157Z] Node Version:  v24.14.0
+[debug] [2026-11-10T07:18:52.157Z] Detected Agent: unknown
+[debug] [2026-11-10T07:18:52.157Z] Time:          Tue Nov 10 2026 15:18:52 GMT+0800 (China Standard Time)
+[debug] [2026-11-10T07:18:52.157Z] ----------------------------------------------------------------------
 [debug] 
-[debug] [2026-11-09T17:21:36.879Z] > command requires scopes: ["email","openid","https://www.googleapis.com/auth/cloudplatformprojects.readonly","https://www.googleapis.com/auth/firebase","https://www.googleapis.com/auth/cloud-platform"]
-[debug] [2026-11-09T17:21:36.879Z] > authorizing via signed-in user (evangelistachristian88@gmail.com)
-[debug] [2026-11-09T17:21:36.893Z] Checked if tokens are valid: false, expires at: 1794245333608
-[debug] [2026-11-09T17:21:36.894Z] Checked if tokens are valid: false, expires at: 1794245333608
-[debug] [2026-11-09T17:21:36.894Z] > refreshing access token with scopes: []
-[debug] [2026-11-09T17:21:36.896Z] >>> [apiv2][query] POST https://www.googleapis.com/oauth2/v3/token [none]
-[debug] [2026-11-09T17:21:36.896Z] >>> [apiv2][body] POST https://www.googleapis.com/oauth2/v3/token [omitted]
-[debug] [2026-11-09T17:21:36.914Z] *** [apiv2] error from fetch(https://www.googleapis.com/oauth2/v3/token, {"headers":{},"method":"POST","body":{"type":"Buffer","data":[45,45,45,45,45,45,45,45,45,45,45,45,45,45,45,45,45,45,45,45,45,45,45,45,45,45,45,45,100,54,102,50,102,55,52,51,97,51,100,99,50,101,49,100,101,99,101,53,100,57,49,54,13,10,67,111,110,116,101,110,116,45,68,105,115,112,111,115,105,116,105,111,110,58,32,102,111,114,109,45,100,97,116,97,59,32,110,97,109,101,61,34,114,101,102,114,101,115,104,95,116,111,107,101,110,34,13,10,13,10,49,47,47,48,101,65,89,119,53,52,52,74,97,98,73,49,67,103,89,73,65,82,65,65,71,65,52,83,78,103,70,45,76,57,73,114,54,97,84,116,45,70,88,50,56,90,66,121,82,68,68,104,82,118,76,82,98,114,102,50,119,53,113,82,83,86,56,76,110,105,74,115,122,73,75,118,81,55,85,116,122,97,122,116,116,106,87,90,69,119,74,49,121,77,67,83,95,75,121,118,100,119,13,10,45,45,45,45,45,45,45,45,45,45,45,45,45,45,45,45,45,45,45,45,45,45,45,45,45,45,45,45,100,54,102,50,102,55,52,51,97,51,100,99,50,101,49,100,101,99,101,53,100,57,49,54,13,10,67,111,110,116,101,110,116,45,68,105,115,112,111,115,105,116,105,111,110,58,32,102,111,114,109,45,100,97,116,97,59,32,110,97,109,101,61,34,99,108,105,101,110,116,95,105,100,34,13,10,13,10,53,54,51,53,56,52,51,51,53,56,54,57,45,102,103,114,104,103,109,100,52,55,98,113,110,101,107,105,106,53,105,56,98,53,112,114,48,51,104,111,56,52,57,101,54,46,97,112,112,115,46,103,111,111,103,108,101,117,115,101,114,99,111,110,116,101,110,116,46,99,111,109,13,10,45,45,45,45,45,45,45,45,45,45,45,45,45,45,45,45,45,45,45,45,45,45,45,45,45,45,45,45,100,54,102,50,102,55,52,51,97,51,100,99,50,101,49,100,101,99,101,53,100,57,49,54,13,10,67,111,110,116,101,110,116,45,68,105,115,112,111,115,105,116,105,111,110,58,32,102,111,114,109,45,100,97,116,97,59,32,110,97,109,101,61,34,99,108,105,101,110,116,95,115,101,99,114,101,116,34,13,10,13,10,106,57,105,86,90,102,83,56,107,107,67,69,70,85,80,97,65,101,74,86,48,115,65,105,13,10,45,45,45,45,45,45,45,45,45,45,45,45,45,45,45,45,45,45,45,45,45,45,45,45,45,45,45,45,100,54,102,50,102,55,52,51,97,51,100,99,50,101,49,100,101,99,101,53,100,57,49,54,13,10,67,111,110,116,101,110,116,45,68,105,115,112,111,115,105,116,105,111,110,58,32,102,111,114,109,45,100,97,116,97,59,32,110,97,109,101,61,34,103,114,97,110,116,95,116,121,112,101,34,13,10,13,10,114,101,102,114,101,115,104,95,116,111,107,101,110,13,10,45,45,45,45,45,45,45,45,45,45,45,45,45,45,45,45,45,45,45,45,45,45,45,45,45,45,45,45,100,54,102,50,102,55,52,51,97,51,100,99,50,101,49,100,101,99,101,53,100,57,49,54,13,10,67,111,110,116,101,110,116,45,68,105,115,112,111,115,105,116,105,111,110,58,32,102,111,114,109,45,100,97,116,97,59,32,110,97,109,101,61,34,115,99,111,112,101,34,13,10,13,10,13,10,45,45,45,45,45,45,45,45,45,45,45,45,45,45,45,45,45,45,45,45,45,45,45,45,45,45,45,45,100,54,102,50,102,55,52,51,97,51,100,99,50,101,49,100,101,99,101,53,100,57,49,54,45,45,13,10]}}): Error: getaddrinfo ENOTFOUND www.googleapis.com
-[error] Authentication Error: Your credentials are no longer valid. Please run firebase login --reauth
-
-For CI servers and headless environments, generate a new token with firebase login:ci
-[debug] [2026-11-09T17:21:36.915Z] Authentication Error: Your credentials are no longer valid. Please run firebase login --reauth
-
-For CI servers and headless environments, generate a new token with firebase login:ci
-[debug] [2026-11-09T17:21:36.926Z] FirebaseError: Authentication Error: Your credentials are no longer valid. Please run firebase login --reauth
-
-For CI servers and headless environments, generate a new token with firebase login:ci
-    at invalidCredentialError (C:\Users\EL\AppData\Roaming\npm\node_modules\firebase-tools\lib\auth.js:178:12)
-    at refreshTokens (C:\Users\EL\AppData\Roaming\npm\node_modules\firebase-tools\lib\auth.js:607:15)
-    at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
-    at async getAccessToken (C:\Users\EL\AppData\Roaming\npm\node_modules\firebase-tools\lib\apiv2.js:53:18)
-    at async Client.addAuthHeader (C:\Users\EL\AppData\Roaming\npm\node_modules\firebase-tools\lib\apiv2.js:209:21)
-    at async Client.request (C:\Users\EL\AppData\Roaming\npm\node_modules\firebase-tools\lib\apiv2.js:156:34)
-    at async getProjectPage (C:\Users\EL\AppData\Roaming\npm\node_modules\firebase-tools\lib\management\projects.js:301:17)
-    at async getFirebaseProjectPage (C:\Users\EL\AppData\Roaming\npm\node_modules\firebase-tools\lib\management\projects.js:318:23)
-    at async listFirebaseProjects (C:\Users\EL\AppData\Roaming\npm\node_modules\firebase-tools\lib\management\projects.js:347:29)
-    at async Command.actionFn (C:\Users\EL\AppData\Roaming\npm\node_modules\firebase-tools\lib\commands\projects-list.js:51:20)
-[error] 
-[error] Error: Failed to list Firebase projects. See firebase-debug.log for more info.
-[debug] [2026-11-09T17:21:37.223Z] Error: EPERM: operation not permitted, open 'C:\Users\EL\.config\configstore\firebase-tools.json.2191394425'
-    at Object.openSync (node:fs:560:18)
-    at writeFile.writeFileSync [as sync] (C:\Users\EL\AppData\Roaming\npm\node_modules\firebase-tools\node_modules\write-file-atomic\index.js:205:13)
-    at set all (C:\Users\EL\AppData\Roaming\npm\node_modules\firebase-tools\node_modules\configstore\index.js:61:20)
-    at Configstore.delete (C:\Users\EL\AppData\Roaming\npm\node_modules\firebase-tools\node_modules\configstore\index.js:101:12)
-    at process.<anonymous> (C:\Users\EL\AppData\Roaming\npm\node_modules\firebase-tools\lib\bin\cli.js:95:45)
-    at process.emit (node:events:520:35)
-    at process.exit (node:internal/process/per_thread:236:15)
-    at Timeout._onTimeout (C:\Users\EL\AppData\Roaming\npm\node_modules\firebase-tools\lib\errorOut.js:20:17)
-    at listOnTimeout (node:internal/timers:605:17)
-    at process.processTimers (node:internal/timers:541:7)
-[error] 
-[error] Error: An unexpected error has occurred.
+[debug] [2026-11-10T07:18:54.274Z] > command requires scopes: ["email","openid","https://www.googleapis.com/auth/cloudplatformprojects.readonly","https://www.googleapis.com/auth/firebase","https://www.googleapis.com/auth/cloud-platform"]
+[debug] [2026-11-10T07:18:54.274Z] > authorizing via signed-in user (evangelistachristian88@gmail.com)
+[debug] [2026-11-10T07:18:54.274Z] [iam] checking project aira-app-database for permissions ["firebase.projects.get","firebasehosting.sites.update"]
+[debug] [2026-11-10T07:18:54.287Z] Checked if tokens are valid: false, expires at: 1794291361899
+[debug] [2026-11-10T07:18:54.287Z] Checked if tokens are valid: false, expires at: 1794291361899
+[debug] [2026-11-10T07:18:54.287Z] > refreshing access token with scopes: []
+[debug] [2026-11-10T07:18:54.289Z] >>> [apiv2][query] POST https://www.googleapis.com/oauth2/v3/token [none]
+[debug] [2026-11-10T07:18:54.289Z] >>> [apiv2][body] POST https://www.googleapis.com/oauth2/v3/token [omitted]
+[debug] [2026-11-10T07:18:54.507Z] <<< [apiv2][status] POST https://www.googleapis.com/oauth2/v3/token 200
+[debug] [2026-11-10T07:18:54.507Z] <<< [apiv2][body] POST https://www.googleapis.com/oauth2/v3/token [omitted]
+[debug] [2026-11-10T07:18:54.523Z] >>> [apiv2][query] POST https://cloudresourcemanager.googleapis.com/v1/projects/aira-app-database:testIamPermissions [none]
+[debug] [2026-11-10T07:18:54.523Z] >>> [apiv2][(partial)header] POST https://cloudresourcemanager.googleapis.com/v1/projects/aira-app-database:testIamPermissions  x-goog-user-project=aira-app-database
+[debug] [2026-11-10T07:18:54.523Z] >>> [apiv2][body] POST https://cloudresourcemanager.googleapis.com/v1/projects/aira-app-database:testIamPermissions {"permissions":["firebase.projects.get","firebasehosting.sites.update"]}
+[debug] [2026-11-10T07:18:55.581Z] <<< [apiv2][status] POST https://cloudresourcemanager.googleapis.com/v1/projects/aira-app-database:testIamPermissions 200
+[debug] [2026-11-10T07:18:55.581Z] <<< [apiv2][body] POST https://cloudresourcemanager.googleapis.com/v1/projects/aira-app-database:testIamPermissions {"permissions":["firebase.projects.get","firebasehosting.sites.update"]}
+[debug] [2026-11-10T07:18:55.582Z] Checked if tokens are valid: true, expires at: 1794298733507
+[debug] [2026-11-10T07:18:55.583Z] Checked if tokens are valid: true, expires at: 1794298733507
+[debug] [2026-11-10T07:18:55.583Z] >>> [apiv2][query] GET https://firebase.googleapis.com/v1beta1/projects/aira-app-database [none]
+[debug] [2026-11-10T07:18:55.943Z] <<< [apiv2][status] GET https://firebase.googleapis.com/v1beta1/projects/aira-app-database 200
+[debug] [2026-11-10T07:18:55.943Z] <<< [apiv2][body] GET https://firebase.googleapis.com/v1beta1/projects/aira-app-database {"projectId":"aira-app-database","projectNumber":"156822326046","displayName":"AIRA-App-Database","name":"projects/aira-app-database","resources":{"hostingSite":"aira-app-database"},"state":"ACTIVE","labels":{"firebase":"enabled"},"etag":"1_3cf5d2a3-3cb4-4fc7-b807-3c2e11af781b"}
+[info] 
+[info] === Deploying to 'aira-app-database'...
+[info] 
+[info] i  deploying hosting 
+[debug] [2026-11-10T07:18:55.948Z] Checked if tokens are valid: true, expires at: 1794298733507
+[debug] [2026-11-10T07:18:55.948Z] Checked if tokens are valid: true, expires at: 1794298733507
+[debug] [2026-11-10T07:18:55.948Z] >>> [apiv2][query] GET https://firebasehosting.googleapis.com/v1beta1/projects/aira-app-database/sites/aira-app-database [none]
+[debug] [2026-11-10T07:18:56.878Z] <<< [apiv2][status] GET https://firebasehosting.googleapis.com/v1beta1/projects/aira-app-database/sites/aira-app-database 200
+[debug] [2026-11-10T07:18:56.878Z] <<< [apiv2][body] GET https://firebasehosting.googleapis.com/v1beta1/projects/aira-app-database/sites/aira-app-database {"name":"projects/aira-app-database/sites/aira-app-database","defaultUrl":"https://aira-app-database.web.app","type":"DEFAULT_SITE"}
+[debug] [2026-11-10T07:18:56.882Z] Checked if tokens are valid: true, expires at: 1794298733507
+[debug] [2026-11-10T07:18:56.882Z] Checked if tokens are valid: true, expires at: 1794298733507
+[debug] [2026-11-10T07:18:56.882Z] >>> [apiv2][query] POST https://firebasehosting.googleapis.com/v1beta1/projects/aira-app-database/sites/aira-app-database/versions [none]
+[debug] [2026-11-10T07:18:56.882Z] >>> [apiv2][body] POST https://firebasehosting.googleapis.com/v1beta1/projects/aira-app-database/sites/aira-app-database/versions {"status":"CREATED","labels":{"deployment-tool":"cli-firebase"}}
