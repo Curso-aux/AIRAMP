@@ -24,6 +24,7 @@ class Assignment {
   final String? cloudId;
   final String? targetSections;
   final String? storageUrl;
+  final String? gdriveFolderUrl;
 
   // Student specific context (if fetched for student)
   final int? submissionId;
@@ -59,6 +60,7 @@ class Assignment {
     this.cloudId,
     this.targetSections,
     this.storageUrl,
+    this.gdriveFolderUrl,
     this.submissionId,
     this.studentSubmissionStatus,
     this.studentGrade,
@@ -94,6 +96,10 @@ class Assignment {
       cloudId: map['cloud_id'] as String?,
       targetSections: map['target_sections'] as String?,
       storageUrl: map['storage_url'] as String?,
+      gdriveFolderUrl: map['gdrive_folder_url'] as String? ??
+          (map['storage_url'] != null && map['storage_url'].toString().contains('drive.google.com')
+              ? map['storage_url'] as String?
+              : null),
       submissionId: map['submission_id'] as int?,
       studentSubmissionStatus: map['submission_status'] as String?,
       studentGrade: (map['grade'] as num?)?.toDouble(),

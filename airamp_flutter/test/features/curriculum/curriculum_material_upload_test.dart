@@ -30,7 +30,7 @@ class MockSubjectDetailNotifier extends SubjectDetailNotifier {
   List<Map<String, dynamic>> build() => _mockHierarchy;
 
   @override
-  Future<void> loadHierarchy(int subjectId) async {
+  Future<void> loadHierarchy(int subjectId, {bool syncCloud = true}) async {
     state = _mockHierarchy;
   }
 }
@@ -62,6 +62,7 @@ void main() {
         fileSize: 2048500,
         fileExtension: 'pdf',
         filePath: '/storage/Lesson_1_Flutter.pdf',
+        fileBytes: base64Encode(utf8.encode('%PDF-1.4 Mock PDF Content')),
         description: 'Read chapters 1 and 2',
       );
 
@@ -74,6 +75,7 @@ void main() {
       expect(parsed.fileSize, equals(2048500));
       expect(parsed.fileExtension, equals('pdf'));
       expect(parsed.filePath, equals('/storage/Lesson_1_Flutter.pdf'));
+      expect(parsed.fileBytes, equals(base64Encode(utf8.encode('%PDF-1.4 Mock PDF Content'))));
       expect(parsed.description, equals('Read chapters 1 and 2'));
     });
 
@@ -234,6 +236,7 @@ void main() {
       expect(find.text('Instructions / Notes (Optional)'), findsOneWidget);
 
       // Tap PPT ChoiceChip
+      await tester.ensureVisible(find.text('PPT'));
       await tester.tap(find.text('PPT'));
       await tester.pumpAndSettle();
 
@@ -241,6 +244,7 @@ void main() {
       expect(find.text('Drop your PPT file here'), findsOneWidget);
 
       // Tap Video ChoiceChip
+      await tester.ensureVisible(find.text('Video'));
       await tester.tap(find.text('Video'));
       await tester.pumpAndSettle();
 
@@ -248,6 +252,7 @@ void main() {
       expect(find.text('Drop your Video file here'), findsOneWidget);
 
       // Tap YouTube ChoiceChip
+      await tester.ensureVisible(find.text('YouTube'));
       await tester.tap(find.text('YouTube'));
       await tester.pumpAndSettle();
 

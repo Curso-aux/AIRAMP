@@ -184,6 +184,10 @@ class _TeacherDashboardScreenState extends ConsumerState<TeacherDashboardScreen>
                                     assignmentTitle: assignment['title'] as String? ?? 'Activity',
                                     totalPoints: (assignment['total_points'] as num?)?.toInt() ?? 100,
                                     dueDate: assignment['due_date'] as String?,
+                                    gdriveFolderUrl: assignment['gdrive_folder_url'] as String? ??
+                                        (assignment['storage_url'] != null && assignment['storage_url'].toString().contains('drive.google.com')
+                                            ? assignment['storage_url'] as String?
+                                            : null),
                                   ),
                                 );
                               }
@@ -1437,6 +1441,10 @@ class _TeacherDashboardScreenState extends ConsumerState<TeacherDashboardScreen>
                                   assignmentTitle: aTitle,
                                   totalPoints: (points as num).toInt(),
                                   dueDate: sub['due_date'] as String?,
+                                  gdriveFolderUrl: sub['gdrive_folder_url'] as String? ??
+                                      (sub['storage_url'] != null && sub['storage_url'].toString().contains('drive.google.com')
+                                          ? sub['storage_url'] as String?
+                                          : null),
                                 ),
                               ).then((_) {
                                 ref.invalidate(teacherRecentSubmissionsProvider(teacherId));

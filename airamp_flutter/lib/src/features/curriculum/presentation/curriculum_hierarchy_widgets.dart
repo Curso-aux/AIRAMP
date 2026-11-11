@@ -1,7 +1,13 @@
+import 'dart:convert';
+import 'dart:io';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:url_launcher/url_launcher.dart';
+import 'package:path_provider/path_provider.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/services/session_draft_service.dart';
+import '../../../core/utils/file_download_helper.dart';
 import '../../admin/data/admin_repository.dart';
 import 'curriculum_content_sheet.dart';
 
@@ -178,10 +184,28 @@ class _TopicCardState extends ConsumerState<TopicCard> {
             if (widget.topic['description'] != null &&
                 widget.topic['description'].toString().trim().isNotEmpty)
               Padding(
-                padding: const EdgeInsets.only(left: 16, right: 16, bottom: 12),
-                child: Text(
-                  widget.topic['description'],
-                  style: TextStyle(color: AppTheme.textSecondary, fontSize: 13, height: 1.4),
+                padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
+                child: Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                  decoration: BoxDecoration(
+                    color: AppTheme.background.withValues(alpha: 0.7),
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(color: AppTheme.border.withValues(alpha: 0.6)),
+                  ),
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Icon(Icons.notes_rounded, size: 14, color: AppTheme.primary),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          widget.topic['description'],
+                          style: TextStyle(color: AppTheme.textSecondary, fontSize: 12, height: 1.4),
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
               ),
 
@@ -191,7 +215,7 @@ class _TopicCardState extends ConsumerState<TopicCard> {
                 padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
                 child: SizedBox(
                   width: double.infinity,
-                  child: OutlinedButton.icon(
+                  child: ElevatedButton.icon(
                     onPressed: () {
                       showModalBottomSheet(
                         context: context,
@@ -200,12 +224,14 @@ class _TopicCardState extends ConsumerState<TopicCard> {
                         builder: (ctx) => AddLOSheet(topicId: widget.topic['id'], subjectId: widget.subjectId),
                       );
                     },
-                    icon: Icon(Icons.add, color: AppTheme.primary, size: 16),
+                    icon: Icon(Icons.add_circle_outline, color: AppTheme.primary, size: 16),
                     label: const Text('Add Learning Outcome', style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold)),
-                    style: OutlinedButton.styleFrom(
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: AppTheme.primary.withValues(alpha: 0.1),
                       foregroundColor: AppTheme.primary,
-                      side: BorderSide(color: AppTheme.primary.withValues(alpha: 0.4)),
-                      padding: const EdgeInsets.symmetric(vertical: 10),
+                      elevation: 0,
+                      side: BorderSide(color: AppTheme.primary.withValues(alpha: 0.3)),
+                      padding: const EdgeInsets.symmetric(vertical: 11),
                       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
                     ),
                   ),
@@ -399,10 +425,34 @@ class _LOCardState extends ConsumerState<LOCard> {
             if (widget.lo['description'] != null &&
                 widget.lo['description'].toString().trim().isNotEmpty)
               Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 4),
-                child: Text(
-                  widget.lo['description'],
-                  style: TextStyle(color: AppTheme.textSecondary, fontSize: 12, height: 1.3),
+                padding: const EdgeInsets.fromLTRB(14, 2, 14, 6),
+                child: Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                  decoration: BoxDecoration(
+                    color: Theme.of(context).colorScheme.surface,
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(color: AppTheme.border.withValues(alpha: 0.5)),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Outcome Overview',
+                        style: TextStyle(
+                          fontSize: 10,
+                          fontWeight: FontWeight.bold,
+                          color: AppTheme.textMuted,
+                          letterSpacing: 0.5,
+                        ),
+                      ),
+                      const SizedBox(height: 3),
+                      Text(
+                        widget.lo['description'],
+                        style: TextStyle(color: AppTheme.textSecondary, fontSize: 12, height: 1.3),
+                      ),
+                    ],
+                  ),
                 ),
               ),
 
@@ -643,6 +693,14 @@ class ContentItemTile extends ConsumerWidget {
               ],
             ),
           ),
+          if (fileInfo != null)
+            IconButton(
+              icon: Icon(Icons.open_in_new, color: AppTheme.primary, size: 16),
+              constraints: const BoxConstraints(),
+              padding: const EdgeInsets.all(4),
+              tooltip: 'Open / Preview File',
+              onPressed: () => openMaterialFile(context, content, fileInfo),
+            ),
           if (canEdit) ...[
             IconButton(
               icon: Icon(Icons.edit_outlined, color: AppTheme.primary, size: 16),
@@ -672,6 +730,51 @@ class ContentItemTile extends ConsumerWidget {
         ],
       ),
     );
+  }
+
+  static Future<void> openMaterialFile(
+    BuildContext context,
+    Map<String, dynamic> content,
+    MaterialFileInfo fileInfo,
+  ) async {
+    try {
+      final cleanName = fileInfo.fileName.replaceAll(RegExp(r'[^a-zA-Z0-9._\-]'), '_');
+      final ext = fileInfo.fileExtension.toLowerCase();
+      final mimeType = ext == 'pdf' ? 'application/pdf' : 'application/octet-stream';
+
+      // 1. If base64 bytes are present, view or download
+      if (fileInfo.fileBytes != null && fileInfo.fileBytes!.trim().isNotEmpty) {
+        final rawBytes = base64Decode(fileInfo.fileBytes!.trim());
+        if (kIsWeb) {
+          downloadBinaryFileWeb(rawBytes, cleanName, mimeType);
+          return;
+        }
+        final tempDir = await getTemporaryDirectory();
+        final tempFile = File('${tempDir.path}/$cleanName');
+        await tempFile.writeAsBytes(rawBytes);
+        final uri = Uri.file(tempFile.path);
+        await launchUrl(uri, mode: LaunchMode.externalApplication);
+        return;
+      }
+
+      // 2. If file path exists locally
+      if (!kIsWeb && fileInfo.filePath != null && File(fileInfo.filePath!).existsSync()) {
+        final uri = Uri.file(fileInfo.filePath!);
+        await launchUrl(uri, mode: LaunchMode.externalApplication);
+        return;
+      }
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('File content not available or awaiting cloud sync. Please pull down to refresh.'),
+          duration: Duration(seconds: 3),
+        ),
+      );
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Could not open file: $e'), backgroundColor: AppTheme.error),
+      );
+    }
   }
 }
 
@@ -999,53 +1102,60 @@ class _CurriculumModalSheet extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      decoration: BoxDecoration(
-        color: Theme.of(context).colorScheme.surface,
-        borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
-      ),
-      padding: EdgeInsets.only(
-        left: 20,
-        right: 20,
-        top: 20,
-        bottom: MediaQuery.of(context).viewInsets.bottom + 24,
-      ),
-      constraints: BoxConstraints(maxHeight: MediaQuery.of(context).size.height * 0.85),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+    return Center(
+      child: ConstrainedBox(
+        constraints: BoxConstraints(
+          maxWidth: 640,
+          maxHeight: MediaQuery.of(context).size.height * 0.85,
+        ),
+        child: Container(
+          decoration: BoxDecoration(
+            color: Theme.of(context).colorScheme.surface,
+            borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+          ),
+          padding: EdgeInsets.only(
+            left: 20,
+            right: 20,
+            top: 20,
+            bottom: MediaQuery.of(context).viewInsets.bottom + 24,
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisSize: MainAxisSize.min,
             children: [
-              Text(title, style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Theme.of(context).colorScheme.onSurface)),
-              IconButton(
-                icon: Icon(Icons.close, color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6)),
-                onPressed: () => Navigator.pop(context),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Text(title, style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Theme.of(context).colorScheme.onSurface)),
+                  IconButton(
+                    icon: Icon(Icons.close, color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6)),
+                    onPressed: () => Navigator.pop(context),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 12),
+              Expanded(
+                child: SingleChildScrollView(
+                  child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: children),
+                ),
+              ),
+              const SizedBox(height: 16),
+              SizedBox(
+                width: double.infinity,
+                child: ElevatedButton(
+                  onPressed: onSave,
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: AppTheme.primary,
+                    foregroundColor: Colors.black,
+                    padding: const EdgeInsets.symmetric(vertical: 14),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                  ),
+                  child: Text(saveLabel, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
+                ),
               ),
             ],
           ),
-          const SizedBox(height: 12),
-          Expanded(
-            child: SingleChildScrollView(
-              child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: children),
-            ),
-          ),
-          const SizedBox(height: 16),
-          SizedBox(
-            width: double.infinity,
-            child: ElevatedButton(
-              onPressed: onSave,
-              style: ElevatedButton.styleFrom(
-                backgroundColor: AppTheme.primary,
-                foregroundColor: Colors.black,
-                padding: const EdgeInsets.symmetric(vertical: 14),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-              ),
-              child: Text(saveLabel, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
-            ),
-          ),
-        ],
+        ),
       ),
     );
   }

@@ -34,6 +34,7 @@ class _CreateAssignmentDialogState extends ConsumerState<CreateAssignmentDialog>
   final _titleController = TextEditingController();
   final _descController = TextEditingController();
   final _pointsController = TextEditingController(text: '100');
+  final _gdriveFolderController = TextEditingController();
   DateTime? _dueDate;
   String _submissionType = 'both'; // 'link', 'file', 'both'
   bool _isSaving = false;
@@ -62,6 +63,7 @@ class _CreateAssignmentDialogState extends ConsumerState<CreateAssignmentDialog>
     _draftDisposer.add(_titleController.bindSessionDraft(formId: _formId, fieldKey: 'title'));
     _draftDisposer.add(_descController.bindSessionDraft(formId: _formId, fieldKey: 'desc'));
     _draftDisposer.add(_pointsController.bindSessionDraft(formId: _formId, fieldKey: 'points'));
+    _draftDisposer.add(_gdriveFolderController.bindSessionDraft(formId: _formId, fieldKey: 'gdriveFolder'));
     // Default due date: 7 days from now
     _dueDate = DateTime.now().add(const Duration(days: 7, hours: 4));
   }
@@ -107,6 +109,7 @@ class _CreateAssignmentDialogState extends ConsumerState<CreateAssignmentDialog>
     _titleController.dispose();
     _descController.dispose();
     _pointsController.dispose();
+    _gdriveFolderController.dispose();
     super.dispose();
   }
 
@@ -223,6 +226,7 @@ class _CreateAssignmentDialogState extends ConsumerState<CreateAssignmentDialog>
         attachmentSize: _attachmentSize,
         attachmentBytes: _attachmentBase64,
         storageUrl: attachmentStorageUrl,
+        gdriveFolderUrl: _gdriveFolderController.text.trim().isNotEmpty ? _gdriveFolderController.text.trim() : null,
       );
 
       // Invalidate relevant providers
@@ -633,6 +637,52 @@ class _CreateAssignmentDialogState extends ConsumerState<CreateAssignmentDialog>
                             subtitle: 'GitHub, Figma, Google Drive or external URL',
                           ),
                         ],
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+
+                    // Google Drive Auto-Routing Folder (Optional)
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Text('Google Drive Submission Folder', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: AppTheme.textSecondary)),
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+                          decoration: BoxDecoration(
+                            color: Colors.green.withValues(alpha: 0.12),
+                            borderRadius: BorderRadius.circular(6),
+                            border: Border.all(color: Colors.green.withValues(alpha: 0.3)),
+                          ),
+                          child: const Text(
+                            'AUTO-UPLOAD TO GDRIVE',
+                            style: TextStyle(fontSize: 9, fontWeight: FontWeight.bold, color: Colors.green),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 6),
+                    TextField(
+                      controller: _gdriveFolderController,
+                      style: TextStyle(color: AppTheme.text, fontSize: 13),
+                      decoration: InputDecoration(
+                        hintText: 'e.g. https://drive.google.com/drive/folders/...',
+                        hintStyle: TextStyle(color: AppTheme.textMuted.withValues(alpha: 0.6), fontSize: 12),
+                        helperText: 'When provided, student submitted files are automatically uploaded directly into this Drive folder.',
+                        helperStyle: TextStyle(color: AppTheme.textMuted, fontSize: 11),
+                        prefixIcon: const Icon(Icons.cloud_upload_outlined, color: Colors.green, size: 20),
+                        contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(10),
+                          borderSide: BorderSide(color: AppTheme.border),
+                        ),
+                        enabledBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(10),
+                          borderSide: BorderSide(color: AppTheme.border),
+                        ),
+                        focusedBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(10),
+                          borderSide: const BorderSide(color: Colors.green),
+                        ),
                       ),
                     ),
                     const SizedBox(height: 16),

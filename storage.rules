@@ -1,0 +1,30 @@
+rules_version = '2';
+service firebase.storage {
+  match /b/{bucket}/o {
+    // Student assignment submissions
+    match /submissions/{allPaths=**} {
+      allow read, write: if true;
+    }
+    
+    // Teacher handouts and assignment briefs
+    match /assignments/{allPaths=**} {
+      allow read, write: if true;
+    }
+
+    // Curriculum learning materials and modules
+    match /materials/{allPaths=**} {
+      allow read, write: if true;
+    }
+
+    // User avatars and profile images
+    match /avatars/{allPaths=**} {
+      allow read, write: if true;
+    }
+
+    // Fallback: allow public read, authenticated writes
+    match /{allPaths=**} {
+      allow read: if true;
+      allow write: if request.auth != null;
+    }
+  }
+}

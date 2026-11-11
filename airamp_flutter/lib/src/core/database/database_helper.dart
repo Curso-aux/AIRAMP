@@ -19,6 +19,7 @@ import '../../features/teacher/domain/item_analysis_model.dart';
 class DatabaseHelper {
   static final DatabaseHelper _instance = DatabaseHelper._internal();
   static Database? _database;
+  static bool _isSyncingCurriculum = false;
 
   factory DatabaseHelper() => _instance;
 
@@ -190,6 +191,11 @@ class DatabaseHelper {
     try {
       await db.execute(
         'ALTER TABLE assignments ADD COLUMN storage_url TEXT',
+      );
+    } catch (_) {}
+    try {
+      await db.execute(
+        'ALTER TABLE assignments ADD COLUMN gdrive_folder_url TEXT',
       );
     } catch (_) {}
     try {
@@ -7919,6 +7925,7 @@ class DatabaseHelper {
     String? targetSections,
     String? cloudId,
     String? storageUrl,
+    String? gdriveFolderUrl,
   }) async {
     final db = await database;
     final now = DateTime.now().toIso8601String();
@@ -7945,7 +7952,8 @@ class DatabaseHelper {
       'attachment_path': attachmentPath,
       'attachment_size': attachmentSize,
       'attachment_bytes': attachmentBytes,
-      'storage_url': storageUrl,
+      'storage_url': storageUrl ?? gdriveFolderUrl,
+      'gdrive_folder_url': gdriveFolderUrl,
       'status': 'active',
       'created_at': now,
     });
@@ -7989,7 +7997,8 @@ class DatabaseHelper {
         'attachment_path': attachmentPath,
         'attachment_size': attachmentSize,
         'attachment_bytes': safeAttachmentBytes,
-        'storage_url': storageUrl,
+        'storage_url': storageUrl ?? gdriveFolderUrl,
+        'gdrive_folder_url': gdriveFolderUrl,
         'status': 'active',
         'created_at': now,
         'updated_at': now,
@@ -8696,10 +8705,12 @@ class DatabaseHelper {
   }
 
   /// Uploads subjects, topics, learning outcomes, and contents to Cloud Firestore
-  Future<void> pushLocalCurriculumToCloud() async {
+  Future<void> pushLocalCurriculumToCloud({int? subjectId}) async {
     try {
       final db = await database;
-      final subjects = await db.query('subjects');
+      final subjects = subjectId != null
+          ? await db.query('subjects', where: 'id = ?', whereArgs: [subjectId])
+          : await db.query('subjects');
       for (final s in subjects) {
         final subId = s['id'] as int;
         final subCode = s['subject_code']?.toString() ?? 'SUBJ_$subId';
@@ -8711,8 +8722,14 @@ class DatabaseHelper {
           whereArgs: [subId],
         );
         final topicsPayload = <Map<String, dynamic>>[];
+        final seenTopicTitles = <String>{};
 
         for (final t in topics) {
+          final tTitle = (t['title']?.toString() ?? 'Topic').trim();
+          final normTitle = tTitle.toLowerCase();
+          if (seenTopicTitles.contains(normTitle)) continue;
+          seenTopicTitles.add(normTitle);
+
           final tId = t['id'] as int;
           final los = await db.query(
             'learning_outcomes',
@@ -8720,8 +8737,14 @@ class DatabaseHelper {
             whereArgs: [tId],
           );
           final losPayload = <Map<String, dynamic>>[];
+          final seenLoTitles = <String>{};
 
           for (final lo in los) {
+            final loTitle = (lo['title']?.toString() ?? 'Learning Outcome').trim();
+            final normLoTitle = loTitle.toLowerCase();
+            if (seenLoTitles.contains(normLoTitle)) continue;
+            seenLoTitles.add(normLoTitle);
+
             final loId = lo['id'] as int;
             final contents = await db.query(
               'contents',
@@ -8787,6 +8810,7 @@ class DatabaseHelper {
           'teacher_id': s['teacher_id'] ?? 'teacher_1',
           'teacher_name': s['teacher_name'] ?? 'Sir John Reyes',
           'created_at': s['created_at'] ?? DateTime.now().toIso8601String(),
+          'updated_at': DateTime.now().toIso8601String(),
           'topics': topicsPayload,
         };
 
@@ -8804,6 +8828,8 @@ class DatabaseHelper {
   /// Pulls all subjects, topics, and learning outcomes from Cloud Firestore and caches in SQLite
   /// Uses delta querying via 'last_synced_at_curriculum' so 0 reads are consumed if nothing changed!
   Future<void> syncCloudCurriculumToLocal({bool force = false}) async {
+    if (_isSyncingCurriculum) return;
+    _isSyncingCurriculum = true;
     try {
       final prefs = await SharedPreferences.getInstance();
       final lastSync = force ? null : prefs.getString('last_synced_at_curriculum');
@@ -8833,8 +8859,8 @@ class DatabaseHelper {
 
         final matchSub = await db.query(
           'subjects',
-          where: 'subject_code = ?',
-          whereArgs: [subCode],
+          where: 'UPPER(subject_code) = ? OR UPPER(name) = ?',
+          whereArgs: [subCode.toUpperCase(), name.toUpperCase()],
         );
         int localSubId;
         if (matchSub.isEmpty) {
@@ -8869,14 +8895,20 @@ class DatabaseHelper {
 
         final topics =
             (doc['topics'] as List?)?.cast<Map<String, dynamic>>() ?? [];
+        final seenIncomingTopicTitles = <String>{};
+
         for (final t in topics) {
-          final tTitle = t['title']?.toString() ?? 'Topic';
+          final tTitle = (t['title']?.toString() ?? 'Topic').trim();
+          final normTTitle = tTitle.toLowerCase();
+          if (seenIncomingTopicTitles.contains(normTTitle)) continue;
+          seenIncomingTopicTitles.add(normTTitle);
+
           final tDesc = t['description']?.toString();
 
           final matchT = await db.query(
             'topics',
-            where: 'subject_id = ? AND LOWER(title) = ?',
-            whereArgs: [localSubId, tTitle.toLowerCase().trim()],
+            where: 'subject_id = ? AND LOWER(TRIM(title)) = ?',
+            whereArgs: [localSubId, normTTitle],
           );
           int localTopicId;
           if (matchT.isEmpty) {
@@ -8890,21 +8922,40 @@ class DatabaseHelper {
             localTopicId = matchT.first['id'] as int;
             await db.update(
               'topics',
-              {'description': tDesc},
+              {'title': tTitle, 'description': tDesc},
               where: 'id = ?',
               whereArgs: [localTopicId],
             );
+            // Prune duplicate topic rows in local SQLite
+            if (matchT.length > 1) {
+              for (int i = 1; i < matchT.length; i++) {
+                final dupId = matchT[i]['id'] as int;
+                await db.update(
+                  'learning_outcomes',
+                  {'topic_id': localTopicId},
+                  where: 'topic_id = ?',
+                  whereArgs: [dupId],
+                );
+                await db.delete('topics', where: 'id = ?', whereArgs: [dupId]);
+              }
+            }
           }
 
           final los =
               (t['learning_outcomes'] as List?)?.cast<Map<String, dynamic>>() ??
               [];
+          final seenIncomingLoTitles = <String>{};
+
           for (final lo in los) {
-            final loTitle = lo['title']?.toString() ?? 'Learning Outcome';
+            final loTitle = (lo['title']?.toString() ?? 'Learning Outcome').trim();
+            final normLoTitle = loTitle.toLowerCase();
+            if (seenIncomingLoTitles.contains(normLoTitle)) continue;
+            seenIncomingLoTitles.add(normLoTitle);
+
             final matchLo = await db.query(
               'learning_outcomes',
-              where: 'topic_id = ? AND LOWER(title) = ?',
-              whereArgs: [localTopicId, loTitle.toLowerCase().trim()],
+              where: 'topic_id = ? AND LOWER(TRIM(title)) = ?',
+              whereArgs: [localTopicId, normLoTitle],
             );
             int localLoId;
             if (matchLo.isEmpty) {
@@ -8925,6 +8976,7 @@ class DatabaseHelper {
               await db.update(
                 'learning_outcomes',
                 {
+                  'title': loTitle,
                   'description': lo['description'],
                   'performance_criteria': lo['performance_criteria'],
                   'passing_score': (lo['passing_score'] as num?)?.toInt() ?? 70,
@@ -8934,16 +8986,23 @@ class DatabaseHelper {
                 where: 'id = ?',
                 whereArgs: [localLoId],
               );
+              // Prune duplicate LO rows in local SQLite
+              if (matchLo.length > 1) {
+                for (int i = 1; i < matchLo.length; i++) {
+                  final dupLoId = matchLo[i]['id'] as int;
+                  await db.delete('learning_outcomes', where: 'id = ?', whereArgs: [dupLoId]);
+                }
+              }
             }
 
             final contents =
                 (lo['contents'] as List?)?.cast<Map<String, dynamic>>() ?? [];
             for (final c in contents) {
-              final cTitle = c['title']?.toString() ?? 'Content';
+              final cTitle = (c['title']?.toString() ?? 'Content').trim();
               final matchC = await db.query(
                 'contents',
-                where: 'lo_id = ? AND LOWER(title) = ?',
-                whereArgs: [localLoId, cTitle.toLowerCase().trim()],
+                where: 'lo_id = ? AND LOWER(TRIM(title)) = ?',
+                whereArgs: [localLoId, cTitle.toLowerCase()],
               );
               if (matchC.isEmpty) {
                 await db.insert('contents', {
@@ -8953,6 +9012,53 @@ class DatabaseHelper {
                   'content_data': c['content_data'] ?? '',
                   'created_at': createdAt,
                 });
+              } else {
+                await db.update(
+                  'contents',
+                  {
+                    'content_type': c['content_type'] ?? 'Text',
+                    'content_data': c['content_data'] ?? '',
+                  },
+                  where: 'id = ?',
+                  whereArgs: [matchC.first['id']],
+                );
+              }
+            }
+
+            final questions =
+                (lo['questions'] as List?)?.cast<Map<String, dynamic>>() ?? [];
+            for (final q in questions) {
+              final qText = (q['question_text']?.toString() ?? '').trim();
+              if (qText.isEmpty) continue;
+              final matchQ = await db.query(
+                'questions',
+                where: 'lo_id = ? AND LOWER(TRIM(question_text)) = ?',
+                whereArgs: [localLoId, qText.toLowerCase()],
+              );
+              if (matchQ.isEmpty) {
+                await db.insert('questions', {
+                  'lo_id': localLoId,
+                  'question_text': qText,
+                  'option_a': q['option_a'] ?? '',
+                  'option_b': q['option_b'] ?? '',
+                  'option_c': q['option_c'] ?? '',
+                  'option_d': q['option_d'] ?? '',
+                  'correct_option': q['correct_option'] ?? 'A',
+                  'created_at': createdAt,
+                });
+              } else {
+                await db.update(
+                  'questions',
+                  {
+                    'option_a': q['option_a'] ?? '',
+                    'option_b': q['option_b'] ?? '',
+                    'option_c': q['option_c'] ?? '',
+                    'option_d': q['option_d'] ?? '',
+                    'correct_option': q['correct_option'] ?? 'A',
+                  },
+                  where: 'id = ?',
+                  whereArgs: [matchQ.first['id']],
+                );
               }
             }
           }
@@ -8961,6 +9067,8 @@ class DatabaseHelper {
       await prefs.setString('last_synced_at_curriculum', DateTime.now().toIso8601String());
     } catch (e) {
       debugPrint('[DatabaseHelper] syncCloudCurriculumToLocal note: $e');
+    } finally {
+      _isSyncingCurriculum = false;
     }
   }
 

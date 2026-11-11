@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 import 'package:dio/dio.dart';
 import 'package:flutter/foundation.dart';
@@ -1116,26 +1117,68 @@ class SubjectDetailNotifier extends Notifier<List<Map<String, dynamic>>> {
     return [];
   }
 
-  Future<void> loadHierarchy(int subjectId) async {
+  Future<void> loadHierarchy(int subjectId, {bool syncCloud = true}) async {
     _subjectId = subjectId;
     final db = await DatabaseHelper().database;
 
-    final topics = await db.query(
+    final rawTopics = await db.query(
       'topics',
       where: 'subject_id = ?',
       whereArgs: [subjectId],
       orderBy: 'id ASC',
     );
 
+    // Auto-clean & deduplicate topic rows in local SQLite if any duplicates exist
+    final seenTitles = <String, int>{};
+    final topics = <Map<String, dynamic>>[];
+    for (var topic in rawTopics) {
+      final cleanTitle = (topic['title']?.toString() ?? '').trim().toLowerCase();
+      final topicId = topic['id'] as int;
+      if (cleanTitle.isNotEmpty && seenTitles.containsKey(cleanTitle)) {
+        final primaryTopicId = seenTitles[cleanTitle]!;
+        await db.update(
+          'learning_outcomes',
+          {'topic_id': primaryTopicId},
+          where: 'topic_id = ?',
+          whereArgs: [topicId],
+        );
+        await db.delete('topics', where: 'id = ?', whereArgs: [topicId]);
+        continue;
+      }
+      if (cleanTitle.isNotEmpty) {
+        seenTitles[cleanTitle] = topicId;
+      }
+      topics.add(topic);
+    }
+
     List<Map<String, dynamic>> fullTopics = [];
     for (var topic in topics) {
       final topicId = topic['id'] as int;
-      final los = await db.query(
+      final rawLos = await db.query(
         'learning_outcomes',
         where: 'topic_id = ?',
         whereArgs: [topicId],
         orderBy: 'id ASC',
       );
+
+      // Auto-clean duplicate learning outcomes
+      final seenLoTitles = <String, int>{};
+      final los = <Map<String, dynamic>>[];
+      for (var lo in rawLos) {
+        final cleanLoTitle = (lo['title']?.toString() ?? '').trim().toLowerCase();
+        final loId = lo['id'] as int;
+        if (cleanLoTitle.isNotEmpty && seenLoTitles.containsKey(cleanLoTitle)) {
+          final primaryLoId = seenLoTitles[cleanLoTitle]!;
+          await db.update('contents', {'lo_id': primaryLoId}, where: 'lo_id = ?', whereArgs: [loId]);
+          await db.update('questions', {'lo_id': primaryLoId}, where: 'lo_id = ?', whereArgs: [loId]);
+          await db.delete('learning_outcomes', where: 'id = ?', whereArgs: [loId]);
+          continue;
+        }
+        if (cleanLoTitle.isNotEmpty) {
+          seenLoTitles[cleanLoTitle] = loId;
+        }
+        los.add(lo);
+      }
 
       List<Map<String, dynamic>> fullLos = [];
       for (var lo in los) {
@@ -1159,30 +1202,68 @@ class SubjectDetailNotifier extends Notifier<List<Map<String, dynamic>>> {
     }
 
     state = fullTopics;
+
+    // Cache-and-Network (Option B): Fetch latest from Cloud Firestore in background and update
+    if (syncCloud) {
+      unawaited(() async {
+        try {
+          await DatabaseHelper().syncCloudCurriculumToLocal(force: true);
+          if (_subjectId == subjectId) {
+            await loadHierarchy(subjectId, syncCloud: false);
+          }
+        } catch (_) {}
+      }());
+    }
   }
 
   // Topics
   Future<void> addTopic(Map<String, dynamic> topic) async {
     if (_subjectId == null) return;
     final db = await DatabaseHelper().database;
+    final title = topic['title']?.toString().trim() ?? '';
+    if (title.isEmpty) return;
+
+    // Guard against duplicate topic creation
+    final existing = await db.query(
+      'topics',
+      where: 'subject_id = ? AND LOWER(TRIM(title)) = ?',
+      whereArgs: [_subjectId, title.toLowerCase()],
+    );
+    if (existing.isNotEmpty) {
+      final existingId = existing.first['id'] as int;
+      await db.update(
+        'topics',
+        {'title': title, 'description': topic['description']},
+        where: 'id = ?',
+        whereArgs: [existingId],
+      );
+      await loadHierarchy(_subjectId!, syncCloud: false);
+      unawaited(DatabaseHelper().pushLocalCurriculumToCloud(subjectId: _subjectId));
+      return;
+    }
+
     topic['subject_id'] = _subjectId;
+    topic['title'] = title;
     topic['created_at'] = DateTime.now().toIso8601String();
     await db.insert('topics', topic);
-    await loadHierarchy(_subjectId!);
+    await loadHierarchy(_subjectId!, syncCloud: false);
+    unawaited(DatabaseHelper().pushLocalCurriculumToCloud(subjectId: _subjectId));
   }
 
   Future<void> updateTopic(int topicId, Map<String, dynamic> data) async {
     if (_subjectId == null) return;
     final db = await DatabaseHelper().database;
     await db.update('topics', data, where: 'id = ?', whereArgs: [topicId]);
-    await loadHierarchy(_subjectId!);
+    await loadHierarchy(_subjectId!, syncCloud: false);
+    unawaited(DatabaseHelper().pushLocalCurriculumToCloud(subjectId: _subjectId));
   }
 
   Future<void> deleteTopic(int topicId) async {
     if (_subjectId == null) return;
     final db = await DatabaseHelper().database;
     await db.delete('topics', where: 'id = ?', whereArgs: [topicId]);
-    await loadHierarchy(_subjectId!);
+    await loadHierarchy(_subjectId!, syncCloud: false);
+    unawaited(DatabaseHelper().pushLocalCurriculumToCloud(subjectId: _subjectId));
   }
 
   // Learning Outcomes
@@ -1192,7 +1273,8 @@ class SubjectDetailNotifier extends Notifier<List<Map<String, dynamic>>> {
     lo['topic_id'] = topicId;
     lo['created_at'] = DateTime.now().toIso8601String();
     await db.insert('learning_outcomes', lo);
-    await loadHierarchy(_subjectId!);
+    await loadHierarchy(_subjectId!, syncCloud: false);
+    unawaited(DatabaseHelper().pushLocalCurriculumToCloud(subjectId: _subjectId));
   }
 
   Future<void> updateLearningOutcome(
@@ -1207,14 +1289,16 @@ class SubjectDetailNotifier extends Notifier<List<Map<String, dynamic>>> {
       where: 'id = ?',
       whereArgs: [loId],
     );
-    await loadHierarchy(_subjectId!);
+    await loadHierarchy(_subjectId!, syncCloud: false);
+    unawaited(DatabaseHelper().pushLocalCurriculumToCloud(subjectId: _subjectId));
   }
 
   Future<void> deleteLearningOutcome(int loId) async {
     if (_subjectId == null) return;
     final db = await DatabaseHelper().database;
     await db.delete('learning_outcomes', where: 'id = ?', whereArgs: [loId]);
-    await loadHierarchy(_subjectId!);
+    await loadHierarchy(_subjectId!, syncCloud: false);
+    unawaited(DatabaseHelper().pushLocalCurriculumToCloud(subjectId: _subjectId));
   }
 
   // Contents
@@ -1224,21 +1308,24 @@ class SubjectDetailNotifier extends Notifier<List<Map<String, dynamic>>> {
     content['lo_id'] = loId;
     content['created_at'] = DateTime.now().toIso8601String();
     await db.insert('contents', content);
-    await loadHierarchy(_subjectId!);
+    await loadHierarchy(_subjectId!, syncCloud: false);
+    unawaited(DatabaseHelper().pushLocalCurriculumToCloud(subjectId: _subjectId));
   }
 
   Future<void> updateContent(int contentId, Map<String, dynamic> data) async {
     if (_subjectId == null) return;
     final db = await DatabaseHelper().database;
     await db.update('contents', data, where: 'id = ?', whereArgs: [contentId]);
-    await loadHierarchy(_subjectId!);
+    await loadHierarchy(_subjectId!, syncCloud: false);
+    unawaited(DatabaseHelper().pushLocalCurriculumToCloud(subjectId: _subjectId));
   }
 
   Future<void> deleteContent(int contentId) async {
     if (_subjectId == null) return;
     final db = await DatabaseHelper().database;
     await db.delete('contents', where: 'id = ?', whereArgs: [contentId]);
-    await loadHierarchy(_subjectId!);
+    await loadHierarchy(_subjectId!, syncCloud: false);
+    unawaited(DatabaseHelper().pushLocalCurriculumToCloud(subjectId: _subjectId));
   }
 
   // Questions
@@ -1248,7 +1335,8 @@ class SubjectDetailNotifier extends Notifier<List<Map<String, dynamic>>> {
     question['lo_id'] = loId;
     question['created_at'] = DateTime.now().toIso8601String();
     await db.insert('questions', question);
-    await loadHierarchy(_subjectId!);
+    await loadHierarchy(_subjectId!, syncCloud: false);
+    unawaited(DatabaseHelper().pushLocalCurriculumToCloud(subjectId: _subjectId));
   }
 
   Future<void> updateQuestion(

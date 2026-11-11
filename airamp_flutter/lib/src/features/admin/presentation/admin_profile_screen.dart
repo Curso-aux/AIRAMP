@@ -9,6 +9,7 @@ import '../../../core/components/profile_photo_sheet.dart';
 import '../../../core/components/skeleton_loader.dart';
 import '../../../core/components/user_avatar_widget.dart';
 import '../../../core/services/otp_service.dart';
+import '../../../core/services/google_drive_service.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/theme/theme_provider.dart';
 import '../../auth/application/auth_provider.dart';
@@ -2082,6 +2083,41 @@ class _AdminProfileScreenState extends ConsumerState<AdminProfileScreen>
           const SizedBox(height: 12),
 
           InkWell(
+            onTap: _showGoogleDriveBridgeDialog,
+            borderRadius: BorderRadius.circular(8),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 4),
+              child: Row(
+                children: [
+                  const Icon(Icons.cloud_sync_outlined, size: 18, color: Colors.green),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'Google Drive Automated Bridge',
+                          style: TextStyle(
+                            fontSize: 13,
+                            fontWeight: FontWeight.w600,
+                            color: AppTheme.text,
+                          ),
+                        ),
+                        Text(
+                          'Configure 5TB Drive auto-upload for teacher assignment folders',
+                          style: TextStyle(fontSize: 11, color: AppTheme.textMuted),
+                        ),
+                      ],
+                    ),
+                  ),
+                  Icon(Icons.arrow_forward_ios_rounded, size: 12, color: AppTheme.textMuted),
+                ],
+              ),
+            ),
+          ),
+          Divider(height: 1, color: AppTheme.border),
+
+          InkWell(
             onTap: _showAdminHelpDialog,
             borderRadius: BorderRadius.circular(8),
             child: Padding(
@@ -2424,6 +2460,103 @@ class _AdminProfileScreenState extends ConsumerState<AdminProfileScreen>
           ),
         ),
       ],
+    );
+  }
+
+  void _showGoogleDriveBridgeDialog() async {
+    final currentUrl = await GoogleDriveService.instance.getBridgeUrl() ?? '';
+    final urlController = TextEditingController(text: currentUrl);
+
+    if (!mounted) return;
+    showDialog(
+      context: context,
+      builder: (ctx) => StatefulBuilder(
+        builder: (context, setDlgState) {
+          return AlertDialog(
+            backgroundColor: AppTheme.surface,
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+            title: Row(
+              children: [
+                const Icon(Icons.cloud_sync_outlined, color: Colors.green),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    'Google Drive Bridge Setup',
+                    style: TextStyle(color: AppTheme.text, fontWeight: FontWeight.bold, fontSize: 16),
+                  ),
+                ),
+              ],
+            ),
+            content: SingleChildScrollView(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(
+                    'Automated Student File Routing',
+                    style: TextStyle(fontWeight: FontWeight.bold, color: AppTheme.text, fontSize: 13),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    'When teachers provide a Google Drive folder link in their assignments, student submitted files are automatically uploaded directly into that Google Drive folder via your Google Apps Script Web App.\n',
+                    style: TextStyle(color: AppTheme.textSecondary, fontSize: 12, height: 1.4),
+                  ),
+                  Text(
+                    'Google Apps Script Web App URL:',
+                    style: TextStyle(fontWeight: FontWeight.w600, color: AppTheme.text, fontSize: 12),
+                  ),
+                  const SizedBox(height: 6),
+                  TextField(
+                    controller: urlController,
+                    style: TextStyle(color: AppTheme.text, fontSize: 13),
+                    decoration: InputDecoration(
+                      hintText: 'https://script.google.com/macros/s/.../exec',
+                      hintStyle: TextStyle(color: AppTheme.textMuted.withValues(alpha: 0.6), fontSize: 12),
+                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+                      contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  Container(
+                    padding: const EdgeInsets.all(10),
+                    decoration: BoxDecoration(
+                      color: Colors.green.withValues(alpha: 0.08),
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(color: Colors.green.withValues(alpha: 0.2)),
+                    ),
+                    child: Text(
+                      '• Deployed under betajhoneilpoblacion@gmail.com (5TB Google Storage)\n• Code template is located at scripts/gdrive_submission_bridge.js\n• Setting this once syncs across all student devices automatically.',
+                      style: TextStyle(color: Colors.green.shade700, fontSize: 11, height: 1.3),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(ctx),
+                child: Text('Cancel', style: TextStyle(color: AppTheme.textMuted)),
+              ),
+              ElevatedButton(
+                onPressed: () async {
+                  await GoogleDriveService.instance.setBridgeUrl(urlController.text.trim());
+                  if (ctx.mounted) Navigator.pop(ctx);
+                  if (mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(content: Text('Google Drive Bridge URL saved and synced successfully!')),
+                    );
+                  }
+                },
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Colors.green,
+                  foregroundColor: Colors.white,
+                ),
+                child: const Text('Save Configuration'),
+              ),
+            ],
+          );
+        },
+      ),
     );
   }
 

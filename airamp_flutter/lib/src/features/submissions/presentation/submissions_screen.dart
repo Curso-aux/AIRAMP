@@ -13,6 +13,7 @@ import '../../../core/components/skeleton_loader.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/theme/theme_provider.dart';
 import '../../../core/services/cloud_storage_service.dart';
+import '../../../core/services/google_drive_service.dart';
 import '../../../core/services/session_draft_service.dart';
 import '../../../core/utils/file_download_helper.dart';
 import '../../../core/utils/image_compress_helper.dart';
@@ -395,7 +396,7 @@ class _SubmissionsScreenState extends ConsumerState<SubmissionsScreen> {
             ElevatedButton(
               onPressed: () {
                 Navigator.pop(dialogCtx);
-                _submit(existing);
+                _submit(existing, assignment);
               },
               style: ElevatedButton.styleFrom(
                 backgroundColor: isLate ? Colors.amber.shade700 : AppTheme.primary,
@@ -440,7 +441,7 @@ class _SubmissionsScreenState extends ConsumerState<SubmissionsScreen> {
     );
   }
 
-  Future<void> _submit(Submission? existing) async {
+  Future<void> _submit(Submission? existing, [Assignment? assignment]) async {
     final text = _textResponseController.text.trim();
     final link = _linkController.text.trim();
     final hasFile = _pickedFileName != null;
@@ -468,9 +469,41 @@ class _SubmissionsScreenState extends ConsumerState<SubmissionsScreen> {
       final submissionType = types.isEmpty ? 'both' : types.join('+');
 
       String? uploadedStorageUrl = existing?.storageUrl;
+      String? linkToSave = link.isNotEmpty ? link : existing?.contentLink;
 
-      // 1. Upload document directly to Cloud Storage if picked
-      if (_pickedFileBytes != null && _pickedFileName != null) {
+      // 1. If teacher provided a Google Drive submission folder, upload directly to Google Drive!
+      final targetGdriveFolder = assignment?.gdriveFolderUrl;
+      if (targetGdriveFolder != null && targetGdriveFolder.trim().isNotEmpty && (_pickedFileBytes != null || _pickedImageBytes != null)) {
+        final uploadBytes = _pickedFileBytes ?? _pickedImageBytes!;
+        final uploadName = _pickedFileName ?? _pickedImageName!;
+        final studentSection = user?.section ?? '';
+
+        if (mounted) {
+          setState(() => _uploadStatusMessage = 'Auto-routing file to Teacher\'s Google Drive...');
+        }
+
+        final gdriveRes = await GoogleDriveService.instance.uploadToTeacherDriveFolder(
+          folderUrlOrId: targetGdriveFolder,
+          fileName: uploadName,
+          bytes: uploadBytes,
+          studentName: studentName,
+          studentId: studentId,
+          section: studentSection,
+          onProgress: (pct) {
+            if (mounted) setState(() => _uploadProgress = pct);
+          },
+        );
+
+        if (gdriveRes.success && gdriveRes.viewUrl != null) {
+          uploadedStorageUrl = gdriveRes.viewUrl;
+          if (linkToSave == null || linkToSave.isEmpty) {
+            linkToSave = gdriveRes.viewUrl;
+          }
+        }
+      }
+
+      // 2. Upload document directly to Cloud Storage if picked and not already on GDrive
+      if (uploadedStorageUrl == null && _pickedFileBytes != null && _pickedFileName != null) {
         if (mounted) setState(() => _uploadStatusMessage = 'Uploading document to cloud storage...');
         final res = await CloudStorageService().uploadSubmissionFile(
           assignmentId: _parsedId,
@@ -486,8 +519,8 @@ class _SubmissionsScreenState extends ConsumerState<SubmissionsScreen> {
         }
       }
 
-      // 2. Upload image directly to Cloud Storage if picked and no document url
-      if (_pickedImageBytes != null && _pickedImageName != null && uploadedStorageUrl == null) {
+      // 3. Upload image directly to Cloud Storage if picked and no URL yet
+      if (uploadedStorageUrl == null && _pickedImageBytes != null && _pickedImageName != null) {
         if (mounted) setState(() => _uploadStatusMessage = 'Uploading image to cloud storage...');
         final res = await CloudStorageService().uploadSubmissionFile(
           assignmentId: _parsedId,
@@ -509,7 +542,7 @@ class _SubmissionsScreenState extends ConsumerState<SubmissionsScreen> {
         studentId: studentId,
         studentName: studentName,
         submissionType: submissionType,
-        contentLink: link.isNotEmpty ? link : (existing?.contentLink),
+        contentLink: linkToSave,
         fileName: _pickedFileName ?? existing?.fileName,
         fileSize: _pickedFileSize > 0 ? _pickedFileSize : existing?.fileSize,
         filePath: _pickedFilePath ?? existing?.filePath,
@@ -779,6 +812,29 @@ class _SubmissionsScreenState extends ConsumerState<SubmissionsScreen> {
             instructions,
             style: TextStyle(color: AppTheme.textSecondary, height: 1.5, fontSize: 14),
           ),
+          if (assignment.gdriveFolderUrl != null && assignment.gdriveFolderUrl!.isNotEmpty) ...[
+            const SizedBox(height: 12),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+              decoration: BoxDecoration(
+                color: Colors.green.withValues(alpha: 0.1),
+                borderRadius: BorderRadius.circular(10),
+                border: Border.all(color: Colors.green.withValues(alpha: 0.3)),
+              ),
+              child: Row(
+                children: [
+                  const Icon(Icons.cloud_done_outlined, color: Colors.green, size: 18),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      'Google Drive Sync Enabled: Uploaded files will be automatically delivered directly into your teacher\'s Google Drive folder.',
+                      style: TextStyle(color: Colors.green.shade700, fontSize: 12, fontWeight: FontWeight.w500),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
         ],
       ),
     );
@@ -1497,6 +1553,22 @@ class _SubmissionsScreenState extends ConsumerState<SubmissionsScreen> {
                           submission.contentLink!,
                           style: TextStyle(color: AppTheme.primary, fontSize: 13),
                         ),
+                      ),
+                      IconButton(
+                        icon: const Icon(Icons.open_in_new, size: 18),
+                        color: AppTheme.primary,
+                        onPressed: () async {
+                          try {
+                            final target = submission.contentLink!.trim();
+                            final uri = Uri.parse(target.startsWith('http://') || target.startsWith('https://') ? target : 'https://$target');
+                            await launchUrl(uri, mode: LaunchMode.externalApplication);
+                          } catch (e) {
+                            if (context.mounted) {
+                              ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Could not open link: $e')));
+                            }
+                          }
+                        },
+                        tooltip: 'Open Link',
                       ),
                       IconButton(
                         icon: const Icon(Icons.copy, size: 18),

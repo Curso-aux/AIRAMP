@@ -21,6 +21,7 @@ class AssignmentRosterDialog extends ConsumerStatefulWidget {
   final String assignmentTitle;
   final int totalPoints;
   final String? dueDate;
+  final String? gdriveFolderUrl;
 
   const AssignmentRosterDialog({
     super.key,
@@ -28,6 +29,7 @@ class AssignmentRosterDialog extends ConsumerStatefulWidget {
     required this.assignmentTitle,
     required this.totalPoints,
     this.dueDate,
+    this.gdriveFolderUrl,
   });
 
   @override
@@ -612,6 +614,13 @@ class _AssignmentRosterDialogState extends ConsumerState<AssignmentRosterDialog>
                     ],
                   ),
                 ),
+                if (widget.gdriveFolderUrl != null && widget.gdriveFolderUrl!.isNotEmpty) ...[
+                  IconButton(
+                    icon: const Icon(Icons.folder_shared_outlined, color: Colors.green),
+                    tooltip: 'Open Submissions in Google Drive',
+                    onPressed: () => _openLink(widget.gdriveFolderUrl!),
+                  ),
+                ],
                 IconButton(
                   icon: Icon(Icons.close, color: AppTheme.textMuted),
                   onPressed: () => Navigator.pop(context),

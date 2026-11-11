@@ -140,5 +140,10 @@ service cloud.firestore {
     match /password_otps/{otpId} {
       allow read, write: if true;
     }
+
+    // ── SYSTEM CONFIGURATION ─────────────────────────────────
+    match /system_config/{configId} {
+      allow read, write: if true;
+    }
   }
 }

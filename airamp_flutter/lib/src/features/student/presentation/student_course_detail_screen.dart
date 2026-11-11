@@ -2,6 +2,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:url_launcher/url_launcher.dart';
 import '../../../core/components/empty_state.dart';
 import '../../../core/components/skeleton_loader.dart';
 import '../../../core/theme/app_theme.dart';
@@ -11,6 +12,7 @@ import '../../../core/database/database_helper.dart';
 import '../../admin/data/admin_repository.dart';
 import '../../auth/application/auth_provider.dart';
 import '../../curriculum/presentation/curriculum_content_sheet.dart';
+import '../../curriculum/presentation/curriculum_hierarchy_widgets.dart';
 import '../data/student_repository.dart';
 
 class StudentCourseDetailScreen extends ConsumerStatefulWidget {
@@ -58,22 +60,38 @@ class _StudentCourseDetailScreenState
     final id = int.tryParse(widget.courseId);
     if (id == null) return;
 
-    await _loadFromLocal(id);
+    if (!force) {
+      await _loadFromLocal(id);
+    }
 
     if (syncCloud) {
-      unawaited(() async {
+      if (force) {
         try {
-          await DatabaseHelper().syncCloudCurriculumToLocal(force: force);
+          await DatabaseHelper().syncCloudCurriculumToLocal(force: true);
           await Future.wait([
-            DatabaseHelper().syncCloudAssignmentsToLocal(force: force),
-            DatabaseHelper().syncCloudQuizzesToLocal(force: force),
-            DatabaseHelper().syncCloudSubmissionsToLocal(force: force),
+            DatabaseHelper().syncCloudAssignmentsToLocal(force: true),
+            DatabaseHelper().syncCloudQuizzesToLocal(force: true),
+            DatabaseHelper().syncCloudSubmissionsToLocal(force: true),
           ]);
-          if (mounted) {
-            await _loadFromLocal(id);
-          }
         } catch (_) {}
-      }());
+        if (mounted) {
+          await _loadFromLocal(id);
+        }
+      } else {
+        unawaited(() async {
+          try {
+            await DatabaseHelper().syncCloudCurriculumToLocal(force: false);
+            await Future.wait([
+              DatabaseHelper().syncCloudAssignmentsToLocal(force: false),
+              DatabaseHelper().syncCloudQuizzesToLocal(force: false),
+              DatabaseHelper().syncCloudSubmissionsToLocal(force: false),
+            ]);
+            if (mounted) {
+              await _loadFromLocal(id);
+            }
+          } catch (_) {}
+        }());
+      }
     }
   }
 
@@ -81,7 +99,9 @@ class _StudentCourseDetailScreenState
     final subject = await ref
         .read(subjectsProvider.notifier)
         .getSubjectById(id);
-    await ref.read(subjectDetailProvider.notifier).loadHierarchy(id);
+    await ref
+        .read(subjectDetailProvider.notifier)
+        .loadHierarchy(id, syncCloud: false);
 
     final user = ref.read(authProvider);
     final studentId = user?.id;
@@ -388,6 +408,105 @@ class _StudentCourseDetailScreenState
               ),
               const SizedBox(height: 24),
 
+              // Course Curriculum & Topics Section
+              Row(
+                children: [
+                  Expanded(
+                    child: Row(
+                      children: [
+                        Icon(
+                          Icons.menu_book_rounded,
+                          color: AppTheme.primary,
+                          size: 22,
+                        ),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Text(
+                            'Course Curriculum',
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: TextStyle(
+                              fontSize: 20,
+                              fontWeight: FontWeight.bold,
+                              color: AppTheme.text,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 8,
+                      vertical: 3,
+                    ),
+                    decoration: BoxDecoration(
+                      color: AppTheme.primary.withValues(alpha: 0.15),
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(
+                        color: AppTheme.primary.withValues(alpha: 0.3),
+                      ),
+                    ),
+                    child: Text(
+                      '${topics.length} Topics',
+                      style: TextStyle(
+                        fontSize: 11,
+                        fontWeight: FontWeight.bold,
+                        color: AppTheme.primary,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 6),
+              // Subtle reminder to pull down to refresh (as requested by user)
+              Row(
+                children: [
+                  Icon(Icons.refresh, size: 12, color: AppTheme.textSecondary),
+                  const SizedBox(width: 4),
+                  Text(
+                    'Pull down to refresh curriculum & learning materials',
+                    style: TextStyle(fontSize: 11, color: AppTheme.textSecondary),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 12),
+              if (topics.isEmpty)
+                Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.all(20),
+                  margin: const EdgeInsets.only(bottom: 24),
+                  decoration: BoxDecoration(
+                    color: AppTheme.surface,
+                    borderRadius: BorderRadius.circular(16),
+                    border: Border.all(color: AppTheme.border),
+                  ),
+                  child: Center(
+                    child: Column(
+                      children: [
+                        Icon(Icons.menu_book_outlined, size: 36, color: AppTheme.textSecondary),
+                        const SizedBox(height: 8),
+                        Text(
+                          'No Topics Published Yet',
+                          style: TextStyle(fontWeight: FontWeight.bold, color: AppTheme.text, fontSize: 14),
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          'Your instructor will add curriculum topics and lecture materials soon. Pull down to refresh.',
+                          textAlign: TextAlign.center,
+                          style: TextStyle(fontSize: 12, color: AppTheme.textSecondary, height: 1.3),
+                        ),
+                      ],
+                    ),
+                  ),
+                )
+              else ...[
+                ..._buildTopicsList(topics, isSequential),
+                const SizedBox(height: 12),
+              ],
+              const SizedBox(height: 12),
+
               // Assigned Quizzes Section
               if (_assignedQuizzes.isNotEmpty) ...[
                 Row(
@@ -519,9 +638,9 @@ class _StudentCourseDetailScreenState
                 const SizedBox(height: 24),
               ],
 
-              // Gizmo Flashcard & Practice Studio Banner
+              // Flashcards & Practice Review Banner
               if (topics.isNotEmpty) ...[
-                _buildGizmoPracticeHeroBanner(topics),
+                _buildPracticeHeroBanner(topics),
                 const SizedBox(height: 24),
               ],
             ],
@@ -532,7 +651,7 @@ class _StudentCourseDetailScreenState
   );
 }
 
-  Widget _buildGizmoPracticeHeroBanner(List<Map<String, dynamic>> topics) {
+  Widget _buildPracticeHeroBanner(List<Map<String, dynamic>> topics) {
     int? targetLoId;
     String? targetLoTitle;
     int totalModulesCount = 0;
@@ -550,35 +669,22 @@ class _StudentCourseDetailScreenState
 
     final subjectName = _subject?['name']?.toString() ?? 'Course';
 
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-
     return Container(
       margin: const EdgeInsets.only(bottom: 24),
       decoration: BoxDecoration(
-        gradient: LinearGradient(
-          colors: [
-            (isDark ? const Color(0xFF6366F1) : const Color(0xFF4F46E5)).withValues(alpha: isDark ? 0.22 : 0.12),
-            (isDark ? const Color(0xFF06B6D4) : const Color(0xFF0284C7)).withValues(alpha: isDark ? 0.15 : 0.08),
-            AppTheme.surface,
-          ],
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-        ),
-        borderRadius: BorderRadius.circular(18),
-        border: Border.all(
-          color: (isDark ? const Color(0xFF818CF8) : const Color(0xFF6366F1)).withValues(alpha: isDark ? 0.4 : 0.35),
-          width: 1.5,
-        ),
+        color: AppTheme.surfaceElevated,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: AppTheme.border),
         boxShadow: [
           BoxShadow(
-            color: (isDark ? const Color(0xFF6366F1) : const Color(0xFF4F46E5)).withValues(alpha: isDark ? 0.12 : 0.08),
-            blurRadius: 18,
-            offset: const Offset(0, 6),
+            color: Colors.black.withValues(alpha: 0.04),
+            blurRadius: 10,
+            offset: const Offset(0, 4),
           ),
         ],
       ),
       child: Padding(
-        padding: const EdgeInsets.all(20),
+        padding: const EdgeInsets.all(18),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -586,28 +692,17 @@ class _StudentCourseDetailScreenState
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Container(
-                  width: 50,
-                  height: 50,
+                  width: 44,
+                  height: 44,
                   decoration: BoxDecoration(
-                    gradient: const LinearGradient(
-                      colors: [Color(0xFF8B5CF6), Color(0xFF6366F1)],
-                      begin: Alignment.topLeft,
-                      end: Alignment.bottomRight,
-                    ),
-                    borderRadius: BorderRadius.circular(14),
-                    boxShadow: [
-                      BoxShadow(
-                        color: const Color(0xFF8B5CF6).withValues(alpha: 0.4),
-                        blurRadius: 10,
-                        offset: const Offset(0, 4),
-                      ),
-                    ],
+                    color: AppTheme.primary.withValues(alpha: 0.12),
+                    borderRadius: BorderRadius.circular(12),
                   ),
-                  child: const Center(
+                  child: Center(
                     child: Icon(
-                      Icons.psychology,
-                      color: Colors.white,
-                      size: 28,
+                      Icons.style_outlined,
+                      color: AppTheme.primary,
+                      size: 24,
                     ),
                   ),
                 ),
@@ -616,47 +711,30 @@ class _StudentCourseDetailScreenState
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Wrap(
-                        spacing: 8,
-                        runSpacing: 4,
-                        crossAxisAlignment: WrapCrossAlignment.center,
+                      Row(
                         children: [
                           Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                            padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
                             decoration: BoxDecoration(
-                              color: (isDark ? const Color(0xFF8B5CF6) : const Color(0xFF7C3AED)).withValues(alpha: isDark ? 0.25 : 0.12),
-                              borderRadius: BorderRadius.circular(6),
+                              color: AppTheme.primary.withValues(alpha: 0.12),
+                              borderRadius: BorderRadius.circular(4),
                             ),
                             child: Text(
-                              'GIZMO REVIEW STUDIO',
+                              'STUDY PRACTICE',
                               style: TextStyle(
                                 fontSize: 10,
                                 fontWeight: FontWeight.bold,
-                                color: isDark ? const Color(0xFFA78BFA) : const Color(0xFF6D28D9),
+                                color: AppTheme.primary,
                                 letterSpacing: 0.5,
                               ),
                             ),
                           ),
-                          Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                            decoration: BoxDecoration(
-                              color: AppTheme.success.withValues(alpha: 0.15),
-                              borderRadius: BorderRadius.circular(4),
-                            ),
-                            child: Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                Icon(Icons.auto_awesome, size: 11, color: AppTheme.success),
-                                const SizedBox(width: 3),
-                                Text(
-                                  'AI Scanned',
-                                  style: TextStyle(
-                                    fontSize: 10,
-                                    fontWeight: FontWeight.bold,
-                                    color: AppTheme.success,
-                                  ),
-                                ),
-                              ],
+                          const SizedBox(width: 8),
+                          Text(
+                            '$totalModulesCount Modules Available',
+                            style: TextStyle(
+                              fontSize: 11,
+                              color: AppTheme.textMuted,
                             ),
                           ),
                         ],
@@ -665,14 +743,14 @@ class _StudentCourseDetailScreenState
                       Text(
                         'Practice Quiz & Flashcards',
                         style: TextStyle(
-                          fontSize: 18,
+                          fontSize: 16,
                           fontWeight: FontWeight.bold,
                           color: AppTheme.text,
                         ),
                       ),
                       const SizedBox(height: 4),
                       Text(
-                        'Review this course with interactive multiple-choice questions & spaced-repetition flashcards automatically generated from your module lessons!',
+                        'Reinforce key terms and test your retention with interactive flashcards and practice questions.',
                         style: TextStyle(
                           fontSize: 12,
                           color: AppTheme.textSecondary,
@@ -685,32 +763,22 @@ class _StudentCourseDetailScreenState
               ],
             ),
             const SizedBox(height: 14),
-            Wrap(
-              spacing: 8,
-              runSpacing: 6,
-              children: [
-                _buildStudioFeatureChip(Icons.quiz_outlined, 'Multiple Choice (A, B, C, D)'),
-                _buildStudioFeatureChip(Icons.check_circle_outline, 'Instant Answer Feedback'),
-                _buildStudioFeatureChip(Icons.style_outlined, '3D Active Recall'),
-              ],
-            ),
-            const SizedBox(height: 16),
             SizedBox(
               width: double.infinity,
-              height: 44,
+              height: 42,
               child: ElevatedButton.icon(
                 style: ElevatedButton.styleFrom(
-                  backgroundColor: isDark ? const Color(0xFF6366F1) : const Color(0xFF4F46E5),
-                  foregroundColor: Colors.white,
+                  backgroundColor: AppTheme.primary,
+                  foregroundColor: Colors.black,
                   shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12),
+                    borderRadius: BorderRadius.circular(10),
                   ),
-                  elevation: 2,
+                  elevation: 0,
                 ),
-                icon: const Icon(Icons.play_circle_fill, size: 18),
+                icon: const Icon(Icons.play_circle_outline, size: 18),
                 label: Text(
                   targetLoTitle != null
-                      ? 'Practice First Module: $targetLoTitle'
+                      ? 'Practice: $targetLoTitle'
                       : 'Start Practice Review',
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
@@ -734,37 +802,6 @@ class _StudentCourseDetailScreenState
     );
   }
 
-  Widget _buildStudioFeatureChip(IconData icon, String label) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-      decoration: BoxDecoration(
-        color: AppTheme.surfaceElevated.withValues(alpha: 0.7),
-        borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: AppTheme.border.withValues(alpha: 0.5)),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(icon, size: 13, color: AppTheme.primary),
-          const SizedBox(width: 5),
-          Flexible(
-            child: Text(
-              label,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: TextStyle(
-                fontSize: 11,
-                fontWeight: FontWeight.w600,
-                color: AppTheme.textSecondary,
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  // ignore: unused_element
   List<Widget> _buildTopicsList(
     List<Map<String, dynamic>> topics,
     bool isSequential,
@@ -976,8 +1013,22 @@ class _StudentCourseDetailScreenState
                       const SizedBox(height: 4),
                       Row(
                         children: [
+                          Icon(
+                            Icons.auto_stories_outlined,
+                            size: 13,
+                            color: AppTheme.primary,
+                          ),
+                          const SizedBox(width: 4),
                           Text(
-                            '$contentCount lessons · $questionCount questions',
+                            '$contentCount ${contentCount == 1 ? "material" : "materials"}',
+                            style: TextStyle(
+                              fontSize: 11,
+                              color: AppTheme.textSecondary,
+                            ),
+                          ),
+                          const SizedBox(width: 6),
+                          Text(
+                            '· $questionCount questions',
                             style: TextStyle(
                               fontSize: 11,
                               color: AppTheme.textSecondary,
@@ -1145,6 +1196,10 @@ class _StudentCourseDetailScreenState
                         final fileInfo = MaterialFileInfo.tryParse(
                           c['content_data'],
                         );
+                        final isPdf = type.toUpperCase() == 'PDF' ||
+                            (fileInfo != null && fileInfo.fileExtension.toLowerCase() == 'pdf');
+                        final isWebOrVideo = type == 'YouTube' ||
+                            (c['content_data'] != null && c['content_data'].toString().trim().startsWith('http'));
 
                         return Container(
                           margin: const EdgeInsets.only(bottom: 12),
@@ -1160,8 +1215,8 @@ class _StudentCourseDetailScreenState
                               Row(
                                 children: [
                                   Container(
-                                    width: 32,
-                                    height: 32,
+                                    width: 34,
+                                    height: 34,
                                     decoration: BoxDecoration(
                                       color: color.withValues(alpha: 0.12),
                                       borderRadius: BorderRadius.circular(8),
@@ -1228,7 +1283,7 @@ class _StudentCourseDetailScreenState
                               const SizedBox(height: 10),
                               if (fileInfo != null) ...[
                                 if (fileInfo.description != null &&
-                                    fileInfo.description!.isNotEmpty)
+                                    fileInfo.description!.isNotEmpty) ...[
                                   Text(
                                     fileInfo.description!,
                                     style: TextStyle(
@@ -1237,39 +1292,103 @@ class _StudentCourseDetailScreenState
                                       height: 1.5,
                                     ),
                                   ),
-                                const SizedBox(height: 6),
-                                Container(
-                                  padding: const EdgeInsets.symmetric(
-                                    horizontal: 10,
-                                    vertical: 6,
-                                  ),
-                                  decoration: BoxDecoration(
-                                    color: AppTheme.surface,
-                                    borderRadius: BorderRadius.circular(6),
-                                    border: Border.all(color: AppTheme.border),
-                                  ),
-                                  child: Row(
-                                    mainAxisSize: MainAxisSize.min,
-                                    children: [
-                                      Icon(
-                                        Icons.attach_file,
-                                        size: 14,
-                                        color: AppTheme.primary,
-                                      ),
-                                      const SizedBox(width: 6),
-                                      Flexible(
-                                        child: Text(
-                                          fileInfo.fileName,
-                                          style: TextStyle(
-                                            fontSize: 12,
-                                            color: AppTheme.text,
-                                            fontWeight: FontWeight.w500,
-                                          ),
-                                          maxLines: 1,
-                                          overflow: TextOverflow.ellipsis,
+                                  const SizedBox(height: 10),
+                                ],
+                                InkWell(
+                                  onTap: () => ContentItemTile.openMaterialFile(context, c, fileInfo),
+                                  borderRadius: BorderRadius.circular(10),
+                                  child: Container(
+                                    padding: const EdgeInsets.symmetric(
+                                      horizontal: 12,
+                                      vertical: 10,
+                                    ),
+                                    decoration: BoxDecoration(
+                                      color: AppTheme.surface,
+                                      borderRadius: BorderRadius.circular(10),
+                                      border: Border.all(color: AppTheme.border),
+                                    ),
+                                    child: Row(
+                                      children: [
+                                        Icon(
+                                          isPdf ? Icons.picture_as_pdf : Icons.attach_file,
+                                          size: 20,
+                                          color: isPdf ? const Color(0xFFEF4444) : AppTheme.primary,
                                         ),
-                                      ),
-                                    ],
+                                        const SizedBox(width: 8),
+                                        Expanded(
+                                          child: Column(
+                                            crossAxisAlignment: CrossAxisAlignment.start,
+                                            children: [
+                                              Text(
+                                                fileInfo.fileName,
+                                                style: TextStyle(
+                                                  fontSize: 13,
+                                                  color: AppTheme.text,
+                                                  fontWeight: FontWeight.w600,
+                                                ),
+                                                maxLines: 1,
+                                                overflow: TextOverflow.ellipsis,
+                                              ),
+                                              Text(
+                                                'Tap to preview & open • ${formatFileSize(fileInfo.fileSize)}',
+                                                style: TextStyle(
+                                                  fontSize: 11,
+                                                  color: AppTheme.textMuted,
+                                                ),
+                                              ),
+                                            ],
+                                          ),
+                                        ),
+                                        const SizedBox(width: 8),
+                                        ElevatedButton.icon(
+                                          onPressed: () => ContentItemTile.openMaterialFile(context, c, fileInfo),
+                                          style: ElevatedButton.styleFrom(
+                                            backgroundColor: AppTheme.primary,
+                                            foregroundColor: Colors.black,
+                                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                                            minimumSize: const Size(0, 32),
+                                            elevation: 0,
+                                            shape: RoundedRectangleBorder(
+                                              borderRadius: BorderRadius.circular(8),
+                                            ),
+                                          ),
+                                          icon: const Icon(Icons.open_in_new, size: 14),
+                                          label: Text(
+                                            isPdf ? 'Open PDF' : 'Open File',
+                                            style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                ),
+                              ] else if (isWebOrVideo) ...[
+                                Text(
+                                  c['content_data']?.toString() ?? '',
+                                  style: TextStyle(
+                                    color: AppTheme.textSecondary,
+                                    fontSize: 13,
+                                    height: 1.5,
+                                  ),
+                                ),
+                                const SizedBox(height: 8),
+                                SizedBox(
+                                  width: double.infinity,
+                                  child: OutlinedButton.icon(
+                                    onPressed: () async {
+                                      final raw = c['content_data']?.toString().trim() ?? '';
+                                      final uri = Uri.tryParse(raw);
+                                      if (uri != null) {
+                                        await launchUrl(uri, mode: LaunchMode.externalApplication);
+                                      }
+                                    },
+                                    icon: const Icon(Icons.play_circle_outline, size: 16),
+                                    label: Text(type == 'YouTube' ? 'Watch Video Lesson' : 'Open External Link'),
+                                    style: OutlinedButton.styleFrom(
+                                      foregroundColor: AppTheme.primary,
+                                      side: BorderSide(color: AppTheme.primary.withValues(alpha: 0.5)),
+                                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                                    ),
                                   ),
                                 ),
                               ] else
@@ -1287,17 +1406,17 @@ class _StudentCourseDetailScreenState
                       }),
 
                     const SizedBox(height: 24),
-                    // ── Gizmo Review Flashcards Banner ──
+                    // ── Module Flashcards & Practice Card in Sheet ──
                     Row(
                       children: [
                         Icon(
-                          Icons.psychology,
+                          Icons.style_outlined,
                           color: AppTheme.primary,
                           size: 20,
                         ),
                         const SizedBox(width: 8),
                         Text(
-                          'Practice & Active Recall',
+                          'Practice & Flashcards',
                           style: TextStyle(
                             fontSize: 16,
                             fontWeight: FontWeight.bold,
@@ -1310,17 +1429,10 @@ class _StudentCourseDetailScreenState
                     Container(
                       padding: const EdgeInsets.all(16),
                       decoration: BoxDecoration(
-                        gradient: LinearGradient(
-                          colors: [
-                            AppTheme.primary.withValues(alpha: 0.12),
-                            AppTheme.surfaceElevated,
-                          ],
-                          begin: Alignment.topLeft,
-                          end: Alignment.bottomRight,
-                        ),
-                        borderRadius: BorderRadius.circular(16),
+                        color: AppTheme.background,
+                        borderRadius: BorderRadius.circular(14),
                         border: Border.all(
-                          color: AppTheme.primary.withValues(alpha: 0.3),
+                          color: AppTheme.border,
                         ),
                       ),
                       child: Column(
@@ -1329,18 +1441,18 @@ class _StudentCourseDetailScreenState
                           Row(
                             children: [
                               Container(
-                                width: 40,
-                                height: 40,
+                                width: 36,
+                                height: 36,
                                 decoration: BoxDecoration(
                                   color: AppTheme.primary.withValues(
-                                    alpha: 0.2,
+                                    alpha: 0.12,
                                   ),
-                                  shape: BoxShape.circle,
+                                  borderRadius: BorderRadius.circular(8),
                                 ),
                                 child: Icon(
-                                  Icons.psychology,
+                                  Icons.style_outlined,
                                   color: AppTheme.primary,
-                                  size: 22,
+                                  size: 20,
                                 ),
                               ),
                               const SizedBox(width: 12),
@@ -1349,7 +1461,7 @@ class _StudentCourseDetailScreenState
                                   crossAxisAlignment: CrossAxisAlignment.start,
                                   children: [
                                     Text(
-                                      'Gizmo Review & Practice Quiz',
+                                      'Module Review & Flashcards',
                                       style: TextStyle(
                                         fontWeight: FontWeight.bold,
                                         color: AppTheme.text,
@@ -1358,7 +1470,7 @@ class _StudentCourseDetailScreenState
                                     ),
                                     const SizedBox(height: 2),
                                     Text(
-                                      'Smart flashcards & mini-quizzes automatically scanned from this module',
+                                      'Practice interactive flashcards and questions prepared for this lesson.',
                                       style: TextStyle(
                                         fontSize: 11,
                                         color: AppTheme.textSecondary,
@@ -1372,19 +1484,19 @@ class _StudentCourseDetailScreenState
                           const SizedBox(height: 14),
                           SizedBox(
                             width: double.infinity,
-                            height: 46,
+                            height: 44,
                             child: ElevatedButton.icon(
                               style: ElevatedButton.styleFrom(
                                 backgroundColor: AppTheme.primary,
                                 foregroundColor: Colors.black,
                                 shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(12),
+                                  borderRadius: BorderRadius.circular(10),
                                 ),
-                                elevation: 2,
+                                elevation: 0,
                               ),
-                              icon: const Icon(Icons.psychology, size: 20),
+                              icon: const Icon(Icons.play_arrow_rounded, size: 18),
                               label: const Text(
-                                '🧠 Practice Quiz & Flashcards (Choices)',
+                                'Practice Quiz & Flashcards',
                                 style: TextStyle(
                                   fontWeight: FontWeight.bold,
                                   fontSize: 13,

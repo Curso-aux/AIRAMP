@@ -1,4 +1,6 @@
 import 'dart:convert';
+import 'dart:io';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:file_picker/file_picker.dart';
@@ -49,7 +51,13 @@ Color getColorForType(String? type) {
 
 /// Checks if the content type corresponds to an uploadable file
 bool isFileType(String type) {
-  return const ['pdf', 'ppt', 'doc', 'image', 'video'].contains(type.toLowerCase());
+  return const [
+    'pdf',
+    'ppt',
+    'doc',
+    'image',
+    'video',
+  ].contains(type.toLowerCase());
 }
 
 /// Returns allowed file extensions for file picker filtering
@@ -87,6 +95,7 @@ class MaterialFileInfo {
   final int fileSize;
   final String fileExtension;
   final String? filePath;
+  final String? fileBytes;
   final String? description;
 
   const MaterialFileInfo({
@@ -95,17 +104,19 @@ class MaterialFileInfo {
     required this.fileSize,
     required this.fileExtension,
     this.filePath,
+    this.fileBytes,
     this.description,
   });
 
   Map<String, dynamic> toJson() => {
-        'is_file': true,
-        'file_name': fileName,
-        'file_size': fileSize,
-        'file_extension': fileExtension,
-        if (filePath != null) 'file_path': filePath,
-        if (description != null) 'description': description,
-      };
+    'is_file': true,
+    'file_name': fileName,
+    'file_size': fileSize,
+    'file_extension': fileExtension,
+    if (filePath != null) 'file_path': filePath,
+    if (fileBytes != null) 'file_bytes': fileBytes,
+    if (description != null) 'description': description,
+  };
 
   static MaterialFileInfo? tryParse(String? data) {
     if (data == null || data.trim().isEmpty) return null;
@@ -118,6 +129,7 @@ class MaterialFileInfo {
           fileSize: (decoded['file_size'] as num?)?.toInt() ?? 0,
           fileExtension: decoded['file_extension']?.toString() ?? '',
           filePath: decoded['file_path']?.toString(),
+          fileBytes: decoded['file_bytes']?.toString(),
           description: decoded['description']?.toString(),
         );
       }
@@ -155,16 +167,24 @@ class _AddContentSheetState extends ConsumerState<AddContentSheet> {
   @override
   void initState() {
     super.initState();
-    _draftDisposer.add(_titleController.bindSessionDraft(formId: _formId, fieldKey: 'title'));
-    _draftDisposer.add(_contentController.bindSessionDraft(formId: _formId, fieldKey: 'content'));
-    _draftDisposer.add(_notesController.bindSessionDraft(formId: _formId, fieldKey: 'notes'));
+    _draftDisposer.add(
+      _titleController.bindSessionDraft(formId: _formId, fieldKey: 'title'),
+    );
+    _draftDisposer.add(
+      _contentController.bindSessionDraft(formId: _formId, fieldKey: 'content'),
+    );
+    _draftDisposer.add(
+      _notesController.bindSessionDraft(formId: _formId, fieldKey: 'notes'),
+    );
   }
+
   String _selectedType = 'Text';
 
   // File state
   String? _pickedFileName;
   int _pickedFileSize = 0;
   String? _pickedFilePath;
+  String? _pickedFileBytes;
   bool _isDragging = false;
   bool _isProcessing = false;
 
@@ -205,16 +225,30 @@ class _AddContentSheetState extends ConsumerState<AddContentSheet> {
       if (files.isNotEmpty) {
         final file = files.first;
         final size = await file.length();
+        Uint8List? bytes;
+        try {
+          bytes = await file.readAsBytes();
+        } catch (_) {
+          if (!kIsWeb && file.path != null) {
+            try {
+              bytes = await File(file.path!).readAsBytes();
+            } catch (_) {}
+          }
+        }
         _applyFileSelection(
           name: file.name,
           size: size,
           path: file.path,
+          bytes: bytes != null ? base64Encode(bytes) : null,
         );
       }
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Failed to pick file: $e'), backgroundColor: AppTheme.error),
+          SnackBar(
+            content: Text('Failed to pick file: $e'),
+            backgroundColor: AppTheme.error,
+          ),
         );
       }
     } finally {
@@ -226,11 +260,13 @@ class _AddContentSheetState extends ConsumerState<AddContentSheet> {
     required String name,
     required int size,
     String? path,
+    String? bytes,
   }) {
     setState(() {
       _pickedFileName = name;
       _pickedFileSize = size;
       _pickedFilePath = path;
+      if (bytes != null) _pickedFileBytes = bytes;
 
       // Auto-fill title if empty
       if (_titleController.text.trim().isEmpty) {
@@ -243,10 +279,15 @@ class _AddContentSheetState extends ConsumerState<AddContentSheet> {
 
   Future<void> _onFileDropped(DropItem item) async {
     final length = await item.length();
+    Uint8List? bytes;
+    try {
+      bytes = await item.readAsBytes();
+    } catch (_) {}
     _applyFileSelection(
       name: item.name,
-      size: length,
+      size: length > 0 ? length : (bytes?.length ?? 0),
       path: item.path,
+      bytes: bytes != null ? base64Encode(bytes) : null,
     );
   }
 
@@ -255,6 +296,7 @@ class _AddContentSheetState extends ConsumerState<AddContentSheet> {
       _pickedFileName = null;
       _pickedFileSize = 0;
       _pickedFilePath = null;
+      _pickedFileBytes = null;
     });
   }
 
@@ -291,6 +333,7 @@ class _AddContentSheetState extends ConsumerState<AddContentSheet> {
             ? _pickedFileName!.split('.').last.toLowerCase()
             : _selectedType.toLowerCase(),
         filePath: _pickedFilePath,
+        fileBytes: _pickedFileBytes,
         description: _notesController.text.trim().isNotEmpty
             ? _notesController.text.trim()
             : null,
@@ -301,9 +344,11 @@ class _AddContentSheetState extends ConsumerState<AddContentSheet> {
       if (contentData.isEmpty) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text(_selectedType == 'YouTube'
-                ? 'Please enter a YouTube video URL'
-                : 'Please enter content text'),
+            content: Text(
+              _selectedType == 'YouTube'
+                  ? 'Please enter a YouTube video URL'
+                  : 'Please enter content text',
+            ),
             backgroundColor: AppTheme.error,
           ),
         );
@@ -366,7 +411,9 @@ class _AddContentSheetState extends ConsumerState<AddContentSheet> {
                   backgroundColor: Theme.of(context).colorScheme.surface,
                   labelStyle: TextStyle(
                     color: isSelected ? Colors.black : AppTheme.textMuted,
-                    fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+                    fontWeight: isSelected
+                        ? FontWeight.bold
+                        : FontWeight.normal,
                     fontSize: 12,
                   ),
                   side: BorderSide(
@@ -452,7 +499,8 @@ class _AddContentSheetState extends ConsumerState<AddContentSheet> {
           const SizedBox(height: 8),
           _buildTextField(
             controller: _contentController,
-            hintText: 'Enter complete lesson text, definitions, or instructions...',
+            hintText:
+                'Enter complete lesson text, definitions, or instructions...',
             maxLines: 6,
           ),
         ],
@@ -481,15 +529,15 @@ class _AddContentSheetState extends ConsumerState<AddContentSheet> {
           color: _isDragging
               ? color.withValues(alpha: 0.12)
               : hasFile
-                  ? Theme.of(context).colorScheme.surface
-                  : AppTheme.background,
+              ? Theme.of(context).colorScheme.surface
+              : AppTheme.background,
           borderRadius: BorderRadius.circular(12),
           border: Border.all(
             color: _isDragging
                 ? color
                 : hasFile
-                    ? AppTheme.primary
-                    : AppTheme.border,
+                ? AppTheme.primary
+                : AppTheme.border,
             width: _isDragging || hasFile ? 1.5 : 1,
             style: BorderStyle.solid,
           ),
@@ -502,7 +550,9 @@ class _AddContentSheetState extends ConsumerState<AddContentSheet> {
   }
 
   Widget _buildUploadPlaceholder(Color color) {
-    final allowedExts = allowedExtensionsFor(_selectedType).map((e) => '.$e').join(', ');
+    final allowedExts = allowedExtensionsFor(
+      _selectedType,
+    ).map((e) => '.$e').join(', ');
 
     return Column(
       mainAxisSize: MainAxisSize.min,
@@ -515,7 +565,9 @@ class _AddContentSheetState extends ConsumerState<AddContentSheet> {
             shape: BoxShape.circle,
           ),
           child: Icon(
-            _isDragging ? Icons.file_download_outlined : Icons.cloud_upload_outlined,
+            _isDragging
+                ? Icons.file_download_outlined
+                : Icons.cloud_upload_outlined,
             size: 28,
             color: color,
           ),
@@ -543,7 +595,10 @@ class _AddContentSheetState extends ConsumerState<AddContentSheet> {
               ? const SizedBox(
                   width: 14,
                   height: 14,
-                  child: CircularProgressIndicator(strokeWidth: 2, color: Colors.black),
+                  child: CircularProgressIndicator(
+                    strokeWidth: 2,
+                    color: Colors.black,
+                  ),
                 )
               : const Icon(Icons.folder_open, size: 16),
           label: Text(
@@ -554,7 +609,9 @@ class _AddContentSheetState extends ConsumerState<AddContentSheet> {
             backgroundColor: AppTheme.primary,
             foregroundColor: Colors.black,
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(8),
+            ),
             elevation: 0,
           ),
         ),
@@ -593,7 +650,10 @@ class _AddContentSheetState extends ConsumerState<AddContentSheet> {
               Row(
                 children: [
                   Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 6,
+                      vertical: 2,
+                    ),
                     decoration: BoxDecoration(
                       color: AppTheme.success.withValues(alpha: 0.15),
                       borderRadius: BorderRadius.circular(4),
@@ -610,7 +670,10 @@ class _AddContentSheetState extends ConsumerState<AddContentSheet> {
                   const SizedBox(width: 8),
                   Text(
                     formatFileSize(_pickedFileSize),
-                    style: TextStyle(fontSize: 11, color: AppTheme.textSecondary),
+                    style: TextStyle(
+                      fontSize: 11,
+                      color: AppTheme.textSecondary,
+                    ),
                   ),
                 ],
               ),
@@ -685,13 +748,18 @@ class _EditContentSheetState extends ConsumerState<EditContentSheet> {
       _pickedFileName = fileInfo.fileName;
       _pickedFileSize = fileInfo.fileSize;
       _pickedFilePath = fileInfo.filePath;
-      _notesController = TextEditingController(text: fileInfo.description ?? '');
+      _pickedFileBytes = fileInfo.fileBytes;
+      _notesController = TextEditingController(
+        text: fileInfo.description ?? '',
+      );
       _contentController = TextEditingController();
     } else {
       _contentController = TextEditingController(text: rawData);
       _notesController = TextEditingController();
     }
   }
+
+  String? _pickedFileBytes;
 
   @override
   void dispose() {
@@ -713,16 +781,30 @@ class _EditContentSheetState extends ConsumerState<EditContentSheet> {
       if (files.isNotEmpty) {
         final file = files.first;
         final size = await file.length();
+        Uint8List? bytes;
+        try {
+          bytes = await file.readAsBytes();
+        } catch (_) {
+          if (!kIsWeb && file.path != null) {
+            try {
+              bytes = await File(file.path!).readAsBytes();
+            } catch (_) {}
+          }
+        }
         setState(() {
           _pickedFileName = file.name;
           _pickedFileSize = size;
           _pickedFilePath = file.path;
+          if (bytes != null) _pickedFileBytes = base64Encode(bytes);
         });
       }
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Failed to pick file: $e'), backgroundColor: AppTheme.error),
+          SnackBar(
+            content: Text('Failed to pick file: $e'),
+            backgroundColor: AppTheme.error,
+          ),
         );
       }
     } finally {
@@ -732,10 +814,15 @@ class _EditContentSheetState extends ConsumerState<EditContentSheet> {
 
   Future<void> _onFileDropped(DropItem item) async {
     final length = await item.length();
+    Uint8List? bytes;
+    try {
+      bytes = await item.readAsBytes();
+    } catch (_) {}
     setState(() {
       _pickedFileName = item.name;
-      _pickedFileSize = length;
+      _pickedFileSize = length > 0 ? length : (bytes?.length ?? 0);
       _pickedFilePath = item.path;
+      if (bytes != null) _pickedFileBytes = base64Encode(bytes);
     });
   }
 
@@ -743,7 +830,10 @@ class _EditContentSheetState extends ConsumerState<EditContentSheet> {
     final title = _titleController.text.trim();
     if (title.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: const Text('Please enter a content title'), backgroundColor: AppTheme.error),
+        SnackBar(
+          content: const Text('Please enter a content title'),
+          backgroundColor: AppTheme.error,
+        ),
       );
       return;
     }
@@ -752,7 +842,10 @@ class _EditContentSheetState extends ConsumerState<EditContentSheet> {
     if (isFileType(_selectedType)) {
       if (_pickedFileName == null) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Please select or drop a $_selectedType file'), backgroundColor: AppTheme.error),
+          SnackBar(
+            content: Text('Please select or drop a $_selectedType file'),
+            backgroundColor: AppTheme.error,
+          ),
         );
         return;
       }
@@ -764,6 +857,7 @@ class _EditContentSheetState extends ConsumerState<EditContentSheet> {
             ? _pickedFileName!.split('.').last.toLowerCase()
             : _selectedType.toLowerCase(),
         filePath: _pickedFilePath,
+        fileBytes: _pickedFileBytes,
         description: _notesController.text.trim().isNotEmpty
             ? _notesController.text.trim()
             : null,
@@ -773,15 +867,21 @@ class _EditContentSheetState extends ConsumerState<EditContentSheet> {
       contentData = _contentController.text.trim();
     }
 
-    ref.read(subjectDetailProvider.notifier).updateContent(widget.contentItem['id'], {
-      'title': title,
-      'content_type': _selectedType,
-      'content_data': contentData,
-    });
+    ref.read(subjectDetailProvider.notifier).updateContent(
+      widget.contentItem['id'],
+      {
+        'title': title,
+        'content_type': _selectedType,
+        'content_data': contentData,
+      },
+    );
 
     Navigator.pop(context);
     ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text('Updated "$title" successfully'), backgroundColor: AppTheme.success),
+      SnackBar(
+        content: Text('Updated "$title" successfully'),
+        backgroundColor: AppTheme.success,
+      ),
     );
   }
 
@@ -794,7 +894,11 @@ class _EditContentSheetState extends ConsumerState<EditContentSheet> {
       children: [
         Text(
           'Content Type',
-          style: TextStyle(color: AppTheme.textSecondary, fontSize: 12, fontWeight: FontWeight.w600),
+          style: TextStyle(
+            color: AppTheme.textSecondary,
+            fontSize: 12,
+            fontWeight: FontWeight.w600,
+          ),
         ),
         const SizedBox(height: 8),
         SingleChildScrollView(
@@ -806,19 +910,30 @@ class _EditContentSheetState extends ConsumerState<EditContentSheet> {
               return Padding(
                 padding: const EdgeInsets.only(right: 8),
                 child: ChoiceChip(
-                  avatar: Icon(type['icon'], color: isSelected ? Colors.black : color, size: 16),
+                  avatar: Icon(
+                    type['icon'],
+                    color: isSelected ? Colors.black : color,
+                    size: 16,
+                  ),
                   label: Text(type['name']),
                   selected: isSelected,
-                  onSelected: (_) => setState(() => _selectedType = type['name']),
+                  onSelected: (_) =>
+                      setState(() => _selectedType = type['name']),
                   selectedColor: AppTheme.primary,
                   backgroundColor: Theme.of(context).colorScheme.surface,
                   labelStyle: TextStyle(
                     color: isSelected ? Colors.black : AppTheme.textMuted,
-                    fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+                    fontWeight: isSelected
+                        ? FontWeight.bold
+                        : FontWeight.normal,
                     fontSize: 12,
                   ),
-                  side: BorderSide(color: isSelected ? AppTheme.primary : AppTheme.border),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                  side: BorderSide(
+                    color: isSelected ? AppTheme.primary : AppTheme.border,
+                  ),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(8),
+                  ),
                 ),
               );
             }).toList(),
@@ -828,23 +943,38 @@ class _EditContentSheetState extends ConsumerState<EditContentSheet> {
 
         Text(
           'Material Title',
-          style: TextStyle(color: AppTheme.textSecondary, fontSize: 12, fontWeight: FontWeight.w600),
+          style: TextStyle(
+            color: AppTheme.textSecondary,
+            fontSize: 12,
+            fontWeight: FontWeight.w600,
+          ),
         ),
         const SizedBox(height: 8),
-        _buildTextField(controller: _titleController, hintText: 'Content title'),
+        _buildTextField(
+          controller: _titleController,
+          hintText: 'Content title',
+        ),
         const SizedBox(height: 16),
 
         if (isFileType(_selectedType)) ...[
           Text(
             'Uploaded File ($_selectedType)',
-            style: TextStyle(color: AppTheme.textSecondary, fontSize: 12, fontWeight: FontWeight.w600),
+            style: TextStyle(
+              color: AppTheme.textSecondary,
+              fontSize: 12,
+              fontWeight: FontWeight.w600,
+            ),
           ),
           const SizedBox(height: 8),
           _buildFileDropZone(),
           const SizedBox(height: 16),
           Text(
             'Instructions / Notes (Optional)',
-            style: TextStyle(color: AppTheme.textSecondary, fontSize: 12, fontWeight: FontWeight.w600),
+            style: TextStyle(
+              color: AppTheme.textSecondary,
+              fontSize: 12,
+              fontWeight: FontWeight.w600,
+            ),
           ),
           const SizedBox(height: 8),
           _buildTextField(
@@ -855,7 +985,11 @@ class _EditContentSheetState extends ConsumerState<EditContentSheet> {
         ] else if (_selectedType == 'YouTube') ...[
           Text(
             'YouTube Video Link',
-            style: TextStyle(color: AppTheme.textSecondary, fontSize: 12, fontWeight: FontWeight.w600),
+            style: TextStyle(
+              color: AppTheme.textSecondary,
+              fontSize: 12,
+              fontWeight: FontWeight.w600,
+            ),
           ),
           const SizedBox(height: 8),
           _buildTextField(
@@ -866,7 +1000,11 @@ class _EditContentSheetState extends ConsumerState<EditContentSheet> {
         ] else ...[
           Text(
             'Text Content / Lecture Notes',
-            style: TextStyle(color: AppTheme.textSecondary, fontSize: 12, fontWeight: FontWeight.w600),
+            style: TextStyle(
+              color: AppTheme.textSecondary,
+              fontSize: 12,
+              fontWeight: FontWeight.w600,
+            ),
           ),
           const SizedBox(height: 8),
           _buildTextField(
@@ -900,15 +1038,15 @@ class _EditContentSheetState extends ConsumerState<EditContentSheet> {
           color: _isDragging
               ? color.withValues(alpha: 0.12)
               : hasFile
-                  ? Theme.of(context).colorScheme.surface
-                  : AppTheme.background,
+              ? Theme.of(context).colorScheme.surface
+              : AppTheme.background,
           borderRadius: BorderRadius.circular(12),
           border: Border.all(
             color: _isDragging
                 ? color
                 : hasFile
-                    ? AppTheme.primary
-                    : AppTheme.border,
+                ? AppTheme.primary
+                : AppTheme.border,
             width: _isDragging || hasFile ? 1.5 : 1,
           ),
         ),
@@ -922,7 +1060,11 @@ class _EditContentSheetState extends ConsumerState<EditContentSheet> {
                       color: color.withValues(alpha: 0.15),
                       borderRadius: BorderRadius.circular(10),
                     ),
-                    child: Icon(getIconForType(_selectedType), color: color, size: 24),
+                    child: Icon(
+                      getIconForType(_selectedType),
+                      color: color,
+                      size: 24,
+                    ),
                   ),
                   const SizedBox(width: 12),
                   Expanded(
@@ -942,7 +1084,10 @@ class _EditContentSheetState extends ConsumerState<EditContentSheet> {
                         const SizedBox(height: 3),
                         Text(
                           formatFileSize(_pickedFileSize),
-                          style: TextStyle(fontSize: 11, color: AppTheme.textSecondary),
+                          style: TextStyle(
+                            fontSize: 11,
+                            color: AppTheme.textSecondary,
+                          ),
                         ),
                       ],
                     ),
@@ -959,16 +1104,28 @@ class _EditContentSheetState extends ConsumerState<EditContentSheet> {
                 children: [
                   Icon(Icons.cloud_upload_outlined, size: 28, color: color),
                   const SizedBox(height: 8),
-                  Text('Drop replacement file here or browse', style: TextStyle(fontSize: 12, color: AppTheme.text)),
+                  Text(
+                    'Drop replacement file here or browse',
+                    style: TextStyle(fontSize: 12, color: AppTheme.text),
+                  ),
                   const SizedBox(height: 8),
                   ElevatedButton(
                     onPressed: _isProcessing ? null : _pickFile,
                     style: ElevatedButton.styleFrom(
                       backgroundColor: AppTheme.primary,
                       foregroundColor: Colors.black,
-                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 14,
+                        vertical: 6,
+                      ),
                     ),
-                    child: Text(_isProcessing ? 'Selecting...' : 'Browse', style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
+                    child: Text(
+                      _isProcessing ? 'Selecting...' : 'Browse',
+                      style: const TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
                   ),
                 ],
               ),
@@ -988,15 +1145,20 @@ Widget _buildTextField({
   Widget? prefixIcon,
   int? maxLength,
 }) {
-  final int effectiveLimit = maxLength ?? (
-    (hintText.toLowerCase().contains('url') || hintText.toLowerCase().contains('youtube') || hintText.toLowerCase().contains('http'))
-        ? 250
-        : (maxLines > 1 ? 2000 : 80)
-  );
+  final int effectiveLimit =
+      maxLength ??
+      ((hintText.toLowerCase().contains('url') ||
+              hintText.toLowerCase().contains('youtube') ||
+              hintText.toLowerCase().contains('http'))
+          ? 250
+          : (maxLines > 1 ? 2000 : 80));
   return TextField(
     controller: controller,
     maxLength: effectiveLimit,
-    buildCounter: maxLines == 1 ? (context, {required currentLength, required isFocused, maxLength}) => null : null,
+    buildCounter: maxLines == 1
+        ? (context, {required currentLength, required isFocused, maxLength}) =>
+              null
+        : null,
     maxLines: maxLines,
     style: TextStyle(color: AppTheme.text, fontSize: 13),
     decoration: InputDecoration(
@@ -1038,71 +1200,83 @@ class _CurriculumBottomSheetContainer extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      decoration: BoxDecoration(
-        color: Theme.of(context).colorScheme.surface,
-        borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
-      ),
-      padding: EdgeInsets.only(
-        left: 20,
-        right: 20,
-        top: 20,
-        bottom: MediaQuery.of(context).viewInsets.bottom + 24,
-      ),
-      constraints: BoxConstraints(
-        maxHeight: MediaQuery.of(context).size.height * 0.9,
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+    return Center(
+      child: ConstrainedBox(
+        constraints: BoxConstraints(
+          maxWidth: 640,
+          maxHeight: MediaQuery.of(context).size.height * 0.9,
+        ),
+        child: Container(
+          decoration: BoxDecoration(
+            color: Theme.of(context).colorScheme.surface,
+            borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+          ),
+          padding: EdgeInsets.only(
+            left: 20,
+            right: 20,
+            top: 20,
+            bottom: MediaQuery.of(context).viewInsets.bottom + 24,
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisSize: MainAxisSize.min,
             children: [
-              Text(
-                title,
-                style: TextStyle(
-                  fontSize: 18,
-                  fontWeight: FontWeight.bold,
-                  color: Theme.of(context).colorScheme.onSurface,
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Text(
+                    title,
+                    style: TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.bold,
+                      color: Theme.of(context).colorScheme.onSurface,
+                    ),
+                  ),
+                  IconButton(
+                    icon: Icon(
+                      Icons.close,
+                      color: Theme.of(
+                        context,
+                      ).colorScheme.onSurface.withValues(alpha: 0.6),
+                    ),
+                    onPressed: () => Navigator.pop(context),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 12),
+              Expanded(
+                child: SingleChildScrollView(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: children,
+                  ),
                 ),
               ),
-              IconButton(
-                icon: Icon(
-                  Icons.close,
-                  color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6),
+              const SizedBox(height: 16),
+              SizedBox(
+                width: double.infinity,
+                child: ElevatedButton(
+                  onPressed: onSave,
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: AppTheme.primary,
+                    foregroundColor: Colors.black,
+                    padding: const EdgeInsets.symmetric(vertical: 14),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                  ),
+                  child: Text(
+                    saveLabel,
+                    style: const TextStyle(
+                      fontWeight: FontWeight.bold,
+                      fontSize: 15,
+                    ),
+                  ),
                 ),
-                onPressed: () => Navigator.pop(context),
               ),
             ],
           ),
-          const SizedBox(height: 12),
-          Expanded(
-            child: SingleChildScrollView(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: children,
-              ),
-            ),
-          ),
-          const SizedBox(height: 16),
-          SizedBox(
-            width: double.infinity,
-            child: ElevatedButton(
-              onPressed: onSave,
-              style: ElevatedButton.styleFrom(
-                backgroundColor: AppTheme.primary,
-                foregroundColor: Colors.black,
-                padding: const EdgeInsets.symmetric(vertical: 14),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-              ),
-              child: Text(
-                saveLabel,
-                style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
-              ),
-            ),
-          ),
-        ],
+        ),
       ),
     );
   }

@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 import '../../../core/components/app_toast.dart';
 import '../../../core/components/empty_state.dart';
 import '../../../core/components/skeleton_loader.dart';
@@ -122,7 +123,13 @@ class _TeacherSubjectDetailScreenState
         scrolledUnderElevation: 1,
         leading: IconButton(
           icon: Icon(Icons.arrow_back, color: AppTheme.text),
-          onPressed: () => Navigator.pop(context),
+          onPressed: () {
+            if (Navigator.of(context).canPop()) {
+              Navigator.pop(context);
+            } else {
+              context.go('/teacher/subjects');
+            }
+          },
         ),
         title: Text(
           subjectName,
@@ -166,140 +173,145 @@ class _TeacherSubjectDetailScreenState
           ],
         ],
       ),
-      body: Column(
-        children: [
-          // Course Info Card
-          Padding(
-            padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
-            child: Container(
-              padding: const EdgeInsets.all(14),
-              decoration: BoxDecoration(
-                color: AppTheme.surface,
-                borderRadius: BorderRadius.circular(16),
-                border: Border.all(color: AppTheme.border),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black.withValues(alpha: 0.03),
-                    blurRadius: 10,
-                    offset: const Offset(0, 3),
+      body: Center(
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 1080),
+          child: Column(
+            children: [
+              // Course Info Card
+              Padding(
+                padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
+                child: Container(
+                  padding: const EdgeInsets.all(14),
+                  decoration: BoxDecoration(
+                    color: AppTheme.surface,
+                    borderRadius: BorderRadius.circular(16),
+                    border: Border.all(color: AppTheme.border),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withValues(alpha: 0.03),
+                        blurRadius: 10,
+                        offset: const Offset(0, 3),
+                      ),
+                    ],
                   ),
-                ],
-              ),
-              child: Row(
-                children: [
-                  Container(
-                    width: 44,
-                    height: 44,
-                    decoration: BoxDecoration(
-                      color: AppTheme.primary.withValues(alpha: 0.12),
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    child: Icon(
-                      Icons.menu_book_rounded,
-                      color: AppTheme.primary,
-                      size: 22,
-                    ),
-                  ),
-                  const SizedBox(width: 14),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Row(
+                  child: Row(
+                    children: [
+                      Container(
+                        width: 44,
+                        height: 44,
+                        decoration: BoxDecoration(
+                          color: AppTheme.primary.withValues(alpha: 0.12),
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: Icon(
+                          Icons.menu_book_rounded,
+                          color: AppTheme.primary,
+                          size: 22,
+                        ),
+                      ),
+                      const SizedBox(width: 14),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            Text(
-                              'Course Overview',
-                              style: TextStyle(
-                                fontSize: 11,
-                                fontWeight: FontWeight.bold,
-                                letterSpacing: 0.6,
-                                color: AppTheme.primary,
-                              ),
-                            ),
-                            const Spacer(),
-                            Container(
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 8,
-                                vertical: 2,
-                              ),
-                              decoration: BoxDecoration(
-                                color: AppTheme.primary.withValues(alpha: 0.1),
-                                borderRadius: BorderRadius.circular(6),
-                              ),
-                              child: Text(
-                                'Teacher Console',
-                                style: TextStyle(
-                                  fontSize: 10,
-                                  fontWeight: FontWeight.bold,
-                                  color: AppTheme.primary,
+                            Row(
+                              children: [
+                                Text(
+                                  'Course Overview',
+                                  style: TextStyle(
+                                    fontSize: 11,
+                                    fontWeight: FontWeight.bold,
+                                    letterSpacing: 0.6,
+                                    color: AppTheme.primary,
+                                  ),
                                 ),
+                                const Spacer(),
+                                Container(
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 8,
+                                    vertical: 2,
+                                  ),
+                                  decoration: BoxDecoration(
+                                    color: AppTheme.primary.withValues(alpha: 0.1),
+                                    borderRadius: BorderRadius.circular(6),
+                                  ),
+                                  child: Text(
+                                    'Teacher Console',
+                                    style: TextStyle(
+                                      fontSize: 10,
+                                      fontWeight: FontWeight.bold,
+                                      color: AppTheme.primary,
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 3),
+                            Text(
+                              subjectDescription.isNotEmpty
+                                  ? subjectDescription
+                                  : 'Manage classroom quizzes, track student evaluations, and review curriculum.',
+                              style: TextStyle(
+                                fontSize: 12,
+                                color: AppTheme.textSecondary,
+                                height: 1.3,
                               ),
+                              maxLines: 2,
+                              overflow: TextOverflow.ellipsis,
                             ),
                           ],
                         ),
-                        const SizedBox(height: 3),
-                        Text(
-                          subjectDescription.isNotEmpty
-                              ? subjectDescription
-                              : 'Manage classroom quizzes, track student evaluations, and review curriculum.',
-                          style: TextStyle(
-                            fontSize: 12,
-                            color: AppTheme.textSecondary,
-                            height: 1.3,
-                          ),
-                          maxLines: 2,
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                      ],
-                    ),
+                      ),
+                    ],
                   ),
-                ],
+                ),
               ),
-            ),
-          ),
 
-          // Segmented Floating Tab Selector
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
-            child: Container(
-              padding: const EdgeInsets.all(4),
-              decoration: BoxDecoration(
-                color: AppTheme.surface,
-                borderRadius: BorderRadius.circular(14),
-                border: Border.all(color: AppTheme.border),
+              // Segmented Floating Tab Selector
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+                child: Container(
+                  padding: const EdgeInsets.all(4),
+                  decoration: BoxDecoration(
+                    color: AppTheme.surface,
+                    borderRadius: BorderRadius.circular(14),
+                    border: Border.all(color: AppTheme.border),
+                  ),
+                  child: Row(
+                    children: [
+                      _buildTabPill(
+                        index: 0,
+                        label: 'Curriculum',
+                        icon: Icons.menu_book_outlined,
+                      ),
+                      _buildTabPill(
+                        index: 1,
+                        label: 'Quizzes',
+                        icon: Icons.quiz_outlined,
+                      ),
+                      _buildTabPill(
+                        index: 2,
+                        label: 'Assignments',
+                        icon: Icons.assignment_outlined,
+                      ),
+                    ],
+                  ),
+                ),
               ),
-              child: Row(
-                children: [
-                  _buildTabPill(
-                    index: 0,
-                    label: 'Curriculum',
-                    icon: Icons.menu_book_outlined,
-                  ),
-                  _buildTabPill(
-                    index: 1,
-                    label: 'Quizzes',
-                    icon: Icons.quiz_outlined,
-                  ),
-                  _buildTabPill(
-                    index: 2,
-                    label: 'Assignments',
-                    icon: Icons.assignment_outlined,
-                  ),
-                ],
-              ),
-            ),
-          ),
-          const SizedBox(height: 4),
+              const SizedBox(height: 4),
 
-          // Tab content
-          Expanded(
-            child: _selectedTab == 0
-                ? _buildCurriculumTab()
-                : _selectedTab == 1
-                ? _buildQuizzesTab()
-                : _buildAssignmentsTab(),
+              // Tab content
+              Expanded(
+                child: _selectedTab == 0
+                    ? _buildCurriculumTab()
+                    : _selectedTab == 1
+                    ? _buildQuizzesTab()
+                    : _buildAssignmentsTab(),
+              ),
+            ],
           ),
-        ],
+        ),
       ),
       floatingActionButton: _selectedTab == 2
           ? FloatingActionButton.extended(
@@ -344,19 +356,24 @@ class _TeacherSubjectDetailScreenState
           ),
           child: Row(
             mainAxisAlignment: MainAxisAlignment.center,
+            mainAxisSize: MainAxisSize.min,
             children: [
               Icon(
                 icon,
                 size: 16,
                 color: isSelected ? Colors.black : AppTheme.textSecondary,
               ),
-              const SizedBox(width: 8),
-              Text(
-                label,
-                style: TextStyle(
-                  fontSize: 13,
-                  fontWeight: isSelected ? FontWeight.bold : FontWeight.w600,
-                  color: isSelected ? Colors.black : AppTheme.textSecondary,
+              const SizedBox(width: 6),
+              Flexible(
+                child: Text(
+                  label,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    fontSize: 13,
+                    fontWeight: isSelected ? FontWeight.bold : FontWeight.w600,
+                    color: isSelected ? Colors.black : AppTheme.textSecondary,
+                  ),
                 ),
               ),
             ],
@@ -1252,6 +1269,7 @@ class _TeacherSubjectDetailScreenState
                               assignmentTitle: a.title,
                               totalPoints: a.totalPoints,
                               dueDate: a.dueDate,
+                              gdriveFolderUrl: a.gdriveFolderUrl,
                             ),
                           ).then((_) {
                             ref.invalidate(

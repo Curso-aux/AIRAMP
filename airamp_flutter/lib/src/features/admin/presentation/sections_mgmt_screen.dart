@@ -95,8 +95,9 @@ class _SectionsMgmtScreenState extends ConsumerState<SectionsMgmtScreen> {
         }
       } catch (_) {
         for (final s in rawSecSubs.split(',')) {
-          if (s.trim().isNotEmpty)
+          if (s.trim().isNotEmpty) {
             initialSubjectCodes.add(s.trim().toUpperCase());
+          }
         }
       }
     }
