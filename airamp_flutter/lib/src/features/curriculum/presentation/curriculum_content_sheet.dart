@@ -7,6 +7,8 @@ import 'package:file_picker/file_picker.dart';
 import 'package:desktop_drop/desktop_drop.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/services/session_draft_service.dart';
+import '../../../core/services/cloud_storage_service.dart';
+import '../../../core/components/app_toast.dart';
 import '../../admin/data/admin_repository.dart';
 
 /// Icon lookup based on content type
@@ -308,15 +310,10 @@ class _AddContentSheetState extends ConsumerState<AddContentSheet> {
     });
   }
 
-  void _save() {
+  Future<void> _save() async {
     final title = _titleController.text.trim();
     if (title.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: const Text('Please enter a content title'),
-          backgroundColor: AppTheme.error,
-        ),
-      );
+      AppToast.showWarning(context, 'Please enter a content title');
       return;
     }
 
@@ -324,13 +321,23 @@ class _AddContentSheetState extends ConsumerState<AddContentSheet> {
 
     if (isFileType(_selectedType)) {
       if (_pickedFileName == null) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Please select or drop a real $_selectedType file'),
-            backgroundColor: AppTheme.error,
-          ),
-        );
+        AppToast.showWarning(context, 'Please select or drop a real $_selectedType file');
         return;
+      }
+
+      String? remoteUrl;
+      if (_pickedFileBytes != null && CloudStorageService().isAvailable) {
+        try {
+          final rawBytes = base64Decode(_pickedFileBytes!);
+          final upRes = await CloudStorageService().uploadCurriculumMaterial(
+            loId: widget.loId,
+            fileName: _pickedFileName!,
+            bytes: rawBytes,
+          );
+          if (upRes.success && upRes.downloadUrl != null) {
+            remoteUrl = upRes.downloadUrl;
+          }
+        } catch (_) {}
       }
 
       final fileInfo = MaterialFileInfo(
@@ -340,7 +347,7 @@ class _AddContentSheetState extends ConsumerState<AddContentSheet> {
         fileExtension: _pickedFileName!.contains('.')
             ? _pickedFileName!.split('.').last.toLowerCase()
             : _selectedType.toLowerCase(),
-        filePath: _pickedFilePath,
+        filePath: remoteUrl ?? _pickedFilePath,
         fileBytes: _pickedFileBytes,
         description: _notesController.text.trim().isNotEmpty
             ? _notesController.text.trim()
@@ -350,15 +357,11 @@ class _AddContentSheetState extends ConsumerState<AddContentSheet> {
     } else {
       contentData = _contentController.text.trim();
       if (contentData.isEmpty) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(
-              _selectedType == 'YouTube'
-                  ? 'Please enter a YouTube video URL'
-                  : 'Please enter content text',
-            ),
-            backgroundColor: AppTheme.error,
-          ),
+        AppToast.showWarning(
+          context,
+          _selectedType == 'YouTube'
+              ? 'Please enter a YouTube video URL'
+              : 'Please enter content text',
         );
         return;
       }
@@ -842,29 +845,36 @@ class _EditContentSheetState extends ConsumerState<EditContentSheet> {
     });
   }
 
-  void _save() {
+  Future<void> _save() async {
     final title = _titleController.text.trim();
     if (title.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: const Text('Please enter a content title'),
-          backgroundColor: AppTheme.error,
-        ),
-      );
+      AppToast.showWarning(context, 'Please enter a content title');
       return;
     }
 
     String contentData = '';
     if (isFileType(_selectedType)) {
       if (_pickedFileName == null) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Please select or drop a $_selectedType file'),
-            backgroundColor: AppTheme.error,
-          ),
-        );
+        AppToast.showWarning(context, 'Please select or drop a $_selectedType file');
         return;
       }
+
+      String? remoteUrl;
+      if (_pickedFileBytes != null && CloudStorageService().isAvailable) {
+        try {
+          final loId = widget.contentItem['lo_id'] as int? ?? 0;
+          final rawBytes = base64Decode(_pickedFileBytes!);
+          final upRes = await CloudStorageService().uploadCurriculumMaterial(
+            loId: loId,
+            fileName: _pickedFileName!,
+            bytes: rawBytes,
+          );
+          if (upRes.success && upRes.downloadUrl != null) {
+            remoteUrl = upRes.downloadUrl;
+          }
+        } catch (_) {}
+      }
+
       final fileInfo = MaterialFileInfo(
         isFile: true,
         fileName: _pickedFileName!,
@@ -872,7 +882,7 @@ class _EditContentSheetState extends ConsumerState<EditContentSheet> {
         fileExtension: _pickedFileName!.contains('.')
             ? _pickedFileName!.split('.').last.toLowerCase()
             : _selectedType.toLowerCase(),
-        filePath: _pickedFilePath,
+        filePath: remoteUrl ?? _pickedFilePath,
         fileBytes: _pickedFileBytes,
         description: _notesController.text.trim().isNotEmpty
             ? _notesController.text.trim()
@@ -893,12 +903,7 @@ class _EditContentSheetState extends ConsumerState<EditContentSheet> {
     );
 
     Navigator.pop(context);
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text('Updated "$title" successfully'),
-        backgroundColor: AppTheme.success,
-      ),
-    );
+    AppToast.showSuccess(context, 'Updated "$title" successfully');
   }
 
   @override

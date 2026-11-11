@@ -7,8 +7,12 @@ import 'package:url_launcher/url_launcher.dart';
 import 'package:path_provider/path_provider.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/services/session_draft_service.dart';
+import '../../../core/services/cloud_storage_service.dart';
+import '../../../core/components/app_toast.dart';
+import '../../../core/database/database_helper.dart';
 import '../../../core/utils/file_download_helper.dart';
 import '../../admin/data/admin_repository.dart';
+import 'package:dio/dio.dart';
 import 'curriculum_content_sheet.dart';
 
 // ─────────────────────────────────────────────────────────────
@@ -735,8 +739,9 @@ class ContentItemTile extends ConsumerWidget {
   static Future<void> openMaterialFile(
     BuildContext context,
     Map<String, dynamic> content,
-    MaterialFileInfo fileInfo,
-  ) async {
+    MaterialFileInfo fileInfo, {
+    bool isDownload = false,
+  }) async {
     try {
       final cleanName = fileInfo.fileName.replaceAll(RegExp(r'[^a-zA-Z0-9._\-]'), '_');
       final ext = fileInfo.fileExtension.toLowerCase();
@@ -751,14 +756,55 @@ class ContentItemTile extends ConsumerWidget {
           : (rawData.startsWith('http://') || rawData.startsWith('https://') ? rawData : null);
 
       if (potentialUrl != null) {
-        final uri = Uri.tryParse(potentialUrl);
-        if (uri != null) {
-          if (kIsWeb) {
+        if (kIsWeb) {
+          if (isDownload) {
             triggerWebUrlDownload(potentialUrl, cleanName);
+            AppToast.showSuccess(context, 'Downloading "$cleanName"...');
           } else {
-            await launchUrl(uri, mode: LaunchMode.externalApplication);
+            final uri = Uri.tryParse(potentialUrl);
+            if (uri != null) {
+              await launchUrl(uri, mode: LaunchMode.externalApplication);
+            }
           }
           return;
+        }
+
+        // On Native (Android / Desktop): Download using Dio
+        AppToast.showInfo(context, isDownload ? 'Downloading "$cleanName"...' : 'Loading "$cleanName"...');
+        try {
+          final docDir = await getApplicationDocumentsDirectory();
+          final localFile = File('${docDir.path}/$cleanName');
+          await Dio().download(potentialUrl, localFile.path);
+
+          // Cache in SQLite so subsequent opens are instant
+          final updatedInfo = MaterialFileInfo(
+            isFile: true,
+            fileName: fileInfo.fileName,
+            fileSize: localFile.lengthSync(),
+            fileExtension: fileInfo.fileExtension,
+            filePath: localFile.path,
+            fileBytes: fileInfo.fileBytes,
+            description: fileInfo.description,
+          );
+          try {
+            final db = await DatabaseHelper().database;
+            await db.update(
+              'contents',
+              {'content_data': jsonEncode(updatedInfo.toJson())},
+              where: 'id = ?',
+              whereArgs: [content['id']],
+            );
+          } catch (_) {}
+
+          if (isDownload) {
+            AppToast.showSuccess(context, 'Saved "$cleanName" to documents');
+          } else {
+            await _launchNativeFile(localFile.path);
+            AppToast.showSuccess(context, 'Opened "$cleanName"');
+          }
+          return;
+        } catch (e) {
+          debugPrint('Dio download error: $e');
         }
       }
 
@@ -766,16 +812,12 @@ class ContentItemTile extends ConsumerWidget {
       if (fileInfo.fileBytes != null && fileInfo.fileBytes!.trim().isNotEmpty) {
         final rawBytes = base64Decode(fileInfo.fileBytes!.trim());
         if (kIsWeb) {
-          if (isPdf) {
-            // Open in browser's built-in PDF viewer in new tab
+          if (isDownload) {
+            downloadBinaryFileWeb(rawBytes, cleanName, mimeType);
+            AppToast.showSuccess(context, 'Downloading "$cleanName"...');
+          } else if (isPdf) {
             openPdfBlobInNewTabWeb(rawBytes, cleanName);
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(
-                content: Text('Opening PDF "$cleanName" in viewer tab...'),
-                backgroundColor: AppTheme.primaryDark,
-                duration: const Duration(seconds: 2),
-              ),
-            );
+            AppToast.showSuccess(context, 'Opened "$cleanName" in viewer tab');
           } else {
             downloadBinaryFileWeb(rawBytes, cleanName, mimeType);
           }
@@ -783,37 +825,16 @@ class ContentItemTile extends ConsumerWidget {
         }
 
         // Native Desktop & Mobile Platforms
-        final tempDir = await getTemporaryDirectory();
-        final targetPath = '${tempDir.path}/$cleanName';
+        final saveDir = isDownload ? await getApplicationDocumentsDirectory() : await getTemporaryDirectory();
+        final targetPath = '${saveDir.path}/$cleanName';
         final tempFile = File(targetPath);
         await tempFile.writeAsBytes(rawBytes);
 
-        if (!kIsWeb && Platform.isWindows) {
-          // Process.run with 'cmd /c start "" path' launches default PDF application
-          try {
-            final res = await Process.run('cmd', ['/c', 'start', '""', targetPath]);
-            if (res.exitCode == 0) return;
-          } catch (_) {}
-          final uri = Uri.file(targetPath);
-          await launchUrl(uri);
-          return;
-        } else if (!kIsWeb && Platform.isMacOS) {
-          try {
-            final res = await Process.run('open', [targetPath]);
-            if (res.exitCode == 0) return;
-          } catch (_) {}
-        } else if (!kIsWeb && Platform.isLinux) {
-          try {
-            final res = await Process.run('xdg-open', [targetPath]);
-            if (res.exitCode == 0) return;
-          } catch (_) {}
-        }
-
-        final uri = Uri.file(tempFile.path);
-        if (await canLaunchUrl(uri)) {
-          await launchUrl(uri, mode: LaunchMode.externalApplication);
+        if (isDownload) {
+          AppToast.showSuccess(context, 'Saved "$cleanName" to device documents');
         } else {
-          await launchUrl(uri);
+          await _launchNativeFile(targetPath);
+          AppToast.showSuccess(context, 'Opened "$cleanName"');
         }
         return;
       }
@@ -822,42 +843,113 @@ class ContentItemTile extends ConsumerWidget {
       if (!kIsWeb && fileInfo.filePath != null) {
         final localFile = File(fileInfo.filePath!);
         if (localFile.existsSync()) {
-          if (Platform.isWindows) {
-            try {
-              final res = await Process.run('cmd', ['/c', 'start', '""', fileInfo.filePath!]);
-              if (res.exitCode == 0) return;
-            } catch (_) {}
-          } else if (Platform.isMacOS) {
-            try {
-              final res = await Process.run('open', [fileInfo.filePath!]);
-              if (res.exitCode == 0) return;
-            } catch (_) {}
-          } else if (Platform.isLinux) {
-            try {
-              final res = await Process.run('xdg-open', [fileInfo.filePath!]);
-              if (res.exitCode == 0) return;
-            } catch (_) {}
+          if (isDownload) {
+            final docDir = await getApplicationDocumentsDirectory();
+            final dest = File('${docDir.path}/$cleanName');
+            await localFile.copy(dest.path);
+            AppToast.showSuccess(context, 'Saved "$cleanName" to documents');
+          } else {
+            await _launchNativeFile(fileInfo.filePath!);
+            AppToast.showSuccess(context, 'Opened "$cleanName"');
           }
-          final uri = Uri.file(fileInfo.filePath!);
-          await launchUrl(uri, mode: LaunchMode.externalApplication);
           return;
         }
       }
 
-      // 4. File data not synced yet
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-            'The file "${fileInfo.fileName}" is not cached locally yet. Pull down on the course screen to sync the latest curriculum materials.',
-          ),
-          backgroundColor: Colors.orange.shade800,
-          duration: const Duration(seconds: 4),
-        ),
+      // 4. File bytes missing: Attempt on-demand download from Cloud Storage!
+      if (CloudStorageService().isAvailable) {
+        AppToast.showInfo(context, 'Downloading "${fileInfo.fileName}" from cloud...');
+        final downloadedBytes = await CloudStorageService().downloadCurriculumMaterial(
+          fileName: fileInfo.fileName,
+          loId: content['lo_id'] as int?,
+        );
+        if (downloadedBytes != null && downloadedBytes.isNotEmpty) {
+          // Cache to SQLite
+          final updatedInfo = MaterialFileInfo(
+            isFile: true,
+            fileName: fileInfo.fileName,
+            fileSize: downloadedBytes.length,
+            fileExtension: fileInfo.fileExtension,
+            fileBytes: base64Encode(downloadedBytes),
+            description: fileInfo.description,
+          );
+          try {
+            final db = await DatabaseHelper().database;
+            await db.update(
+              'contents',
+              {'content_data': jsonEncode(updatedInfo.toJson())},
+              where: 'id = ?',
+              whereArgs: [content['id']],
+            );
+          } catch (_) {}
+
+          if (kIsWeb) {
+            if (isDownload || !isPdf) {
+              downloadBinaryFileWeb(downloadedBytes, cleanName, mimeType);
+            } else {
+              openPdfBlobInNewTabWeb(downloadedBytes, cleanName);
+            }
+            AppToast.showSuccess(context, isDownload ? 'Downloading "$cleanName"...' : 'Opened "$cleanName"');
+            return;
+          }
+
+          final saveDir = isDownload ? await getApplicationDocumentsDirectory() : await getTemporaryDirectory();
+          final targetPath = '${saveDir.path}/$cleanName';
+          final savedFile = File(targetPath);
+          await savedFile.writeAsBytes(downloadedBytes);
+
+          if (isDownload) {
+            AppToast.showSuccess(context, 'Saved "$cleanName" to documents');
+          } else {
+            await _launchNativeFile(targetPath);
+            AppToast.showSuccess(context, 'Opened "$cleanName"');
+          }
+          return;
+        }
+      }
+
+      // 5. File data not yet uploaded to cloud
+      AppToast.showWarning(
+        context,
+        'File "${fileInfo.fileName}" is not yet uploaded to the cloud. Pull down to refresh.',
+        actionLabel: 'Refresh',
+        onAction: () async {
+          try {
+            await DatabaseHelper().syncCloudCurriculumToLocal(force: true);
+            if (context.mounted) {
+              AppToast.showSuccess(context, 'Curriculum synced! Try opening again.');
+            }
+          } catch (_) {}
+        },
       );
     } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Could not open file: $e'), backgroundColor: AppTheme.error),
-      );
+      AppToast.showError(context, 'Could not open file: $e');
+    }
+  }
+
+  static Future<void> _launchNativeFile(String filePath) async {
+    if (!kIsWeb && Platform.isWindows) {
+      try {
+        final res = await Process.run('cmd', ['/c', 'start', '""', filePath]);
+        if (res.exitCode == 0) return;
+      } catch (_) {}
+    } else if (!kIsWeb && Platform.isMacOS) {
+      try {
+        final res = await Process.run('open', [filePath]);
+        if (res.exitCode == 0) return;
+      } catch (_) {}
+    } else if (!kIsWeb && Platform.isLinux) {
+      try {
+        final res = await Process.run('xdg-open', [filePath]);
+        if (res.exitCode == 0) return;
+      } catch (_) {}
+    }
+
+    final uri = Uri.file(filePath);
+    if (await canLaunchUrl(uri)) {
+      await launchUrl(uri, mode: LaunchMode.externalApplication);
+    } else {
+      await launchUrl(uri);
     }
   }
 }

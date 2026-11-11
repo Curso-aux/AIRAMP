@@ -14,6 +14,7 @@ import '../utils/image_compress_helper.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'firestore_service.dart';
 import '../services/email_service.dart';
+import '../services/cloud_storage_service.dart';
 import '../../features/teacher/domain/item_analysis_model.dart';
 
 class DatabaseHelper {
@@ -8780,6 +8781,49 @@ class DatabaseHelper {
               whereArgs: [loId],
             );
 
+            // Ensure any local file attachments get uploaded to Cloud Storage with public downloadUrl
+            final sanitizedContents = <Map<String, dynamic>>[];
+            for (final c in contents) {
+              var cData = c['content_data']?.toString() ?? '';
+              try {
+                final decoded = jsonDecode(cData);
+                if (decoded is Map<String, dynamic> && decoded['is_file'] == true) {
+                  final filePath = decoded['file_path']?.toString();
+                  final fileBytesStr = decoded['file_bytes']?.toString();
+                  final fileName = decoded['file_name']?.toString() ?? 'material.pdf';
+
+                  if ((filePath == null || !filePath.startsWith('http')) && CloudStorageService().isAvailable) {
+                    Uint8List? rawBytes;
+                    if (fileBytesStr != null && fileBytesStr.trim().isNotEmpty) {
+                      rawBytes = base64Decode(fileBytesStr.trim());
+                    } else if (filePath != null && !kIsWeb) {
+                      final f = File(filePath);
+                      if (f.existsSync()) rawBytes = await f.readAsBytes();
+                    }
+
+                    if (rawBytes != null && rawBytes.isNotEmpty) {
+                      final upRes = await CloudStorageService().uploadCurriculumMaterial(
+                        loId: loId,
+                        fileName: fileName,
+                        bytes: rawBytes,
+                      );
+                      if (upRes.success && upRes.downloadUrl != null) {
+                        decoded['file_path'] = upRes.downloadUrl;
+                        cData = jsonEncode(decoded);
+                        await db.update('contents', {'content_data': cData}, where: 'id = ?', whereArgs: [c['id']]);
+                      }
+                    }
+                  }
+                }
+              } catch (_) {}
+
+              sanitizedContents.add({
+                'content_type': c['content_type'],
+                'title': c['title'],
+                'content_data': cData,
+              });
+            }
+
             losPayload.add({
               'id': loId,
               'title': lo['title'],
@@ -8790,15 +8834,7 @@ class DatabaseHelper {
               'schedule_end': lo['schedule_end'],
               'timezone': lo['timezone'],
               'allow_extend': lo['allow_extend'] ?? 0,
-              'contents': contents
-                  .map(
-                    (c) => {
-                      'content_type': c['content_type'],
-                      'title': c['title'],
-                      'content_data': c['content_data'],
-                    },
-                  )
-                  .toList(),
+              'contents': sanitizedContents,
               'questions': questions
                   .map(
                     (q) => {

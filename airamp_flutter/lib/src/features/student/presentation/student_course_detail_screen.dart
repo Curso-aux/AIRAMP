@@ -5,6 +5,7 @@ import 'package:go_router/go_router.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../../../core/components/empty_state.dart';
 import '../../../core/components/skeleton_loader.dart';
+import '../../../core/components/app_toast.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/theme/theme_provider.dart';
 import '../../../core/utils/philippine_time_helper.dart';
@@ -248,7 +249,12 @@ class _StudentCourseDetailScreenState
       backgroundColor: AppTheme.background,
       body: SafeArea(
         child: RefreshIndicator(
-          onRefresh: () async => await _loadData(syncCloud: true, force: true),
+          onRefresh: () async {
+            await _loadData(syncCloud: true, force: true);
+            if (context.mounted) {
+              AppToast.showSuccess(context, 'Curriculum & learning materials refreshed');
+            }
+          },
           color: AppTheme.primary,
           child: SingleChildScrollView(
             physics: const AlwaysScrollableScrollPhysics(),
@@ -456,38 +462,35 @@ class _StudentCourseDetailScreenState
                     ),
                   ),
                   const SizedBox(width: 8),
-                  Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 8,
-                      vertical: 3,
-                    ),
-                    decoration: BoxDecoration(
-                      color: AppTheme.primary.withValues(alpha: 0.15),
+                  Tooltip(
+                    message: 'Pull down to refresh course materials',
+                    child: InkWell(
                       borderRadius: BorderRadius.circular(12),
-                      border: Border.all(
-                        color: AppTheme.primary.withValues(alpha: 0.3),
+                      onTap: () {
+                        AppToast.showInfo(context, 'Pull down anytime to refresh curriculum & materials');
+                      },
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 8,
+                          vertical: 3,
+                        ),
+                        decoration: BoxDecoration(
+                          color: AppTheme.primary.withValues(alpha: 0.15),
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(
+                            color: AppTheme.primary.withValues(alpha: 0.3),
+                          ),
+                        ),
+                        child: Text(
+                          '${topics.length} Topics',
+                          style: TextStyle(
+                            fontSize: 11,
+                            fontWeight: FontWeight.bold,
+                            color: AppTheme.primary,
+                          ),
+                        ),
                       ),
                     ),
-                    child: Text(
-                      '${topics.length} Topics',
-                      style: TextStyle(
-                        fontSize: 11,
-                        fontWeight: FontWeight.bold,
-                        color: AppTheme.primary,
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 6),
-              // Subtle reminder to pull down to refresh (as requested by user)
-              Row(
-                children: [
-                  Icon(Icons.refresh, size: 12, color: AppTheme.textSecondary),
-                  const SizedBox(width: 4),
-                  Text(
-                    'Pull down to refresh curriculum & learning materials',
-                    style: TextStyle(fontSize: 11, color: AppTheme.textSecondary),
                   ),
                 ],
               ),
@@ -692,9 +695,6 @@ class _StudentCourseDetailScreenState
     }
 
     if (totalModulesCount == 0 || targetLoId == null) return const SizedBox.shrink();
-    }
-
-    if (totalModulesCount == 0) return const SizedBox.shrink();
 
     final subjectName = _subject?['name']?.toString() ?? 'Course';
 
@@ -1222,19 +1222,19 @@ class _StudentCourseDetailScreenState
                         final type = c['content_type']?.toString() ?? 'Text';
                         final icon = getIconForType(type);
                         final color = getColorForType(type);
-                        var fileInfo = MaterialFileInfo.tryParse(
+                        final parsedInfo = MaterialFileInfo.tryParse(
                           c['content_data'],
                         );
                         final isPdf = type.toUpperCase() == 'PDF' ||
-                            (fileInfo != null && fileInfo.fileExtension.toLowerCase() == 'pdf');
+                            (parsedInfo != null && parsedInfo.fileExtension.toLowerCase() == 'pdf');
                         final isWebOrVideo = type == 'YouTube' ||
                             (c['content_data'] != null && c['content_data'].toString().trim().startsWith('http'));
 
                         // Graceful fallback for PDF items stored as direct URL or raw base64
-                        if (fileInfo == null && isPdf) {
+                        MaterialFileInfo? resolvePdfFallback() {
                           final raw = (c['content_data']?.toString() ?? '').trim();
                           if (raw.startsWith('http://') || raw.startsWith('https://')) {
-                            fileInfo = MaterialFileInfo(
+                            return MaterialFileInfo(
                               isFile: true,
                               fileName: '${c['title'] ?? 'Lecture_Notes'}.pdf',
                               fileSize: 0,
@@ -1242,7 +1242,7 @@ class _StudentCourseDetailScreenState
                               filePath: raw,
                             );
                           } else if (raw.length > 50 && !raw.contains('\n') && !raw.contains(' ')) {
-                            fileInfo = MaterialFileInfo(
+                            return MaterialFileInfo(
                               isFile: true,
                               fileName: '${c['title'] ?? 'Lecture_Notes'}.pdf',
                               fileSize: (raw.length * 3 / 4).round(),
@@ -1250,7 +1250,10 @@ class _StudentCourseDetailScreenState
                               fileBytes: raw,
                             );
                           }
+                          return null;
                         }
+
+                        final fileInfo = parsedInfo ?? (isPdf ? resolvePdfFallback() : null);
 
                         return Container(
                           margin: const EdgeInsets.only(bottom: 12),
@@ -1391,8 +1394,43 @@ class _StudentCourseDetailScreenState
                                           ),
                                         ),
                                         const SizedBox(width: 8),
+                                        // Download File Button
+                                        Tooltip(
+                                          message: 'Download to device',
+                                          child: InkWell(
+                                            borderRadius: BorderRadius.circular(8),
+                                            onTap: () => ContentItemTile.openMaterialFile(
+                                              context,
+                                              c,
+                                              fileInfo,
+                                              isDownload: true,
+                                            ),
+                                            child: Container(
+                                              padding: const EdgeInsets.all(7),
+                                              decoration: BoxDecoration(
+                                                color: AppTheme.primary.withValues(alpha: 0.12),
+                                                borderRadius: BorderRadius.circular(8),
+                                                border: Border.all(
+                                                  color: AppTheme.primary.withValues(alpha: 0.3),
+                                                ),
+                                              ),
+                                              child: Icon(
+                                                Icons.download_rounded,
+                                                size: 16,
+                                                color: AppTheme.primary,
+                                              ),
+                                            ),
+                                          ),
+                                        ),
+                                        const SizedBox(width: 6),
+                                        // View / Open File Button
                                         ElevatedButton.icon(
-                                          onPressed: () => ContentItemTile.openMaterialFile(context, c, fileInfo),
+                                          onPressed: () => ContentItemTile.openMaterialFile(
+                                            context,
+                                            c,
+                                            fileInfo,
+                                            isDownload: false,
+                                          ),
                                           style: ElevatedButton.styleFrom(
                                             backgroundColor: AppTheme.primary,
                                             foregroundColor: Colors.black,
@@ -1403,9 +1441,9 @@ class _StudentCourseDetailScreenState
                                               borderRadius: BorderRadius.circular(8),
                                             ),
                                           ),
-                                          icon: const Icon(Icons.open_in_new, size: 14),
+                                          icon: const Icon(Icons.visibility_outlined, size: 14),
                                           label: Text(
-                                            isPdf ? 'Open PDF' : 'Open File',
+                                            isPdf ? 'View PDF' : 'View File',
                                             style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
                                           ),
                                         ),
