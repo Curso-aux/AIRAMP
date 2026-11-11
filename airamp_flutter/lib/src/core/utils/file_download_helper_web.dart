@@ -33,6 +33,25 @@ void downloadBinaryFileWeb(List<int> bytes, String filename, String mimeType) {
   html.Url.revokeObjectUrl(url);
 }
 
+/// Browser-native PDF viewer opener via Blob in a new browser tab.
+/// If popup is blocked by the browser, seamlessly falls back to triggering download.
+void openPdfBlobInNewTabWeb(List<int> bytes, String filename) {
+  try {
+    final blob = html.Blob([bytes], 'application/pdf');
+    final url = html.Url.createObjectUrlFromBlob(blob);
+    final win = html.window.open(url, '_blank');
+    if (win == null) {
+      // Popup blocked, fall back to download
+      downloadBinaryFileWeb(bytes, filename, 'application/pdf');
+    }
+    Timer(const Duration(minutes: 5), () {
+      html.Url.revokeObjectUrl(url);
+    });
+  } catch (_) {
+    downloadBinaryFileWeb(bytes, filename, 'application/pdf');
+  }
+}
+
 /// Triggers a download of a remote URL on Web via an invisible AnchorElement.
 void triggerWebUrlDownload(String url, String filename) {
   final anchor = html.AnchorElement(href: url)

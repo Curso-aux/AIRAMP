@@ -740,34 +740,118 @@ class ContentItemTile extends ConsumerWidget {
     try {
       final cleanName = fileInfo.fileName.replaceAll(RegExp(r'[^a-zA-Z0-9._\-]'), '_');
       final ext = fileInfo.fileExtension.toLowerCase();
-      final mimeType = ext == 'pdf' ? 'application/pdf' : 'application/octet-stream';
+      final isPdf = ext == 'pdf' || (content['content_type']?.toString().toUpperCase() == 'PDF');
+      final mimeType = isPdf ? 'application/pdf' : 'application/octet-stream';
 
-      // 1. If base64 bytes are present, view or download
+      // 1. Check if filePath or content_data is a remote URL (HTTP/HTTPS)
+      final rawPath = (fileInfo.filePath ?? '').trim();
+      final rawData = (content['content_data']?.toString() ?? '').trim();
+      final potentialUrl = rawPath.startsWith('http://') || rawPath.startsWith('https://')
+          ? rawPath
+          : (rawData.startsWith('http://') || rawData.startsWith('https://') ? rawData : null);
+
+      if (potentialUrl != null) {
+        final uri = Uri.tryParse(potentialUrl);
+        if (uri != null) {
+          if (kIsWeb) {
+            triggerWebUrlDownload(potentialUrl, cleanName);
+          } else {
+            await launchUrl(uri, mode: LaunchMode.externalApplication);
+          }
+          return;
+        }
+      }
+
+      // 2. If base64 bytes are present, view or download
       if (fileInfo.fileBytes != null && fileInfo.fileBytes!.trim().isNotEmpty) {
         final rawBytes = base64Decode(fileInfo.fileBytes!.trim());
         if (kIsWeb) {
-          downloadBinaryFileWeb(rawBytes, cleanName, mimeType);
+          if (isPdf) {
+            // Open in browser's built-in PDF viewer in new tab
+            openPdfBlobInNewTabWeb(rawBytes, cleanName);
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text('Opening PDF "$cleanName" in viewer tab...'),
+                backgroundColor: AppTheme.primaryDark,
+                duration: const Duration(seconds: 2),
+              ),
+            );
+          } else {
+            downloadBinaryFileWeb(rawBytes, cleanName, mimeType);
+          }
           return;
         }
+
+        // Native Desktop & Mobile Platforms
         final tempDir = await getTemporaryDirectory();
-        final tempFile = File('${tempDir.path}/$cleanName');
+        final targetPath = '${tempDir.path}/$cleanName';
+        final tempFile = File(targetPath);
         await tempFile.writeAsBytes(rawBytes);
+
+        if (!kIsWeb && Platform.isWindows) {
+          // Process.run with 'cmd /c start "" path' launches default PDF application
+          try {
+            final res = await Process.run('cmd', ['/c', 'start', '""', targetPath]);
+            if (res.exitCode == 0) return;
+          } catch (_) {}
+          final uri = Uri.file(targetPath);
+          await launchUrl(uri);
+          return;
+        } else if (!kIsWeb && Platform.isMacOS) {
+          try {
+            final res = await Process.run('open', [targetPath]);
+            if (res.exitCode == 0) return;
+          } catch (_) {}
+        } else if (!kIsWeb && Platform.isLinux) {
+          try {
+            final res = await Process.run('xdg-open', [targetPath]);
+            if (res.exitCode == 0) return;
+          } catch (_) {}
+        }
+
         final uri = Uri.file(tempFile.path);
-        await launchUrl(uri, mode: LaunchMode.externalApplication);
+        if (await canLaunchUrl(uri)) {
+          await launchUrl(uri, mode: LaunchMode.externalApplication);
+        } else {
+          await launchUrl(uri);
+        }
         return;
       }
 
-      // 2. If file path exists locally
-      if (!kIsWeb && fileInfo.filePath != null && File(fileInfo.filePath!).existsSync()) {
-        final uri = Uri.file(fileInfo.filePath!);
-        await launchUrl(uri, mode: LaunchMode.externalApplication);
-        return;
+      // 3. If file path exists locally on this machine
+      if (!kIsWeb && fileInfo.filePath != null) {
+        final localFile = File(fileInfo.filePath!);
+        if (localFile.existsSync()) {
+          if (Platform.isWindows) {
+            try {
+              final res = await Process.run('cmd', ['/c', 'start', '""', fileInfo.filePath!]);
+              if (res.exitCode == 0) return;
+            } catch (_) {}
+          } else if (Platform.isMacOS) {
+            try {
+              final res = await Process.run('open', [fileInfo.filePath!]);
+              if (res.exitCode == 0) return;
+            } catch (_) {}
+          } else if (Platform.isLinux) {
+            try {
+              final res = await Process.run('xdg-open', [fileInfo.filePath!]);
+              if (res.exitCode == 0) return;
+            } catch (_) {}
+          }
+          final uri = Uri.file(fileInfo.filePath!);
+          await launchUrl(uri, mode: LaunchMode.externalApplication);
+          return;
+        }
       }
 
+      // 4. File data not synced yet
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('File content not available or awaiting cloud sync. Please pull down to refresh.'),
-          duration: Duration(seconds: 3),
+        SnackBar(
+          content: Text(
+            'The file "${fileInfo.fileName}" is not cached locally yet. Pull down on the course screen to sync the latest curriculum materials.',
+          ),
+          backgroundColor: Colors.orange.shade800,
+          duration: const Duration(seconds: 4),
         ),
       );
     } catch (e) {

@@ -283,11 +283,19 @@ class _AddContentSheetState extends ConsumerState<AddContentSheet> {
     try {
       bytes = await item.readAsBytes();
     } catch (_) {}
+    if ((bytes == null || bytes.isEmpty) && !kIsWeb && item.path.isNotEmpty) {
+      try {
+        final f = File(item.path);
+        if (f.existsSync()) {
+          bytes = await f.readAsBytes();
+        }
+      } catch (_) {}
+    }
     _applyFileSelection(
       name: item.name,
-      size: length > 0 ? length : (bytes?.length ?? 0),
+      size: (bytes != null && bytes.isNotEmpty) ? bytes.length : (length > 0 ? length : 0),
       path: item.path,
-      bytes: bytes != null ? base64Encode(bytes) : null,
+      bytes: (bytes != null && bytes.isNotEmpty) ? base64Encode(bytes) : null,
     );
   }
 
@@ -818,11 +826,19 @@ class _EditContentSheetState extends ConsumerState<EditContentSheet> {
     try {
       bytes = await item.readAsBytes();
     } catch (_) {}
+    if ((bytes == null || bytes.isEmpty) && !kIsWeb && item.path.isNotEmpty) {
+      try {
+        final f = File(item.path);
+        if (f.existsSync()) {
+          bytes = await f.readAsBytes();
+        }
+      } catch (_) {}
+    }
     setState(() {
       _pickedFileName = item.name;
-      _pickedFileSize = length > 0 ? length : (bytes?.length ?? 0);
+      _pickedFileSize = (bytes != null && bytes.isNotEmpty) ? bytes.length : (length > 0 ? length : 0);
       _pickedFilePath = item.path;
-      if (bytes != null) _pickedFileBytes = base64Encode(bytes);
+      if (bytes != null && bytes.isNotEmpty) _pickedFileBytes = base64Encode(bytes);
     });
   }
 

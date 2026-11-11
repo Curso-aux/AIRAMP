@@ -2946,6 +2946,29 @@ class DatabaseHelper {
     );
   }
 
+  /// Check if a Learning Outcome has verified flashcards
+  Future<bool> hasFlashcardsForLo(int loId) async {
+    final db = await database;
+    final res = await db.rawQuery(
+      'SELECT COUNT(*) as cnt FROM module_flashcards WHERE lo_id = ?',
+      [loId],
+    );
+    final count = Sqflite.firstIntValue(res) ?? 0;
+    return count > 0;
+  }
+
+  /// Check if any LO in the subject has flashcards
+  Future<int> getFlashcardCountForSubject(int subjectId) async {
+    final db = await database;
+    final res = await db.rawQuery('''
+      SELECT COUNT(*) as cnt FROM module_flashcards mf
+      INNER JOIN learning_outcomes lo ON mf.lo_id = lo.id
+      INNER JOIN topics t ON lo.topic_id = t.id
+      WHERE t.subject_id = ?
+    ''', [subjectId]);
+    return Sqflite.firstIntValue(res) ?? 0;
+  }
+
   /// Retrieve cached flashcards for an entire Topic
   Future<List<Map<String, dynamic>>> getTopicFlashcards(int topicId) async {
     final db = await database;

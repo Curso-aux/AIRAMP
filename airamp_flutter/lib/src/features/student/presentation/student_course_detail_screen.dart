@@ -32,6 +32,8 @@ class _StudentCourseDetailScreenState
   List<Map<String, dynamic>> _completedLos = [];
   List<Map<String, dynamic>> _assignedQuizzes = [];
   List<Map<String, dynamic>> _assignments = [];
+  int _flashcardCount = 0;
+  Set<int> _losWithFlashcards = {};
   Timer? _scheduleTicker;
 
   @override
@@ -131,12 +133,30 @@ class _StudentCourseDetailScreenState
       subjectId: id,
     );
 
+    // Check if any verified flashcards actually exist for this subject/LOs
+    final flashcardCount = await DatabaseHelper().getFlashcardCountForSubject(id);
+    final Set<int> losWithFlashcards = {};
+    for (final topic in ref.read(subjectDetailProvider)) {
+      final los = (topic['learning_outcomes'] as List?) ?? [];
+      for (final lo in los) {
+        final loId = lo['id'] as int?;
+        if (loId != null) {
+          final hasCards = await DatabaseHelper().hasFlashcardsForLo(loId);
+          if (hasCards) {
+            losWithFlashcards.add(loId);
+          }
+        }
+      }
+    }
+
     if (mounted) {
       setState(() {
         _subject = subject;
         _completedLos = progressRows;
         _assignedQuizzes = assignedQuizzes;
         _assignments = assignments;
+        _flashcardCount = flashcardCount;
+        _losWithFlashcards = losWithFlashcards;
         _loading = false;
       });
     }
@@ -638,8 +658,8 @@ class _StudentCourseDetailScreenState
                 const SizedBox(height: 24),
               ],
 
-              // Flashcards & Practice Review Banner
-              if (topics.isNotEmpty) ...[
+              // Flashcards & Practice Review Banner (Only displayed if teacher created or verified flashcards exist)
+              if (topics.isNotEmpty && _flashcardCount > 0) ...[
                 _buildPracticeHeroBanner(topics),
                 const SizedBox(height: 24),
               ],
@@ -652,17 +672,26 @@ class _StudentCourseDetailScreenState
 }
 
   Widget _buildPracticeHeroBanner(List<Map<String, dynamic>> topics) {
+    if (_flashcardCount == 0) return const SizedBox.shrink();
     int? targetLoId;
     String? targetLoTitle;
     int totalModulesCount = 0;
 
     for (final topic in topics) {
       final los = (topic['learning_outcomes'] as List?)?.cast<Map<String, dynamic>>() ?? [];
-      totalModulesCount += los.length;
-      if (targetLoId == null && los.isNotEmpty) {
-        targetLoId = los.first['id'] as int?;
-        targetLoTitle = los.first['title']?.toString();
+      for (final lo in los) {
+        final loId = lo['id'] as int?;
+        if (loId != null && _losWithFlashcards.contains(loId)) {
+          totalModulesCount++;
+          if (targetLoId == null) {
+            targetLoId = loId;
+            targetLoTitle = lo['title']?.toString();
+          }
+        }
       }
+    }
+
+    if (totalModulesCount == 0 || targetLoId == null) return const SizedBox.shrink();
     }
 
     if (totalModulesCount == 0) return const SizedBox.shrink();
@@ -1193,13 +1222,35 @@ class _StudentCourseDetailScreenState
                         final type = c['content_type']?.toString() ?? 'Text';
                         final icon = getIconForType(type);
                         final color = getColorForType(type);
-                        final fileInfo = MaterialFileInfo.tryParse(
+                        var fileInfo = MaterialFileInfo.tryParse(
                           c['content_data'],
                         );
                         final isPdf = type.toUpperCase() == 'PDF' ||
                             (fileInfo != null && fileInfo.fileExtension.toLowerCase() == 'pdf');
                         final isWebOrVideo = type == 'YouTube' ||
                             (c['content_data'] != null && c['content_data'].toString().trim().startsWith('http'));
+
+                        // Graceful fallback for PDF items stored as direct URL or raw base64
+                        if (fileInfo == null && isPdf) {
+                          final raw = (c['content_data']?.toString() ?? '').trim();
+                          if (raw.startsWith('http://') || raw.startsWith('https://')) {
+                            fileInfo = MaterialFileInfo(
+                              isFile: true,
+                              fileName: '${c['title'] ?? 'Lecture_Notes'}.pdf',
+                              fileSize: 0,
+                              fileExtension: 'pdf',
+                              filePath: raw,
+                            );
+                          } else if (raw.length > 50 && !raw.contains('\n') && !raw.contains(' ')) {
+                            fileInfo = MaterialFileInfo(
+                              isFile: true,
+                              fileName: '${c['title'] ?? 'Lecture_Notes'}.pdf',
+                              fileSize: (raw.length * 3 / 4).round(),
+                              fileExtension: 'pdf',
+                              fileBytes: raw,
+                            );
+                          }
+                        }
 
                         return Container(
                           margin: const EdgeInsets.only(bottom: 12),
@@ -1405,120 +1456,122 @@ class _StudentCourseDetailScreenState
                         );
                       }),
 
-                    const SizedBox(height: 24),
-                    // ── Module Flashcards & Practice Card in Sheet ──
-                    Row(
-                      children: [
-                        Icon(
-                          Icons.style_outlined,
-                          color: AppTheme.primary,
-                          size: 20,
-                        ),
-                        const SizedBox(width: 8),
-                        Text(
-                          'Practice & Flashcards',
-                          style: TextStyle(
-                            fontSize: 16,
-                            fontWeight: FontWeight.bold,
-                            color: AppTheme.text,
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 12),
-                    Container(
-                      padding: const EdgeInsets.all(16),
-                      decoration: BoxDecoration(
-                        color: AppTheme.background,
-                        borderRadius: BorderRadius.circular(14),
-                        border: Border.all(
-                          color: AppTheme.border,
-                        ),
-                      ),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
+                    if (_losWithFlashcards.contains(loId)) ...[
+                      const SizedBox(height: 24),
+                      // ── Module Flashcards & Practice Card in Sheet (Only if verified flashcards exist) ──
+                      Row(
                         children: [
-                          Row(
-                            children: [
-                              Container(
-                                width: 36,
-                                height: 36,
-                                decoration: BoxDecoration(
-                                  color: AppTheme.primary.withValues(
-                                    alpha: 0.12,
-                                  ),
-                                  borderRadius: BorderRadius.circular(8),
-                                ),
-                                child: Icon(
-                                  Icons.style_outlined,
-                                  color: AppTheme.primary,
-                                  size: 20,
-                                ),
-                              ),
-                              const SizedBox(width: 12),
-                              Expanded(
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    Text(
-                                      'Module Review & Flashcards',
-                                      style: TextStyle(
-                                        fontWeight: FontWeight.bold,
-                                        color: AppTheme.text,
-                                        fontSize: 14,
-                                      ),
-                                    ),
-                                    const SizedBox(height: 2),
-                                    Text(
-                                      'Practice interactive flashcards and questions prepared for this lesson.',
-                                      style: TextStyle(
-                                        fontSize: 11,
-                                        color: AppTheme.textSecondary,
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              ),
-                            ],
+                          Icon(
+                            Icons.style_outlined,
+                            color: AppTheme.primary,
+                            size: 20,
                           ),
-                          const SizedBox(height: 14),
-                          SizedBox(
-                            width: double.infinity,
-                            height: 44,
-                            child: ElevatedButton.icon(
-                              style: ElevatedButton.styleFrom(
-                                backgroundColor: AppTheme.primary,
-                                foregroundColor: Colors.black,
-                                shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(10),
-                                ),
-                                elevation: 0,
-                              ),
-                              icon: const Icon(Icons.play_arrow_rounded, size: 18),
-                              label: const Text(
-                                'Practice Quiz & Flashcards',
-                                style: TextStyle(
-                                  fontWeight: FontWeight.bold,
-                                  fontSize: 13,
-                                ),
-                              ),
-                              onPressed: () {
-                                Navigator.pop(ctx);
-                                final title = Uri.encodeComponent(
-                                  lo['title']?.toString() ?? 'Module',
-                                );
-                                final subjectName = Uri.encodeComponent(
-                                  _subject?['name']?.toString() ?? 'Subject',
-                                );
-                                context.push(
-                                  '/module-review/$loId?title=$title&subject=$subjectName',
-                                );
-                              },
+                          const SizedBox(width: 8),
+                          Text(
+                            'Practice & Flashcards',
+                            style: TextStyle(
+                              fontSize: 16,
+                              fontWeight: FontWeight.bold,
+                              color: AppTheme.text,
                             ),
                           ),
                         ],
                       ),
-                    ),
+                      const SizedBox(height: 12),
+                      Container(
+                        padding: const EdgeInsets.all(16),
+                        decoration: BoxDecoration(
+                          color: AppTheme.background,
+                          borderRadius: BorderRadius.circular(14),
+                          border: Border.all(
+                            color: AppTheme.border,
+                          ),
+                        ),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Row(
+                              children: [
+                                Container(
+                                  width: 36,
+                                  height: 36,
+                                  decoration: BoxDecoration(
+                                    color: AppTheme.primary.withValues(
+                                      alpha: 0.12,
+                                    ),
+                                    borderRadius: BorderRadius.circular(8),
+                                  ),
+                                  child: Icon(
+                                    Icons.style_outlined,
+                                    color: AppTheme.primary,
+                                    size: 20,
+                                  ),
+                                ),
+                                const SizedBox(width: 12),
+                                Expanded(
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      Text(
+                                        'Module Review & Flashcards',
+                                        style: TextStyle(
+                                          fontWeight: FontWeight.bold,
+                                          color: AppTheme.text,
+                                          fontSize: 14,
+                                        ),
+                                      ),
+                                      const SizedBox(height: 2),
+                                      Text(
+                                        'Practice interactive flashcards and questions prepared for this lesson.',
+                                        style: TextStyle(
+                                          fontSize: 11,
+                                          color: AppTheme.textSecondary,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 14),
+                            SizedBox(
+                              width: double.infinity,
+                              height: 44,
+                              child: ElevatedButton.icon(
+                                style: ElevatedButton.styleFrom(
+                                  backgroundColor: AppTheme.primary,
+                                  foregroundColor: Colors.black,
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(10),
+                                  ),
+                                  elevation: 0,
+                                ),
+                                icon: const Icon(Icons.play_arrow_rounded, size: 18),
+                                label: const Text(
+                                  'Practice Quiz & Flashcards',
+                                  style: TextStyle(
+                                    fontWeight: FontWeight.bold,
+                                    fontSize: 13,
+                                  ),
+                                ),
+                                onPressed: () {
+                                  Navigator.pop(ctx);
+                                  final title = Uri.encodeComponent(
+                                    lo['title']?.toString() ?? 'Module',
+                                  );
+                                  final subjectName = Uri.encodeComponent(
+                                    _subject?['name']?.toString() ?? 'Subject',
+                                  );
+                                  context.push(
+                                    '/module-review/$loId?title=$title&subject=$subjectName',
+                                  );
+                                },
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
 
                     const SizedBox(height: 24),
                     Text(

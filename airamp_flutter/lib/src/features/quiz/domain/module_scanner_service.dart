@@ -81,50 +81,10 @@ class ModuleScannerService {
     // Collect all vocabulary terms across the module for smart multiple-choice distractor generation
     final Set<String> vocabularyPool = {};
 
-    // ── 1. Process Assessment Questions (Highest Educational Precision) ──
-    for (int i = 0; i < questions.length; i++) {
-      final q = questions[i];
-      final qText = (q['question_text']?.toString() ?? '').trim();
-      final optA = (q['option_a']?.toString() ?? '').trim();
-      final optB = (q['option_b']?.toString() ?? '').trim();
-      final optC = (q['option_c']?.toString() ?? '').trim();
-      final optD = (q['option_d']?.toString() ?? '').trim();
-      final correct = (q['correct_option']?.toString() ?? 'A').toUpperCase().trim();
-
-      if (qText.isEmpty) continue;
-
-      String correctText = optA;
-      if (correct == 'B') correctText = optB;
-      if (correct == 'C') correctText = optC;
-      if (correct == 'D') correctText = optD;
-
-      vocabularyPool.add(correctText);
-
-      final optionsList = [
-        'A: $optA',
-        'B: $optB',
-        'C: $optC',
-        'D: $optD',
-      ];
-
-      // Add as Interactive Practice Quiz card
-      cards.add({
-        'lo_id': loId,
-        'topic_id': topicId,
-        'card_type': 'practice_quiz',
-        'front_text': qText,
-        'back_text': 'Correct Answer ($correct): $correctText',
-        'options_json': jsonEncode(optionsList),
-        'correct_option': correct,
-        'explanation': 'Correct option is ($correct). This is a verified competency question from the module assessment.',
-        'source_snippet': 'Module Assessment Question #${i + 1}',
-        'is_mastered': 0,
-        'review_count': 0,
-      });
-      seenFronts.add(qText.toLowerCase());
-    }
-
-    // ── 2. Scan Reading Materials (lo_contents) ──
+    // ── 1. Scan Reading Materials (lo_contents) ──
+    // Note: Graded assessment questions (questions table) are intentionally EXCLUDED here.
+    // They are reserved for the graded assessment ('Take Quiz') to prevent question leaking
+    // when the teacher has not explicitly set up a practice reviewer.
     for (final content in contents) {
       final contentTitle = (content['title']?.toString() ?? '').trim();
       final rawText = (content['content_data']?.toString() ?? '').trim();
@@ -180,19 +140,22 @@ class ModuleScannerService {
       }
     }
 
-    // ── 3. Guarantee 4 Multiple-Choice Options on EVERY Card (Gizmo Practice Mode) ──
+    if (cards.isEmpty) {
+      // No reading definitions found; do not fabricate fake flashcards.
+      return [];
+    }
+
+    // ── 2. Guarantee 4 Multiple-Choice Options on EVERY Card (Gizmo Practice Mode) ──
     final List<String> domainPool = [
       ...vocabularyPool,
-      'Encapsulation & Scoping',
-      'Dependency Injection',
-      'Reactive State Stream',
-      'Immutable Widget Tree',
-      'Asynchronous Event Loop',
-      'Lifecycle Management',
-      'Build Context Hierarchy',
-      'Client-Server Sync Protocol',
-      'Memory Cache Optimization',
-      'Stateful Architecture',
+      'Key Subject Principle',
+      'Fundamental Module Concept',
+      'Standard Terminology Definition',
+      'Applied Practical Method',
+      'Core Competency Directive',
+      'Theoretical Overview',
+      'Systematic Analysis Criterion',
+      'Contextual Framework Principle',
     ];
 
     for (int i = 0; i < cards.length; i++) {

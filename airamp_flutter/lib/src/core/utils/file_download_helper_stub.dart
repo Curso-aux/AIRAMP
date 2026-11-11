@@ -11,6 +11,11 @@ void downloadBinaryFileWeb(List<int> bytes, String filename, String mimeType) {
   debugPrint('Binary Download (Stub): $filename (${bytes.length} bytes)');
 }
 
+/// Stub implementation for opening PDF in new tab on web
+void openPdfBlobInNewTabWeb(List<int> bytes, String filename) {
+  debugPrint('openPdfBlobInNewTabWeb (Stub): $filename (${bytes.length} bytes)');
+}
+
 /// Stub implementation for non-web URL trigger
 void triggerWebUrlDownload(String url, String filename) {
   debugPrint('Trigger URL Download (Stub): $filename from $url');
