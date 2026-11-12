@@ -524,12 +524,16 @@ class _MyCoursesScreenState extends ConsumerState<MyCoursesScreen> {
                               children: [
                                 Icon(Icons.meeting_room_outlined, size: 16, color: AppTheme.accent),
                                 const SizedBox(width: 6),
-                                Text(
-                                  'Classroom: $room',
-                                  style: TextStyle(
-                                    color: AppTheme.accent,
-                                    fontSize: 13,
-                                    fontWeight: FontWeight.w600,
+                                Expanded(
+                                  child: Text(
+                                    'Classroom: $room',
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                    style: TextStyle(
+                                      color: AppTheme.accent,
+                                      fontSize: 13,
+                                      fontWeight: FontWeight.w600,
+                                    ),
                                   ),
                                 ),
                               ],
@@ -539,9 +543,13 @@ class _MyCoursesScreenState extends ConsumerState<MyCoursesScreen> {
                               children: [
                                 Icon(Icons.vpn_key_outlined, size: 14, color: AppTheme.textMuted),
                                 const SizedBox(width: 6),
-                                Text(
-                                  'Key: $key',
-                                  style: TextStyle(color: AppTheme.textSecondary, fontSize: 12),
+                                Expanded(
+                                  child: Text(
+                                    'Key: $key',
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                    style: TextStyle(color: AppTheme.textSecondary, fontSize: 12),
+                                  ),
                                 ),
                               ],
                             ),
@@ -625,9 +633,13 @@ class _MyCoursesScreenState extends ConsumerState<MyCoursesScreen> {
                                       children: [
                                         Icon(Icons.person_outline, size: 12, color: AppTheme.textMuted),
                                         const SizedBox(width: 4),
-                                        Text(
-                                          teacher,
-                                          style: TextStyle(fontSize: 12, color: AppTheme.textSecondary),
+                                        Expanded(
+                                          child: Text(
+                                            teacher,
+                                            maxLines: 1,
+                                            overflow: TextOverflow.ellipsis,
+                                            style: TextStyle(fontSize: 12, color: AppTheme.textSecondary),
+                                          ),
                                         ),
                                       ],
                                     ),

@@ -972,12 +972,14 @@ class _ForgotPasswordScreenState extends ConsumerState<ForgotPasswordScreen> {
           color: isMet ? Colors.green : AppTheme.textMuted,
         ),
         const SizedBox(width: 8),
-        Text(
-          text,
-          style: TextStyle(
-            fontSize: 12.5,
-            color: isMet ? AppTheme.text : AppTheme.textMuted,
-            fontWeight: isMet ? FontWeight.w600 : FontWeight.normal,
+        Expanded(
+          child: Text(
+            text,
+            style: TextStyle(
+              fontSize: 12.5,
+              color: isMet ? AppTheme.text : AppTheme.textMuted,
+              fontWeight: isMet ? FontWeight.w600 : FontWeight.normal,
+            ),
           ),
         ),
       ],

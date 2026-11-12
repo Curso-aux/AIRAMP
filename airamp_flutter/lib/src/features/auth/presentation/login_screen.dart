@@ -654,39 +654,48 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
     return Column(
       mainAxisSize: MainAxisSize.min,
       children: [
-        Row(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(Icons.shield_outlined, size: 14, color: mutedColor),
-            const SizedBox(width: 6),
-            Text(
-              'DepEd Senior High School Learning Portal',
-              style: TextStyle(
-                fontSize: 12,
-                fontWeight: FontWeight.w500,
-                letterSpacing: 0.2,
-                color: mutedColor,
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 16),
+          child: Wrap(
+            alignment: WrapAlignment.center,
+            crossAxisAlignment: WrapCrossAlignment.center,
+            spacing: 6,
+            runSpacing: 2,
+            children: [
+              Icon(Icons.shield_outlined, size: 14, color: mutedColor),
+              Text(
+                'DepEd Senior High School Learning Portal',
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w500,
+                  letterSpacing: 0.2,
+                  color: mutedColor,
+                ),
               ),
-            ),
-          ],
+            ],
+          ),
         ),
         const SizedBox(height: 10),
         InkWell(
           onTap: () => context.push('/terms'),
           borderRadius: BorderRadius.circular(8),
           child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+            child: Wrap(
+              alignment: WrapAlignment.center,
+              crossAxisAlignment: WrapCrossAlignment.center,
+              spacing: 6,
+              runSpacing: 4,
               children: [
                 Icon(
                   Icons.article_outlined,
                   size: 14,
                   color: linkColor,
                 ),
-                const SizedBox(width: 6),
                 Text(
-                  'More about Terms of Service / Conditions & Privacy Policy',
+                  'Terms of Service, Conditions & Privacy Policy',
+                  textAlign: TextAlign.center,
                   style: TextStyle(
                     fontSize: 11.5,
                     fontWeight: FontWeight.w600,

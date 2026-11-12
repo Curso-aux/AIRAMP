@@ -117,13 +117,17 @@ class _TermsOfServiceScreenState extends State<TermsOfServiceScreen> {
           children: [
             AppLogo.mark(size: 24, isDark: isDark),
             const SizedBox(width: 10),
-            Text(
-              'Terms of Service & Privacy Policy',
-              style: TextStyle(
-                fontSize: 15,
-                fontWeight: FontWeight.w700,
-                color: textColor,
-                letterSpacing: -0.2,
+            Flexible(
+              child: Text(
+                'Terms of Service & Privacy Policy',
+                style: TextStyle(
+                  fontSize: 15,
+                  fontWeight: FontWeight.w700,
+                  color: textColor,
+                  letterSpacing: -0.2,
+                ),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
               ),
             ),
           ],
@@ -861,67 +865,83 @@ class _TermsOfServiceScreenState extends State<TermsOfServiceScreen> {
     Color textColor,
     Color textSecondary,
   ) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 16),
-      decoration: BoxDecoration(
-        color: surfaceColor,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: borderColor, width: 0.8),
-      ),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        children: [
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  'Understood and Ready to Proceed?',
-                  style: TextStyle(
-                    fontSize: 13.5,
-                    fontWeight: FontWeight.w700,
-                    color: textColor,
-                  ),
-                ),
-                const SizedBox(height: 2),
-                Text(
-                  'Return to the login screen to access your institutional portal.',
-                  style: TextStyle(
-                    fontSize: 11.5,
-                    color: textSecondary,
-                  ),
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(width: 12),
-          ElevatedButton.icon(
-            onPressed: () {
-              if (context.canPop()) {
-                context.pop();
-              } else {
-                context.go('/login');
-              }
-            },
-            icon: const Icon(Icons.arrow_back, size: 15),
-            label: const Text('Back to Login'),
-            style: ElevatedButton.styleFrom(
-              backgroundColor: isDark ? const Color(0xFF1E293B) : const Color(0xFF0F172A),
-              foregroundColor: Colors.white,
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 11),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(8),
-                side: BorderSide(
-                  color: isDark ? const Color(0xFF334155) : const Color(0xFF0F172A),
-                  width: 0.8,
-                ),
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final isCompact = constraints.maxWidth < 420;
+        final content = Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'Understood and Ready to Proceed?',
+              style: TextStyle(
+                fontSize: 13.5,
+                fontWeight: FontWeight.w700,
+                color: textColor,
               ),
-              textStyle: const TextStyle(fontWeight: FontWeight.w700, fontSize: 12.5),
-              elevation: 0,
             ),
+            const SizedBox(height: 2),
+            Text(
+              'Return to the login screen to access your institutional portal.',
+              style: TextStyle(
+                fontSize: 11.5,
+                color: textSecondary,
+              ),
+            ),
+          ],
+        );
+
+        final button = ElevatedButton.icon(
+          onPressed: () {
+            if (context.canPop()) {
+              context.pop();
+            } else {
+              context.go('/login');
+            }
+          },
+          icon: const Icon(Icons.arrow_back, size: 15),
+          label: const Text('Back to Login'),
+          style: ElevatedButton.styleFrom(
+            backgroundColor: isDark ? const Color(0xFF1E293B) : const Color(0xFF0F172A),
+            foregroundColor: Colors.white,
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 11),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(8),
+              side: BorderSide(
+                color: isDark ? const Color(0xFF334155) : const Color(0xFF0F172A),
+                width: 0.8,
+              ),
+            ),
+            textStyle: const TextStyle(fontWeight: FontWeight.w700, fontSize: 12.5),
+            elevation: 0,
           ),
-        ],
-      ),
+        );
+
+        return Container(
+          padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 16),
+          decoration: BoxDecoration(
+            color: surfaceColor,
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(color: borderColor, width: 0.8),
+          ),
+          child: isCompact
+              ? Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    content,
+                    const SizedBox(height: 12),
+                    button,
+                  ],
+                )
+              : Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Expanded(child: content),
+                    const SizedBox(width: 14),
+                    button,
+                  ],
+                ),
+        );
+      },
     );
   }
 }
