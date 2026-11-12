@@ -434,24 +434,51 @@ class AuthRepository {
       }
     }
 
-    final id = '${role}_${DateTime.now().millisecondsSinceEpoch}';
+    final String id;
+    if (role == 'student') {
+      id = await DatabaseHelper().generateNextStudentId();
+    } else if (role == 'teacher') {
+      id = await DatabaseHelper().generateNextTeacherId();
+    } else if (role == 'admin') {
+      id = await DatabaseHelper().generateNextAdminId();
+    } else {
+      id = 'U-${DateTime.now().millisecondsSinceEpoch}';
+    }
+
     final resolvedUsername = username?.trim().isNotEmpty == true
         ? username!.trim()
         : (email.contains('@') ? email.split('@').first : fullName.trim());
 
     final salt = DatabaseHelper.generateSalt();
     final hashedPassword = DatabaseHelper.hashPassword(password, salt);
+    final cleanFullName = fullName.trim();
+    final firstName = cleanFullName.split(' ').where((s) => s.isNotEmpty).firstOrNull ?? cleanFullName;
+    final cleanEmail = email.trim().toLowerCase();
 
     final userData = {
       'id': id,
-      'email': email.trim(),
+      'email': cleanEmail,
+      'email_lower': cleanEmail,
       'username': resolvedUsername,
+      'username_lower': resolvedUsername.toLowerCase(),
       'password': hashedPassword,
       'password_salt': salt,
       'role': role,
-      'full_name': fullName.trim(),
+      'category': role,
+      'full_name': cleanFullName,
+      'fullName': cleanFullName,
+      'first_name': firstName,
+      'firstName': firstName,
+      'school_id': 'sch_main',
+      'must_change_password': 0,
       'created_at': DateTime.now().toIso8601String(),
     };
+
+    if (role == 'student') {
+      userData['student_type'] = 'regular';
+      userData['enrolled_courses'] = 0;
+      userData['enrolled_subjects'] = <String>[];
+    }
 
     // If student and section code provided, validate and bind
     String? assignedSection;
@@ -497,7 +524,16 @@ class AuthRepository {
       userData['grade'] = assignedGrade;
     }
 
-    await db.insert('users', userData);
+    final sqliteRow = Map<String, dynamic>.from(userData)
+      ..remove('fullName')
+      ..remove('firstName')
+      ..remove('first_name')
+      ..remove('email_lower')
+      ..remove('username_lower')
+      ..remove('enrolled_courses')
+      ..remove('enrolled_subjects');
+
+    await db.insert('users', sqliteRow);
 
     // Save to Cloud Firestore so the user can log in on any device or browser
     try {

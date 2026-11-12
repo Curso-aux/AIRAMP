@@ -500,16 +500,93 @@ class FirestoreService {
   Future<void> saveUser(Map<String, dynamic> userData) async {
     if (_isTestEnv) return;
     invalidateUsersSyncCache();
-    final id = userData['id']?.toString();
+    final id = userData['id']?.toString().trim();
     if (id == null || id.isEmpty) return;
 
     final dataToSave = Map<String, dynamic>.from(userData);
+    dataToSave['id'] = id;
+
+    // If core fields are missing, merge with local authoritative SQLite record
+    try {
+      final isMissingCoreFields = !dataToSave.containsKey('email') ||
+          (dataToSave['email']?.toString().trim().isEmpty ?? true) ||
+          (!dataToSave.containsKey('full_name') && !dataToSave.containsKey('fullName')) ||
+          (!dataToSave.containsKey('role') && !dataToSave.containsKey('category')) ||
+          !dataToSave.containsKey('password');
+
+      if (isMissingCoreFields) {
+        final db = await DatabaseHelper().database;
+        final cleanEmailParam = (dataToSave['email']?.toString() ?? '').toLowerCase().trim();
+        final localUsers = await db.query(
+          'users',
+          where: 'id = ?${cleanEmailParam.isNotEmpty ? ' OR LOWER(email) = ?' : ''}',
+          whereArgs: [id, if (cleanEmailParam.isNotEmpty) cleanEmailParam],
+          limit: 1,
+        );
+        if (localUsers.isNotEmpty) {
+          final local = localUsers.first;
+          for (final entry in local.entries) {
+            if (entry.value != null &&
+                (!dataToSave.containsKey(entry.key) ||
+                    dataToSave[entry.key] == null ||
+                    dataToSave[entry.key].toString().trim().isEmpty)) {
+              dataToSave[entry.key] = entry.value;
+            }
+          }
+        }
+      }
+    } catch (_) {}
+
+    // Populate role & category duality
+    final resolvedRole = (dataToSave['role'] ?? dataToSave['category'] ?? InstitutionalIdHelper.detectRole(id) ?? 'student').toString().toLowerCase().trim();
+    dataToSave['role'] = resolvedRole;
+    dataToSave['category'] = resolvedRole;
+
+    // Populate fullName, full_name, firstName, first_name
+    final fullNameVal = (dataToSave['full_name'] ?? dataToSave['fullName'] ?? '').toString().trim();
+    if (fullNameVal.isNotEmpty) {
+      dataToSave['full_name'] = fullNameVal;
+      dataToSave['fullName'] = fullNameVal;
+      final parts = fullNameVal.split(' ').where((p) => p.isNotEmpty).toList();
+      final firstNameVal = parts.isNotEmpty ? parts.first : fullNameVal;
+      dataToSave['first_name'] ??= firstNameVal;
+      dataToSave['firstName'] ??= firstNameVal;
+    }
+
+    // Populate email and lowercase
     if (dataToSave.containsKey('email') && dataToSave['email'] is String) {
-      dataToSave['email_lower'] = (dataToSave['email'] as String).toLowerCase().trim();
+      final cleanEmail = (dataToSave['email'] as String).toLowerCase().trim();
+      dataToSave['email'] = cleanEmail;
+      dataToSave['email_lower'] = cleanEmail;
     }
+
+    // Populate username and lowercase
     if (dataToSave.containsKey('username') && dataToSave['username'] is String) {
-      dataToSave['username_lower'] = (dataToSave['username'] as String).toLowerCase().trim();
+      final cleanUser = (dataToSave['username'] as String).trim();
+      dataToSave['username'] = cleanUser;
+      dataToSave['username_lower'] = cleanUser.toLowerCase();
+    } else if (dataToSave.containsKey('email') && dataToSave['email'] is String) {
+      final emailStr = dataToSave['email'] as String;
+      final fallbackUser = emailStr.contains('@') ? emailStr.split('@').first : emailStr;
+      dataToSave['username'] ??= fallbackUser;
+      dataToSave['username_lower'] ??= fallbackUser.toLowerCase();
     }
+
+    // Populate student specific attributes
+    if (resolvedRole == 'student') {
+      dataToSave['student_type'] ??= 'regular';
+      if (!dataToSave.containsKey('enrolled_subjects') || dataToSave['enrolled_subjects'] == null) {
+        dataToSave['enrolled_subjects'] = <String>[];
+      }
+      if (!dataToSave.containsKey('enrolled_courses') || dataToSave['enrolled_courses'] == null) {
+        final enrList = dataToSave['enrolled_subjects'];
+        dataToSave['enrolled_courses'] = (enrList is List) ? enrList.length : 0;
+      }
+    }
+
+    dataToSave['school_id'] ??= 'sch_main';
+    dataToSave['must_change_password'] ??= 1;
+    dataToSave['created_at'] ??= DateTime.now().toIso8601String();
     dataToSave['updated_at'] = DateTime.now().toIso8601String();
 
     // Ensure profile_image and profileImage fields stay consistent
@@ -541,7 +618,7 @@ class FirestoreService {
     if (isAvailable) {
       try {
         await usersCollection.doc(id).set(dataToSave, SetOptions(merge: true))
-            .timeout(const Duration(seconds: 4));
+            .timeout(const Duration(seconds: 12));
         debugPrint('[FirestoreService] Successfully saved user $id via SDK');
         unawaited(_saveUserRest(id, dataToSave));
         return;
@@ -1052,6 +1129,27 @@ class FirestoreService {
             }));
           }
 
+          // If Cloud Firestore has an incomplete record (e.g. S-100-0116 missing email, name, role),
+          // but local SQLite has the full user data, auto-repair Cloud Firestore immediately!
+          final cloudHasIncompleteData = (data['email'] == null || data['email'].toString().trim().isEmpty) ||
+              (data['full_name'] == null || data['full_name'].toString().trim().isEmpty);
+          final localHasCompleteData = existing.isNotEmpty &&
+              existing.first['email'] != null && existing.first['email'].toString().trim().isNotEmpty &&
+              existing.first['full_name'] != null && existing.first['full_name'].toString().trim().isNotEmpty;
+          if (cloudHasIncompleteData && localHasCompleteData) {
+            debugPrint('[FirestoreService] Auto-repairing incomplete Cloud Firestore record for $targetId');
+            final repairPayload = Map<String, dynamic>.from(existing.first);
+            if (data.containsKey('enrolled_courses')) repairPayload['enrolled_courses'] = data['enrolled_courses'];
+            if (data.containsKey('enrolled_subjects')) repairPayload['enrolled_subjects'] = data['enrolled_subjects'];
+            if (data.containsKey('section') && (repairPayload['section'] == null || repairPayload['section'].toString().isEmpty)) {
+              repairPayload['section'] = data['section'];
+            }
+            if (data.containsKey('grade') && (repairPayload['grade'] == null || repairPayload['grade'].toString().isEmpty)) {
+              repairPayload['grade'] = data['grade'];
+            }
+            unawaited(saveUser(repairPayload));
+          }
+
           // Safely merge fields: do not let a secondary document overwrite populated values with null/empty
           final old = existing.isNotEmpty ? existing.first : <String, dynamic>{};
           final fullNameVal = (data['full_name'] != null && data['full_name'].toString().isNotEmpty)
@@ -1150,6 +1248,21 @@ class FirestoreService {
           } catch (_) {}
           debugPrint('[FirestoreService] Pruned permanently deleted user: $localId ($localEmail)');
           continue;
+        }
+
+        // 2. Auto-push local users missing or incomplete in Cloud Firestore
+        if (!deletedList.contains(localId) && (local['email']?.toString().trim().isNotEmpty ?? false)) {
+          final cloudMatch = cloudUsers.cast<Map<String, dynamic>?>().firstWhere(
+            (c) => c != null && (c['id']?.toString() == localId || (c['email']?.toString().toLowerCase().trim() == localEmail && localEmail.isNotEmpty)),
+            orElse: () => null,
+          );
+          final cloudIsIncomplete = cloudMatch == null ||
+              (cloudMatch['email'] == null || cloudMatch['email'].toString().trim().isEmpty) ||
+              (cloudMatch['full_name'] == null || cloudMatch['full_name'].toString().trim().isEmpty);
+          if (cloudIsIncomplete) {
+            debugPrint('[FirestoreService] Auto-pushing complete user record for $localId to Cloud Firestore');
+            unawaited(saveUser(Map<String, dynamic>.from(local)));
+          }
         }
       }
 

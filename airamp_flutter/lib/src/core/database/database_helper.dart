@@ -2331,13 +2331,22 @@ class DatabaseHelper {
           .map((s) => s['subject_code']?.toString().trim().toUpperCase() ?? '')
           .where((c) => c.isNotEmpty)
           .toList();
-      await FirestoreService().saveUser({
+      final userRow = (await db.query('users', where: 'id = ?', whereArgs: [studentId])).firstOrNull;
+      final syncPayload = <String, dynamic>{
         'id': studentId,
         'section': sectionName,
         if (grade.isNotEmpty) 'grade': grade,
         'enrolled_courses': subjects.length,
         'enrolled_subjects': enrolledCodes,
-      });
+      };
+      if (userRow != null) {
+        for (final entry in userRow.entries) {
+          if (entry.value != null && !syncPayload.containsKey(entry.key)) {
+            syncPayload[entry.key] = entry.value;
+          }
+        }
+      }
+      await FirestoreService().saveUser(syncPayload);
     } catch (_) {}
 
     // 4. Automatically join student to their section's official group chat
@@ -5447,23 +5456,43 @@ class DatabaseHelper {
               ? email.split('@').first
               : fullName.trim().toLowerCase().replaceAll(' ', '.'));
 
+    final cleanFullName = fullName.trim();
+    final firstName = cleanFullName.split(' ').where((s) => s.isNotEmpty).firstOrNull ?? cleanFullName;
+
     final studentData = {
       'id': finalStudentId,
-      'email': email.trim(),
+      'email': cleanEmail,
+      'email_lower': cleanEmail,
       'username': resolvedUsername,
+      'username_lower': resolvedUsername.toLowerCase(),
       'password': hashedPassword,
       'password_salt': salt,
       'role': 'student',
       'category': 'student',
-      'full_name': fullName.trim(),
+      'full_name': cleanFullName,
+      'fullName': cleanFullName,
+      'first_name': firstName,
+      'firstName': firstName,
       'grade': grade,
       'section': section,
       'student_type': studentType,
       'special_notes': specialNotes,
       'school_id': 'sch_main',
       'must_change_password': 1,
+      'enrolled_courses': 0,
+      'enrolled_subjects': <String>[],
       'created_at': DateTime.now().toIso8601String(),
     };
+
+    // Filter sqlite-compatible columns for local users table
+    final sqliteRow = Map<String, dynamic>.from(studentData)
+      ..remove('fullName')
+      ..remove('firstName')
+      ..remove('first_name')
+      ..remove('email_lower')
+      ..remove('username_lower')
+      ..remove('enrolled_courses')
+      ..remove('enrolled_subjects');
 
     // Clear any previous tombstone in SharedPreferences so newly created accounts are never blocked
     try {
@@ -5479,12 +5508,12 @@ class DatabaseHelper {
       try {
         await db.update(
           'users',
-          studentData,
+          sqliteRow,
           where: 'id = ?',
           whereArgs: [finalStudentId],
         );
       } catch (_) {
-        final fallback = Map<String, dynamic>.from(studentData)
+        final fallback = Map<String, dynamic>.from(sqliteRow)
           ..remove('category');
         await db.update(
           'users',
@@ -5497,11 +5526,11 @@ class DatabaseHelper {
       try {
         await db.insert(
           'users',
-          studentData,
+          sqliteRow,
           conflictAlgorithm: ConflictAlgorithm.replace,
         );
       } catch (_) {
-        final fallbackData = Map<String, dynamic>.from(studentData)
+        final fallbackData = Map<String, dynamic>.from(sqliteRow)
           ..remove('category');
         await db.insert(
           'users',
@@ -5509,6 +5538,13 @@ class DatabaseHelper {
           conflictAlgorithm: ConflictAlgorithm.replace,
         );
       }
+    }
+
+    // Save full student user profile to Cloud Firestore FIRST to prevent partial-field stubs
+    try {
+      await FirestoreService().saveUser(studentData);
+    } catch (e) {
+      debugPrint('[DatabaseHelper] Error syncing student to Firestore: $e');
     }
 
     if (section != null && section.isNotEmpty) {
@@ -5520,12 +5556,6 @@ class DatabaseHelper {
       try {
         await setStudentEnrollments(finalStudentId, enrollSubjectIds);
       } catch (_) {}
-    }
-
-    try {
-      await FirestoreService().saveUser(studentData);
-    } catch (e) {
-      debugPrint('[DatabaseHelper] Error syncing student to Firestore: $e');
     }
 
     try {
@@ -6632,11 +6662,20 @@ class DatabaseHelper {
         whereArgs: [studentId],
       );
       try {
-        await FirestoreService().saveUser({
+        final userRow = (await db.query('users', where: 'id = ?', whereArgs: [studentId])).firstOrNull;
+        final syncPayload = <String, dynamic>{
           'id': studentId,
           'enrolled_courses': 0,
-          'enrolled_subjects': [],
-        });
+          'enrolled_subjects': <String>[],
+        };
+        if (userRow != null) {
+          for (final entry in userRow.entries) {
+            if (entry.value != null && !syncPayload.containsKey(entry.key)) {
+              syncPayload[entry.key] = entry.value;
+            }
+          }
+        }
+        await FirestoreService().saveUser(syncPayload);
       } catch (_) {}
       return;
     }
@@ -6682,11 +6721,20 @@ class DatabaseHelper {
     }
 
     try {
-      await FirestoreService().saveUser({
+      final userRow = (await db.query('users', where: 'id = ?', whereArgs: [studentId])).firstOrNull;
+      final syncPayload = <String, dynamic>{
         'id': studentId,
         'enrolled_courses': subjectIds.length,
         'enrolled_subjects': enrolledCodes,
-      });
+      };
+      if (userRow != null) {
+        for (final entry in userRow.entries) {
+          if (entry.value != null && !syncPayload.containsKey(entry.key)) {
+            syncPayload[entry.key] = entry.value;
+          }
+        }
+      }
+      await FirestoreService().saveUser(syncPayload);
     } catch (_) {}
   }
 
@@ -6774,8 +6822,9 @@ class DatabaseHelper {
   /// Ensures a student is enrolled in all subjects assigned to their section
   Future<void> ensureStudentEnrolledInSectionSubjects(
     String studentId,
-    String sectionName,
-  ) async {
+    String sectionName, {
+    bool syncToCloud = true,
+  }) async {
     final db = await database;
     if (studentId.isEmpty || sectionName.isEmpty) return;
 
@@ -6786,15 +6835,17 @@ class DatabaseHelper {
       whereArgs: [sectionName.toLowerCase().trim(), sectionName.toLowerCase().trim()],
     );
     String? secGrade;
+    bool gradeUpdated = false;
     if (secRes.isNotEmpty) {
       secGrade = secRes.first['grade']?.toString();
       if (secGrade != null && secGrade.isNotEmpty) {
-        await db.update(
+        final rowsAffected = await db.update(
           'users',
           {'grade': secGrade},
-          where: 'id = ?',
-          whereArgs: [studentId],
+          where: 'id = ? AND (grade IS NULL OR grade != ?)',
+          whereArgs: [studentId, secGrade],
         );
+        if (rowsAffected > 0) gradeUpdated = true;
       }
     }
 
@@ -6803,20 +6854,30 @@ class DatabaseHelper {
     final validSubjectIds = <int>{};
     final now = DateTime.now().toIso8601String();
 
+    final currentEnrsBefore = await db.query(
+      'enrollments',
+      where: 'student_id = ? AND status = ?',
+      whereArgs: [studentId, 'active'],
+    );
+    final currentSubIdsBefore = currentEnrsBefore.map((e) => e['subject_id'] as int).toSet();
+
     for (final s in subjects) {
       final subId = s['id'] as int;
       validSubjectIds.add(subId);
-      await db.insert('enrollments', {
-        'student_id': studentId,
-        'subject_id': subId,
-        'enrolled_at': now,
-        'status': 'active',
-      }, conflictAlgorithm: ConflictAlgorithm.replace);
+      if (!currentSubIdsBefore.contains(subId)) {
+        await db.insert('enrollments', {
+          'student_id': studentId,
+          'subject_id': subId,
+          'enrolled_at': now,
+          'status': 'active',
+        }, conflictAlgorithm: ConflictAlgorithm.replace);
+      }
       final c = s['subject_code']?.toString().trim().toUpperCase() ?? '';
       if (c.isNotEmpty && !enrolledCodes.contains(c)) enrolledCodes.add(c);
     }
 
     // Prune stale enrollments: remove any enrollments that are NOT part of this section's subjects
+    bool staleRemoved = false;
     if (validSubjectIds.isNotEmpty) {
       final currentEnrs = await db.query(
         'enrollments',
@@ -6831,19 +6892,37 @@ class DatabaseHelper {
             where: 'student_id = ? AND subject_id = ?',
             whereArgs: [studentId, enrSubId],
           );
+          staleRemoved = true;
         }
       }
     }
 
-    try {
-      await FirestoreService().saveUser({
-        'id': studentId,
-        'section': sectionName,
-        if (secGrade != null && secGrade.isNotEmpty) 'grade': secGrade,
-        'enrolled_courses': enrolledCodes.length,
-        'enrolled_subjects': enrolledCodes,
-      });
-    } catch (_) {}
+    final bool enrollmentsChanged = gradeUpdated ||
+        staleRemoved ||
+        currentSubIdsBefore.length != validSubjectIds.length ||
+        !currentSubIdsBefore.containsAll(validSubjectIds);
+
+    // Only invoke Firestore write if enrollments or section/grade actually changed to conserve quota
+    if (syncToCloud && enrollmentsChanged) {
+      try {
+        final userRow = (await db.query('users', where: 'id = ?', whereArgs: [studentId])).firstOrNull;
+        final syncPayload = <String, dynamic>{
+          'id': studentId,
+          'section': sectionName,
+          if (secGrade != null && secGrade.isNotEmpty) 'grade': secGrade,
+          'enrolled_courses': enrolledCodes.length,
+          'enrolled_subjects': enrolledCodes,
+        };
+        if (userRow != null) {
+          for (final entry in userRow.entries) {
+            if (entry.value != null && !syncPayload.containsKey(entry.key)) {
+              syncPayload[entry.key] = entry.value;
+            }
+          }
+        }
+        await FirestoreService().saveUser(syncPayload);
+      } catch (_) {}
+    }
 
     // Auto-join student to their section's official group chat
     try {
@@ -6869,7 +6948,7 @@ class DatabaseHelper {
     }
   }
 
-  /// Reconciles enrollments for all active sections and students
+  /// Reconciles enrollments for all active sections and students (local SQLite with change-only cloud sync)
   Future<void> reconcileAllEnrollments() async {
     final db = await database;
 
@@ -6883,16 +6962,6 @@ class DatabaseHelper {
       final name = sec['name'] as String? ?? '';
       if (name.isNotEmpty) {
         await autoEnrollAllStudentsInSection(name);
-      }
-    }
-
-    // Also reconcile each student directly based on their assigned section or grade
-    final students = await db.query('users', where: "role = 'student'");
-    for (final st in students) {
-      final sid = st['id']?.toString() ?? '';
-      final sec = (st['section'] as String?)?.trim() ?? '';
-      if (sid.isNotEmpty && sec.isNotEmpty && sec != 'Unassigned') {
-        await ensureStudentEnrolledInSectionSubjects(sid, sec);
       }
     }
   }
