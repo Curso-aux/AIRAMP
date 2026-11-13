@@ -101,6 +101,33 @@ class _TeacherStudentsScreenState extends ConsumerState<TeacherStudentsScreen> {
     super.dispose();
   }
 
+  String _cleanSectionName(String raw) {
+    var clean = raw.trim();
+    if (clean.toLowerCase().startsWith('grade')) {
+      final dashIdx = clean.indexOf('-');
+      if (dashIdx != -1) {
+        clean = clean.substring(dashIdx + 1).trim();
+      }
+    }
+    return clean;
+  }
+
+  String _formatSectionBadge(String section, String grade) {
+    var cleanSec = section.trim();
+    if (cleanSec.toLowerCase().startsWith('grade')) {
+      final idx = cleanSec.indexOf('-');
+      if (idx != -1) cleanSec = cleanSec.substring(idx + 1).trim();
+    }
+    if (grade.isNotEmpty && cleanSec.isNotEmpty && cleanSec != 'Unassigned') {
+      return '$grade • Sec. $cleanSec';
+    } else if (cleanSec.isNotEmpty && cleanSec != 'Unassigned') {
+      return 'Sec. $cleanSec';
+    } else if (grade.isNotEmpty) {
+      return grade;
+    }
+    return section;
+  }
+
   @override
   Widget build(BuildContext context) {
     ref.watch(themeProvider);
@@ -260,156 +287,237 @@ class _TeacherStudentsScreenState extends ConsumerState<TeacherStudentsScreen> {
                       const SizedBox(height: 8),
                       SizedBox(
                         height: 94,
-                        child: ListView(
+                        child: SingleChildScrollView(
                           scrollDirection: Axis.horizontal,
+                          physics: const BouncingScrollPhysics(),
                           clipBehavior: Clip.none,
-                          children: [
-                            // "All Sections" Card
-                            _buildSectionCard(
-                              name: 'All Sections',
-                              grade: 'All Levels',
-                              studentCount: handledSections.fold<int>(
-                                0,
-                                (sum, s) => sum + (s['student_count'] as int? ?? 0),
+                          child: Row(
+                            children: [
+                              // "All Sections" Card
+                              _buildSectionCard(
+                                name: 'All Sections',
+                                grade: 'All Levels',
+                                studentCount: handledSections.fold<int>(
+                                  0,
+                                  (sum, s) => sum + (s['student_count'] as int? ?? 0),
+                                ),
+                                isSelected: _selectedSection == 'All Sections',
+                                onTap: () => _onSelectSection('All Sections'),
+                                isAllCard: true,
                               ),
-                              isSelected: _selectedSection == 'All Sections',
-                              onTap: () => _onSelectSection('All Sections'),
-                              isAllCard: true,
-                            ),
-                            // Individual Handled Section Cards
-                            ...handledSections.map((sec) {
-                              final name = sec['name'] as String? ?? 'Section';
-                              final grade = sec['grade'] as String? ?? '';
-                              final count = sec['student_count'] as int? ?? 0;
-                              final isSelected = _selectedSection.toLowerCase() == name.toLowerCase();
+                              // Individual Handled Section Cards
+                              ...handledSections.map((sec) {
+                                final name = sec['name'] as String? ?? 'Section';
+                                final grade = sec['grade'] as String? ?? '';
+                                final count = sec['student_count'] as int? ?? 0;
+                                final isSelected = _selectedSection.toLowerCase() == name.toLowerCase();
 
-                              return _buildSectionCard(
-                                name: name,
-                                grade: grade,
-                                studentCount: count,
-                                isSelected: isSelected,
-                                onTap: () => _onSelectSection(name),
-                              );
-                            }),
-                          ],
+                                return _buildSectionCard(
+                                  name: name,
+                                  grade: grade,
+                                  studentCount: count,
+                                  isSelected: isSelected,
+                                  onTap: () => _onSelectSection(name),
+                                );
+                              }),
+                            ],
+                          ),
                         ),
                       ),
                       const SizedBox(height: 14),
                     ],
 
-                    // Search input
-                    ConstrainedBox(
-                      constraints: const BoxConstraints(maxWidth: 520),
-                      child: TextField(
-                        controller: _searchController,
-                        maxLength: 60,
-                        buildCounter: (context, {required currentLength, required isFocused, maxLength}) => null,
-                        style: TextStyle(color: AppTheme.text, fontSize: 14),
-                        decoration: InputDecoration(
-                          hintText: _selectedSection == 'All Sections'
-                              ? 'Search students across all sections...'
-                              : 'Search students in $_selectedSection...',
-                          counterText: '',
-                          hintStyle: TextStyle(color: AppTheme.textMuted, fontSize: 13),
-                          prefixIcon: Icon(Icons.search, color: AppTheme.textMuted, size: 20),
-                          suffixIcon: _searchController.text.isNotEmpty
-                              ? IconButton(
-                                  icon: Icon(Icons.clear, color: AppTheme.textMuted, size: 18),
-                                  onPressed: () {
-                                    _searchController.clear();
-                                  },
-                                )
-                              : null,
-                          filled: true,
-                          fillColor: AppTheme.surface,
-                          contentPadding: const EdgeInsets.symmetric(vertical: 0, horizontal: 16),
-                          border: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(12),
-                            borderSide: BorderSide(color: AppTheme.border),
+                    // Responsive Search & Unified Filter Bar
+                    LayoutBuilder(
+                      builder: (context, constraints) {
+                        final isWide = constraints.maxWidth >= 640;
+                        final searchField = SizedBox(
+                          height: 44,
+                          child: TextField(
+                            controller: _searchController,
+                            maxLength: 60,
+                            buildCounter: (context, {required currentLength, required isFocused, maxLength}) => null,
+                            style: TextStyle(color: AppTheme.text, fontSize: 13.5),
+                            decoration: InputDecoration(
+                              hintText: _selectedSection == 'All Sections'
+                                  ? 'Search students across all sections...'
+                                  : 'Search students in ${_cleanSectionName(_selectedSection)}...',
+                              counterText: '',
+                              hintStyle: TextStyle(color: AppTheme.textMuted, fontSize: 13),
+                              prefixIcon: Icon(Icons.search_rounded, color: AppTheme.textMuted, size: 19),
+                              suffixIcon: _searchController.text.isNotEmpty
+                                  ? IconButton(
+                                      icon: Icon(Icons.clear_rounded, color: AppTheme.textMuted, size: 17),
+                                      onPressed: () {
+                                        _searchController.clear();
+                                      },
+                                    )
+                                  : null,
+                              filled: true,
+                              fillColor: AppTheme.surface,
+                              isDense: true,
+                              contentPadding: const EdgeInsets.symmetric(vertical: 10, horizontal: 14),
+                              border: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(12),
+                                borderSide: BorderSide(color: AppTheme.border),
+                              ),
+                              enabledBorder: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(12),
+                                borderSide: BorderSide(color: AppTheme.border),
+                              ),
+                              focusedBorder: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(12),
+                                borderSide: BorderSide(color: AppTheme.primary, width: 1.5),
+                              ),
+                            ),
                           ),
-                          enabledBorder: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(12),
-                            borderSide: BorderSide(color: AppTheme.border),
-                          ),
-                          focusedBorder: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(12),
-                            borderSide: BorderSide(color: AppTheme.primary),
-                          ),
+                        );
+
+                        if (isWide) {
+                          return Row(
+                            children: [
+                              Expanded(
+                                child: ConstrainedBox(
+                                  constraints: const BoxConstraints(maxWidth: 480),
+                                  child: searchField,
+                                ),
+                              ),
+                              const SizedBox(width: 12),
+                              if (_selectedSection != 'All Sections') ...[
+                                Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                                  decoration: BoxDecoration(
+                                    color: AppTheme.primary.withValues(alpha: 0.10),
+                                    borderRadius: BorderRadius.circular(10),
+                                    border: Border.all(color: AppTheme.primary.withValues(alpha: 0.28)),
+                                  ),
+                                  child: Row(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      Icon(Icons.filter_alt_rounded, size: 14, color: AppTheme.primary),
+                                      const SizedBox(width: 4),
+                                      Text(
+                                        'Section: ${_cleanSectionName(_selectedSection)}',
+                                        style: TextStyle(
+                                          fontSize: 12,
+                                          fontWeight: FontWeight.w600,
+                                          color: AppTheme.primary,
+                                        ),
+                                      ),
+                                      const SizedBox(width: 6),
+                                      InkWell(
+                                        onTap: () => _onSelectSection('All Sections'),
+                                        child: Icon(Icons.close_rounded, size: 15, color: AppTheme.primary),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                                const SizedBox(width: 8),
+                              ],
+                              Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 11, vertical: 7),
+                                decoration: BoxDecoration(
+                                  color: AppTheme.surface,
+                                  borderRadius: BorderRadius.circular(10),
+                                  border: Border.all(color: AppTheme.border),
+                                ),
+                                child: Text(
+                                  '${students.length} ${students.length == 1 ? 'Student' : 'Students'}',
+                                  style: TextStyle(
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.w600,
+                                    color: AppTheme.textSecondary,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          );
+                        }
+
+                        return Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            searchField,
+                            if (_selectedSection != 'All Sections') ...[
+                              const SizedBox(height: 8),
+                              Row(
+                                children: [
+                                  Container(
+                                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                                    decoration: BoxDecoration(
+                                      color: AppTheme.primary.withValues(alpha: 0.10),
+                                      borderRadius: BorderRadius.circular(8),
+                                      border: Border.all(color: AppTheme.primary.withValues(alpha: 0.25)),
+                                    ),
+                                    child: Row(
+                                      mainAxisSize: MainAxisSize.min,
+                                      children: [
+                                        Icon(Icons.filter_alt_rounded, size: 13, color: AppTheme.primary),
+                                        const SizedBox(width: 4),
+                                        Text(
+                                          'Filtered: ${_cleanSectionName(_selectedSection)}',
+                                          style: TextStyle(
+                                            fontSize: 11.5,
+                                            fontWeight: FontWeight.w600,
+                                            color: AppTheme.primary,
+                                          ),
+                                        ),
+                                        const SizedBox(width: 6),
+                                        InkWell(
+                                          onTap: () => _onSelectSection('All Sections'),
+                                          child: Icon(Icons.close_rounded, size: 14, color: AppTheme.primary),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                  const Spacer(),
+                                  Text(
+                                    '${students.length} ${students.length == 1 ? 'Student' : 'Students'}',
+                                    style: TextStyle(fontSize: 11.5, color: AppTheme.textSecondary),
+                                  ),
+                                ],
+                              ),
+                            ],
+                          ],
+                        );
+                      },
+                    ),
+
+                    // Fallback Filter chips row only if handledSections is empty
+                    if (handledSections.isEmpty && combinedSections.length > 1) ...[
+                      const SizedBox(height: 10),
+                      SingleChildScrollView(
+                        scrollDirection: Axis.horizontal,
+                        physics: const BouncingScrollPhysics(),
+                        child: Row(
+                          children: combinedSections.map((sec) {
+                            final isSelected = _selectedSection.toLowerCase() == sec.toLowerCase();
+                            return Padding(
+                              padding: const EdgeInsets.only(right: 8),
+                              child: FilterChip(
+                                label: Text(sec),
+                                selected: isSelected,
+                                onSelected: (_) => _onSelectSection(sec),
+                                backgroundColor: AppTheme.surface,
+                                selectedColor: AppTheme.primary.withValues(alpha: 0.15),
+                                labelStyle: TextStyle(
+                                  fontSize: 12,
+                                  fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+                                  color: isSelected ? AppTheme.primary : AppTheme.text,
+                                ),
+                                side: BorderSide(
+                                  color: isSelected ? AppTheme.primary : AppTheme.border,
+                                ),
+                                padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 0),
+                              ),
+                            );
+                          }).toList(),
                         ),
                       ),
-                    ),
-                    const SizedBox(height: 10),
-
-                    // Filter chips row
-                    SingleChildScrollView(
-                      scrollDirection: Axis.horizontal,
-                      child: Row(
-                        children: combinedSections.map((sec) {
-                          final isSelected = _selectedSection.toLowerCase() == sec.toLowerCase();
-                          return Padding(
-                            padding: const EdgeInsets.only(right: 8),
-                            child: FilterChip(
-                              label: Text(sec),
-                              selected: isSelected,
-                              onSelected: (_) => _onSelectSection(sec),
-                              backgroundColor: AppTheme.surface,
-                              selectedColor: AppTheme.primary.withValues(alpha: 0.15),
-                              labelStyle: TextStyle(
-                                fontSize: 12,
-                                fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
-                                color: isSelected ? AppTheme.primary : AppTheme.text,
-                              ),
-                              side: BorderSide(
-                                color: isSelected ? AppTheme.primary : AppTheme.border,
-                              ),
-                              padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 0),
-                            ),
-                          );
-                        }).toList(),
-                      ),
-                    ),
+                    ],
                   ],
                 ),
               ),
-
-              // Active Section Banner (when a specific section is chosen)
-              if (_selectedSection != 'All Sections')
-                Container(
-                  margin: const EdgeInsets.fromLTRB(20, 0, 20, 8),
-                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-                  decoration: BoxDecoration(
-                    color: AppTheme.primary.withValues(alpha: 0.08),
-                    borderRadius: BorderRadius.circular(10),
-                    border: Border.all(color: AppTheme.primary.withValues(alpha: 0.25)),
-                  ),
-                  child: Row(
-                    children: [
-                      Icon(Icons.layers, color: AppTheme.primary, size: 18),
-                      const SizedBox(width: 10),
-                      Expanded(
-                        child: Text(
-                          'Showing students in section: $_selectedSection',
-                          style: TextStyle(
-                            fontSize: 12,
-                            fontWeight: FontWeight.w600,
-                            color: AppTheme.text,
-                          ),
-                        ),
-                      ),
-                      TextButton.icon(
-                        icon: const Icon(Icons.close, size: 14),
-                        label: const Text('Clear Filter', style: TextStyle(fontSize: 11)),
-                        style: TextButton.styleFrom(
-                          foregroundColor: AppTheme.primary,
-                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                          minimumSize: Size.zero,
-                          tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                        ),
-                        onPressed: () => _onSelectSection('All Sections'),
-                      ),
-                    ],
-                  ),
-                ),
 
               Divider(height: 1, color: AppTheme.border),
 
@@ -455,8 +563,8 @@ class _TeacherStudentsScreenState extends ConsumerState<TeacherStudentsScreen> {
                             return GridView.builder(
                               padding: EdgeInsets.fromLTRB(20, 12, 20, bottomPad),
                               gridDelegate: const SliverGridDelegateWithMaxCrossAxisExtent(
-                                maxCrossAxisExtent: 540,
-                                mainAxisExtent: 114,
+                                maxCrossAxisExtent: 480,
+                                mainAxisExtent: 118,
                                 crossAxisSpacing: 14,
                                 mainAxisSpacing: 12,
                               ),
@@ -591,7 +699,7 @@ class _TeacherStudentsScreenState extends ConsumerState<TeacherStudentsScreen> {
                         borderRadius: BorderRadius.circular(6),
                       ),
                       child: Text(
-                        grade.isNotEmpty ? '$section · $grade' : section,
+                        _formatSectionBadge(section, grade),
                         style: TextStyle(
                           fontSize: 10.5,
                           fontWeight: FontWeight.w600,
@@ -720,79 +828,112 @@ class _TeacherStudentsScreenState extends ConsumerState<TeacherStudentsScreen> {
     required VoidCallback onTap,
     bool isAllCard = false,
   }) {
-    return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        width: 140,
-        margin: const EdgeInsets.only(right: 10),
-        padding: const EdgeInsets.all(10),
-        decoration: BoxDecoration(
-          color: isSelected ? AppTheme.primary.withValues(alpha: 0.12) : AppTheme.surface,
-          borderRadius: BorderRadius.circular(12),
-          border: Border.all(
-            color: isSelected ? AppTheme.primary : AppTheme.border,
-            width: isSelected ? 1.5 : 1.0,
+    final displayName = isAllCard ? 'All Sections' : _cleanSectionName(name);
+    final displayGrade = isAllCard
+        ? 'All Levels'
+        : (grade.isNotEmpty ? grade : (name.startsWith('Grade') ? name.split('-').first.trim() : 'Section'));
+
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: () {
+          HapticFeedback.selectionClick();
+          onTap();
+        },
+        borderRadius: BorderRadius.circular(14),
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 200),
+          constraints: const BoxConstraints(minWidth: 165),
+          margin: const EdgeInsets.only(right: 10),
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+          decoration: BoxDecoration(
+            color: isSelected ? AppTheme.primary.withValues(alpha: 0.12) : AppTheme.surface,
+            borderRadius: BorderRadius.circular(14),
+            border: Border.all(
+              color: isSelected ? AppTheme.primary : AppTheme.border,
+              width: isSelected ? 1.6 : 1.0,
+            ),
+            boxShadow: [
+              BoxShadow(
+                color: isSelected
+                    ? AppTheme.primary.withValues(alpha: 0.12)
+                    : Colors.black.withValues(alpha: 0.03),
+                blurRadius: isSelected ? 8 : 4,
+                offset: const Offset(0, 2),
+              ),
+            ],
           ),
-          boxShadow: isSelected
-              ? [
-                  BoxShadow(
-                    color: AppTheme.primary.withValues(alpha: 0.1),
-                    blurRadius: 6,
-                    offset: const Offset(0, 2),
-                  ),
-                ]
-              : null,
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Row(
-              children: [
-                Icon(
-                  isAllCard ? Icons.grid_view_rounded : Icons.layers,
-                  size: 16,
-                  color: isSelected ? AppTheme.primary : AppTheme.textSecondary,
-                ),
-                const SizedBox(width: 6),
-                Expanded(
-                  child: Text(
-                    name,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: TextStyle(
-                      fontWeight: FontWeight.bold,
-                      fontSize: 13,
-                      color: isSelected ? AppTheme.primary : AppTheme.text,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(5),
+                    decoration: BoxDecoration(
+                      color: isSelected
+                          ? AppTheme.primary.withValues(alpha: 0.20)
+                          : AppTheme.border.withValues(alpha: 0.35),
+                      borderRadius: BorderRadius.circular(7),
+                    ),
+                    child: Icon(
+                      isAllCard ? Icons.grid_view_rounded : Icons.layers_rounded,
+                      size: 15,
+                      color: isSelected ? AppTheme.primary : AppTheme.textSecondary,
                     ),
                   ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 4),
-            Text(
-              grade,
-              style: TextStyle(fontSize: 10, color: AppTheme.textSecondary),
-            ),
-            const SizedBox(height: 4),
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-              decoration: BoxDecoration(
-                color: isSelected
-                    ? AppTheme.primary.withValues(alpha: 0.2)
-                    : AppTheme.border.withValues(alpha: 0.4),
-                borderRadius: BorderRadius.circular(4),
+                  const SizedBox(width: 8),
+                  Text(
+                    displayName,
+                    style: TextStyle(
+                      fontWeight: FontWeight.bold,
+                      fontSize: 13.5,
+                      color: isSelected ? AppTheme.primary : AppTheme.text,
+                      letterSpacing: -0.2,
+                    ),
+                  ),
+                  if (isSelected) ...[
+                    const SizedBox(width: 6),
+                    Icon(Icons.check_circle_rounded, size: 14, color: AppTheme.primary),
+                  ],
+                ],
               ),
-              child: Text(
-                '$studentCount ${studentCount == 1 ? 'Student' : 'Students'}',
-                style: TextStyle(
-                  fontSize: 10,
-                  fontWeight: FontWeight.w600,
-                  color: isSelected ? AppTheme.primary : AppTheme.text,
-                ),
+              const SizedBox(height: 5),
+              Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(
+                    displayGrade,
+                    style: TextStyle(
+                      fontSize: 11,
+                      fontWeight: FontWeight.w500,
+                      color: AppTheme.textSecondary,
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+                    decoration: BoxDecoration(
+                      color: isSelected
+                          ? AppTheme.primary.withValues(alpha: 0.22)
+                          : AppTheme.border.withValues(alpha: 0.45),
+                      borderRadius: BorderRadius.circular(6),
+                    ),
+                    child: Text(
+                      '$studentCount ${studentCount == 1 ? 'Student' : 'Students'}',
+                      style: TextStyle(
+                        fontSize: 10,
+                        fontWeight: FontWeight.w600,
+                        color: isSelected ? AppTheme.primary : AppTheme.text,
+                      ),
+                    ),
+                  ),
+                ],
               ),
-            ),
-          ],
+            ],
+          ),
         ),
       ),
     );

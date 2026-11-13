@@ -1826,13 +1826,28 @@ class _AdminWebTeachersScreenState extends ConsumerState<AdminWebTeachersScreen>
   Future<void> _openAddTeacherDialog(BuildContext context, List<Map<String, dynamic>> availableSubjects) async {
     final nextId = await DatabaseHelper().generateNextTeacherId();
     final teacherIdCtrl = TextEditingController(text: nextId);
-    final nameCtrl = TextEditingController();
+    final firstNameCtrl = TextEditingController();
+    final middleNameCtrl = TextEditingController();
+    final lastNameCtrl = TextEditingController();
+    String selectedSuffix = 'None';
+    const suffixOptions = ['None', 'Jr.', 'Sr.', 'II', 'III', 'IV', 'V'];
     final emailCtrl = TextEditingController();
     final usernameCtrl = TextEditingController();
     final passwordCtrl = TextEditingController(text: _generateAutoTeacherPassword());
     final selectedSubjectIds = <int>{};
     final formKey = GlobalKey<FormState>();
     bool obscurePassword = false;
+
+    String normalizeNamePart(String input) {
+      final trimmed = input.trim().replaceAll(RegExp(r'\s+'), ' ');
+      if (trimmed.isEmpty) return '';
+      return trimmed.split(' ').map((word) {
+        if (word.isEmpty) return '';
+        final lower = word.toLowerCase();
+        if (['de', 'la', 'del', 'san', 'van', 'von'].contains(lower)) return lower;
+        return word[0].toUpperCase() + word.substring(1).toLowerCase();
+      }).join(' ');
+    }
 
     if (!mounted || !context.mounted) return;
 
@@ -1898,21 +1913,97 @@ class _AdminWebTeachersScreenState extends ConsumerState<AdminWebTeachersScreen>
                           },
                         ),
                         const SizedBox(height: 14),
-                        TextFormField(
-                          controller: nameCtrl,
-                          maxLength: 50,
-                          buildCounter: (context, {required currentLength, required isFocused, maxLength}) => null,
-                          style: TextStyle(color: AppTheme.text, fontSize: 14),
-                          decoration: InputDecoration(
-                            labelText: 'Full Name (e.g. Sir Juan Luna)',
-                            labelStyle: TextStyle(color: AppTheme.textSecondary, fontSize: 13),
-                            counterText: '',
-                            prefixIcon: Icon(Icons.person_outline, size: 20, color: AppTheme.textMuted),
-                            filled: true,
-                            fillColor: AppTheme.background,
-                            border: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: BorderSide(color: AppTheme.border)),
-                          ),
-                          validator: (v) => v == null || v.trim().isEmpty ? 'Please enter teacher full name' : null,
+                        // 1. First Name & Middle Name (Optional)
+                        Row(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Expanded(
+                              flex: 6,
+                              child: TextFormField(
+                                controller: firstNameCtrl,
+                                maxLength: 35,
+                                textCapitalization: TextCapitalization.words,
+                                buildCounter: (context, {required currentLength, required isFocused, maxLength}) => null,
+                                style: TextStyle(color: AppTheme.text, fontSize: 14),
+                                decoration: InputDecoration(
+                                  labelText: 'First Name *',
+                                  hintText: 'e.g. Juan',
+                                  labelStyle: TextStyle(color: AppTheme.textSecondary, fontSize: 13),
+                                  counterText: '',
+                                  prefixIcon: Icon(Icons.person_outline, size: 20, color: AppTheme.textMuted),
+                                  filled: true,
+                                  fillColor: AppTheme.background,
+                                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: BorderSide(color: AppTheme.border)),
+                                ),
+                                validator: (v) => v == null || v.trim().isEmpty ? 'Please enter first name' : null,
+                              ),
+                            ),
+                            const SizedBox(width: 10),
+                            Expanded(
+                              flex: 5,
+                              child: TextFormField(
+                                controller: middleNameCtrl,
+                                maxLength: 30,
+                                textCapitalization: TextCapitalization.words,
+                                buildCounter: (context, {required currentLength, required isFocused, maxLength}) => null,
+                                style: TextStyle(color: AppTheme.text, fontSize: 14),
+                                decoration: InputDecoration(
+                                  labelText: 'Middle Name (Optional)',
+                                  hintText: 'e.g. Novicio',
+                                  labelStyle: TextStyle(color: AppTheme.textSecondary, fontSize: 13),
+                                  counterText: '',
+                                  filled: true,
+                                  fillColor: AppTheme.background,
+                                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: BorderSide(color: AppTheme.border)),
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 14),
+                        // 2. Surname / Last Name & Suffix
+                        Row(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Expanded(
+                              flex: 7,
+                              child: TextFormField(
+                                controller: lastNameCtrl,
+                                maxLength: 35,
+                                textCapitalization: TextCapitalization.words,
+                                buildCounter: (context, {required currentLength, required isFocused, maxLength}) => null,
+                                style: TextStyle(color: AppTheme.text, fontSize: 14),
+                                decoration: InputDecoration(
+                                  labelText: 'Surname / Last Name *',
+                                  hintText: 'e.g. Luna',
+                                  labelStyle: TextStyle(color: AppTheme.textSecondary, fontSize: 13),
+                                  counterText: '',
+                                  prefixIcon: Icon(Icons.badge_outlined, size: 20, color: AppTheme.textMuted),
+                                  filled: true,
+                                  fillColor: AppTheme.background,
+                                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: BorderSide(color: AppTheme.border)),
+                                ),
+                                validator: (v) => v == null || v.trim().isEmpty ? 'Please enter surname' : null,
+                              ),
+                            ),
+                            const SizedBox(width: 10),
+                            Expanded(
+                              flex: 4,
+                              child: DropdownButtonFormField<String>(
+                                initialValue: selectedSuffix,
+                                style: TextStyle(color: AppTheme.text, fontSize: 14),
+                                decoration: InputDecoration(
+                                  labelText: 'Suffix',
+                                  labelStyle: TextStyle(color: AppTheme.textSecondary, fontSize: 13),
+                                  filled: true,
+                                  fillColor: AppTheme.background,
+                                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: BorderSide(color: AppTheme.border)),
+                                ),
+                                items: suffixOptions.map((s) => DropdownMenuItem(value: s, child: Text(s))).toList(),
+                                onChanged: (val) => setDialogState(() => selectedSuffix = val ?? 'None'),
+                              ),
+                            ),
+                          ],
                         ),
                         const SizedBox(height: 14),
                         TextFormField(
@@ -2166,13 +2257,25 @@ class _AdminWebTeachersScreenState extends ConsumerState<AdminWebTeachersScreen>
                 ElevatedButton(
                   onPressed: () async {
                     if (!formKey.currentState!.validate()) return;
+                    final cleanFirst = normalizeNamePart(firstNameCtrl.text);
+                    final cleanMiddle = normalizeNamePart(middleNameCtrl.text);
+                    final cleanLast = normalizeNamePart(lastNameCtrl.text);
+                    final sfx = (selectedSuffix != 'None' && selectedSuffix.isNotEmpty) ? ' $selectedSuffix' : '';
+                    final computedFullName = cleanMiddle.isNotEmpty
+                        ? '$cleanFirst $cleanMiddle $cleanLast$sfx'
+                        : '$cleanFirst $cleanLast$sfx';
+
+                    final autoUsername = (usernameCtrl.text.trim().isNotEmpty)
+                        ? usernameCtrl.text.trim()
+                        : '${cleanFirst.toLowerCase().split(' ').first}.${cleanLast.toLowerCase().replaceAll(' ', '')}';
+
                     try {
                       final createdTid = await ref.read(adminTeachersProvider.notifier).addTeacher(
                             id: teacherIdCtrl.text.trim().isNotEmpty ? teacherIdCtrl.text.trim() : null,
-                            fullName: nameCtrl.text.trim(),
+                            fullName: computedFullName,
                             email: emailCtrl.text.trim(),
                             password: passwordCtrl.text.trim(),
-                            username: usernameCtrl.text.trim().isNotEmpty ? usernameCtrl.text.trim() : null,
+                            username: autoUsername,
                             assignSubjectIds: selectedSubjectIds.toList(),
                           );
                       final emailResult = EmailService.lastResult;
@@ -2195,9 +2298,9 @@ class _AdminWebTeachersScreenState extends ConsumerState<AdminWebTeachersScreen>
                                   child: Text(
                                     emailSent
                                         ? (isQueued
-                                            ? 'Faculty "${nameCtrl.text.trim()}" ($finalTeacherId) onboarded! Credentials queued for delivery to ${emailCtrl.text.trim()} via Gmail SMTP.'
-                                            : 'Faculty "${nameCtrl.text.trim()}" ($finalTeacherId) onboarded! Credentials sent to ${emailCtrl.text.trim()} via Gmail SMTP!')
-                                        : 'Faculty "${nameCtrl.text.trim()}" ($finalTeacherId) created! Note: SMTP email could not be delivered (${emailResult?.message ?? "SMTP bridge error"}). You can resend anytime using the Resend button.',
+                                            ? 'Faculty "$computedFullName" ($finalTeacherId) onboarded! Credentials queued for delivery to ${emailCtrl.text.trim()} via Gmail SMTP.'
+                                            : 'Faculty "$computedFullName" ($finalTeacherId) onboarded! Credentials sent to ${emailCtrl.text.trim()} via Gmail SMTP!')
+                                        : 'Faculty "$computedFullName" ($finalTeacherId) created! Note: SMTP email could not be delivered (${emailResult?.message ?? "SMTP bridge error"}). You can resend anytime using the Resend button.',
                                   ),
                                 ),
                               ],
@@ -2209,7 +2312,7 @@ class _AdminWebTeachersScreenState extends ConsumerState<AdminWebTeachersScreen>
                                     onPressed: () {
                                       _resendTeacherCredentialsDialog(context, {
                                         'id': teacherIdCtrl.text.trim(),
-                                        'full_name': nameCtrl.text.trim(),
+                                        'full_name': computedFullName,
                                         'email': emailCtrl.text.trim(),
                                       });
                                     },
@@ -3239,12 +3342,13 @@ class _AdminWebTeachersScreenState extends ConsumerState<AdminWebTeachersScreen>
                         title: 'Permanently Deleting Faculty Record',
                         initialMessage: 'Purging faculty records and cloud database...',
                         task: (updateProgress) async {
-                          updateProgress(0.4, 'Unassigning courses and removing credentials...');
                           await ref
                               .read(adminArchivedTeachersProvider.notifier)
-                              .permanentDeleteTeacher(teacherId)
+                              .permanentDeleteTeacher(
+                                teacherId,
+                                onProgress: updateProgress,
+                              )
                               .timeout(const Duration(seconds: 10));
-                          updateProgress(1.0, 'Faculty record purged permanently!');
                         },
                       );
                       setState(() => _selectedTeacherIds.remove(teacherId));

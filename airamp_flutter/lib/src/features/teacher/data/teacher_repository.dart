@@ -185,6 +185,21 @@ final teacherHandledSectionsProvider = FutureProvider<List<String>>((ref) async 
   return await DatabaseHelper().getSectionsForTeacher(teacherId);
 });
 
+// Teacher Handled Sections For Specific Subject Provider
+final subjectHandledSectionsProvider = FutureProvider.family<List<String>, int?>((ref, subjectId) async {
+  if (subjectId != null && subjectId > 0) {
+    final subjectSections = await DatabaseHelper().getSectionsForSubject(subjectId);
+    if (subjectSections.isNotEmpty) {
+      return subjectSections;
+    }
+  }
+  // Fallback to all sections for teacher if subject has no enrolled sections yet
+  final user = ref.watch(authProvider);
+  final teacherId = user?.id;
+  if (teacherId == null) return [];
+  return await DatabaseHelper().getSectionsForTeacher(teacherId);
+});
+
 // Teacher Handled Sections Details Provider (counts, subjects, rooms)
 final teacherHandledSectionsDetailsProvider = FutureProvider<List<Map<String, dynamic>>>((ref) async {
   final user = ref.watch(authProvider);
@@ -295,6 +310,50 @@ final teacherQuizzesForAnalysisProvider = FutureProvider.autoDispose.family<List
 final quizItemAnalysisProvider = FutureProvider.autoDispose.family<ItemAnalysisReport, int>((ref, quizId) async {
   return await DatabaseHelper().calculateQuizItemAnalysis(quizId);
 });
+
+// --- Competency Mastery Heatmap Providers ---
+
+class CompetencyHeatmapParams {
+  final String? teacherId;
+  final int? subjectId;
+  final String? section;
+  final String? studentId;
+
+  const CompetencyHeatmapParams({
+    this.teacherId,
+    this.subjectId,
+    this.section,
+    this.studentId,
+  });
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is CompetencyHeatmapParams &&
+          runtimeType == other.runtimeType &&
+          teacherId == other.teacherId &&
+          subjectId == other.subjectId &&
+          section == other.section &&
+          studentId == other.studentId;
+
+  @override
+  int get hashCode =>
+      teacherId.hashCode ^
+      subjectId.hashCode ^
+      section.hashCode ^
+      studentId.hashCode;
+}
+
+final competencyHeatmapProvider = FutureProvider.autoDispose
+    .family<Map<String, dynamic>, CompetencyHeatmapParams>((ref, params) async {
+  return await DatabaseHelper().getCompetencyMasteryHeatmapData(
+    teacherId: params.teacherId,
+    subjectId: params.subjectId,
+    section: params.section,
+    studentId: params.studentId,
+  );
+});
+
 
 
 

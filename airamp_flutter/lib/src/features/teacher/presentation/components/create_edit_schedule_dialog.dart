@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../core/animations/app_transitions.dart';
+import '../../../../core/components/aira_action_toast.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../../core/database/database_helper.dart';
 import '../../../admin/data/admin_repository.dart';
@@ -204,14 +205,20 @@ class _CreateEditScheduleDialogState extends ConsumerState<CreateEditScheduleDia
   Future<void> _save() async {
     if (!_formKey.currentState!.validate()) return;
     if (_selectedTeacherId == null || _selectedTeacherName == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Please select an instructor/teacher to assign')),
+      AiraActionToast.show(
+        context,
+        title: 'Teacher Required',
+        message: 'Please select an instructor/teacher to assign.',
+        type: AiraToastType.warning,
       );
       return;
     }
     if (_selectedSubjectId == null || _selectedSubjectName == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Please select a subject for this class')),
+      AiraActionToast.show(
+        context,
+        title: 'Subject Required',
+        message: 'Please select a subject for this class.',
+        type: AiraToastType.warning,
       );
       return;
     }
@@ -219,8 +226,11 @@ class _CreateEditScheduleDialogState extends ConsumerState<CreateEditScheduleDia
         ? _customSectionController.text.trim()
         : (_selectedSection?.trim() ?? '');
     if (sectionToSave.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Please select or specify a class section')),
+      AiraActionToast.show(
+        context,
+        title: 'Section Required',
+        message: 'Please select or specify a class section.',
+        type: AiraToastType.warning,
       );
       return;
     }
@@ -314,15 +324,12 @@ class _CreateEditScheduleDialogState extends ConsumerState<CreateEditScheduleDia
 
       if (!mounted) return;
       Navigator.of(context).pop(true);
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-            widget.initialSchedule != null
-                ? 'Class schedule updated successfully'
-                : 'Schedule assigned to $_selectedTeacherName successfully',
-          ),
-          backgroundColor: AppTheme.success,
-        ),
+      AiraActionToast.showSuccess(
+        context,
+        title: widget.initialSchedule != null ? 'Schedule Updated' : 'Schedule Assigned',
+        message: widget.initialSchedule != null
+            ? 'Class schedule updated successfully.'
+            : 'Schedule assigned to $_selectedTeacherName successfully.',
       );
     } catch (e) {
       if (mounted) {

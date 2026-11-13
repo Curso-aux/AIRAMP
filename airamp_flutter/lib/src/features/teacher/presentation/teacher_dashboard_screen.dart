@@ -10,7 +10,7 @@ import '../../auth/application/auth_provider.dart';
 import '../data/teacher_repository.dart';
 import 'components/post_announcement_dialog.dart';
 import 'components/assignment_roster_dialog.dart';
-import 'components/create_assignment_dialog.dart';
+import 'components/quiz_item_analysis_dialog.dart';
 import 'components/class_overview_widget.dart';
 import '../../../core/database/database_helper.dart';
 import '../../../core/utils/announcement_helper.dart';
@@ -23,7 +23,6 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../../../core/components/analytics_donut_chart.dart';
 import '../../submissions/data/submissions_repository.dart';
 import '../../esp32_hub/presentation/teacher_esp32_hub_modal.dart';
-import '../../../core/components/global_dashboard_filter_bar.dart';
 import '../../../core/components/kpi_summary_card.dart';
 import '../../../core/components/lo_mastery_matrix.dart';
 
@@ -628,27 +627,6 @@ class _TeacherDashboardScreenState extends ConsumerState<TeacherDashboardScreen>
             ],
           ),
           const Spacer(),
-          ElevatedButton.icon(
-            onPressed: () {
-              showDialog(
-                context: context,
-                builder: (ctx) => const CreateAssignmentDialog(),
-              ).then((_) {
-                ref.invalidate(teacherSubjectsProvider);
-                ref.invalidate(teacherRecentSubmissionsProvider(currentUser?.id ?? ''));
-              });
-            },
-            icon: const Icon(Icons.add_task, size: 16),
-            label: const Text('Create Assignment', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
-            style: ElevatedButton.styleFrom(
-              backgroundColor: AppTheme.primary,
-              foregroundColor: Colors.black,
-              elevation: 0,
-              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(9)),
-            ),
-          ),
-          const SizedBox(width: 10),
           ElevatedButton.icon(
             onPressed: () => _showAnalyticsModal(context),
             icon: const Icon(Icons.bar_chart_rounded, size: 16),
@@ -1290,18 +1268,6 @@ class _TeacherDashboardScreenState extends ConsumerState<TeacherDashboardScreen>
                     ),
                   ),
                 ),
-                TextButton.icon(
-                  onPressed: () {
-                    showDialog(
-                      context: context,
-                      builder: (ctx) => const CreateAssignmentDialog(),
-                    ).then((_) {
-                      ref.invalidate(teacherRecentSubmissionsProvider(teacherId));
-                    });
-                  },
-                  icon: const Icon(Icons.add_task, size: 16),
-                  label: const Text('New Assignment', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
-                ),
               ],
             ),
             const SizedBox(height: 8),
@@ -1793,25 +1759,12 @@ class _TeacherDashboardScreenState extends ConsumerState<TeacherDashboardScreen>
         const SizedBox(height: 14),
 
         // View Content based on _analyticsViewIndex (0: Cards, 1: Donut Breakdown, 2: Performance Mastery, 3: LO Heatmap Matrix)
-        if (_analyticsViewIndex == 3) ...[
-          GlobalDashboardFilterBar(
-            compact: true,
-            customSections: ['All Sections', ...handledSections],
-            selectedSection: _analyticsSectionFilter == 'All Handled Sections' ? 'All Sections' : _analyticsSectionFilter,
-            onSectionChanged: (sec) {
-              setState(() {
-                _analyticsSectionFilter = sec == 'All Sections' ? 'All Handled Sections' : sec;
-              });
-              ref.read(teacherDashboardProvider.notifier).reload(
-                section: _analyticsSectionFilter,
-                studentId: _analyticsStudentFilter,
-              );
-              onStateChanged?.call();
-            },
-          ),
-          const SizedBox(height: 14),
-          const LoMasteryMatrix(),
-        ]
+        if (_analyticsViewIndex == 3)
+          LoMasteryMatrix(
+            teacherId: ref.watch(authProvider)?.id,
+            initialSection: effectiveSection == 'All Handled Sections' ? null : effectiveSection,
+            initialStudentId: effectiveStudentId == 'All' ? null : effectiveStudentId,
+          )
         else if (_analyticsViewIndex == 1)
           _buildTeacherDonutView(
             totalSubjects: totalSubjects,
@@ -2589,12 +2542,55 @@ class _TeacherDashboardScreenState extends ConsumerState<TeacherDashboardScreen>
     required bool isDark,
   }) {
     final milestones = _buildGrowthMilestones(recentAttempts, avgScore);
+
+    if (milestones.isEmpty) {
+      return Container(
+        padding: const EdgeInsets.all(20),
+        decoration: BoxDecoration(
+          color: AppTheme.surface,
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(
+            color: isDark ? AppTheme.darkBorder : const Color(0xFFE2E8F0),
+            width: 1.0,
+          ),
+        ),
+        child: Row(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(10),
+              decoration: BoxDecoration(
+                color: AppTheme.primary.withValues(alpha: 0.12),
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: Icon(Icons.show_chart_rounded, color: AppTheme.primary, size: 22),
+            ),
+            const SizedBox(width: 14),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Score Mastery & Assessment Timeline',
+                    style: TextStyle(fontSize: 13.5, fontWeight: FontWeight.bold, color: AppTheme.text),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    'No completed student quiz attempts recorded yet. As students take quizzes, their actual score progression will be charted here.',
+                    style: TextStyle(fontSize: 11.5, color: AppTheme.textSecondary, height: 1.35),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+
     final scores = milestones.map((m) => m.score).toList();
     final firstScore = scores.first;
     final lastScore = scores.last;
     final maxScore = scores.reduce((a, b) => a > b ? a : b);
-    final netGrowth = lastScore - firstScore;
-    final isReal = recentAttempts.length >= 3;
+    final netGrowth = milestones.length > 1 ? (lastScore - firstScore) : 0.0;
 
     return Container(
       decoration: BoxDecoration(
@@ -2646,7 +2642,7 @@ class _TeacherDashboardScreenState extends ConsumerState<TeacherDashboardScreen>
                   mainAxisSize: MainAxisSize.min,
                   children: [
                     Text(
-                      'Score Mastery & Growth Trajectory',
+                      'Score Mastery & Assessment Timeline',
                       style: TextStyle(
                         fontSize: 13.5,
                         fontWeight: FontWeight.bold,
@@ -2656,9 +2652,7 @@ class _TeacherDashboardScreenState extends ConsumerState<TeacherDashboardScreen>
                     ),
                     const SizedBox(height: 2),
                     Text(
-                      isReal
-                          ? 'Official assessment timeline & milestone mastery'
-                          : 'Curriculum mastery progression & learning curve',
+                      'Actual assessment progression across ${milestones.length} recorded attempt(s)',
                       style: TextStyle(
                         fontSize: 11,
                         color: AppTheme.textSecondary,
@@ -2681,20 +2675,31 @@ class _TeacherDashboardScreenState extends ConsumerState<TeacherDashboardScreen>
                 child: Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    Icon(
-                      netGrowth >= 0 ? Icons.trending_up_rounded : Icons.trending_down_rounded,
-                      size: 13,
-                      color: isDark ? AppTheme.darkTextSecondary : const Color(0xFF475569),
-                    ),
-                    const SizedBox(width: 4),
-                    Text(
-                      '${netGrowth >= 0 ? '+' : ''}${netGrowth.toStringAsFixed(1)}%',
-                      style: TextStyle(
-                        fontSize: 10.5,
-                        fontWeight: FontWeight.w700,
-                        color: isDark ? AppTheme.darkText : const Color(0xFF1E293B),
+                    if (milestones.length > 1) ...[
+                      Icon(
+                        netGrowth >= 0 ? Icons.trending_up_rounded : Icons.trending_down_rounded,
+                        size: 13,
+                        color: isDark ? AppTheme.darkTextSecondary : const Color(0xFF475569),
                       ),
-                    ),
+                      const SizedBox(width: 4),
+                      Text(
+                        '${netGrowth >= 0 ? '+' : ''}${netGrowth.toStringAsFixed(1)}%',
+                        style: TextStyle(
+                          fontSize: 10.5,
+                          fontWeight: FontWeight.w700,
+                          color: isDark ? AppTheme.darkText : const Color(0xFF1E293B),
+                        ),
+                      ),
+                    ] else ...[
+                      Text(
+                        '${lastScore.toStringAsFixed(0)}% Score',
+                        style: TextStyle(
+                          fontSize: 10.5,
+                          fontWeight: FontWeight.w700,
+                          color: AppTheme.primary,
+                        ),
+                      ),
+                    ],
                   ],
                 ),
               ),
@@ -2708,9 +2713,9 @@ class _TeacherDashboardScreenState extends ConsumerState<TeacherDashboardScreen>
             children: [
               Expanded(
                 child: _buildGrowthKpiCard(
-                  label: 'Baseline Score',
+                  label: 'Initial Score',
                   value: '${firstScore.toStringAsFixed(0)}%',
-                  subtitle: 'Initial milestone',
+                  subtitle: milestones.length > 1 ? 'First attempt' : 'Single assessment',
                   isDark: isDark,
                 ),
               ),
@@ -2719,7 +2724,7 @@ class _TeacherDashboardScreenState extends ConsumerState<TeacherDashboardScreen>
                 child: _buildGrowthKpiCard(
                   label: 'Peak Score',
                   value: '${maxScore.toStringAsFixed(0)}%',
-                  subtitle: 'Highest surge',
+                  subtitle: 'Highest score',
                   isDark: isDark,
                   badge: 'Peak',
                 ),
@@ -2727,9 +2732,9 @@ class _TeacherDashboardScreenState extends ConsumerState<TeacherDashboardScreen>
               const SizedBox(width: 8),
               Expanded(
                 child: _buildGrowthKpiCard(
-                  label: 'Latest Mastery',
+                  label: 'Latest Score',
                   value: '${lastScore.toStringAsFixed(0)}%',
-                  subtitle: '${scores.length} milestones',
+                  subtitle: '${milestones.length} attempt${milestones.length == 1 ? '' : 's'}',
                   isDark: isDark,
                 ),
               ),
@@ -2738,7 +2743,7 @@ class _TeacherDashboardScreenState extends ConsumerState<TeacherDashboardScreen>
 
           const SizedBox(height: 14),
 
-          // Interactive Up and Down Growth Graph
+          // Interactive Growth Graph
           _MasteryGrowthGraphWidget(
             milestones: milestones,
             isDark: isDark,
@@ -2746,7 +2751,7 @@ class _TeacherDashboardScreenState extends ConsumerState<TeacherDashboardScreen>
 
           const SizedBox(height: 12),
 
-          // Executive Growth Insight Strip
+          // Growth Insight Strip
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 11, vertical: 7),
             decoration: BoxDecoration(
@@ -2766,9 +2771,11 @@ class _TeacherDashboardScreenState extends ConsumerState<TeacherDashboardScreen>
                 const SizedBox(width: 6),
                 Expanded(
                   child: Text(
-                    netGrowth >= 0
-                        ? 'Continuous upward trajectory with mastery spikes across review milestones.'
-                        : 'Score fluctuations detected; review recommended on foundational modules.',
+                    milestones.length == 1
+                        ? 'Single assessment recorded: ${lastScore.toStringAsFixed(0)}% (${lastScore >= 75 ? 'DepEd standard met' : 'Remediation suggested'}).'
+                        : (netGrowth >= 0
+                            ? 'Positive progression: Score mastery has improved by +${netGrowth.toStringAsFixed(1)}% across recent assessments.'
+                            : 'Score variance detected across assessments (-${netGrowth.abs().toStringAsFixed(1)}%); review recommended on foundational modules.'),
                     style: TextStyle(
                       fontSize: 10.5,
                       fontWeight: FontWeight.w500,
@@ -2854,44 +2861,47 @@ class _TeacherDashboardScreenState extends ConsumerState<TeacherDashboardScreen>
   }
 
   List<_GrowthMilestone> _buildGrowthMilestones(List<Map<String, dynamic>> recentAttempts, int avgScore) {
-    if (recentAttempts.length >= 3) {
-      final chronological = recentAttempts.reversed.take(7).toList();
-      return List.generate(chronological.length, (index) {
-        final item = chronological[index];
-        final pct = (item['percentage'] as num?)?.toDouble() ?? 0.0;
-        final rawTitle = (item['quiz_title'] as String?) ?? (item['subject_name'] as String?) ?? 'Assessment ${index + 1}';
-        final short = 'A${index + 1}';
-        return _GrowthMilestone(
-          label: rawTitle,
-          shortCode: short,
-          score: pct.clamp(0.0, 100.0),
-          date: 'Milestone ${index + 1}',
-        );
-      });
+    if (recentAttempts.isEmpty) {
+      return [];
     }
 
-    // Realistic curriculum growth trajectory model (standard DepEd SHS assessment progression)
-    // Demonstrates up-and-down score dynamics as conceptual difficulty increases then improves with remediation
-    final base = avgScore > 0 ? avgScore.toDouble() : 74.0;
-    final deltas = [-10.0, 4.0, -3.5, 11.5, -2.0, 13.0, 8.5];
-    final labels = [
-      'Mod 1 (Introductory)',
-      'Quiz 1 (Foundations)',
-      'Mid-Term Diagnostic',
-      'Mod 2 (Advanced Topics)',
-      'Quiz 2 (Competencies)',
-      'Summative Examination',
-      'Current Mastery Target'
-    ];
-    final shorts = ['M-1', 'Q-1', 'Mid', 'M-2', 'Q-2', 'Exam', 'Final'];
+    // Sort chronologically ascending (oldest first to newest last)
+    final chronological = List<Map<String, dynamic>>.from(recentAttempts);
+    try {
+      chronological.sort((a, b) {
+        final dateA = a['attempted_at']?.toString() ?? '';
+        final dateB = b['attempted_at']?.toString() ?? '';
+        return dateA.compareTo(dateB);
+      });
+    } catch (_) {}
 
-    return List.generate(7, (i) {
-      final s = (base + deltas[i]).clamp(42.0, 96.0);
+    // Take up to the last 8 recent attempts for a clean timeline
+    final window = chronological.length > 8 ? chronological.sublist(chronological.length - 8) : chronological;
+
+    return List.generate(window.length, (index) {
+      final item = window[index];
+      final pct = (item['percentage'] as num?)?.toDouble() ?? 0.0;
+      final rawTitle = (item['quiz_title'] as String?) ??
+          (item['lo_title'] as String?) ??
+          (item['subject_name'] as String?) ??
+          'Assessment ${index + 1}';
+
+      String dateStr = 'Attempt ${index + 1}';
+      final iso = item['attempted_at']?.toString();
+      if (iso != null && iso.isNotEmpty) {
+        try {
+          final dt = DateTime.parse(iso).toLocal();
+          const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+          dateStr = '${months[dt.month - 1]} ${dt.day}';
+        } catch (_) {}
+      }
+
+      final short = 'A${index + 1}';
       return _GrowthMilestone(
-        label: labels[i],
-        shortCode: shorts[i],
-        score: double.parse(s.toStringAsFixed(1)),
-        date: 'Week ${i + 1}',
+        label: rawTitle,
+        shortCode: short,
+        score: pct.clamp(0.0, 100.0),
+        date: dateStr,
       );
     });
   }
@@ -3191,15 +3201,15 @@ class _TeacherDashboardScreenState extends ConsumerState<TeacherDashboardScreen>
               Container(
                 padding: const EdgeInsets.all(6),
                 decoration: BoxDecoration(
-                  color: const Color(0xFF8B5CF6).withValues(alpha: 0.12),
+                  color: AppTheme.primary.withValues(alpha: 0.12),
                   borderRadius: BorderRadius.circular(8),
                 ),
-                child: const Icon(Icons.auto_awesome_rounded, size: 16, color: Color(0xFF8B5CF6)),
+                child: Icon(Icons.health_and_safety_outlined, size: 16, color: AppTheme.primary),
               ),
               const SizedBox(width: 8),
               Expanded(
                 child: Text(
-                  'Learning Forecast & Early Support',
+                  'Class Assessment Health & Student Support',
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                   style: TextStyle(
@@ -3212,15 +3222,15 @@ class _TeacherDashboardScreenState extends ConsumerState<TeacherDashboardScreen>
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                 decoration: BoxDecoration(
-                  color: const Color(0xFF8B5CF6).withValues(alpha: 0.10),
+                  color: AppTheme.primary.withValues(alpha: 0.10),
                   borderRadius: BorderRadius.circular(8),
                 ),
-                child: const Text(
-                  'Predictive AI',
+                child: Text(
+                  'Assessment Health',
                   style: TextStyle(
                     fontSize: 10.5,
                     fontWeight: FontWeight.w700,
-                    color: Color(0xFF8B5CF6),
+                    color: AppTheme.primary,
                   ),
                 ),
               ),
@@ -3228,7 +3238,7 @@ class _TeacherDashboardScreenState extends ConsumerState<TeacherDashboardScreen>
           ),
           const SizedBox(height: 14),
 
-          // Forecast Banner
+          // Health Status Banner
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
             decoration: BoxDecoration(
@@ -3240,8 +3250,8 @@ class _TeacherDashboardScreenState extends ConsumerState<TeacherDashboardScreen>
               children: [
                 Icon(
                   forecastPassRate != null && forecastPassRate >= 75
-                      ? Icons.trending_up_rounded
-                      : (forecastPassRate != null ? Icons.trending_down_rounded : Icons.info_outline_rounded),
+                      ? Icons.check_circle_outline_rounded
+                      : (forecastPassRate != null ? Icons.error_outline_rounded : Icons.info_outline_rounded),
                   size: 20,
                   color: forecastPassRate != null && forecastPassRate >= 75
                       ? AppTheme.success
@@ -3253,9 +3263,9 @@ class _TeacherDashboardScreenState extends ConsumerState<TeacherDashboardScreen>
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        forecastPassRate != null
-                            ? 'Projected Term Pass Rate: $forecastPassRate%'
-                            : 'Performance Trajectory: Awaiting Baseline Quizzes',
+                        totalAttempts > 0
+                            ? 'Class Standard: $forecastPassRate% Overall Pass Rate'
+                            : 'Performance Baseline: Awaiting Quiz Submissions',
                         style: TextStyle(
                           fontSize: 12.5,
                           fontWeight: FontWeight.bold,
@@ -3264,11 +3274,11 @@ class _TeacherDashboardScreenState extends ConsumerState<TeacherDashboardScreen>
                       ),
                       const SizedBox(height: 2),
                       Text(
-                        forecastPassRate != null
-                            ? (forecastPassRate >= 75
-                                ? 'Class is currently on track to satisfy DepEd passing benchmarks. Keep up the momentum!'
-                                : 'Class pass trajectory is below 75%. Reviewing foundational quiz questions is recommended.')
-                            : 'Once students complete quizzes, early trend forecasting will predict term completion outcomes.',
+                        totalAttempts > 0
+                            ? (forecastPassRate != null && forecastPassRate >= 75
+                                ? 'Class is meeting the 75% DepEd passing standard across all recorded assessments.'
+                                : 'Class pass rate is below the 75% target benchmark. Reviewing difficult quiz concepts is recommended.')
+                            : 'Once students complete quizzes, real-time passing health and intervention tracking will show here.',
                         style: TextStyle(fontSize: 11, color: AppTheme.textSecondary, height: 1.3),
                       ),
                     ],
@@ -3426,7 +3436,7 @@ class _TeacherDashboardScreenState extends ConsumerState<TeacherDashboardScreen>
               const SizedBox(width: 8),
               Expanded(
                 child: Text(
-                  'Suggested Next Steps for Today',
+                  'Practical Classroom Next Steps',
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                   style: TextStyle(
@@ -3443,7 +3453,7 @@ class _TeacherDashboardScreenState extends ConsumerState<TeacherDashboardScreen>
                   borderRadius: BorderRadius.circular(8),
                 ),
                 child: Text(
-                  'Action Items',
+                  'Next Steps',
                   style: TextStyle(
                     fontSize: 10.5,
                     fontWeight: FontWeight.w700,
@@ -3545,6 +3555,8 @@ class _TeacherDashboardScreenState extends ConsumerState<TeacherDashboardScreen>
                   context.go('/teacher/students');
                 } else if (actionType == 'create_subject') {
                   context.go('/teacher/subjects');
+                } else if (actionType == 'item_analysis') {
+                  QuizItemAnalysisDialog.show(context);
                 }
               },
               child: Text(
@@ -3569,6 +3581,8 @@ class _TeacherDashboardScreenState extends ConsumerState<TeacherDashboardScreen>
         return 'Open Roster';
       case 'create_subject':
         return 'View Subjects';
+      case 'item_analysis':
+        return 'Item Analysis';
       default:
         return 'Take Action';
     }
@@ -4639,57 +4653,73 @@ class _MasteryGrowthPainter extends CustomPainter {
     }
 
     // 2. Compute Node Points
-    final stepX = plotWidth / (milestones.length - 1);
     final points = <Offset>[];
-    for (int i = 0; i < milestones.length; i++) {
-      final x = leftPadding + (i * stepX);
-      final norm = (milestones[i].score / 100.0).clamp(0.0, 1.0);
+    if (milestones.length == 1) {
+      final x = leftPadding + (plotWidth / 2);
+      final norm = (milestones[0].score / 100.0).clamp(0.0, 1.0);
       final y = topPadding + (plotHeight * (1.0 - norm));
       points.add(Offset(x, y));
+    } else {
+      final stepX = plotWidth / (milestones.length - 1);
+      for (int i = 0; i < milestones.length; i++) {
+        final x = leftPadding + (i * stepX);
+        final norm = (milestones[i].score / 100.0).clamp(0.0, 1.0);
+        final y = topPadding + (plotHeight * (1.0 - norm));
+        points.add(Offset(x, y));
+      }
     }
 
-    // 3. Construct Smooth Cubic Bezier Spline
-    final path = Path();
-    final fillPath = Path();
-    path.moveTo(points[0].dx, points[0].dy);
-    fillPath.moveTo(points[0].dx, topPadding + plotHeight);
-    fillPath.lineTo(points[0].dx, points[0].dy);
+    // 3. Construct Smooth Cubic Bezier Spline (if >= 2 points) or Baseline Guide Line (if 1 point)
+    if (points.length >= 2) {
+      final path = Path();
+      final fillPath = Path();
+      path.moveTo(points[0].dx, points[0].dy);
+      fillPath.moveTo(points[0].dx, topPadding + plotHeight);
+      fillPath.lineTo(points[0].dx, points[0].dy);
 
-    for (int i = 1; i < points.length; i++) {
-      final pPrev = points[i - 1];
-      final pCur = points[i];
-      final cx1 = pPrev.dx + (pCur.dx - pPrev.dx) / 2;
-      final cy1 = pPrev.dy;
-      final cx2 = pPrev.dx + (pCur.dx - pPrev.dx) / 2;
-      final cy2 = pCur.dy;
-      path.cubicTo(cx1, cy1, cx2, cy2, pCur.dx, pCur.dy);
-      fillPath.cubicTo(cx1, cy1, cx2, cy2, pCur.dx, pCur.dy);
+      for (int i = 1; i < points.length; i++) {
+        final pPrev = points[i - 1];
+        final pCur = points[i];
+        final cx1 = pPrev.dx + (pCur.dx - pPrev.dx) / 2;
+        final cy1 = pPrev.dy;
+        final cx2 = pPrev.dx + (pCur.dx - pPrev.dx) / 2;
+        final cy2 = pCur.dy;
+        path.cubicTo(cx1, cy1, cx2, cy2, pCur.dx, pCur.dy);
+        fillPath.cubicTo(cx1, cy1, cx2, cy2, pCur.dx, pCur.dy);
+      }
+
+      fillPath.lineTo(points.last.dx, topPadding + plotHeight);
+      fillPath.close();
+
+      // 4. Subtle, formal Area Fill Beneath Curve
+      final fillPaint = Paint()
+        ..style = PaintingStyle.fill
+        ..shader = LinearGradient(
+          begin: Alignment.topCenter,
+          end: Alignment.bottomCenter,
+          colors: [
+            AppTheme.primary.withValues(alpha: isDark ? 0.08 : 0.04),
+            AppTheme.primary.withValues(alpha: 0.0),
+          ],
+        ).createShader(Rect.fromLTWH(leftPadding, topPadding, plotWidth, plotHeight));
+      canvas.drawPath(fillPath, fillPaint);
+
+      // 5. Solid Authoritative Curve Stroke (No Rainbow Gradient)
+      final strokePaint = Paint()
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 2.0
+        ..strokeCap = StrokeCap.round
+        ..strokeJoin = StrokeJoin.round
+        ..color = AppTheme.primary;
+      canvas.drawPath(path, strokePaint);
+    } else if (points.length == 1) {
+      // 1 point: draw a clean horizontal baseline guide line through the score
+      final p = points[0];
+      final guidePaint = Paint()
+        ..color = AppTheme.primary.withValues(alpha: 0.35)
+        ..strokeWidth = 1.0;
+      _drawDashedLine(canvas, Offset(leftPadding, p.dy), Offset(size.width - rightPadding, p.dy), guidePaint);
     }
-
-    fillPath.lineTo(points.last.dx, topPadding + plotHeight);
-    fillPath.close();
-
-    // 4. Subtle, formal Area Fill Beneath Curve
-    final fillPaint = Paint()
-      ..style = PaintingStyle.fill
-      ..shader = LinearGradient(
-        begin: Alignment.topCenter,
-        end: Alignment.bottomCenter,
-        colors: [
-          AppTheme.primary.withValues(alpha: isDark ? 0.08 : 0.04),
-          AppTheme.primary.withValues(alpha: 0.0),
-        ],
-      ).createShader(Rect.fromLTWH(leftPadding, topPadding, plotWidth, plotHeight));
-    canvas.drawPath(fillPath, fillPaint);
-
-    // 5. Solid Authoritative Curve Stroke (No Rainbow Gradient)
-    final strokePaint = Paint()
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = 2.0
-      ..strokeCap = StrokeCap.round
-      ..strokeJoin = StrokeJoin.round
-      ..color = AppTheme.primary;
-    canvas.drawPath(path, strokePaint);
 
     // 6. Draw Milestone Nodes & High/Low Annotations
     for (int i = 0; i < points.length; i++) {

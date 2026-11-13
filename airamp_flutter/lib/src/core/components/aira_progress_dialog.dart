@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 
 /// A modern, high-fidelity loading dialog overlay with real-time
@@ -100,8 +101,11 @@ class _AiraProgressDialogState extends State<AiraProgressDialog> with SingleTick
   late AnimationController _animController;
   late Animation<double> _pulseAnimation;
 
-  double? _progress;
+  double? _targetProgress;
+  double _displayProgress = 0.08;
   late String _statusMessage;
+  bool _isCompleted = false;
+  Timer? _creepTimer;
 
   @override
   void initState() {
@@ -117,12 +121,32 @@ class _AiraProgressDialogState extends State<AiraProgressDialog> with SingleTick
       CurvedAnimation(parent: _animController, curve: Curves.easeInOut),
     );
 
+    // Subtle virtual creep timer so progress bar feels alive and never freezes at a fixed number like 30%
+    _creepTimer = Timer.periodic(const Duration(milliseconds: 250), (_) {
+      if (!mounted || _isCompleted) return;
+      setState(() {
+        if (_targetProgress != null && _targetProgress! > 0) {
+          // If a real target is set, allow gentle creep up to min(target + 0.10, 0.92) if target hasn't updated
+          final ceiling = (_targetProgress! + 0.12).clamp(0.0, 0.92);
+          if (_displayProgress < ceiling) {
+            _displayProgress = (_displayProgress + 0.008).clamp(0.0, ceiling);
+          }
+        } else {
+          // Initial creep up to 20%
+          if (_displayProgress < 0.20) {
+            _displayProgress = (_displayProgress + 0.015).clamp(0.0, 0.20);
+          }
+        }
+      });
+    });
+
     // Execute task after the dialog is mounted
     WidgetsBinding.instance.addPostFrameCallback((_) => _executeTask());
   }
 
   @override
   void dispose() {
+    _creepTimer?.cancel();
     _animController.dispose();
     super.dispose();
   }
@@ -132,15 +156,40 @@ class _AiraProgressDialogState extends State<AiraProgressDialog> with SingleTick
       await widget.task((progress, statusMessage) {
         if (mounted) {
           setState(() {
-            _progress = progress.clamp(0.0, 1.0);
+            _targetProgress = progress.clamp(0.0, 1.0);
+            if (_targetProgress! > _displayProgress) {
+              _displayProgress = _targetProgress!;
+            }
             _statusMessage = statusMessage;
+            if (_targetProgress! >= 1.0) {
+              _isCompleted = true;
+            }
           });
         }
       });
+
       if (mounted) {
-        Navigator.of(context, rootNavigator: true).pop();
+        _creepTimer?.cancel();
+        setState(() {
+          _isCompleted = true;
+          _displayProgress = 1.0;
+          _targetProgress = 1.0;
+          if (!_statusMessage.toLowerCase().contains('complete') &&
+              !_statusMessage.toLowerCase().contains('success') &&
+              !_statusMessage.toLowerCase().contains('purged')) {
+            _statusMessage = 'Purge completed successfully!';
+          }
+        });
+
+        // Hold 650ms for visual satisfaction so the user sees 100% and success confirmation
+        await Future.delayed(const Duration(milliseconds: 650));
+
+        if (mounted) {
+          Navigator.of(context, rootNavigator: true).pop();
+        }
       }
     } catch (e) {
+      _creepTimer?.cancel();
       if (mounted) {
         Navigator.of(context, rootNavigator: true).pop();
       }
@@ -155,6 +204,14 @@ class _AiraProgressDialogState extends State<AiraProgressDialog> with SingleTick
     final borderColor = isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0);
     final textPrimary = isDark ? const Color(0xFFF8FAFC) : const Color(0xFF0F172A);
     final textSecondary = isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B);
+
+    final currentAccent = _isCompleted
+        ? const Color(0xFF10B981) // Emerald Green on completion
+        : widget.accentColor;
+
+    final currentIcon = _isCompleted
+        ? Icons.check_circle_rounded
+        : widget.icon;
 
     return PopScope(
       canPop: false,
@@ -177,29 +234,34 @@ class _AiraProgressDialogState extends State<AiraProgressDialog> with SingleTick
                   // ── Pulsing Icon Badge ──
                   ScaleTransition(
                     scale: _pulseAnimation,
-                    child: Container(
+                    child: AnimatedContainer(
+                      duration: const Duration(milliseconds: 300),
                       width: 64,
                       height: 64,
                       decoration: BoxDecoration(
                         shape: BoxShape.circle,
-                        color: widget.accentColor.withValues(alpha: 0.12),
+                        color: currentAccent.withValues(alpha: 0.12),
                         border: Border.all(
-                          color: widget.accentColor.withValues(alpha: 0.35),
+                          color: currentAccent.withValues(alpha: 0.35),
                           width: 2,
                         ),
                         boxShadow: [
                           BoxShadow(
-                            color: widget.accentColor.withValues(alpha: 0.2),
+                            color: currentAccent.withValues(alpha: 0.2),
                             blurRadius: 16,
                             spreadRadius: 2,
                           ),
                         ],
                       ),
                       child: Center(
-                        child: Icon(
-                          widget.icon,
-                          color: widget.accentColor,
-                          size: 30,
+                        child: AnimatedSwitcher(
+                          duration: const Duration(milliseconds: 250),
+                          child: Icon(
+                            currentIcon,
+                            key: ValueKey(currentIcon),
+                            color: currentAccent,
+                            size: 30,
+                          ),
                         ),
                       ),
                     ),
@@ -227,46 +289,62 @@ class _AiraProgressDialogState extends State<AiraProgressDialog> with SingleTick
                       key: ValueKey(_statusMessage),
                       textAlign: TextAlign.center,
                       style: TextStyle(
-                        fontSize: 13.5,
-                        color: textSecondary,
+                        fontSize: 13,
+                        color: _isCompleted ? const Color(0xFF10B981) : textSecondary,
+                        fontWeight: _isCompleted ? FontWeight.w600 : FontWeight.normal,
                         height: 1.4,
                       ),
                     ),
                   ),
                   const SizedBox(height: 24),
 
-                  // ── Progress Bar ──
+                  // ── Progress Bar with Smooth Tween Interpolation ──
                   ClipRRect(
                     borderRadius: BorderRadius.circular(8),
                     child: SizedBox(
                       height: 8,
-                      child: _progress == null
-                          ? LinearProgressIndicator(
-                              backgroundColor: widget.accentColor.withValues(alpha: 0.12),
-                              valueColor: AlwaysStoppedAnimation<Color>(widget.accentColor),
-                            )
-                          : LinearProgressIndicator(
-                              value: _progress,
-                              backgroundColor: widget.accentColor.withValues(alpha: 0.12),
-                              valueColor: AlwaysStoppedAnimation<Color>(widget.accentColor),
-                            ),
+                      child: TweenAnimationBuilder<double>(
+                        tween: Tween<double>(begin: 0.05, end: _displayProgress),
+                        duration: const Duration(milliseconds: 320),
+                        curve: Curves.easeOutCubic,
+                        builder: (context, animatedVal, _) {
+                          final barColor = (animatedVal >= 0.999 || _isCompleted)
+                              ? const Color(0xFF10B981)
+                              : widget.accentColor;
+                          return LinearProgressIndicator(
+                            value: animatedVal.clamp(0.0, 1.0),
+                            backgroundColor: barColor.withValues(alpha: 0.12),
+                            valueColor: AlwaysStoppedAnimation<Color>(barColor),
+                          );
+                        },
+                      ),
                     ),
                   ),
                   const SizedBox(height: 10),
 
-                  // ── Percentage Display ──
-                  if (_progress != null)
-                    Align(
-                      alignment: Alignment.centerRight,
-                      child: Text(
-                        '${(_progress! * 100).toInt()}%',
-                        style: TextStyle(
-                          fontSize: 12,
-                          fontWeight: FontWeight.bold,
-                          color: widget.accentColor,
+                  // ── Percentage Display with Smooth Counter Animation ──
+                  TweenAnimationBuilder<double>(
+                    tween: Tween<double>(begin: 0.05, end: _displayProgress),
+                    duration: const Duration(milliseconds: 320),
+                    curve: Curves.easeOutCubic,
+                    builder: (context, animatedVal, _) {
+                      final pctColor = (animatedVal >= 0.999 || _isCompleted)
+                          ? const Color(0xFF10B981)
+                          : widget.accentColor;
+                      final pctText = '${(animatedVal.clamp(0.0, 1.0) * 100).toInt()}%';
+                      return Align(
+                        alignment: Alignment.centerRight,
+                        child: Text(
+                          pctText,
+                          style: TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.bold,
+                            color: pctColor,
+                          ),
                         ),
-                      ),
-                    ),
+                      );
+                    },
+                  ),
                   const SizedBox(height: 16),
 
                   // ── Lock & Safety Info Pill ──
@@ -282,14 +360,20 @@ class _AiraProgressDialogState extends State<AiraProgressDialog> with SingleTick
                     child: Row(
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        Icon(Icons.shield_outlined, size: 14, color: textSecondary),
+                        Icon(
+                          _isCompleted ? Icons.verified_user_rounded : Icons.shield_outlined,
+                          size: 14,
+                          color: _isCompleted ? const Color(0xFF10B981) : textSecondary,
+                        ),
                         const SizedBox(width: 8),
                         Flexible(
                           child: Text(
-                            'Synchronizing records safely. Please do not close this window.',
+                            _isCompleted
+                                ? 'Account permanently purged and credentials securely revoked.'
+                                : 'Synchronizing records safely. Please do not close this window.',
                             style: TextStyle(
                               fontSize: 11.5,
-                              color: textSecondary,
+                              color: _isCompleted ? const Color(0xFF10B981) : textSecondary,
                               fontWeight: FontWeight.w500,
                             ),
                             textAlign: TextAlign.center,

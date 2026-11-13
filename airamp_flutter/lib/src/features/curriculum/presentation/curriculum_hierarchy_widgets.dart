@@ -796,10 +796,12 @@ class ContentItemTile extends ConsumerWidget {
             );
           } catch (_) {}
 
+          if (!context.mounted) return;
           if (isDownload) {
             AppToast.showSuccess(context, 'Saved "$cleanName" to documents');
           } else {
             await _launchNativeFile(localFile.path);
+            if (!context.mounted) return;
             AppToast.showSuccess(context, 'Opened "$cleanName"');
           }
           return;
@@ -830,10 +832,12 @@ class ContentItemTile extends ConsumerWidget {
         final tempFile = File(targetPath);
         await tempFile.writeAsBytes(rawBytes);
 
+        if (!context.mounted) return;
         if (isDownload) {
           AppToast.showSuccess(context, 'Saved "$cleanName" to device documents');
         } else {
           await _launchNativeFile(targetPath);
+          if (!context.mounted) return;
           AppToast.showSuccess(context, 'Opened "$cleanName"');
         }
         return;
@@ -847,9 +851,11 @@ class ContentItemTile extends ConsumerWidget {
             final docDir = await getApplicationDocumentsDirectory();
             final dest = File('${docDir.path}/$cleanName');
             await localFile.copy(dest.path);
+            if (!context.mounted) return;
             AppToast.showSuccess(context, 'Saved "$cleanName" to documents');
           } else {
             await _launchNativeFile(fileInfo.filePath!);
+            if (!context.mounted) return;
             AppToast.showSuccess(context, 'Opened "$cleanName"');
           }
           return;
@@ -889,6 +895,7 @@ class ContentItemTile extends ConsumerWidget {
             } else {
               openPdfBlobInNewTabWeb(downloadedBytes, cleanName);
             }
+            if (!context.mounted) return;
             AppToast.showSuccess(context, isDownload ? 'Downloading "$cleanName"...' : 'Opened "$cleanName"');
             return;
           }
@@ -898,16 +905,19 @@ class ContentItemTile extends ConsumerWidget {
           final savedFile = File(targetPath);
           await savedFile.writeAsBytes(downloadedBytes);
 
+          if (!context.mounted) return;
           if (isDownload) {
             AppToast.showSuccess(context, 'Saved "$cleanName" to documents');
           } else {
             await _launchNativeFile(targetPath);
+            if (!context.mounted) return;
             AppToast.showSuccess(context, 'Opened "$cleanName"');
           }
           return;
         }
       }
 
+      if (!context.mounted) return;
       // 5. File data not yet uploaded to cloud
       AppToast.showWarning(
         context,
@@ -923,7 +933,9 @@ class ContentItemTile extends ConsumerWidget {
         },
       );
     } catch (e) {
-      AppToast.showError(context, 'Could not open file: $e');
+      if (context.mounted) {
+        AppToast.showError(context, 'Could not open file: $e');
+      }
     }
   }
 

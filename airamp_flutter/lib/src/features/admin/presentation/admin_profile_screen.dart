@@ -2471,7 +2471,7 @@ class _AdminProfileScreenState extends ConsumerState<AdminProfileScreen>
     showDialog(
       context: context,
       builder: (ctx) => StatefulBuilder(
-        builder: (context, setDlgState) {
+        builder: (dlgContext, setDlgState) {
           return AlertDialog(
             backgroundColor: AppTheme.surface,
             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),

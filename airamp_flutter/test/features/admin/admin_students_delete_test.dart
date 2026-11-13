@@ -39,7 +39,7 @@ class MockAdminArchivedStudentsNotifier extends AdminArchivedStudentsNotifier {
   }
 
   @override
-  Future<void> permanentDeleteStudent(String studentId) async {
+  Future<void> permanentDeleteStudent(String studentId, {void Function(double, String)? onProgress}) async {
     state = state.where((s) => s['id'] != studentId).toList();
   }
 }

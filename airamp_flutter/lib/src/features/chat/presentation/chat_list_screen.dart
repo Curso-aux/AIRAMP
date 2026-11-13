@@ -31,8 +31,22 @@ class _ChatListScreenState extends ConsumerState<ChatListScreen> {
   String _selectedSection = 'All';
   bool _showArchived = false;
 
-  final List<String> _gradeOptions = ['All', 'Grade 10', 'Grade 11', 'Grade 12'];
-  final List<String> _sectionOptions = ['All', 'Emerald', 'Ruby', 'Diamond', 'Gold'];
+  List<String> _getDynamicSectionOptions(List<ChatUser> availableUsers) {
+    final set = <String>{'All'};
+    for (final u in availableUsers) {
+      final s = u.section?.trim();
+      if (s != null && s.isNotEmpty) {
+        var clean = s;
+        if (clean.toLowerCase().startsWith('grade')) {
+          final idx = clean.indexOf('-');
+          if (idx != -1) clean = clean.substring(idx + 1).trim();
+        }
+        set.add(clean);
+      }
+    }
+    final list = set.toList()..sort();
+    return list;
+  }
 
   @override
   void initState() {
@@ -98,12 +112,16 @@ class _ChatListScreenState extends ConsumerState<ChatListScreen> {
 
     // Filter by section
     if (_selectedSection != 'All') {
-      list = list.where((u) =>
-        u.section != null && (
-          u.section == _selectedSection ||
-          u.section!.endsWith(_selectedSection) ||
-          u.section!.contains(_selectedSection)
-        )).toList();
+      final sTarget = _selectedSection.toLowerCase().trim();
+      list = list.where((u) {
+        if (u.section == null) return false;
+        var sSec = u.section!.toLowerCase().trim();
+        if (sSec.startsWith('grade')) {
+          final idx = sSec.indexOf('-');
+          if (idx != -1) sSec = sSec.substring(idx + 1).trim();
+        }
+        return sSec == sTarget || u.section!.toLowerCase().contains(sTarget);
+      }).toList();
     }
 
     // Filter by search query
@@ -143,6 +161,7 @@ class _ChatListScreenState extends ConsumerState<ChatListScreen> {
     final filteredContacts = _getFilteredContacts(chatState.availableUsers);
     final screenWidth = MediaQuery.of(context).size.width;
     final isDesktop = screenWidth >= 900;
+    final sidebarWidth = (screenWidth * 0.30).clamp(380.0, 460.0);
 
     final listPane = _buildListPane(context, filteredConversations, filteredContacts, chatState, isDesktop: isDesktop);
 
@@ -153,7 +172,7 @@ class _ChatListScreenState extends ConsumerState<ChatListScreen> {
           child: Row(
             children: [
               SizedBox(
-                width: 380,
+                width: sidebarWidth,
                 child: Container(
                   decoration: BoxDecoration(
                     color: AppTheme.surface,
@@ -825,6 +844,10 @@ class _ChatListScreenState extends ConsumerState<ChatListScreen> {
   // ── Contacts View ──────────────────────────────────────────
 
   Widget _buildContactsView(List<ChatUser> contacts) {
+    final currentUser = ref.watch(authProvider);
+    final isStudent = currentUser?.role == 'student';
+    final dynamicSections = _getDynamicSectionOptions(ref.watch(chatProvider).availableUsers);
+
     return Column(
       children: [
         // Contact Search
@@ -873,52 +896,71 @@ class _ChatListScreenState extends ConsumerState<ChatListScreen> {
         ),
         const SizedBox(height: 10),
 
-        // Consolidated Single-Row Filter Toolbar: Roles, Grade, Section, Reset
-        SingleChildScrollView(
-          scrollDirection: Axis.horizontal,
-          padding: const EdgeInsets.symmetric(horizontal: 20),
-          child: Row(
-            children: [
-              _buildRoleChip('all', 'All Contacts'),
-              const SizedBox(width: 8),
-              _buildRoleChip('teacher', 'Teachers'),
-              const SizedBox(width: 8),
-              _buildRoleChip('student', 'Students'),
-              if (_selectedRole != 'teacher') ...[
+        // Responsive Filter Toolbar: Roles, Section, Reset (or Student Directory Banner)
+        if (isStudent) ...[
+          Container(
+            margin: const EdgeInsets.symmetric(horizontal: 20),
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 9),
+            decoration: BoxDecoration(
+              color: AppTheme.primary.withValues(alpha: Theme.of(context).brightness == Brightness.dark ? 0.15 : 0.08),
+              borderRadius: BorderRadius.circular(10),
+              border: Border.all(color: AppTheme.primary.withValues(alpha: 0.22)),
+            ),
+            child: Row(
+              children: [
+                Icon(Icons.school_outlined, size: 16, color: AppTheme.primary),
                 const SizedBox(width: 8),
-                Container(
-                  height: 18,
-                  width: 1,
-                  color: AppTheme.border,
-                ),
-                const SizedBox(width: 8),
-                _buildDropdownChip(
-                  label: _selectedGrade == 'All' ? 'Grade: All' : _selectedGrade,
-                  isActive: _selectedGrade != 'All',
-                  value: _selectedGrade,
-                  items: _gradeOptions,
-                  onChanged: (val) {
-                    if (val != null) setState(() => _selectedGrade = val);
-                  },
-                ),
-                const SizedBox(width: 8),
-                _buildDropdownChip(
-                  label: _selectedSection == 'All' ? 'Section: All' : 'Sec. $_selectedSection',
-                  isActive: _selectedSection != 'All',
-                  value: _selectedSection,
-                  items: _sectionOptions,
-                  onChanged: (val) {
-                    if (val != null) setState(() => _selectedSection = val);
-                  },
+                Expanded(
+                  child: Text(
+                    'Faculty Directory • Your Instructors & Academic Staff',
+                    style: TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w600,
+                      color: AppTheme.text,
+                    ),
+                  ),
                 ),
               ],
-              if (_selectedGrade != 'All' || _selectedSection != 'All' || _selectedRole != 'all') ...[
-                const SizedBox(width: 8),
-                _buildResetChip(),
-              ],
-            ],
+            ),
           ),
-        ),
+        ] else ...[
+          SingleChildScrollView(
+            scrollDirection: Axis.horizontal,
+            physics: const BouncingScrollPhysics(),
+            padding: const EdgeInsets.symmetric(horizontal: 20),
+            child: Row(
+              children: [
+                _buildRoleChip('all', 'All'),
+                const SizedBox(width: 6),
+                _buildRoleChip('teacher', 'Faculty'),
+                const SizedBox(width: 6),
+                _buildRoleChip('student', 'Students'),
+                if (_selectedRole != 'teacher' && dynamicSections.length > 1) ...[
+                  const SizedBox(width: 6),
+                  Container(
+                    height: 18,
+                    width: 1,
+                    color: AppTheme.border,
+                  ),
+                  const SizedBox(width: 6),
+                  _buildDropdownChip(
+                    label: _selectedSection == 'All' ? 'Section: All' : 'Sec. $_selectedSection',
+                    isActive: _selectedSection != 'All',
+                    value: dynamicSections.contains(_selectedSection) ? _selectedSection : 'All',
+                    items: dynamicSections,
+                    onChanged: (val) {
+                      if (val != null) setState(() => _selectedSection = val);
+                    },
+                  ),
+                ],
+                if (_selectedSection != 'All' || _selectedRole != 'all') ...[
+                  const SizedBox(width: 6),
+                  _buildResetChip(),
+                ],
+              ],
+            ),
+          ),
+        ],
         const SizedBox(height: 10),
 
         // Contacts list count header
@@ -984,13 +1026,25 @@ class _ChatListScreenState extends ConsumerState<ChatListScreen> {
                     final isTeacher = user.role == 'teacher' || user.role == 'admin' || user.role == 'super_admin';
                     final isDark = Theme.of(context).brightness == Brightness.dark;
 
-                    // Academic Metadata Subtitle (e.g. Grade 10 • Sec. Emerald • email@school.edu)
+                    // Academic Metadata Subtitle (e.g. Grade 12 • Sec. Sapphire)
                     final List<String> metaParts = [];
-                    if (user.grade != null && user.grade!.isNotEmpty) metaParts.add(user.grade!);
-                    if (user.section != null && user.section!.isNotEmpty) {
-                      metaParts.add(user.section!.startsWith('Sec') ? user.section! : 'Sec. ${user.section!}');
+                    if (isTeacher) {
+                      metaParts.add(user.role == 'super_admin' ? 'Administration' : (user.role == 'admin' ? 'School Admin' : 'Faculty'));
+                      metaParts.add(user.email);
+                    } else {
+                      final rawSec = user.section?.trim() ?? '';
+                      String cleanSec = rawSec;
+                      if (cleanSec.toLowerCase().startsWith('grade')) {
+                        final dashIdx = cleanSec.indexOf('-');
+                        if (dashIdx != -1) cleanSec = cleanSec.substring(dashIdx + 1).trim();
+                      }
+                      if (user.grade != null && user.grade!.isNotEmpty) {
+                        metaParts.add(user.grade!);
+                      }
+                      if (cleanSec.isNotEmpty) {
+                        metaParts.add('Sec. $cleanSec');
+                      }
                     }
-                    metaParts.add(user.email);
                     final subtitleText = metaParts.join(' • ');
 
                     return ListTile(
@@ -1153,7 +1207,7 @@ class _ChatListScreenState extends ConsumerState<ChatListScreen> {
       ),
       child: DropdownButtonHideUnderline(
         child: DropdownButton<String>(
-          value: value,
+          value: items.contains(value) ? value : (items.isNotEmpty ? items.first : 'All'),
           isDense: true,
           dropdownColor: Theme.of(context).colorScheme.surface,
           icon: Icon(

@@ -1015,7 +1015,21 @@ class FirestoreService {
         try {
           final userId = data['id']?.toString() ?? '';
           final email = (data['email']?.toString() ?? '').toLowerCase().trim();
+          final fullName = data['full_name']?.toString() ?? '';
           if (userId.isEmpty && email.isEmpty) continue;
+
+          // Skip & purge regression test user artifacts from local and cloud
+          if (userId.contains('1794') ||
+              userId.startsWith('s_anticheat_') ||
+              userId.startsWith('student_reset_') ||
+              userId.startsWith('student_lo_reset_') ||
+              userId.startsWith('s_lo_') ||
+              userId.startsWith('test_') ||
+              fullName.contains('1794') ||
+              fullName.startsWith('Student student_')) {
+            unawaited(deleteDocument('users', userId));
+            continue;
+          }
 
           // If an active account exists in Cloud Firestore, ensure it is not blocked by stale local deleted tombstone
           if (deletedList.contains(userId) || (email.isNotEmpty && deletedList.contains(email))) {

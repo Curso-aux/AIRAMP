@@ -1,9 +1,11 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:qr_flutter/qr_flutter.dart';
 import '../../../../core/components/aira_action_toast.dart';
+import '../../../../core/database/database_helper.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../../core/theme/theme_provider.dart';
 import '../../../../core/utils/section_key_helper.dart';
@@ -859,13 +861,34 @@ class _AdminWebKeysScreenState extends ConsumerState<AdminWebKeysScreen> {
 
   void _showClassroomQrModal(String code, String section, int usedCount, int maxUses) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    final pct = maxUses > 0 ? (usedCount / maxUses).clamp(0.0, 1.0) : 0.0;
+    int currentUsed = usedCount;
+    Timer? pollTimer;
 
-    showDialog(
+    final dialogFuture = showDialog(
       context: context,
       builder: (ctx) => StatefulBuilder(
         builder: (ctx, setModalState) {
           final isJustCopied = _recentlyCopiedKey == code;
+          final livePct = maxUses > 0 ? (currentUsed / maxUses).clamp(0.0, 1.0) : 0.0;
+
+          // Start polling live enrollment count while projector modal is active
+          pollTimer ??= Timer.periodic(const Duration(seconds: 3), (_) async {
+            try {
+              final updatedKeys = await DatabaseHelper().getEnrollmentKeysList();
+              final matched = updatedKeys.firstWhere(
+                (k) => k['code']?.toString().toUpperCase() == code.toUpperCase(),
+                orElse: () => {},
+              );
+              if (matched.isNotEmpty && ctx.mounted) {
+                final newCount = matched['used_count'] as int? ?? currentUsed;
+                if (newCount != currentUsed) {
+                  setModalState(() {
+                    currentUsed = newCount;
+                  });
+                }
+              }
+            } catch (_) {}
+          });
 
           return AlertDialog(
             backgroundColor: isDark ? AppTheme.darkSurface : Colors.white,
@@ -996,13 +1019,56 @@ class _AdminWebKeysScreenState extends ConsumerState<AdminWebKeysScreen> {
                           Row(
                             mainAxisAlignment: MainAxisAlignment.spaceBetween,
                             children: [
-                              Text(
-                                'Section Capacity',
-                                style: TextStyle(fontSize: 12, color: isDark ? AppTheme.darkTextSecondary : AppTheme.lightTextSecondary),
+                              Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Text(
+                                    'Section Capacity',
+                                    style: TextStyle(
+                                      fontSize: 12,
+                                      color: isDark ? AppTheme.darkTextSecondary : AppTheme.lightTextSecondary,
+                                    ),
+                                  ),
+                                  const SizedBox(width: 6),
+                                  Container(
+                                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                    decoration: BoxDecoration(
+                                      color: AppTheme.success.withValues(alpha: 0.12),
+                                      borderRadius: BorderRadius.circular(4),
+                                    ),
+                                    child: Row(
+                                      mainAxisSize: MainAxisSize.min,
+                                      children: [
+                                        Container(
+                                          width: 5,
+                                          height: 5,
+                                          decoration: BoxDecoration(
+                                            color: AppTheme.success,
+                                            shape: BoxShape.circle,
+                                          ),
+                                        ),
+                                        const SizedBox(width: 4),
+                                        Text(
+                                          'LIVE',
+                                          style: TextStyle(
+                                            fontSize: 9.5,
+                                            fontWeight: FontWeight.bold,
+                                            color: AppTheme.success,
+                                            letterSpacing: 0.5,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                ],
                               ),
                               Text(
-                                '$usedCount / $maxUses Students (${(pct * 100).toInt()}%)',
-                                style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: AppTheme.primary),
+                                '$currentUsed / $maxUses Students (${(livePct * 100).toInt()}%)',
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.bold,
+                                  color: AppTheme.primary,
+                                ),
                               ),
                             ],
                           ),
@@ -1010,7 +1076,7 @@ class _AdminWebKeysScreenState extends ConsumerState<AdminWebKeysScreen> {
                           ClipRRect(
                             borderRadius: BorderRadius.circular(4),
                             child: LinearProgressIndicator(
-                              value: pct,
+                              value: livePct,
                               backgroundColor: isDark ? AppTheme.darkBorder : const Color(0xFFE2E8F0),
                               valueColor: AlwaysStoppedAnimation(AppTheme.primary),
                               minHeight: 6,
@@ -1078,6 +1144,11 @@ class _AdminWebKeysScreenState extends ConsumerState<AdminWebKeysScreen> {
         },
       ),
     );
+
+    dialogFuture.whenComplete(() {
+      pollTimer?.cancel();
+      pollTimer = null;
+    });
   }
 
   void _showShareModal(String code, String section) {

@@ -32,6 +32,8 @@ class ScoresScreen extends ConsumerStatefulWidget {
 class _ScoresScreenState extends ConsumerState<ScoresScreen> {
   final _searchController = TextEditingController();
   late String _activeSection;
+  String _statusFilter = 'All'; // 'All', 'Passed', 'Needs Remediation'
+  String _sortBy = 'recent'; // 'recent', 'lowest', 'highest'
   static const int _pageSize = 20;
   int _displayLimit = _pageSize;
 
@@ -170,10 +172,36 @@ class _ScoresScreenState extends ConsumerState<ScoresScreen> {
     final totalAttempts = scores.length;
     final uniqueStudents = scores.map((s) => s['student_id']).toSet().length;
     final passedAttempts = scores.where((s) => s['is_passed'] == 1 || s['is_passed'] == true).length;
+    final failedAttempts = totalAttempts - passedAttempts;
     final passRate = totalAttempts > 0 ? '${((passedAttempts / totalAttempts) * 100).toStringAsFixed(0)}%' : '0%';
     final avgScore = totalAttempts > 0
         ? '${((scores.map((s) => (s['percentage'] as num?)?.toDouble() ?? 0.0).reduce((a, b) => a + b)) / totalAttempts).toStringAsFixed(0)}%'
         : '0%';
+
+    // Filter by triage status
+    final filteredScores = scores.where((s) {
+      final isPassed = s['is_passed'] == 1 || s['is_passed'] == true;
+      if (_statusFilter == 'Passed') return isPassed;
+      if (_statusFilter == 'Needs Remediation') return !isPassed;
+      return true;
+    }).toList();
+
+    // Sort processed scores
+    filteredScores.sort((a, b) {
+      if (_sortBy == 'lowest') {
+        final aScore = (a['percentage'] as num?)?.toDouble() ?? 0.0;
+        final bScore = (b['percentage'] as num?)?.toDouble() ?? 0.0;
+        return aScore.compareTo(bScore);
+      } else if (_sortBy == 'highest') {
+        final aScore = (a['percentage'] as num?)?.toDouble() ?? 0.0;
+        final bScore = (b['percentage'] as num?)?.toDouble() ?? 0.0;
+        return bScore.compareTo(aScore);
+      } else {
+        final aDate = a['completed_at']?.toString() ?? '';
+        final bDate = b['completed_at']?.toString() ?? '';
+        return bDate.compareTo(aDate);
+      }
+    });
 
     final content = RefreshIndicator(
       onRefresh: () async {
@@ -229,49 +257,52 @@ class _ScoresScreenState extends ConsumerState<ScoresScreen> {
                 ),
                 const SizedBox(height: 18),
 
-                // Search Bar
-                TextField(
-                  controller: _searchController,
-                  maxLength: 60,
-                  buildCounter: (context, {required currentLength, required isFocused, maxLength}) => null,
-                  style: TextStyle(color: AppTheme.text, fontSize: 13.5),
-                  decoration: InputDecoration(
-                    hintText: 'Search student, subject, or quiz...',
-                    hintStyle: TextStyle(color: AppTheme.textMuted, fontSize: 13.5),
-                    counterText: '',
-                    prefixIcon: Icon(Icons.search_rounded, color: AppTheme.textMuted, size: 20),
-                    suffixIcon: _searchController.text.isNotEmpty
-                        ? IconButton(
-                            icon: const Icon(Icons.clear, size: 18),
-                            onPressed: () {
-                              _searchController.clear();
-                              ref.read(teacherScoresProvider.notifier).loadScores(query: '');
-                            },
-                          )
-                        : null,
-                    filled: true,
-                    fillColor: AppTheme.surface,
-                    contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(14),
-                      borderSide: BorderSide(color: AppTheme.border),
-                    ),
-                    enabledBorder: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(14),
-                      borderSide: BorderSide(color: AppTheme.border),
-                    ),
-                    focusedBorder: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(14),
-                      borderSide: BorderSide(color: AppTheme.primary, width: 1.5),
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 12),
+                // Responsive Search & Filter Bar
+                LayoutBuilder(
+                  builder: (context, constraints) {
+                    final isWide = constraints.maxWidth >= 640;
+                    final searchField = SizedBox(
+                      height: 44,
+                      child: TextField(
+                        controller: _searchController,
+                        maxLength: 60,
+                        buildCounter: (context, {required currentLength, required isFocused, maxLength}) => null,
+                        style: TextStyle(color: AppTheme.text, fontSize: 13.5),
+                        decoration: InputDecoration(
+                          hintText: 'Search student, subject, or quiz...',
+                          hintStyle: TextStyle(color: AppTheme.textMuted, fontSize: 13),
+                          counterText: '',
+                          prefixIcon: Icon(Icons.search_rounded, color: AppTheme.textMuted, size: 19),
+                          suffixIcon: _searchController.text.isNotEmpty
+                              ? IconButton(
+                                  icon: const Icon(Icons.clear_rounded, size: 17),
+                                  onPressed: () {
+                                    _searchController.clear();
+                                    ref.read(teacherScoresProvider.notifier).loadScores(query: '');
+                                  },
+                                )
+                              : null,
+                          filled: true,
+                          fillColor: AppTheme.surface,
+                          isDense: true,
+                          contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(12),
+                            borderSide: BorderSide(color: AppTheme.border),
+                          ),
+                          enabledBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(12),
+                            borderSide: BorderSide(color: AppTheme.border),
+                          ),
+                          focusedBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(12),
+                            borderSide: BorderSide(color: AppTheme.primary, width: 1.5),
+                          ),
+                        ),
+                      ),
+                    );
 
-                // Compact Filter Bar (Opens Bottom Sheet Modal)
-                Row(
-                  children: [
-                    OutlinedButton.icon(
+                    final filterButton = OutlinedButton.icon(
                       onPressed: () => _openSectionFilterBottomSheet(context, sectionOptions),
                       icon: Icon(
                         _activeSection == 'All Sections' ? Icons.filter_list_rounded : Icons.layers_rounded,
@@ -305,42 +336,200 @@ class _ScoresScreenState extends ConsumerState<ScoresScreen> {
                           color: _activeSection == 'All Sections' ? AppTheme.border : AppTheme.primary.withValues(alpha: 0.5),
                           width: 1.2,
                         ),
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-                        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
                       ),
-                    ),
-                    if (_activeSection != 'All Sections') ...[
-                      const SizedBox(width: 8),
-                      AnimatedPressable(
-                        onTap: () {
-                          setState(() => _activeSection = 'All Sections');
-                          ref.read(teacherScoresProvider.notifier).loadScores(section: 'All Sections');
-                        },
-                        borderRadius: BorderRadius.circular(16),
-                        child: Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                          decoration: BoxDecoration(
-                            color: AppTheme.border.withValues(alpha: 0.4),
-                            borderRadius: BorderRadius.circular(16),
-                          ),
-                          child: Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              Text(
-                                'Clear',
-                                style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: AppTheme.textSecondary),
+                    );
+
+                    final clearButton = _activeSection != 'All Sections'
+                        ? AnimatedPressable(
+                            onTap: () {
+                              setState(() => _activeSection = 'All Sections');
+                              ref.read(teacherScoresProvider.notifier).loadScores(section: 'All Sections');
+                            },
+                            borderRadius: BorderRadius.circular(10),
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                              decoration: BoxDecoration(
+                                color: AppTheme.border.withValues(alpha: 0.4),
+                                borderRadius: BorderRadius.circular(10),
                               ),
-                              const SizedBox(width: 4),
-                              Icon(Icons.close_rounded, size: 13, color: AppTheme.textSecondary),
-                            ],
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Text(
+                                    'Clear',
+                                    style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.w600, color: AppTheme.textSecondary),
+                                  ),
+                                  const SizedBox(width: 4),
+                                  Icon(Icons.close_rounded, size: 14, color: AppTheme.textSecondary),
+                                ],
+                              ),
+                            ),
+                          )
+                        : const SizedBox.shrink();
+
+                    if (isWide) {
+                      return Row(
+                        children: [
+                          Expanded(
+                            child: ConstrainedBox(
+                              constraints: const BoxConstraints(maxWidth: 480),
+                              child: searchField,
+                            ),
                           ),
+                          const SizedBox(width: 12),
+                          filterButton,
+                          if (_activeSection != 'All Sections') ...[
+                            const SizedBox(width: 8),
+                            clearButton,
+                          ],
+                        ],
+                      );
+                    }
+
+                    return Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        searchField,
+                        const SizedBox(height: 10),
+                        Row(
+                          children: [
+                            filterButton,
+                            if (_activeSection != 'All Sections') ...[
+                              const SizedBox(width: 8),
+                              clearButton,
+                            ],
+                          ],
                         ),
-                      ),
-                    ],
-                  ],
+                      ],
+                    );
+                  },
                 ),
 
-                const SizedBox(height: 24),
+                const SizedBox(height: 14),
+
+                // Triage Segmented Filter & Sort Controls
+                Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: Theme.of(context).brightness == Brightness.dark
+                        ? AppTheme.surfaceElevated
+                        : AppTheme.surface,
+                    borderRadius: BorderRadius.circular(14),
+                    border: Border.all(color: AppTheme.border),
+                  ),
+                  child: LayoutBuilder(
+                    builder: (context, constraints) {
+                      final isNarrow = constraints.maxWidth < 620;
+
+                      final triageChips = Wrap(
+                        spacing: 8,
+                        runSpacing: 8,
+                        children: [
+                          _buildTriageChip(
+                            label: 'All Attempts',
+                            count: totalAttempts,
+                            isSelected: _statusFilter == 'All',
+                            color: AppTheme.primary,
+                            onTap: () {
+                              setState(() {
+                                _statusFilter = 'All';
+                                _displayLimit = _pageSize;
+                              });
+                            },
+                          ),
+                          _buildTriageChip(
+                            label: 'Passed',
+                            count: passedAttempts,
+                            isSelected: _statusFilter == 'Passed',
+                            color: AppTheme.success,
+                            icon: Icons.check_circle_outline_rounded,
+                            onTap: () {
+                              setState(() {
+                                _statusFilter = 'Passed';
+                                _displayLimit = _pageSize;
+                              });
+                            },
+                          ),
+                          _buildTriageChip(
+                            label: 'Needs Remediation',
+                            count: failedAttempts,
+                            isSelected: _statusFilter == 'Needs Remediation',
+                            color: AppTheme.error,
+                            icon: Icons.assignment_late_outlined,
+                            onTap: () {
+                              setState(() {
+                                _statusFilter = 'Needs Remediation';
+                                _displayLimit = _pageSize;
+                              });
+                            },
+                          ),
+                        ],
+                      );
+
+                      final sortControl = Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 2),
+                        decoration: BoxDecoration(
+                          color: AppTheme.background,
+                          borderRadius: BorderRadius.circular(10),
+                          border: Border.all(color: AppTheme.border),
+                        ),
+                        child: DropdownButtonHideUnderline(
+                          child: DropdownButton<String>(
+                            value: _sortBy,
+                            isDense: true,
+                            icon: Icon(Icons.sort_rounded, size: 16, color: AppTheme.primary),
+                            items: const [
+                              DropdownMenuItem(
+                                value: 'recent',
+                                child: Text('Sort: Most Recent', style: TextStyle(fontSize: 12)),
+                              ),
+                              DropdownMenuItem(
+                                value: 'lowest',
+                                child: Text('Sort: Lowest Score First (Intervention)', style: TextStyle(fontSize: 12)),
+                              ),
+                              DropdownMenuItem(
+                                value: 'highest',
+                                child: Text('Sort: Highest Score First', style: TextStyle(fontSize: 12)),
+                              ),
+                            ],
+                            onChanged: (val) {
+                              if (val != null) {
+                                setState(() => _sortBy = val);
+                              }
+                            },
+                          ),
+                        ),
+                      );
+
+                      if (isNarrow) {
+                        return Column(
+                          crossAxisAlignment: CrossAxisAlignment.stretch,
+                          children: [
+                            triageChips,
+                            const SizedBox(height: 8),
+                            Align(
+                              alignment: Alignment.centerRight,
+                              child: sortControl,
+                            ),
+                          ],
+                        );
+                      }
+
+                      return Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Expanded(child: triageChips),
+                          const SizedBox(width: 12),
+                          sortControl,
+                        ],
+                      );
+                    },
+                  ),
+                ),
+
+                const SizedBox(height: 16),
 
                 // Scores List or Empty State
                 if (scores.isEmpty)
@@ -371,14 +560,30 @@ class _ScoresScreenState extends ConsumerState<ScoresScreen> {
                                 ref.read(teacherScoresProvider.notifier).loadScores(forceRefresh: true);
                               },
                             )
+                else if (filteredScores.isEmpty)
+                  AppEmptyState(
+                    icon: _statusFilter == 'Passed' ? Icons.emoji_events_outlined : Icons.done_all_rounded,
+                    title: 'No $_statusFilter Attempts Found',
+                    message: _statusFilter == 'Passed'
+                        ? 'No students have achieved a passing score under the current filter.'
+                        : 'Great news! There are currently no students requiring remediation under this filter.',
+                    actionLabel: 'View All Attempts',
+                    actionIcon: Icons.clear_all_rounded,
+                    onAction: () {
+                      setState(() {
+                        _statusFilter = 'All';
+                        _displayLimit = _pageSize;
+                      });
+                    },
+                  )
                 else ...[
                   ListView.separated(
                     shrinkWrap: true,
                     physics: const NeverScrollableScrollPhysics(),
-                    itemCount: scores.take(_displayLimit).length,
+                    itemCount: filteredScores.take(_displayLimit).length,
                     separatorBuilder: (_, _) => const SizedBox(height: 12),
                     itemBuilder: (context, index) {
-                      final item = scores[index];
+                      final item = filteredScores[index];
                       final isPassed = item['is_passed'] == 1 || item['is_passed'] == true;
                       final score = (item['score'] as num?)?.toInt() ?? 0;
                       final total = (item['total_questions'] as num?)?.toInt() ?? 0;
@@ -410,7 +615,7 @@ class _ScoresScreenState extends ConsumerState<ScoresScreen> {
                       );
                     },
                   ),
-                  if (scores.length > _displayLimit) ...[
+                  if (filteredScores.length > _displayLimit) ...[
                     const SizedBox(height: 16),
                     Center(
                       child: AnimatedPressable(
@@ -439,7 +644,7 @@ class _ScoresScreenState extends ConsumerState<ScoresScreen> {
                               Icon(Icons.expand_more_rounded, size: 18, color: AppTheme.primary),
                               const SizedBox(width: 8),
                               Text(
-                                'Load More Attempts (${scores.length - _displayLimit} remaining)',
+                                'Load More Attempts (${filteredScores.length - _displayLimit} remaining)',
                                 style: TextStyle(
                                   color: AppTheme.text,
                                   fontWeight: FontWeight.w600,
@@ -466,6 +671,65 @@ class _ScoresScreenState extends ConsumerState<ScoresScreen> {
       backgroundColor: AppTheme.background,
       body: SafeArea(
         child: content,
+      ),
+    );
+  }
+
+  Widget _buildTriageChip({
+    required String label,
+    required int count,
+    required bool isSelected,
+    required Color color,
+    IconData? icon,
+    required VoidCallback onTap,
+  }) {
+    return AnimatedPressable(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(10),
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 200),
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
+        decoration: BoxDecoration(
+          color: isSelected ? color.withValues(alpha: 0.15) : Colors.transparent,
+          borderRadius: BorderRadius.circular(10),
+          border: Border.all(
+            color: isSelected ? color : AppTheme.border.withValues(alpha: 0.6),
+            width: isSelected ? 1.4 : 1.0,
+          ),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            if (icon != null) ...[
+              Icon(icon, size: 14, color: isSelected ? color : AppTheme.textMuted),
+              const SizedBox(width: 5),
+            ],
+            Text(
+              label,
+              style: TextStyle(
+                fontSize: 12,
+                fontWeight: isSelected ? FontWeight.bold : FontWeight.w500,
+                color: isSelected ? color : AppTheme.textSecondary,
+              ),
+            ),
+            const SizedBox(width: 6),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1.5),
+              decoration: BoxDecoration(
+                color: isSelected ? color : AppTheme.border.withValues(alpha: 0.7),
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: Text(
+                '$count',
+                style: TextStyle(
+                  fontSize: 11,
+                  fontWeight: FontWeight.bold,
+                  color: isSelected ? Colors.white : AppTheme.textSecondary,
+                ),
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }

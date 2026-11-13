@@ -3241,25 +3241,57 @@ class DatabaseHelper {
     final db = await database;
     final results = await db.rawQuery('''
       SELECT qa.*, 
-             COALESCE(u.full_name, 'Student ' || qa.student_id) as student_name, 
+             u.full_name as student_name, 
              COALESCE(u.email, 'No email') as student_email, 
-             COALESCE(u.section, 'Grade 12 - Sapphire') as student_section, 
-             COALESCE(u.grade, 'Grade 12') as student_grade,
+             COALESCE(u.section, 'Unassigned') as student_section, 
+             COALESCE(u.grade, '') as student_grade,
              u.profile_image as student_profile_image,
              u.profile_image,
-             COALESCE(s.name, 'Mobile UI & State Management') as subject_name, 
-             COALESCE(s.subject_code, 'CS202') as subject_code, 
+             COALESCE(s.name, 'General Subject') as subject_name, 
+             COALESCE(s.subject_code, '') as subject_code, 
              COALESCE(qz.title, lo.title, 'Quiz Assessment') as lo_title, 
              COALESCE(qz.passing_score, lo.passing_score, 70) as passing_score
       FROM quiz_attempts qa
-      LEFT JOIN users u ON qa.student_id = u.id
+      INNER JOIN users u ON qa.student_id = u.id
       LEFT JOIN subjects s ON qa.subject_id = s.id
       LEFT JOIN learning_outcomes lo ON qa.lo_id = lo.id
       LEFT JOIN quizzes qz ON qa.quiz_id = qz.id
+      WHERE u.full_name IS NOT NULL
+        AND u.full_name != ''
+        AND u.id NOT LIKE '%1794%'
+        AND qa.student_id NOT LIKE '%1794%'
+        AND qa.student_id NOT LIKE 's_anticheat_%'
+        AND qa.student_id NOT LIKE 'student_reset_%'
+        AND qa.student_id NOT LIKE 'student_lo_reset_%'
+        AND qa.student_id NOT LIKE 's_lo_%'
+        AND qa.student_id NOT LIKE 'test_%'
+        AND COALESCE(qz.title, '') NOT LIKE '%1794%'
+        AND COALESCE(qz.title, '') NOT LIKE '%Math Roster Quiz%'
+        AND COALESCE(lo.title, '') NOT LIKE '%1794%'
+        AND (qa.quiz_id IS NULL OR qa.quiz_id IN (SELECT id FROM quizzes WHERE title NOT LIKE '%1794%' AND title NOT LIKE '%Math Roster Quiz%' AND title != '1'))
       ORDER BY qa.attempted_at DESC
     ''');
 
-    var list = results;
+    var list = results.where((r) {
+      final sId = (r['student_id']?.toString() ?? '').toLowerCase();
+      final uId = (r['id']?.toString() ?? '').toLowerCase();
+      final sName = (r['student_name']?.toString() ?? '').toLowerCase();
+      final qTitle = (r['lo_title']?.toString() ?? '').toLowerCase();
+      if (sId.contains('1794') ||
+          uId.contains('1794') ||
+          sName.contains('1794') ||
+          qTitle.contains('1794') ||
+          sId.startsWith('s_anticheat_') ||
+          sId.startsWith('student_reset_') ||
+          sId.startsWith('student_lo_reset_') ||
+          sId.startsWith('s_lo_') ||
+          sId.startsWith('test_') ||
+          sName.startsWith('student student_') ||
+          qTitle.contains('math roster quiz')) {
+        return false;
+      }
+      return true;
+    }).toList();
     if (section != null && section.isNotEmpty && section != 'All Sections') {
       final secLower = section.trim().toLowerCase();
       list = list.where((r) {
@@ -3300,6 +3332,9 @@ class DatabaseHelper {
     String? departmentGradeLevel,
   }) async {
     final db = await database;
+    try {
+      await purgeGarbageTestArtifacts();
+    } catch (_) {}
 
     final allUsers = await db.query('users');
 
@@ -3821,13 +3856,13 @@ class DatabaseHelper {
       );
     }
     await batch.commit(noResult: true);
-    onProgress?.call(0.3, 'Synchronizing with Cloud Firestore...');
+    onProgress?.call(0.25, 'Connecting to Cloud Firestore ($total accounts)...');
 
-    // Chunked concurrent execution (12 per batch)
-    const chunkSize = 12;
+    // Concurrently synchronize Cloud Firestore with granular per-item progress
     int completed = 0;
-    for (var i = 0; i < studentIds.length; i += chunkSize) {
-      final end = (i + chunkSize < studentIds.length) ? i + chunkSize : studentIds.length;
+    const concurrency = 4;
+    for (var i = 0; i < studentIds.length; i += concurrency) {
+      final end = (i + concurrency < studentIds.length) ? i + concurrency : studentIds.length;
       final chunk = studentIds.sublist(i, end);
       await Future.wait(
         chunk.map((id) async {
@@ -3837,16 +3872,19 @@ class DatabaseHelper {
               'archived_at': now,
             });
           } catch (_) {}
+          completed++;
+          final ratio = completed / total;
+          final progressVal = 0.25 + (0.65 * ratio);
+          onProgress?.call(
+            progressVal,
+            'Deactivated in Cloud Firestore ($completed of $total: $id)',
+          );
         }),
       );
-      completed += chunk.length;
-      final progressVal = 0.3 + (0.7 * (completed / total));
-      onProgress?.call(
-        progressVal,
-        'Synchronizing Cloud Firestore ($completed of $total)...',
-      );
     }
-    onProgress?.call(1.0, 'Deactivation complete!');
+    onProgress?.call(0.95, 'Refreshing student directory...');
+    await Future.delayed(const Duration(milliseconds: 100));
+    onProgress?.call(1.0, 'Deactivation complete! ($total students deactivated)');
   }
 
   /// Restores an archived student back to the active directory.
@@ -3903,7 +3941,7 @@ class DatabaseHelper {
   }) async {
     if (studentIds.isEmpty) return;
     final total = studentIds.length;
-    onProgress?.call(0.1, 'Purging local student enrollments and records ($total students)...');
+    onProgress?.call(0.10, 'Purging local student enrollments and records ($total students)...');
 
     final db = await database;
     final idToEmail = <String, String>{};
@@ -3933,6 +3971,8 @@ class DatabaseHelper {
     }
     await batch.commit(noResult: true);
 
+    onProgress?.call(0.20, 'Revoking system credentials & blacklisting accounts...');
+
     try {
       final prefs = await SharedPreferences.getInstance();
       final deletedList = prefs.getStringList('permanently_deleted_accounts') ?? [];
@@ -3942,29 +3982,35 @@ class DatabaseHelper {
       await prefs.setStringList('permanently_deleted_accounts', deletedList);
     } catch (_) {}
 
-    onProgress?.call(0.3, 'Purging Cloud Firestore records...');
+    onProgress?.call(0.25, 'Connecting to Cloud Firestore ($total accounts)...');
 
-    // Chunked concurrent Cloud Firestore deletions
-    const chunkSize = 12;
+    // Concurrently purge Cloud Firestore with granular per-item progress tracking
     int completed = 0;
-    for (var i = 0; i < studentIds.length; i += chunkSize) {
-      final end = (i + chunkSize < studentIds.length) ? i + chunkSize : studentIds.length;
+    const concurrency = 4;
+    for (var i = 0; i < studentIds.length; i += concurrency) {
+      final end = (i + concurrency < studentIds.length) ? i + concurrency : studentIds.length;
       final chunk = studentIds.sublist(i, end);
       await Future.wait(
         chunk.map((id) async {
           try {
             await FirestoreService().deleteUser(id, email: idToEmail[id]);
           } catch (_) {}
+          completed++;
+          final ratio = completed / total;
+          final progressVal = 0.25 + (0.65 * ratio); // Scales 25% -> 90%
+          final email = idToEmail[id];
+          final displayTarget = (email != null && email.isNotEmpty) ? email : id;
+          onProgress?.call(
+            progressVal,
+            'Purged Cloud Firestore ($completed of $total: $displayTarget)',
+          );
         }),
       );
-      completed += chunk.length;
-      final progressVal = 0.3 + (0.7 * (completed / total));
-      onProgress?.call(
-        progressVal,
-        'Purging Cloud Firestore ($completed of $total)...',
-      );
     }
-    onProgress?.call(1.0, 'Purge complete!');
+
+    onProgress?.call(0.95, 'Synchronizing school registry & invalidating cache...');
+    await Future.delayed(const Duration(milliseconds: 150));
+    onProgress?.call(1.0, 'Purge complete! ($total student records removed)');
   }
 
   Future<void> updateStudentSection(
@@ -4021,7 +4067,11 @@ class DatabaseHelper {
 
   /// Permanently removes a student, unenrolls from all subjects,
   /// clears quiz and progress records, and deletes from Cloud Firestore.
-  Future<void> deleteStudent(String studentId) async {
+  Future<void> deleteStudent(
+    String studentId, {
+    void Function(double progress, String statusMessage)? onProgress,
+  }) async {
+    onProgress?.call(0.15, 'Purging student records & local enrollments...');
     final db = await database;
     String? email;
     try {
@@ -4081,6 +4131,20 @@ class DatabaseHelper {
     } catch (_) {}
     // 6. Delete user record
     await db.delete('users', where: 'id = ?', whereArgs: [studentId]);
+
+    onProgress?.call(0.35, 'Revoking student credentials & blacklisting account...');
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final deletedList = prefs.getStringList('permanently_deleted_accounts') ?? [];
+      if (!deletedList.contains(studentId)) {
+        deletedList.add(studentId);
+        await prefs.setStringList('permanently_deleted_accounts', deletedList);
+      }
+    } catch (_) {}
+
+    final targetDesc = (email != null && email.isNotEmpty) ? email : studentId;
+    onProgress?.call(0.60, 'Purging Cloud Firestore records for $targetDesc...');
+
     // 7. Delete from Cloud Firestore
     try {
       await FirestoreService()
@@ -4098,6 +4162,10 @@ class DatabaseHelper {
         '[DatabaseHelper] Error deleting student $studentId from Firestore: $e',
       );
     }
+
+    onProgress?.call(0.95, 'Synchronizing student registry & invalidating cache...');
+    await Future.delayed(const Duration(milliseconds: 150));
+    onProgress?.call(1.0, 'Student record purged successfully!');
   }
 
   /// Bulk import students and faculty members with atomic validation,
@@ -4464,25 +4532,128 @@ class DatabaseHelper {
   Future<List<Map<String, dynamic>>> getEnrollmentKeysList() async {
     final db = await database;
     try {
-      final rows = await db.query('reg_links', orderBy: 'created_at DESC');
+      final rowsRaw = await db.query('reg_links', orderBy: 'created_at DESC');
+      final List<Map<String, dynamic>> rows = rowsRaw.map((r) => Map<String, dynamic>.from(r)).toList();
       final sections = await db.query('sections');
+      final students = await db.query(
+        'users',
+        columns: ['id', 'section', 'grade'],
+        where: "(role = 'student' OR id LIKE 'S-%' OR id LIKE '003-%' OR id LIKE 'STU_%') AND (is_archived IS NULL OR is_archived = 0)",
+      );
+
       final Map<String, String> sectionGradeMap = {};
+      final Map<String, int> sectionStudentCountMap = {};
+
       for (final s in sections) {
         final sName = (s['name'] as String?)?.trim().toLowerCase();
         final sGrade = (s['grade'] as String?)?.trim();
         if (sName != null && sGrade != null && sGrade.isNotEmpty) {
           sectionGradeMap[sName] = sGrade;
         }
+        final sCount = int.tryParse(s['student_count']?.toString() ?? '0') ?? 0;
+        if (sName != null && sCount > 0) {
+          sectionStudentCountMap[sName] = sCount;
+        }
       }
 
-      return rows.map((r) {
+      final existingSectionNames = rows.map((r) => (r['section'] as String?)?.trim().toLowerCase()).whereType<String>().toSet();
+      final existingCodes = rows.map((r) => (r['code'] as String?)?.trim().toUpperCase()).whereType<String>().toSet();
+
+      // Ensure EVERY active section in the school has an enrollment key visible, even if 0 students are enrolled
+      for (final s in sections) {
+        final secName = (s['name'] as String?)?.trim() ?? '';
+        if (secName.isEmpty) continue;
+        final secLower = secName.toLowerCase();
+        final rawKey = s['enrollment_key']?.toString().trim().toUpperCase();
+        final code = (rawKey != null && rawKey.isNotEmpty)
+            ? rawKey
+            : SectionKeyHelper.generateKey(sectionName: secName, gradeLevel: s['grade']?.toString());
+
+        if (!existingSectionNames.contains(secLower) && !existingCodes.contains(code)) {
+          final maxUses = int.tryParse(s['max_students']?.toString() ?? '50') ?? 50;
+          final fallbackRow = {
+            'code': code,
+            'section': secName,
+            'max_uses': maxUses,
+            'used_count': 0,
+            'expiration': 'Never (Standard)',
+            'created_at': s['created_at'] ?? DateTime.now().toIso8601String(),
+          };
+          rows.add(fallbackRow);
+          existingSectionNames.add(secLower);
+          existingCodes.add(code);
+
+          // Persist synthesized key into SQLite reg_links so it is immediately cached
+          db.insert('reg_links', fallbackRow, conflictAlgorithm: ConflictAlgorithm.replace).catchError((_) => 0);
+        }
+      }
+
+      final List<Map<String, dynamic>> enriched = [];
+
+      for (final r in rows) {
         final secName = (r['section'] as String?)?.trim() ?? '';
-        String? resolvedGrade = sectionGradeMap[secName.toLowerCase()];
+        final secLower = secName.toLowerCase();
+        String? resolvedGrade = sectionGradeMap[secLower];
         if (resolvedGrade == null || resolvedGrade.isEmpty) {
           resolvedGrade = SectionKeyHelper.extractGradeFromSection(secName);
         }
-        return {...r, 'grade': resolvedGrade};
-      }).toList();
+
+        // Clean section name to token (e.g. 'Grade 12 - Sapphire' -> 'sapphire')
+        final cleanSec = secLower
+            .replaceAll(RegExp(r'^grade\s*\d+\s*[-–—]\s*'), '')
+            .replaceAll(RegExp(r'\b(?:grade|section|room)\b'), '')
+            .replaceAll(RegExp(r'[^a-zA-Z0-9]'), '')
+            .trim();
+
+        // Calculate real live enrolled students from users table
+        int liveStudentCount = 0;
+        for (final stu in students) {
+          final stuSec = (stu['section'] as String?)?.trim().toLowerCase() ?? '';
+          if (stuSec.isEmpty) continue;
+
+          final cleanStuSec = stuSec
+              .replaceAll(RegExp(r'^grade\s*\d+\s*[-–—]\s*'), '')
+              .replaceAll(RegExp(r'\b(?:grade|section|room)\b'), '')
+              .replaceAll(RegExp(r'[^a-zA-Z0-9]'), '')
+              .trim();
+
+          if (stuSec == secLower ||
+              (cleanSec.isNotEmpty &&
+                  (cleanStuSec == cleanSec ||
+                      cleanStuSec.contains(cleanSec) ||
+                      cleanSec.contains(cleanStuSec)))) {
+            liveStudentCount++;
+          }
+        }
+
+        final storedUsed = (r['used_count'] as int?) ?? 0;
+        final sectionTableCount = sectionStudentCountMap[secLower] ?? 0;
+
+        // Effective count is the maximum of live students, section cached count, and stored counter
+        final effectiveUsed = [liveStudentCount, sectionTableCount, storedUsed]
+            .reduce((a, b) => a > b ? a : b);
+
+        // Keep local SQLite reg_links updated if out of sync
+        if (effectiveUsed != storedUsed) {
+          final code = r['code']?.toString();
+          if (code != null && code.isNotEmpty) {
+            db.update(
+              'reg_links',
+              {'used_count': effectiveUsed},
+              where: 'code = ?',
+              whereArgs: [code],
+            ).catchError((_) => 0);
+          }
+        }
+
+        enriched.add({
+          ...r,
+          'grade': resolvedGrade,
+          'used_count': effectiveUsed,
+        });
+      }
+
+      return enriched;
     } catch (_) {
       return await db.query('reg_links', orderBy: 'created_at DESC');
     }
@@ -4652,15 +4823,39 @@ class DatabaseHelper {
     // Dynamically calculate section student counts from real registered active students
     try {
       final allSecs = await db.query('sections');
+      final allStudents = await db.query(
+        'users',
+        columns: ['section'],
+        where: "(role = 'student' OR id LIKE 'S-%' OR id LIKE '003-%' OR id LIKE 'STU_%') AND (is_archived IS NULL OR is_archived = 0)",
+      );
+
       for (final s in allSecs) {
-        final sName = s['name'] as String? ?? '';
+        final sName = (s['name'] as String? ?? '').trim().toLowerCase();
         if (sName.isNotEmpty) {
-          final count = Sqflite.firstIntValue(
-            await db.rawQuery(
-              "SELECT COUNT(*) FROM users WHERE section = ? AND role = 'student' AND (is_archived IS NULL OR is_archived = 0)",
-              [sName],
-            ),
-          ) ?? 0;
+          final cleanSec = sName
+              .replaceAll(RegExp(r'^grade\s*\d+\s*[-–—]\s*'), '')
+              .replaceAll(RegExp(r'\b(?:grade|section|room)\b'), '')
+              .replaceAll(RegExp(r'[^a-zA-Z0-9]'), '')
+              .trim();
+
+          int count = 0;
+          for (final stu in allStudents) {
+            final stuSec = (stu['section'] as String?)?.trim().toLowerCase() ?? '';
+            if (stuSec.isEmpty) continue;
+            final cleanStuSec = stuSec
+                .replaceAll(RegExp(r'^grade\s*\d+\s*[-–—]\s*'), '')
+                .replaceAll(RegExp(r'\b(?:grade|section|room)\b'), '')
+                .replaceAll(RegExp(r'[^a-zA-Z0-9]'), '')
+                .trim();
+
+            if (stuSec == sName ||
+                (cleanSec.isNotEmpty &&
+                    (cleanStuSec == cleanSec ||
+                        cleanStuSec.contains(cleanSec) ||
+                        cleanSec.contains(cleanStuSec)))) {
+              count++;
+            }
+          }
           await db.update('sections', {'student_count': count}, where: 'id = ?', whereArgs: [s['id']]);
         }
       }
@@ -4896,12 +5091,13 @@ class DatabaseHelper {
       );
     }
     await batch.commit(noResult: true);
-    onProgress?.call(0.3, 'Synchronizing with Cloud Firestore...');
+    onProgress?.call(0.25, 'Connecting to Cloud Firestore ($total accounts)...');
 
-    const chunkSize = 12;
+    // Concurrently synchronize Cloud Firestore with granular per-item progress
     int completed = 0;
-    for (var i = 0; i < teacherIds.length; i += chunkSize) {
-      final end = (i + chunkSize < teacherIds.length) ? i + chunkSize : teacherIds.length;
+    const concurrency = 4;
+    for (var i = 0; i < teacherIds.length; i += concurrency) {
+      final end = (i + concurrency < teacherIds.length) ? i + concurrency : teacherIds.length;
       final chunk = teacherIds.sublist(i, end);
       await Future.wait(
         chunk.map((id) async {
@@ -4911,16 +5107,19 @@ class DatabaseHelper {
               'archived_at': now,
             });
           } catch (_) {}
+          completed++;
+          final ratio = completed / total;
+          final progressVal = 0.25 + (0.65 * ratio);
+          onProgress?.call(
+            progressVal,
+            'Deactivated in Cloud Firestore ($completed of $total: $id)',
+          );
         }),
       );
-      completed += chunk.length;
-      final progressVal = 0.3 + (0.7 * (completed / total));
-      onProgress?.call(
-        progressVal,
-        'Synchronizing Cloud Firestore ($completed of $total)...',
-      );
     }
-    onProgress?.call(1.0, 'Deactivation complete!');
+    onProgress?.call(0.95, 'Refreshing faculty directory...');
+    await Future.delayed(const Duration(milliseconds: 100));
+    onProgress?.call(1.0, 'Deactivation complete! ($total members deactivated)');
   }
 
   /// Restores an archived teacher back to the active faculty directory.
@@ -4977,7 +5176,7 @@ class DatabaseHelper {
   }) async {
     if (teacherIds.isEmpty) return;
     final total = teacherIds.length;
-    onProgress?.call(0.1, 'Unassigning subjects and purging faculty records ($total members)...');
+    onProgress?.call(0.10, 'Unassigning subjects and preparing purge ($total members)...');
 
     final db = await database;
     final idToEmail = <String, String>{};
@@ -5007,6 +5206,8 @@ class DatabaseHelper {
     }
     await batch.commit(noResult: true);
 
+    onProgress?.call(0.20, 'Revoking system credentials & blacklisting accounts...');
+
     try {
       final prefs = await SharedPreferences.getInstance();
       final deletedList = prefs.getStringList('permanently_deleted_accounts') ?? [];
@@ -5016,28 +5217,35 @@ class DatabaseHelper {
       await prefs.setStringList('permanently_deleted_accounts', deletedList);
     } catch (_) {}
 
-    onProgress?.call(0.3, 'Purging Cloud Firestore records...');
+    onProgress?.call(0.25, 'Connecting to Cloud Firestore ($total accounts)...');
 
-    const chunkSize = 12;
+    // Concurrently purge Cloud Firestore with granular per-item progress tracking
     int completed = 0;
-    for (var i = 0; i < teacherIds.length; i += chunkSize) {
-      final end = (i + chunkSize < teacherIds.length) ? i + chunkSize : teacherIds.length;
+    const concurrency = 4;
+    for (var i = 0; i < teacherIds.length; i += concurrency) {
+      final end = (i + concurrency < teacherIds.length) ? i + concurrency : teacherIds.length;
       final chunk = teacherIds.sublist(i, end);
       await Future.wait(
         chunk.map((id) async {
           try {
             await FirestoreService().deleteUser(id, email: idToEmail[id]);
           } catch (_) {}
+          completed++;
+          final ratio = completed / total;
+          final progressVal = 0.25 + (0.65 * ratio); // Scales 25% -> 90%
+          final email = idToEmail[id];
+          final displayTarget = (email != null && email.isNotEmpty) ? email : id;
+          onProgress?.call(
+            progressVal,
+            'Purged Cloud Firestore ($completed of $total: $displayTarget)',
+          );
         }),
       );
-      completed += chunk.length;
-      final progressVal = 0.3 + (0.7 * (completed / total));
-      onProgress?.call(
-        progressVal,
-        'Purging Cloud Firestore ($completed of $total)...',
-      );
     }
-    onProgress?.call(1.0, 'Purge complete!');
+
+    onProgress?.call(0.95, 'Synchronizing school registry & invalidating cache...');
+    await Future.delayed(const Duration(milliseconds: 150));
+    onProgress?.call(1.0, 'Purge complete! ($total faculty members removed)');
   }
 
   /// Checks whether a given user ID is already registered in local SQLite or Cloud Firestore
@@ -5363,20 +5571,20 @@ class DatabaseHelper {
       debugPrint('[DatabaseHelper] Error syncing teacher to Firestore: $e');
     }
 
-    try {
-      await EmailService().sendAccountCredentials(
+    unawaited(
+      EmailService().sendAccountCredentials(
         toEmail: email.trim(),
         fullName: fullName.trim(),
         userId: finalTeacherId,
         username: resolvedUsername,
         plainPassword: password,
         role: 'teacher',
-      );
-    } catch (e) {
-      debugPrint(
-        '[DatabaseHelper] Error dispatching teacher credentials email: $e',
-      );
-    }
+      ).then((res) {
+        debugPrint('[DatabaseHelper] Teacher credentials email dispatched: ${res.success}');
+      }).catchError((e) {
+        debugPrint('[DatabaseHelper] Error dispatching teacher credentials email: $e');
+      }),
+    );
 
     return finalTeacherId;
   }
@@ -5558,8 +5766,8 @@ class DatabaseHelper {
       } catch (_) {}
     }
 
-    try {
-      await EmailService().sendAccountCredentials(
+    unawaited(
+      EmailService().sendAccountCredentials(
         toEmail: email.trim(),
         fullName: fullName.trim(),
         userId: finalStudentId,
@@ -5569,12 +5777,12 @@ class DatabaseHelper {
         grade: grade,
         section: section,
         specialNotes: specialNotes,
-      );
-    } catch (e) {
-      debugPrint(
-        '[DatabaseHelper] Error dispatching student credentials email: $e',
-      );
-    }
+      ).then((res) {
+        debugPrint('[DatabaseHelper] Student credentials email dispatched: ${res.success}');
+      }).catchError((e) {
+        debugPrint('[DatabaseHelper] Error dispatching student credentials email: $e');
+      }),
+    );
 
     return finalStudentId;
   }
@@ -5773,7 +5981,11 @@ class DatabaseHelper {
     }
   }
 
-  Future<void> deleteTeacher(String teacherId) async {
+  Future<void> deleteTeacher(
+    String teacherId, {
+    void Function(double progress, String statusMessage)? onProgress,
+  }) async {
+    onProgress?.call(0.15, 'Unassigning courses and clearing local records...');
     final db = await database;
     String? email;
     try {
@@ -5797,6 +6009,20 @@ class DatabaseHelper {
     );
     // Delete the teacher account
     await db.delete('users', where: 'id = ?', whereArgs: [teacherId]);
+
+    onProgress?.call(0.35, 'Revoking faculty credentials & blacklisting account...');
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final deletedList = prefs.getStringList('permanently_deleted_accounts') ?? [];
+      if (!deletedList.contains(teacherId)) {
+        deletedList.add(teacherId);
+        await prefs.setStringList('permanently_deleted_accounts', deletedList);
+      }
+    } catch (_) {}
+
+    final targetDesc = (email != null && email.isNotEmpty) ? email : teacherId;
+    onProgress?.call(0.60, 'Purging Cloud Firestore records for $targetDesc...');
+
     // Delete from Cloud Firestore
     try {
       await FirestoreService()
@@ -5814,6 +6040,10 @@ class DatabaseHelper {
         '[DatabaseHelper] Error deleting teacher $teacherId from Firestore: $e',
       );
     }
+
+    onProgress?.call(0.95, 'Synchronizing school registry & invalidating cache...');
+    await Future.delayed(const Duration(milliseconds: 150));
+    onProgress?.call(1.0, 'Faculty record purged permanently!');
   }
 
   Future<List<Map<String, dynamic>>> getSubjectsForTeacher(
@@ -6120,11 +6350,11 @@ class DatabaseHelper {
       if (atRiskStudents.isNotEmpty) {
         final firstStudent = atRiskStudents.first['name'];
         recommendedActions.add({
-          'title': 'Offer Review for Struggling Students',
+          'title': 'Review for Flagged Students',
           'description':
-              '${atRiskStudents.length} student(s) including $firstStudent could benefit from targeted practice before the next exam.',
+              '${atRiskStudents.length} student(s) including $firstStudent scored below 75%. Offer targeted practice or direct consultation.',
           'actionType': 'view_students',
-          'badge': 'Targeted Support',
+          'badge': 'Intervention',
           'icon': 'support_agent_outlined',
         });
       }
@@ -6132,33 +6362,37 @@ class DatabaseHelper {
         final pct = ((needsAttentionCount / totalAttempts) * 100).round();
         if (pct >= 25) {
           recommendedActions.add({
-            'title': 'Dedicate 10-Min Review in Class',
+            'title': 'Review Key Assessment Concepts',
             'description':
-                '$pct% of quiz attempts were below 75%. Clarifying key quiz questions will boost overall class confidence.',
-            'actionType': 'post_announcement',
-            'badge': 'Concept Review',
-            'icon': 'rate_review_outlined',
+                '$pct% of recent quiz attempts were below 75%. Check item analysis to clarify questions students missed most.',
+            'actionType': 'item_analysis',
+            'badge': 'Item Analysis',
+            'icon': 'analytics_outlined',
           });
         }
       }
-      if (passRate >= 80) {
+      if (passRate >= 80 && totalAttempts > 0) {
         recommendedActions.add({
-          'title': 'Challenge Advanced Learners',
+          'title': 'Curriculum Schedule On Track',
           'description':
-              'Class is performing strongly ($passRate% pass rate). Consider unlocking enrichment projects or peer tutoring.',
-          'actionType': 'create_quiz',
-          'badge': 'Enrichment',
-          'icon': 'workspace_premium_outlined',
+              'Class mastery is solid ($passRate% pass rate). Review item analysis or schedule your next learning module assessment.',
+          'actionType': 'item_analysis',
+          'badge': 'Benchmark Met',
+          'icon': 'check_circle_outline_rounded',
         });
       }
     }
 
     // Recent attempts with section/student filtering
     String recentQuery = '''
-      SELECT qa.*, u.full_name as student_name, u.profile_image as student_profile_image, u.profile_image, s.name as subject_name
+      SELECT qa.*, u.full_name as student_name, u.profile_image as student_profile_image, u.profile_image, s.name as subject_name,
+             COALESCE(q.title, lo.title, s.name || ' Quiz') as quiz_title,
+             lo.title as lo_title
       FROM quiz_attempts qa
       JOIN users u ON qa.student_id = u.id
       JOIN subjects s ON qa.subject_id = s.id
+      LEFT JOIN quizzes q ON qa.quiz_id = q.id
+      LEFT JOIN learning_outcomes lo ON qa.lo_id = lo.id
       WHERE s.teacher_id = ?
     ''';
     final recentArgs = <dynamic>[teacherId];
@@ -6171,7 +6405,7 @@ class DatabaseHelper {
       recentArgs.add(section.toLowerCase().trim());
     }
 
-    recentQuery += ' ORDER BY qa.attempted_at DESC LIMIT 10';
+    recentQuery += ' ORDER BY qa.attempted_at DESC LIMIT 15';
     final recent = await db.rawQuery(recentQuery, recentArgs);
 
     return {
@@ -6186,9 +6420,7 @@ class DatabaseHelper {
       'proficientCount': proficientCount,
       'needsAttentionCount': needsAttentionCount,
       'atRiskStudents': atRiskStudents,
-      'forecastPassRate': totalAttempts > 0
-          ? ((passRate * 0.95 + 4).clamp(0, 100)).round()
-          : null,
+      'forecastPassRate': totalAttempts > 0 ? passRate : null,
       'recommendedActions': recommendedActions,
     };
   }
@@ -6495,6 +6727,397 @@ class DatabaseHelper {
 
     final sorted = sections.toList()..sort();
     return sorted;
+  }
+
+  /// Get distinct list of sections specifically enrolled in a given subject
+  Future<List<String>> getSectionsForSubject(int subjectId) async {
+    final db = await database;
+    final sections = <String>{};
+
+    try {
+      final enrollments = await db.query(
+        'enrollments',
+        columns: ['student_id'],
+        where: 'subject_id = ? AND status = ?',
+        whereArgs: [subjectId, 'active'],
+      );
+      final studentIds = enrollments
+          .map((e) => e['student_id']?.toString() ?? '')
+          .where((id) => id.isNotEmpty)
+          .toSet()
+          .toList();
+
+      if (studentIds.isNotEmpty) {
+        final students = await db.query(
+          'users',
+          columns: ['section'],
+          where:
+              'id IN (${studentIds.map((_) => '?').join(',')}) AND section IS NOT NULL',
+          whereArgs: studentIds,
+        );
+        for (final s in students) {
+          final sec = s['section']?.toString().trim();
+          if (sec != null && sec.isNotEmpty && sec != 'Unassigned') {
+            sections.add(sec);
+          }
+        }
+      }
+    } catch (_) {}
+
+    final sorted = sections.toList()..sort();
+    return sorted;
+  }
+
+  /// Heatmap Matrix Data: Learning Outcomes & Quizzes competency mastery broken down by section and student
+  Future<Map<String, dynamic>> getCompetencyMasteryHeatmapData({
+    String? teacherId,
+    int? subjectId,
+    String? section,
+    String? studentId,
+  }) async {
+    final db = await database;
+
+    // 1. Fetch relevant subjects
+    List<Map<String, dynamic>> subjects = [];
+    if (teacherId != null && teacherId.isNotEmpty) {
+      subjects = await getSubjectsForTeacher(teacherId);
+    }
+    if (subjects.isEmpty) {
+      subjects = await db.query('subjects', orderBy: 'id ASC');
+    }
+
+    if (subjectId != null) {
+      subjects = subjects.where((s) => s['id'] == subjectId).toList();
+    }
+    final subjectIds = subjects.map((s) => s['id'] as int).toList();
+
+    // 2. Fetch Handled Sections
+    List<String> sectionsList = [];
+    if (teacherId != null && teacherId.isNotEmpty) {
+      sectionsList = await getSectionsForTeacher(teacherId);
+    }
+    if (sectionsList.isEmpty) {
+      final secRows = await db.query('sections', orderBy: 'name ASC');
+      sectionsList = secRows
+          .map((r) => (r['name'] as String?)?.trim() ?? '')
+          .where((s) => s.isNotEmpty)
+          .toList();
+    }
+    if (section != null &&
+        section.isNotEmpty &&
+        section != 'All Sections' &&
+        section != 'All Handled Sections') {
+      final cleanSec = section.toLowerCase().trim();
+      final filteredSecs = sectionsList.where((s) {
+        final lower = s.toLowerCase().trim();
+        return lower == cleanSec || lower.contains(cleanSec) || cleanSec.contains(lower);
+      }).toList();
+      sectionsList = filteredSecs.isNotEmpty ? filteredSecs : [section];
+    }
+
+    // 3. Fetch Students in target sections
+    final allStudentsRaw = await db.query(
+      'users',
+      where: 'role = ?',
+      whereArgs: ['student'],
+    );
+    final sectionsSet = sectionsList.map((s) => s.toLowerCase().trim()).toSet();
+    final List<Map<String, dynamic>> students = [];
+    for (final u in allStudentsRaw) {
+      final uSec = (u['section'] as String?)?.toLowerCase().trim() ?? '';
+      final isMatch = sectionsSet.isEmpty ||
+          sectionsSet.contains(uSec) ||
+          sectionsSet.any((s) => s.contains(uSec) || uSec.contains(s));
+      if (isMatch) {
+        students.add({
+          'id': u['id']?.toString() ?? '',
+          'name': (u['full_name'] as String?)?.trim() ?? 'Student',
+          'email': (u['email'] as String?)?.trim() ?? '',
+          'section': (u['section'] as String?)?.trim() ?? '',
+          'profile_image': u['profile_image']?.toString(),
+        });
+      }
+    }
+
+    // Apply student filter if provided
+    List<Map<String, dynamic>> targetStudents = students;
+    if (studentId != null && studentId.isNotEmpty && studentId != 'All') {
+      targetStudents = students.where((s) => s['id'] == studentId).toList();
+    }
+
+    // 4. Fetch Learning Outcomes & Topics
+    final List<Map<String, dynamic>> competencies = [];
+    if (subjectIds.isNotEmpty) {
+      final placeholders = subjectIds.map((_) => '?').join(',');
+      try {
+        final loRows = await db.rawQuery('''
+          SELECT 
+            lo.id as lo_id,
+            lo.title as lo_title,
+            lo.passing_score,
+            t.id as topic_id,
+            t.title as topic_title,
+            s.id as subject_id,
+            s.name as subject_name,
+            COALESCE(s.subject_code, s.code, '') as subject_code
+          FROM learning_outcomes lo
+          JOIN topics t ON lo.topic_id = t.id
+          JOIN subjects s ON t.subject_id = s.id
+          WHERE s.id IN ($placeholders)
+          ORDER BY s.id ASC, t.id ASC, lo.id ASC
+        ''', subjectIds);
+
+        for (int i = 0; i < loRows.length; i++) {
+          final r = loRows[i];
+          final loId = r['lo_id'] as int;
+          competencies.add({
+            'key': 'lo_$loId',
+            'code': 'LO-${i + 1}',
+            'id': loId,
+            'type': 'lo',
+            'title': (r['lo_title'] as String? ?? 'Learning Outcome').trim(),
+            'topicTitle': (r['topic_title'] as String? ?? '').trim(),
+            'subjectId': r['subject_id'] as int,
+            'subjectName': (r['subject_name'] as String? ?? '').trim(),
+            'subjectCode': (r['subject_code'] as String? ?? '').trim(),
+            'passingScore': (r['passing_score'] as int?) ?? 75,
+          });
+        }
+      } catch (_) {}
+
+      // Fetch Quizzes to ensure standalone or unmapped quizzes are also represented
+      try {
+        final quizRows = await db.rawQuery('''
+          SELECT 
+            q.id as quiz_id,
+            q.title as quiz_title,
+            q.passing_score,
+            q.lo_id,
+            s.id as subject_id,
+            s.name as subject_name,
+            COALESCE(s.subject_code, s.code, '') as subject_code
+          FROM quizzes q
+          JOIN subjects s ON q.subject_id = s.id
+          WHERE s.id IN ($placeholders)
+          ORDER BY q.id ASC
+        ''', subjectIds);
+
+        final existingLoIds = competencies
+            .where((c) => c['type'] == 'lo')
+            .map((c) => c['id'] as int)
+            .toSet();
+
+        for (final q in quizRows) {
+          final qLoId = q['lo_id'] as int?;
+          if (qLoId == null || !existingLoIds.contains(qLoId)) {
+            final qId = q['quiz_id'] as int;
+            competencies.add({
+              'key': 'quiz_$qId',
+              'code': 'Q-$qId',
+              'id': qId,
+              'type': 'quiz',
+              'title': (q['quiz_title'] as String? ?? 'Quiz Assessment').trim(),
+              'topicTitle': 'Quiz Assessment',
+              'subjectId': q['subject_id'] as int,
+              'subjectName': (q['subject_name'] as String? ?? '').trim(),
+              'subjectCode': (q['subject_code'] as String? ?? '').trim(),
+              'passingScore': (q['passing_score'] as int?) ?? 75,
+            });
+          }
+        }
+      } catch (_) {}
+    }
+
+    // 5. Fetch Quiz Attempts for these subjects
+    List<Map<String, dynamic>> rawAttempts = [];
+    if (subjectIds.isNotEmpty) {
+      final placeholders = subjectIds.map((_) => '?').join(',');
+      try {
+        rawAttempts = await db.rawQuery('''
+          SELECT 
+            qa.id,
+            qa.student_id,
+            u.full_name as student_name,
+            u.section as student_section,
+            qa.subject_id,
+            qa.lo_id,
+            qa.quiz_id,
+            qa.score,
+            qa.total_questions,
+            qa.percentage,
+            qa.is_passed,
+            qa.attempted_at,
+            COALESCE(lo.title, q.title, 'Quiz Attempt') as assessment_title
+          FROM quiz_attempts qa
+          JOIN users u ON qa.student_id = u.id
+          JOIN subjects s ON qa.subject_id = s.id
+          LEFT JOIN learning_outcomes lo ON qa.lo_id = lo.id
+          LEFT JOIN quizzes q ON qa.quiz_id = q.id
+          WHERE qa.subject_id IN ($placeholders)
+          ORDER BY qa.attempted_at ASC
+        ''', subjectIds);
+      } catch (_) {}
+    }
+
+    // Dynamically register any orphaned LOs or Quizzes from attempts so data is 100% visible
+    final compKeys = competencies.map((c) => c['key'] as String).toSet();
+    for (final att in rawAttempts) {
+      final loId = att['lo_id'] as int?;
+      final qId = att['quiz_id'] as int?;
+      final key = loId != null ? 'lo_$loId' : (qId != null ? 'quiz_$qId' : null);
+      if (key != null && !compKeys.contains(key)) {
+        competencies.add({
+          'key': key,
+          'code': loId != null ? 'LO-$loId' : 'Q-$qId',
+          'id': loId ?? qId!,
+          'type': loId != null ? 'lo' : 'quiz',
+          'title': (att['assessment_title'] as String? ?? 'Curriculum Assessment').trim(),
+          'topicTitle': 'Curriculum Assessment',
+          'subjectId': att['subject_id'] as int? ?? (subjectIds.isNotEmpty ? subjectIds.first : 0),
+          'subjectName': '',
+          'subjectCode': '',
+          'passingScore': 75,
+        });
+        compKeys.add(key);
+      }
+    }
+
+    // 6. Pre-index attempts by competency key
+    final attemptsByComp = <String, List<Map<String, dynamic>>>{};
+    for (final att in rawAttempts) {
+      final loId = att['lo_id'] as int?;
+      final qId = att['quiz_id'] as int?;
+      if (loId != null) {
+        attemptsByComp.putIfAbsent('lo_$loId', () => []).add(att);
+      }
+      if (qId != null) {
+        attemptsByComp.putIfAbsent('quiz_$qId', () => []).add(att);
+      }
+    }
+
+    // 7. Calculate cell metrics for each competency
+    final matrixData = <Map<String, dynamic>>[];
+    for (final comp in competencies) {
+      final compKey = comp['key'] as String;
+      final compAttempts = attemptsByComp[compKey] ?? [];
+
+      // Section scores: Map<sectionName, stats>
+      final sectionStats = <String, Map<String, dynamic>>{};
+      for (final sec in sectionsList) {
+        final secLower = sec.toLowerCase().trim();
+        final secAtts = compAttempts.where((a) {
+          final sSec = (a['student_section'] as String?)?.toLowerCase().trim() ?? '';
+          return sSec == secLower || sSec.contains(secLower) || secLower.contains(sSec);
+        }).toList();
+
+        final attCount = secAtts.length;
+        final double? avg = attCount > 0
+            ? (secAtts.map((a) => (a['percentage'] as num).toDouble()).reduce((a, b) => a + b) / attCount)
+            : null;
+        final passCount = secAtts.where((a) => (a['is_passed'] as int?) == 1).length;
+        final passRate = attCount > 0 ? (passCount / attCount) * 100 : null;
+
+        String tier;
+        if (avg == null) {
+          tier = 'unassessed';
+        } else if (avg >= 85.0) {
+          tier = 'mastered';
+        } else if (avg >= 70.0) {
+          tier = 'proficient';
+        } else if (avg >= 50.0) {
+          tier = 'developing';
+        } else {
+          tier = 'needs_help';
+        }
+
+        sectionStats[sec] = {
+          'attemptsCount': attCount,
+          'avgScore': avg != null ? double.parse(avg.toStringAsFixed(1)) : null,
+          'passedCount': passCount,
+          'passRate': passRate != null ? double.parse(passRate.toStringAsFixed(1)) : null,
+          'tier': tier,
+          'attempts': secAtts,
+        };
+      }
+
+      // Student scores: Map<studentId, stats>
+      final studentStats = <String, Map<String, dynamic>>{};
+      for (final stud in targetStudents) {
+        final sId = stud['id'] as String;
+        final sAtts = compAttempts.where((a) => a['student_id'] == sId).toList();
+        final attCount = sAtts.length;
+        final double? avg = attCount > 0
+            ? (sAtts.map((a) => (a['percentage'] as num).toDouble()).reduce((a, b) => a + b) / attCount)
+            : null;
+        final passCount = sAtts.where((a) => (a['is_passed'] as int?) == 1).length;
+        final latest = sAtts.isNotEmpty ? sAtts.last : null;
+
+        String tier;
+        if (avg == null) {
+          tier = 'unassessed';
+        } else if (avg >= 85.0) {
+          tier = 'mastered';
+        } else if (avg >= 70.0) {
+          tier = 'proficient';
+        } else if (avg >= 50.0) {
+          tier = 'developing';
+        } else {
+          tier = 'needs_help';
+        }
+
+        studentStats[sId] = {
+          'attemptsCount': attCount,
+          'avgScore': avg != null ? double.parse(avg.toStringAsFixed(1)) : null,
+          'passedCount': passCount,
+          'latestScore': latest != null ? (latest['percentage'] as num).toDouble() : null,
+          'isPassed': latest != null ? ((latest['is_passed'] as int?) == 1) : null,
+          'lastAttemptDate': latest?['attempted_at'],
+          'tier': tier,
+          'attempts': sAtts,
+        };
+      }
+
+      // Overall cohort stats for this competency
+      final totalAtts = compAttempts.length;
+      final double? overallAvg = totalAtts > 0
+          ? (compAttempts.map((a) => (a['percentage'] as num).toDouble()).reduce((a, b) => a + b) / totalAtts)
+          : null;
+      final overallPassed = compAttempts.where((a) => (a['is_passed'] as int?) == 1).length;
+      final overallPassRate = totalAtts > 0 ? (overallPassed / totalAtts) * 100 : null;
+
+      String overallTier;
+      if (overallAvg == null) {
+        overallTier = 'unassessed';
+      } else if (overallAvg >= 85.0) {
+        overallTier = 'mastered';
+      } else if (overallAvg >= 70.0) {
+        overallTier = 'proficient';
+      } else if (overallAvg >= 50.0) {
+        overallTier = 'developing';
+      } else {
+        overallTier = 'needs_help';
+      }
+
+      matrixData.add({
+        ...comp,
+        'sections': sectionStats,
+        'students': studentStats,
+        'overall': {
+          'attemptsCount': totalAtts,
+          'avgScore': overallAvg != null ? double.parse(overallAvg.toStringAsFixed(1)) : null,
+          'passedCount': overallPassed,
+          'passRate': overallPassRate != null ? double.parse(overallPassRate.toStringAsFixed(1)) : null,
+          'tier': overallTier,
+        },
+      });
+    }
+
+    return {
+      'subjects': subjects,
+      'sections': sectionsList,
+      'students': targetStudents,
+      'matrix': matrixData,
+    };
   }
 
   /// Get announcements for a teacher with optional section filtering
@@ -7558,7 +8181,162 @@ class DatabaseHelper {
     await db.delete('quizzes', where: 'id = ?', whereArgs: [quizId]);
   }
 
+  /// Purges test artifacts and orphan quizzes that have 0 student attempts
+  /// and match automated timestamp or test placeholder titles.
+  Future<int> purgeGarbageTestQuizzes() async {
+    final db = await database;
+    final candidates = await db.rawQuery('''
+      SELECT q.id FROM quizzes q
+      WHERE (SELECT COUNT(*) FROM quiz_attempts WHERE quiz_id = q.id) = 0
+        AND (
+          q.title LIKE '%1794%'
+          OR q.title = '1'
+          OR q.title = ''
+          OR q.title LIKE 'Test%'
+          OR q.title LIKE '%dummy%'
+          OR q.title LIKE '%temp%'
+        )
+    ''');
+
+    int deletedCount = 0;
+    for (final row in candidates) {
+      final qId = row['id'] as int;
+      await db.delete('questions', where: 'quiz_id = ?', whereArgs: [qId]);
+      await db.delete('quizzes', where: 'id = ?', whereArgs: [qId]);
+      deletedCount++;
+    }
+    return deletedCount;
+  }
+
+  /// System-wide purge of automated test runner artifacts across
+  /// quiz attempts, student scores, test quizzes, and dummy user profiles.
+  Future<int> purgeGarbageTestArtifacts() async {
+    final db = await database;
+    int deleted = 0;
+
+    // 1. Delete orphan/test attempts from quiz_attempts
+    deleted += await db.rawDelete('''
+      DELETE FROM quiz_attempts
+      WHERE student_id LIKE '%1794%'
+         OR student_id LIKE 's_anticheat_%'
+         OR student_id LIKE 'student_reset_%'
+         OR student_id LIKE 'student_lo_reset_%'
+         OR student_id LIKE 's_lo_%'
+         OR student_id LIKE 'test_%'
+         OR student_id NOT IN (SELECT id FROM users WHERE full_name IS NOT NULL AND full_name != '')
+         OR quiz_id IN (SELECT id FROM quizzes WHERE title LIKE '%1794%' OR title LIKE '%Math Roster Quiz%' OR title = '1')
+         OR (quiz_id IS NOT NULL AND quiz_id NOT IN (SELECT id FROM quizzes))
+    ''');
+
+    // 2. Delete test student scores
+    deleted += await db.rawDelete('''
+      DELETE FROM student_scores
+      WHERE student_id LIKE '%1794%'
+         OR student_id LIKE 's_anticheat_%'
+         OR student_id LIKE 'student_reset_%'
+         OR student_id LIKE 'student_lo_reset_%'
+         OR student_id LIKE 's_lo_%'
+         OR student_id LIKE 'test_%'
+         OR student_id NOT IN (SELECT id FROM users WHERE full_name IS NOT NULL AND full_name != '')
+         OR quiz_id IN (SELECT id FROM quizzes WHERE title LIKE '%1794%' OR title LIKE '%Math Roster Quiz%' OR title = '1')
+    ''');
+
+    // 3. Delete test quizzes and their questions
+    final testQuizzes = await db.rawQuery('''
+      SELECT id FROM quizzes
+      WHERE title LIKE '%1794%' OR title LIKE '%Math Roster Quiz%' OR title = '1'
+    ''');
+    for (final q in testQuizzes) {
+      final qId = q['id'] as int;
+      await db.delete('questions', where: 'quiz_id = ?', whereArgs: [qId]);
+      await db.delete('quizzes', where: 'id = ?', whereArgs: [qId]);
+      deleted++;
+    }
+
+    // 4. Delete test users and students
+    deleted += await db.rawDelete('''
+      DELETE FROM users
+      WHERE id LIKE '%1794%' 
+         OR username LIKE '%1794%' 
+         OR full_name LIKE '%1794%'
+         OR id LIKE 's_anticheat_%'
+         OR id LIKE 'student_reset_%'
+         OR id LIKE 'student_lo_reset_%'
+         OR id LIKE 's_lo_%'
+         OR full_name LIKE 'Student student_%'
+    ''');
+
+    deleted += await db.rawDelete('''
+      DELETE FROM students
+      WHERE id LIKE '%1794%' 
+         OR name LIKE '%1794%' 
+         OR email LIKE '%1794%'
+         OR id LIKE 's_anticheat_%'
+         OR id LIKE 'student_reset_%'
+         OR id LIKE 'student_lo_reset_%'
+         OR id LIKE 's_lo_%'
+         OR name LIKE 'Student student_%'
+    ''');
+
+    // 5. Cloud Firestore synchronization purge (removes artifacts from cloud collections)
+    try {
+      final cloudAttempts = await FirestoreService().fetchAllDocuments('quiz_attempts');
+      for (final doc in cloudAttempts) {
+        final sid = doc['student_id']?.toString() ?? '';
+        final qTitle = doc['quiz_title']?.toString() ?? '';
+        final docId = doc['id']?.toString() ?? doc['document_id']?.toString() ?? '';
+        if (sid.contains('1794') ||
+            sid.startsWith('s_anticheat_') ||
+            sid.startsWith('student_reset_') ||
+            sid.startsWith('student_lo_reset_') ||
+            sid.startsWith('s_lo_') ||
+            sid.startsWith('test_') ||
+            qTitle.contains('1794') ||
+            qTitle.toLowerCase().contains('math roster quiz')) {
+          if (docId.isNotEmpty) {
+            unawaited(FirestoreService().deleteDocument('quiz_attempts', docId));
+            deleted++;
+          }
+        }
+      }
+
+      final cloudQuizzes = await FirestoreService().fetchAllDocuments('quizzes');
+      for (final q in cloudQuizzes) {
+        final title = q['title']?.toString() ?? '';
+        final docId = q['id']?.toString() ?? q['document_id']?.toString() ?? '';
+        if (title.contains('1794') || title == '1' || title.toLowerCase().contains('math roster quiz')) {
+          if (docId.isNotEmpty) {
+            unawaited(FirestoreService().deleteDocument('quizzes', docId));
+            deleted++;
+          }
+        }
+      }
+
+      final cloudUsers = await FirestoreService().fetchAllDocuments('users');
+      for (final u in cloudUsers) {
+        final uid = u['id']?.toString() ?? '';
+        final name = u['full_name']?.toString() ?? '';
+        final docId = u['id']?.toString() ?? u['document_id']?.toString() ?? '';
+        if (uid.contains('1794') ||
+            uid.startsWith('s_anticheat_') ||
+            uid.startsWith('student_reset_') ||
+            uid.startsWith('student_lo_reset_') ||
+            uid.startsWith('s_lo_') ||
+            name.contains('1794') ||
+            name.startsWith('Student student_')) {
+          if (docId.isNotEmpty) {
+            unawaited(FirestoreService().deleteDocument('users', docId));
+            deleted++;
+          }
+        }
+      }
+    } catch (_) {}
+
+    return deleted;
+  }
+
   /// Retrieves all quizzes available for analysis, optionally filtered by teacher or subject.
+  /// Prioritizes quizzes with active student attempts at the top of the list.
   Future<List<Map<String, dynamic>>> getQuizzesAvailableForAnalysis({
     String? teacherId,
     int? subjectId,
@@ -7588,7 +8366,7 @@ class DatabaseHelper {
       args.add(teacherId);
       args.add(teacherId);
     }
-    query += ' ORDER BY q.created_at DESC, q.id DESC';
+    query += ' ORDER BY attempt_count DESC, q.created_at DESC, q.id DESC';
     return await db.rawQuery(query, args);
   }
 
@@ -8065,12 +8843,6 @@ class DatabaseHelper {
           ? sub.first['name'] as String? ?? 'Subject'
           : 'Subject';
 
-      // Cap Base64 size at 750KB to respect Firestore's 1MB document limit
-      final safeAttachmentBytes =
-          (attachmentBytes != null && attachmentBytes.length < 750000)
-          ? attachmentBytes
-          : null;
-
       final assignmentMap = {
         'id': canonicalCloudId,
         'cloud_id': canonicalCloudId,
@@ -8089,7 +8861,7 @@ class DatabaseHelper {
         'attachment_name': attachmentName,
         'attachment_path': attachmentPath,
         'attachment_size': attachmentSize,
-        'attachment_bytes': safeAttachmentBytes,
+        'attachment_bytes': null, // Do not bloat Cloud Firestore with large Base64 files
         'storage_url': storageUrl ?? gdriveFolderUrl,
         'gdrive_folder_url': gdriveFolderUrl,
         'status': 'active',
@@ -8376,7 +9148,7 @@ class DatabaseHelper {
           'attachment_name': a['attachment_name'],
           'attachment_path': a['attachment_path'],
           'attachment_size': a['attachment_size'],
-          'attachment_bytes': a['attachment_bytes'],
+          'attachment_bytes': null, // Kept local in SQLite, null in Cloud Firestore to preserve limits
           'status': a['status'] ?? 'active',
           'created_at': a['created_at'] ?? DateTime.now().toIso8601String(),
         };
@@ -8518,6 +9290,13 @@ class DatabaseHelper {
 
       for (final doc in cloudQuizzes) {
         final title = doc['title']?.toString() ?? 'Quiz';
+        final docId = doc['id']?.toString() ?? doc['document_id']?.toString() ?? '';
+        if (title.contains('1794') || title == '1' || title.toLowerCase().contains('math roster quiz')) {
+          if (docId.isNotEmpty) {
+            unawaited(FirestoreService().deleteDocument('quizzes', docId));
+          }
+          continue;
+        }
         final description = doc['description']?.toString();
         final subCode = doc['subject_code']?.toString().trim();
         final subName = doc['subject_name']?.toString().trim();
@@ -8723,8 +9502,24 @@ class DatabaseHelper {
 
       // Sync cloud quiz attempts so teachers on Web see student attempts in real time
       for (final att in cloudAttempts) {
-        final sid = att['student_id']?.toString();
-        if (sid == null || sid.isEmpty) continue;
+        final sid = att['student_id']?.toString() ?? '';
+        if (sid.isEmpty) continue;
+        final docId = att['id']?.toString() ?? att['document_id']?.toString() ?? '';
+        final qTitle = att['quiz_title']?.toString() ?? '';
+        final isGarbage = sid.contains('1794') ||
+            sid.startsWith('s_anticheat_') ||
+            sid.startsWith('student_reset_') ||
+            sid.startsWith('student_lo_reset_') ||
+            sid.startsWith('s_lo_') ||
+            sid.startsWith('test_') ||
+            qTitle.contains('1794') ||
+            qTitle.toLowerCase().contains('math roster quiz');
+        if (isGarbage) {
+          if (docId.isNotEmpty) {
+            unawaited(FirestoreService().deleteDocument('quiz_attempts', docId));
+          }
+          continue;
+        }
         final rawQId = (att['quiz_id'] as num?)?.toInt();
         final rawSubId = (att['subject_id'] as num?)?.toInt() ?? 1;
         final attemptedAt = att['attempted_at']?.toString() ?? DateTime.now().toIso8601String();
@@ -9545,17 +10340,37 @@ class DatabaseHelper {
         ' ORDER BY CASE WHEN sub.status IS NULL THEN 0 ELSE 1 END, a.due_date ASC, a.created_at DESC';
     final rows = await db.rawQuery(query, args);
 
-    // Filter by target_sections if specified
+    // Filter by target_sections if specified (strict exact match, preventing substring collisions)
+    final cleanStudentSec = studentSec?.trim().toLowerCase();
     final filtered = rows.where((a) {
-      if (studentSec == null || studentSec.isEmpty) return true;
-      final target = (a['target_sections'] as String?)?.trim().toLowerCase();
-      if (target == null ||
-          target.isEmpty ||
-          target == 'all handled sections' ||
-          target == 'all sections') {
+      if (cleanStudentSec == null || cleanStudentSec.isEmpty) return true;
+      final rawTarget = (a['target_sections'] as String?)?.trim();
+      if (rawTarget == null ||
+          rawTarget.isEmpty ||
+          rawTarget.toLowerCase() == 'all handled sections' ||
+          rawTarget.toLowerCase() == 'all sections' ||
+          rawTarget == '*' ||
+          rawTarget == '[]') {
         return true;
       }
-      return target.contains(studentSec) || studentSec.contains(target);
+
+      final targetSet = <String>{};
+      if (rawTarget.startsWith('[') && rawTarget.endsWith(']')) {
+        try {
+          final List<dynamic> decoded = jsonDecode(rawTarget);
+          targetSet.addAll(decoded.map((e) => e.toString().trim().toLowerCase()));
+        } catch (_) {}
+      } else {
+        targetSet.addAll(rawTarget.split(',').map((s) => s.trim().toLowerCase()));
+      }
+
+      if (targetSet.contains('*') ||
+          targetSet.contains('all sections') ||
+          targetSet.contains('all handled sections')) {
+        return true;
+      }
+
+      return targetSet.contains(cleanStudentSec);
     }).toList();
 
     // Deduplicate assignments so that if multiple rows exist for the same assignment, only one is returned (preferring the one with an active submission)
@@ -9784,6 +10599,9 @@ class DatabaseHelper {
     String? storageUrl,
     String? notes,
   }) async {
+    if (fileSize != null && fileSize > 10 * 1024 * 1024) {
+      throw Exception('Submitted file size ($fileSize bytes) exceeds the 10 MB limit.');
+    }
     final db = await database;
     final now = DateTime.now().toIso8601String();
 
@@ -9878,15 +10696,11 @@ class DatabaseHelper {
         safeImageBytes = null;
       }
 
-      final safeFileBytes = (fileBytes != null && fileBytes.length < 850000)
-          ? fileBytes
-          : null;
-
       unawaited(
         FirestoreService().saveDocument('submissions', docId, {
           ...subData,
-          'file_bytes': safeFileBytes,
-          'image_bytes': safeImageBytes,
+          'file_bytes': null, // Kept in local SQLite, omitted from Cloud Firestore to preserve 1MB limits & bandwidth
+          'image_bytes': null, // Kept in local SQLite, omitted from Cloud Firestore
           'id': id,
         }),
       );

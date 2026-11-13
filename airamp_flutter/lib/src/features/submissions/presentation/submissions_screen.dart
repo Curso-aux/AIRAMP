@@ -96,11 +96,11 @@ class _SubmissionsScreenState extends ConsumerState<SubmissionsScreen> {
           }
           return;
         }
-        if (size > 50 * 1024 * 1024) {
+        if (size > 10 * 1024 * 1024) {
           if (mounted) {
             ScaffoldMessenger.of(context).showSnackBar(
               SnackBar(
-                content: Text('File size (${_formatFileSize(size)}) exceeds the 50 MB limit. Please select a document under 50 MB.'),
+                content: Text('File size (${_formatFileSize(size)}) exceeds the 10 MB limit. Please select a document under 10 MB.'),
                 backgroundColor: AppTheme.error,
               ),
             );
@@ -145,11 +145,11 @@ class _SubmissionsScreenState extends ConsumerState<SubmissionsScreen> {
       if (files.isNotEmpty) {
         final file = files.first;
         final size = await file.length();
-        if (size > 50 * 1024 * 1024) {
+        if (size > 10 * 1024 * 1024) {
           if (mounted) {
             ScaffoldMessenger.of(context).showSnackBar(
               SnackBar(
-                content: Text('Image size (${_formatFileSize(size)}) exceeds the 50 MB limit. Please select an image under 50 MB.'),
+                content: Text('Image size (${_formatFileSize(size)}) exceeds the 10 MB limit. Please select an image under 10 MB.'),
                 backgroundColor: AppTheme.error,
               ),
             );
@@ -448,6 +448,18 @@ class _SubmissionsScreenState extends ConsumerState<SubmissionsScreen> {
     final hasExistingFile = existing?.fileName != null && !_isEditingExisting;
     final hasImage = _pickedImageName != null;
     final hasExistingImage = existing?.imagePath != null && !_isEditingExisting;
+
+    if (_pickedFileSize > 10 * 1024 * 1024 || _pickedImageSize > 10 * 1024 * 1024) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: const Text('Selected attachment exceeds the 10 MB limit. Please select a smaller file.'),
+            backgroundColor: AppTheme.error,
+          ),
+        );
+      }
+      return;
+    }
 
     final user = ref.read(authProvider);
     final studentId = user?.id ?? 'student_1';
@@ -987,7 +999,7 @@ class _SubmissionsScreenState extends ConsumerState<SubmissionsScreen> {
                   border: Border.all(color: AppTheme.primary.withValues(alpha: 0.3)),
                 ),
                 child: Text(
-                  'MAX 50 MB',
+                  'MAX 10 MB',
                   style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: AppTheme.primary),
                 ),
               ),
@@ -1081,7 +1093,7 @@ class _SubmissionsScreenState extends ConsumerState<SubmissionsScreen> {
             OutlinedButton.icon(
               onPressed: _pickImage,
               icon: Icon(Icons.add_photo_alternate_outlined, color: AppTheme.primary, size: 20),
-              label: Text('Attach Image (JPG, PNG, WebP • Max 50 MB)', style: TextStyle(color: AppTheme.primary)),
+              label: Text('Attach Image (JPG, PNG, WebP • Max 10 MB)', style: TextStyle(color: AppTheme.primary)),
               style: OutlinedButton.styleFrom(
                 side: BorderSide(color: AppTheme.primary.withValues(alpha: 0.5)),
                 padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
@@ -1109,7 +1121,7 @@ class _SubmissionsScreenState extends ConsumerState<SubmissionsScreen> {
                   border: Border.all(color: AppTheme.primary.withValues(alpha: 0.3)),
                 ),
                 child: Text(
-                  'MAX 50 MB',
+                  'MAX 10 MB',
                   style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: AppTheme.primary),
                 ),
               ),
@@ -1139,7 +1151,7 @@ class _SubmissionsScreenState extends ConsumerState<SubmissionsScreen> {
                           overflow: TextOverflow.ellipsis,
                         ),
                         Text(
-                          '${_formatFileSize(_pickedFileSize)} • Within 50 MB limit',
+                          '${_formatFileSize(_pickedFileSize)} • Within 10 MB limit',
                           style: TextStyle(color: AppTheme.textMuted, fontSize: 11),
                         ),
                       ],
@@ -1184,7 +1196,7 @@ class _SubmissionsScreenState extends ConsumerState<SubmissionsScreen> {
             OutlinedButton.icon(
               onPressed: _pickFile,
               icon: Icon(Icons.upload_file_outlined, color: AppTheme.primary),
-              label: Text('Browse or Pick File (PDF, DOCX, ZIP • Max 50 MB)', style: TextStyle(color: AppTheme.primary)),
+              label: Text('Browse or Pick File (PDF, DOCX, ZIP • Max 10 MB)', style: TextStyle(color: AppTheme.primary)),
               style: OutlinedButton.styleFrom(
                 side: BorderSide(color: AppTheme.primary.withValues(alpha: 0.5)),
                 padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
@@ -1563,7 +1575,7 @@ class _SubmissionsScreenState extends ConsumerState<SubmissionsScreen> {
                             final uri = Uri.parse(target.startsWith('http://') || target.startsWith('https://') ? target : 'https://$target');
                             await launchUrl(uri, mode: LaunchMode.externalApplication);
                           } catch (e) {
-                            if (context.mounted) {
+                            if (mounted) {
                               ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Could not open link: $e')));
                             }
                           }

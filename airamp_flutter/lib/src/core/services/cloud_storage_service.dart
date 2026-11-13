@@ -217,38 +217,36 @@ class CloudStorageService {
   /// Attempts to find and download a curriculum material from Cloud Storage
   Future<Uint8List?> downloadCurriculumMaterial({
     required String fileName,
+    String? storagePath,
     int? loId,
   }) async {
     final storage = _storage;
     if (storage == null) return null;
     try {
-      final sanitized = _sanitizeFileName(fileName).toLowerCase();
-      // Try loId folder first if provided
+      // 1. Direct path lookup if storagePath is provided (0 list operations)
+      if (storagePath != null && storagePath.isNotEmpty) {
+        try {
+          return await storage.ref(storagePath).getData(10 * 1024 * 1024);
+        } catch (_) {}
+      }
+
+      final sanitized = _sanitizeFileName(fileName);
+
+      // 2. Direct reference under loId if provided
       if (loId != null) {
         try {
-          final listRes = await storage.ref('curriculum/lo_$loId').listAll();
+          return await storage.ref('curriculum/lo_$loId/$sanitized').getData(10 * 1024 * 1024);
+        } catch (_) {}
+        try {
+          final listRes = await storage.ref('curriculum/lo_$loId').list(const ListOptions(maxResults: 20));
           for (final item in listRes.items) {
             final itemName = item.name.toLowerCase();
-            if (itemName.contains(sanitized) || sanitized.contains(itemName.replaceAll(RegExp(r'^\d+_'), ''))) {
-              return await item.getData(35 * 1024 * 1024); // max 35MB
+            if (itemName.contains(sanitized.toLowerCase()) || sanitized.toLowerCase().contains(itemName.replaceAll(RegExp(r'^\d+_'), ''))) {
+              return await item.getData(10 * 1024 * 1024);
             }
           }
         } catch (_) {}
       }
-
-      // Try global curriculum folders
-      try {
-        final rootRes = await storage.ref('curriculum').listAll();
-        for (final prefix in rootRes.prefixes) {
-          final subList = await prefix.listAll();
-          for (final item in subList.items) {
-            final itemName = item.name.toLowerCase();
-            if (itemName.contains(sanitized) || sanitized.contains(itemName.replaceAll(RegExp(r'^\d+_'), ''))) {
-              return await item.getData(35 * 1024 * 1024);
-            }
-          }
-        }
-      } catch (_) {}
     } catch (e) {
       debugPrint('[CloudStorageService] downloadCurriculumMaterial error: $e');
     }

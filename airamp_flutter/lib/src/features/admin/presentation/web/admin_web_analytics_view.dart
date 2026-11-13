@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../../core/theme/theme_provider.dart';
+import '../../../../core/database/database_helper.dart';
 import '../../../../core/components/analytics_donut_chart.dart';
 import '../../data/admin_repository.dart';
 import 'components/analytics_filter_bar.dart';
@@ -87,8 +88,46 @@ class AdminWebAnalyticsView extends ConsumerWidget {
                     ],
                   );
 
+                  final purgeBtn = OutlinedButton.icon(
+                    onPressed: () async {
+                      final deleted = await DatabaseHelper().purgeGarbageTestArtifacts();
+                      await ref.read(adminAnalyticsProvider.notifier).loadAnalytics(syncCloud: true);
+                      if (context.mounted) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(
+                            content: Text(deleted > 0
+                                ? 'Purged $deleted test/orphan artifacts from local & cloud.'
+                                : 'Ledger is clean. No test artifacts found.'),
+                            backgroundColor: AppTheme.success,
+                            behavior: SnackBarBehavior.floating,
+                            duration: const Duration(seconds: 3),
+                          ),
+                        );
+                      }
+                    },
+                    icon: Icon(Icons.cleaning_services_outlined, size: 16, color: AppTheme.textSecondary),
+                    label: Text(
+                      'Purge Test Data',
+                      style: TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w600,
+                        color: isDark ? AppTheme.darkTextSecondary : AppTheme.lightTextSecondary,
+                      ),
+                    ),
+                    style: OutlinedButton.styleFrom(
+                      backgroundColor: isDark ? AppTheme.darkSurface : Colors.white,
+                      side: BorderSide(color: isDark ? AppTheme.darkBorder : AppTheme.lightBorder),
+                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                      minimumSize: const Size(0, 40),
+                    ),
+                  );
+
                   final refreshBtn = OutlinedButton.icon(
-                    onPressed: () => ref.read(adminAnalyticsProvider.notifier).loadAnalytics(syncCloud: true),
+                    onPressed: () async {
+                      await DatabaseHelper().purgeGarbageTestArtifacts();
+                      await ref.read(adminAnalyticsProvider.notifier).loadAnalytics(syncCloud: true);
+                    },
                     icon: Icon(Icons.refresh, size: 16, color: isDark ? AppTheme.darkPrimary : AppTheme.lightPrimary),
                     label: Text(
                       'Refresh Data',
@@ -107,13 +146,22 @@ class AdminWebAnalyticsView extends ConsumerWidget {
                     ),
                   );
 
+                  final actionButtons = Wrap(
+                    spacing: 8,
+                    runSpacing: 8,
+                    children: [
+                      purgeBtn,
+                      refreshBtn,
+                    ],
+                  );
+
                   if (isNarrow) {
                     return Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         titleSection,
                         const SizedBox(height: 12),
-                        refreshBtn,
+                        actionButtons,
                       ],
                     );
                   }
@@ -123,7 +171,7 @@ class AdminWebAnalyticsView extends ConsumerWidget {
                     children: [
                       Expanded(child: titleSection),
                       const SizedBox(width: 16),
-                      refreshBtn,
+                      actionButtons,
                     ],
                   );
                 },

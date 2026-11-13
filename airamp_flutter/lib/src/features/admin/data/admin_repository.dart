@@ -1869,6 +1869,17 @@ class AdminKeysNotifier extends Notifier<List<Map<String, dynamic>>> {
     final keys = await DatabaseHelper().getEnrollmentKeysList();
     if (!ref.mounted) return;
     state = keys;
+
+    // Asynchronously ensure Firestore has accurate used_count
+    for (final k in keys) {
+      final code = k['code']?.toString();
+      final used = k['used_count'] as int? ?? 0;
+      if (code != null && code.isNotEmpty && used > 0) {
+        FirestoreService().saveDocument('enrollment_keys', code, {
+          'used_count': used,
+        }).catchError((_) {});
+      }
+    }
   }
 
   Future<void> createKey({
@@ -1977,8 +1988,11 @@ class AdminArchivedStudentsNotifier
     ref.read(sectionsProvider.notifier).reload();
   }
 
-  Future<void> permanentDeleteStudent(String studentId) async {
-    await DatabaseHelper().deleteStudent(studentId);
+  Future<void> permanentDeleteStudent(
+    String studentId, {
+    void Function(double progress, String statusMessage)? onProgress,
+  }) async {
+    await DatabaseHelper().deleteStudent(studentId, onProgress: onProgress);
     await loadArchived();
     ref.read(adminStudentsProvider.notifier).loadStudents();
     ref.read(adminAnalyticsProvider.notifier).loadAnalytics();
@@ -2163,8 +2177,11 @@ class AdminArchivedTeachersNotifier
     ref.read(subjectsProvider.notifier).reload();
   }
 
-  Future<void> permanentDeleteTeacher(String teacherId) async {
-    await DatabaseHelper().deleteTeacher(teacherId);
+  Future<void> permanentDeleteTeacher(
+    String teacherId, {
+    void Function(double progress, String statusMessage)? onProgress,
+  }) async {
+    await DatabaseHelper().deleteTeacher(teacherId, onProgress: onProgress);
     await loadArchivedTeachers();
     ref.read(adminTeachersProvider.notifier).loadTeachers();
     ref.read(subjectsProvider.notifier).reload();

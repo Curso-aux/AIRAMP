@@ -383,6 +383,33 @@ class ChatNotifier extends Notifier<ChatState> {
           }
 
           if (matchedOther != null) {
+            // Institutional privacy: students cannot direct message other students
+            if (currentUser.role == 'student' && matchedOther.role == 'student') {
+              continue;
+            }
+            // Teachers can only direct message colleagues/admins and students in their handled sections
+            if (currentUser.role == 'teacher' && matchedOther.role == 'student') {
+              final handledSections = await db.getSectionsForTeacher(currentUser.id);
+              final cleanSections = handledSections
+                  .map((s) => s.trim().toLowerCase())
+                  .where((s) => s.isNotEmpty && s != 'all handled sections' && s != 'all sections')
+                  .map((s) {
+                    if (s.startsWith('grade')) {
+                      final idx = s.indexOf('-');
+                      if (idx != -1) return s.substring(idx + 1).trim();
+                    }
+                    return s;
+                  })
+                  .toSet();
+              var sSec = matchedOther.section?.trim().toLowerCase() ?? '';
+              if (sSec.startsWith('grade')) {
+                final idx = sSec.indexOf('-');
+                if (idx != -1) sSec = sSec.substring(idx + 1).trim();
+              }
+              if (sSec.isEmpty || !cleanSections.contains(sSec)) {
+                continue;
+              }
+            }
             otherParticipant = matchedOther;
           } else {
             // Direct conversation between two other users; hide from current user
@@ -800,17 +827,68 @@ class ChatNotifier extends Notifier<ChatState> {
       // Apply institutional privacy boundaries
       if (currentUser != null) {
         if (currentUser.role == 'student') {
-          final studentSection = currentUser.section?.trim().toLowerCase();
+          // Students can ONLY contact their professors/teachers and school administrators
+          final sqliteDb = await db.database;
+          final teacherRows = await sqliteDb.rawQuery('''
+            SELECT DISTINCT s.teacher_id, s.teacher_name 
+            FROM enrollments e
+            JOIN subjects s ON e.subject_id = s.id
+            WHERE e.student_id = ? AND e.status = 'active'
+          ''', [currentUser.id]);
+
+          final enrolledTeacherIds = teacherRows
+              .map((r) => r['teacher_id']?.toString().trim())
+              .where((id) => id != null && id.isNotEmpty)
+              .toSet();
+          final enrolledTeacherNames = teacherRows
+              .map((r) => r['teacher_name']?.toString().trim().toLowerCase())
+              .where((n) => n != null && n.isNotEmpty)
+              .toSet();
+
           filtered = filtered.where((u) {
-            // Students can always contact teachers and school administrators
+            // School administrators are always reachable
+            if (u.role == 'admin' || u.role == 'super_admin') return true;
+            // Teachers / Professors: must teach an enrolled subject (or all teachers if not yet enrolled)
+            if (u.role == 'teacher') {
+              if (enrolledTeacherIds.isNotEmpty || enrolledTeacherNames.isNotEmpty) {
+                return enrolledTeacherIds.contains(u.id) ||
+                    enrolledTeacherNames.contains(u.fullName.trim().toLowerCase());
+              }
+              return true;
+            }
+            // Students cannot direct message other students (peers interact in the Section GC)
+            return false;
+          }).toList();
+        } else if (currentUser.role == 'teacher') {
+          // Teachers can contact fellow teachers/admins and ONLY students in their handled sections
+          final handledSections = await db.getSectionsForTeacher(currentUser.id);
+          final cleanHandledSections = handledSections
+              .map((s) => s.trim().toLowerCase())
+              .where((s) => s.isNotEmpty && s != 'all handled sections' && s != 'all sections')
+              .map((s) {
+                if (s.startsWith('grade')) {
+                  final idx = s.indexOf('-');
+                  if (idx != -1) return s.substring(idx + 1).trim();
+                }
+                return s;
+              })
+              .toSet();
+
+          filtered = filtered.where((u) {
+            // Teachers can contact fellow teachers and school administrators
             if (u.role == 'teacher' || u.role == 'admin' || u.role == 'super_admin') {
               return true;
             }
-            // For fellow students, scope to the same section (if section assigned)
+            // Teachers can ONLY contact students in their handled sections
             if (u.role == 'student') {
-              if (studentSection == null || studentSection.isEmpty) return true;
-              final otherSection = u.section?.trim().toLowerCase();
-              return otherSection == studentSection;
+              if (cleanHandledSections.isEmpty) return false;
+              var studentSec = u.section?.trim().toLowerCase();
+              if (studentSec == null || studentSec.isEmpty) return false;
+              if (studentSec.startsWith('grade')) {
+                final idx = studentSec.indexOf('-');
+                if (idx != -1) studentSec = studentSec.substring(idx + 1).trim();
+              }
+              return cleanHandledSections.contains(studentSec);
             }
             return false;
           }).toList();
@@ -852,6 +930,12 @@ class ChatNotifier extends Notifier<ChatState> {
     }
 
     final targetName = targetUser?.fullName ?? 'Direct Chat';
+
+    // Institutional access boundaries:
+    if (currentUser.role == 'student' && targetUser?.role == 'student') {
+      debugPrint('[ChatNotifier] Blocked attempt by student to create 1-on-1 chat with another student.');
+      return null;
+    }
 
     // Check existing conversation in state
     for (final conv in state.conversations) {

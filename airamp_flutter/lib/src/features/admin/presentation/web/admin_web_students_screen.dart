@@ -3206,12 +3206,13 @@ class _AdminWebStudentsScreenState extends ConsumerState<AdminWebStudentsScreen>
                         title: 'Permanently Deleting Student Record',
                         initialMessage: 'Purging student records and cloud database...',
                         task: (updateProgress) async {
-                          updateProgress(0.4, 'Purging enrollments and quiz attempts...');
                           await ref
                               .read(adminArchivedStudentsProvider.notifier)
-                              .permanentDeleteStudent(studentId)
+                              .permanentDeleteStudent(
+                                studentId,
+                                onProgress: updateProgress,
+                              )
                               .timeout(const Duration(seconds: 10));
-                          updateProgress(1.0, 'Record purged successfully!');
                         },
                       );
                       setState(() => _selectedStudentIds.remove(studentId));
@@ -3702,12 +3703,27 @@ void _resendStudentCredentialsDialog(BuildContext context, Map<String, dynamic> 
     final formKey = GlobalKey<FormState>();
     final nextId = await DatabaseHelper().generateNextStudentId();
     final studentIdCtrl = TextEditingController(text: nextId);
-    final nameCtrl = TextEditingController();
+    final firstNameCtrl = TextEditingController();
+    final middleNameCtrl = TextEditingController();
+    final lastNameCtrl = TextEditingController();
+    String selectedSuffix = 'None';
+    const suffixOptions = ['None', 'Jr.', 'Sr.', 'II', 'III', 'IV', 'V'];
     final emailCtrl = TextEditingController();
     final usernameCtrl = TextEditingController();
     final passwordCtrl = TextEditingController(text: _generateAutoStudentPassword());
     final customSectionCtrl = TextEditingController();
     final notesCtrl = TextEditingController();
+
+    String normalizeNamePart(String input) {
+      final trimmed = input.trim().replaceAll(RegExp(r'\s+'), ' ');
+      if (trimmed.isEmpty) return '';
+      return trimmed.split(' ').map((word) {
+        if (word.isEmpty) return '';
+        final lower = word.toLowerCase();
+        if (['de', 'la', 'del', 'san', 'van', 'von'].contains(lower)) return lower;
+        return word[0].toUpperCase() + word.substring(1).toLowerCase();
+      }).join(' ');
+    }
 
     if (!mounted || !context.mounted) return;
 
@@ -3804,21 +3820,97 @@ void _resendStudentCredentialsDialog(BuildContext context, Map<String, dynamic> 
                           },
                         ),
                         const SizedBox(height: 14),
-                        TextFormField(
-                          controller: nameCtrl,
-                          maxLength: 50,
-                          buildCounter: (context, {required currentLength, required isFocused, maxLength}) => null,
-                          style: TextStyle(color: AppTheme.text, fontSize: 14),
-                          decoration: InputDecoration(
-                            labelText: 'Full Name (e.g. Maria Clara Santos)',
-                            labelStyle: TextStyle(color: AppTheme.textSecondary, fontSize: 13),
-                            counterText: '',
-                            prefixIcon: Icon(Icons.person_outline, size: 20, color: AppTheme.textMuted),
-                            filled: true,
-                            fillColor: AppTheme.background,
-                            border: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: BorderSide(color: AppTheme.border)),
-                          ),
-                          validator: (v) => v == null || v.trim().isEmpty ? 'Please enter student full name' : null,
+                        // 1. First Name & Middle Name (Optional)
+                        Row(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Expanded(
+                              flex: 6,
+                              child: TextFormField(
+                                controller: firstNameCtrl,
+                                maxLength: 35,
+                                textCapitalization: TextCapitalization.words,
+                                buildCounter: (context, {required currentLength, required isFocused, maxLength}) => null,
+                                style: TextStyle(color: AppTheme.text, fontSize: 14),
+                                decoration: InputDecoration(
+                                  labelText: 'First Name *',
+                                  hintText: 'e.g. Maria Clara',
+                                  labelStyle: TextStyle(color: AppTheme.textSecondary, fontSize: 13),
+                                  counterText: '',
+                                  prefixIcon: Icon(Icons.person_outline, size: 20, color: AppTheme.textMuted),
+                                  filled: true,
+                                  fillColor: AppTheme.background,
+                                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: BorderSide(color: AppTheme.border)),
+                                ),
+                                validator: (v) => v == null || v.trim().isEmpty ? 'Please enter first name' : null,
+                              ),
+                            ),
+                            const SizedBox(width: 10),
+                            Expanded(
+                              flex: 5,
+                              child: TextFormField(
+                                controller: middleNameCtrl,
+                                maxLength: 30,
+                                textCapitalization: TextCapitalization.words,
+                                buildCounter: (context, {required currentLength, required isFocused, maxLength}) => null,
+                                style: TextStyle(color: AppTheme.text, fontSize: 14),
+                                decoration: InputDecoration(
+                                  labelText: 'Middle Name (Optional)',
+                                  hintText: 'e.g. Santos',
+                                  labelStyle: TextStyle(color: AppTheme.textSecondary, fontSize: 13),
+                                  counterText: '',
+                                  filled: true,
+                                  fillColor: AppTheme.background,
+                                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: BorderSide(color: AppTheme.border)),
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 14),
+                        // 2. Surname / Last Name & Suffix
+                        Row(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Expanded(
+                              flex: 7,
+                              child: TextFormField(
+                                controller: lastNameCtrl,
+                                maxLength: 35,
+                                textCapitalization: TextCapitalization.words,
+                                buildCounter: (context, {required currentLength, required isFocused, maxLength}) => null,
+                                style: TextStyle(color: AppTheme.text, fontSize: 14),
+                                decoration: InputDecoration(
+                                  labelText: 'Surname / Last Name *',
+                                  hintText: 'e.g. Dela Cruz',
+                                  labelStyle: TextStyle(color: AppTheme.textSecondary, fontSize: 13),
+                                  counterText: '',
+                                  prefixIcon: Icon(Icons.badge_outlined, size: 20, color: AppTheme.textMuted),
+                                  filled: true,
+                                  fillColor: AppTheme.background,
+                                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: BorderSide(color: AppTheme.border)),
+                                ),
+                                validator: (v) => v == null || v.trim().isEmpty ? 'Please enter surname' : null,
+                              ),
+                            ),
+                            const SizedBox(width: 10),
+                            Expanded(
+                              flex: 4,
+                              child: DropdownButtonFormField<String>(
+                                initialValue: selectedSuffix,
+                                style: TextStyle(color: AppTheme.text, fontSize: 14),
+                                decoration: InputDecoration(
+                                  labelText: 'Suffix',
+                                  labelStyle: TextStyle(color: AppTheme.textSecondary, fontSize: 13),
+                                  filled: true,
+                                  fillColor: AppTheme.background,
+                                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: BorderSide(color: AppTheme.border)),
+                                ),
+                                items: suffixOptions.map((s) => DropdownMenuItem(value: s, child: Text(s))).toList(),
+                                onChanged: (val) => setDialogState(() => selectedSuffix = val ?? 'None'),
+                              ),
+                            ),
+                          ],
                         ),
                         const SizedBox(height: 14),
                         TextFormField(
@@ -4258,13 +4350,25 @@ void _resendStudentCredentialsDialog(BuildContext context, Map<String, dynamic> 
                               ? (customSectionCtrl.text.trim().isNotEmpty ? customSectionCtrl.text.trim() : 'Unassigned')
                               : selectedSection;
 
+                          final cleanFirst = normalizeNamePart(firstNameCtrl.text);
+                          final cleanMiddle = normalizeNamePart(middleNameCtrl.text);
+                          final cleanLast = normalizeNamePart(lastNameCtrl.text);
+                          final sfx = (selectedSuffix != 'None' && selectedSuffix.isNotEmpty) ? ' $selectedSuffix' : '';
+                          final computedFullName = cleanMiddle.isNotEmpty
+                              ? '$cleanFirst $cleanMiddle $cleanLast$sfx'
+                              : '$cleanFirst $cleanLast$sfx';
+
+                          final autoUsername = (usernameCtrl.text.trim().isNotEmpty)
+                              ? usernameCtrl.text.trim()
+                              : '${cleanFirst.toLowerCase().split(' ').first}.${cleanLast.toLowerCase().replaceAll(' ', '')}';
+
                           try {
                             final createdSid = await ref.read(adminStudentsProvider.notifier).addStudent(
                                   id: studentIdCtrl.text.trim().isNotEmpty ? studentIdCtrl.text.trim() : null,
-                                  fullName: nameCtrl.text.trim(),
+                                  fullName: computedFullName,
                                   email: emailCtrl.text.trim(),
                                   password: passwordCtrl.text.trim(),
-                                  username: usernameCtrl.text.trim().isNotEmpty ? usernameCtrl.text.trim() : null,
+                                  username: autoUsername,
                                   grade: selectedGrade,
                                   section: finalSection,
                                   studentType: selectedType,
@@ -4291,9 +4395,9 @@ void _resendStudentCredentialsDialog(BuildContext context, Map<String, dynamic> 
                                         child: Text(
                                           emailSent
                                               ? (isQueued
-                                                  ? 'Student "${nameCtrl.text.trim()}" ($finalStudentId) onboarded! Credentials queued for delivery to ${emailCtrl.text.trim()} via Gmail SMTP.'
-                                                  : 'Student "${nameCtrl.text.trim()}" ($finalStudentId) onboarded! Credentials sent to ${emailCtrl.text.trim()} via Gmail SMTP!')
-                                              : 'Student "${nameCtrl.text.trim()}" ($finalStudentId) created! Note: SMTP email could not be delivered (${emailResult?.message ?? "SMTP bridge error"}). You can resend anytime using the Resend button.',
+                                                  ? 'Student "$computedFullName" ($finalStudentId) onboarded! Credentials queued for delivery to ${emailCtrl.text.trim()} via Gmail SMTP.'
+                                                  : 'Student "$computedFullName" ($finalStudentId) onboarded! Credentials sent to ${emailCtrl.text.trim()} via Gmail SMTP!')
+                                              : 'Student "$computedFullName" ($finalStudentId) created! Note: SMTP email could not be delivered (${emailResult?.message ?? "SMTP bridge error"}). You can resend anytime using the Resend button.',
                                         ),
                                       ),
                                     ],
@@ -4305,7 +4409,7 @@ void _resendStudentCredentialsDialog(BuildContext context, Map<String, dynamic> 
                                           onPressed: () {
                                             _resendStudentCredentialsDialog(context, {
                                               'id': finalStudentId,
-                                              'full_name': nameCtrl.text.trim(),
+                                              'full_name': computedFullName,
                                               'email': emailCtrl.text.trim(),
                                             });
                                           },

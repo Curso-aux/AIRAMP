@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import '../../../core/components/aira_qr_scanner_dialog.dart';
 import '../../../core/components/otp_verification_dialog.dart';
 import '../../../core/database/database_helper.dart';
 import '../../../core/services/otp_service.dart';
@@ -339,12 +340,33 @@ class _SignupScreenState extends ConsumerState<SignupScreen> {
                           hintText: 'e.g., SEC-EMR10',
                           counterText: '',
                           prefixIcon: Icon(Icons.key, color: Theme.of(context).colorScheme.primary, size: 20),
-                          suffixIcon: _sectionKeyController.text.isNotEmpty
-                              ? IconButton(
+                          suffixIcon: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              IconButton(
+                                icon: Icon(
+                                  Icons.qr_code_scanner_rounded,
+                                  color: Theme.of(context).colorScheme.primary,
+                                  size: 20,
+                                ),
+                                tooltip: 'Scan Section QR Code',
+                                onPressed: () {
+                                  AiraQrScannerDialog.show(
+                                    context: context,
+                                    title: 'Scan Section Enrollment QR',
+                                    onKeyScanned: (scannedKey) {
+                                      _sectionKeyController.text = scannedKey;
+                                    },
+                                  );
+                                },
+                              ),
+                              if (_sectionKeyController.text.isNotEmpty)
+                                IconButton(
                                   icon: const Icon(Icons.clear, size: 18),
                                   onPressed: () => _sectionKeyController.clear(),
-                                )
-                              : null,
+                                ),
+                            ],
+                          ),
                           isDense: true,
                         ),
                       ),

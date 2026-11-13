@@ -36,7 +36,23 @@ class _NewConversationModalState extends ConsumerState<NewConversationModal>
   String _selectedSection = 'All';
 
   final List<String> _gradeOptions = ['All', 'Grade 10', 'Grade 11', 'Grade 12'];
-  final List<String> _sectionOptions = ['All', 'Emerald', 'Ruby', 'Diamond', 'Gold'];
+
+  List<String> _getDynamicSectionOptions(List<ChatUser> availableUsers) {
+    final set = <String>{'All'};
+    for (final u in availableUsers) {
+      final s = u.section?.trim();
+      if (s != null && s.isNotEmpty) {
+        var clean = s;
+        if (clean.toLowerCase().startsWith('grade')) {
+          final idx = clean.indexOf('-');
+          if (idx != -1) clean = clean.substring(idx + 1).trim();
+        }
+        set.add(clean);
+      }
+    }
+    final list = set.toList()..sort();
+    return list;
+  }
 
   @override
   void initState() {
@@ -72,7 +88,16 @@ class _NewConversationModalState extends ConsumerState<NewConversationModal>
     }
 
     if (_selectedSection != 'All') {
-      list = list.where((u) => u.section == _selectedSection).toList();
+      final sTarget = _selectedSection.toLowerCase().trim();
+      list = list.where((u) {
+        if (u.section == null) return false;
+        var sSec = u.section!.toLowerCase().trim();
+        if (sSec.startsWith('grade')) {
+          final idx = sSec.indexOf('-');
+          if (idx != -1) sSec = sSec.substring(idx + 1).trim();
+        }
+        return sSec == sTarget || u.section!.toLowerCase().contains(sTarget);
+      }).toList();
     }
 
     if (query.trim().isNotEmpty) {
@@ -388,6 +413,8 @@ class _NewConversationModalState extends ConsumerState<NewConversationModal>
   }
 
   Widget _buildUsersTab(List<ChatUser> users) {
+    final dynamicSections = _getDynamicSectionOptions(users);
+
     return Column(
       children: [
         // ── Consolidated Horizontal Filter Strip ──
@@ -401,7 +428,7 @@ class _NewConversationModalState extends ConsumerState<NewConversationModal>
               _buildRoleChip('teacher', 'Teachers'),
               const SizedBox(width: 6),
               _buildRoleChip('student', 'Students'),
-              if (_selectedRole != 'teacher') ...[
+              if (_selectedRole != 'teacher' && dynamicSections.length > 1) ...[
                 const SizedBox(width: 6),
                 Container(
                   height: 16,
@@ -412,7 +439,7 @@ class _NewConversationModalState extends ConsumerState<NewConversationModal>
                 _buildDropdownChip(
                   label: _selectedGrade == 'All' ? 'Grade: All' : _selectedGrade,
                   isActive: _selectedGrade != 'All',
-                  value: _selectedGrade,
+                  value: _gradeOptions.contains(_selectedGrade) ? _selectedGrade : 'All',
                   items: _gradeOptions,
                   onChanged: (val) {
                     if (val != null) setState(() => _selectedGrade = val);
@@ -422,8 +449,8 @@ class _NewConversationModalState extends ConsumerState<NewConversationModal>
                 _buildDropdownChip(
                   label: _selectedSection == 'All' ? 'Section: All' : 'Sec. $_selectedSection',
                   isActive: _selectedSection != 'All',
-                  value: _selectedSection,
-                  items: _sectionOptions,
+                  value: dynamicSections.contains(_selectedSection) ? _selectedSection : 'All',
+                  items: dynamicSections,
                   onChanged: (val) {
                     if (val != null) setState(() => _selectedSection = val);
                   },
@@ -495,9 +522,19 @@ class _NewConversationModalState extends ConsumerState<NewConversationModal>
                     final isTeacher = user.role == 'teacher' || user.role == 'admin' || user.role == 'super_admin';
 
                     final List<String> details = [];
-                    if (user.grade != null && user.grade!.isNotEmpty) details.add(user.grade!);
-                    if (user.section != null && user.section!.isNotEmpty) details.add('Sec. ${user.section!}');
-                    details.add(user.email);
+                    if (isTeacher) {
+                      details.add(_getRoleLabel(user.role));
+                      details.add(user.email);
+                    } else {
+                      final rawSec = user.section?.trim() ?? '';
+                      String cleanSec = rawSec;
+                      if (cleanSec.toLowerCase().startsWith('grade')) {
+                        final dashIdx = cleanSec.indexOf('-');
+                        if (dashIdx != -1) cleanSec = cleanSec.substring(dashIdx + 1).trim();
+                      }
+                      if (user.grade != null && user.grade!.isNotEmpty) details.add(user.grade!);
+                      if (cleanSec.isNotEmpty) details.add('Sec. $cleanSec');
+                    }
                     final subtitleText = details.join(' • ');
 
                     return InkWell(
@@ -656,7 +693,7 @@ class _NewConversationModalState extends ConsumerState<NewConversationModal>
       ),
       child: DropdownButtonHideUnderline(
         child: DropdownButton<String>(
-          value: value,
+          value: items.contains(value) ? value : (items.isNotEmpty ? items.first : 'All'),
           isDense: true,
           dropdownColor: Theme.of(context).colorScheme.surface,
           icon: Icon(

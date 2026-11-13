@@ -39,11 +39,7 @@ void openPdfBlobInNewTabWeb(List<int> bytes, String filename) {
   try {
     final blob = html.Blob([bytes], 'application/pdf');
     final url = html.Url.createObjectUrlFromBlob(blob);
-    final win = html.window.open(url, '_blank');
-    if (win == null) {
-      // Popup blocked, fall back to download
-      downloadBinaryFileWeb(bytes, filename, 'application/pdf');
-    }
+    html.window.open(url, '_blank');
     Timer(const Duration(minutes: 5), () {
       html.Url.revokeObjectUrl(url);
     });

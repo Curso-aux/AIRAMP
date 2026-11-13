@@ -8,8 +8,9 @@ import '../../../core/database/database_helper.dart';
 import '../../teacher/data/teacher_repository.dart';
 import '../../teacher/presentation/components/create_quiz_dialog.dart';
 import '../../teacher/presentation/components/quiz_roster_dialog.dart';
+import '../../../core/components/empty_state.dart';
+import '../../auth/application/auth_provider.dart';
 import '../../curriculum/presentation/curriculum_content_sheet.dart';
-import '../../curriculum/presentation/components/pdf_module_upload_dialog.dart';
 import '../data/admin_repository.dart';
 
 class SubjectDetailScreen extends ConsumerStatefulWidget {
@@ -249,317 +250,350 @@ class _SubjectDetailScreenState extends ConsumerState<SubjectDetailScreen> {
 
     final subjectId = int.tryParse(widget.subjectId) ?? (_subject?['id'] as int? ?? 0);
     final subjectName = _subject!['name'] ?? 'Untitled';
+    final subjectCode = _subject!['subject_code']?.toString() ?? '';
+    final department = _subject!['department']?.toString() ?? '';
+    final description = _subject!['description']?.toString() ?? '';
     final unlockType = _subject!['unlock_type'] ?? 'Sequential';
     final semester = _subject!['semester']?.toString() ?? '';
+    final teacherName = _subject!['teacher_name']?.toString() ?? '';
     final topics = ref.watch(subjectDetailProvider);
+    final quizzesAsync = ref.watch(subjectQuizzesProvider(subjectId));
+    final totalQuizzes = quizzesAsync.value?.length ?? 0;
+    final totalLOs = topics.fold<int>(0, (sum, t) => sum + ((t['learning_outcomes'] as List?)?.length ?? 0));
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final currentUser = ref.watch(authProvider);
+    final isTeacher = currentUser?.isTeacher ?? false;
 
     return Scaffold(
+      backgroundColor: AppTheme.background,
       body: SafeArea(
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+              padding: const EdgeInsets.fromLTRB(20, 16, 20, 12),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  // Header
-                  Text(
-                    'Manage Subjects',
-                    style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold, color: Theme.of(context).colorScheme.onSurface),
-                  ),
-                  const SizedBox(height: 4),
-                  Text(
-                    'COCs, LOs, content & quizzes',
-                    style: TextStyle(color: AppTheme.textSecondary, fontSize: 14),
+                  // Top Navigation Bar & Action Row
+                  Row(
+                    children: [
+                      IconButton(
+                        onPressed: () => context.pop(),
+                        icon: const Icon(Icons.arrow_back_rounded, size: 20),
+                        tooltip: 'Back to Subjects',
+                        style: IconButton.styleFrom(
+                          backgroundColor: AppTheme.surface,
+                          foregroundColor: AppTheme.text,
+                          padding: const EdgeInsets.all(10),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(10),
+                            side: BorderSide(color: AppTheme.border),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 14),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Row(
+                              children: [
+                                Text('Subjects & Courses', style: TextStyle(color: AppTheme.textSecondary, fontSize: 12)),
+                                Padding(
+                                  padding: const EdgeInsets.symmetric(horizontal: 6),
+                                  child: Icon(Icons.chevron_right_rounded, size: 14, color: AppTheme.textMuted),
+                                ),
+                                Text(
+                                  subjectCode.isNotEmpty ? subjectCode : 'Curriculum',
+                                  style: TextStyle(color: AppTheme.primary, fontSize: 12, fontWeight: FontWeight.bold),
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 2),
+                            Text(
+                              subjectName,
+                              style: TextStyle(
+                                fontSize: 20,
+                                fontWeight: FontWeight.bold,
+                                color: Theme.of(context).colorScheme.onSurface,
+                                letterSpacing: -0.3,
+                              ),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      if (_selectedTab == 0)
+                        ElevatedButton.icon(
+                          onPressed: () => _showAddTopicSheet(context, subjectId),
+                          icon: const Icon(Icons.add_rounded, size: 18),
+                          label: const Text('Add Topic'),
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: AppTheme.primary,
+                            foregroundColor: Colors.black,
+                            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                            textStyle: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+                          ),
+                        )
+                      else if (isTeacher)
+                        ElevatedButton.icon(
+                          onPressed: () async {
+                            final created = await Navigator.of(context, rootNavigator: true).push<bool>(
+                              MaterialPageRoute(
+                                fullscreenDialog: true,
+                                builder: (ctx) => CreateQuizDialog(
+                                  initialSubjectId: subjectId,
+                                  subjectName: subjectName,
+                                ),
+                              ),
+                            );
+                            if (created == true && context.mounted) {
+                              ref.invalidate(subjectQuizzesProvider(subjectId));
+                              ref.invalidate(teacherDashboardProvider);
+                            }
+                          },
+                          icon: const Icon(Icons.add_task_rounded, size: 18),
+                          label: const Text('Create Quiz'),
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: AppTheme.primary,
+                            foregroundColor: Colors.black,
+                            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                            textStyle: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+                          ),
+                        ),
+                    ],
                   ),
                   const SizedBox(height: 16),
 
-                  // Back link
-                  GestureDetector(
-                    onTap: () => context.pop(),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Icon(Icons.arrow_back, color: Theme.of(context).colorScheme.primary, size: 18),
-                        SizedBox(width: 4),
-                        Text(
-                          'Back to Subjects',
-                          style: TextStyle(color: AppTheme.primary, fontSize: 14, fontWeight: FontWeight.w600),
-                        ),
-                      ],
-                    ),
-                  ),
-                  const SizedBox(height: 20),
-
-                  // Subject Info Card
+                  // Upgraded Subject Overview Hero Card
                   Container(
                     width: double.infinity,
                     padding: const EdgeInsets.all(16),
                     decoration: BoxDecoration(
-                      gradient: LinearGradient(
-                        colors: [AppTheme.primary, Color(0xFF0A9B8A)],
-                        begin: Alignment.topLeft,
-                        end: Alignment.bottomRight,
-                      ),
-                      borderRadius: BorderRadius.circular(12),
+                      color: AppTheme.surface,
+                      borderRadius: BorderRadius.circular(16),
+                      border: Border.all(color: AppTheme.border),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withValues(alpha: isDark ? 0.20 : 0.03),
+                          blurRadius: 10,
+                          offset: const Offset(0, 2),
+                        ),
+                      ],
                     ),
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text(
-                          subjectName,
-                          style: const TextStyle(
-                            color: Colors.black,
-                            fontWeight: FontWeight.bold,
-                            fontSize: 18,
-                          ),
+                        Row(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Container(
+                              padding: const EdgeInsets.all(10),
+                              decoration: BoxDecoration(
+                                color: AppTheme.primary.withValues(alpha: 0.12),
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                              child: Icon(Icons.auto_stories_rounded, color: AppTheme.primary, size: 24),
+                            ),
+                            const SizedBox(width: 12),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Row(
+                                    children: [
+                                      if (subjectCode.isNotEmpty) ...[
+                                        Container(
+                                          padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+                                          decoration: BoxDecoration(
+                                            color: AppTheme.primary.withValues(alpha: 0.15),
+                                            borderRadius: BorderRadius.circular(6),
+                                          ),
+                                          child: Text(
+                                            subjectCode,
+                                            style: TextStyle(
+                                              fontSize: 11,
+                                              fontWeight: FontWeight.bold,
+                                              color: AppTheme.primary,
+                                            ),
+                                          ),
+                                        ),
+                                        const SizedBox(width: 8),
+                                      ],
+                                      Text(
+                                        department.isNotEmpty ? department : 'Academic Curriculum',
+                                        style: TextStyle(fontSize: 12, color: AppTheme.textSecondary),
+                                      ),
+                                    ],
+                                  ),
+                                  const SizedBox(height: 4),
+                                  Text(
+                                    subjectName,
+                                    style: TextStyle(
+                                      fontSize: 18,
+                                      fontWeight: FontWeight.bold,
+                                      color: AppTheme.text,
+                                      letterSpacing: -0.2,
+                                    ),
+                                  ),
+                                  if (description.isNotEmpty) ...[
+                                    const SizedBox(height: 4),
+                                    Text(
+                                      description,
+                                      style: TextStyle(fontSize: 12.5, color: AppTheme.textSecondary, height: 1.3),
+                                      maxLines: 2,
+                                      overflow: TextOverflow.ellipsis,
+                                    ),
+                                  ],
+                                ],
+                              ),
+                            ),
+                          ],
                         ),
-                        const SizedBox(height: 8),
+                        const SizedBox(height: 12),
+                        const Divider(height: 1),
+                        const SizedBox(height: 12),
+
+                        // Badges & Configuration Row
                         Wrap(
                           spacing: 8,
-                          runSpacing: 6,
+                          runSpacing: 8,
                           crossAxisAlignment: WrapCrossAlignment.center,
                           children: [
                             // Interactive Progression Mode Chip
                             InkWell(
                               onTap: () => _showUnlockTypeSelector(subjectId, unlockType),
-                              borderRadius: BorderRadius.circular(6),
+                              borderRadius: BorderRadius.circular(8),
                               child: Container(
-                                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
                                 decoration: BoxDecoration(
-                                  color: Colors.black.withValues(alpha: 0.15),
-                                  borderRadius: BorderRadius.circular(6),
-                                  border: Border.all(color: Colors.black26),
+                                  color: AppTheme.primary.withValues(alpha: 0.12),
+                                  borderRadius: BorderRadius.circular(8),
+                                  border: Border.all(color: AppTheme.primary.withValues(alpha: 0.35)),
                                 ),
                                 child: Row(
                                   mainAxisSize: MainAxisSize.min,
                                   children: [
                                     Icon(
-                                      unlockType == 'Sequential' ? Icons.lock_outline : Icons.lock_open_outlined,
+                                      unlockType == 'Sequential' ? Icons.lock_outline_rounded : Icons.lock_open_rounded,
                                       size: 13,
-                                      color: Colors.black,
+                                      color: AppTheme.primary,
                                     ),
-                                    const SizedBox(width: 4),
+                                    const SizedBox(width: 5),
                                     Text(
                                       'Progression: $unlockType',
-                                      style: const TextStyle(
-                                        fontSize: 12,
+                                      style: TextStyle(
+                                        fontSize: 11.5,
                                         fontWeight: FontWeight.bold,
-                                        color: Colors.black,
+                                        color: AppTheme.primary,
                                       ),
                                     ),
-                                    const SizedBox(width: 4),
-                                    const Icon(Icons.edit, size: 12, color: Colors.black54),
+                                    const SizedBox(width: 5),
+                                    Icon(Icons.edit_outlined, size: 12, color: AppTheme.primary.withValues(alpha: 0.7)),
                                   ],
                                 ),
                               ),
                             ),
+                            // Semester chip
                             if (semester.isNotEmpty)
                               Container(
-                                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
                                 decoration: BoxDecoration(
-                                  color: Colors.black.withValues(alpha: 0.1),
-                                  borderRadius: BorderRadius.circular(6),
+                                  color: AppTheme.border.withValues(alpha: 0.4),
+                                  borderRadius: BorderRadius.circular(8),
                                 ),
                                 child: Text(
                                   semester,
-                                  style: const TextStyle(
-                                    fontSize: 12,
+                                  style: TextStyle(
+                                    fontSize: 11.5,
                                     fontWeight: FontWeight.w600,
-                                    color: Colors.black87,
+                                    color: AppTheme.textSecondary,
                                   ),
                                 ),
                               ),
+                            // Faculty chip
+                            if (teacherName.isNotEmpty)
+                              Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                                decoration: BoxDecoration(
+                                  color: AppTheme.border.withValues(alpha: 0.4),
+                                  borderRadius: BorderRadius.circular(8),
+                                ),
+                                child: Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    Icon(Icons.school_outlined, size: 13, color: AppTheme.textSecondary),
+                                    const SizedBox(width: 5),
+                                    Text(
+                                      'Faculty: $teacherName',
+                                      style: TextStyle(
+                                        fontSize: 11.5,
+                                        fontWeight: FontWeight.w600,
+                                        color: AppTheme.text,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            // Overview Stats Chip
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                              decoration: BoxDecoration(
+                                color: Theme.of(context).brightness == Brightness.dark
+                                    ? AppTheme.surfaceElevated
+                                    : AppTheme.background,
+                                borderRadius: BorderRadius.circular(8),
+                                border: Border.all(color: AppTheme.border),
+                              ),
+                              child: Text(
+                                '${topics.length} ${topics.length == 1 ? 'Topic' : 'Topics'} · $totalLOs LOs · $totalQuizzes Quizzes',
+                                style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: AppTheme.textSecondary),
+                              ),
+                            ),
                           ],
                         ),
-                        if (_subject!['teacher_name'] != null && _subject!['teacher_name'].toString().isNotEmpty) ...[
-                          const SizedBox(height: 6),
-                          Row(
-                            children: [
-                              const Icon(Icons.school, size: 14, color: Colors.black87),
-                              const SizedBox(width: 4),
-                              Text(
-                                'Assigned Faculty: ${_subject!['teacher_name']}',
-                                style: const TextStyle(
-                                  color: Colors.black87,
-                                  fontSize: 12,
-                                  fontWeight: FontWeight.w600,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ],
                       ],
                     ),
                   ),
-                  const SizedBox(height: 20),
+                  const SizedBox(height: 14),
 
-                  // Topics / Quizzes Tab
+                  // Refined Segmented Tab Control
                   Container(
+                    padding: const EdgeInsets.all(4),
                     decoration: BoxDecoration(
-                      color: Theme.of(context).colorScheme.surface,
+                      color: Theme.of(context).brightness == Brightness.dark
+                          ? AppTheme.surfaceElevated
+                          : AppTheme.surface,
                       borderRadius: BorderRadius.circular(12),
+                      border: Border.all(color: AppTheme.border),
                     ),
                     child: Row(
+                      mainAxisSize: MainAxisSize.min,
                       children: [
-                        Expanded(
-                          child: GestureDetector(
-                            onTap: () => setState(() => _selectedTab = 0),
-                            child: Container(
-                              padding: const EdgeInsets.symmetric(vertical: 12),
-                              decoration: BoxDecoration(
-                                color: _selectedTab == 0 ? AppTheme.primary : Colors.transparent,
-                                borderRadius: BorderRadius.circular(12),
-                              ),
-                              child: Row(
-                                mainAxisAlignment: MainAxisAlignment.center,
-                                children: [
-                                  Icon(
-                                    Icons.layers_outlined,
-                                    size: 18,
-                                    color: _selectedTab == 0 ? Colors.black : AppTheme.textSecondary,
-                                  ),
-                                  const SizedBox(width: 8),
-                                  Text(
-                                    'Topics',
-                                    style: TextStyle(
-                                      color: _selectedTab == 0 ? Colors.black : AppTheme.textSecondary,
-                                      fontWeight: FontWeight.bold,
-                                      fontSize: 14,
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
-                          ),
+                        _buildTabChip(
+                          title: 'Curriculum Topics',
+                          count: topics.length,
+                          icon: Icons.layers_rounded,
+                          isSelected: _selectedTab == 0,
+                          onTap: () => setState(() => _selectedTab = 0),
                         ),
-                        Expanded(
-                          child: GestureDetector(
-                            onTap: () => setState(() => _selectedTab = 1),
-                            child: Container(
-                              padding: const EdgeInsets.symmetric(vertical: 12),
-                              decoration: BoxDecoration(
-                                color: _selectedTab == 1 ? AppTheme.primary : Colors.transparent,
-                                borderRadius: BorderRadius.circular(12),
-                              ),
-                              child: Row(
-                                mainAxisAlignment: MainAxisAlignment.center,
-                                children: [
-                                  Icon(
-                                    Icons.help_outline,
-                                    size: 18,
-                                    color: _selectedTab == 1 ? Colors.black : AppTheme.textSecondary,
-                                  ),
-                                  const SizedBox(width: 8),
-                                  Text(
-                                    'Quizzes',
-                                    style: TextStyle(
-                                      color: _selectedTab == 1 ? Colors.black : AppTheme.textSecondary,
-                                      fontWeight: FontWeight.bold,
-                                      fontSize: 14,
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
-                          ),
+                        const SizedBox(width: 4),
+                        _buildTabChip(
+                          title: 'Assigned Quizzes',
+                          count: totalQuizzes,
+                          icon: Icons.quiz_rounded,
+                          isSelected: _selectedTab == 1,
+                          onTap: () => setState(() => _selectedTab = 1),
                         ),
                       ],
                     ),
                   ),
-                  const SizedBox(height: 16),
-
-                  // Add Topic / Create Quiz button
-                  // Add Topic / Upload PDF / Create Quiz button
-                  if (_selectedTab == 0) ...[
-                    Row(
-                      children: [
-                        Expanded(
-                          child: ElevatedButton.icon(
-                            onPressed: () {
-                              _showAddTopicSheet(context, subjectId);
-                            },
-                            icon: const Icon(
-                              Icons.add,
-                              color: Colors.black,
-                              size: 18,
-                            ),
-                            label: const Text(
-                              'Add Topic',
-                              style: TextStyle(fontWeight: FontWeight.bold),
-                            ),
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: Theme.of(context).colorScheme.primary,
-                              foregroundColor: Colors.black,
-                              padding: const EdgeInsets.symmetric(vertical: 14),
-                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                              textStyle: const TextStyle(fontSize: 14),
-                            ),
-                          ),
-                        ),
-                        const SizedBox(width: 10),
-                        Expanded(
-                          child: ElevatedButton.icon(
-                            onPressed: () => _openPdfModuleUploadDialog(subjectId, subjectName),
-                            icon: const Icon(
-                              Icons.picture_as_pdf,
-                              color: Colors.white,
-                              size: 18,
-                            ),
-                            label: const Text(
-                              'Upload PDF Module',
-                              style: TextStyle(fontWeight: FontWeight.bold),
-                            ),
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: const Color(0xFFE11D48),
-                              foregroundColor: Colors.white,
-                              padding: const EdgeInsets.symmetric(vertical: 14),
-                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                              textStyle: const TextStyle(fontSize: 14),
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ] else ...[
-                    SizedBox(
-                      width: double.infinity,
-                      child: ElevatedButton.icon(
-                        onPressed: () async {
-                          final created = await Navigator.of(context, rootNavigator: true).push<bool>(
-                            MaterialPageRoute(
-                              fullscreenDialog: true,
-                              builder: (ctx) => CreateQuizDialog(
-                                initialSubjectId: subjectId,
-                                subjectName: subjectName,
-                              ),
-                            ),
-                          );
-                          if (created == true && context.mounted) {
-                            ref.invalidate(subjectQuizzesProvider(subjectId));
-                            ref.invalidate(teacherDashboardProvider);
-                          }
-                        },
-                        icon: const Icon(
-                          Icons.assignment_add,
-                          color: Colors.black,
-                          size: 20,
-                        ),
-                        label: const Text(
-                          'Create & Assign Quiz',
-                          style: TextStyle(fontWeight: FontWeight.bold),
-                        ),
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: Theme.of(context).colorScheme.primary,
-                          foregroundColor: Colors.black,
-                          padding: const EdgeInsets.symmetric(vertical: 14),
-                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                          textStyle: const TextStyle(fontSize: 16),
-                        ),
-                      ),
-                    ),
-                  ],
                 ],
               ),
             ),
@@ -576,44 +610,77 @@ class _SubjectDetailScreenState extends ConsumerState<SubjectDetailScreen> {
     );
   }
 
+  Widget _buildTabChip({
+    required String title,
+    required int count,
+    required IconData icon,
+    required bool isSelected,
+    required VoidCallback onTap,
+  }) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(9),
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 180),
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+        decoration: BoxDecoration(
+          color: isSelected ? AppTheme.primary.withValues(alpha: 0.15) : Colors.transparent,
+          borderRadius: BorderRadius.circular(9),
+          border: Border.all(
+            color: isSelected ? AppTheme.primary : Colors.transparent,
+            width: 1.2,
+          ),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(
+              icon,
+              size: 16,
+              color: isSelected ? AppTheme.primary : AppTheme.textSecondary,
+            ),
+            const SizedBox(width: 6),
+            Text(
+              title,
+              style: TextStyle(
+                fontSize: 12.5,
+                fontWeight: isSelected ? FontWeight.bold : FontWeight.w500,
+                color: isSelected ? AppTheme.primary : AppTheme.textSecondary,
+              ),
+            ),
+            const SizedBox(width: 6),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1.5),
+              decoration: BoxDecoration(
+                color: isSelected ? AppTheme.primary : AppTheme.border.withValues(alpha: 0.6),
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: Text(
+                '$count',
+                style: TextStyle(
+                  fontSize: 10.5,
+                  fontWeight: FontWeight.bold,
+                  color: isSelected ? Colors.white : AppTheme.textSecondary,
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   Widget _buildTopicsList(List<Map<String, dynamic>> topics, int subjectId) {
     final subjectName = _subject?['name']?.toString() ?? 'Subject';
 
     if (topics.isEmpty) {
-      return SingleChildScrollView(
-        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
-        child: Center(
-          child: Container(
-            constraints: const BoxConstraints(maxWidth: 680),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                PdfModuleUploadCard(
-                  subjectId: subjectId,
-                  subjectName: subjectName,
-                  isDialog: false,
-                  onCompleted: (result) {
-                    if (result.success && mounted) {
-                      ref.read(subjectDetailProvider.notifier).loadHierarchy(subjectId);
-                    }
-                  },
-                ),
-                const SizedBox(height: 16),
-                Center(
-                  child: TextButton.icon(
-                    onPressed: () => _showAddTopicSheet(context, subjectId),
-                    icon: const Icon(Icons.add, size: 16),
-                    label: const Text('Or create a topic manually without a PDF'),
-                    style: TextButton.styleFrom(
-                      foregroundColor: AppTheme.textSecondary,
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 24),
-              ],
-            ),
-          ),
-        ),
+      return AppEmptyState(
+        icon: Icons.layers_outlined,
+        title: 'No Curriculum Topics Yet',
+        message: 'Organize "$subjectName" into structured curriculum topics and learning outcomes.',
+        actionLabel: 'Add First Topic',
+        actionIcon: Icons.add_rounded,
+        onAction: () => _showAddTopicSheet(context, subjectId),
       );
     }
 
@@ -626,12 +693,6 @@ class _SubjectDetailScreenState extends ConsumerState<SubjectDetailScreen> {
           topic: topic,
           topicIndex: index + 1,
           subjectId: subjectId,
-          onUploadPdf: () => _openPdfModuleUploadDialog(
-            subjectId,
-            subjectName,
-            topicId: topic['id'] as int?,
-            topicTitle: topic['title']?.toString(),
-          ),
         );
       },
     );
@@ -640,6 +701,9 @@ class _SubjectDetailScreenState extends ConsumerState<SubjectDetailScreen> {
   Widget _buildQuizzesList(List<Map<String, dynamic>> topics, int subjectId) {
     final quizzesAsync = ref.watch(subjectQuizzesProvider(subjectId));
     final subjectName = _subject?['name']?.toString() ?? 'Subject';
+    final teacherName = _subject?['teacher_name']?.toString() ?? '';
+    final currentUser = ref.watch(authProvider);
+    final isTeacher = currentUser?.isTeacher ?? false;
 
     return ListView(
       padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
@@ -671,35 +735,42 @@ class _SubjectDetailScreenState extends ConsumerState<SubjectDetailScreen> {
                         children: [
                           Text('No assigned quizzes created yet', style: TextStyle(fontWeight: FontWeight.bold, color: AppTheme.text, fontSize: 13)),
                           const SizedBox(height: 2),
-                          Text('Author questions and assign them in bulk to students.', style: TextStyle(color: AppTheme.textSecondary, fontSize: 11)),
+                          Text(
+                            isTeacher
+                                ? 'Author questions and assign them in bulk to students.'
+                                : 'Subject quizzes and assessments are authored and assigned by the designated faculty instructor (${teacherName.isNotEmpty ? teacherName : 'assigned teacher'}).',
+                            style: TextStyle(color: AppTheme.textSecondary, fontSize: 11),
+                          ),
                         ],
                       ),
                     ),
-                    const SizedBox(width: 8),
-                    ElevatedButton(
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: AppTheme.primary,
-                        foregroundColor: Colors.black,
-                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                        textStyle: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
-                      ),
-                      onPressed: () async {
-                        final created = await Navigator.of(context, rootNavigator: true).push<bool>(
-                          MaterialPageRoute(
-                            fullscreenDialog: true,
-                            builder: (ctx) => CreateQuizDialog(
-                              initialSubjectId: subjectId,
-                              subjectName: subjectName,
+                    if (isTeacher) ...[
+                      const SizedBox(width: 8),
+                      ElevatedButton(
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: AppTheme.primary,
+                          foregroundColor: Colors.black,
+                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                          textStyle: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
+                        ),
+                        onPressed: () async {
+                          final created = await Navigator.of(context, rootNavigator: true).push<bool>(
+                            MaterialPageRoute(
+                              fullscreenDialog: true,
+                              builder: (ctx) => CreateQuizDialog(
+                                initialSubjectId: subjectId,
+                                subjectName: subjectName,
+                              ),
                             ),
-                          ),
-                        );
-                        if (created == true && context.mounted) {
-                          ref.invalidate(subjectQuizzesProvider(subjectId));
-                          ref.invalidate(teacherDashboardProvider);
-                        }
-                      },
-                      child: const Text('Create'),
-                    ),
+                          );
+                          if (created == true && context.mounted) {
+                            ref.invalidate(subjectQuizzesProvider(subjectId));
+                            ref.invalidate(teacherDashboardProvider);
+                          }
+                        },
+                        child: const Text('Create'),
+                      ),
+                    ],
                   ],
                 ),
               );
@@ -884,32 +955,6 @@ class _SubjectDetailScreenState extends ConsumerState<SubjectDetailScreen> {
       builder: (ctx) => _AddTopicSheet(subjectId: subjectId),
     );
   }
-
-  Future<void> _openPdfModuleUploadDialog(
-    int subjectId,
-    String subjectName, {
-    int? topicId,
-    String? topicTitle,
-  }) async {
-    final result = await showDialog<bool>(
-      context: context,
-      barrierDismissible: false,
-      builder: (ctx) => PdfModuleUploadDialog(
-        subjectId: subjectId,
-        subjectName: subjectName,
-        initialTopicId: topicId,
-        initialTopicTitle: topicTitle,
-      ),
-    );
-    if (result == true && mounted) {
-      ref.read(subjectDetailProvider.notifier).loadHierarchy(subjectId);
-      AiraActionToast.showSuccess(
-        context,
-        title: 'PDF Module Imported',
-        message: 'PDF Module imported and practice quizzes generated successfully!',
-      );
-    }
-  }
 }
 
 // ========================
@@ -919,13 +964,11 @@ class _TopicCard extends ConsumerStatefulWidget {
   final Map<String, dynamic> topic;
   final int topicIndex;
   final int subjectId;
-  final VoidCallback? onUploadPdf;
 
   const _TopicCard({
     required this.topic,
     required this.topicIndex,
     required this.subjectId,
-    this.onUploadPdf,
   });
 
   @override
@@ -965,10 +1008,10 @@ class _TopicCardState extends ConsumerState<_TopicCard> {
     final los = widget.topic['learning_outcomes'] as List<Map<String, dynamic>>? ?? [];
 
     return Container(
-      margin: const EdgeInsets.only(bottom: 16),
+      margin: const EdgeInsets.only(bottom: 14),
       decoration: BoxDecoration(
         color: Theme.of(context).colorScheme.surface,
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(14),
         border: Border.all(color: AppTheme.border),
       ),
       child: Column(
@@ -977,57 +1020,86 @@ class _TopicCardState extends ConsumerState<_TopicCard> {
           // Topic Header
           InkWell(
             onTap: () => setState(() => _isExpanded = !_isExpanded),
-            borderRadius: BorderRadius.circular(12),
+            borderRadius: BorderRadius.circular(14),
             child: Padding(
               padding: const EdgeInsets.all(16),
               child: Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
+                crossAxisAlignment: CrossAxisAlignment.center,
                 children: [
+                  Container(
+                    width: 36,
+                    height: 36,
+                    decoration: BoxDecoration(
+                      color: AppTheme.primary.withValues(alpha: 0.12),
+                      borderRadius: BorderRadius.circular(10),
+                      border: Border.all(color: AppTheme.primary.withValues(alpha: 0.3)),
+                    ),
+                    alignment: Alignment.center,
+                    child: Text(
+                      widget.topicIndex.toString().padLeft(2, '0'),
+                      style: TextStyle(
+                        color: AppTheme.primary,
+                        fontWeight: FontWeight.bold,
+                        fontSize: 13,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
                   Expanded(
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text(
-                          'Topic ${widget.topicIndex}',
-                          style: TextStyle(color: AppTheme.primary, fontSize: 12, fontWeight: FontWeight.bold),
+                        Row(
+                          children: [
+                            Text(
+                              'Topic ${widget.topicIndex}',
+                              style: TextStyle(color: AppTheme.primary, fontSize: 11.5, fontWeight: FontWeight.bold),
+                            ),
+                            const SizedBox(width: 8),
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1.5),
+                              decoration: BoxDecoration(
+                                color: Theme.of(context).brightness == Brightness.dark
+                                    ? AppTheme.surfaceElevated
+                                    : AppTheme.border.withValues(alpha: 0.4),
+                                borderRadius: BorderRadius.circular(6),
+                              ),
+                              child: Text(
+                                '${los.length} ${los.length == 1 ? 'Outcome' : 'Outcomes'}',
+                                style: TextStyle(color: AppTheme.textSecondary, fontSize: 10.5, fontWeight: FontWeight.w600),
+                              ),
+                            ),
+                          ],
                         ),
-                        const SizedBox(height: 4),
+                        const SizedBox(height: 3),
                         Text(
-                          widget.topic['title'],
-                          style: TextStyle(color: AppTheme.text, fontSize: 16, fontWeight: FontWeight.bold),
-                        ),
-                        const SizedBox(height: 4),
-                        Text(
-                          '${los.length} Learning Outcomes',
-                          style: TextStyle(color: AppTheme.textSecondary, fontSize: 12),
+                          widget.topic['title'] ?? 'Untitled Topic',
+                          style: TextStyle(color: AppTheme.text, fontSize: 15, fontWeight: FontWeight.bold),
                         ),
                       ],
                     ),
                   ),
-                  Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      IconButton(
-                        icon: Icon(Icons.edit_outlined, color: Theme.of(context).colorScheme.primary, size: 20),
-                        onPressed: () {
-                          showModalBottomSheet(
-                            context: context,
-                            isScrollControlled: true,
-                            backgroundColor: Colors.transparent,
-                            builder: (ctx) => _EditTopicSheet(topic: widget.topic, subjectId: widget.subjectId),
-                          );
-                        },
-                      ),
-                      IconButton(
-                        icon: Icon(Icons.delete_outline, color: Theme.of(context).colorScheme.error, size: 20),
-                        onPressed: _confirmDeleteTopic,
-                      ),
-                      Icon(
-                        _isExpanded ? Icons.keyboard_arrow_up : Icons.keyboard_arrow_down,
-                        color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6),
-                        size: 24,
-                      ),
-                    ],
+                  IconButton(
+                    tooltip: 'Edit Topic',
+                    icon: Icon(Icons.edit_outlined, color: Theme.of(context).colorScheme.primary, size: 19),
+                    onPressed: () {
+                      showModalBottomSheet(
+                        context: context,
+                        isScrollControlled: true,
+                        backgroundColor: Colors.transparent,
+                        builder: (ctx) => _EditTopicSheet(topic: widget.topic, subjectId: widget.subjectId),
+                      );
+                    },
+                  ),
+                  IconButton(
+                    tooltip: 'Delete Topic',
+                    icon: Icon(Icons.delete_outline, color: Theme.of(context).colorScheme.error, size: 19),
+                    onPressed: _confirmDeleteTopic,
+                  ),
+                  Icon(
+                    _isExpanded ? Icons.keyboard_arrow_up_rounded : Icons.keyboard_arrow_down_rounded,
+                    color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6),
+                    size: 22,
                   ),
                 ],
               ),
@@ -1037,68 +1109,47 @@ class _TopicCardState extends ConsumerState<_TopicCard> {
           if (_isExpanded) ...[
             if (widget.topic['description'] != null && widget.topic['description'].toString().isNotEmpty)
               Padding(
-                padding: const EdgeInsets.only(left: 16, right: 16, bottom: 16),
-                child: Text(
-                  widget.topic['description'],
-                  style: TextStyle(color: AppTheme.textSecondary, fontSize: 14),
+                padding: const EdgeInsets.only(left: 16, right: 16, bottom: 14),
+                child: Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: Theme.of(context).brightness == Brightness.dark
+                        ? AppTheme.surfaceElevated
+                        : AppTheme.background,
+                    borderRadius: BorderRadius.circular(10),
+                    border: Border.all(color: AppTheme.border.withValues(alpha: 0.6)),
+                  ),
+                  child: Text(
+                    widget.topic['description'],
+                    style: TextStyle(color: AppTheme.textSecondary, fontSize: 13, height: 1.35),
+                  ),
                 ),
               ),
 
-            // Add LO & Upload PDF Buttons
+            // Add LO Button
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 16),
-              child: Row(
-                children: [
-                  Expanded(
-                    child: OutlinedButton.icon(
-                      onPressed: () {
-                        showModalBottomSheet(
-                          context: context,
-                          isScrollControlled: true,
-                          backgroundColor: Colors.transparent,
-                          builder: (ctx) => _AddLOSheet(topicId: widget.topic['id'], subjectId: widget.subjectId),
-                        );
-                      },
-                      icon: Icon(Icons.add, color: Theme.of(context).colorScheme.primary, size: 18),
-                      label: const Text('Add LO'),
-                      style: OutlinedButton.styleFrom(
-                        foregroundColor: Theme.of(context).colorScheme.primary,
-                        side: BorderSide(color: Theme.of(context).colorScheme.primary.withValues(alpha: 0.3)),
-                        padding: const EdgeInsets.symmetric(vertical: 12),
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                      ),
-                    ),
+              child: SizedBox(
+                width: double.infinity,
+                child: OutlinedButton.icon(
+                  onPressed: () {
+                    showModalBottomSheet(
+                      context: context,
+                      isScrollControlled: true,
+                      backgroundColor: Colors.transparent,
+                      builder: (ctx) => _AddLOSheet(topicId: widget.topic['id'], subjectId: widget.subjectId),
+                    );
+                  },
+                  icon: Icon(Icons.add_rounded, color: Theme.of(context).colorScheme.primary, size: 18),
+                  label: const Text('Add Learning Outcome (LO)'),
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: Theme.of(context).colorScheme.primary,
+                    side: BorderSide(color: Theme.of(context).colorScheme.primary.withValues(alpha: 0.35)),
+                    padding: const EdgeInsets.symmetric(vertical: 12),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
                   ),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: OutlinedButton.icon(
-                      onPressed: () {
-                        if (widget.onUploadPdf != null) {
-                          widget.onUploadPdf!();
-                        } else {
-                          showDialog(
-                            context: context,
-                            barrierDismissible: false,
-                            builder: (ctx) => PdfModuleUploadDialog(
-                              subjectId: widget.subjectId,
-                              subjectName: widget.topic['title']?.toString() ?? 'Topic',
-                              initialTopicId: widget.topic['id'] as int?,
-                              initialTopicTitle: widget.topic['title']?.toString(),
-                            ),
-                          );
-                        }
-                      },
-                      icon: const Icon(Icons.picture_as_pdf, color: Color(0xFFE11D48), size: 18),
-                      label: const Text('Upload PDF'),
-                      style: OutlinedButton.styleFrom(
-                        foregroundColor: const Color(0xFFE11D48),
-                        side: BorderSide(color: const Color(0xFFE11D48).withValues(alpha: 0.3)),
-                        padding: const EdgeInsets.symmetric(vertical: 12),
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                      ),
-                    ),
-                  ),
-                ],
+                ),
               ),
             ),
             const SizedBox(height: 16),
@@ -1740,6 +1791,8 @@ class _QuizLOCardState extends ConsumerState<_QuizLOCard> {
   @override
   Widget build(BuildContext context) {
     final questions = widget.lo['questions'] as List<Map<String, dynamic>>? ?? [];
+    final currentUser = ref.watch(authProvider);
+    final isTeacher = currentUser?.isTeacher ?? false;
     
     return Container(
       margin: const EdgeInsets.only(bottom: 12),
@@ -1779,20 +1832,23 @@ class _QuizLOCardState extends ConsumerState<_QuizLOCard> {
                   Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      IconButton(
-                        icon: Icon(Icons.add, color: Theme.of(context).colorScheme.primary, size: 20),
-                        constraints: const BoxConstraints(),
-                        padding: const EdgeInsets.all(4),
-                        onPressed: () {
-                          showModalBottomSheet(
-                            context: context,
-                            isScrollControlled: true,
-                            backgroundColor: Colors.transparent,
-                            builder: (ctx) => _AddQuestionSheet(loId: widget.lo['id'], subjectId: widget.subjectId),
-                          );
-                        },
-                      ),
-                      const SizedBox(width: 4),
+                      if (isTeacher) ...[
+                        IconButton(
+                          tooltip: 'Add Question',
+                          icon: Icon(Icons.add, color: Theme.of(context).colorScheme.primary, size: 20),
+                          constraints: const BoxConstraints(),
+                          padding: const EdgeInsets.all(4),
+                          onPressed: () {
+                            showModalBottomSheet(
+                              context: context,
+                              isScrollControlled: true,
+                              backgroundColor: Colors.transparent,
+                              builder: (ctx) => _AddQuestionSheet(loId: widget.lo['id'], subjectId: widget.subjectId),
+                            );
+                          },
+                        ),
+                        const SizedBox(width: 4),
+                      ],
                       Icon(
                         _isExpanded ? Icons.keyboard_arrow_up : Icons.keyboard_arrow_down,
                         color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6),
@@ -1818,7 +1874,7 @@ class _QuizLOCardState extends ConsumerState<_QuizLOCard> {
                       style: TextStyle(color: AppTheme.textSecondary, fontSize: 13),
                     ),
                   ),
-                  if (widget.lo['passing_score'] != null && widget.lo['passing_score'] > 0)
+                  if (isTeacher && widget.lo['passing_score'] != null && widget.lo['passing_score'] > 0)
                     IconButton(
                       icon: Icon(Icons.delete_outline, color: Theme.of(context).colorScheme.error, size: 16),
                       constraints: const BoxConstraints(),
@@ -1918,24 +1974,26 @@ class _QuizLOCardState extends ConsumerState<_QuizLOCard> {
                         ],
                       ),
                     ],
-                    const SizedBox(height: 12),
-                    OutlinedButton.icon(
-                      style: OutlinedButton.styleFrom(
-                        foregroundColor: Theme.of(context).colorScheme.primary,
-                        side: BorderSide(color: Theme.of(context).colorScheme.primary),
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                    if (isTeacher) ...[
+                      const SizedBox(height: 12),
+                      OutlinedButton.icon(
+                        style: OutlinedButton.styleFrom(
+                          foregroundColor: Theme.of(context).colorScheme.primary,
+                          side: BorderSide(color: Theme.of(context).colorScheme.primary),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                        ),
+                        icon: const Icon(Icons.edit_calendar, size: 16),
+                        label: const Text('Edit Schedule', style: TextStyle(fontWeight: FontWeight.bold)),
+                        onPressed: () {
+                          showModalBottomSheet(
+                            context: context,
+                            isScrollControlled: true,
+                            backgroundColor: Colors.transparent,
+                            builder: (ctx) => _ScheduleQuizSheet(lo: widget.lo),
+                          );
+                        },
                       ),
-                      icon: const Icon(Icons.edit_calendar, size: 16),
-                      label: const Text('Edit Schedule', style: TextStyle(fontWeight: FontWeight.bold)),
-                      onPressed: () {
-                        showModalBottomSheet(
-                          context: context,
-                          isScrollControlled: true,
-                          backgroundColor: Colors.transparent,
-                          builder: (ctx) => _ScheduleQuizSheet(lo: widget.lo),
-                        );
-                      },
-                    ),
+                    ],
                   ],
                 ],
               ),
@@ -1974,6 +2032,8 @@ class _QuestionCard extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final currentUser = ref.watch(authProvider);
+    final isTeacher = currentUser?.isTeacher ?? false;
     final correctOption = question['correct_option'] as String;
 
     Widget buildOption(String letter, String text) {
@@ -2030,54 +2090,55 @@ class _QuestionCard extends ConsumerWidget {
               ],
             ),
           ),
-          Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              IconButton(
-                icon: Icon(Icons.edit_outlined, color: Theme.of(context).colorScheme.primary, size: 16),
-                constraints: const BoxConstraints(),
-                padding: const EdgeInsets.all(4),
-                onPressed: () {
-                  showModalBottomSheet(
-                    context: context,
-                    isScrollControlled: true,
-                    backgroundColor: Colors.transparent,
-                    builder: (ctx) => _EditQuestionSheet(question: question, subjectId: subjectId),
-                  );
-                },
-              ),
-              const SizedBox(width: 4),
-              IconButton(
-                icon: Icon(Icons.delete_outline, color: Theme.of(context).colorScheme.error, size: 16),
-                constraints: const BoxConstraints(),
-                padding: const EdgeInsets.all(4),
-                onPressed: () {
-                  showDialog(
-                    context: context,
-                    builder: (context) => AlertDialog(
-                      backgroundColor: Theme.of(context).colorScheme.surface,
-                      title: Text('Delete Question', style: TextStyle(color: AppTheme.text)),
-                      content: Text('Are you sure you want to delete this question?',
-                          style: TextStyle(color: AppTheme.textSecondary)),
-                      actions: [
-                        TextButton(
-                          onPressed: () => Navigator.pop(context),
-                          child: Text('Cancel', style: TextStyle(color: AppTheme.textSecondary)),
-                        ),
-                        TextButton(
-                          onPressed: () {
-                            ref.read(subjectDetailProvider.notifier).deleteQuestion(question['id']);
-                            Navigator.pop(context);
-                          },
-                          child: Text('Delete', style: TextStyle(color: AppTheme.error)),
-                        ),
-                      ],
-                    ),
-                  );
-                },
-              ),
-            ],
-          ),
+          if (isTeacher)
+            Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                IconButton(
+                  icon: Icon(Icons.edit_outlined, color: Theme.of(context).colorScheme.primary, size: 16),
+                  constraints: const BoxConstraints(),
+                  padding: const EdgeInsets.all(4),
+                  onPressed: () {
+                    showModalBottomSheet(
+                      context: context,
+                      isScrollControlled: true,
+                      backgroundColor: Colors.transparent,
+                      builder: (ctx) => _EditQuestionSheet(question: question, subjectId: subjectId),
+                    );
+                  },
+                ),
+                const SizedBox(width: 4),
+                IconButton(
+                  icon: Icon(Icons.delete_outline, color: Theme.of(context).colorScheme.error, size: 16),
+                  constraints: const BoxConstraints(),
+                  padding: const EdgeInsets.all(4),
+                  onPressed: () {
+                    showDialog(
+                      context: context,
+                      builder: (context) => AlertDialog(
+                        backgroundColor: Theme.of(context).colorScheme.surface,
+                        title: Text('Delete Question', style: TextStyle(color: AppTheme.text)),
+                        content: Text('Are you sure you want to delete this question?',
+                            style: TextStyle(color: AppTheme.textSecondary)),
+                        actions: [
+                          TextButton(
+                            onPressed: () => Navigator.pop(context),
+                            child: Text('Cancel', style: TextStyle(color: AppTheme.textSecondary)),
+                          ),
+                          TextButton(
+                            onPressed: () {
+                              ref.read(subjectDetailProvider.notifier).deleteQuestion(question['id']);
+                              Navigator.pop(context);
+                            },
+                            child: Text('Delete', style: TextStyle(color: AppTheme.error)),
+                          ),
+                        ],
+                      ),
+                    );
+                  },
+                ),
+              ],
+            ),
         ],
       ),
     );

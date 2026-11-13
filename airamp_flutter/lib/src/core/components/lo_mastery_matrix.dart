@@ -1,513 +1,1164 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../../features/auth/application/auth_provider.dart';
+import '../../features/teacher/data/teacher_repository.dart';
 import '../theme/app_theme.dart';
 
-class LoMasteryItem {
-  final String loCode;
-  final String loTitle;
-  final String subject;
-  final String section;
-  final double score; // 0.0 to 100.0
-  final int assessedCount;
-  final int masteredCount;
-  final int developingCount;
-  final int atRiskCount;
-  final List<LoMissedQuestion> mostMissedItems;
-  final String remediationAction;
+class _TierVisuals {
+  final Color bgLight;
+  final Color bgDark;
+  final Color borderLight;
+  final Color borderDark;
+  final Color textLight;
+  final Color textDark;
+  final String label;
+  final IconData icon;
 
-  const LoMasteryItem({
-    required this.loCode,
-    required this.loTitle,
-    required this.subject,
-    required this.section,
-    required this.score,
-    required this.assessedCount,
-    required this.masteredCount,
-    required this.developingCount,
-    required this.atRiskCount,
-    required this.mostMissedItems,
-    required this.remediationAction,
+  const _TierVisuals({
+    required this.bgLight,
+    required this.bgDark,
+    required this.borderLight,
+    required this.borderDark,
+    required this.textLight,
+    required this.textDark,
+    required this.label,
+    required this.icon,
   });
 
-  String get tier {
-    if (score >= 80.0) return 'Proficient';
-    if (score >= 60.0) return 'Developing';
-    return 'Needs Help';
+  Color bg(bool isDark) => isDark ? bgDark : bgLight;
+  Color border(bool isDark) => isDark ? borderDark : borderLight;
+  Color text(bool isDark) => isDark ? textDark : textLight;
+}
+
+const _masteredTier = _TierVisuals(
+  bgLight: Color(0xFFECFDF5),
+  bgDark: Color(0x33064E3B),
+  borderLight: Color(0xFFA7F3D0),
+  borderDark: Color(0x66059669),
+  textLight: Color(0xFF047857),
+  textDark: Color(0xFF6EE7B7),
+  label: 'Mastered (≥85%)',
+  icon: Icons.check_circle_rounded,
+);
+
+const _proficientTier = _TierVisuals(
+  bgLight: Color(0xFFEFF6FF),
+  bgDark: Color(0x331E3A8A),
+  borderLight: Color(0xFFBFDBFE),
+  borderDark: Color(0x662563EB),
+  textLight: Color(0xFF1D4ED8),
+  textDark: Color(0xFF93C5FD),
+  label: 'Proficient (70–84%)',
+  icon: Icons.trending_up_rounded,
+);
+
+const _developingTier = _TierVisuals(
+  bgLight: Color(0xFFFFFBEB),
+  bgDark: Color(0x3378350F),
+  borderLight: Color(0xFFFDE68A),
+  borderDark: Color(0x66D97706),
+  textLight: Color(0xFFB45309),
+  textDark: Color(0xFFFCD34D),
+  label: 'Developing (50–69%)',
+  icon: Icons.info_outline_rounded,
+);
+
+const _needsHelpTier = _TierVisuals(
+  bgLight: Color(0xFFFFF1F2),
+  bgDark: Color(0x33881337),
+  borderLight: Color(0xFFFECDD3),
+  borderDark: Color(0x66E11D48),
+  textLight: Color(0xFFBE123C),
+  textDark: Color(0xFFFDA4AF),
+  label: 'Needs Support (<50%)',
+  icon: Icons.warning_amber_rounded,
+);
+
+const _unassessedTier = _TierVisuals(
+  bgLight: Color(0xFFF8FAFC),
+  bgDark: Color(0x2A1E293B),
+  borderLight: Color(0xFFE2E8F0),
+  borderDark: Color(0x40334155),
+  textLight: Color(0xFF94A3B8),
+  textDark: Color(0xFF64748B),
+  label: 'Not Assessed',
+  icon: Icons.remove_rounded,
+);
+
+_TierVisuals _resolveTierVisual(String? tier) {
+  switch (tier?.toLowerCase()) {
+    case 'mastered':
+      return _masteredTier;
+    case 'proficient':
+      return _proficientTier;
+    case 'developing':
+      return _developingTier;
+    case 'needs_help':
+      return _needsHelpTier;
+    default:
+      return _unassessedTier;
   }
 }
 
-class LoMissedQuestion {
-  final String questionText;
-  final int missedPercent;
-  final String commonMistake;
-
-  const LoMissedQuestion({
-    required this.questionText,
-    required this.missedPercent,
-    required this.commonMistake,
-  });
-}
-
-class LoMasteryMatrix extends StatefulWidget {
-  final String? initialSubject;
+class LoMasteryMatrix extends ConsumerStatefulWidget {
+  final String? teacherId;
+  final String? initialSection;
+  final String? initialStudentId;
+  final int? initialSubjectId;
   final bool compact;
 
   const LoMasteryMatrix({
     super.key,
-    this.initialSubject,
+    this.teacherId,
+    this.initialSection,
+    this.initialStudentId,
+    this.initialSubjectId,
     this.compact = false,
   });
 
   @override
-  State<LoMasteryMatrix> createState() => _LoMasteryMatrixState();
+  ConsumerState<LoMasteryMatrix> createState() => _LoMasteryMatrixState();
 }
 
-class _LoMasteryMatrixState extends State<LoMasteryMatrix> {
-  String _selectedSubject = 'All Subjects';
-  String _selectedSection = 'All Sections';
+class _LoMasteryMatrixState extends ConsumerState<LoMasteryMatrix> {
+  int? _selectedSubjectId;
+  String _viewDimension = 'section'; // 'section' or 'student'
   String _searchQuery = '';
-  bool _isCardView = true;
-  bool _initializedViewMode = false;
-  final Set<String> _expandedLoKeys = {'LO-01'};
-
-  // Standard curriculum mock database for matrix visualization
-  late final List<LoMasteryItem> _masteryData;
+  final TextEditingController _searchController = TextEditingController();
 
   @override
   void initState() {
     super.initState();
-    if (widget.initialSubject != null) {
-      _selectedSubject = widget.initialSubject!;
+    _selectedSubjectId = widget.initialSubjectId;
+  }
+
+  @override
+  void didUpdateWidget(covariant LoMasteryMatrix oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.initialSubjectId != oldWidget.initialSubjectId) {
+      _selectedSubjectId = widget.initialSubjectId;
     }
-    _masteryData = _generateMasteryData();
   }
 
-  List<LoMasteryItem> _generateMasteryData() {
-    return const [
-      // Empowerment Technologies
-      LoMasteryItem(
-        loCode: 'LO-01',
-        loTitle: 'Advanced Productivity & Automation',
-        subject: 'Empowerment Technologies',
-        section: '11-STEM-A',
-        score: 88.5,
-        assessedCount: 42,
-        masteredCount: 32,
-        developingCount: 8,
-        atRiskCount: 2,
-        mostMissedItems: [
-          LoMissedQuestion(
-            questionText: 'Nested lookup formulas & dynamic references in spreadsheets',
-            missedPercent: 45,
-            commonMistake: 'Confused relative vs. absolute cell locking (\$A\$1)',
-          ),
-          LoMissedQuestion(
-            questionText: 'Mail merge source connection security exceptions',
-            missedPercent: 32,
-            commonMistake: 'Overlooked file path permission headers',
-          ),
-        ],
-        remediationAction: 'Provide short laboratory drill on absolute range anchoring and dynamic references.',
-      ),
-      LoMasteryItem(
-        loCode: 'LO-01',
-        loTitle: 'Advanced Productivity & Automation',
-        subject: 'Empowerment Technologies',
-        section: '11-STEM-B',
-        score: 82.0,
-        assessedCount: 40,
-        masteredCount: 27,
-        developingCount: 10,
-        atRiskCount: 3,
-        mostMissedItems: [
-          LoMissedQuestion(
-            questionText: 'Conditional formatting with custom formula criteria',
-            missedPercent: 52,
-            commonMistake: 'Omitted leading equals sign in boolean criteria',
-          ),
-        ],
-        remediationAction: 'Assign peer review exercise covering conditional formatting rules.',
-      ),
-      LoMasteryItem(
-        loCode: 'LO-01',
-        loTitle: 'Advanced Productivity & Automation',
-        subject: 'Empowerment Technologies',
-        section: '11-ABM-A',
-        score: 74.0,
-        assessedCount: 38,
-        masteredCount: 19,
-        developingCount: 14,
-        atRiskCount: 5,
-        mostMissedItems: [
-          LoMissedQuestion(
-            questionText: 'Macro automation scripting syntax & event triggers',
-            missedPercent: 64,
-            commonMistake: 'Syntax errors in subroutine declarations',
-          ),
-        ],
-        remediationAction: 'Schedule a 20-minute targeted review with guided worksheet walkthrough.',
-      ),
-      LoMasteryItem(
-        loCode: 'LO-01',
-        loTitle: 'Advanced Productivity & Automation',
-        subject: 'Empowerment Technologies',
-        section: '11-HUMSS-A',
-        score: 68.5,
-        assessedCount: 36,
-        masteredCount: 16,
-        developingCount: 14,
-        atRiskCount: 6,
-        mostMissedItems: [
-          LoMissedQuestion(
-            questionText: 'Data validation rules with custom input alerts',
-            missedPercent: 60,
-            commonMistake: 'Incorrect error alert stop vs warning settings',
-          ),
-        ],
-        remediationAction: 'Deploy Gizmo interactive flashcard deck for spreadsheet validation concepts.',
-      ),
-      LoMasteryItem(
-        loCode: 'LO-01',
-        loTitle: 'Advanced Productivity & Automation',
-        subject: 'Empowerment Technologies',
-        section: '12-TVL-ICT',
-        score: 91.0,
-        assessedCount: 35,
-        masteredCount: 30,
-        developingCount: 4,
-        atRiskCount: 1,
-        mostMissedItems: [
-          LoMissedQuestion(
-            questionText: 'Cloud document collaboration conflict resolution',
-            missedPercent: 28,
-            commonMistake: 'Missed revision history restore branching',
-          ),
-        ],
-        remediationAction: 'Advanced mastery demonstrated. Ready for practical capstone assessment.',
-      ),
-
-      // LO-02: Web Design & Principles
-      LoMasteryItem(
-        loCode: 'LO-02',
-        loTitle: 'Web Principles & Responsive Design',
-        subject: 'Empowerment Technologies',
-        section: '11-STEM-A',
-        score: 84.0,
-        assessedCount: 42,
-        masteredCount: 29,
-        developingCount: 11,
-        atRiskCount: 2,
-        mostMissedItems: [
-          LoMissedQuestion(
-            questionText: 'CSS Flexbox vs CSS Grid layout mechanics',
-            missedPercent: 48,
-            commonMistake: 'Misunderstanding cross-axis alignment parameters',
-          ),
-        ],
-        remediationAction: 'Conduct visual CSS diagramming recap during laboratory session.',
-      ),
-      LoMasteryItem(
-        loCode: 'LO-02',
-        loTitle: 'Web Principles & Responsive Design',
-        subject: 'Empowerment Technologies',
-        section: '11-STEM-B',
-        score: 78.5,
-        assessedCount: 40,
-        masteredCount: 23,
-        developingCount: 13,
-        atRiskCount: 4,
-        mostMissedItems: [
-          LoMissedQuestion(
-            questionText: 'Mobile viewport meta tag configuration',
-            missedPercent: 55,
-            commonMistake: 'Omitted initial-scale=1.0 parameter',
-          ),
-        ],
-        remediationAction: 'Provide responsive emulator test template in offline learning hub.',
-      ),
-      LoMasteryItem(
-        loCode: 'LO-02',
-        loTitle: 'Web Principles & Responsive Design',
-        subject: 'Empowerment Technologies',
-        section: '11-ABM-A',
-        score: 63.0,
-        assessedCount: 38,
-        masteredCount: 14,
-        developingCount: 15,
-        atRiskCount: 9,
-        mostMissedItems: [
-          LoMissedQuestion(
-            questionText: 'Semantic HTML5 structure & accessibility tags',
-            missedPercent: 68,
-            commonMistake: 'Overusing generic div tags instead of article and section',
-          ),
-        ],
-        remediationAction: 'Deliver remediation mini-module on semantic web accessibility standards.',
-      ),
-      LoMasteryItem(
-        loCode: 'LO-02',
-        loTitle: 'Web Principles & Responsive Design',
-        subject: 'Empowerment Technologies',
-        section: '11-HUMSS-A',
-        score: 58.0,
-        assessedCount: 36,
-        masteredCount: 11,
-        developingCount: 14,
-        atRiskCount: 11,
-        mostMissedItems: [
-          LoMissedQuestion(
-            questionText: 'Color contrast ratio accessibility guidelines (WCAG)',
-            missedPercent: 72,
-            commonMistake: 'Failed to meet 4.5:1 minimum normal text contrast',
-          ),
-        ],
-        remediationAction: 'High priority intervention: Schedule guided review and open quiz retake.',
-      ),
-      LoMasteryItem(
-        loCode: 'LO-02',
-        loTitle: 'Web Principles & Responsive Design',
-        subject: 'Empowerment Technologies',
-        section: '12-TVL-ICT',
-        score: 87.5,
-        assessedCount: 35,
-        masteredCount: 28,
-        developingCount: 6,
-        atRiskCount: 1,
-        mostMissedItems: [
-          LoMissedQuestion(
-            questionText: 'Media queries breakpoint strategy',
-            missedPercent: 36,
-            commonMistake: 'Desktop-first vs mobile-first query precedence',
-          ),
-        ],
-        remediationAction: 'Section demonstrated strong practical mastery.',
-      ),
-
-      // General Mathematics: Functions & Rational Equations
-      LoMasteryItem(
-        loCode: 'LO-03',
-        loTitle: 'Functions & Rational Expressions',
-        subject: 'General Mathematics',
-        section: '11-STEM-A',
-        score: 86.0,
-        assessedCount: 42,
-        masteredCount: 30,
-        developingCount: 10,
-        atRiskCount: 2,
-        mostMissedItems: [
-          LoMissedQuestion(
-            questionText: 'Vertical and horizontal asymptotes of rational functions',
-            missedPercent: 44,
-            commonMistake: 'Ignored degree equality rules for horizontal asymptote',
-          ),
-        ],
-        remediationAction: 'Share asymptotic behavior summary cheatsheet.',
-      ),
-      LoMasteryItem(
-        loCode: 'LO-03',
-        loTitle: 'Functions & Rational Expressions',
-        subject: 'General Mathematics',
-        section: '11-STEM-B',
-        score: 81.5,
-        assessedCount: 40,
-        masteredCount: 26,
-        developingCount: 11,
-        atRiskCount: 3,
-        mostMissedItems: [
-          LoMissedQuestion(
-            questionText: 'Extraneous solutions in rational algebraic equations',
-            missedPercent: 50,
-            commonMistake: 'Did not check root against denominator zero restrictions',
-          ),
-        ],
-        remediationAction: 'Practice domain restriction verification drills.',
-      ),
-      LoMasteryItem(
-        loCode: 'LO-03',
-        loTitle: 'Functions & Rational Expressions',
-        subject: 'General Mathematics',
-        section: '11-ABM-A',
-        score: 66.0,
-        assessedCount: 38,
-        masteredCount: 15,
-        developingCount: 16,
-        atRiskCount: 7,
-        mostMissedItems: [
-          LoMissedQuestion(
-            questionText: 'Inverse function algebraic derivation',
-            missedPercent: 62,
-            commonMistake: 'Algebraic slip during cross-multiplication isolation',
-          ),
-        ],
-        remediationAction: 'Conduct small-group remediation on algebraic function operations.',
-      ),
-      LoMasteryItem(
-        loCode: 'LO-03',
-        loTitle: 'Functions & Rational Expressions',
-        subject: 'General Mathematics',
-        section: '11-HUMSS-A',
-        score: 55.0,
-        assessedCount: 36,
-        masteredCount: 9,
-        developingCount: 15,
-        atRiskCount: 12,
-        mostMissedItems: [
-          LoMissedQuestion(
-            questionText: 'Word problems involving combined work rates',
-            missedPercent: 78,
-            commonMistake: 'Set up sum of times rather than sum of reciprocal work rates',
-          ),
-        ],
-        remediationAction: 'Urgent intervention: Deploy stepped problem solver and video tutorials.',
-      ),
-      LoMasteryItem(
-        loCode: 'LO-03',
-        loTitle: 'Functions & Rational Expressions',
-        subject: 'General Mathematics',
-        section: '12-TVL-ICT',
-        score: 72.0,
-        assessedCount: 35,
-        masteredCount: 18,
-        developingCount: 13,
-        atRiskCount: 4,
-        mostMissedItems: [
-          LoMissedQuestion(
-            questionText: 'Piecewise function interval evaluation',
-            missedPercent: 56,
-            commonMistake: 'Included boundary value in wrong interval segment',
-          ),
-        ],
-        remediationAction: 'Reinforce boundary inequality signs with number line graphs.',
-      ),
-
-      // Oral Communication: Speech Acts & Delivery
-      LoMasteryItem(
-        loCode: 'LO-04',
-        loTitle: 'Speech Acts & Communicative Competence',
-        subject: 'Oral Communication',
-        section: '11-STEM-A',
-        score: 89.0,
-        assessedCount: 42,
-        masteredCount: 33,
-        developingCount: 8,
-        atRiskCount: 1,
-        mostMissedItems: [
-          LoMissedQuestion(
-            questionText: 'Illocutionary vs perlocutionary speech act distinction',
-            missedPercent: 35,
-            commonMistake: 'Confused speaker intent with listener behavioral consequence',
-          ),
-        ],
-        remediationAction: 'Maintain current instructional pace.',
-      ),
-      LoMasteryItem(
-        loCode: 'LO-04',
-        loTitle: 'Speech Acts & Communicative Competence',
-        subject: 'Oral Communication',
-        section: '11-HUMSS-A',
-        score: 93.5,
-        assessedCount: 36,
-        masteredCount: 32,
-        developingCount: 4,
-        atRiskCount: 0,
-        mostMissedItems: [
-          LoMissedQuestion(
-            questionText: 'Turn-taking and nomination repair strategies',
-            missedPercent: 22,
-            commonMistake: 'Overlapped topic control with abrupt termination',
-          ),
-        ],
-        remediationAction: 'Exemplary cohort performance. Assign advanced debate seminar.',
-      ),
-      LoMasteryItem(
-        loCode: 'LO-04',
-        loTitle: 'Speech Acts & Communicative Competence',
-        subject: 'Oral Communication',
-        section: '11-ABM-A',
-        score: 83.0,
-        assessedCount: 38,
-        masteredCount: 27,
-        developingCount: 9,
-        atRiskCount: 2,
-        mostMissedItems: [
-          LoMissedQuestion(
-            questionText: 'Non-verbal kinesics and proxemics in business pitches',
-            missedPercent: 40,
-            commonMistake: 'Underestimated spatial distance impact on audience reception',
-          ),
-        ],
-        remediationAction: 'Conduct mock presentation rehearsals.',
-      ),
-      LoMasteryItem(
-        loCode: 'LO-04',
-        loTitle: 'Speech Acts & Communicative Competence',
-        subject: 'Oral Communication',
-        section: '11-STEM-B',
-        score: 85.0,
-        assessedCount: 40,
-        masteredCount: 29,
-        developingCount: 9,
-        atRiskCount: 2,
-        mostMissedItems: [
-          LoMissedQuestion(
-            questionText: 'J.L. Austin speech act classification taxonomy',
-            missedPercent: 38,
-            commonMistake: 'Swapped verdictives with exercitives',
-          ),
-        ],
-        remediationAction: 'Reinforce classification mnemonic.',
-      ),
-      LoMasteryItem(
-        loCode: 'LO-04',
-        loTitle: 'Speech Acts & Communicative Competence',
-        subject: 'Oral Communication',
-        section: '12-TVL-ICT',
-        score: 79.0,
-        assessedCount: 35,
-        masteredCount: 22,
-        developingCount: 11,
-        atRiskCount: 2,
-        mostMissedItems: [
-          LoMissedQuestion(
-            questionText: 'Handling technical jargon in client communication',
-            missedPercent: 48,
-            commonMistake: 'Relied on acronyms without client contextualization',
-          ),
-        ],
-        remediationAction: 'Practice plain-language technical translation drills.',
-      ),
-    ];
+  @override
+  void dispose() {
+    _searchController.dispose();
+    super.dispose();
   }
 
-  void _showDrillDownDialog(BuildContext context, LoMasteryItem item, bool isDark) {
+  @override
+  Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final currentUser = ref.watch(authProvider);
+    final effectiveTeacherId = widget.teacherId ?? (currentUser?.role == 'teacher' ? currentUser?.id : null);
+
+    final params = CompetencyHeatmapParams(
+      teacherId: effectiveTeacherId,
+      subjectId: _selectedSubjectId,
+      section: widget.initialSection,
+      studentId: widget.initialStudentId,
+    );
+
+    final heatmapAsync = ref.watch(competencyHeatmapProvider(params));
+
+    return heatmapAsync.when(
+      loading: () => Container(
+        height: 280,
+        alignment: Alignment.center,
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            const SizedBox(
+              width: 28,
+              height: 28,
+              child: CircularProgressIndicator(strokeWidth: 2.5),
+            ),
+            const SizedBox(height: 12),
+            Text(
+              'Loading curriculum competency matrix...',
+              style: TextStyle(fontSize: 12, color: AppTheme.textSecondary),
+            ),
+          ],
+        ),
+      ),
+      error: (err, stack) => Container(
+        padding: const EdgeInsets.all(20),
+        decoration: BoxDecoration(
+          color: isDark ? AppTheme.darkSurface : Colors.white,
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: AppTheme.error.withValues(alpha: 0.3)),
+        ),
+        child: Row(
+          children: [
+            Icon(Icons.error_outline_rounded, color: AppTheme.error, size: 22),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Text(
+                'Unable to load competency heatmap: $err',
+                style: TextStyle(fontSize: 12.5, color: isDark ? AppTheme.darkText : AppTheme.lightText),
+              ),
+            ),
+            TextButton(
+              onPressed: () => ref.invalidate(competencyHeatmapProvider(params)),
+              child: const Text('Retry'),
+            ),
+          ],
+        ),
+      ),
+      data: (data) => _buildHeatmapContent(context, data, isDark, params),
+    );
+  }
+
+  Widget _buildHeatmapContent(
+    BuildContext context,
+    Map<String, dynamic> data,
+    bool isDark,
+    CompetencyHeatmapParams params,
+  ) {
+    final subjects = (data['subjects'] as List<dynamic>?)?.cast<Map<String, dynamic>>() ?? [];
+    final sections = (data['sections'] as List<dynamic>?)?.cast<String>() ?? [];
+    final students = (data['students'] as List<dynamic>?)?.cast<Map<String, dynamic>>() ?? [];
+    final rawMatrix = (data['matrix'] as List<dynamic>?)?.cast<Map<String, dynamic>>() ?? [];
+
+    // Filter competencies by search query
+    final query = _searchQuery.trim().toLowerCase();
+    final competencies = rawMatrix.where((c) {
+      if (query.isEmpty) return true;
+      final code = (c['code'] as String? ?? '').toLowerCase();
+      final title = (c['title'] as String? ?? '').toLowerCase();
+      final topic = (c['topicTitle'] as String? ?? '').toLowerCase();
+      final sub = (c['subjectName'] as String? ?? '').toLowerCase();
+      return code.contains(query) || title.contains(query) || topic.contains(query) || sub.contains(query);
+    }).toList();
+
+    final screenWidth = MediaQuery.of(context).size.width;
+    final isMobile = screenWidth < 768;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        // ── Controls Toolbar ──
+        _buildControlsToolbar(
+          context: context,
+          isDark: isDark,
+          isMobile: isMobile,
+          subjects: subjects,
+          hasStudents: students.isNotEmpty,
+          onRefresh: () => ref.invalidate(competencyHeatmapProvider(params)),
+        ),
+        const SizedBox(height: 12),
+
+        // ── Legend Bar ──
+        _buildLegendBar(isDark),
+        const SizedBox(height: 14),
+
+        // ── Heatmap Grid or Empty State ──
+        if (competencies.isEmpty)
+          _buildEmptyCompetenciesState(isDark)
+        else
+          _buildHeatmapMatrixGrid(
+            context: context,
+            competencies: competencies,
+            sections: sections,
+            students: students,
+            isDark: isDark,
+            isMobile: isMobile,
+          ),
+      ],
+    );
+  }
+
+  Widget _buildControlsToolbar({
+    required BuildContext context,
+    required bool isDark,
+    required bool isMobile,
+    required List<Map<String, dynamic>> subjects,
+    required bool hasStudents,
+    required VoidCallback onRefresh,
+  }) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+      decoration: BoxDecoration(
+        color: isDark ? AppTheme.darkSurfaceLight : const Color(0xFFF8FAFC),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: isDark ? AppTheme.darkBorder : const Color(0xFFE2E8F0)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Wrap(
+            alignment: WrapAlignment.spaceBetween,
+            crossAxisAlignment: WrapCrossAlignment.center,
+            spacing: 10,
+            runSpacing: 10,
+            children: [
+              // Dimension Switcher (By Section vs By Student)
+              Container(
+                height: 34,
+                padding: const EdgeInsets.all(2),
+                decoration: BoxDecoration(
+                  color: isDark ? AppTheme.darkSurface : Colors.white,
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(color: isDark ? AppTheme.darkBorder : const Color(0xFFCBD5E1)),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    _buildDimensionButton(
+                      label: 'Class Sections',
+                      icon: Icons.domain_rounded,
+                      isActive: _viewDimension == 'section',
+                      isDark: isDark,
+                      onTap: () {
+                        HapticFeedback.lightImpact();
+                        setState(() => _viewDimension = 'section');
+                      },
+                    ),
+                    _buildDimensionButton(
+                      label: 'Individual Students',
+                      icon: Icons.person_search_rounded,
+                      isActive: _viewDimension == 'student',
+                      isDark: isDark,
+                      onTap: () {
+                        HapticFeedback.lightImpact();
+                        setState(() => _viewDimension = 'student');
+                      },
+                    ),
+                  ],
+                ),
+              ),
+
+              // Subject Filter Dropdown
+              if (subjects.length > 1)
+                Container(
+                  height: 34,
+                  padding: const EdgeInsets.symmetric(horizontal: 10),
+                  decoration: BoxDecoration(
+                    color: isDark ? AppTheme.darkSurface : Colors.white,
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(color: isDark ? AppTheme.darkBorder : const Color(0xFFCBD5E1)),
+                  ),
+                  child: DropdownButtonHideUnderline(
+                    child: DropdownButton<int?>(
+                      value: _selectedSubjectId,
+                      icon: Icon(Icons.arrow_drop_down_rounded, size: 18, color: AppTheme.textSecondary),
+                      isDense: true,
+                      style: TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
+                        color: isDark ? AppTheme.darkText : AppTheme.lightText,
+                      ),
+                      dropdownColor: isDark ? AppTheme.darkSurface : Colors.white,
+                      items: [
+                        const DropdownMenuItem<int?>(
+                          value: null,
+                          child: Text('All Active Subjects'),
+                        ),
+                        ...subjects.map((s) {
+                          final subId = s['id'] as int;
+                          final subCode = (s['subject_code'] ?? s['code'] ?? '').toString();
+                          final subName = (s['name'] ?? 'Subject').toString();
+                          final display = subCode.isNotEmpty ? '$subCode - $subName' : subName;
+                          return DropdownMenuItem<int?>(
+                            value: subId,
+                            child: Text(
+                              display.length > 28 ? '${display.substring(0, 26)}...' : display,
+                            ),
+                          );
+                        }),
+                      ],
+                      onChanged: (val) {
+                        HapticFeedback.selectionClick();
+                        setState(() => _selectedSubjectId = val);
+                      },
+                    ),
+                  ),
+                ),
+
+              // Refresh Button
+              IconButton(
+                icon: const Icon(Icons.refresh_rounded, size: 18),
+                tooltip: 'Refresh Mastery Matrix',
+                padding: EdgeInsets.zero,
+                constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
+                color: AppTheme.textSecondary,
+                onPressed: onRefresh,
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+
+          // Instant Search Bar
+          SizedBox(
+            height: 34,
+            child: TextField(
+              controller: _searchController,
+              onChanged: (val) => setState(() => _searchQuery = val),
+              style: TextStyle(
+                fontSize: 12,
+                color: isDark ? AppTheme.darkText : AppTheme.lightText,
+              ),
+              decoration: InputDecoration(
+                hintText: 'Search competency by code, title, or topic...',
+                hintStyle: TextStyle(fontSize: 11.5, color: AppTheme.textSecondary),
+                prefixIcon: Icon(Icons.search_rounded, size: 16, color: AppTheme.textSecondary),
+                suffixIcon: _searchQuery.isNotEmpty
+                    ? IconButton(
+                        icon: const Icon(Icons.clear_rounded, size: 15),
+                        padding: EdgeInsets.zero,
+                        onPressed: () {
+                          _searchController.clear();
+                          setState(() => _searchQuery = '');
+                        },
+                      )
+                    : null,
+                filled: true,
+                fillColor: isDark ? AppTheme.darkSurface : Colors.white,
+                contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 0),
+                enabledBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(8),
+                  borderSide: BorderSide(color: isDark ? AppTheme.darkBorder : const Color(0xFFE2E8F0)),
+                ),
+                focusedBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(8),
+                  borderSide: BorderSide(color: AppTheme.primary, width: 1.2),
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildDimensionButton({
+    required String label,
+    required IconData icon,
+    required bool isActive,
+    required bool isDark,
+    required VoidCallback onTap,
+  }) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(6),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+        decoration: BoxDecoration(
+          color: isActive ? AppTheme.primary : Colors.transparent,
+          borderRadius: BorderRadius.circular(6),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(
+              icon,
+              size: 14,
+              color: isActive
+                  ? Colors.white
+                  : (isDark ? AppTheme.darkTextSecondary : AppTheme.lightTextSecondary),
+            ),
+            const SizedBox(width: 5),
+            Text(
+              label,
+              style: TextStyle(
+                fontSize: 11.5,
+                fontWeight: isActive ? FontWeight.bold : FontWeight.w500,
+                color: isActive
+                    ? Colors.white
+                    : (isDark ? AppTheme.darkTextSecondary : AppTheme.lightTextSecondary),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildLegendBar(bool isDark) {
+    return Wrap(
+      spacing: 12,
+      runSpacing: 6,
+      crossAxisAlignment: WrapCrossAlignment.center,
+      children: [
+        _buildLegendPill(_masteredTier, isDark),
+        _buildLegendPill(_proficientTier, isDark),
+        _buildLegendPill(_developingTier, isDark),
+        _buildLegendPill(_needsHelpTier, isDark),
+        _buildLegendPill(_unassessedTier, isDark),
+      ],
+    );
+  }
+
+  Widget _buildLegendPill(_TierVisuals visuals, bool isDark) {
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Container(
+          width: 10,
+          height: 10,
+          decoration: BoxDecoration(
+            color: visuals.bg(isDark),
+            borderRadius: BorderRadius.circular(3),
+            border: Border.all(color: visuals.border(isDark), width: 1),
+          ),
+        ),
+        const SizedBox(width: 5),
+        Text(
+          visuals.label,
+          style: TextStyle(
+            fontSize: 11,
+            fontWeight: FontWeight.w500,
+            color: isDark ? AppTheme.darkTextSecondary : AppTheme.lightTextSecondary,
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildHeatmapMatrixGrid({
+    required BuildContext context,
+    required List<Map<String, dynamic>> competencies,
+    required List<String> sections,
+    required List<Map<String, dynamic>> students,
+    required bool isDark,
+    required bool isMobile,
+  }) {
+    final isStudentMode = _viewDimension == 'student';
+    final double competencyColWidth = isMobile ? 180.0 : 270.0;
+    const double cellWidth = 98.0;
+    const double summaryColWidth = 104.0;
+    const double headerHeight = 44.0;
+    const double rowHeight = 52.0;
+
+    final borderColor = isDark ? AppTheme.darkBorder : const Color(0xFFE2E8F0);
+    final headerBg = isDark ? AppTheme.darkSurfaceLight : const Color(0xFFF1F5F9);
+    final rowBg = isDark ? AppTheme.darkSurface : Colors.white;
+
+    final List<String> columnHeaders = isStudentMode
+        ? (students.isNotEmpty
+            ? students.map((s) => s['name'] as String? ?? 'Student').toList()
+            : ['No Students Enrolled'])
+        : (sections.isNotEmpty ? sections : ['Cohort']);
+
+    return Container(
+      decoration: BoxDecoration(
+        color: rowBg,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: borderColor),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: isDark ? 0.2 : 0.03),
+            blurRadius: 6,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      clipBehavior: Clip.antiAlias,
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // ── Pinned Frozen Left Column: Competency ──
+          SizedBox(
+            width: competencyColWidth,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                // Header
+                Container(
+                  height: headerHeight,
+                  padding: const EdgeInsets.symmetric(horizontal: 12),
+                  alignment: Alignment.centerLeft,
+                  color: headerBg,
+                  child: Row(
+                    children: [
+                      Text(
+                        'COMPETENCY',
+                        style: TextStyle(
+                          fontSize: 11,
+                          fontWeight: FontWeight.bold,
+                          letterSpacing: 0.5,
+                          color: isDark ? AppTheme.darkTextSecondary : AppTheme.lightTextSecondary,
+                        ),
+                      ),
+                      const SizedBox(width: 6),
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1.5),
+                        decoration: BoxDecoration(
+                          color: AppTheme.primary.withValues(alpha: 0.15),
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                        child: Text(
+                          '${competencies.length}',
+                          style: TextStyle(
+                            fontSize: 10,
+                            fontWeight: FontWeight.bold,
+                            color: AppTheme.primary,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                // Rows
+                for (int i = 0; i < competencies.length; i++) ...[
+                  Divider(height: 1, thickness: 1, color: borderColor),
+                  _buildCompetencyRowTitle(
+                    competency: competencies[i],
+                    height: rowHeight,
+                    isDark: isDark,
+                  ),
+                ],
+              ],
+            ),
+          ),
+
+          // ── Vertical Column Divider ──
+          Container(
+            width: 1,
+            height: headerHeight + (competencies.length * (rowHeight + 1)),
+            color: borderColor,
+          ),
+
+          // ── Scrollable Data Columns ──
+          Expanded(
+            child: SingleChildScrollView(
+              scrollDirection: Axis.horizontal,
+              physics: const BouncingScrollPhysics(),
+              child: SizedBox(
+                width: (columnHeaders.length * cellWidth) + summaryColWidth,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    // Header Row
+                    Container(
+                      height: headerHeight,
+                      color: headerBg,
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          for (int idx = 0; idx < columnHeaders.length; idx++)
+                            SizedBox(
+                              width: cellWidth,
+                              height: headerHeight,
+                              child: Center(
+                                child: Padding(
+                                  padding: const EdgeInsets.symmetric(horizontal: 4),
+                                  child: Text(
+                                    columnHeaders[idx],
+                                    textAlign: TextAlign.center,
+                                    maxLines: 2,
+                                    overflow: TextOverflow.ellipsis,
+                                    style: TextStyle(
+                                      fontSize: 11,
+                                      fontWeight: FontWeight.bold,
+                                      color: isDark ? AppTheme.darkText : AppTheme.lightText,
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            ),
+                          // Summary Column Header
+                          SizedBox(
+                            width: summaryColWidth,
+                            height: headerHeight,
+                            child: Center(
+                              child: Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                                decoration: BoxDecoration(
+                                  color: AppTheme.primary.withValues(alpha: 0.1),
+                                  borderRadius: BorderRadius.circular(6),
+                                ),
+                                child: Text(
+                                  isStudentMode ? 'Section Avg' : 'Class Avg',
+                                  textAlign: TextAlign.center,
+                                  style: TextStyle(
+                                    fontSize: 11,
+                                    fontWeight: FontWeight.bold,
+                                    color: AppTheme.primary,
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+
+                    // Data Rows
+                    for (int i = 0; i < competencies.length; i++) ...[
+                      Divider(height: 1, thickness: 1, color: borderColor),
+                      _buildHeatmapDataRow(
+                        context: context,
+                        competency: competencies[i],
+                        sections: sections,
+                        students: students,
+                        isStudentMode: isStudentMode,
+                        cellWidth: cellWidth,
+                        summaryWidth: summaryColWidth,
+                        rowHeight: rowHeight,
+                        isDark: isDark,
+                      ),
+                    ],
+                  ],
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildCompetencyRowTitle({
+    required Map<String, dynamic> competency,
+    required double height,
+    required bool isDark,
+  }) {
+    final code = competency['code'] as String? ?? 'LO';
+    final title = competency['title'] as String? ?? 'Competency';
+    final topic = competency['topicTitle'] as String? ?? '';
+    final passingScore = competency['passingScore'] as int? ?? 75;
+
+    return Container(
+      height: height,
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+      alignment: Alignment.centerLeft,
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
+                decoration: BoxDecoration(
+                  color: AppTheme.primary.withValues(alpha: 0.12),
+                  borderRadius: BorderRadius.circular(4),
+                ),
+                child: Text(
+                  code,
+                  style: TextStyle(
+                    fontSize: 9.5,
+                    fontWeight: FontWeight.bold,
+                    color: AppTheme.primary,
+                  ),
+                ),
+              ),
+              const SizedBox(width: 5),
+              if (topic.isNotEmpty)
+                Flexible(
+                  child: Text(
+                    topic,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(fontSize: 10, color: AppTheme.textSecondary),
+                  ),
+                ),
+              const Spacer(),
+              Text(
+                'Pass: $passingScore%',
+                style: TextStyle(fontSize: 9.5, color: AppTheme.textSecondary),
+              ),
+            ],
+          ),
+          const SizedBox(height: 2),
+          Text(
+            title,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: TextStyle(
+              fontSize: 11.5,
+              fontWeight: FontWeight.w600,
+              color: isDark ? AppTheme.darkText : AppTheme.lightText,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildHeatmapDataRow({
+    required BuildContext context,
+    required Map<String, dynamic> competency,
+    required List<String> sections,
+    required List<Map<String, dynamic>> students,
+    required bool isStudentMode,
+    required double cellWidth,
+    required double summaryWidth,
+    required double rowHeight,
+    required bool isDark,
+  }) {
+    final sectionsMap = (competency['sections'] as Map<String, dynamic>?) ?? {};
+    final studentsMap = (competency['students'] as Map<String, dynamic>?) ?? {};
+    final overallMap = (competency['overall'] as Map<String, dynamic>?) ?? {};
+
+    return SizedBox(
+      height: rowHeight,
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          if (isStudentMode) ...[
+            if (students.isEmpty)
+              SizedBox(
+                width: cellWidth,
+                height: rowHeight,
+                child: Center(
+                  child: Text(
+                    '—',
+                    style: TextStyle(
+                      fontSize: 14,
+                      color: isDark ? AppTheme.darkTextMuted : AppTheme.lightTextMuted,
+                    ),
+                  ),
+                ),
+              )
+            else
+              for (final stud in students)
+                _buildStudentCell(
+                  context: context,
+                  competency: competency,
+                  student: stud,
+                  stats: studentsMap[stud['id']],
+                  width: cellWidth,
+                  height: rowHeight,
+                  isDark: isDark,
+                ),
+          ] else ...[
+            if (sections.isEmpty)
+              _buildSectionCell(
+                context: context,
+                competency: competency,
+                sectionName: 'Cohort',
+                stats: overallMap,
+                width: cellWidth,
+                height: rowHeight,
+                isDark: isDark,
+              )
+            else
+              for (final sec in sections)
+                _buildSectionCell(
+                  context: context,
+                  competency: competency,
+                  sectionName: sec,
+                  stats: sectionsMap[sec],
+                  width: cellWidth,
+                  height: rowHeight,
+                  isDark: isDark,
+                ),
+          ],
+
+          // Summary Column (Cohort Avg or Section Avg)
+          _buildSummaryCell(
+            context: context,
+            competency: competency,
+            stats: overallMap,
+            width: summaryWidth,
+            height: rowHeight,
+            isDark: isDark,
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildSectionCell({
+    required BuildContext context,
+    required Map<String, dynamic> competency,
+    required String sectionName,
+    required dynamic stats,
+    required double width,
+    required double height,
+    required bool isDark,
+  }) {
+    final statMap = (stats as Map<String, dynamic>?) ?? {};
+    final double? avgScore = (statMap['avgScore'] as num?)?.toDouble();
+    final int attCount = (statMap['attemptsCount'] as num?)?.toInt() ?? 0;
+    final String tier = statMap['tier'] as String? ?? 'unassessed';
+    final visuals = _resolveTierVisual(tier);
+
+    final tooltipMsg = avgScore != null
+        ? '${competency['title']}\n$sectionName: ${avgScore.toStringAsFixed(1)}% ($attCount att.)'
+        : '${competency['title']}\n$sectionName: Not yet assessed';
+
+    return SizedBox(
+      width: width,
+      height: height,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 3),
+        child: Tooltip(
+          message: tooltipMsg,
+          child: InkWell(
+            onTap: () => _showCellDetailModal(
+              context: context,
+              competency: competency,
+              targetLabel: sectionName,
+              stats: statMap,
+              isDark: isDark,
+            ),
+            borderRadius: BorderRadius.circular(8),
+            child: Container(
+              decoration: BoxDecoration(
+                color: visuals.bg(isDark),
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: visuals.border(isDark), width: 1.1),
+              ),
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  if (avgScore != null) ...[
+                    Text(
+                      '${avgScore.round()}%',
+                      style: TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.bold,
+                        color: visuals.text(isDark),
+                      ),
+                    ),
+                    Text(
+                      '$attCount att.',
+                      style: TextStyle(
+                        fontSize: 9,
+                        fontWeight: FontWeight.w500,
+                        color: visuals.text(isDark).withValues(alpha: 0.85),
+                      ),
+                    ),
+                  ] else ...[
+                    Text(
+                      '—',
+                      style: TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.bold,
+                        color: visuals.text(isDark),
+                      ),
+                    ),
+                    Text(
+                      'No data',
+                      style: TextStyle(
+                        fontSize: 8.5,
+                        color: visuals.text(isDark).withValues(alpha: 0.8),
+                      ),
+                    ),
+                  ],
+                ],
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildStudentCell({
+    required BuildContext context,
+    required Map<String, dynamic> competency,
+    required Map<String, dynamic> student,
+    required dynamic stats,
+    required double width,
+    required double height,
+    required bool isDark,
+  }) {
+    final statMap = (stats as Map<String, dynamic>?) ?? {};
+    final double? avgScore = (statMap['avgScore'] as num?)?.toDouble();
+    final int attCount = (statMap['attemptsCount'] as num?)?.toInt() ?? 0;
+    final String tier = statMap['tier'] as String? ?? 'unassessed';
+    final visuals = _resolveTierVisual(tier);
+
+    final studName = student['name'] as String? ?? 'Student';
+    final tooltipMsg = avgScore != null
+        ? '${competency['title']}\n$studName: ${avgScore.toStringAsFixed(1)}% ($attCount att.)'
+        : '${competency['title']}\n$studName: No attempts recorded';
+
+    return SizedBox(
+      width: width,
+      height: height,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 3),
+        child: Tooltip(
+          message: tooltipMsg,
+          child: InkWell(
+            onTap: () => _showCellDetailModal(
+              context: context,
+              competency: competency,
+              targetLabel: studName,
+              stats: statMap,
+              isDark: isDark,
+            ),
+            borderRadius: BorderRadius.circular(8),
+            child: Container(
+              decoration: BoxDecoration(
+                color: visuals.bg(isDark),
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: visuals.border(isDark), width: 1.1),
+              ),
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  if (avgScore != null) ...[
+                    Text(
+                      '${avgScore.round()}%',
+                      style: TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.bold,
+                        color: visuals.text(isDark),
+                      ),
+                    ),
+                    Text(
+                      '$attCount att.',
+                      style: TextStyle(
+                        fontSize: 9,
+                        fontWeight: FontWeight.w500,
+                        color: visuals.text(isDark).withValues(alpha: 0.85),
+                      ),
+                    ),
+                  ] else ...[
+                    Text(
+                      '—',
+                      style: TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.bold,
+                        color: visuals.text(isDark),
+                      ),
+                    ),
+                    Text(
+                      'No data',
+                      style: TextStyle(
+                        fontSize: 8.5,
+                        color: visuals.text(isDark).withValues(alpha: 0.8),
+                      ),
+                    ),
+                  ],
+                ],
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildSummaryCell({
+    required BuildContext context,
+    required Map<String, dynamic> competency,
+    required dynamic stats,
+    required double width,
+    required double height,
+    required bool isDark,
+  }) {
+    final statMap = (stats as Map<String, dynamic>?) ?? {};
+    final double? avgScore = (statMap['avgScore'] as num?)?.toDouble();
+    final int attCount = (statMap['attemptsCount'] as num?)?.toInt() ?? 0;
+    final String tier = statMap['tier'] as String? ?? 'unassessed';
+    final visuals = _resolveTierVisual(tier);
+
+    return SizedBox(
+      width: width,
+      height: height,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 3),
+        child: Tooltip(
+          message: avgScore != null
+              ? 'Overall Cohort Average: ${avgScore.toStringAsFixed(1)}% across $attCount attempts'
+              : 'Cohort: No assessment attempts yet',
+          child: InkWell(
+            onTap: () => _showCellDetailModal(
+              context: context,
+              competency: competency,
+              targetLabel: 'Cohort Overall Average',
+              stats: statMap,
+              isDark: isDark,
+            ),
+            borderRadius: BorderRadius.circular(8),
+            child: Container(
+              decoration: BoxDecoration(
+                color: visuals.bg(isDark),
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: visuals.border(isDark), width: 1.2),
+              ),
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  if (avgScore != null) ...[
+                    Text(
+                      '${avgScore.round()}%',
+                      style: TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.bold,
+                        color: visuals.text(isDark),
+                      ),
+                    ),
+                    Text(
+                      '$attCount attempts',
+                      style: TextStyle(
+                        fontSize: 8.5,
+                        fontWeight: FontWeight.w500,
+                        color: visuals.text(isDark).withValues(alpha: 0.85),
+                      ),
+                    ),
+                  ] else ...[
+                    Text(
+                      '—',
+                      style: TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.bold,
+                        color: visuals.text(isDark),
+                      ),
+                    ),
+                    Text(
+                      'Unassessed',
+                      style: TextStyle(
+                        fontSize: 8.5,
+                        color: visuals.text(isDark).withValues(alpha: 0.8),
+                      ),
+                    ),
+                  ],
+                ],
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  void _showCellDetailModal({
+    required BuildContext context,
+    required Map<String, dynamic> competency,
+    required String targetLabel,
+    required Map<String, dynamic> stats,
+    required bool isDark,
+  }) {
+    HapticFeedback.lightImpact();
+    final code = competency['code'] as String? ?? 'LO';
+    final title = competency['title'] as String? ?? 'Competency';
+    final topic = competency['topicTitle'] as String? ?? '';
+    final subName = competency['subjectName'] as String? ?? '';
+    final double? avgScore = (stats['avgScore'] as num?)?.toDouble();
+    final double? passRate = (stats['passRate'] as num?)?.toDouble();
+    final int attCount = (stats['attemptsCount'] as num?)?.toInt() ?? 0;
+    final int passedCount = (stats['passedCount'] as num?)?.toInt() ?? 0;
+    final String tier = stats['tier'] as String? ?? 'unassessed';
+    final visuals = _resolveTierVisual(tier);
+    final attempts = (stats['attempts'] as List<dynamic>?)?.cast<Map<String, dynamic>>() ?? [];
+
     showDialog(
       context: context,
       builder: (ctx) => AlertDialog(
         backgroundColor: isDark ? AppTheme.darkSurface : Colors.white,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
-        insetPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 24),
-        contentPadding: const EdgeInsets.all(18),
-        titlePadding: const EdgeInsets.fromLTRB(18, 18, 18, 0),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        titlePadding: const EdgeInsets.fromLTRB(20, 20, 20, 10),
+        contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
         title: Row(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Container(
-              padding: const EdgeInsets.all(10),
+              padding: const EdgeInsets.all(8),
               decoration: BoxDecoration(
-                color: _getTierColor(item.score).withValues(alpha: isDark ? 0.2 : 0.12),
-                borderRadius: BorderRadius.circular(12),
-                border: Border.all(
-                  color: _getTierColor(item.score).withValues(alpha: 0.35),
-                ),
+                color: visuals.bg(isDark),
+                borderRadius: BorderRadius.circular(10),
+                border: Border.all(color: visuals.border(isDark)),
               ),
-              child: Icon(
-                item.score >= 80.0
-                    ? Icons.check_circle_rounded
-                    : item.score >= 60.0
-                        ? Icons.trending_up_rounded
-                        : Icons.warning_amber_rounded,
-                color: _getTierColor(item.score),
-                size: 24,
-              ),
+              child: Icon(visuals.icon, color: visuals.text(isDark), size: 22),
             ),
             const SizedBox(width: 12),
             Expanded(
@@ -517,137 +1168,104 @@ class _LoMasteryMatrixState extends State<LoMasteryMatrix> {
                   Row(
                     children: [
                       Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2.5),
+                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                         decoration: BoxDecoration(
                           color: AppTheme.primary.withValues(alpha: 0.15),
-                          borderRadius: BorderRadius.circular(6),
+                          borderRadius: BorderRadius.circular(4),
                         ),
                         child: Text(
-                          item.loCode,
+                          code,
                           style: TextStyle(
-                            fontSize: 11,
+                            fontSize: 10,
                             fontWeight: FontWeight.bold,
                             color: AppTheme.primary,
                           ),
                         ),
                       ),
-                      const SizedBox(width: 8),
-                      Expanded(
-                        child: Text(
-                          item.section,
-                          overflow: TextOverflow.ellipsis,
-                          style: TextStyle(
-                            fontSize: 13,
-                            fontWeight: FontWeight.bold,
-                            color: isDark ? AppTheme.darkText : AppTheme.lightText,
-                          ),
+                      const SizedBox(width: 6),
+                      Text(
+                        targetLabel,
+                        style: TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.bold,
+                          color: isDark ? AppTheme.darkTextSecondary : AppTheme.lightTextSecondary,
                         ),
                       ),
                     ],
                   ),
                   const SizedBox(height: 4),
                   Text(
-                    item.loTitle,
+                    title,
                     style: TextStyle(
-                      fontSize: 16,
+                      fontSize: 15,
                       fontWeight: FontWeight.bold,
                       color: isDark ? AppTheme.darkText : AppTheme.lightText,
                     ),
                   ),
-                  Text(
-                    item.subject,
-                    style: TextStyle(
-                      fontSize: 12,
-                      color: isDark ? AppTheme.darkTextSecondary : AppTheme.lightTextSecondary,
+                  if (topic.isNotEmpty || subName.isNotEmpty)
+                    Text(
+                      subName.isNotEmpty ? '$subName • $topic' : topic,
+                      style: TextStyle(fontSize: 11.5, color: AppTheme.textSecondary),
                     ),
-                  ),
                 ],
               ),
             ),
           ],
         ),
         content: SizedBox(
-          width: 580,
+          width: 520,
           child: SingleChildScrollView(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               mainAxisSize: MainAxisSize.min,
               children: [
-                const SizedBox(height: 8),
-
-                // Overall Score Badge Banner
+                // Metric Banner
                 Container(
                   padding: const EdgeInsets.all(14),
                   decoration: BoxDecoration(
-                    color: _getTierColor(item.score).withValues(alpha: isDark ? 0.12 : 0.08),
+                    color: visuals.bg(isDark),
                     borderRadius: BorderRadius.circular(12),
-                    border: Border.all(
-                      color: _getTierColor(item.score).withValues(alpha: 0.3),
-                    ),
+                    border: Border.all(color: visuals.border(isDark)),
                   ),
-                  child: Wrap(
-                    alignment: WrapAlignment.spaceBetween,
-                    runSpacing: 10,
-                    crossAxisAlignment: WrapCrossAlignment.center,
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceAround,
                     children: [
                       Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Text(
-                            'Average Student Score',
-                            style: TextStyle(
-                              fontSize: 11.5,
-                              color: isDark ? AppTheme.darkTextSecondary : AppTheme.lightTextSecondary,
-                            ),
-                          ),
+                          Text('Score Mastery', style: TextStyle(fontSize: 11, color: AppTheme.textSecondary)),
                           const SizedBox(height: 2),
-                          Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              Text(
-                                '${item.score.toStringAsFixed(1)}%',
-                                style: TextStyle(
-                                  fontSize: 26,
-                                  fontWeight: FontWeight.w800,
-                                  color: _getTierColor(item.score),
-                                ),
-                              ),
-                              const SizedBox(width: 8),
-                              Container(
-                                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                                decoration: BoxDecoration(
-                                  color: _getTierColor(item.score),
-                                  borderRadius: BorderRadius.circular(6),
-                                ),
-                                child: Text(
-                                  item.tier.toUpperCase(),
-                                  style: const TextStyle(
-                                    fontSize: 10,
-                                    fontWeight: FontWeight.bold,
-                                    color: Colors.white,
-                                    letterSpacing: 0.5,
-                                  ),
-                                ),
-                              ),
-                            ],
+                          Text(
+                            avgScore != null ? '${avgScore.toStringAsFixed(1)}%' : '—',
+                            style: TextStyle(
+                              fontSize: 22,
+                              fontWeight: FontWeight.bold,
+                              color: visuals.text(isDark),
+                            ),
                           ),
                         ],
                       ),
                       Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Text(
-                            'Students Assessed',
-                            style: TextStyle(
-                              fontSize: 11.5,
-                              color: isDark ? AppTheme.darkTextSecondary : AppTheme.lightTextSecondary,
-                            ),
-                          ),
+                          Text('Pass Rate', style: TextStyle(fontSize: 11, color: AppTheme.textSecondary)),
                           const SizedBox(height: 2),
                           Text(
-                            '${item.assessedCount} total',
+                            passRate != null ? '${passRate.toStringAsFixed(0)}%' : '—',
                             style: TextStyle(
-                              fontSize: 18,
+                              fontSize: 22,
+                              fontWeight: FontWeight.bold,
+                              color: isDark ? AppTheme.darkText : AppTheme.lightText,
+                            ),
+                          ),
+                        ],
+                      ),
+                      Column(
+                        children: [
+                          Text('Recorded Attempts', style: TextStyle(fontSize: 11, color: AppTheme.textSecondary)),
+                          const SizedBox(height: 2),
+                          Text(
+                            '$passedCount / $attCount',
+                            style: TextStyle(
+                              fontSize: 22,
                               fontWeight: FontWeight.bold,
                               color: isDark ? AppTheme.darkText : AppTheme.lightText,
                             ),
@@ -657,198 +1275,89 @@ class _LoMasteryMatrixState extends State<LoMasteryMatrix> {
                     ],
                   ),
                 ),
-                const SizedBox(height: 18),
+                const SizedBox(height: 16),
 
-                // Student Distribution Breakdown
+                // Recorded Attempts List
                 Text(
-                  'Student Performance Distribution',
+                  'Assessment History (${attempts.length} attempts)',
                   style: TextStyle(
-                    fontSize: 13,
+                    fontSize: 12.5,
                     fontWeight: FontWeight.bold,
                     color: isDark ? AppTheme.darkText : AppTheme.lightText,
                   ),
                 ),
                 const SizedBox(height: 8),
 
-                // Segmented distribution bar
-                ClipRRect(
-                  borderRadius: BorderRadius.circular(6),
-                  child: Row(
-                    children: [
-                      Expanded(
-                        flex: item.masteredCount,
-                        child: Container(
-                          height: 10,
-                          color: AppTheme.success,
+                if (attempts.isEmpty)
+                  Container(
+                    padding: const EdgeInsets.symmetric(vertical: 24),
+                    alignment: Alignment.center,
+                    child: Text(
+                      'No individual attempts logged for this competency yet.',
+                      style: TextStyle(fontSize: 12, color: AppTheme.textSecondary),
+                    ),
+                  )
+                else
+                  for (final att in attempts)
+                    Container(
+                      margin: const EdgeInsets.only(bottom: 6),
+                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                      decoration: BoxDecoration(
+                        color: isDark ? AppTheme.darkSurfaceLight : const Color(0xFFF8FAFC),
+                        borderRadius: BorderRadius.circular(8),
+                        border: Border.all(
+                          color: isDark ? AppTheme.darkBorder : const Color(0xFFE2E8F0),
                         ),
                       ),
-                      Expanded(
-                        flex: item.developingCount,
-                        child: Container(
-                          height: 10,
-                          color: AppTheme.warning,
-                        ),
-                      ),
-                      Expanded(
-                        flex: item.atRiskCount,
-                        child: Container(
-                          height: 10,
-                          color: AppTheme.error,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                const SizedBox(height: 8),
-
-                // Distribution Legend Chips (Responsive Wrap)
-                Wrap(
-                  spacing: 10,
-                  runSpacing: 6,
-                  children: [
-                    _buildDistributionLegendItem(
-                      label: 'Mastered (≥80%)',
-                      count: item.masteredCount,
-                      color: AppTheme.success,
-                      isDark: isDark,
-                    ),
-                    _buildDistributionLegendItem(
-                      label: 'Developing (60–79%)',
-                      count: item.developingCount,
-                      color: AppTheme.warning,
-                      isDark: isDark,
-                    ),
-                    _buildDistributionLegendItem(
-                      label: 'At-Risk (<60%)',
-                      count: item.atRiskCount,
-                      color: AppTheme.error,
-                      isDark: isDark,
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 20),
-
-                // Most-Missed Assessment Items
-                Text(
-                  'Most-Missed Assessment Items & Misconceptions',
-                  style: TextStyle(
-                    fontSize: 13,
-                    fontWeight: FontWeight.bold,
-                    color: isDark ? AppTheme.darkText : AppTheme.lightText,
-                  ),
-                ),
-                const SizedBox(height: 8),
-
-                ...item.mostMissedItems.map((q) {
-                  return Container(
-                    margin: const EdgeInsets.only(bottom: 8),
-                    padding: const EdgeInsets.all(12),
-                    decoration: BoxDecoration(
-                      color: isDark ? AppTheme.darkSurfaceLight : const Color(0xFFF8FAFC),
-                      borderRadius: BorderRadius.circular(10),
-                      border: Border.all(
-                        color: isDark ? AppTheme.darkBorder : AppTheme.lightBorder,
-                      ),
-                    ),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Row(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                              decoration: BoxDecoration(
-                                color: AppTheme.error.withValues(alpha: 0.15),
-                                borderRadius: BorderRadius.circular(6),
-                              ),
-                              child: Text(
-                                '${q.missedPercent}% missed',
-                                style: TextStyle(
-                                  fontSize: 11,
-                                  fontWeight: FontWeight.bold,
-                                  color: AppTheme.error,
-                                ),
-                              ),
+                      child: Row(
+                        children: [
+                          CircleAvatar(
+                            radius: 14,
+                            backgroundColor: AppTheme.primary.withValues(alpha: 0.15),
+                            child: Text(
+                              (att['student_name'] as String? ?? 'S').substring(0, 1).toUpperCase(),
+                              style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: AppTheme.primary),
                             ),
-                            const SizedBox(width: 8),
-                            Expanded(
-                              child: Text(
-                                q.questionText,
-                                style: TextStyle(
-                                  fontSize: 12.5,
-                                  fontWeight: FontWeight.w600,
-                                  color: isDark ? AppTheme.darkText : AppTheme.lightText,
+                          ),
+                          const SizedBox(width: 10),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  att['student_name'] as String? ?? 'Student',
+                                  style: TextStyle(
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.w600,
+                                    color: isDark ? AppTheme.darkText : AppTheme.lightText,
+                                  ),
                                 ),
-                              ),
-                            ),
-                          ],
-                        ),
-                        const SizedBox(height: 6),
-                        Row(
-                          children: [
-                            Icon(Icons.lightbulb_outline_rounded, size: 14, color: AppTheme.warning),
-                            const SizedBox(width: 4),
-                            Expanded(
-                              child: Text(
-                                'Common Student Difficulty: ${q.commonMistake}',
-                                style: TextStyle(
-                                  fontSize: 11.5,
-                                  fontStyle: FontStyle.italic,
-                                  color: isDark ? AppTheme.darkTextMuted : AppTheme.lightTextMuted,
+                                Text(
+                                  att['attempted_at']?.toString() ?? '',
+                                  style: TextStyle(fontSize: 10, color: AppTheme.textSecondary),
                                 ),
-                              ),
+                              ],
                             ),
-                          ],
-                        ),
-                      ],
-                    ),
-                  );
-                }),
-                const SizedBox(height: 14),
-
-                // Targeted Remediation Recommendation
-                Container(
-                  padding: const EdgeInsets.all(12),
-                  decoration: BoxDecoration(
-                    color: AppTheme.primary.withValues(alpha: isDark ? 0.15 : 0.08),
-                    borderRadius: BorderRadius.circular(10),
-                    border: Border.all(
-                      color: AppTheme.primary.withValues(alpha: 0.3),
-                    ),
-                  ),
-                  child: Row(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Icon(Icons.lightbulb_outline_rounded, color: AppTheme.primary, size: 18),
-                      const SizedBox(width: 8),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              'Suggested Teaching Strategy',
+                          ),
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                            decoration: BoxDecoration(
+                              color: (att['is_passed'] == 1 ? AppTheme.success : AppTheme.error)
+                                  .withValues(alpha: 0.15),
+                              borderRadius: BorderRadius.circular(6),
+                            ),
+                            child: Text(
+                              '${att['percentage']}% • ${att['is_passed'] == 1 ? 'Passed' : 'Needs Review'}',
                               style: TextStyle(
-                                fontSize: 12,
+                                fontSize: 11,
                                 fontWeight: FontWeight.bold,
-                                color: AppTheme.primary,
+                                color: att['is_passed'] == 1 ? AppTheme.success : AppTheme.error,
                               ),
                             ),
-                            const SizedBox(height: 3),
-                            Text(
-                              item.remediationAction,
-                              style: TextStyle(
-                                fontSize: 12,
-                                color: isDark ? AppTheme.darkText : AppTheme.lightText,
-                                height: 1.35,
-                              ),
-                            ),
-                          ],
-                        ),
+                          ),
+                        ],
                       ),
-                    ],
-                  ),
-                ),
+                    ),
               ],
             ),
           ),
@@ -856,1053 +1365,45 @@ class _LoMasteryMatrixState extends State<LoMasteryMatrix> {
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx),
-            child: Text(
-              'Close',
-              style: TextStyle(color: isDark ? AppTheme.darkTextSecondary : AppTheme.lightTextSecondary),
-            ),
-          ),
-          ElevatedButton.icon(
-            onPressed: () {
-              Navigator.pop(ctx);
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(
-                  content: Text('Practice quiz assigned to ${item.section} (${item.loCode})!'),
-                  backgroundColor: AppTheme.primary,
-                  behavior: SnackBarBehavior.floating,
-                ),
-              );
-            },
-            icon: const Icon(Icons.assignment_outlined, size: 15),
-            label: const Text('Assign Review Quiz'),
-            style: ElevatedButton.styleFrom(
-              backgroundColor: AppTheme.primary,
-              foregroundColor: Colors.white,
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-            ),
+            child: const Text('Close'),
           ),
         ],
       ),
     );
   }
 
-  Widget _buildDistributionLegendItem({
-    required String label,
-    required int count,
-    required Color color,
-    required bool isDark,
-  }) {
-    return Row(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        Container(
-          width: 8,
-          height: 8,
-          decoration: BoxDecoration(shape: BoxShape.circle, color: color),
-        ),
-        const SizedBox(width: 5),
-        Text(
-          '$label: ',
-          style: TextStyle(
-            fontSize: 11,
-            color: isDark ? AppTheme.darkTextSecondary : AppTheme.lightTextSecondary,
-          ),
-        ),
-        Text(
-          '$count',
-          style: TextStyle(
-            fontSize: 11.5,
-            fontWeight: FontWeight.bold,
-            color: color,
-          ),
-        ),
-      ],
-    );
-  }
-
-  Color _getTierColor(double score) {
-    if (score >= 80.0) return const Color(0xFF0D9488); // Academic Deep Teal
-    if (score >= 60.0) return const Color(0xFFD97706); // Warm Ochre / Bronze
-    return const Color(0xFFBE123C); // Muted Wine / Rose
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    final isMobile = MediaQuery.of(context).size.width < 768;
-
-    if (!_initializedViewMode) {
-      _isCardView = isMobile;
-      _initializedViewMode = true;
-    }
-
-    final subjects = [
-      'All Subjects',
-      'Empowerment Technologies',
-      'General Mathematics',
-      'Oral Communication',
-    ];
-
-    // Filter data
-    final filtered = _masteryData.where((item) {
-      if (_selectedSubject != 'All Subjects' && item.subject != _selectedSubject) {
-        return false;
-      }
-      if (_searchQuery.isNotEmpty) {
-        final q = _searchQuery.toLowerCase();
-        final match = item.loCode.toLowerCase().contains(q) ||
-            item.loTitle.toLowerCase().contains(q) ||
-            item.section.toLowerCase().contains(q);
-        if (!match) return false;
-      }
-      return true;
-    }).toList();
-
-    // Collect unique sections and unique LOs
-    final allSections = ['11-STEM-A', '11-STEM-B', '11-ABM-A', '11-HUMSS-A', '12-TVL-ICT'];
-    final sections = _selectedSection == 'All Sections'
-        ? allSections
-        : [_selectedSection];
-    final loCodes = <String, String>{};
-    for (final it in filtered) {
-      loCodes[it.loCode] = it.loTitle;
-    }
-
+  Widget _buildEmptyCompetenciesState(bool isDark) {
     return Container(
+      padding: const EdgeInsets.symmetric(vertical: 40, horizontal: 20),
+      alignment: Alignment.center,
       decoration: BoxDecoration(
         color: isDark ? AppTheme.darkSurface : Colors.white,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: isDark ? AppTheme.darkBorder : AppTheme.lightBorder),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: isDark ? 0.2 : 0.04),
-            blurRadius: 10,
-            offset: const Offset(0, 2),
-          ),
-        ],
-      ),
-      padding: const EdgeInsets.all(18),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          // Header: Title, Description, and Semantic Legend Badges
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Container(
-                padding: const EdgeInsets.all(8),
-                decoration: BoxDecoration(
-                  color: AppTheme.primary.withValues(alpha: isDark ? 0.2 : 0.1),
-                  borderRadius: BorderRadius.circular(10),
-                ),
-                child: Icon(Icons.table_chart_outlined, color: AppTheme.primary, size: 20),
-              ),
-              const SizedBox(width: 10),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      'Curriculum Competencies by Class Section',
-                      style: TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.bold,
-                        color: isDark ? AppTheme.darkText : AppTheme.lightText,
-                      ),
-                    ),
-                    const SizedBox(height: 2),
-                    Text(
-                      'Overview of student performance across core competencies. Click any cell to view detailed assessment results and study topics.',
-                      style: TextStyle(
-                        fontSize: 12,
-                        color: isDark ? AppTheme.darkTextSecondary : AppTheme.lightTextSecondary,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 14),
-
-          // Benchmark Scale Legend (Formal Academic Scale, Zero Traffic Light Bulbs)
-          _buildBenchmarkScale(isDark),
-          const SizedBox(height: 12),
-
-          // Responsive Balanced Filter Bar (Fills 100% Width — No Vacant Dead Space!)
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              // Row 1: Subject and Section Filters (50% / 50% split)
-              Row(
-                children: [
-                  Expanded(
-                    child: _buildSubjectDropdown(isDark, subjects),
-                  ),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: _buildSectionDropdown(isDark, allSections),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 8),
-
-              // Row 2: Search Input + View Mode Switcher [Cards / Grid]
-              Row(
-                children: [
-                  Expanded(
-                    child: _buildSearchInput(isDark),
-                  ),
-                  const SizedBox(width: 8),
-                  // View Switcher (Choose between Expandable Cards vs Heatmap Grid)
-                  Container(
-                    height: 34,
-                    decoration: BoxDecoration(
-                      color: isDark ? AppTheme.darkSurfaceLight : const Color(0xFFF1F5F9),
-                      borderRadius: BorderRadius.circular(8),
-                      border: Border.all(color: isDark ? AppTheme.darkBorder : AppTheme.lightBorder),
-                    ),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        _buildViewToggleBtn(
-                          toggleKey: const Key('view_mode_cards'),
-                          icon: Icons.view_agenda_outlined,
-                          tooltip: 'Expandable Cards (Mobile Friendly)',
-                          isActive: _isCardView,
-                          isDark: isDark,
-                          onTap: () => setState(() => _isCardView = true),
-                        ),
-                        _buildViewToggleBtn(
-                          toggleKey: const Key('view_mode_grid'),
-                          icon: Icons.table_chart_outlined,
-                          tooltip: 'Heatmap Matrix (Grid View)',
-                          isActive: !_isCardView,
-                          isDark: isDark,
-                          onTap: () => setState(() => _isCardView = false),
-                        ),
-                      ],
-                    ),
-                  ),
-                ],
-              ),
-            ],
-          ),
-          const SizedBox(height: 14),
-
-          // Main Content: Expandable Cards View OR Heatmap Matrix
-          Builder(
-            builder: (_) {
-              if (loCodes.isEmpty) {
-                return Padding(
-                  padding: const EdgeInsets.symmetric(vertical: 36),
-                  child: Center(
-                    child: Text(
-                      'No learning competencies match the selected criteria.',
-                      style: TextStyle(
-                        fontSize: 13,
-                        color: isDark ? AppTheme.darkTextMuted : AppTheme.lightTextMuted,
-                      ),
-                    ),
-                  ),
-                );
-              }
-
-              // ── 1. Expandable Cards Mode (Zero horizontal scrolling on mobile!) ──
-              if (_isCardView) {
-                return Column(
-                  children: [
-                    for (final loKey in loCodes.keys)
-                      _buildExpandableLoCard(
-                        loKey: loKey,
-                        loTitle: loCodes[loKey] ?? '',
-                        sections: sections,
-                        filtered: filtered,
-                        isDark: isDark,
-                      ),
-                  ],
-                );
-              }
-
-              // ── 2. Heatmap Matrix Mode (with Pinned Frozen Column) ──
-              final double competencyColWidth = isMobile ? 140.0 : 225.0;
-              final double sectionColWidth = isMobile ? 86.0 : 96.0;
-              final double avgColWidth = isMobile ? 86.0 : 96.0;
-              const double headerHeight = 44.0;
-              const double rowHeight = 72.0;
-              final loKeysList = loCodes.keys.toList();
-              final borderColor = isDark ? AppTheme.darkBorder : AppTheme.lightBorder;
-              final headerBg = isDark ? AppTheme.darkSurfaceLight : const Color(0xFFF8FAFC);
-              final rowBg = isDark ? AppTheme.darkSurface : Colors.white;
-
-              return Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  if (isMobile && sections.length > 1)
-                    Padding(
-                      padding: const EdgeInsets.only(bottom: 8),
-                      child: Row(
-                        children: [
-                          Icon(Icons.swipe_outlined, size: 14, color: AppTheme.primary),
-                          const SizedBox(width: 5),
-                          Expanded(
-                            child: Text(
-                              'Swipe horizontally to view all ${sections.length} sections',
-                              style: TextStyle(
-                                fontSize: 11,
-                                fontWeight: FontWeight.w500,
-                                color: isDark ? AppTheme.darkTextSecondary : AppTheme.lightTextSecondary,
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  Container(
-                    decoration: BoxDecoration(
-                      borderRadius: BorderRadius.circular(10),
-                      border: Border.all(color: borderColor),
-                    ),
-                    clipBehavior: Clip.antiAlias,
-                    child: Row(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        // Pinned Frozen Left Column: Learning Competency
-                        SizedBox(
-                          width: competencyColWidth,
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.stretch,
-                            children: [
-                              Container(
-                                height: headerHeight,
-                                padding: const EdgeInsets.symmetric(horizontal: 10),
-                                alignment: Alignment.centerLeft,
-                                color: headerBg,
-                                child: Text(
-                                  'COMPETENCY',
-                                  style: TextStyle(
-                                    fontSize: 11,
-                                    fontWeight: FontWeight.bold,
-                                    color: isDark ? AppTheme.darkTextSecondary : AppTheme.lightTextSecondary,
-                                    letterSpacing: 0.3,
-                                  ),
-                                ),
-                              ),
-                              for (int i = 0; i < loKeysList.length; i++) ...[
-                                Divider(height: 1, thickness: 1, color: borderColor),
-                                Container(
-                                  height: rowHeight,
-                                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-                                  alignment: Alignment.centerLeft,
-                                  color: rowBg,
-                                  child: Column(
-                                    mainAxisAlignment: MainAxisAlignment.center,
-                                    crossAxisAlignment: CrossAxisAlignment.start,
-                                    mainAxisSize: MainAxisSize.min,
-                                    children: [
-                                      Container(
-                                        padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1.5),
-                                        decoration: BoxDecoration(
-                                          color: AppTheme.primary.withValues(alpha: 0.12),
-                                          borderRadius: BorderRadius.circular(4),
-                                        ),
-                                        child: Text(
-                                          loKeysList[i],
-                                          style: TextStyle(
-                                            fontSize: 10,
-                                            fontWeight: FontWeight.bold,
-                                            color: AppTheme.primary,
-                                          ),
-                                        ),
-                                      ),
-                                      const SizedBox(height: 3),
-                                      Flexible(
-                                        child: Text(
-                                          loCodes[loKeysList[i]] ?? '',
-                                          maxLines: isMobile ? 1 : 2,
-                                          overflow: TextOverflow.ellipsis,
-                                          style: TextStyle(
-                                            fontSize: isMobile ? 11 : 12,
-                                            height: 1.25,
-                                            fontWeight: FontWeight.w600,
-                                            color: isDark ? AppTheme.darkText : AppTheme.lightText,
-                                          ),
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                ),
-                              ],
-                            ],
-                          ),
-                        ),
-
-                        // Vertical Divider
-                        Container(
-                          width: 1,
-                          height: headerHeight + (loKeysList.length * (rowHeight + 1)),
-                          color: borderColor,
-                        ),
-
-                        // Scrollable Right Columns: Sections & Class Average
-                        Expanded(
-                          child: SingleChildScrollView(
-                            scrollDirection: Axis.horizontal,
-                            physics: const BouncingScrollPhysics(),
-                            child: SizedBox(
-                              width: (sections.length * sectionColWidth) + avgColWidth,
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Container(
-                                    height: headerHeight,
-                                    color: headerBg,
-                                    child: Row(
-                                      mainAxisSize: MainAxisSize.min,
-                                      children: [
-                                        for (final sec in sections)
-                                          SizedBox(
-                                            width: sectionColWidth,
-                                            height: headerHeight,
-                                            child: Center(
-                                              child: Text(
-                                                sec,
-                                                textAlign: TextAlign.center,
-                                                style: TextStyle(
-                                                  fontSize: 11.5,
-                                                  fontWeight: FontWeight.bold,
-                                                  color: isDark ? AppTheme.darkText : AppTheme.lightText,
-                                                ),
-                                              ),
-                                            ),
-                                          ),
-                                        SizedBox(
-                                          width: avgColWidth,
-                                          height: headerHeight,
-                                          child: Center(
-                                            child: Text(
-                                              'Class Avg',
-                                              textAlign: TextAlign.center,
-                                              style: TextStyle(
-                                                fontSize: 11.5,
-                                                fontWeight: FontWeight.bold,
-                                                color: isDark ? AppTheme.darkText : AppTheme.lightText,
-                                              ),
-                                            ),
-                                          ),
-                                        ),
-                                      ],
-                                    ),
-                                  ),
-                                  for (int i = 0; i < loKeysList.length; i++) ...[
-                                    Divider(height: 1, thickness: 1, color: borderColor),
-                                    Builder(
-                                      builder: (_) {
-                                        final loKey = loKeysList[i];
-                                        final loTitle = loCodes[loKey] ?? '';
-                                        final itemsForLo = filtered.where((item) => item.loCode == loKey).toList();
-                                        final avgScore = itemsForLo.isNotEmpty
-                                            ? itemsForLo.map((e) => e.score).reduce((a, b) => a + b) / itemsForLo.length
-                                            : 0.0;
-
-                                        return Container(
-                                          height: rowHeight,
-                                          color: rowBg,
-                                          child: Row(
-                                            mainAxisSize: MainAxisSize.min,
-                                            children: [
-                                            for (final sec in sections) ...[
-                                              Builder(
-                                                builder: (_) {
-                                                  final match = filtered.firstWhere(
-                                                    (it) => it.loCode == loKey && it.section == sec,
-                                                    orElse: () => LoMasteryItem(
-                                                      loCode: loKey,
-                                                      loTitle: loTitle,
-                                                      subject: _selectedSubject,
-                                                      section: sec,
-                                                      score: 75.0,
-                                                      assessedCount: 30,
-                                                      masteredCount: 20,
-                                                      developingCount: 7,
-                                                      atRiskCount: 3,
-                                                      mostMissedItems: [],
-                                                      remediationAction: 'Standard review',
-                                                    ),
-                                                  );
-                                                  final cellColor = _getTierColor(match.score);
-
-                                                  return SizedBox(
-                                                    width: sectionColWidth,
-                                                    height: rowHeight,
-                                                    child: Center(
-                                                      child: InkWell(
-                                                        onTap: () => _showDrillDownDialog(context, match, isDark),
-                                                        borderRadius: BorderRadius.circular(8),
-                                                        child: Container(
-                                                          width: sectionColWidth - 12,
-                                                          height: 48,
-                                                          decoration: BoxDecoration(
-                                                            color: cellColor.withValues(alpha: isDark ? 0.08 : 0.04),
-                                                            borderRadius: BorderRadius.circular(8),
-                                                            border: Border.all(
-                                                              color: cellColor.withValues(alpha: 0.22),
-                                                              width: 1,
-                                                            ),
-                                                          ),
-                                                          child: Column(
-                                                            mainAxisAlignment: MainAxisAlignment.center,
-                                                            children: [
-                                                              Text(
-                                                                '${match.score.toStringAsFixed(1)}%',
-                                                                style: TextStyle(
-                                                                  fontSize: 12.5,
-                                                                  fontWeight: FontWeight.w800,
-                                                                  color: cellColor,
-                                                                ),
-                                                              ),
-                                                              Padding(
-                                                                padding: const EdgeInsets.symmetric(horizontal: 2),
-                                                                child: Text(
-                                                                  match.tier,
-                                                                  maxLines: 1,
-                                                                  overflow: TextOverflow.ellipsis,
-                                                                  textAlign: TextAlign.center,
-                                                                  style: TextStyle(
-                                                                    fontSize: 9,
-                                                                    fontWeight: FontWeight.w600,
-                                                                    color: isDark ? AppTheme.darkTextSecondary : AppTheme.lightTextSecondary,
-                                                                  ),
-                                                                ),
-                                                              ),
-                                                            ],
-                                                          ),
-                                                        ),
-                                                      ),
-                                                    ),
-                                                  );
-                                                },
-                                              ),
-                                            ],
-                                            SizedBox(
-                                              width: avgColWidth,
-                                              height: rowHeight,
-                                              child: Center(
-                                                child: Container(
-                                                  width: avgColWidth - 12,
-                                                  height: 48,
-                                                  decoration: BoxDecoration(
-                                                    color: _getTierColor(avgScore).withValues(alpha: isDark ? 0.14 : 0.08),
-                                                    borderRadius: BorderRadius.circular(8),
-                                                    border: Border.all(
-                                                      color: _getTierColor(avgScore).withValues(alpha: 0.25),
-                                                    ),
-                                                  ),
-                                                  child: Column(
-                                                    mainAxisAlignment: MainAxisAlignment.center,
-                                                    children: [
-                                                      Text(
-                                                        '${avgScore.toStringAsFixed(1)}%',
-                                                        style: TextStyle(
-                                                          fontSize: 12.5,
-                                                          fontWeight: FontWeight.w800,
-                                                          color: _getTierColor(avgScore),
-                                                        ),
-                                                      ),
-                                                      Text(
-                                                        avgScore >= 80 ? 'Mastered' : (avgScore >= 60 ? 'Developing' : 'At-Risk'),
-                                                        style: TextStyle(
-                                                          fontSize: 9,
-                                                          fontWeight: FontWeight.w600,
-                                                          color: _getTierColor(avgScore),
-                                                        ),
-                                                      ),
-                                                    ],
-                                                  ),
-                                                ),
-                                              ),
-                                            ),
-                                          ],
-                                        ),
-                                      );
-                                    },
-                                  ),
-                                ],
-                              ],
-                            ),
-                          ),
-                        ),
-                      ),
-                    ],
-                    ),
-                  ),
-                ],
-              );
-            },
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildSubjectDropdown(bool isDark, List<String> subjects) {
-    return Container(
-      height: 38,
-      padding: const EdgeInsets.symmetric(horizontal: 10),
-      decoration: BoxDecoration(
-        color: isDark ? AppTheme.darkSurfaceLight : Colors.white,
-        borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: isDark ? AppTheme.darkBorder : AppTheme.lightBorder),
-      ),
-      child: DropdownButtonHideUnderline(
-        child: DropdownButton<String>(
-          value: subjects.contains(_selectedSubject) ? _selectedSubject : subjects.first,
-          isExpanded: true,
-          dropdownColor: isDark ? AppTheme.darkSurface : Colors.white,
-          icon: Icon(
-            Icons.keyboard_arrow_down_rounded,
-            size: 18,
-            color: isDark ? AppTheme.darkTextSecondary : AppTheme.lightTextSecondary,
-          ),
-          style: TextStyle(
-            fontSize: 12.5,
-            fontWeight: FontWeight.w600,
-            color: isDark ? AppTheme.darkText : AppTheme.lightText,
-          ),
-          items: subjects.map((subj) {
-            return DropdownMenuItem<String>(
-              value: subj,
-              child: Text(
-                subj,
-                overflow: TextOverflow.ellipsis,
-              ),
-            );
-          }).toList(),
-          onChanged: (val) {
-            if (val != null) {
-              setState(() => _selectedSubject = val);
-            }
-          },
-        ),
-      ),
-    );
-  }
-
-  Widget _buildSectionDropdown(bool isDark, List<String> allSections) {
-    final options = ['All Sections', ...allSections];
-    return Container(
-      height: 38,
-      padding: const EdgeInsets.symmetric(horizontal: 10),
-      decoration: BoxDecoration(
-        color: isDark ? AppTheme.darkSurfaceLight : Colors.white,
-        borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: isDark ? AppTheme.darkBorder : AppTheme.lightBorder),
-      ),
-      child: DropdownButtonHideUnderline(
-        child: DropdownButton<String>(
-          value: options.contains(_selectedSection) ? _selectedSection : 'All Sections',
-          isExpanded: true,
-          dropdownColor: isDark ? AppTheme.darkSurface : Colors.white,
-          icon: Icon(
-            Icons.keyboard_arrow_down_rounded,
-            size: 18,
-            color: isDark ? AppTheme.darkTextSecondary : AppTheme.lightTextSecondary,
-          ),
-          style: TextStyle(
-            fontSize: 12.5,
-            fontWeight: FontWeight.w600,
-            color: isDark ? AppTheme.darkText : AppTheme.lightText,
-          ),
-          items: options.map((sec) {
-            return DropdownMenuItem<String>(
-              value: sec,
-              child: Text(
-                sec,
-                overflow: TextOverflow.ellipsis,
-              ),
-            );
-          }).toList(),
-          onChanged: (val) {
-            if (val != null) {
-              setState(() => _selectedSection = val);
-            }
-          },
-        ),
-      ),
-    );
-  }
-
-  Widget _buildSearchInput(bool isDark) {
-    return Container(
-      height: 34,
-      decoration: BoxDecoration(
-        color: isDark ? AppTheme.darkSurfaceLight : Colors.white,
-        borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: isDark ? AppTheme.darkBorder : AppTheme.lightBorder),
-      ),
-      padding: const EdgeInsets.symmetric(horizontal: 8),
-      child: Row(
-        children: [
-          Icon(
-            Icons.search_rounded,
-            size: 16,
-            color: isDark ? AppTheme.darkTextSecondary : AppTheme.lightTextSecondary,
-          ),
-          const SizedBox(width: 6),
-          Expanded(
-            child: TextField(
-              style: TextStyle(
-                fontSize: 12,
-                color: isDark ? AppTheme.darkText : AppTheme.lightText,
-              ),
-              decoration: InputDecoration(
-                hintText: 'Search topic, LO code, or section...',
-                hintStyle: TextStyle(
-                  fontSize: 12,
-                  color: isDark ? AppTheme.darkTextMuted : AppTheme.lightTextMuted,
-                ),
-                border: InputBorder.none,
-                isDense: true,
-                contentPadding: const EdgeInsets.symmetric(vertical: 8),
-              ),
-              onChanged: (val) {
-                setState(() => _searchQuery = val);
-              },
-            ),
-          ),
-          if (_searchQuery.isNotEmpty)
-            GestureDetector(
-              onTap: () {
-                setState(() => _searchQuery = '');
-              },
-              child: Icon(
-                Icons.close_rounded,
-                size: 14,
-                color: isDark ? AppTheme.darkTextMuted : AppTheme.lightTextMuted,
-              ),
-            ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildViewToggleBtn({
-    Key? toggleKey,
-    required IconData icon,
-    required String tooltip,
-    required bool isActive,
-    required bool isDark,
-    required VoidCallback onTap,
-  }) {
-    return Tooltip(
-      message: tooltip,
-      child: InkWell(
-        key: toggleKey,
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(7),
-        child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-          decoration: BoxDecoration(
-            color: isActive
-                ? (isDark ? AppTheme.primary.withValues(alpha: 0.25) : Colors.white)
-                : Colors.transparent,
-            borderRadius: BorderRadius.circular(7),
-            boxShadow: isActive && !isDark
-                ? [
-                    BoxShadow(
-                      color: Colors.black.withValues(alpha: 0.05),
-                      blurRadius: 4,
-                      offset: const Offset(0, 1),
-                    ),
-                  ]
-                : null,
-          ),
-          child: Icon(
-            icon,
-            size: 18,
-            color: isActive
-                ? AppTheme.primary
-                : (isDark ? AppTheme.darkTextSecondary : AppTheme.lightTextSecondary),
-          ),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildExpandableLoCard({
-    required String loKey,
-    required String loTitle,
-    required List<String> sections,
-    required List<LoMasteryItem> filtered,
-    required bool isDark,
-  }) {
-    final isExpanded = _expandedLoKeys.contains(loKey);
-    final itemsForLo = filtered.where((item) => item.loCode == loKey).toList();
-    final avgScore = itemsForLo.isNotEmpty
-        ? itemsForLo.map((e) => e.score).reduce((a, b) => a + b) / itemsForLo.length
-        : 0.0;
-    final avgColor = _getTierColor(avgScore);
-    final borderColor = isDark ? AppTheme.darkBorder : AppTheme.lightBorder;
-
-    return Container(
-      margin: const EdgeInsets.only(bottom: 10),
-      decoration: BoxDecoration(
-        color: isDark ? AppTheme.darkSurfaceLight : Colors.white,
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: borderColor),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          // Header (Click to expand/collapse)
-          InkWell(
-            onTap: () {
-              setState(() {
-                if (isExpanded) {
-                  _expandedLoKeys.remove(loKey);
-                } else {
-                  _expandedLoKeys.add(loKey);
-                }
-              });
-            },
-            borderRadius: BorderRadius.circular(12),
-            child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-              child: Row(
-                children: [
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                    decoration: BoxDecoration(
-                      color: AppTheme.primary.withValues(alpha: 0.12),
-                      borderRadius: BorderRadius.circular(4),
-                    ),
-                    child: Text(
-                      loKey,
-                      style: TextStyle(
-                        fontSize: 10.5,
-                        fontWeight: FontWeight.bold,
-                        color: AppTheme.primary,
-                      ),
-                    ),
-                  ),
-                  const SizedBox(width: 10),
-                  Expanded(
-                    child: Text(
-                      loTitle,
-                      style: TextStyle(
-                        fontSize: 13,
-                        fontWeight: FontWeight.w600,
-                        color: isDark ? AppTheme.darkText : AppTheme.lightText,
-                      ),
-                    ),
-                  ),
-                  const SizedBox(width: 8),
-                  // Score Badge (Sober, Institutional Tint)
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                    decoration: BoxDecoration(
-                      color: avgColor.withValues(alpha: isDark ? 0.14 : 0.08),
-                      borderRadius: BorderRadius.circular(6),
-                      border: Border.all(color: avgColor.withValues(alpha: 0.3)),
-                    ),
-                    child: Text(
-                      '${avgScore.toStringAsFixed(1)}%',
-                      style: TextStyle(
-                        fontSize: 11.5,
-                        fontWeight: FontWeight.bold,
-                        color: avgColor,
-                      ),
-                    ),
-                  ),
-                  const SizedBox(width: 6),
-                  Icon(
-                    isExpanded ? Icons.keyboard_arrow_up_rounded : Icons.keyboard_arrow_down_rounded,
-                    size: 20,
-                    color: isDark ? AppTheme.darkTextSecondary : AppTheme.lightTextSecondary,
-                  ),
-                ],
-              ),
-            ),
-          ),
-
-          // Expanded Content: Sections Mastery Breakdown
-          if (isExpanded) ...[
-            Divider(height: 1, thickness: 1, color: borderColor),
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-              color: isDark ? AppTheme.darkSurface : const Color(0xFFFAFAFA),
-              child: Column(
-                children: [
-                  for (final sec in sections) ...[
-                    Builder(
-                      builder: (_) {
-                        final match = filtered.firstWhere(
-                          (it) => it.loCode == loKey && it.section == sec,
-                          orElse: () => LoMasteryItem(
-                            loCode: loKey,
-                            loTitle: loTitle,
-                            subject: _selectedSubject,
-                            section: sec,
-                            score: 75.0,
-                            assessedCount: 30,
-                            masteredCount: 20,
-                            developingCount: 7,
-                            atRiskCount: 3,
-                            mostMissedItems: [],
-                            remediationAction: 'Standard review',
-                          ),
-                        );
-                        final secColor = _getTierColor(match.score);
-
-                        return InkWell(
-                          onTap: () => _showDrillDownDialog(context, match, isDark),
-                          borderRadius: BorderRadius.circular(8),
-                          child: Padding(
-                            padding: const EdgeInsets.symmetric(vertical: 6, horizontal: 4),
-                            child: Row(
-                              children: [
-                                SizedBox(
-                                  width: 90,
-                                  child: Text(
-                                    sec,
-                                    style: TextStyle(
-                                      fontSize: 12,
-                                      fontWeight: FontWeight.w600,
-                                      color: isDark ? AppTheme.darkText : AppTheme.lightText,
-                                    ),
-                                  ),
-                                ),
-                                const SizedBox(width: 8),
-                                Expanded(
-                                  child: ClipRRect(
-                                    borderRadius: BorderRadius.circular(4),
-                                    child: LinearProgressIndicator(
-                                      value: match.score / 100.0,
-                                      minHeight: 8,
-                                      backgroundColor: isDark ? AppTheme.darkBorder : const Color(0xFFE2E8F0),
-                                      valueColor: AlwaysStoppedAnimation<Color>(secColor),
-                                    ),
-                                  ),
-                                ),
-                                const SizedBox(width: 12),
-                                Container(
-                                  width: 64,
-                                  alignment: Alignment.centerRight,
-                                  child: Text(
-                                    '${match.score.toStringAsFixed(1)}%',
-                                    style: TextStyle(
-                                      fontSize: 12,
-                                      fontWeight: FontWeight.bold,
-                                      color: secColor,
-                                    ),
-                                  ),
-                                ),
-                                const SizedBox(width: 4),
-                                Icon(
-                                  Icons.chevron_right_rounded,
-                                  size: 16,
-                                  color: isDark ? AppTheme.darkTextMuted : AppTheme.lightTextMuted,
-                                ),
-                              ],
-                            ),
-                          ),
-                        );
-                      },
-                    ),
-                    if (sec != sections.last)
-                      Divider(height: 1, thickness: 0.5, color: borderColor.withValues(alpha: 0.5)),
-                  ],
-                ],
-              ),
-            ),
-          ],
-        ],
-      ),
-    );
-  }
-
-  Widget _buildBenchmarkScale(bool isDark) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
-      decoration: BoxDecoration(
-        color: isDark ? AppTheme.darkSurfaceLight.withValues(alpha: 0.5) : const Color(0xFFF8FAFC),
-        borderRadius: BorderRadius.circular(10),
         border: Border.all(color: isDark ? AppTheme.darkBorder : const Color(0xFFE2E8F0)),
       ),
-      child: Wrap(
-        crossAxisAlignment: WrapCrossAlignment.center,
-        spacing: 16,
-        runSpacing: 6,
+      child: Column(
         children: [
-          Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Icon(
-                Icons.tune_rounded,
-                size: 13,
-                color: isDark ? AppTheme.darkTextSecondary : AppTheme.lightTextSecondary,
-              ),
-              const SizedBox(width: 5),
-              Text(
-                'Mastery Scale:',
-                style: TextStyle(
-                  fontSize: 11,
-                  fontWeight: FontWeight.bold,
-                  color: isDark ? AppTheme.darkTextSecondary : AppTheme.lightTextSecondary,
-                  letterSpacing: 0.2,
-                ),
-              ),
-            ],
+          Icon(Icons.analytics_outlined, size: 36, color: AppTheme.textSecondary),
+          const SizedBox(height: 12),
+          Text(
+            _searchQuery.isNotEmpty
+                ? 'No curriculum competencies match "$_searchQuery"'
+                : 'No competencies or learning outcomes found for current subjects.',
+            textAlign: TextAlign.center,
+            style: TextStyle(
+              fontSize: 13,
+              fontWeight: FontWeight.w600,
+              color: isDark ? AppTheme.darkText : AppTheme.lightText,
+            ),
           ),
-          _buildBenchmarkTier(
-            label: 'Proficient',
-            range: '80%+',
-            accentColor: const Color(0xFF0D9488),
-            isDark: isDark,
-          ),
-          _buildBenchmarkTier(
-            label: 'Developing',
-            range: '60% – 79%',
-            accentColor: const Color(0xFFD97706),
-            isDark: isDark,
-          ),
-          _buildBenchmarkTier(
-            label: 'Needs Help',
-            range: 'Below 60%',
-            accentColor: const Color(0xFFBE123C),
-            isDark: isDark,
+          const SizedBox(height: 6),
+          Text(
+            'Quizzes and curriculum learning outcomes will populate here automatically as students attempt assessments.',
+            textAlign: TextAlign.center,
+            style: TextStyle(fontSize: 11.5, color: AppTheme.textSecondary),
           ),
         ],
       ),
-    );
-  }
-
-  Widget _buildBenchmarkTier({
-    required String label,
-    required String range,
-    required Color accentColor,
-    required bool isDark,
-  }) {
-    return Row(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        Container(
-          width: 3.5,
-          height: 11,
-          decoration: BoxDecoration(
-            color: accentColor,
-            borderRadius: BorderRadius.circular(2),
-          ),
-        ),
-        const SizedBox(width: 6),
-        Text(
-          '$label ($range)',
-          style: TextStyle(
-            fontSize: 11,
-            fontWeight: FontWeight.w600,
-            color: isDark ? AppTheme.darkText : AppTheme.lightText,
-          ),
-        ),
-      ],
     );
   }
 }

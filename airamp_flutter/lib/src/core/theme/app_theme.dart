@@ -224,6 +224,12 @@ class AppTheme {
           TargetPlatform.fuchsia: SmoothPageTransitionsBuilder(),
         },
       ),
+      snackBarTheme: SnackBarThemeData(
+        behavior: SnackBarBehavior.floating,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+        insetPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+        elevation: 8,
+      ),
       dialogTheme: DialogThemeData(
         backgroundColor: darkSurface,
         elevation: 16,
@@ -355,6 +361,12 @@ class AppTheme {
           TargetPlatform.linux: SmoothPageTransitionsBuilder(),
           TargetPlatform.fuchsia: SmoothPageTransitionsBuilder(),
         },
+      ),
+      snackBarTheme: SnackBarThemeData(
+        behavior: SnackBarBehavior.floating,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+        insetPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+        elevation: 8,
       ),
       dialogTheme: DialogThemeData(
         backgroundColor: lightSurface,

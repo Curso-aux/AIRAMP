@@ -105,9 +105,9 @@ class _SectionsMgmtScreenState extends ConsumerState<SectionsMgmtScreen> {
 
     showDialog(
       context: context,
-      builder: (context) {
+      builder: (dialogCtx) {
         return StatefulBuilder(
-          builder: (context, setDialogState) {
+          builder: (dialogStateCtx, setDialogState) {
             return AlertDialog(
               backgroundColor: Theme.of(context).colorScheme.surface,
               title: Text(
@@ -1534,7 +1534,7 @@ class _SectionsMgmtScreenState extends ConsumerState<SectionsMgmtScreen> {
                                         .deleteSection(sectionId);
                                     if (mounted) {
                                       AiraActionToast.showDeleted(
-                                        context,
+                                        this.context,
                                         title: 'Section Deleted',
                                         message:
                                             'Section "$secName" was permanently deleted.',
@@ -1543,7 +1543,7 @@ class _SectionsMgmtScreenState extends ConsumerState<SectionsMgmtScreen> {
                                   } catch (e) {
                                     if (mounted) {
                                       AiraActionToast.showError(
-                                        context,
+                                        this.context,
                                         title: 'Failed to Delete Section',
                                         message:
                                             'Failed to delete section: ${e.toString().replaceFirst("Exception: ", "")}',
@@ -1596,7 +1596,7 @@ class _SectionsMgmtScreenState extends ConsumerState<SectionsMgmtScreen> {
                                           .deleteSection(sectionId);
                                       if (mounted) {
                                         AiraActionToast.showDeleted(
-                                          context,
+                                          this.context,
                                           title: 'Section Deleted',
                                           message:
                                               'Section "$secName" was permanently deleted.',
@@ -1605,7 +1605,7 @@ class _SectionsMgmtScreenState extends ConsumerState<SectionsMgmtScreen> {
                                     } catch (e) {
                                       if (mounted) {
                                         AiraActionToast.showError(
-                                          context,
+                                          this.context,
                                           title: 'Failed to Delete Section',
                                           message:
                                               'Failed to delete section: ${e.toString().replaceFirst("Exception: ", "")}',

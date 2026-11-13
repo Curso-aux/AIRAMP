@@ -6,7 +6,6 @@ import '../../../core/components/aira_action_toast.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/theme/theme_provider.dart';
 import '../../auth/application/auth_provider.dart';
-import '../../curriculum/presentation/components/pdf_module_upload_dialog.dart';
 import '../data/admin_repository.dart';
 import 'components/teacher_picker_field.dart';
 
@@ -174,42 +173,6 @@ class _SubjectsMgmtScreenState extends ConsumerState<SubjectsMgmtScreen> {
                       ),
                     );
 
-                    final pdfImportBtn = OutlinedButton.icon(
-                      onPressed: _openCreateSubjectFromPdf,
-                      icon: Icon(
-                        Icons.upload_file_outlined,
-                        size: 16,
-                        color: AppTheme.primary,
-                      ),
-                      label: Text(
-                        isNarrow ? 'PDF Auto-Scan' : 'Create from PDF Module',
-                        style: const TextStyle(
-                          fontSize: 13,
-                          fontWeight: FontWeight.w600,
-                        ),
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                      style: OutlinedButton.styleFrom(
-                        foregroundColor: AppTheme.primary,
-                        side: BorderSide(
-                          color: AppTheme.primary.withValues(
-                            alpha: 0.4,
-                          ),
-                        ),
-                        backgroundColor: AppTheme.primary.withValues(
-                          alpha: 0.05,
-                        ),
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 14,
-                          vertical: 12,
-                        ),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(10),
-                        ),
-                        minimumSize: const Size(0, 42),
-                      ),
-                    );
-
                     final createSubjectBtn = ElevatedButton.icon(
                       onPressed: () => _showCreateSubjectDialog(),
                       icon: const Icon(Icons.add, size: 16),
@@ -247,12 +210,9 @@ class _SubjectsMgmtScreenState extends ConsumerState<SubjectsMgmtScreen> {
                               child: createSubjectBtn,
                             ),
                             const SizedBox(height: 10),
-                            Row(
-                              children: [
-                                Expanded(child: adoptGlobalBtn),
-                                const SizedBox(width: 10),
-                                Expanded(child: pdfImportBtn),
-                              ],
+                            SizedBox(
+                              width: double.infinity,
+                              child: adoptGlobalBtn,
                             ),
                           ],
                         ],
@@ -270,8 +230,6 @@ class _SubjectsMgmtScreenState extends ConsumerState<SubjectsMgmtScreen> {
                             mainAxisSize: MainAxisSize.min,
                             children: [
                               adoptGlobalBtn,
-                              const SizedBox(width: 10),
-                              pdfImportBtn,
                               const SizedBox(width: 10),
                               createSubjectBtn,
                             ],
@@ -817,22 +775,6 @@ class _SubjectsMgmtScreenState extends ConsumerState<SubjectsMgmtScreen> {
                           Container(width: 1, height: 18, color: AppTheme.border),
                         ],
                         _segmentedActionIcon(
-                          icon: Icons.picture_as_pdf_outlined,
-                          color: AppTheme.primary,
-                          tooltip: 'Upload PDF Syllabus',
-                          onTap: () {
-                            showDialog(
-                              context: context,
-                              barrierDismissible: false,
-                              builder: (ctx) => PdfModuleUploadDialog(
-                                subjectId: subject['id'] as int,
-                                subjectName: subject['name']?.toString() ?? 'Subject',
-                              ),
-                            );
-                          },
-                        ),
-                        Container(width: 1, height: 18, color: AppTheme.border),
-                        _segmentedActionIcon(
                           icon: Icons.edit_outlined,
                           color: AppTheme.textSecondary,
                           tooltip: 'Edit Subject Details',
@@ -1173,83 +1115,7 @@ class _SubjectsMgmtScreenState extends ConsumerState<SubjectsMgmtScreen> {
     });
 
     if (!mounted) return;
-
-    // Prompt user to immediately upload a PDF Module
-    final uploadNow = await showDialog<bool>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        backgroundColor: Theme.of(context).colorScheme.surface,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        title: Row(
-          children: [
-            Container(
-              padding: const EdgeInsets.all(8),
-              decoration: BoxDecoration(
-                color: const Color(0xFFE11D48).withValues(alpha: 0.15),
-                borderRadius: BorderRadius.circular(10),
-              ),
-              child: const Icon(
-                Icons.picture_as_pdf,
-                color: Color(0xFFE11D48),
-                size: 24,
-              ),
-            ),
-            const SizedBox(width: 12),
-            const Expanded(
-              child: Text(
-                'Upload PDF Module?',
-                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18),
-              ),
-            ),
-          ],
-        ),
-        content: Text(
-          'Subject "${result.name}" was created successfully!\n\nWould you like to upload a PDF module now to automatically scan Topics, Learning Outcomes, and Quiz Practice Flashcards?',
-          style: TextStyle(color: AppTheme.textSecondary, fontSize: 14),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx, false),
-            child: Text(
-              'Later',
-              style: TextStyle(color: AppTheme.textSecondary),
-            ),
-          ),
-          ElevatedButton.icon(
-            onPressed: () => Navigator.pop(ctx, true),
-            icon: const Icon(Icons.auto_awesome, size: 16),
-            label: const Text('Upload PDF Module'),
-            style: ElevatedButton.styleFrom(
-              backgroundColor: AppTheme.primary,
-              foregroundColor: Colors.black,
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(10),
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-
-    if (!mounted) return;
-
-    if (uploadNow == true) {
-      context.push('/admin/subjects/$newSubjectId');
-    } else {
-      context.push('/admin/subjects/$newSubjectId');
-    }
-  }
-
-  Future<void> _openCreateSubjectFromPdf() async {
-    final result = await showDialog<bool>(
-      context: context,
-      barrierDismissible: false,
-      builder: (ctx) => const PdfModuleUploadDialog(subjectId: null),
-    );
-
-    if (result == true && mounted) {
-      ref.read(subjectsProvider.notifier).reload();
-    }
+    context.push('/admin/subjects/$newSubjectId');
   }
 }
 

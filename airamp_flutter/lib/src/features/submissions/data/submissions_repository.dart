@@ -291,6 +291,9 @@ class SubmissionsRepository {
     String? storageUrl,
     String? notes,
   }) {
+    if (fileSize != null && fileSize > 10 * 1024 * 1024) {
+      throw Exception('Submitted file size exceeds the 10 MB limit.');
+    }
     return _dbHelper.submitAssignment(
       assignmentId: assignmentId,
       studentId: studentId,

@@ -76,7 +76,6 @@ class ModuleScannerService {
     final performanceCriteria = moduleData['performance_criteria']?.toString().trim() ?? '';
 
     final contents = (moduleData['contents'] as List?)?.cast<Map<String, dynamic>>() ?? [];
-    final questions = (moduleData['questions'] as List?)?.cast<Map<String, dynamic>>() ?? [];
 
     // Collect all vocabulary terms across the module for smart multiple-choice distractor generation
     final Set<String> vocabularyPool = {};

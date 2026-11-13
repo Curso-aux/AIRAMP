@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import '../../../../core/components/aira_qr_scanner_dialog.dart';
+import '../../../../core/components/app_toast.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../../core/components/user_avatar_widget.dart';
 import '../../../admin/data/admin_repository.dart';
@@ -186,11 +188,18 @@ class StudentStickyTopHeader extends ConsumerWidget {
 
           const SizedBox(width: 8),
 
-          // Right: Action Buttons (Analytics, Notifications Bell, extraActions)
+          // Right: Action Buttons (QR Scanner, Analytics, Notifications Bell, extraActions)
           Row(
             mainAxisSize: MainAxisSize.min,
             children: [
               ...?extraActions,
+              _buildQrScanButton(
+                context,
+                ref,
+                isDark: isDark,
+                isCompact: compact,
+              ),
+              const SizedBox(width: 8),
               _buildAnalyticsHeaderButton(
                 context,
                 completionPct: completionPct,
@@ -208,6 +217,221 @@ class StudentStickyTopHeader extends ConsumerWidget {
           ),
         ],
       ),
+    );
+  }
+
+  Widget _buildQrScanButton(
+    BuildContext context,
+    WidgetRef ref, {
+    required bool isDark,
+    bool isCompact = false,
+  }) {
+    final primary = AppTheme.primary;
+    return Tooltip(
+      message: 'Scan Section QR Code',
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          borderRadius: BorderRadius.circular(10),
+          onTap: () {
+            HapticFeedback.lightImpact();
+            AiraQrScannerDialog.show(
+              context: context,
+              title: 'Scan Section Enrollment QR',
+              subtitle: 'Point camera at classroom projector display',
+              onKeyScanned: (scannedKey) async {
+                try {
+                  final verified = await ref.read(studentCoursesProvider.notifier).verifyKey(scannedKey);
+                  if (verified != null && context.mounted) {
+                    _showDirectEnrollConfirmSheet(context, ref, verified, scannedKey);
+                  } else if (context.mounted) {
+                    AppToast.showWarning(
+                      context,
+                      'Invalid Key "$scannedKey". Please check with your teacher.',
+                    );
+                  }
+                } catch (e) {
+                  if (context.mounted) {
+                    AppToast.showError(context, 'Verification error: $e');
+                  }
+                }
+              },
+            );
+          },
+          child: Container(
+            height: 36,
+            width: 36,
+            decoration: BoxDecoration(
+              color: primary.withValues(alpha: isDark ? 0.16 : 0.08),
+              borderRadius: BorderRadius.circular(10),
+              border: Border.all(
+                color: primary.withValues(alpha: 0.25),
+                width: 1,
+              ),
+            ),
+            child: Icon(
+              Icons.qr_code_scanner_rounded,
+              size: 18,
+              color: primary,
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  void _showDirectEnrollConfirmSheet(
+    BuildContext context,
+    WidgetRef ref,
+    Map<String, dynamic> verifiedData,
+    String key,
+  ) {
+    final sec = (verifiedData['section'] as Map<String, dynamic>?) ?? {};
+    final subjects = (verifiedData['subjects'] as List?) ?? [];
+    final sectionName = sec['name']?.toString() ?? 'Section';
+    final grade = sec['grade']?.toString() ?? '';
+    final room = sec['room']?.toString() ?? 'Main Building';
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final primary = AppTheme.primary;
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: isDark ? AppTheme.darkSurface : Colors.white,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      builder: (sheetCtx) {
+        return Padding(
+          padding: EdgeInsets.fromLTRB(
+            20,
+            16,
+            20,
+            MediaQuery.of(sheetCtx).viewInsets.bottom + 24,
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Center(
+                child: Container(
+                  width: 40,
+                  height: 4,
+                  decoration: BoxDecoration(
+                    color: AppTheme.textMuted.withValues(alpha: 0.3),
+                    borderRadius: BorderRadius.circular(2),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 16),
+              Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(10),
+                    decoration: BoxDecoration(
+                      color: AppTheme.success.withValues(alpha: 0.12),
+                      shape: BoxShape.circle,
+                    ),
+                    child: Icon(Icons.check_circle_rounded, color: AppTheme.success, size: 24),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'Verified Section QR',
+                          style: TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.bold,
+                            color: AppTheme.success,
+                          ),
+                        ),
+                        Text(
+                          sectionName,
+                          style: TextStyle(
+                            fontSize: 18,
+                            fontWeight: FontWeight.bold,
+                            color: isDark ? AppTheme.darkText : AppTheme.lightText,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 12),
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: primary.withValues(alpha: isDark ? 0.12 : 0.06),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Row(
+                  children: [
+                    Icon(Icons.meeting_room_outlined, size: 16, color: primary),
+                    const SizedBox(width: 8),
+                    Text(
+                      '$grade · Room $room · ${subjects.length} Subjects',
+                      style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.w600, color: primary),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 18),
+              Row(
+                children: [
+                  Expanded(
+                    child: OutlinedButton(
+                      onPressed: () => Navigator.pop(sheetCtx),
+                      style: OutlinedButton.styleFrom(
+                        padding: const EdgeInsets.symmetric(vertical: 12),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                      ),
+                      child: const Text('Cancel'),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    flex: 2,
+                    child: ElevatedButton.icon(
+                      onPressed: () async {
+                        Navigator.pop(sheetCtx);
+                        try {
+                          final success = await ref
+                              .read(studentCoursesProvider.notifier)
+                              .enrollBySectionKey(key);
+                          if (success && context.mounted) {
+                            ref.read(studentCoursesProvider.notifier).reload();
+                            AppToast.showSuccess(
+                              context,
+                              'Enrolled in $sectionName successfully! Loaded ${subjects.length} subjects.',
+                            );
+                          } else if (context.mounted) {
+                            AppToast.showError(context, 'Enrollment failed. Please try again.');
+                          }
+                        } catch (e) {
+                          if (context.mounted) {
+                            AppToast.showError(context, 'Error enrolling: $e');
+                          }
+                        }
+                      },
+                      icon: const Icon(Icons.school_rounded, size: 18),
+                      label: const Text('Confirm & Enroll', style: TextStyle(fontWeight: FontWeight.bold)),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: primary,
+                        foregroundColor: Colors.white,
+                        padding: const EdgeInsets.symmetric(vertical: 12),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        );
+      },
     );
   }
 

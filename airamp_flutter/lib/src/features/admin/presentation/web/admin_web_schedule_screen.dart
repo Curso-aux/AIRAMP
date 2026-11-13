@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../../../../core/components/aira_action_toast.dart';
 import '../../../../core/components/calendar/actual_calendar_view.dart';
 import '../../../../core/database/database_helper.dart';
 import '../../../../core/theme/app_theme.dart';
@@ -140,8 +141,10 @@ class _AdminWebScheduleScreenState extends ConsumerState<AdminWebScheduleScreen>
                 ref.invalidate(sectionSchedulesProvider(section));
               }
               if (mounted) {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('Class schedule entry removed')),
+                AiraActionToast.showDeleted(
+                  context,
+                  title: 'Schedule Removed',
+                  message: 'Class schedule entry was removed successfully.',
                 );
               }
             },

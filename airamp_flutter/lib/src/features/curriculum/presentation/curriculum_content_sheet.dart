@@ -375,6 +375,7 @@ class _AddContentSheetState extends ConsumerState<AddContentSheet> {
 
     SessionDraftService.instance.clearForm(_formId);
 
+    if (!mounted) return;
     Navigator.pop(context);
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
@@ -902,6 +903,7 @@ class _EditContentSheetState extends ConsumerState<EditContentSheet> {
       },
     );
 
+    if (!mounted) return;
     Navigator.pop(context);
     AppToast.showSuccess(context, 'Updated "$title" successfully');
   }

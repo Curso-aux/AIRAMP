@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../../core/components/app_toast.dart';
+import '../../../core/components/aira_qr_scanner_dialog.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/theme/theme_provider.dart';
 import '../../auth/application/auth_provider.dart';
@@ -226,6 +227,48 @@ class _MyCoursesScreenState extends ConsumerState<MyCoursesScreen> {
                           ),
                           const SizedBox(height: 18),
 
+                          // QR Scan Action Banner
+                          InkWell(
+                            onTap: () {
+                              AiraQrScannerDialog.show(
+                                context: context,
+                                onKeyScanned: (scannedKey) {
+                                  controller.text = scannedKey;
+                                  submitKey();
+                                },
+                              );
+                            },
+                            borderRadius: BorderRadius.circular(12),
+                            child: Container(
+                              width: double.infinity,
+                              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 11),
+                              decoration: BoxDecoration(
+                                color: primary.withValues(alpha: isDark ? 0.16 : 0.08),
+                                borderRadius: BorderRadius.circular(12),
+                                border: Border.all(
+                                  color: primary.withValues(alpha: 0.3),
+                                  width: 1.2,
+                                ),
+                              ),
+                              child: Row(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [
+                                  Icon(Icons.qr_code_scanner_rounded, size: 20, color: primary),
+                                  const SizedBox(width: 8),
+                                  Text(
+                                    'Scan Classroom Projection QR Code',
+                                    style: TextStyle(
+                                      fontSize: 13,
+                                      fontWeight: FontWeight.bold,
+                                      color: primary,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
+                          const SizedBox(height: 14),
+
                           // Field Label
                           Text(
                             'SECTION KEY',
@@ -268,14 +311,31 @@ class _MyCoursesScreenState extends ConsumerState<MyCoursesScreen> {
                                 color: keyText.isNotEmpty ? primary : AppTheme.textMuted,
                                 size: 20,
                               ),
-                              suffixIcon: controller.text.isNotEmpty
-                                  ? IconButton(
+                              suffixIcon: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  IconButton(
+                                    icon: Icon(Icons.qr_code_scanner_rounded, size: 20, color: primary),
+                                    tooltip: 'Scan Classroom QR',
+                                    onPressed: () {
+                                      AiraQrScannerDialog.show(
+                                        context: context,
+                                        onKeyScanned: (scannedKey) {
+                                          controller.text = scannedKey;
+                                          submitKey();
+                                        },
+                                      );
+                                    },
+                                  ),
+                                  if (controller.text.isNotEmpty)
+                                    IconButton(
                                       icon: const Icon(Icons.cancel_rounded, size: 18),
                                       color: AppTheme.textMuted,
                                       tooltip: 'Clear',
                                       onPressed: () => setDialogState(() => controller.clear()),
                                     )
-                                  : IconButton(
+                                  else
+                                    IconButton(
                                       icon: const Icon(Icons.content_paste_rounded, size: 18),
                                       color: primary,
                                       tooltip: 'Paste from clipboard',
@@ -288,6 +348,8 @@ class _MyCoursesScreenState extends ConsumerState<MyCoursesScreen> {
                                         }
                                       },
                                     ),
+                                ],
+                              ),
                               border: OutlineInputBorder(
                                 borderRadius: BorderRadius.circular(14),
                                 borderSide: BorderSide(
@@ -1299,11 +1361,28 @@ class _MyCoursesScreenState extends ConsumerState<MyCoursesScreen> {
                 onSelected: (val) {
                   if (val == 'switch') {
                     _showEnterKeyDialog(initialKey: key);
+                  } else if (val == 'scan') {
+                    AiraQrScannerDialog.show(
+                      context: context,
+                      onKeyScanned: (scannedKey) {
+                        _showEnterKeyDialog(initialKey: scannedKey);
+                      },
+                    );
                   } else if (val == 'leave') {
                     _showLeaveSectionDialog(name);
                   }
                 },
                 itemBuilder: (ctx) => [
+                  PopupMenuItem(
+                    value: 'scan',
+                    child: Row(
+                      children: [
+                        Icon(Icons.qr_code_scanner_rounded, size: 18, color: Theme.of(context).colorScheme.primary),
+                        const SizedBox(width: 8),
+                        const Text('Scan Section QR'),
+                      ],
+                    ),
+                  ),
                   PopupMenuItem(
                     value: 'switch',
                     child: Row(
@@ -1483,8 +1562,43 @@ class _MyCoursesScreenState extends ConsumerState<MyCoursesScreen> {
                   ),
                   decoration: InputDecoration(
                     counterText: '',
-                    hintText: 'e.g. SEC-10A',
+                    hintText: 'e.g. SEC-SAPH12',
                     prefixIcon: Icon(Icons.key_rounded, color: AppTheme.textMuted, size: 18),
+                    suffixIcon: IconButton(
+                      icon: Icon(Icons.qr_code_scanner_rounded, color: primary, size: 20),
+                      tooltip: 'Scan Classroom Projection QR',
+                      onPressed: () {
+                        AiraQrScannerDialog.show(
+                          context: context,
+                          onKeyScanned: (scannedKey) async {
+                            _keyController.text = scannedKey;
+                            setState(() => _isVerifying = true);
+                            try {
+                              final verified = await ref.read(studentCoursesProvider.notifier).verifyKey(scannedKey);
+                              if (verified != null) {
+                                _showVerificationPreviewSheet(verified, scannedKey);
+                              } else if (mounted) {
+                                AppToast.showWarning(
+                                  context,
+                                  'Invalid Key "$scannedKey". Please check with your school administrator.',
+                                );
+                              }
+                            } catch (e) {
+                              if (mounted) {
+                                AppToast.showError(
+                                  context,
+                                  'Error verifying key: ${e.toString().replaceFirst("Exception: ", "")}',
+                                );
+                              }
+                            } finally {
+                              if (mounted) {
+                                setState(() => _isVerifying = false);
+                              }
+                            }
+                          },
+                        );
+                      },
+                    ),
                     contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
                     filled: true,
                     fillColor: isDark ? AppTheme.darkInputBg : const Color(0xFFF8FAFC),
@@ -1503,7 +1617,51 @@ class _MyCoursesScreenState extends ConsumerState<MyCoursesScreen> {
                   ),
                 ),
               ),
-              const SizedBox(width: 10),
+              const SizedBox(width: 8),
+              OutlinedButton.icon(
+                onPressed: _isVerifying
+                    ? null
+                    : () {
+                        AiraQrScannerDialog.show(
+                          context: context,
+                          onKeyScanned: (scannedKey) async {
+                            _keyController.text = scannedKey;
+                            setState(() => _isVerifying = true);
+                            try {
+                              final verified = await ref.read(studentCoursesProvider.notifier).verifyKey(scannedKey);
+                              if (verified != null) {
+                                _showVerificationPreviewSheet(verified, scannedKey);
+                              } else if (mounted) {
+                                AppToast.showWarning(
+                                  context,
+                                  'Invalid Key "$scannedKey". Please check with your school administrator.',
+                                );
+                              }
+                            } catch (e) {
+                              if (mounted) {
+                                AppToast.showError(
+                                  context,
+                                  'Error verifying key: ${e.toString().replaceFirst("Exception: ", "")}',
+                                );
+                              }
+                            } finally {
+                              if (mounted) {
+                                setState(() => _isVerifying = false);
+                              }
+                            }
+                          },
+                        );
+                      },
+                icon: const Icon(Icons.qr_code_scanner_rounded, size: 17),
+                label: const Text('Scan QR', style: TextStyle(fontWeight: FontWeight.bold)),
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: primary,
+                  side: BorderSide(color: primary.withValues(alpha: 0.45), width: 1.2),
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 14),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                ),
+              ),
+              const SizedBox(width: 8),
               ElevatedButton(
                 onPressed: _isVerifying
                     ? null
