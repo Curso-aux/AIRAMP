@@ -6,7 +6,8 @@ import '../../../core/database/database_helper.dart';
 class ModuleScannerService {
   final DatabaseHelper _dbHelper;
 
-  ModuleScannerService({DatabaseHelper? dbHelper}) : _dbHelper = dbHelper ?? DatabaseHelper();
+  ModuleScannerService({DatabaseHelper? dbHelper})
+    : _dbHelper = dbHelper ?? DatabaseHelper();
 
   /// Scans a specific Learning Outcome module and returns the generated/cached flashcards.
   Future<List<Map<String, dynamic>>> scanAndGenerateCards({
@@ -16,11 +17,17 @@ class ModuleScannerService {
     // 1. Check local cache first unless forced refresh or incomplete options
     if (!forceRefresh) {
       final cached = await _dbHelper.getModuleFlashcards(loId);
-      final hasMissingOptions = cached.isEmpty || cached.any((c) {
-        final optStr = c['options_json']?.toString().trim();
-        final correct = c['correct_option']?.toString().trim();
-        return optStr == null || optStr.isEmpty || optStr == '[]' || correct == null || correct.isEmpty;
-      });
+      final hasMissingOptions =
+          cached.isEmpty ||
+          cached.any((c) {
+            final optStr = c['options_json']?.toString().trim();
+            final correct = c['correct_option']?.toString().trim();
+            return optStr == null ||
+                optStr.isEmpty ||
+                optStr == '[]' ||
+                correct == null ||
+                correct.isEmpty;
+          });
       if (cached.isNotEmpty && !hasMissingOptions) {
         return cached;
       }
@@ -37,7 +44,11 @@ class ModuleScannerService {
 
     // 4. Save to SQLite cache for offline instant recall
     if (cards.isNotEmpty) {
-      await _dbHelper.saveModuleFlashcards(loId, moduleData['topic_id'] as int?, cards);
+      await _dbHelper.saveModuleFlashcards(
+        loId,
+        moduleData['topic_id'] as int?,
+        cards,
+      );
       return await _dbHelper.getModuleFlashcards(loId);
     }
 
@@ -52,12 +63,18 @@ class ModuleScannerService {
     final topicData = await _dbHelper.getTopicDataForReview(topicId);
     if (topicData == null) return [];
 
-    final los = (topicData['learning_outcomes'] as List?)?.cast<Map<String, dynamic>>() ?? [];
+    final los =
+        (topicData['learning_outcomes'] as List?)
+            ?.cast<Map<String, dynamic>>() ??
+        [];
     List<Map<String, dynamic>> combined = [];
 
     for (final lo in los) {
       final loId = lo['id'] as int;
-      final cards = await scanAndGenerateCards(loId: loId, forceRefresh: forceRefresh);
+      final cards = await scanAndGenerateCards(
+        loId: loId,
+        forceRefresh: forceRefresh,
+      );
       combined.addAll(cards);
     }
 
@@ -73,9 +90,11 @@ class ModuleScannerService {
     final topicId = moduleData['topic_id'] as int?;
     final loTitle = moduleData['title']?.toString().trim() ?? 'Module Concept';
     final loDescription = moduleData['description']?.toString().trim() ?? '';
-    final performanceCriteria = moduleData['performance_criteria']?.toString().trim() ?? '';
+    final performanceCriteria =
+        moduleData['performance_criteria']?.toString().trim() ?? '';
 
-    final contents = (moduleData['contents'] as List?)?.cast<Map<String, dynamic>>() ?? [];
+    final contents =
+        (moduleData['contents'] as List?)?.cast<Map<String, dynamic>>() ?? [];
 
     // Collect all vocabulary terms across the module for smart multiple-choice distractor generation
     final Set<String> vocabularyPool = {};
@@ -97,7 +116,9 @@ class ModuleScannerService {
         final back = def['back']!;
         if (!seenFronts.contains(front.toLowerCase())) {
           seenFronts.add(front.toLowerCase());
-          vocabularyPool.add(front.replaceAll('What is ', '').replaceAll('?', '').trim());
+          vocabularyPool.add(
+            front.replaceAll('What is ', '').replaceAll('?', '').trim(),
+          );
 
           cards.add({
             'lo_id': loId,
@@ -107,7 +128,8 @@ class ModuleScannerService {
             'back_text': back,
             'options_json': null,
             'correct_option': null,
-            'explanation': 'Key concept derived from reading material: "$contentTitle"',
+            'explanation':
+                'Key concept derived from reading material: "$contentTitle"',
             'source_snippet': contentTitle,
             'is_mastered': 0,
             'review_count': 0,
@@ -160,7 +182,8 @@ class ModuleScannerService {
     for (int i = 0; i < cards.length; i++) {
       final card = cards[i];
       if (card['options_json'] == null) {
-        final frontClean = card['front_text'].toString()
+        final frontClean = card['front_text']
+            .toString()
             .replaceAll('What is ', '')
             .replaceAll('Define: ', '')
             .replaceAll('?', '')
@@ -173,20 +196,29 @@ class ModuleScannerService {
         }
 
         // 2. Select 3 distinct distractors
-        final List<String> distractors = domainPool
-            .where((v) => v.toLowerCase().trim() != correctChoice.toLowerCase().trim())
-            .toSet()
-            .toList()
-          ..shuffle();
+        final List<String> distractors =
+            domainPool
+                .where(
+                  (v) =>
+                      v.toLowerCase().trim() !=
+                      correctChoice.toLowerCase().trim(),
+                )
+                .toSet()
+                .toList()
+              ..shuffle();
 
         final chosenDistractors = distractors.take(3).toList();
         while (chosenDistractors.length < 3) {
-          chosenDistractors.add('General Competency Standard ${chosenDistractors.length + 1}');
+          chosenDistractors.add(
+            'General Competency Standard ${chosenDistractors.length + 1}',
+          );
         }
 
         final allChoices = [correctChoice, ...chosenDistractors]..shuffle();
         final correctIdx = allChoices.indexOf(correctChoice);
-        final correctLetter = String.fromCharCode(65 + correctIdx); // 'A', 'B', 'C', 'D'
+        final correctLetter = String.fromCharCode(
+          65 + correctIdx,
+        ); // 'A', 'B', 'C', 'D'
 
         final formattedOptions = allChoices.asMap().entries.map((e) {
           final letter = String.fromCharCode(65 + e.key);
@@ -204,7 +236,12 @@ class ModuleScannerService {
         final front1 = 'What is the primary topic of this module?';
         if (!seenFronts.contains(front1.toLowerCase())) {
           seenFronts.add(front1.toLowerCase());
-          final choices = [loTitle, 'General System Configuration', 'Legacy Database Indexing', 'Network Socket Protocols']..shuffle();
+          final choices = [
+            loTitle,
+            'General System Configuration',
+            'Legacy Database Indexing',
+            'Network Socket Protocols',
+          ]..shuffle();
           final cIdx = choices.indexOf(loTitle);
           cards.add({
             'lo_id': loId,
@@ -212,7 +249,13 @@ class ModuleScannerService {
             'card_type': 'concept',
             'front_text': front1,
             'back_text': loTitle,
-            'options_json': jsonEncode(choices.asMap().entries.map((e) => '${String.fromCharCode(65 + e.key)}: ${e.value}').toList()),
+            'options_json': jsonEncode(
+              choices
+                  .asMap()
+                  .entries
+                  .map((e) => '${String.fromCharCode(65 + e.key)}: ${e.value}')
+                  .toList(),
+            ),
             'correct_option': String.fromCharCode(65 + cIdx),
             'explanation': 'Main module title and core focus area.',
             'source_snippet': 'Module Learning Outcome',
@@ -226,7 +269,12 @@ class ModuleScannerService {
         final front2 = 'What is the core learning objective for $loTitle?';
         if (!seenFronts.contains(front2.toLowerCase())) {
           seenFronts.add(front2.toLowerCase());
-          final choices = [loDescription, 'Memorize arbitrary syntax definitions', 'Configure external hardware ports only', 'Skip prerequisites and tests']..shuffle();
+          final choices = [
+            loDescription,
+            'Memorize arbitrary syntax definitions',
+            'Configure external hardware ports only',
+            'Skip prerequisites and tests',
+          ]..shuffle();
           final cIdx = choices.indexOf(loDescription);
           cards.add({
             'lo_id': loId,
@@ -234,9 +282,16 @@ class ModuleScannerService {
             'card_type': 'qa',
             'front_text': front2,
             'back_text': loDescription,
-            'options_json': jsonEncode(choices.asMap().entries.map((e) => '${String.fromCharCode(65 + e.key)}: ${e.value}').toList()),
+            'options_json': jsonEncode(
+              choices
+                  .asMap()
+                  .entries
+                  .map((e) => '${String.fromCharCode(65 + e.key)}: ${e.value}')
+                  .toList(),
+            ),
             'correct_option': String.fromCharCode(65 + cIdx),
-            'explanation': 'Official competency statement for this learning unit.',
+            'explanation':
+                'Official competency statement for this learning unit.',
             'source_snippet': 'Curriculum Specifications',
             'is_mastered': 0,
             'review_count': 0,
@@ -245,10 +300,16 @@ class ModuleScannerService {
       }
 
       if (performanceCriteria.isNotEmpty) {
-        final front3 = 'What are the performance criteria required to pass $loTitle?';
+        final front3 =
+            'What are the performance criteria required to pass $loTitle?';
         if (!seenFronts.contains(front3.toLowerCase())) {
           seenFronts.add(front3.toLowerCase());
-          final choices = [performanceCriteria, 'Attendance without demonstration', 'Unverified theoretical submission', 'Standard waiver criteria']..shuffle();
+          final choices = [
+            performanceCriteria,
+            'Attendance without demonstration',
+            'Unverified theoretical submission',
+            'Standard waiver criteria',
+          ]..shuffle();
           final cIdx = choices.indexOf(performanceCriteria);
           cards.add({
             'lo_id': loId,
@@ -256,7 +317,13 @@ class ModuleScannerService {
             'card_type': 'qa',
             'front_text': front3,
             'back_text': performanceCriteria,
-            'options_json': jsonEncode(choices.asMap().entries.map((e) => '${String.fromCharCode(65 + e.key)}: ${e.value}').toList()),
+            'options_json': jsonEncode(
+              choices
+                  .asMap()
+                  .entries
+                  .map((e) => '${String.fromCharCode(65 + e.key)}: ${e.value}')
+                  .toList(),
+            ),
             'correct_option': String.fromCharCode(65 + cIdx),
             'explanation': 'Criteria required for mastery and certification.',
             'source_snippet': 'Performance Assessment Standard',
@@ -271,7 +338,10 @@ class ModuleScannerService {
   }
 
   // ── Helper Heuristics: Definition Extraction ──
-  static List<Map<String, String>> _extractDefinitions(String text, String sourceTitle) {
+  static List<Map<String, String>> _extractDefinitions(
+    String text,
+    String sourceTitle,
+  ) {
     final List<Map<String, String>> results = [];
     final lines = text.split('\n');
 
@@ -280,43 +350,45 @@ class ModuleScannerService {
       if (clean.isEmpty) continue;
 
       // Pattern 1: **Term**: Definition or Term: Definition
-      final colonMatch = RegExp(r'^(\*{0,2}[A-Za-z0-9\s\-_/]{2,40}\*{0,2})\s*:\s*(.+)$').firstMatch(clean);
+      final colonMatch = RegExp(
+        r'^(\*{0,2}[A-Za-z0-9\s\-_/]{2,40}\*{0,2})\s*:\s*(.+)$',
+      ).firstMatch(clean);
       if (colonMatch != null) {
         final term = colonMatch.group(1)!.replaceAll('*', '').trim();
         final def = colonMatch.group(2)!.trim();
-        if (term.length >= 3 && def.length >= 8 && !term.toLowerCase().startsWith('http')) {
-          results.add({
-            'front': 'What is $term?',
-            'back': def,
-          });
+        if (term.length >= 3 &&
+            def.length >= 8 &&
+            !term.toLowerCase().startsWith('http')) {
+          results.add({'front': 'What is $term?', 'back': def});
           continue;
         }
       }
 
       // Pattern 2: Term - Definition
-      final dashMatch = RegExp(r'^(\*{0,2}[A-Za-z0-9\s\-_/]{2,40}\*{0,2})\s*[-–—]\s*(.+)$').firstMatch(clean);
+      final dashMatch = RegExp(
+        r'^(\*{0,2}[A-Za-z0-9\s\-_/]{2,40}\*{0,2})\s*[-–—]\s*(.+)$',
+      ).firstMatch(clean);
       if (dashMatch != null) {
         final term = dashMatch.group(1)!.replaceAll('*', '').trim();
         final def = dashMatch.group(2)!.trim();
-        if (term.length >= 3 && def.length >= 8 && !term.toLowerCase().startsWith('http')) {
-          results.add({
-            'front': 'What is $term?',
-            'back': def,
-          });
+        if (term.length >= 3 &&
+            def.length >= 8 &&
+            !term.toLowerCase().startsWith('http')) {
+          results.add({'front': 'What is $term?', 'back': def});
           continue;
         }
       }
 
       // Pattern 3: "X is defined as Y" or "X refers to Y"
-      final isDefinedAsMatch = RegExp(r'^([A-Z][A-Za-z0-9\s]{2,35})\s+(?:is defined as|refers to|is a|is an)\s+(.+)$', caseSensitive: false).firstMatch(clean);
+      final isDefinedAsMatch = RegExp(
+        r'^([A-Z][A-Za-z0-9\s]{2,35})\s+(?:is defined as|refers to|is a|is an)\s+(.+)$',
+        caseSensitive: false,
+      ).firstMatch(clean);
       if (isDefinedAsMatch != null) {
         final term = isDefinedAsMatch.group(1)!.trim();
         final def = clean;
         if (term.length >= 3) {
-          results.add({
-            'front': 'Define: $term',
-            'back': def,
-          });
+          results.add({'front': 'Define: $term', 'back': def});
         }
       }
     }
@@ -325,7 +397,10 @@ class ModuleScannerService {
   }
 
   // ── Helper Heuristics: Bullet Points & List Items ──
-  static List<Map<String, String>> _extractBulletTakeaways(String text, String sourceTitle) {
+  static List<Map<String, String>> _extractBulletTakeaways(
+    String text,
+    String sourceTitle,
+  ) {
     final List<Map<String, String>> results = [];
     final lines = text.split('\n');
     String? currentHeading;
@@ -341,7 +416,9 @@ class ModuleScannerService {
       }
 
       // Detect bullet points: *, -, •, or 1., 2.
-      final bulletMatch = RegExp(r'^(?:[*•\-]|\d+\.)\s+(.+)$').firstMatch(clean);
+      final bulletMatch = RegExp(
+        r'^(?:[*•\-]|\d+\.)\s+(.+)$',
+      ).firstMatch(clean);
       if (bulletMatch != null) {
         final itemText = bulletMatch.group(1)!.trim();
         if (itemText.length >= 12 && itemText.length <= 250) {
@@ -349,10 +426,7 @@ class ModuleScannerService {
               ? 'Key takeaway under "$currentHeading":'
               : 'Recall key point from "$sourceTitle":';
 
-          results.add({
-            'front': prompt,
-            'back': itemText,
-          });
+          results.add({'front': prompt, 'back': itemText});
         }
       }
     }
