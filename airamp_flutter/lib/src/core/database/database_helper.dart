@@ -9944,6 +9944,15 @@ class DatabaseHelper {
   /// Uploads subjects, topics, learning outcomes, and contents to Cloud Firestore
   Future<void> pushLocalCurriculumToCloud({int? subjectId}) async {
     try {
+      SharedPreferences? prefs;
+      try {
+        prefs = await SharedPreferences.getInstance();
+      } catch (_) {}
+      final role = prefs?.getString('auth_session_role');
+      if (role == 'student') {
+        // Students should NEVER overwrite or push curriculum up to Cloud Firestore!
+        return;
+      }
       final db = await database;
       final subjects = subjectId != null
           ? await db.query('subjects', where: 'id = ?', whereArgs: [subjectId])
@@ -10027,6 +10036,11 @@ class DatabaseHelper {
                       }
                     }
                   }
+                  final cloudDecoded = Map<String, dynamic>.from(decoded);
+                  if (cloudDecoded['file_path'] != null && cloudDecoded['file_path'].toString().startsWith('http')) {
+                    cloudDecoded.remove('file_bytes');
+                  }
+                  cData = jsonEncode(cloudDecoded);
                 }
               } catch (_) {}
 
@@ -10269,12 +10283,15 @@ class DatabaseHelper {
 
             final contents =
                 (lo['contents'] as List?)?.cast<Map<String, dynamic>>() ?? [];
+            final incomingContentTitles = <String>{};
             for (final c in contents) {
               final cTitle = (c['title']?.toString() ?? 'Content').trim();
+              final normTitle = cTitle.toLowerCase();
+              if (normTitle.isNotEmpty) incomingContentTitles.add(normTitle);
               final matchC = await db.query(
                 'contents',
                 where: 'lo_id = ? AND LOWER(TRIM(title)) = ?',
-                whereArgs: [localLoId, cTitle.toLowerCase()],
+                whereArgs: [localLoId, normTitle],
               );
               if (matchC.isEmpty) {
                 await db.insert('contents', {
@@ -10297,15 +10314,32 @@ class DatabaseHelper {
               }
             }
 
+            // RECONCILE DELETIONS: Purge local materials deleted from cloud
+            final localContents = await db.query(
+              'contents',
+              columns: ['id', 'title'],
+              where: 'lo_id = ?',
+              whereArgs: [localLoId],
+            );
+            for (final row in localContents) {
+              final locTitle = (row['title']?.toString() ?? '').trim().toLowerCase();
+              if (!incomingContentTitles.contains(locTitle)) {
+                await db.delete('contents', where: 'id = ?', whereArgs: [row['id']]);
+              }
+            }
+
             final questions =
                 (lo['questions'] as List?)?.cast<Map<String, dynamic>>() ?? [];
+            final incomingQuestionTexts = <String>{};
             for (final q in questions) {
               final qText = (q['question_text']?.toString() ?? '').trim();
               if (qText.isEmpty) continue;
+              final normQText = qText.toLowerCase();
+              incomingQuestionTexts.add(normQText);
               final matchQ = await db.query(
                 'questions',
                 where: 'lo_id = ? AND LOWER(TRIM(question_text)) = ?',
-                whereArgs: [localLoId, qText.toLowerCase()],
+                whereArgs: [localLoId, normQText],
               );
               if (matchQ.isEmpty) {
                 await db.insert('questions', {
@@ -10333,6 +10367,59 @@ class DatabaseHelper {
                 );
               }
             }
+
+            // RECONCILE DELETIONS: Purge local questions deleted from cloud
+            final localQuestions = await db.query(
+              'questions',
+              columns: ['id', 'question_text'],
+              where: 'lo_id = ?',
+              whereArgs: [localLoId],
+            );
+            for (final row in localQuestions) {
+              final locQText = (row['question_text']?.toString() ?? '').trim().toLowerCase();
+              if (!incomingQuestionTexts.contains(locQText)) {
+                await db.delete('questions', where: 'id = ?', whereArgs: [row['id']]);
+              }
+            }
+          }
+
+          // RECONCILE DELETIONS: Purge local LOs deleted from cloud
+          final localLos = await db.query(
+            'learning_outcomes',
+            columns: ['id', 'title'],
+            where: 'topic_id = ?',
+            whereArgs: [localTopicId],
+          );
+          for (final row in localLos) {
+            final locLoTitle = (row['title']?.toString() ?? '').trim().toLowerCase();
+            if (!seenIncomingLoTitles.contains(locLoTitle)) {
+              final delLoId = row['id'] as int;
+              await db.delete('contents', where: 'lo_id = ?', whereArgs: [delLoId]);
+              await db.delete('questions', where: 'lo_id = ?', whereArgs: [delLoId]);
+              await db.delete('learning_outcomes', where: 'id = ?', whereArgs: [delLoId]);
+            }
+          }
+        }
+
+        // RECONCILE DELETIONS: Purge local topics deleted from cloud
+        final localTopics = await db.query(
+          'topics',
+          columns: ['id', 'title'],
+          where: 'subject_id = ?',
+          whereArgs: [localSubId],
+        );
+        for (final row in localTopics) {
+          final locTTitle = (row['title']?.toString() ?? '').trim().toLowerCase();
+          if (!seenIncomingTopicTitles.contains(locTTitle)) {
+            final delTopicId = row['id'] as int;
+            final childLos = await db.query('learning_outcomes', columns: ['id'], where: 'topic_id = ?', whereArgs: [delTopicId]);
+            for (final loRow in childLos) {
+              final delLoId = loRow['id'] as int;
+              await db.delete('contents', where: 'lo_id = ?', whereArgs: [delLoId]);
+              await db.delete('questions', where: 'lo_id = ?', whereArgs: [delLoId]);
+            }
+            await db.delete('learning_outcomes', where: 'topic_id = ?', whereArgs: [delTopicId]);
+            await db.delete('topics', where: 'id = ?', whereArgs: [delTopicId]);
           }
         }
       }

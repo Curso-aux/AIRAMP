@@ -16,11 +16,8 @@ if exist "build\web\downloads\*.apk" del /q /f "build\web\downloads\*.apk"
 echo [3/4] Building Android Release APK...
 call flutter build apk --release
 
-echo [4/4] Hosting Android Release APK in Web Downloads...
-if exist "build\app\outputs\flutter-apk\app-release.apk" (
-    copy /y "build\app\outputs\flutter-apk\app-release.apk" "build\web\downloads\aira-latest.apk"
-    echo Hosted Android APK copied to build\web\downloads\aira-latest.apk
-)
+echo [4/4] Ensuring clean web build directory for Spark Hosting...
+if exist "build\web\downloads\*.apk" del /q /f "build\web\downloads\*.apk"
 
 cd /d "%~dp0"
 echo ============================================================

@@ -1302,30 +1302,94 @@ class SubjectDetailNotifier extends Notifier<List<Map<String, dynamic>>> {
   }
 
   // Contents
-  Future<void> addContent(int loId, Map<String, dynamic> content) async {
-    if (_subjectId == null) return;
+  Future<void> addContent(int loId, Map<String, dynamic> content, {int? subjectId}) async {
     final db = await DatabaseHelper().database;
     content['lo_id'] = loId;
     content['created_at'] = DateTime.now().toIso8601String();
     await db.insert('contents', content);
-    await loadHierarchy(_subjectId!, syncCloud: false);
-    unawaited(DatabaseHelper().pushLocalCurriculumToCloud(subjectId: _subjectId));
+
+    int? targetSubId = subjectId ?? _subjectId;
+    if (targetSubId == null) {
+      try {
+        final loRows = await db.query('learning_outcomes', where: 'id = ?', whereArgs: [loId]);
+        if (loRows.isNotEmpty) {
+          final tId = loRows.first['topic_id'] as int?;
+          if (tId != null) {
+            final tRows = await db.query('topics', where: 'id = ?', whereArgs: [tId]);
+            if (tRows.isNotEmpty) {
+              targetSubId = tRows.first['subject_id'] as int?;
+            }
+          }
+        }
+      } catch (_) {}
+    }
+
+    if (targetSubId != null) {
+      _subjectId = targetSubId;
+      await loadHierarchy(targetSubId, syncCloud: false);
+      await DatabaseHelper().pushLocalCurriculumToCloud(subjectId: targetSubId);
+    }
   }
 
-  Future<void> updateContent(int contentId, Map<String, dynamic> data) async {
-    if (_subjectId == null) return;
+  Future<void> updateContent(int contentId, Map<String, dynamic> data, {int? subjectId}) async {
     final db = await DatabaseHelper().database;
     await db.update('contents', data, where: 'id = ?', whereArgs: [contentId]);
-    await loadHierarchy(_subjectId!, syncCloud: false);
-    unawaited(DatabaseHelper().pushLocalCurriculumToCloud(subjectId: _subjectId));
+
+    int? targetSubId = subjectId ?? _subjectId;
+    if (targetSubId == null) {
+      try {
+        final cRows = await db.query('contents', where: 'id = ?', whereArgs: [contentId]);
+        if (cRows.isNotEmpty) {
+          final loId = cRows.first['lo_id'] as int?;
+          if (loId != null) {
+            final loRows = await db.query('learning_outcomes', where: 'id = ?', whereArgs: [loId]);
+            if (loRows.isNotEmpty) {
+              final tId = loRows.first['topic_id'] as int?;
+              if (tId != null) {
+                final tRows = await db.query('topics', where: 'id = ?', whereArgs: [tId]);
+                if (tRows.isNotEmpty) targetSubId = tRows.first['subject_id'] as int?;
+              }
+            }
+          }
+        }
+      } catch (_) {}
+    }
+
+    if (targetSubId != null) {
+      _subjectId = targetSubId;
+      await loadHierarchy(targetSubId, syncCloud: false);
+      await DatabaseHelper().pushLocalCurriculumToCloud(subjectId: targetSubId);
+    }
   }
 
-  Future<void> deleteContent(int contentId) async {
-    if (_subjectId == null) return;
+  Future<void> deleteContent(int contentId, {int? subjectId}) async {
     final db = await DatabaseHelper().database;
+    int? targetSubId = subjectId ?? _subjectId;
+    if (targetSubId == null) {
+      try {
+        final cRows = await db.query('contents', where: 'id = ?', whereArgs: [contentId]);
+        if (cRows.isNotEmpty) {
+          final loId = cRows.first['lo_id'] as int?;
+          if (loId != null) {
+            final loRows = await db.query('learning_outcomes', where: 'id = ?', whereArgs: [loId]);
+            if (loRows.isNotEmpty) {
+              final tId = loRows.first['topic_id'] as int?;
+              if (tId != null) {
+                final tRows = await db.query('topics', where: 'id = ?', whereArgs: [tId]);
+                if (tRows.isNotEmpty) targetSubId = tRows.first['subject_id'] as int?;
+              }
+            }
+          }
+        }
+      } catch (_) {}
+    }
+
     await db.delete('contents', where: 'id = ?', whereArgs: [contentId]);
-    await loadHierarchy(_subjectId!, syncCloud: false);
-    unawaited(DatabaseHelper().pushLocalCurriculumToCloud(subjectId: _subjectId));
+    if (targetSubId != null) {
+      _subjectId = targetSubId;
+      await loadHierarchy(targetSubId, syncCloud: false);
+      await DatabaseHelper().pushLocalCurriculumToCloud(subjectId: targetSubId);
+    }
   }
 
   // Questions

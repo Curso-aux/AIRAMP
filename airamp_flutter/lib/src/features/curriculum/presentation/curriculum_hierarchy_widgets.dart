@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:url_launcher/url_launcher.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/services/session_draft_service.dart';
 import '../../../core/components/aira_document_viewer_dialog.dart';
@@ -596,7 +597,7 @@ class ContentItemTile extends ConsumerWidget {
           ),
           TextButton(
             onPressed: () {
-              ref.read(subjectDetailProvider.notifier).deleteContent(content['id']);
+              ref.read(subjectDetailProvider.notifier).deleteContent(content['id'], subjectId: subjectId);
               Navigator.pop(context);
             },
             child: Text('Delete', style: TextStyle(color: AppTheme.error, fontWeight: FontWeight.bold)),
@@ -682,7 +683,9 @@ class ContentItemTile extends ConsumerWidget {
                   )
                 else
                   Text(
-                    type == 'YouTube' ? 'Video URL' : 'Text Lesson',
+                    type == 'Link'
+                        ? 'Resource Link'
+                        : (type == 'YouTube' ? 'Video URL' : 'Learning Material'),
                     style: TextStyle(color: AppTheme.textMuted, fontSize: 11),
                   ),
               ],
@@ -695,6 +698,19 @@ class ContentItemTile extends ConsumerWidget {
               padding: const EdgeInsets.all(4),
               tooltip: 'Open / Preview File',
               onPressed: () => openMaterialFile(context, content, fileInfo),
+            )
+          else if (rawData.trim().startsWith('http://') || rawData.trim().startsWith('https://'))
+            IconButton(
+              icon: Icon(Icons.open_in_new, color: AppTheme.primary, size: 16),
+              constraints: const BoxConstraints(),
+              padding: const EdgeInsets.all(4),
+              tooltip: 'Open Link',
+              onPressed: () async {
+                final uri = Uri.tryParse(rawData.trim());
+                if (uri != null) {
+                  await launchUrl(uri, mode: LaunchMode.externalApplication);
+                }
+              },
             ),
           if (canEdit) ...[
             IconButton(

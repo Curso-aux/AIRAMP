@@ -1228,6 +1228,7 @@ class _StudentCourseDetailScreenState
                         final isPdf = type.toUpperCase() == 'PDF' ||
                             (parsedInfo != null && parsedInfo.fileExtension.toLowerCase() == 'pdf');
                         final isWebOrVideo = type == 'YouTube' ||
+                            type == 'Link' ||
                             (c['content_data'] != null && c['content_data'].toString().trim().startsWith('http'));
 
                         // Robust fallback for PDF items stored as direct URL, raw base64, or text notes
@@ -1477,8 +1478,8 @@ class _StudentCourseDetailScreenState
                                         await launchUrl(uri, mode: LaunchMode.externalApplication);
                                       }
                                     },
-                                    icon: const Icon(Icons.play_circle_outline, size: 16),
-                                    label: Text(type == 'YouTube' ? 'Watch Video Lesson' : 'Open External Link'),
+                                    icon: Icon(type == 'YouTube' ? Icons.play_circle_outline : Icons.open_in_new, size: 16),
+                                    label: Text(type == 'YouTube' ? 'Watch Video Lesson' : 'Open Resource Link'),
                                     style: OutlinedButton.styleFrom(
                                       foregroundColor: AppTheme.primary,
                                       side: BorderSide(color: AppTheme.primary.withValues(alpha: 0.5)),

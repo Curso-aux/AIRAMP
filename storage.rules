@@ -15,6 +15,9 @@ service firebase.storage {
     match /materials/{allPaths=**} {
       allow read, write: if true;
     }
+    match /curriculum/{allPaths=**} {
+      allow read, write: if true;
+    }
 
     // User avatars and profile images
     match /avatars/{allPaths=**} {

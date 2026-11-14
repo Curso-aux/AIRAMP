@@ -81,8 +81,8 @@ class CloudStorageService {
         });
       }
 
-      final snapshot = await uploadTask;
-      final downloadUrl = await snapshot.ref.getDownloadURL();
+      final snapshot = await uploadTask.timeout(const Duration(seconds: 15));
+      final downloadUrl = await snapshot.ref.getDownloadURL().timeout(const Duration(seconds: 8));
 
       return CloudStorageUploadResult(
         success: true,
@@ -139,8 +139,8 @@ class CloudStorageService {
         });
       }
 
-      final snapshot = await uploadTask;
-      final downloadUrl = await snapshot.ref.getDownloadURL();
+      final snapshot = await uploadTask.timeout(const Duration(seconds: 15));
+      final downloadUrl = await snapshot.ref.getDownloadURL().timeout(const Duration(seconds: 8));
 
       return CloudStorageUploadResult(
         success: true,
@@ -197,8 +197,8 @@ class CloudStorageService {
         });
       }
 
-      final snapshot = await uploadTask;
-      final downloadUrl = await snapshot.ref.getDownloadURL();
+      final snapshot = await uploadTask.timeout(const Duration(seconds: 15));
+      final downloadUrl = await snapshot.ref.getDownloadURL().timeout(const Duration(seconds: 8));
 
       return CloudStorageUploadResult(
         success: true,

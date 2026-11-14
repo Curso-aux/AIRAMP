@@ -14,10 +14,13 @@ import '../../admin/data/admin_repository.dart';
 /// Icon lookup based on content type
 IconData getIconForType(String? type) {
   switch ((type ?? '').toLowerCase()) {
-    case 'youtube':
-      return Icons.play_circle_outline;
     case 'pdf':
       return Icons.picture_as_pdf_outlined;
+    case 'link':
+    case 'url':
+      return Icons.link_rounded;
+    case 'youtube':
+      return Icons.play_circle_outline;
     case 'ppt':
       return Icons.slideshow_outlined;
     case 'doc':
@@ -34,10 +37,13 @@ IconData getIconForType(String? type) {
 /// Color lookup based on content type
 Color getColorForType(String? type) {
   switch ((type ?? '').toLowerCase()) {
-    case 'youtube':
-      return const Color(0xFFEF4444);
     case 'pdf':
       return const Color(0xFFE11D48);
+    case 'link':
+    case 'url':
+      return const Color(0xFF2563EB);
+    case 'youtube':
+      return const Color(0xFFEF4444);
     case 'ppt':
       return const Color(0xFFEA580C);
     case 'doc':
@@ -76,7 +82,7 @@ List<String> allowedExtensionsFor(String type) {
     case 'video':
       return ['mp4', 'mov', 'avi', 'mkv', 'webm', 'm4v'];
     default:
-      return ['pdf', 'ppt', 'pptx', 'doc', 'docx', 'txt', 'png', 'jpg', 'mp4'];
+      return ['pdf'];
   }
 }
 
@@ -180,7 +186,7 @@ class _AddContentSheetState extends ConsumerState<AddContentSheet> {
     );
   }
 
-  String _selectedType = 'Text';
+  String _selectedType = 'PDF';
 
   // File state
   String? _pickedFileName;
@@ -189,15 +195,11 @@ class _AddContentSheetState extends ConsumerState<AddContentSheet> {
   String? _pickedFileBytes;
   bool _isDragging = false;
   bool _isProcessing = false;
+  bool _isSaving = false;
 
   final List<Map<String, dynamic>> _types = [
-    {'name': 'Text', 'icon': Icons.article_outlined},
-    {'name': 'YouTube', 'icon': Icons.play_circle_outline},
     {'name': 'PDF', 'icon': Icons.picture_as_pdf_outlined},
-    {'name': 'PPT', 'icon': Icons.slideshow_outlined},
-    {'name': 'Doc', 'icon': Icons.description_outlined},
-    {'name': 'Image', 'icon': Icons.image_outlined},
-    {'name': 'Video', 'icon': Icons.videocam_outlined},
+    {'name': 'Link', 'icon': Icons.link_rounded},
   ];
 
   @override
@@ -294,7 +296,9 @@ class _AddContentSheetState extends ConsumerState<AddContentSheet> {
     }
     _applyFileSelection(
       name: item.name,
-      size: (bytes != null && bytes.isNotEmpty) ? bytes.length : (length > 0 ? length : 0),
+      size: (bytes != null && bytes.isNotEmpty)
+          ? bytes.length
+          : (length > 0 ? length : 0),
       path: item.path,
       bytes: (bytes != null && bytes.isNotEmpty) ? base64Encode(bytes) : null,
     );
@@ -310,86 +314,105 @@ class _AddContentSheetState extends ConsumerState<AddContentSheet> {
   }
 
   Future<void> _save() async {
+    if (_isSaving) return;
     final title = _titleController.text.trim();
     if (title.isEmpty) {
       AppToast.showWarning(context, 'Please enter a content title');
       return;
     }
 
-    String contentData = '';
+    setState(() => _isSaving = true);
+    try {
+      String contentData = '';
 
-    if (isFileType(_selectedType)) {
-      if (_pickedFileName == null) {
-        AppToast.showWarning(context, 'Please select or drop a real $_selectedType file');
-        return;
-      }
+      if (isFileType(_selectedType)) {
+        if (_pickedFileName == null) {
+          AppToast.showWarning(context, 'Please select or drop a PDF file');
+          return;
+        }
 
-      String? remoteUrl;
-      if (_pickedFileBytes != null && CloudStorageService().isAvailable) {
-        try {
-          final rawBytes = base64Decode(_pickedFileBytes!);
-          final upRes = await CloudStorageService().uploadCurriculumMaterial(
-            loId: widget.loId,
-            fileName: _pickedFileName!,
-            bytes: rawBytes,
-          );
-          if (upRes.success && upRes.downloadUrl != null) {
-            remoteUrl = upRes.downloadUrl;
-          }
-        } catch (_) {}
-      }
+        String? remoteUrl;
+        if (_pickedFileBytes != null && CloudStorageService().isAvailable) {
+          try {
+            final rawBytes = base64Decode(_pickedFileBytes!);
+            final upRes = await CloudStorageService()
+                .uploadCurriculumMaterial(
+                  loId: widget.loId,
+                  fileName: _pickedFileName!,
+                  bytes: rawBytes,
+                )
+                .timeout(
+                  const Duration(seconds: 4),
+                  onTimeout: () {
+                    return const CloudStorageUploadResult(
+                      success: false,
+                      errorMessage: 'Timeout',
+                    );
+                  },
+                );
+            if (upRes.success && upRes.downloadUrl != null) {
+              remoteUrl = upRes.downloadUrl;
+            }
+          } catch (_) {}
+        }
 
-      final fileInfo = MaterialFileInfo(
-        isFile: true,
-        fileName: _pickedFileName!,
-        fileSize: _pickedFileSize,
-        fileExtension: _pickedFileName!.contains('.')
-            ? _pickedFileName!.split('.').last.toLowerCase()
-            : _selectedType.toLowerCase(),
-        filePath: remoteUrl ?? _pickedFilePath,
-        fileBytes: _pickedFileBytes,
-        description: _notesController.text.trim().isNotEmpty
-            ? _notesController.text.trim()
-            : null,
-      );
-      contentData = jsonEncode(fileInfo.toJson());
-    } else {
-      contentData = _contentController.text.trim();
-      if (contentData.isEmpty) {
-        AppToast.showWarning(
-          context,
-          _selectedType == 'YouTube'
-              ? 'Please enter a YouTube video URL'
-              : 'Please enter content text',
+        final fileInfo = MaterialFileInfo(
+          isFile: true,
+          fileName: _pickedFileName!,
+          fileSize: _pickedFileSize,
+          fileExtension: _pickedFileName!.contains('.')
+              ? _pickedFileName!.split('.').last.toLowerCase()
+              : _selectedType.toLowerCase(),
+          filePath: remoteUrl ?? _pickedFilePath,
+          fileBytes: _pickedFileBytes,
+          description: _notesController.text.trim().isNotEmpty
+              ? _notesController.text.trim()
+              : null,
         );
-        return;
+        contentData = jsonEncode(fileInfo.toJson());
+      } else {
+        var url = _contentController.text.trim();
+        if (url.isEmpty) {
+          AppToast.showWarning(context, 'Please enter a valid link (URL)');
+          return;
+        }
+        if (!url.startsWith('http://') && !url.startsWith('https://')) {
+          url = 'https://$url';
+        }
+        contentData = url;
       }
+
+      await ref.read(subjectDetailProvider.notifier).addContent(widget.loId, {
+        'title': title,
+        'content_type': _selectedType,
+        'content_data': contentData,
+      }, subjectId: widget.subjectId);
+
+      SessionDraftService.instance.clearForm(_formId);
+
+      if (!mounted) return;
+      Navigator.pop(context);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Learning material "$title" added successfully'),
+          backgroundColor: AppTheme.success,
+        ),
+      );
+    } catch (e) {
+      if (mounted) {
+        AppToast.showError(context, 'Failed to save material: $e');
+      }
+    } finally {
+      if (mounted) setState(() => _isSaving = false);
     }
-
-    ref.read(subjectDetailProvider.notifier).addContent(widget.loId, {
-      'title': title,
-      'content_type': _selectedType,
-      'content_data': contentData,
-    });
-
-    SessionDraftService.instance.clearForm(_formId);
-
-    if (!mounted) return;
-    Navigator.pop(context);
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text('Learning material "$title" added successfully'),
-        backgroundColor: AppTheme.success,
-      ),
-    );
   }
 
   @override
   Widget build(BuildContext context) {
     return _CurriculumBottomSheetContainer(
       title: 'Add Learning Material',
-      onSave: _save,
-      saveLabel: 'Save Material',
+      onSave: _isSaving ? null : _save,
+      saveLabel: _isSaving ? 'Saving...' : 'Save Material',
       children: [
         // Content Type selector
         Text(
@@ -459,7 +482,7 @@ class _AddContentSheetState extends ConsumerState<AddContentSheet> {
         // Dynamic body based on type
         if (isFileType(_selectedType)) ...[
           Text(
-            'Upload File ($_selectedType)',
+            'Upload File (PDF)',
             style: TextStyle(
               color: AppTheme.textSecondary,
               fontSize: 12,
@@ -483,24 +506,9 @@ class _AddContentSheetState extends ConsumerState<AddContentSheet> {
             hintText: 'Add supplementary instructions or objectives...',
             maxLines: 2,
           ),
-        ] else if (_selectedType == 'YouTube') ...[
-          Text(
-            'YouTube Video Link',
-            style: TextStyle(
-              color: AppTheme.textSecondary,
-              fontSize: 12,
-              fontWeight: FontWeight.w600,
-            ),
-          ),
-          const SizedBox(height: 8),
-          _buildTextField(
-            controller: _contentController,
-            hintText: 'https://www.youtube.com/watch?v=...',
-            prefixIcon: const Icon(Icons.link, size: 18),
-          ),
         ] else ...[
           Text(
-            'Text Content / Lecture Notes',
+            'Resource Link (Google Drive, YouTube, or Web Link)',
             style: TextStyle(
               color: AppTheme.textSecondary,
               fontSize: 12,
@@ -511,8 +519,23 @@ class _AddContentSheetState extends ConsumerState<AddContentSheet> {
           _buildTextField(
             controller: _contentController,
             hintText:
-                'Enter complete lesson text, definitions, or instructions...',
-            maxLines: 6,
+                'https://drive.google.com/..., https://youtube.com/..., or any link',
+            prefixIcon: const Icon(Icons.link, size: 18),
+          ),
+          const SizedBox(height: 16),
+          Text(
+            'Instructions / Notes (Optional)',
+            style: TextStyle(
+              color: AppTheme.textSecondary,
+              fontSize: 12,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+          const SizedBox(height: 8),
+          _buildTextField(
+            controller: _notesController,
+            hintText: 'Add instructions or notes about this resource...',
+            maxLines: 2,
           ),
         ],
       ],
@@ -735,22 +758,23 @@ class _EditContentSheetState extends ConsumerState<EditContentSheet> {
   String? _pickedFilePath;
   bool _isDragging = false;
   bool _isProcessing = false;
+  bool _isSaving = false;
 
   final List<Map<String, dynamic>> _types = [
-    {'name': 'Text', 'icon': Icons.article_outlined},
-    {'name': 'YouTube', 'icon': Icons.play_circle_outline},
     {'name': 'PDF', 'icon': Icons.picture_as_pdf_outlined},
-    {'name': 'PPT', 'icon': Icons.slideshow_outlined},
-    {'name': 'Doc', 'icon': Icons.description_outlined},
-    {'name': 'Image', 'icon': Icons.image_outlined},
-    {'name': 'Video', 'icon': Icons.videocam_outlined},
+    {'name': 'Link', 'icon': Icons.link_rounded},
   ];
 
   @override
   void initState() {
     super.initState();
     _titleController = TextEditingController(text: widget.contentItem['title']);
-    _selectedType = widget.contentItem['content_type'] ?? 'Text';
+    final rawType = widget.contentItem['content_type']?.toString() ?? 'PDF';
+    if (rawType.toUpperCase() == 'PDF' || isFileType(rawType)) {
+      _selectedType = 'PDF';
+    } else {
+      _selectedType = 'Link';
+    }
 
     final rawData = widget.contentItem['content_data']?.toString() ?? '';
     final fileInfo = MaterialFileInfo.tryParse(rawData);
@@ -838,80 +862,112 @@ class _EditContentSheetState extends ConsumerState<EditContentSheet> {
     }
     setState(() {
       _pickedFileName = item.name;
-      _pickedFileSize = (bytes != null && bytes.isNotEmpty) ? bytes.length : (length > 0 ? length : 0);
+      _pickedFileSize = (bytes != null && bytes.isNotEmpty)
+          ? bytes.length
+          : (length > 0 ? length : 0);
       _pickedFilePath = item.path;
-      if (bytes != null && bytes.isNotEmpty) _pickedFileBytes = base64Encode(bytes);
+      if (bytes != null && bytes.isNotEmpty)
+        _pickedFileBytes = base64Encode(bytes);
     });
   }
 
   Future<void> _save() async {
+    if (_isSaving) return;
     final title = _titleController.text.trim();
     if (title.isEmpty) {
       AppToast.showWarning(context, 'Please enter a content title');
       return;
     }
 
-    String contentData = '';
-    if (isFileType(_selectedType)) {
-      if (_pickedFileName == null) {
-        AppToast.showWarning(context, 'Please select or drop a $_selectedType file');
-        return;
+    setState(() => _isSaving = true);
+    try {
+      String contentData = '';
+      if (isFileType(_selectedType)) {
+        if (_pickedFileName == null) {
+          AppToast.showWarning(context, 'Please select or drop a PDF file');
+          return;
+        }
+
+        String? remoteUrl;
+        if (_pickedFileBytes != null && CloudStorageService().isAvailable) {
+          try {
+            final loId = widget.contentItem['lo_id'] as int? ?? 0;
+            final rawBytes = base64Decode(_pickedFileBytes!);
+            final upRes = await CloudStorageService()
+                .uploadCurriculumMaterial(
+                  loId: loId,
+                  fileName: _pickedFileName!,
+                  bytes: rawBytes,
+                )
+                .timeout(
+                  const Duration(seconds: 4),
+                  onTimeout: () {
+                    return const CloudStorageUploadResult(
+                      success: false,
+                      errorMessage: 'Timeout',
+                    );
+                  },
+                );
+            if (upRes.success && upRes.downloadUrl != null) {
+              remoteUrl = upRes.downloadUrl;
+            }
+          } catch (_) {}
+        }
+
+        final fileInfo = MaterialFileInfo(
+          isFile: true,
+          fileName: _pickedFileName!,
+          fileSize: _pickedFileSize,
+          fileExtension: _pickedFileName!.contains('.')
+              ? _pickedFileName!.split('.').last.toLowerCase()
+              : _selectedType.toLowerCase(),
+          filePath: remoteUrl ?? _pickedFilePath,
+          fileBytes: _pickedFileBytes,
+          description: _notesController.text.trim().isNotEmpty
+              ? _notesController.text.trim()
+              : null,
+        );
+        contentData = jsonEncode(fileInfo.toJson());
+      } else {
+        var url = _contentController.text.trim();
+        if (url.isEmpty) {
+          AppToast.showWarning(context, 'Please enter a valid link (URL)');
+          return;
+        }
+        if (!url.startsWith('http://') && !url.startsWith('https://')) {
+          url = 'https://$url';
+        }
+        contentData = url;
       }
 
-      String? remoteUrl;
-      if (_pickedFileBytes != null && CloudStorageService().isAvailable) {
-        try {
-          final loId = widget.contentItem['lo_id'] as int? ?? 0;
-          final rawBytes = base64Decode(_pickedFileBytes!);
-          final upRes = await CloudStorageService().uploadCurriculumMaterial(
-            loId: loId,
-            fileName: _pickedFileName!,
-            bytes: rawBytes,
-          );
-          if (upRes.success && upRes.downloadUrl != null) {
-            remoteUrl = upRes.downloadUrl;
-          }
-        } catch (_) {}
-      }
-
-      final fileInfo = MaterialFileInfo(
-        isFile: true,
-        fileName: _pickedFileName!,
-        fileSize: _pickedFileSize,
-        fileExtension: _pickedFileName!.contains('.')
-            ? _pickedFileName!.split('.').last.toLowerCase()
-            : _selectedType.toLowerCase(),
-        filePath: remoteUrl ?? _pickedFilePath,
-        fileBytes: _pickedFileBytes,
-        description: _notesController.text.trim().isNotEmpty
-            ? _notesController.text.trim()
-            : null,
+      await ref.read(subjectDetailProvider.notifier).updateContent(
+        widget.contentItem['id'],
+        {
+          'title': title,
+          'content_type': _selectedType,
+          'content_data': contentData,
+        },
+        subjectId: widget.subjectId,
       );
-      contentData = jsonEncode(fileInfo.toJson());
-    } else {
-      contentData = _contentController.text.trim();
+
+      if (!mounted) return;
+      Navigator.pop(context);
+      AppToast.showSuccess(context, 'Updated "$title" successfully');
+    } catch (e) {
+      if (mounted) {
+        AppToast.showError(context, 'Failed to update material: $e');
+      }
+    } finally {
+      if (mounted) setState(() => _isSaving = false);
     }
-
-    ref.read(subjectDetailProvider.notifier).updateContent(
-      widget.contentItem['id'],
-      {
-        'title': title,
-        'content_type': _selectedType,
-        'content_data': contentData,
-      },
-    );
-
-    if (!mounted) return;
-    Navigator.pop(context);
-    AppToast.showSuccess(context, 'Updated "$title" successfully');
   }
 
   @override
   Widget build(BuildContext context) {
     return _CurriculumBottomSheetContainer(
       title: 'Edit Learning Material',
-      onSave: _save,
-      saveLabel: 'Update Material',
+      onSave: _isSaving ? null : _save,
+      saveLabel: _isSaving ? 'Updating...' : 'Update Material',
       children: [
         Text(
           'Content Type',
@@ -979,7 +1035,7 @@ class _EditContentSheetState extends ConsumerState<EditContentSheet> {
 
         if (isFileType(_selectedType)) ...[
           Text(
-            'Uploaded File ($_selectedType)',
+            'Uploaded File (PDF)',
             style: TextStyle(
               color: AppTheme.textSecondary,
               fontSize: 12,
@@ -1003,24 +1059,9 @@ class _EditContentSheetState extends ConsumerState<EditContentSheet> {
             hintText: 'Add supplementary instructions or notes...',
             maxLines: 2,
           ),
-        ] else if (_selectedType == 'YouTube') ...[
-          Text(
-            'YouTube Video Link',
-            style: TextStyle(
-              color: AppTheme.textSecondary,
-              fontSize: 12,
-              fontWeight: FontWeight.w600,
-            ),
-          ),
-          const SizedBox(height: 8),
-          _buildTextField(
-            controller: _contentController,
-            hintText: 'https://www.youtube.com/watch?v=...',
-            prefixIcon: const Icon(Icons.link, size: 18),
-          ),
         ] else ...[
           Text(
-            'Text Content / Lecture Notes',
+            'Resource Link (Google Drive, YouTube, or Web Link)',
             style: TextStyle(
               color: AppTheme.textSecondary,
               fontSize: 12,
@@ -1030,8 +1071,24 @@ class _EditContentSheetState extends ConsumerState<EditContentSheet> {
           const SizedBox(height: 8),
           _buildTextField(
             controller: _contentController,
-            hintText: 'Enter text content...',
-            maxLines: 6,
+            hintText:
+                'https://drive.google.com/..., https://youtube.com/..., or any link',
+            prefixIcon: const Icon(Icons.link, size: 18),
+          ),
+          const SizedBox(height: 16),
+          Text(
+            'Instructions / Notes (Optional)',
+            style: TextStyle(
+              color: AppTheme.textSecondary,
+              fontSize: 12,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+          const SizedBox(height: 8),
+          _buildTextField(
+            controller: _notesController,
+            hintText: 'Add supplementary instructions or notes...',
+            maxLines: 2,
           ),
         ],
       ],
@@ -1170,8 +1227,10 @@ Widget _buildTextField({
       maxLength ??
       ((hintText.toLowerCase().contains('url') ||
               hintText.toLowerCase().contains('youtube') ||
+              hintText.toLowerCase().contains('drive') ||
+              hintText.toLowerCase().contains('link') ||
               hintText.toLowerCase().contains('http'))
-          ? 250
+          ? 2000
           : (maxLines > 1 ? 2000 : 80));
   return TextField(
     controller: controller,
@@ -1208,13 +1267,13 @@ Widget _buildTextField({
 
 class _CurriculumBottomSheetContainer extends StatelessWidget {
   final String title;
-  final VoidCallback onSave;
+  final VoidCallback? onSave;
   final String saveLabel;
   final List<Widget> children;
 
   const _CurriculumBottomSheetContainer({
     required this.title,
-    required this.onSave,
+    this.onSave,
     this.saveLabel = 'Save',
     required this.children,
   });

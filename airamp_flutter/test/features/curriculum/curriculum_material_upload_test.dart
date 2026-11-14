@@ -222,41 +222,18 @@ void main() {
       // Modal title
       expect(find.text('Add Learning Material'), findsOneWidget);
 
-      // Initial type is Text
-      expect(find.text('Text Content / Lecture Notes'), findsOneWidget);
-
-      // Tap PDF ChoiceChip
-      await tester.tap(find.text('PDF'));
-      await tester.pumpAndSettle();
-
-      // Drop & Browse file zone must appear for PDF
+      // Initial type is PDF
       expect(find.text('Upload File (PDF)'), findsOneWidget);
       expect(find.text('Drop your PDF file here'), findsOneWidget);
       expect(find.text('Browse File'), findsOneWidget);
       expect(find.text('Instructions / Notes (Optional)'), findsOneWidget);
 
-      // Tap PPT ChoiceChip
-      await tester.ensureVisible(find.text('PPT'));
-      await tester.tap(find.text('PPT'));
+      // Tap Link ChoiceChip
+      await tester.ensureVisible(find.text('Link'));
+      await tester.tap(find.text('Link'));
       await tester.pumpAndSettle();
 
-      expect(find.text('Upload File (PPT)'), findsOneWidget);
-      expect(find.text('Drop your PPT file here'), findsOneWidget);
-
-      // Tap Video ChoiceChip
-      await tester.ensureVisible(find.text('Video'));
-      await tester.tap(find.text('Video'));
-      await tester.pumpAndSettle();
-
-      expect(find.text('Upload File (Video)'), findsOneWidget);
-      expect(find.text('Drop your Video file here'), findsOneWidget);
-
-      // Tap YouTube ChoiceChip
-      await tester.ensureVisible(find.text('YouTube'));
-      await tester.tap(find.text('YouTube'));
-      await tester.pumpAndSettle();
-
-      expect(find.text('YouTube Video Link'), findsOneWidget);
+      expect(find.text('Resource Link (Google Drive, YouTube, or Web Link)'), findsOneWidget);
     });
   });
 
