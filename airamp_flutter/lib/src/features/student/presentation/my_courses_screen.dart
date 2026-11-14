@@ -2,8 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
-import '../../../core/components/app_toast.dart';
-import '../../../core/components/aira_qr_scanner_dialog.dart';
+import '../../../core/components/components.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/theme/theme_provider.dart';
 import '../../auth/application/auth_provider.dart';
@@ -49,6 +48,67 @@ class _MyCoursesScreenState extends ConsumerState<MyCoursesScreen> {
     super.dispose();
   }
 
+  Future<void> _handleSectionKeyVerification(String rawKey) async {
+    final key = rawKey.trim().toUpperCase();
+    if (key.isEmpty) {
+      AppToast.showWarning(
+        context,
+        'Please enter or scan a Section Key to continue.',
+      );
+      return;
+    }
+
+    setState(() => _isVerifying = true);
+    Map<String, dynamic>? verified;
+    String? verifyError;
+
+    try {
+      await AiraProgressDialog.showVerifying(
+        context,
+        title: 'Verifying Section',
+        initialMessage: 'Checking section key "$key"...',
+        task: (updateProgress) async {
+          updateProgress(0.3, 'Connecting to school registry...');
+          await Future.delayed(const Duration(milliseconds: 260));
+
+          updateProgress(0.7, 'Validating classroom authority...');
+          try {
+            verified = await ref.read(studentCoursesProvider.notifier).verifyKey(key);
+          } catch (e) {
+            verifyError = e.toString().replaceFirst("Exception: ", "");
+          }
+
+          if (verified != null) {
+            updateProgress(1.0, 'Section found! Loading curriculum preview...');
+            await Future.delayed(const Duration(milliseconds: 220));
+          } else {
+            updateProgress(1.0, 'Invalid key or section not found.');
+          }
+        },
+      );
+
+      if (verified != null) {
+        _showVerificationPreviewSheet(verified!, key);
+      } else if (mounted) {
+        AppToast.showWarning(
+          context,
+          verifyError ?? 'Invalid Key "$key". Please check with your school administrator.',
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        AppToast.showError(
+          context,
+          'Error verifying key: ${e.toString().replaceFirst("Exception: ", "")}',
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _isVerifying = false);
+      }
+    }
+  }
+
   void _showEnterKeyDialog({String? initialKey}) {
     final controller = TextEditingController(text: initialKey ?? '');
     bool isVerifyingModal = false;
@@ -62,29 +122,58 @@ class _MyCoursesScreenState extends ConsumerState<MyCoursesScreen> {
           final surface = Theme.of(context).colorScheme.surface;
           final onSurface = Theme.of(context).colorScheme.onSurface;
           final keyText = controller.text.trim();
-          final canSubmit = keyText.isNotEmpty && !isVerifyingModal;
 
           Future<void> submitKey() async {
             final key = controller.text.trim();
-            if (key.isEmpty || isVerifyingModal) return;
+            if (key.isEmpty) {
+              AppToast.showWarning(
+                context,
+                'Please enter or scan a Section Key to continue.',
+              );
+              return;
+            }
+            if (isVerifyingModal) return;
 
             setDialogState(() => isVerifyingModal = true);
-            try {
-              final verified = await ref.read(studentCoursesProvider.notifier).verifyKey(key);
+            Map<String, dynamic>? verified;
+            String? verifyError;
 
+            try {
               if (dialogCtx.mounted) {
                 Navigator.pop(dialogCtx);
               }
 
+              await AiraProgressDialog.showVerifying(
+                context,
+                title: 'Verifying Section',
+                initialMessage: 'Checking section key "$key"...',
+                task: (updateProgress) async {
+                  updateProgress(0.3, 'Connecting to school registry...');
+                  await Future.delayed(const Duration(milliseconds: 260));
+
+                  updateProgress(0.7, 'Validating classroom authority...');
+                  try {
+                    verified = await ref.read(studentCoursesProvider.notifier).verifyKey(key);
+                  } catch (e) {
+                    verifyError = e.toString().replaceFirst("Exception: ", "");
+                  }
+
+                  if (verified != null) {
+                    updateProgress(1.0, 'Section found! Loading curriculum preview...');
+                    await Future.delayed(const Duration(milliseconds: 220));
+                  } else {
+                    updateProgress(1.0, 'Invalid key or section not found.');
+                  }
+                },
+              );
+
               if (verified != null) {
-                _showVerificationPreviewSheet(verified, key);
-              } else {
-                if (mounted) {
-                  AppToast.showWarning(
-                    context,
-                    'Invalid Section Key "$key". Please check with your administrator.',
-                  );
-                }
+                _showVerificationPreviewSheet(verified!, key);
+              } else if (mounted) {
+                AppToast.showWarning(
+                  context,
+                  verifyError ?? 'Invalid Section Key "$key". Please check with your school administrator.',
+                );
               }
             } catch (e) {
               if (mounted) {
@@ -94,7 +183,7 @@ class _MyCoursesScreenState extends ConsumerState<MyCoursesScreen> {
                 );
               }
             } finally {
-              if (dialogCtx.mounted) {
+              if (mounted) {
                 setDialogState(() => isVerifyingModal = false);
               }
             }
@@ -414,7 +503,7 @@ class _MyCoursesScreenState extends ConsumerState<MyCoursesScreen> {
                               Expanded(
                                 flex: 2,
                                 child: ElevatedButton(
-                                  onPressed: canSubmit ? submitKey : null,
+                                  onPressed: isVerifyingModal ? null : submitKey,
                                   style: ElevatedButton.styleFrom(
                                     backgroundColor: primary,
                                     foregroundColor: Colors.white,
@@ -742,26 +831,49 @@ class _MyCoursesScreenState extends ConsumerState<MyCoursesScreen> {
                       child: ElevatedButton.icon(
                         onPressed: () async {
                           Navigator.pop(sheetCtx);
-                          try {
-                            final success = await ref.read(studentCoursesProvider.notifier).enrollBySectionKey(key);
-                            if (success && mounted) {
-                              AppToast.showSuccess(
-                                context,
-                                'Enrolled in $sectionName successfully! All ${subjects.length} subjects loaded.',
-                              );
-                            } else if (mounted) {
-                              AppToast.showError(
-                                context,
-                                'Enrollment failed. Please try again.',
-                              );
-                            }
-                          } catch (e) {
-                            if (mounted) {
-                              AppToast.showError(
-                                context,
-                                'Enrollment error: ${e.toString().replaceFirst("Exception: ", "")}',
-                              );
-                            }
+
+                          bool success = false;
+                          String? enrollError;
+
+                          await AiraProgressDialog.showEnrolling(
+                            context,
+                            title: 'Joining Classroom',
+                            initialMessage: 'Enrolling into $sectionName...',
+                            task: (updateProgress) async {
+                              updateProgress(0.18, 'Validating section authority & room assignment...');
+                              await Future.delayed(const Duration(milliseconds: 320));
+
+                              updateProgress(0.50, 'Registering student seat in $sectionName...');
+                              try {
+                                success = await ref
+                                    .read(studentCoursesProvider.notifier)
+                                    .enrollBySectionKey(key);
+                              } catch (e) {
+                                enrollError = e.toString().replaceFirst("Exception: ", "");
+                              }
+
+                              if (success) {
+                                updateProgress(0.85, 'Syncing ${subjects.length} curriculum subjects & syllabus...');
+                                await Future.delayed(const Duration(milliseconds: 380));
+                                updateProgress(1.0, 'Classroom ready! Welcome to $sectionName!');
+                                await Future.delayed(const Duration(milliseconds: 280));
+                              } else {
+                                updateProgress(1.0, enrollError ?? 'Enrollment failed.');
+                              }
+                            },
+                          );
+
+                          if (success && mounted) {
+                            AiraActionToast.showSuccess(
+                              context,
+                              title: 'Classroom Enrolled!',
+                              message: 'Welcome to $sectionName ($grade)! All ${subjects.length} subjects loaded.',
+                            );
+                          } else if (mounted) {
+                            AppToast.showError(
+                              context,
+                              enrollError ?? 'Enrollment failed. Please try again.',
+                            );
                           }
                         },
                         icon: const Icon(Icons.check, size: 18),
@@ -1570,31 +1682,9 @@ class _MyCoursesScreenState extends ConsumerState<MyCoursesScreen> {
                       onPressed: () {
                         AiraQrScannerDialog.show(
                           context: context,
-                          onKeyScanned: (scannedKey) async {
+                          onKeyScanned: (scannedKey) {
                             _keyController.text = scannedKey;
-                            setState(() => _isVerifying = true);
-                            try {
-                              final verified = await ref.read(studentCoursesProvider.notifier).verifyKey(scannedKey);
-                              if (verified != null) {
-                                _showVerificationPreviewSheet(verified, scannedKey);
-                              } else if (mounted) {
-                                AppToast.showWarning(
-                                  context,
-                                  'Invalid Key "$scannedKey". Please check with your school administrator.',
-                                );
-                              }
-                            } catch (e) {
-                              if (mounted) {
-                                AppToast.showError(
-                                  context,
-                                  'Error verifying key: ${e.toString().replaceFirst("Exception: ", "")}',
-                                );
-                              }
-                            } finally {
-                              if (mounted) {
-                                setState(() => _isVerifying = false);
-                              }
-                            }
+                            _handleSectionKeyVerification(scannedKey);
                           },
                         );
                       },
@@ -1624,31 +1714,9 @@ class _MyCoursesScreenState extends ConsumerState<MyCoursesScreen> {
                     : () {
                         AiraQrScannerDialog.show(
                           context: context,
-                          onKeyScanned: (scannedKey) async {
+                          onKeyScanned: (scannedKey) {
                             _keyController.text = scannedKey;
-                            setState(() => _isVerifying = true);
-                            try {
-                              final verified = await ref.read(studentCoursesProvider.notifier).verifyKey(scannedKey);
-                              if (verified != null) {
-                                _showVerificationPreviewSheet(verified, scannedKey);
-                              } else if (mounted) {
-                                AppToast.showWarning(
-                                  context,
-                                  'Invalid Key "$scannedKey". Please check with your school administrator.',
-                                );
-                              }
-                            } catch (e) {
-                              if (mounted) {
-                                AppToast.showError(
-                                  context,
-                                  'Error verifying key: ${e.toString().replaceFirst("Exception: ", "")}',
-                                );
-                              }
-                            } finally {
-                              if (mounted) {
-                                setState(() => _isVerifying = false);
-                              }
-                            }
+                            _handleSectionKeyVerification(scannedKey);
                           },
                         );
                       },
@@ -1665,37 +1733,7 @@ class _MyCoursesScreenState extends ConsumerState<MyCoursesScreen> {
               ElevatedButton(
                 onPressed: _isVerifying
                     ? null
-                    : () async {
-                        final key = _keyController.text.trim();
-                        if (key.isEmpty) return;
-
-                        setState(() => _isVerifying = true);
-                        try {
-                          final verified = await ref.read(studentCoursesProvider.notifier).verifyKey(key);
-
-                          if (verified != null) {
-                            _showVerificationPreviewSheet(verified, key);
-                          } else {
-                            if (mounted) {
-                              AppToast.showWarning(
-                                context,
-                                'Invalid Key "$key". Please check with your school administrator.',
-                              );
-                            }
-                          }
-                        } catch (e) {
-                          if (mounted) {
-                            AppToast.showError(
-                              context,
-                              'Error verifying key: ${e.toString().replaceFirst("Exception: ", "")}',
-                            );
-                          }
-                        } finally {
-                          if (mounted) {
-                            setState(() => _isVerifying = false);
-                          }
-                        }
-                      },
+                    : () => _handleSectionKeyVerification(_keyController.text),
                 style: ElevatedButton.styleFrom(
                   backgroundColor: primary,
                   foregroundColor: Colors.white,

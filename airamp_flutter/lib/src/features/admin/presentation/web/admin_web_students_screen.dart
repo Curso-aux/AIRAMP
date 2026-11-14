@@ -276,18 +276,10 @@ class _AdminWebStudentsScreenState extends ConsumerState<AdminWebStudentsScreen>
     final csvString = ref.read(adminStudentsProvider.notifier).exportStudentsCsv(studentsToExport: students);
     downloadCsvFile(csvString, fileName);
     if (!mounted || !context.mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Row(
-          children: [
-            const Icon(Icons.download_done, color: Colors.white, size: 18),
-            const SizedBox(width: 8),
-            Text('Exported ${students.length} student records to $fileName'),
-          ],
-        ),
-        backgroundColor: AppTheme.primary,
-        duration: const Duration(seconds: 3),
-      ),
+    AiraActionToast.showSuccess(
+      context,
+      title: 'Export Complete',
+      message: 'Exported ${students.length} student records to $fileName',
     );
   }
 

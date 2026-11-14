@@ -230,12 +230,11 @@ class _AddContentSheetState extends ConsumerState<AddContentSheet> {
         Uint8List? bytes;
         try {
           bytes = await file.readAsBytes();
-        } catch (_) {
-          if (!kIsWeb && file.path != null) {
-            try {
-              bytes = await File(file.path!).readAsBytes();
-            } catch (_) {}
-          }
+        } catch (_) {}
+        if ((bytes == null || bytes.isEmpty) && !kIsWeb && file.path != null) {
+          try {
+            bytes = await File(file.path!).readAsBytes();
+          } catch (_) {}
         }
         _applyFileSelection(
           name: file.name,
@@ -796,12 +795,11 @@ class _EditContentSheetState extends ConsumerState<EditContentSheet> {
         Uint8List? bytes;
         try {
           bytes = await file.readAsBytes();
-        } catch (_) {
-          if (!kIsWeb && file.path != null) {
-            try {
-              bytes = await File(file.path!).readAsBytes();
-            } catch (_) {}
-          }
+        } catch (_) {}
+        if ((bytes == null || bytes.isEmpty) && !kIsWeb && file.path != null) {
+          try {
+            bytes = await File(file.path!).readAsBytes();
+          } catch (_) {}
         }
         setState(() {
           _pickedFileName = file.name;

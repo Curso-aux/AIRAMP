@@ -6,4 +6,6 @@ export 'app_toast.dart';
 export 'app_logo.dart';
 export 'aira_action_toast.dart';
 export 'aira_qr_scanner_dialog.dart';
+export 'aira_progress_dialog.dart';
+export 'aira_document_viewer_dialog.dart';
 

@@ -1,18 +1,9 @@
-import 'dart:convert';
-import 'dart:io';
-import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:url_launcher/url_launcher.dart';
-import 'package:path_provider/path_provider.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/services/session_draft_service.dart';
-import '../../../core/services/cloud_storage_service.dart';
-import '../../../core/components/app_toast.dart';
-import '../../../core/database/database_helper.dart';
-import '../../../core/utils/file_download_helper.dart';
+import '../../../core/components/aira_document_viewer_dialog.dart';
 import '../../admin/data/admin_repository.dart';
-import 'package:dio/dio.dart';
 import 'curriculum_content_sheet.dart';
 
 // ─────────────────────────────────────────────────────────────
@@ -742,226 +733,18 @@ class ContentItemTile extends ConsumerWidget {
     MaterialFileInfo fileInfo, {
     bool isDownload = false,
   }) async {
-    try {
-      final cleanName = fileInfo.fileName.replaceAll(RegExp(r'[^a-zA-Z0-9._\-]'), '_');
-      final ext = fileInfo.fileExtension.toLowerCase();
-      final isPdf = ext == 'pdf' || (content['content_type']?.toString().toUpperCase() == 'PDF');
-      final mimeType = isPdf ? 'application/pdf' : 'application/octet-stream';
-
-      // 1. Check if filePath or content_data is a remote URL (HTTP/HTTPS)
-      final rawPath = (fileInfo.filePath ?? '').trim();
-      final rawData = (content['content_data']?.toString() ?? '').trim();
-      final potentialUrl = rawPath.startsWith('http://') || rawPath.startsWith('https://')
-          ? rawPath
-          : (rawData.startsWith('http://') || rawData.startsWith('https://') ? rawData : null);
-
-      if (potentialUrl != null) {
-        if (kIsWeb) {
-          if (isDownload) {
-            triggerWebUrlDownload(potentialUrl, cleanName);
-            AppToast.showSuccess(context, 'Downloading "$cleanName"...');
-          } else {
-            final uri = Uri.tryParse(potentialUrl);
-            if (uri != null) {
-              await launchUrl(uri, mode: LaunchMode.externalApplication);
-            }
-          }
-          return;
-        }
-
-        // On Native (Android / Desktop): Download using Dio
-        AppToast.showInfo(context, isDownload ? 'Downloading "$cleanName"...' : 'Loading "$cleanName"...');
-        try {
-          final docDir = await getApplicationDocumentsDirectory();
-          final localFile = File('${docDir.path}/$cleanName');
-          await Dio().download(potentialUrl, localFile.path);
-
-          // Cache in SQLite so subsequent opens are instant
-          final updatedInfo = MaterialFileInfo(
-            isFile: true,
-            fileName: fileInfo.fileName,
-            fileSize: localFile.lengthSync(),
-            fileExtension: fileInfo.fileExtension,
-            filePath: localFile.path,
-            fileBytes: fileInfo.fileBytes,
-            description: fileInfo.description,
-          );
-          try {
-            final db = await DatabaseHelper().database;
-            await db.update(
-              'contents',
-              {'content_data': jsonEncode(updatedInfo.toJson())},
-              where: 'id = ?',
-              whereArgs: [content['id']],
-            );
-          } catch (_) {}
-
-          if (!context.mounted) return;
-          if (isDownload) {
-            AppToast.showSuccess(context, 'Saved "$cleanName" to documents');
-          } else {
-            await _launchNativeFile(localFile.path);
-            if (!context.mounted) return;
-            AppToast.showSuccess(context, 'Opened "$cleanName"');
-          }
-          return;
-        } catch (e) {
-          debugPrint('Dio download error: $e');
-        }
-      }
-
-      // 2. If base64 bytes are present, view or download
-      if (fileInfo.fileBytes != null && fileInfo.fileBytes!.trim().isNotEmpty) {
-        final rawBytes = base64Decode(fileInfo.fileBytes!.trim());
-        if (kIsWeb) {
-          if (isDownload) {
-            downloadBinaryFileWeb(rawBytes, cleanName, mimeType);
-            AppToast.showSuccess(context, 'Downloading "$cleanName"...');
-          } else if (isPdf) {
-            openPdfBlobInNewTabWeb(rawBytes, cleanName);
-            AppToast.showSuccess(context, 'Opened "$cleanName" in viewer tab');
-          } else {
-            downloadBinaryFileWeb(rawBytes, cleanName, mimeType);
-          }
-          return;
-        }
-
-        // Native Desktop & Mobile Platforms
-        final saveDir = isDownload ? await getApplicationDocumentsDirectory() : await getTemporaryDirectory();
-        final targetPath = '${saveDir.path}/$cleanName';
-        final tempFile = File(targetPath);
-        await tempFile.writeAsBytes(rawBytes);
-
-        if (!context.mounted) return;
-        if (isDownload) {
-          AppToast.showSuccess(context, 'Saved "$cleanName" to device documents');
-        } else {
-          await _launchNativeFile(targetPath);
-          if (!context.mounted) return;
-          AppToast.showSuccess(context, 'Opened "$cleanName"');
-        }
-        return;
-      }
-
-      // 3. If file path exists locally on this machine
-      if (!kIsWeb && fileInfo.filePath != null) {
-        final localFile = File(fileInfo.filePath!);
-        if (localFile.existsSync()) {
-          if (isDownload) {
-            final docDir = await getApplicationDocumentsDirectory();
-            final dest = File('${docDir.path}/$cleanName');
-            await localFile.copy(dest.path);
-            if (!context.mounted) return;
-            AppToast.showSuccess(context, 'Saved "$cleanName" to documents');
-          } else {
-            await _launchNativeFile(fileInfo.filePath!);
-            if (!context.mounted) return;
-            AppToast.showSuccess(context, 'Opened "$cleanName"');
-          }
-          return;
-        }
-      }
-
-      // 4. File bytes missing: Attempt on-demand download from Cloud Storage!
-      if (CloudStorageService().isAvailable) {
-        AppToast.showInfo(context, 'Downloading "${fileInfo.fileName}" from cloud...');
-        final downloadedBytes = await CloudStorageService().downloadCurriculumMaterial(
-          fileName: fileInfo.fileName,
-          loId: content['lo_id'] as int?,
-        );
-        if (downloadedBytes != null && downloadedBytes.isNotEmpty) {
-          // Cache to SQLite
-          final updatedInfo = MaterialFileInfo(
-            isFile: true,
-            fileName: fileInfo.fileName,
-            fileSize: downloadedBytes.length,
-            fileExtension: fileInfo.fileExtension,
-            fileBytes: base64Encode(downloadedBytes),
-            description: fileInfo.description,
-          );
-          try {
-            final db = await DatabaseHelper().database;
-            await db.update(
-              'contents',
-              {'content_data': jsonEncode(updatedInfo.toJson())},
-              where: 'id = ?',
-              whereArgs: [content['id']],
-            );
-          } catch (_) {}
-
-          if (kIsWeb) {
-            if (isDownload || !isPdf) {
-              downloadBinaryFileWeb(downloadedBytes, cleanName, mimeType);
-            } else {
-              openPdfBlobInNewTabWeb(downloadedBytes, cleanName);
-            }
-            if (!context.mounted) return;
-            AppToast.showSuccess(context, isDownload ? 'Downloading "$cleanName"...' : 'Opened "$cleanName"');
-            return;
-          }
-
-          final saveDir = isDownload ? await getApplicationDocumentsDirectory() : await getTemporaryDirectory();
-          final targetPath = '${saveDir.path}/$cleanName';
-          final savedFile = File(targetPath);
-          await savedFile.writeAsBytes(downloadedBytes);
-
-          if (!context.mounted) return;
-          if (isDownload) {
-            AppToast.showSuccess(context, 'Saved "$cleanName" to documents');
-          } else {
-            await _launchNativeFile(targetPath);
-            if (!context.mounted) return;
-            AppToast.showSuccess(context, 'Opened "$cleanName"');
-          }
-          return;
-        }
-      }
-
-      if (!context.mounted) return;
-      // 5. File data not yet uploaded to cloud
-      AppToast.showWarning(
-        context,
-        'File "${fileInfo.fileName}" is not yet uploaded to the cloud. Pull down to refresh.',
-        actionLabel: 'Refresh',
-        onAction: () async {
-          try {
-            await DatabaseHelper().syncCloudCurriculumToLocal(force: true);
-            if (context.mounted) {
-              AppToast.showSuccess(context, 'Curriculum synced! Try opening again.');
-            }
-          } catch (_) {}
-        },
+    if (isDownload) {
+      await downloadMaterialFileHelper(
+        context: context,
+        content: content,
+        fileInfo: fileInfo,
       );
-    } catch (e) {
-      if (context.mounted) {
-        AppToast.showError(context, 'Could not open file: $e');
-      }
-    }
-  }
-
-  static Future<void> _launchNativeFile(String filePath) async {
-    if (!kIsWeb && Platform.isWindows) {
-      try {
-        final res = await Process.run('cmd', ['/c', 'start', '""', filePath]);
-        if (res.exitCode == 0) return;
-      } catch (_) {}
-    } else if (!kIsWeb && Platform.isMacOS) {
-      try {
-        final res = await Process.run('open', [filePath]);
-        if (res.exitCode == 0) return;
-      } catch (_) {}
-    } else if (!kIsWeb && Platform.isLinux) {
-      try {
-        final res = await Process.run('xdg-open', [filePath]);
-        if (res.exitCode == 0) return;
-      } catch (_) {}
-    }
-
-    final uri = Uri.file(filePath);
-    if (await canLaunchUrl(uri)) {
-      await launchUrl(uri, mode: LaunchMode.externalApplication);
     } else {
-      await launchUrl(uri);
+      await AiraDocumentViewerDialog.show(
+        context,
+        content: content,
+        fileInfo: fileInfo,
+      );
     }
   }
 }

@@ -6494,6 +6494,32 @@ class DatabaseHelper {
       }).toList();
     }
 
+    // Batch query completed learning objectives for candidate students
+    final candidateIds = students.map((s) => s['id'] as String).toList();
+    final completedLosMap = <String, int>{};
+    if (candidateIds.isNotEmpty && subjectIds.isNotEmpty) {
+      try {
+        final progressRows = await db.rawQuery(
+          '''
+          SELECT student_id, COUNT(*) as cnt 
+          FROM student_progress 
+          WHERE is_completed = 1 
+            AND student_id IN (${candidateIds.map((_) => '?').join(',')}) 
+            AND subject_id IN (${subjectIds.map((_) => '?').join(',')})
+          GROUP BY student_id
+          ''',
+          [...candidateIds, ...subjectIds],
+        );
+        for (final row in progressRows) {
+          final sId = row['student_id'] as String? ?? '';
+          final cnt = (row['cnt'] as num?)?.toInt() ?? 0;
+          if (sId.isNotEmpty) {
+            completedLosMap[sId] = cnt;
+          }
+        }
+      } catch (_) {}
+    }
+
     final list = <Map<String, dynamic>>[];
     for (final s in students) {
       final sid = s['id'] as String;
@@ -6510,20 +6536,7 @@ class DatabaseHelper {
         }
       }
 
-      // Progress for this student in teacher's subjects
-      int completedLos = 0;
-      if (subjectIds.isNotEmpty) {
-        final progress = await db.rawQuery(
-          '''
-          SELECT * FROM student_progress 
-          WHERE student_id = ? AND subject_id IN (${subjectIds.map((_) => '?').join(',')})
-        ''',
-          [sid, ...subjectIds],
-        );
-        completedLos = progress
-            .where((p) => (p['is_completed'] as int?) == 1)
-            .length;
-      }
+      final completedLos = completedLosMap[sid] ?? 0;
 
       final studentSubjectEnrollments = enrollments
           .where((e) => e['student_id'] == sid)
@@ -6551,7 +6564,13 @@ class DatabaseHelper {
     String teacherId,
   ) async {
     final db = await database;
-    final handledSectionNames = await getSectionsForTeacher(teacherId);
+    var handledSectionNames = await getSectionsForTeacher(teacherId);
+    if (handledSectionNames.isEmpty) {
+      final available = await getAvailableSectionsList();
+      if (available.isNotEmpty) {
+        handledSectionNames = available;
+      }
+    }
     final subjects = await getSubjectsForTeacher(teacherId);
     final subjectIds = subjects.map((s) => s['id'] as int).toList();
 
@@ -6632,11 +6651,21 @@ class DatabaseHelper {
           .where((n) => n.isNotEmpty)
           .toList();
 
+      String enrollmentKey =
+          meta?['enrollment_key']?.toString().trim().toUpperCase() ?? '';
+      if (enrollmentKey.isEmpty) {
+        enrollmentKey = SectionKeyHelper.generateKey(
+          sectionName: secName,
+          gradeLevel: grade,
+        );
+      }
+
       details.add({
         'name': secName,
         'grade': grade,
         'room': room,
         'description': description,
+        'enrollment_key': enrollmentKey,
         'student_count': totalStudents > 0 ? totalStudents : enrolledCount,
         'enrolled_count': enrolledCount,
         'subjects': subjectNames,
@@ -8172,6 +8201,9 @@ class DatabaseHelper {
 
   Future<void> deleteQuiz(int quizId) async {
     final db = await database;
+    // 1. Delete associated attempts, scores, assignments, questions, and the quiz itself
+    await db.delete('quiz_attempts', where: 'quiz_id = ?', whereArgs: [quizId]);
+    await db.delete('student_scores', where: 'quiz_id = ?', whereArgs: [quizId]);
     await db.delete(
       'quiz_assignments',
       where: 'quiz_id = ?',
@@ -8179,32 +8211,235 @@ class DatabaseHelper {
     );
     await db.delete('questions', where: 'quiz_id = ?', whereArgs: [quizId]);
     await db.delete('quizzes', where: 'id = ?', whereArgs: [quizId]);
+
+    // 2. Cloud Firestore deletion so the quiz and its attempts do not resurrect on web or sync
+    try {
+      unawaited(FirestoreService().deleteDocument('quizzes', quizId.toString()));
+      final cloudAttempts = await FirestoreService().fetchAllDocuments('quiz_attempts');
+      for (final doc in cloudAttempts) {
+        final rawQId = doc['quiz_id'];
+        final docId = doc['id']?.toString() ?? doc['document_id']?.toString() ?? '';
+        if (rawQId == quizId || rawQId?.toString() == quizId.toString()) {
+          if (docId.isNotEmpty) {
+            unawaited(FirestoreService().deleteDocument('quiz_attempts', docId));
+          }
+        }
+      }
+      final cloudAssignments = await FirestoreService().fetchAllDocuments('quiz_assignments');
+      for (final doc in cloudAssignments) {
+        final rawQId = doc['quiz_id'];
+        final docId = doc['id']?.toString() ?? doc['document_id']?.toString() ?? '';
+        if (rawQId == quizId || rawQId?.toString() == quizId.toString()) {
+          if (docId.isNotEmpty) {
+            unawaited(FirestoreService().deleteDocument('quiz_assignments', docId));
+          }
+        }
+      }
+    } catch (_) {}
   }
 
-  /// Purges test artifacts and orphan quizzes that have 0 student attempts
-  /// and match automated timestamp or test placeholder titles.
-  Future<int> purgeGarbageTestQuizzes() async {
+  /// Purges test artifacts, orphan duplicate quizzes, and test runner quiz attempts.
+  /// Handles both SQLite and Cloud Firestore synchronization so items never reappear.
+  Future<int> purgeGarbageTestQuizzes({bool includeTestAttempts = true}) async {
     final db = await database;
-    final candidates = await db.rawQuery('''
-      SELECT q.id FROM quizzes q
-      WHERE (SELECT COUNT(*) FROM quiz_attempts WHERE quiz_id = q.id) = 0
-        AND (
-          q.title LIKE '%1794%'
-          OR q.title = '1'
-          OR q.title = ''
-          OR q.title LIKE 'Test%'
-          OR q.title LIKE '%dummy%'
-          OR q.title LIKE '%temp%'
+    int deletedCount = 0;
+
+    // 1. Find candidate test quizzes:
+    // - Test runner titles (Diagnostic Quiz, Quantum Mechanics, World War 2, Photosynthesis, Initial Science, etc.)
+    // - Timestamp or placeholder titles (1794, 1, Test, dummy, temp)
+    // - Quizzes where all attempts belong to test runner accounts (student_loop_, bulk_student_, s_anticheat_, test_)
+    // - Duplicate quizzes with zero attempts where an identical title exists in the same subject
+    final candidateQuizzes = await db.rawQuery('''
+      SELECT q.id, q.title,
+        (SELECT COUNT(*) FROM quiz_attempts WHERE quiz_id = q.id) as total_attempts,
+        (SELECT COUNT(*) FROM quiz_attempts WHERE quiz_id = q.id
+           AND student_id NOT LIKE 'student_loop_%'
+           AND student_id NOT LIKE 'bulk_student_%'
+           AND student_id NOT LIKE 's_anticheat_%'
+           AND student_id NOT LIKE 'student_reset_%'
+           AND student_id NOT LIKE 'student_lo_reset_%'
+           AND student_id NOT LIKE 's_lo_%'
+           AND student_id NOT LIKE 'test_%'
+           AND student_id NOT LIKE '%1794%'
+           AND student_id NOT IN ('student_1', 'student_2', 'student_3', 'student_4', 'student_5', 'student_6', 'student_7', 'student_8', 'student_9')
+        ) as genuine_attempts
+      FROM quizzes q
+      WHERE 
+        -- Automated test runner titles
+        q.title LIKE 'Diagnostic Quiz%'
+        OR q.title LIKE 'Quantum Mechanics%'
+        OR q.title LIKE 'World War 2%'
+        OR q.title LIKE 'Photosynthesis%'
+        OR q.title LIKE 'Initial Science Quiz%'
+        OR q.title LIKE 'Updated Science Quiz%'
+        OR q.title LIKE 'Math Roster Quiz%'
+        OR q.title LIKE 'Loop Science%'
+        OR q.title LIKE 'DB Quiz%'
+        OR q.title LIKE 'Initial Quiz%'
+        OR q.title LIKE 'Updated Quiz%'
+        OR q.title LIKE '%1794%'
+        OR q.title = '1'
+        OR q.title = ''
+        OR q.title LIKE 'Test%'
+        OR q.title LIKE '%dummy%'
+        OR q.title LIKE '%temp%'
+        -- Duplicate zero-attempt drafts
+        OR (
+          (SELECT COUNT(*) FROM quiz_attempts WHERE quiz_id = q.id) = 0
+          AND EXISTS (
+            SELECT 1 FROM quizzes q2 
+            WHERE q2.id != q.id 
+              AND LOWER(TRIM(q2.title)) = LOWER(TRIM(q.title))
+              AND (q2.subject_id = q.subject_id OR (q2.subject_id IS NULL AND q.subject_id IS NULL))
+          )
         )
     ''');
 
-    int deletedCount = 0;
-    for (final row in candidates) {
+    final candidateIds = <int>{};
+    for (final row in candidateQuizzes) {
       final qId = row['id'] as int;
-      await db.delete('questions', where: 'quiz_id = ?', whereArgs: [qId]);
-      await db.delete('quizzes', where: 'id = ?', whereArgs: [qId]);
-      deletedCount++;
+      final genuine = (row['genuine_attempts'] as num?)?.toInt() ?? 0;
+      if (genuine == 0 || includeTestAttempts) {
+        candidateIds.add(qId);
+      }
     }
+
+    if (candidateIds.isNotEmpty) {
+      final placeholders = List.filled(candidateIds.length, '?').join(',');
+      final idArgs = candidateIds.toList();
+
+      deletedCount += await db.rawDelete(
+        'DELETE FROM quiz_attempts WHERE quiz_id IN ($placeholders)',
+        idArgs,
+      );
+      deletedCount += await db.rawDelete(
+        'DELETE FROM student_scores WHERE quiz_id IN ($placeholders)',
+        idArgs,
+      );
+      await db.rawDelete(
+        'DELETE FROM quiz_assignments WHERE quiz_id IN ($placeholders)',
+        idArgs,
+      );
+      await db.rawDelete(
+        'DELETE FROM questions WHERE quiz_id IN ($placeholders)',
+        idArgs,
+      );
+      final purgedQuizzes = await db.rawDelete(
+        'DELETE FROM quizzes WHERE id IN ($placeholders)',
+        idArgs,
+      );
+      deletedCount += purgedQuizzes;
+    }
+
+    // 2. Delete test attempts from test runner accounts
+    if (includeTestAttempts) {
+      deletedCount += await db.rawDelete('''
+        DELETE FROM quiz_attempts
+        WHERE student_id LIKE 'student_loop_%'
+           OR student_id LIKE 'bulk_student_%'
+           OR student_id LIKE 's_anticheat_%'
+           OR student_id LIKE 'student_reset_%'
+           OR student_id LIKE 'student_lo_reset_%'
+           OR student_id LIKE 's_lo_%'
+           OR student_id LIKE 'test_%'
+           OR student_id LIKE '%1794%'
+           OR student_id IN ('student_1', 'student_2', 'student_3', 'student_4', 'student_5', 'student_6', 'student_7', 'student_8', 'student_9')
+           OR (quiz_id IS NOT NULL AND quiz_id NOT IN (SELECT id FROM quizzes))
+      ''');
+
+      deletedCount += await db.rawDelete('''
+        DELETE FROM student_scores
+        WHERE student_id LIKE 'student_loop_%'
+           OR student_id LIKE 'bulk_student_%'
+           OR student_id LIKE 's_anticheat_%'
+           OR student_id LIKE 'student_reset_%'
+           OR student_id LIKE 'student_lo_reset_%'
+           OR student_id LIKE 's_lo_%'
+           OR student_id LIKE 'test_%'
+           OR student_id LIKE '%1794%'
+           OR student_id IN ('student_1', 'student_2', 'student_3', 'student_4', 'student_5', 'student_6', 'student_7', 'student_8', 'student_9')
+           OR (quiz_id IS NOT NULL AND quiz_id NOT IN (SELECT id FROM quizzes))
+      ''');
+    }
+
+    // 3. Purge Cloud Firestore collections so artifacts never resurrect
+    try {
+      final cloudQuizzes = await FirestoreService().fetchAllDocuments('quizzes');
+      final List<Future<void>> quizDeleteFutures = [];
+      for (final q in cloudQuizzes) {
+        final title = q['title']?.toString() ?? '';
+        final lowerTitle = title.toLowerCase().trim();
+        final rawId = q['_docId'] ?? q['id'] ?? q['document_id'];
+        final docId = rawId?.toString().trim() ?? '';
+        final intId = (rawId is int) ? rawId : int.tryParse(docId);
+
+        final isTestQuiz = candidateIds.contains(intId) ||
+            title.contains('1794') ||
+            title == '1' ||
+            title == '' ||
+            lowerTitle.contains('math roster quiz') ||
+            lowerTitle.startsWith('diagnostic quiz') ||
+            lowerTitle.startsWith('quantum mechanics') ||
+            lowerTitle.startsWith('world war 2') ||
+            lowerTitle.startsWith('photosynthesis') ||
+            lowerTitle.startsWith('initial science') ||
+            lowerTitle.startsWith('updated science') ||
+            lowerTitle.startsWith('loop science') ||
+            lowerTitle.startsWith('db quiz') ||
+            lowerTitle.startsWith('test') ||
+            lowerTitle.contains('dummy') ||
+            lowerTitle.contains('temp');
+
+        if (isTestQuiz && docId.isNotEmpty) {
+          quizDeleteFutures.add(FirestoreService().deleteDocument('quizzes', docId));
+          deletedCount++;
+        }
+      }
+      if (quizDeleteFutures.isNotEmpty) {
+        await Future.wait(quizDeleteFutures);
+      }
+
+      final cloudAttempts = await FirestoreService().fetchAllDocuments('quiz_attempts');
+      final List<Future<void>> attemptDeleteFutures = [];
+      for (final doc in cloudAttempts) {
+        final sid = doc['student_id']?.toString() ?? '';
+        final qTitle = doc['quiz_title']?.toString() ?? '';
+        final lowerQTitle = qTitle.toLowerCase().trim();
+        final rawQId = doc['quiz_id'];
+        final intQId = (rawQId is int) ? rawQId : int.tryParse(rawQId?.toString() ?? '');
+        final docId = (doc['_docId'] ?? doc['id'] ?? doc['document_id'] ?? '').toString().trim();
+
+        final isTestAttempt = candidateIds.contains(intQId) ||
+            sid.contains('1794') ||
+            sid.startsWith('student_loop_') ||
+            sid.startsWith('bulk_student_') ||
+            sid.startsWith('s_anticheat_') ||
+            sid.startsWith('student_reset_') ||
+            sid.startsWith('student_lo_reset_') ||
+            sid.startsWith('s_lo_') ||
+            sid.startsWith('test_') ||
+            RegExp(r'^student_\d+$').hasMatch(sid) ||
+            qTitle.contains('1794') ||
+            lowerQTitle.contains('math roster quiz') ||
+            lowerQTitle.startsWith('diagnostic quiz') ||
+            lowerQTitle.startsWith('quantum mechanics') ||
+            lowerQTitle.startsWith('world war 2') ||
+            lowerQTitle.startsWith('photosynthesis') ||
+            lowerQTitle.startsWith('initial science') ||
+            lowerQTitle.startsWith('updated science') ||
+            lowerQTitle.startsWith('loop science') ||
+            lowerQTitle.startsWith('test');
+
+        if (isTestAttempt && docId.isNotEmpty) {
+          attemptDeleteFutures.add(FirestoreService().deleteDocument('quiz_attempts', docId));
+          deletedCount++;
+        }
+      }
+      if (attemptDeleteFutures.isNotEmpty) {
+        await Future.wait(attemptDeleteFutures);
+      }
+    } catch (_) {}
+
     return deletedCount;
   }
 
@@ -8223,8 +8458,24 @@ class DatabaseHelper {
          OR student_id LIKE 'student_lo_reset_%'
          OR student_id LIKE 's_lo_%'
          OR student_id LIKE 'test_%'
+         OR student_id LIKE 'student_loop_%'
+         OR student_id LIKE 'bulk_student_%'
+         OR student_id IN ('student_1', 'student_2', 'student_3', 'student_4', 'student_5', 'student_6', 'student_7', 'student_8', 'student_9')
          OR student_id NOT IN (SELECT id FROM users WHERE full_name IS NOT NULL AND full_name != '')
-         OR quiz_id IN (SELECT id FROM quizzes WHERE title LIKE '%1794%' OR title LIKE '%Math Roster Quiz%' OR title = '1')
+         OR quiz_id IN (
+           SELECT id FROM quizzes 
+           WHERE title LIKE '%1794%' 
+              OR title LIKE '%Math Roster Quiz%' 
+              OR title LIKE 'Diagnostic Quiz%'
+              OR title LIKE 'Quantum Mechanics%'
+              OR title LIKE 'World War 2%'
+              OR title LIKE 'Photosynthesis%'
+              OR title LIKE 'Initial Science Quiz%'
+              OR title LIKE 'Updated Science Quiz%'
+              OR title LIKE 'Loop Science%'
+              OR title LIKE 'DB Quiz%'
+              OR title = '1'
+         )
          OR (quiz_id IS NOT NULL AND quiz_id NOT IN (SELECT id FROM quizzes))
     ''');
 
@@ -8237,14 +8488,40 @@ class DatabaseHelper {
          OR student_id LIKE 'student_lo_reset_%'
          OR student_id LIKE 's_lo_%'
          OR student_id LIKE 'test_%'
+         OR student_id LIKE 'student_loop_%'
+         OR student_id LIKE 'bulk_student_%'
+         OR student_id IN ('student_1', 'student_2', 'student_3', 'student_4', 'student_5', 'student_6', 'student_7', 'student_8', 'student_9')
          OR student_id NOT IN (SELECT id FROM users WHERE full_name IS NOT NULL AND full_name != '')
-         OR quiz_id IN (SELECT id FROM quizzes WHERE title LIKE '%1794%' OR title LIKE '%Math Roster Quiz%' OR title = '1')
+         OR quiz_id IN (
+           SELECT id FROM quizzes 
+           WHERE title LIKE '%1794%' 
+              OR title LIKE '%Math Roster Quiz%' 
+              OR title LIKE 'Diagnostic Quiz%'
+              OR title LIKE 'Quantum Mechanics%'
+              OR title LIKE 'World War 2%'
+              OR title LIKE 'Photosynthesis%'
+              OR title LIKE 'Initial Science Quiz%'
+              OR title LIKE 'Updated Science Quiz%'
+              OR title LIKE 'Loop Science%'
+              OR title LIKE 'DB Quiz%'
+              OR title = '1'
+         )
     ''');
 
     // 3. Delete test quizzes and their questions
     final testQuizzes = await db.rawQuery('''
       SELECT id FROM quizzes
-      WHERE title LIKE '%1794%' OR title LIKE '%Math Roster Quiz%' OR title = '1'
+      WHERE title LIKE '%1794%' 
+         OR title LIKE '%Math Roster Quiz%' 
+         OR title LIKE 'Diagnostic Quiz%'
+         OR title LIKE 'Quantum Mechanics%'
+         OR title LIKE 'World War 2%'
+         OR title LIKE 'Photosynthesis%'
+         OR title LIKE 'Initial Science Quiz%'
+         OR title LIKE 'Updated Science Quiz%'
+         OR title LIKE 'Loop Science%'
+         OR title LIKE 'DB Quiz%'
+         OR title = '1'
     ''');
     for (final q in testQuizzes) {
       final qId = q['id'] as int;
@@ -8263,6 +8540,8 @@ class DatabaseHelper {
          OR id LIKE 'student_reset_%'
          OR id LIKE 'student_lo_reset_%'
          OR id LIKE 's_lo_%'
+         OR id LIKE 'student_loop_%'
+         OR id LIKE 'bulk_student_%'
          OR full_name LIKE 'Student student_%'
     ''');
 
@@ -8275,6 +8554,8 @@ class DatabaseHelper {
          OR id LIKE 'student_reset_%'
          OR id LIKE 'student_lo_reset_%'
          OR id LIKE 's_lo_%'
+         OR id LIKE 'student_loop_%'
+         OR id LIKE 'bulk_student_%'
          OR name LIKE 'Student student_%'
     ''');
 
@@ -8284,6 +8565,7 @@ class DatabaseHelper {
       for (final doc in cloudAttempts) {
         final sid = doc['student_id']?.toString() ?? '';
         final qTitle = doc['quiz_title']?.toString() ?? '';
+        final lowerQTitle = qTitle.toLowerCase().trim();
         final docId = doc['id']?.toString() ?? doc['document_id']?.toString() ?? '';
         if (sid.contains('1794') ||
             sid.startsWith('s_anticheat_') ||
@@ -8291,8 +8573,20 @@ class DatabaseHelper {
             sid.startsWith('student_lo_reset_') ||
             sid.startsWith('s_lo_') ||
             sid.startsWith('test_') ||
+            sid.startsWith('student_loop_') ||
+            sid.startsWith('bulk_student_') ||
+            RegExp(r'^student_\d+$').hasMatch(sid) ||
             qTitle.contains('1794') ||
-            qTitle.toLowerCase().contains('math roster quiz')) {
+            lowerQTitle.contains('math roster quiz') ||
+            lowerQTitle.startsWith('diagnostic quiz') ||
+            lowerQTitle.startsWith('quantum mechanics') ||
+            lowerQTitle.startsWith('world war 2') ||
+            lowerQTitle.startsWith('photosynthesis') ||
+            lowerQTitle.startsWith('initial science') ||
+            lowerQTitle.startsWith('updated science') ||
+            lowerQTitle.startsWith('loop science') ||
+            lowerQTitle.startsWith('db quiz') ||
+            lowerQTitle.startsWith('test')) {
           if (docId.isNotEmpty) {
             unawaited(FirestoreService().deleteDocument('quiz_attempts', docId));
             deleted++;
@@ -8303,8 +8597,20 @@ class DatabaseHelper {
       final cloudQuizzes = await FirestoreService().fetchAllDocuments('quizzes');
       for (final q in cloudQuizzes) {
         final title = q['title']?.toString() ?? '';
+        final lowerTitle = title.toLowerCase().trim();
         final docId = q['id']?.toString() ?? q['document_id']?.toString() ?? '';
-        if (title.contains('1794') || title == '1' || title.toLowerCase().contains('math roster quiz')) {
+        if (title.contains('1794') || 
+            title == '1' || 
+            lowerTitle.contains('math roster quiz') ||
+            lowerTitle.startsWith('diagnostic quiz') ||
+            lowerTitle.startsWith('quantum mechanics') ||
+            lowerTitle.startsWith('world war 2') ||
+            lowerTitle.startsWith('photosynthesis') ||
+            lowerTitle.startsWith('initial science') ||
+            lowerTitle.startsWith('updated science') ||
+            lowerTitle.startsWith('loop science') ||
+            lowerTitle.startsWith('db quiz') ||
+            lowerTitle.startsWith('test')) {
           if (docId.isNotEmpty) {
             unawaited(FirestoreService().deleteDocument('quizzes', docId));
             deleted++;
@@ -8322,6 +8628,8 @@ class DatabaseHelper {
             uid.startsWith('student_reset_') ||
             uid.startsWith('student_lo_reset_') ||
             uid.startsWith('s_lo_') ||
+            uid.startsWith('student_loop_') ||
+            uid.startsWith('bulk_student_') ||
             name.contains('1794') ||
             name.startsWith('Student student_')) {
           if (docId.isNotEmpty) {
@@ -8355,6 +8663,18 @@ class DatabaseHelper {
       FROM quizzes q
       LEFT JOIN subjects s ON q.subject_id = s.id
       WHERE 1=1
+        AND q.title NOT LIKE 'Diagnostic Quiz%'
+        AND q.title NOT LIKE 'Quantum Mechanics%'
+        AND q.title NOT LIKE 'World War 2%'
+        AND q.title NOT LIKE 'Photosynthesis%'
+        AND q.title NOT LIKE 'Initial Science Quiz%'
+        AND q.title NOT LIKE 'Updated Science Quiz%'
+        AND q.title NOT LIKE 'Math Roster Quiz%'
+        AND q.title NOT LIKE 'Loop Science%'
+        AND q.title NOT LIKE 'DB Quiz%'
+        AND q.title NOT LIKE '%1794%'
+        AND q.title != '1'
+        AND TRIM(q.title) != ''
     ''';
     final List<dynamic> args = [];
     if (subjectId != null && subjectId > 0) {
@@ -9291,7 +9611,23 @@ class DatabaseHelper {
       for (final doc in cloudQuizzes) {
         final title = doc['title']?.toString() ?? 'Quiz';
         final docId = doc['id']?.toString() ?? doc['document_id']?.toString() ?? '';
-        if (title.contains('1794') || title == '1' || title.toLowerCase().contains('math roster quiz')) {
+        final lowerTitle = title.toLowerCase().trim();
+        final isGarbageQuiz = title.contains('1794') ||
+            title == '1' ||
+            title == '' ||
+            lowerTitle.contains('math roster quiz') ||
+            lowerTitle.startsWith('diagnostic quiz') ||
+            lowerTitle.startsWith('quantum mechanics') ||
+            lowerTitle.startsWith('world war 2') ||
+            lowerTitle.startsWith('photosynthesis') ||
+            lowerTitle.startsWith('initial science') ||
+            lowerTitle.startsWith('updated science') ||
+            lowerTitle.startsWith('loop science') ||
+            lowerTitle.startsWith('db quiz') ||
+            lowerTitle.startsWith('test') ||
+            lowerTitle.contains('dummy') ||
+            lowerTitle.contains('temp');
+        if (isGarbageQuiz) {
           if (docId.isNotEmpty) {
             unawaited(FirestoreService().deleteDocument('quizzes', docId));
           }
@@ -9506,14 +9842,27 @@ class DatabaseHelper {
         if (sid.isEmpty) continue;
         final docId = att['id']?.toString() ?? att['document_id']?.toString() ?? '';
         final qTitle = att['quiz_title']?.toString() ?? '';
+        final lowerQTitle = qTitle.toLowerCase().trim();
         final isGarbage = sid.contains('1794') ||
             sid.startsWith('s_anticheat_') ||
             sid.startsWith('student_reset_') ||
             sid.startsWith('student_lo_reset_') ||
             sid.startsWith('s_lo_') ||
             sid.startsWith('test_') ||
+            sid.startsWith('student_loop_') ||
+            sid.startsWith('bulk_student_') ||
+            RegExp(r'^student_\d+$').hasMatch(sid) ||
             qTitle.contains('1794') ||
-            qTitle.toLowerCase().contains('math roster quiz');
+            lowerQTitle.contains('math roster quiz') ||
+            lowerQTitle.startsWith('diagnostic quiz') ||
+            lowerQTitle.startsWith('quantum mechanics') ||
+            lowerQTitle.startsWith('world war 2') ||
+            lowerQTitle.startsWith('photosynthesis') ||
+            lowerQTitle.startsWith('initial science') ||
+            lowerQTitle.startsWith('updated science') ||
+            lowerQTitle.startsWith('loop science') ||
+            lowerQTitle.startsWith('db quiz') ||
+            lowerQTitle.startsWith('test');
         if (isGarbage) {
           if (docId.isNotEmpty) {
             unawaited(FirestoreService().deleteDocument('quiz_attempts', docId));

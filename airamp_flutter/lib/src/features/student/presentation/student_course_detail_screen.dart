@@ -1230,8 +1230,8 @@ class _StudentCourseDetailScreenState
                         final isWebOrVideo = type == 'YouTube' ||
                             (c['content_data'] != null && c['content_data'].toString().trim().startsWith('http'));
 
-                        // Graceful fallback for PDF items stored as direct URL or raw base64
-                        MaterialFileInfo? resolvePdfFallback() {
+                        // Robust fallback for PDF items stored as direct URL, raw base64, or text notes
+                        MaterialFileInfo resolvePdfFallback() {
                           final raw = (c['content_data']?.toString() ?? '').trim();
                           if (raw.startsWith('http://') || raw.startsWith('https://')) {
                             return MaterialFileInfo(
@@ -1250,7 +1250,13 @@ class _StudentCourseDetailScreenState
                               fileBytes: raw,
                             );
                           }
-                          return null;
+                          return MaterialFileInfo(
+                            isFile: true,
+                            fileName: '${c['title'] ?? 'Lecture_Notes'}.pdf',
+                            fileSize: raw.isNotEmpty ? raw.length : 1024,
+                            fileExtension: 'pdf',
+                            description: raw.isNotEmpty ? raw : null,
+                          );
                         }
 
                         final fileInfo = parsedInfo ?? (isPdf ? resolvePdfFallback() : null);
@@ -1349,7 +1355,7 @@ class _StudentCourseDetailScreenState
                                   const SizedBox(height: 10),
                                 ],
                                 InkWell(
-                                  onTap: () => ContentItemTile.openMaterialFile(context, c, fileInfo),
+                                  onTap: () => ContentItemTile.openMaterialFile(ctx, c, fileInfo),
                                   borderRadius: BorderRadius.circular(10),
                                   child: Container(
                                     padding: const EdgeInsets.symmetric(
@@ -1400,7 +1406,7 @@ class _StudentCourseDetailScreenState
                                           child: InkWell(
                                             borderRadius: BorderRadius.circular(8),
                                             onTap: () => ContentItemTile.openMaterialFile(
-                                              context,
+                                              ctx,
                                               c,
                                               fileInfo,
                                               isDownload: true,
@@ -1426,7 +1432,7 @@ class _StudentCourseDetailScreenState
                                         // View / Open File Button
                                         ElevatedButton.icon(
                                           onPressed: () => ContentItemTile.openMaterialFile(
-                                            context,
+                                            ctx,
                                             c,
                                             fileInfo,
                                             isDownload: false,

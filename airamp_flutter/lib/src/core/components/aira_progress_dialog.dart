@@ -93,6 +93,40 @@ class AiraProgressDialog extends StatefulWidget {
     );
   }
 
+  /// Convenience helper for classroom enrollment and section joining operations.
+  static Future<void> showEnrolling(
+    BuildContext context, {
+    required String title,
+    required String initialMessage,
+    required Future<void> Function(void Function(double progress, String statusMessage) updateProgress) task,
+  }) {
+    return show(
+      context,
+      title: title,
+      initialMessage: initialMessage,
+      icon: Icons.school_rounded,
+      accentColor: const Color(0xFF0D9488), // Teal primary
+      task: task,
+    );
+  }
+
+  /// Convenience helper for QR code / section key verification operations.
+  static Future<void> showVerifying(
+    BuildContext context, {
+    required String title,
+    required String initialMessage,
+    required Future<void> Function(void Function(double progress, String statusMessage) updateProgress) task,
+  }) {
+    return show(
+      context,
+      title: title,
+      initialMessage: initialMessage,
+      icon: Icons.qr_code_scanner_rounded,
+      accentColor: const Color(0xFF0D9488), // Teal primary
+      task: task,
+    );
+  }
+
   @override
   State<AiraProgressDialog> createState() => _AiraProgressDialogState();
 }

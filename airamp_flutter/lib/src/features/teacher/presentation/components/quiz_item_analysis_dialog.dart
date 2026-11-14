@@ -4,6 +4,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../core/components/components.dart';
 import '../../../../core/database/database_helper.dart';
 import '../../../../core/theme/app_theme.dart';
+import '../../../../core/utils/file_download_helper.dart';
+import '../../../student/data/student_repository.dart';
 import '../../data/teacher_repository.dart';
 import '../../domain/item_analysis_model.dart';
 
@@ -43,64 +45,315 @@ class _QuizItemAnalysisDialogState
   final Set<int> _expandedQuestions = {};
   bool _onlyWithAttempts = false;
 
+  Widget _buildPurgeInfoRow(
+    IconData icon,
+    Color color,
+    String title,
+    String subtitle,
+  ) {
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Container(
+          padding: const EdgeInsets.all(6),
+          decoration: BoxDecoration(
+            color: color.withValues(alpha: 0.12),
+            borderRadius: BorderRadius.circular(8),
+          ),
+          child: Icon(icon, color: color, size: 18),
+        ),
+        const SizedBox(width: 12),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                title,
+                style: TextStyle(
+                  fontSize: 13,
+                  fontWeight: FontWeight.bold,
+                  color: AppTheme.text,
+                ),
+              ),
+              const SizedBox(height: 2),
+              Text(
+                subtitle,
+                style: TextStyle(
+                  fontSize: 11,
+                  color: AppTheme.textSecondary,
+                  height: 1.3,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+
   Future<void> _confirmPurgeGarbageQuizzes() async {
+    bool includeTestAttempts = true;
     final confirmed = await showDialog<bool>(
       context: context,
-      builder: (ctx) => AlertDialog(
-        backgroundColor: AppTheme.surface,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        title: Row(
-          children: [
-            Icon(
-              Icons.cleaning_services_rounded,
-              color: Colors.orange.shade700,
-              size: 22,
+      builder: (ctx) => StatefulBuilder(
+        builder: (context, setModalState) {
+          return Dialog(
+            backgroundColor: AppTheme.surface,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(20),
+              side: BorderSide(color: AppTheme.border.withValues(alpha: 0.6)),
             ),
-            const SizedBox(width: 10),
-            const Text(
-              'Clean Test Quizzes',
-              style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
-            ),
-          ],
-        ),
-        content: const Text(
-          'This will purge unassociated test quizzes that have 0 student attempts and automated timestamp titles (e.g. "Photosynthesis Quiz 1794...").\n\nExisting quizzes with real student submissions will NEVER be affected.',
-          style: TextStyle(fontSize: 13, height: 1.4),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx, false),
-            child: Text(
-              'Cancel',
-              style: TextStyle(color: AppTheme.textSecondary),
-            ),
-          ),
-          ElevatedButton(
-            style: ElevatedButton.styleFrom(
-              backgroundColor: Colors.orange.shade700,
-              foregroundColor: Colors.white,
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(10),
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 500),
+              child: Padding(
+                padding: const EdgeInsets.all(24),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    // Header with Icon, Title and Close Button
+                    Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.all(12),
+                          decoration: BoxDecoration(
+                            color: Colors.orange.withValues(alpha: 0.12),
+                            borderRadius: BorderRadius.circular(14),
+                            border: Border.all(
+                              color: Colors.orange.withValues(alpha: 0.25),
+                            ),
+                          ),
+                          child: Icon(
+                            Icons.auto_delete_rounded,
+                            color: Colors.orange.shade700,
+                            size: 26,
+                          ),
+                        ),
+                        const SizedBox(width: 14),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                'Purge Automated Test Quizzes',
+                                style: TextStyle(
+                                  fontSize: 18,
+                                  fontWeight: FontWeight.bold,
+                                  color: AppTheme.text,
+                                ),
+                              ),
+                              const SizedBox(height: 4),
+                              Text(
+                                'Clean residual test fixtures, duplicate drafts, and mock submissions.',
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  color: AppTheme.textSecondary,
+                                  height: 1.3,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        IconButton(
+                          icon: Icon(
+                            Icons.close_rounded,
+                            size: 20,
+                            color: AppTheme.textMuted,
+                          ),
+                          onPressed: () => Navigator.pop(ctx, false),
+                          padding: EdgeInsets.zero,
+                          constraints: const BoxConstraints(),
+                          splashRadius: 18,
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 18),
+
+                    // Explanation Cards
+                    Container(
+                      padding: const EdgeInsets.all(14),
+                      decoration: BoxDecoration(
+                        color: AppTheme.background,
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(
+                          color: AppTheme.border.withValues(alpha: 0.5),
+                        ),
+                      ),
+                      child: Column(
+                        children: [
+                          _buildPurgeInfoRow(
+                            Icons.layers_clear_outlined,
+                            Colors.orange.shade700,
+                            'Automated Test Quizzes',
+                            'Deletes test runner items (e.g. Diagnostic Quiz Sprint, Quantum Mechanics, World War 2, Photosynthesis, timestamps).',
+                          ),
+                          const Divider(height: 18),
+                          _buildPurgeInfoRow(
+                            Icons.person_off_outlined,
+                            AppTheme.primary,
+                            'Mock Submissions & Attempts',
+                            'Cleans up score records submitted by automated test accounts (e.g. bulk_student, student_1, student_loop).',
+                          ),
+                          const Divider(height: 18),
+                          _buildPurgeInfoRow(
+                            Icons.copy_rounded,
+                            Colors.amber.shade700,
+                            'Zero-Attempt Duplicate Drafts',
+                            'Removes duplicate quiz copies in the same subject with 0 student submissions.',
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 14),
+
+                    // Safety Guarantee Banner
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 12,
+                        vertical: 10,
+                      ),
+                      decoration: BoxDecoration(
+                        color: AppTheme.success.withValues(alpha: 0.08),
+                        borderRadius: BorderRadius.circular(10),
+                        border: Border.all(
+                          color: AppTheme.success.withValues(alpha: 0.25),
+                        ),
+                      ),
+                      child: Row(
+                        children: [
+                          Icon(
+                            Icons.verified_user_outlined,
+                            color: AppTheme.success,
+                            size: 20,
+                          ),
+                          const SizedBox(width: 10),
+                          Expanded(
+                            child: Text(
+                              'Official student grades and real classroom quizzes are protected and will never be touched.',
+                              style: TextStyle(
+                                fontSize: 11.5,
+                                color: AppTheme.success,
+                                fontWeight: FontWeight.w600,
+                                height: 1.3,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+
+                    // Toggle Checkbox for mock submissions
+                    InkWell(
+                      borderRadius: BorderRadius.circular(8),
+                      onTap: () {
+                        setModalState(() {
+                          includeTestAttempts = !includeTestAttempts;
+                        });
+                      },
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(
+                          vertical: 4,
+                          horizontal: 2,
+                        ),
+                        child: Row(
+                          children: [
+                            Checkbox(
+                              value: includeTestAttempts,
+                              activeColor: Colors.orange.shade700,
+                              onChanged: (val) {
+                                setModalState(() {
+                                  includeTestAttempts = val ?? true;
+                                });
+                              },
+                            ),
+                            const SizedBox(width: 4),
+                            Expanded(
+                              child: Text(
+                                'Include mock test attempts (allows deleting quizzes that have 1 test submission)',
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.w500,
+                                  color: AppTheme.text,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 18),
+
+                    // Actions
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.end,
+                      children: [
+                        TextButton(
+                          onPressed: () => Navigator.pop(ctx, false),
+                          child: Text(
+                            'Cancel',
+                            style: TextStyle(
+                              color: AppTheme.textSecondary,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 10),
+                        ElevatedButton.icon(
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: Colors.orange.shade700,
+                            foregroundColor: Colors.white,
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 18,
+                              vertical: 12,
+                            ),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            elevation: 0,
+                          ),
+                          onPressed: () => Navigator.pop(ctx, true),
+                          icon: const Icon(
+                            Icons.delete_sweep_rounded,
+                            size: 18,
+                          ),
+                          label: const Text(
+                            'Purge Test Quizzes',
+                            style: TextStyle(
+                              fontSize: 13,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
               ),
             ),
-            onPressed: () => Navigator.pop(ctx, true),
-            child: const Text('Purge Test Quizzes'),
-          ),
-        ],
+          );
+        },
       ),
     );
 
     if (confirmed == true && mounted) {
-      final purged = await DatabaseHelper().purgeGarbageTestQuizzes();
+      final purged = await DatabaseHelper().purgeGarbageTestQuizzes(
+        includeTestAttempts: includeTestAttempts,
+      );
       if (mounted) {
         AiraActionToast.showSuccess(
           context,
-          title: 'Purge Quizzes',
+          title: 'Purge Complete',
           message: purged > 0
-              ? 'Successfully purged $purged test artifact(s)!'
+              ? 'Successfully purged $purged test artifact(s) and mock attempts!'
               : 'No orphan test quizzes found to purge.',
         );
+        ref.invalidate(teacherQuizzesForAnalysisProvider);
         ref.invalidate(teacherQuizzesForAnalysisProvider(widget.subjectId));
+        try {
+          ref.read(teacherScoresProvider.notifier).loadScores(forceRefresh: true);
+        } catch (_) {}
         setState(() {
           _selectedQuizId = null;
         });
@@ -108,7 +361,11 @@ class _QuizItemAnalysisDialogState
     }
   }
 
-  Future<void> _confirmDeleteSingleQuiz(int quizId, String quizTitle) async {
+  Future<void> _confirmDeleteSingleQuiz(
+    int quizId,
+    String quizTitle, {
+    int attemptCount = 0,
+  }) async {
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
@@ -116,36 +373,99 @@ class _QuizItemAnalysisDialogState
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
         title: Row(
           children: [
-            Icon(Icons.delete_forever_rounded, color: AppTheme.error, size: 22),
-            const SizedBox(width: 10),
+            Container(
+              padding: const EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                color: AppTheme.error.withValues(alpha: 0.12),
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: Icon(
+                Icons.delete_forever_rounded,
+                color: AppTheme.error,
+                size: 22,
+              ),
+            ),
+            const SizedBox(width: 12),
             const Text(
               'Delete Quiz',
-              style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+              style: TextStyle(fontSize: 17, fontWeight: FontWeight.bold),
             ),
           ],
         ),
-        content: Text(
-          'Are you sure you want to delete "$quizTitle"? This quiz has 0 student attempts and will be removed permanently.',
-          style: const TextStyle(fontSize: 13, height: 1.4),
+        content: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 420),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                attemptCount > 0
+                    ? 'Are you sure you want to delete "$quizTitle"? This quiz has $attemptCount student submission(s) which will also be permanently deleted from the database and cloud sync.'
+                    : 'Are you sure you want to delete "$quizTitle"? This quiz has 0 student attempts and will be removed permanently.',
+                style: TextStyle(
+                  fontSize: 13.5,
+                  color: AppTheme.textSecondary,
+                  height: 1.4,
+                ),
+              ),
+              const SizedBox(height: 12),
+              Container(
+                padding: const EdgeInsets.all(10),
+                decoration: BoxDecoration(
+                  color: AppTheme.error.withValues(alpha: 0.08),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Row(
+                  children: [
+                    Icon(
+                      Icons.warning_amber_rounded,
+                      color: AppTheme.error,
+                      size: 18,
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        'This action is irreversible.',
+                        style: TextStyle(
+                          fontSize: 11.5,
+                          color: AppTheme.error,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
         ),
+        actionsPadding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx, false),
             child: Text(
               'Cancel',
-              style: TextStyle(color: AppTheme.textSecondary),
+              style: TextStyle(
+                color: AppTheme.textSecondary,
+                fontWeight: FontWeight.w600,
+              ),
             ),
           ),
-          ElevatedButton(
+          ElevatedButton.icon(
             style: ElevatedButton.styleFrom(
               backgroundColor: AppTheme.error,
               foregroundColor: Colors.white,
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(10),
               ),
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
             ),
             onPressed: () => Navigator.pop(ctx, true),
-            child: const Text('Delete Quiz'),
+            icon: const Icon(Icons.delete_forever_rounded, size: 16),
+            label: const Text(
+              'Delete Quiz',
+              style: TextStyle(fontWeight: FontWeight.bold),
+            ),
           ),
         ],
       ),
@@ -156,13 +476,17 @@ class _QuizItemAnalysisDialogState
       if (mounted) {
         AiraActionToast.showSuccess(
           context,
-          title: 'Delete Quiz',
-          message: 'Quiz deleted successfully',
+          title: 'Quiz Deleted',
+          message: 'Quiz "$quizTitle" deleted successfully.',
         );
         setState(() {
           _selectedQuizId = null;
         });
+        ref.invalidate(teacherQuizzesForAnalysisProvider);
         ref.invalidate(teacherQuizzesForAnalysisProvider(widget.subjectId));
+        try {
+          ref.read(teacherScoresProvider.notifier).loadScores(forceRefresh: true);
+        } catch (_) {}
       }
     }
   }
@@ -341,11 +665,27 @@ class _QuizItemAnalysisDialogState
   }
 
   Widget _buildQuizDropdown(List<Map<String, dynamic>> rawList) {
+    final sanitizedList = rawList.where((q) {
+      final title = (q['title']?.toString() ?? '').toLowerCase().trim();
+      return !title.startsWith('diagnostic quiz') &&
+          !title.startsWith('quantum mechanics') &&
+          !title.startsWith('world war 2') &&
+          !title.startsWith('photosynthesis') &&
+          !title.startsWith('initial science') &&
+          !title.startsWith('updated science') &&
+          !title.startsWith('math roster quiz') &&
+          !title.startsWith('loop science') &&
+          !title.startsWith('db quiz') &&
+          !title.contains('1794') &&
+          title != '1' &&
+          title.isNotEmpty;
+    }).toList();
+
     final quizList = _onlyWithAttempts
-        ? rawList
+        ? sanitizedList
               .where((q) => ((q['attempt_count'] as num?)?.toInt() ?? 0) > 0)
               .toList()
-        : rawList;
+        : sanitizedList;
 
     if (_selectedQuizId != null &&
         quizList.isNotEmpty &&
@@ -609,26 +949,57 @@ class _QuizItemAnalysisDialogState
                       overflow: TextOverflow.ellipsis,
                     ),
                   ),
-                  OutlinedButton.icon(
-                    style: OutlinedButton.styleFrom(
-                      foregroundColor: AppTheme.primary,
-                      side: BorderSide(
-                        color: AppTheme.primary.withValues(alpha: 0.5),
+                  Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      OutlinedButton.icon(
+                        style: OutlinedButton.styleFrom(
+                          foregroundColor: AppTheme.error,
+                          side: BorderSide(
+                            color: AppTheme.error.withValues(alpha: 0.5),
+                          ),
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 10,
+                            vertical: 6,
+                          ),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                        ),
+                        onPressed: () => _confirmDeleteSingleQuiz(
+                          report.quizId,
+                          report.quizTitle,
+                          attemptCount: report.totalAttempts,
+                        ),
+                        icon: const Icon(Icons.delete_outline_rounded, size: 16),
+                        label: const Text(
+                          'Delete',
+                          style: TextStyle(fontSize: 12),
+                        ),
                       ),
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 12,
-                        vertical: 6,
+                      const SizedBox(width: 8),
+                      OutlinedButton.icon(
+                        style: OutlinedButton.styleFrom(
+                          foregroundColor: AppTheme.primary,
+                          side: BorderSide(
+                            color: AppTheme.primary.withValues(alpha: 0.5),
+                          ),
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 12,
+                            vertical: 6,
+                          ),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                        ),
+                        onPressed: () => _exportCsvReport(context, report),
+                        icon: const Icon(Icons.download_rounded, size: 16),
+                        label: const Text(
+                          'Export CSV',
+                          style: TextStyle(fontSize: 12),
+                        ),
                       ),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                    ),
-                    onPressed: () => _exportCsvReport(context, report),
-                    icon: const Icon(Icons.download_rounded, size: 16),
-                    label: const Text(
-                      'Export CSV',
-                      style: TextStyle(fontSize: 12),
-                    ),
+                    ],
                   ),
                 ],
               ),
@@ -1484,7 +1855,168 @@ class _QuizItemAnalysisDialogState
     return 'Very Easy';
   }
 
-  void _exportCsvReport(BuildContext context, ItemAnalysisReport report) {
+  Widget _buildExportSummaryRow(
+    String label,
+    String value, {
+    bool isMonospace = false,
+  }) {
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      children: [
+        Text(
+          label,
+          style: TextStyle(fontSize: 12.5, color: AppTheme.textMuted),
+        ),
+        const SizedBox(width: 12),
+        Flexible(
+          child: Text(
+            value,
+            textAlign: TextAlign.right,
+            style: TextStyle(
+              fontSize: 12.5,
+              fontWeight: FontWeight.w600,
+              fontFamily: isMonospace ? 'monospace' : null,
+              color: AppTheme.text,
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Future<void> _exportCsvReport(BuildContext context, ItemAnalysisReport report) async {
+    final now = DateTime.now();
+    final dateStr =
+        '${now.year}-${now.month.toString().padLeft(2, '0')}-${now.day.toString().padLeft(2, '0')}';
+    final safeTitle = report.quizTitle
+        .toLowerCase()
+        .replaceAll(RegExp(r'[^a-z0-9]+'), '_')
+        .replaceAll(RegExp(r'^_+|_+$'), '');
+    final fileName =
+        'item_analysis_${safeTitle.isEmpty ? "quiz" : safeTitle}_$dateStr.csv';
+
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogCtx) => AlertDialog(
+        backgroundColor: AppTheme.surface,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: Row(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                color: AppTheme.primary.withValues(alpha: 0.12),
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: Icon(
+                Icons.file_download_outlined,
+                color: AppTheme.primary,
+                size: 22,
+              ),
+            ),
+            const SizedBox(width: 12),
+            Text(
+              'Confirm CSV Export',
+              style: TextStyle(
+                fontSize: 18,
+                fontWeight: FontWeight.bold,
+                color: AppTheme.text,
+              ),
+            ),
+          ],
+        ),
+        content: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 440),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'Are you sure you want to export the DepEd psychometric item analysis matrix for this quiz?',
+                style: TextStyle(
+                  fontSize: 13,
+                  color: AppTheme.textSecondary,
+                  height: 1.4,
+                ),
+              ),
+              const SizedBox(height: 14),
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: AppTheme.background,
+                  borderRadius: BorderRadius.circular(10),
+                  border: Border.all(color: AppTheme.border),
+                ),
+                child: Column(
+                  children: [
+                    _buildExportSummaryRow('Quiz Title', report.quizTitle),
+                    const Divider(height: 14),
+                    _buildExportSummaryRow(
+                      'Subject',
+                      '${report.subjectName} (${report.subjectCode})',
+                    ),
+                    const Divider(height: 14),
+                    _buildExportSummaryRow(
+                      'Sample Size',
+                      '${report.totalAttempts} Submissions',
+                    ),
+                    const Divider(height: 14),
+                    _buildExportSummaryRow(
+                      'Total Items',
+                      '${report.totalQuestions} Questions',
+                    ),
+                    const Divider(height: 14),
+                    _buildExportSummaryRow(
+                      'KR-20 Reliability',
+                      '${report.kr20Reliability?.toStringAsFixed(3) ?? "N/A"} (${report.reliabilityRating})',
+                    ),
+                    const Divider(height: 14),
+                    _buildExportSummaryRow(
+                      'Target File',
+                      fileName,
+                      isMonospace: true,
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+        actionsPadding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogCtx, false),
+            child: Text(
+              'Cancel',
+              style: TextStyle(
+                color: AppTheme.textMuted,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ),
+          ElevatedButton.icon(
+            onPressed: () => Navigator.pop(dialogCtx, true),
+            icon: const Icon(Icons.download_rounded, size: 16),
+            label: const Text(
+              'Export CSV',
+              style: TextStyle(fontWeight: FontWeight.bold),
+            ),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppTheme.primary,
+              foregroundColor: Colors.white,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(10),
+              ),
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+              elevation: 0,
+            ),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed != true || !context.mounted) return;
+
     final buffer = StringBuffer();
     buffer.writeln('AIRAMP Quiz Item Analysis Report');
     buffer.writeln('Quiz Title,"${report.quizTitle}"');
@@ -1518,14 +2050,17 @@ class _QuizItemAnalysisDialogState
       );
     }
 
-    Clipboard.setData(ClipboardData(text: buffer.toString()));
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        backgroundColor: AppTheme.success,
-        content: Text(
-          'Item Analysis matrix copied to clipboard in CSV format! You can paste it directly into Excel or Google Sheets.',
-        ),
-      ),
+    // Trigger browser/device file download
+    downloadCsvFile(buffer.toString(), fileName);
+
+    // Also copy to clipboard for convenience
+    await Clipboard.setData(ClipboardData(text: buffer.toString()));
+
+    if (!context.mounted) return;
+    AiraActionToast.showSuccess(
+      context,
+      title: 'Export Complete',
+      message: 'Exported item analysis to $fileName and copied matrix to clipboard.',
     );
   }
 }

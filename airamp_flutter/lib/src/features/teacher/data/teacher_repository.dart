@@ -87,6 +87,19 @@ class TeacherDashboardNotifier extends Notifier<Map<String, dynamic>> {
 }
 
 // Teacher Students
+class TeacherStudentsLoadingNotifier extends Notifier<bool> {
+  @override
+  bool build() => false;
+
+  @override
+  set state(bool val) => super.state = val;
+}
+
+final isTeacherStudentsLoadingProvider =
+    NotifierProvider<TeacherStudentsLoadingNotifier, bool>(() {
+  return TeacherStudentsLoadingNotifier();
+});
+
 final teacherStudentsProvider = NotifierProvider<TeacherStudentsNotifier, List<Map<String, dynamic>>>(() {
   return TeacherStudentsNotifier();
 });
@@ -109,15 +122,26 @@ class TeacherStudentsNotifier extends Notifier<List<Map<String, dynamic>>> {
       if (ref.mounted) state = [];
       return;
     }
-    final cacheKey = 'teacher_students_${teacherId}_${section ?? "all"}_${query ?? ""}';
-    final results = await AppCacheManager.instance.getOrFetch(
-      cacheKey,
-      () => DatabaseHelper().getStudentsForTeacher(teacherId, section: section, query: query),
-      ttl: const Duration(minutes: 2),
-      forceRefresh: forceRefresh,
-    );
-    if (!ref.mounted) return;
-    state = results;
+    Future.microtask(() {
+      if (ref.mounted) {
+        ref.read(isTeacherStudentsLoadingProvider.notifier).state = true;
+      }
+    });
+    try {
+      final cacheKey = 'teacher_students_${teacherId}_${section ?? "all"}_${query ?? ""}';
+      final results = await AppCacheManager.instance.getOrFetch(
+        cacheKey,
+        () => DatabaseHelper().getStudentsForTeacher(teacherId, section: section, query: query),
+        ttl: const Duration(minutes: 2),
+        forceRefresh: forceRefresh,
+      );
+      if (!ref.mounted) return;
+      state = results;
+    } finally {
+      if (ref.mounted) {
+        ref.read(isTeacherStudentsLoadingProvider.notifier).state = false;
+      }
+    }
   }
 
   Future<void> reload({String? section, String? query}) async {
