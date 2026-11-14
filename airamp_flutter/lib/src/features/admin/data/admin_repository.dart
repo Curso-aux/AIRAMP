@@ -1132,7 +1132,9 @@ class SubjectDetailNotifier extends Notifier<List<Map<String, dynamic>>> {
     final seenTitles = <String, int>{};
     final topics = <Map<String, dynamic>>[];
     for (var topic in rawTopics) {
-      final cleanTitle = (topic['title']?.toString() ?? '').trim().toLowerCase();
+      final cleanTitle = (topic['title']?.toString() ?? '')
+          .trim()
+          .toLowerCase();
       final topicId = topic['id'] as int;
       if (cleanTitle.isNotEmpty && seenTitles.containsKey(cleanTitle)) {
         final primaryTopicId = seenTitles[cleanTitle]!;
@@ -1165,13 +1167,29 @@ class SubjectDetailNotifier extends Notifier<List<Map<String, dynamic>>> {
       final seenLoTitles = <String, int>{};
       final los = <Map<String, dynamic>>[];
       for (var lo in rawLos) {
-        final cleanLoTitle = (lo['title']?.toString() ?? '').trim().toLowerCase();
+        final cleanLoTitle = (lo['title']?.toString() ?? '')
+            .trim()
+            .toLowerCase();
         final loId = lo['id'] as int;
         if (cleanLoTitle.isNotEmpty && seenLoTitles.containsKey(cleanLoTitle)) {
           final primaryLoId = seenLoTitles[cleanLoTitle]!;
-          await db.update('contents', {'lo_id': primaryLoId}, where: 'lo_id = ?', whereArgs: [loId]);
-          await db.update('questions', {'lo_id': primaryLoId}, where: 'lo_id = ?', whereArgs: [loId]);
-          await db.delete('learning_outcomes', where: 'id = ?', whereArgs: [loId]);
+          await db.update(
+            'contents',
+            {'lo_id': primaryLoId},
+            where: 'lo_id = ?',
+            whereArgs: [loId],
+          );
+          await db.update(
+            'questions',
+            {'lo_id': primaryLoId},
+            where: 'lo_id = ?',
+            whereArgs: [loId],
+          );
+          await db.delete(
+            'learning_outcomes',
+            where: 'id = ?',
+            whereArgs: [loId],
+          );
           continue;
         }
         if (cleanLoTitle.isNotEmpty) {
@@ -1238,7 +1256,9 @@ class SubjectDetailNotifier extends Notifier<List<Map<String, dynamic>>> {
         whereArgs: [existingId],
       );
       await loadHierarchy(_subjectId!, syncCloud: false);
-      unawaited(DatabaseHelper().pushLocalCurriculumToCloud(subjectId: _subjectId));
+      unawaited(
+        DatabaseHelper().pushLocalCurriculumToCloud(subjectId: _subjectId),
+      );
       return;
     }
 
@@ -1247,7 +1267,9 @@ class SubjectDetailNotifier extends Notifier<List<Map<String, dynamic>>> {
     topic['created_at'] = DateTime.now().toIso8601String();
     await db.insert('topics', topic);
     await loadHierarchy(_subjectId!, syncCloud: false);
-    unawaited(DatabaseHelper().pushLocalCurriculumToCloud(subjectId: _subjectId));
+    unawaited(
+      DatabaseHelper().pushLocalCurriculumToCloud(subjectId: _subjectId),
+    );
   }
 
   Future<void> updateTopic(int topicId, Map<String, dynamic> data) async {
@@ -1255,7 +1277,9 @@ class SubjectDetailNotifier extends Notifier<List<Map<String, dynamic>>> {
     final db = await DatabaseHelper().database;
     await db.update('topics', data, where: 'id = ?', whereArgs: [topicId]);
     await loadHierarchy(_subjectId!, syncCloud: false);
-    unawaited(DatabaseHelper().pushLocalCurriculumToCloud(subjectId: _subjectId));
+    unawaited(
+      DatabaseHelper().pushLocalCurriculumToCloud(subjectId: _subjectId),
+    );
   }
 
   Future<void> deleteTopic(int topicId) async {
@@ -1263,7 +1287,9 @@ class SubjectDetailNotifier extends Notifier<List<Map<String, dynamic>>> {
     final db = await DatabaseHelper().database;
     await db.delete('topics', where: 'id = ?', whereArgs: [topicId]);
     await loadHierarchy(_subjectId!, syncCloud: false);
-    unawaited(DatabaseHelper().pushLocalCurriculumToCloud(subjectId: _subjectId));
+    unawaited(
+      DatabaseHelper().pushLocalCurriculumToCloud(subjectId: _subjectId),
+    );
   }
 
   // Learning Outcomes
@@ -1274,7 +1300,9 @@ class SubjectDetailNotifier extends Notifier<List<Map<String, dynamic>>> {
     lo['created_at'] = DateTime.now().toIso8601String();
     await db.insert('learning_outcomes', lo);
     await loadHierarchy(_subjectId!, syncCloud: false);
-    unawaited(DatabaseHelper().pushLocalCurriculumToCloud(subjectId: _subjectId));
+    unawaited(
+      DatabaseHelper().pushLocalCurriculumToCloud(subjectId: _subjectId),
+    );
   }
 
   Future<void> updateLearningOutcome(
@@ -1290,7 +1318,9 @@ class SubjectDetailNotifier extends Notifier<List<Map<String, dynamic>>> {
       whereArgs: [loId],
     );
     await loadHierarchy(_subjectId!, syncCloud: false);
-    unawaited(DatabaseHelper().pushLocalCurriculumToCloud(subjectId: _subjectId));
+    unawaited(
+      DatabaseHelper().pushLocalCurriculumToCloud(subjectId: _subjectId),
+    );
   }
 
   Future<void> deleteLearningOutcome(int loId) async {
@@ -1298,11 +1328,17 @@ class SubjectDetailNotifier extends Notifier<List<Map<String, dynamic>>> {
     final db = await DatabaseHelper().database;
     await db.delete('learning_outcomes', where: 'id = ?', whereArgs: [loId]);
     await loadHierarchy(_subjectId!, syncCloud: false);
-    unawaited(DatabaseHelper().pushLocalCurriculumToCloud(subjectId: _subjectId));
+    unawaited(
+      DatabaseHelper().pushLocalCurriculumToCloud(subjectId: _subjectId),
+    );
   }
 
   // Contents
-  Future<void> addContent(int loId, Map<String, dynamic> content, {int? subjectId}) async {
+  Future<void> addContent(
+    int loId,
+    Map<String, dynamic> content, {
+    int? subjectId,
+  }) async {
     final db = await DatabaseHelper().database;
     content['lo_id'] = loId;
     content['created_at'] = DateTime.now().toIso8601String();
@@ -1311,11 +1347,19 @@ class SubjectDetailNotifier extends Notifier<List<Map<String, dynamic>>> {
     int? targetSubId = subjectId ?? _subjectId;
     if (targetSubId == null) {
       try {
-        final loRows = await db.query('learning_outcomes', where: 'id = ?', whereArgs: [loId]);
+        final loRows = await db.query(
+          'learning_outcomes',
+          where: 'id = ?',
+          whereArgs: [loId],
+        );
         if (loRows.isNotEmpty) {
           final tId = loRows.first['topic_id'] as int?;
           if (tId != null) {
-            final tRows = await db.query('topics', where: 'id = ?', whereArgs: [tId]);
+            final tRows = await db.query(
+              'topics',
+              where: 'id = ?',
+              whereArgs: [tId],
+            );
             if (tRows.isNotEmpty) {
               targetSubId = tRows.first['subject_id'] as int?;
             }
@@ -1331,23 +1375,40 @@ class SubjectDetailNotifier extends Notifier<List<Map<String, dynamic>>> {
     }
   }
 
-  Future<void> updateContent(int contentId, Map<String, dynamic> data, {int? subjectId}) async {
+  Future<void> updateContent(
+    int contentId,
+    Map<String, dynamic> data, {
+    int? subjectId,
+  }) async {
     final db = await DatabaseHelper().database;
     await db.update('contents', data, where: 'id = ?', whereArgs: [contentId]);
 
     int? targetSubId = subjectId ?? _subjectId;
     if (targetSubId == null) {
       try {
-        final cRows = await db.query('contents', where: 'id = ?', whereArgs: [contentId]);
+        final cRows = await db.query(
+          'contents',
+          where: 'id = ?',
+          whereArgs: [contentId],
+        );
         if (cRows.isNotEmpty) {
           final loId = cRows.first['lo_id'] as int?;
           if (loId != null) {
-            final loRows = await db.query('learning_outcomes', where: 'id = ?', whereArgs: [loId]);
+            final loRows = await db.query(
+              'learning_outcomes',
+              where: 'id = ?',
+              whereArgs: [loId],
+            );
             if (loRows.isNotEmpty) {
               final tId = loRows.first['topic_id'] as int?;
               if (tId != null) {
-                final tRows = await db.query('topics', where: 'id = ?', whereArgs: [tId]);
-                if (tRows.isNotEmpty) targetSubId = tRows.first['subject_id'] as int?;
+                final tRows = await db.query(
+                  'topics',
+                  where: 'id = ?',
+                  whereArgs: [tId],
+                );
+                if (tRows.isNotEmpty)
+                  targetSubId = tRows.first['subject_id'] as int?;
               }
             }
           }
@@ -1367,16 +1428,29 @@ class SubjectDetailNotifier extends Notifier<List<Map<String, dynamic>>> {
     int? targetSubId = subjectId ?? _subjectId;
     if (targetSubId == null) {
       try {
-        final cRows = await db.query('contents', where: 'id = ?', whereArgs: [contentId]);
+        final cRows = await db.query(
+          'contents',
+          where: 'id = ?',
+          whereArgs: [contentId],
+        );
         if (cRows.isNotEmpty) {
           final loId = cRows.first['lo_id'] as int?;
           if (loId != null) {
-            final loRows = await db.query('learning_outcomes', where: 'id = ?', whereArgs: [loId]);
+            final loRows = await db.query(
+              'learning_outcomes',
+              where: 'id = ?',
+              whereArgs: [loId],
+            );
             if (loRows.isNotEmpty) {
               final tId = loRows.first['topic_id'] as int?;
               if (tId != null) {
-                final tRows = await db.query('topics', where: 'id = ?', whereArgs: [tId]);
-                if (tRows.isNotEmpty) targetSubId = tRows.first['subject_id'] as int?;
+                final tRows = await db.query(
+                  'topics',
+                  where: 'id = ?',
+                  whereArgs: [tId],
+                );
+                if (tRows.isNotEmpty)
+                  targetSubId = tRows.first['subject_id'] as int?;
               }
             }
           }
@@ -1400,7 +1474,9 @@ class SubjectDetailNotifier extends Notifier<List<Map<String, dynamic>>> {
     question['created_at'] = DateTime.now().toIso8601String();
     await db.insert('questions', question);
     await loadHierarchy(_subjectId!, syncCloud: false);
-    unawaited(DatabaseHelper().pushLocalCurriculumToCloud(subjectId: _subjectId));
+    unawaited(
+      DatabaseHelper().pushLocalCurriculumToCloud(subjectId: _subjectId),
+    );
   }
 
   Future<void> updateQuestion(
@@ -1939,9 +2015,9 @@ class AdminKeysNotifier extends Notifier<List<Map<String, dynamic>>> {
       final code = k['code']?.toString();
       final used = k['used_count'] as int? ?? 0;
       if (code != null && code.isNotEmpty && used > 0) {
-        FirestoreService().saveDocument('enrollment_keys', code, {
-          'used_count': used,
-        }).catchError((_) {});
+        FirestoreService()
+            .saveDocument('enrollment_keys', code, {'used_count': used})
+            .catchError((_) {});
       }
     }
   }
