@@ -20,7 +20,59 @@ import 'database_helper.dart';
 class FirestoreService {
   static final FirestoreService _instance = FirestoreService._internal();
   factory FirestoreService() => _instance;
+  static FirestoreService get instance => _instance;
   FirestoreService._internal();
+
+  static bool _emulatorEnabled = false;
+  static String _emulatorHost = 'localhost';
+  static int _emulatorFirestorePort = 8080;
+  static int _emulatorAuthPort = 9099;
+
+  static bool get isEmulatorEnabled => _emulatorEnabled;
+  static String get emulatorHost => _emulatorHost;
+  static int get emulatorFirestorePort => _emulatorFirestorePort;
+  static int get emulatorAuthPort => _emulatorAuthPort;
+
+  /// Base URL for Firestore REST requests, redirecting to local emulator when active
+  static String get firestoreRestBaseUrl {
+    if (_emulatorEnabled) {
+      return 'http://$_emulatorHost:$_emulatorFirestorePort/v1/projects/$projectId/databases/(default)/documents';
+    }
+    return 'https://firestore.googleapis.com/v1/projects/$projectId/databases/(default)/documents';
+  }
+
+  /// Connects Firestore SDK and REST endpoints to local Firebase Emulator Suite.
+  /// Also connects FirebaseAuth to the Auth emulator for anonymous session creation.
+  Future<void> useEmulator({
+    String host = 'localhost',
+    int firestorePort = 8080,
+    int authPort = 9099,
+  }) async {
+    _emulatorEnabled = true;
+    _emulatorHost = host;
+    _emulatorFirestorePort = firestorePort;
+    _emulatorAuthPort = authPort;
+
+    try {
+      if (Firebase.apps.isNotEmpty) {
+        firestore.useFirestoreEmulator(host, firestorePort, sslEnabled: false);
+        await FirebaseAuth.instance.useAuthEmulator(host, authPort);
+        debugPrint('[FirestoreService] Connected to Firestore emulator ($host:$firestorePort) and Auth emulator ($host:$authPort)');
+      } else {
+        debugPrint('[FirestoreService] Firebase apps not yet initialized; emulator settings cached for REST and upcoming SDK calls');
+      }
+    } catch (e) {
+      debugPrint('[FirestoreService] Note configuring SDK emulator: $e');
+    }
+  }
+
+  /// Disables emulator redirection and restores standard cloud endpoints (useful in test teardowns).
+  void resetEmulator() {
+    _emulatorEnabled = false;
+    _emulatorHost = 'localhost';
+    _emulatorFirestorePort = 8080;
+    _emulatorAuthPort = 9099;
+  }
 
   /// Real-time sync listener registry
   static final List<VoidCallback> _syncListeners = [];
@@ -204,7 +256,7 @@ class FirestoreService {
   Future<Map<String, dynamic>?> _queryRest(String field, String value) async {
     try {
       final dio = _dio;
-      final url = 'https://firestore.googleapis.com/v1/projects/$projectId/databases/(default)/documents:runQuery?key=$apiKey';
+      final url = '$firestoreRestBaseUrl:runQuery?key=$apiKey';
       final response = await dio.post(
         url,
         data: {
@@ -255,7 +307,7 @@ class FirestoreService {
 
       do {
         final tokenParam = pageToken != null && pageToken.isNotEmpty ? '&pageToken=$pageToken' : '';
-        final url = 'https://firestore.googleapis.com/v1/projects/$projectId/databases/(default)/documents/users?pageSize=300$tokenParam$keyParam';
+        final url = '$firestoreRestBaseUrl/users?pageSize=300$tokenParam$keyParam';
         final response = await dio.get(url);
 
         if (response.data is Map && response.data.containsKey('documents')) {
@@ -295,7 +347,7 @@ class FirestoreService {
 
       do {
         final tokenParam = pageToken != null && pageToken.isNotEmpty ? '&pageToken=$pageToken' : '';
-        final url = 'https://firestore.googleapis.com/v1/projects/$projectId/databases/(default)/documents/$collection?pageSize=300$tokenParam$keyParam';
+        final url = '$firestoreRestBaseUrl/$collection?pageSize=300$tokenParam$keyParam';
         final response = await dio.get(url);
 
         if (response.data is Map && response.data.containsKey('documents')) {
@@ -664,7 +716,7 @@ class FirestoreService {
       }
       final maskQuery = fields.keys.map((k) => 'updateMask.fieldPaths=$k').join('&');
       final keyParam = apiKey.isNotEmpty ? '&key=$apiKey' : '';
-      final url = 'https://firestore.googleapis.com/v1/projects/$projectId/databases/(default)/documents/users/$id?$maskQuery$keyParam';
+      final url = '$firestoreRestBaseUrl/users/$id?$maskQuery$keyParam';
       await dio.patch(url, data: {'fields': fields});
       debugPrint('[FirestoreService] Successfully saved user $id via REST');
     } catch (e) {
@@ -677,7 +729,7 @@ class FirestoreService {
     try {
       final dio = _dio;
       final keyParam = apiKey.isNotEmpty ? '?key=$apiKey' : '';
-      final docUrl = 'https://firestore.googleapis.com/v1/projects/$projectId/databases/(default)/documents/users/$docId$keyParam';
+      final docUrl = '$firestoreRestBaseUrl/users/$docId$keyParam';
       final docResp = await dio.get(docUrl);
       if (docResp.statusCode == 200 && docResp.data is Map && docResp.data['fields'] is Map) {
         final parsed = _parseFirestoreFields(docResp.data['fields'] as Map<String, dynamic>);
@@ -1922,7 +1974,7 @@ class FirestoreService {
       try {
         final dio = _dio;
         final keyParam = apiKey.isNotEmpty ? '?key=$apiKey' : '';
-        final url = 'https://firestore.googleapis.com/v1/projects/$projectId/databases/(default)/documents/conversations/$cleanConvId/messages$keyParam';
+        final url = '$firestoreRestBaseUrl/conversations/$cleanConvId/messages$keyParam';
         final response = await dio.get(url);
         if (response.data is Map && response.data.containsKey('documents')) {
           final docs = response.data['documents'] as List? ?? [];
@@ -2171,6 +2223,10 @@ class FirestoreService {
   }
 
   bool get _isTestEnv {
+    // When emulator mode is explicitly enabled, permit actual database writes and deletes
+    // against the local emulator container.
+    if (_emulatorEnabled) return false;
+
     try {
       if (!kIsWeb && Platform.environment.containsKey('FLUTTER_TEST')) {
         return true;
@@ -2215,7 +2271,7 @@ class FirestoreService {
       }
       final maskQuery = fields.keys.map((k) => 'updateMask.fieldPaths=$k').join('&');
       final keyParam = apiKey.isNotEmpty ? '&key=$apiKey' : '';
-      final url = 'https://firestore.googleapis.com/v1/projects/$projectId/databases/(default)/documents/$collection/$cleanDocId?$maskQuery$keyParam';
+      final url = '$firestoreRestBaseUrl/$collection/$cleanDocId?$maskQuery$keyParam';
       await dio.patch(url, data: {'fields': fields});
       debugPrint('[FirestoreService] Successfully saved $collection/$cleanDocId via REST');
     } catch (e, st) {
@@ -2245,7 +2301,7 @@ class FirestoreService {
 
     try {
       final dio = _dio;
-      final url = 'https://firestore.googleapis.com/v1/projects/$projectId/databases/(default)/documents/$collection/$cleanDocId?key=$apiKey';
+      final url = '$firestoreRestBaseUrl/$collection/$cleanDocId?key=$apiKey';
       final resp = await dio.get(url);
       if (resp.statusCode == 200 && resp.data is Map && resp.data['fields'] is Map) {
         final parsed = _parseFirestoreFields(resp.data['fields'] as Map<String, dynamic>);
@@ -2281,7 +2337,7 @@ class FirestoreService {
     try {
       final dio = _dio;
       final keyParam = apiKey.isNotEmpty ? '?key=$apiKey' : '';
-      final url = 'https://firestore.googleapis.com/v1/projects/$projectId/databases/(default)/documents/$collection/$cleanDocId$keyParam';
+      final url = '$firestoreRestBaseUrl/$collection/$cleanDocId$keyParam';
       await dio.delete(url);
       debugPrint('[FirestoreService] Successfully deleted document $collection/$cleanDocId via REST');
     } catch (e) {

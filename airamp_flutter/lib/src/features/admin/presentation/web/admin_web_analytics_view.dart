@@ -10,6 +10,8 @@ import 'components/analytics_filter_bar.dart';
 import '../../../../core/components/kpi_summary_card.dart';
 import '../../../../core/components/lo_mastery_matrix.dart';
 import '../../../../core/components/user_avatar_widget.dart';
+import '../controllers/semester_renewal_controller.dart';
+import '../widgets/academic_term_reset_modal.dart';
 
 class AdminWebAnalyticsView extends ConsumerWidget {
   const AdminWebAnalyticsView({super.key});
@@ -176,6 +178,10 @@ class AdminWebAnalyticsView extends ConsumerWidget {
                   );
                 },
               ),
+              const SizedBox(height: 20),
+
+              // Dedicated Semester-End Record Archiving & System Renewal Card (Milestone 2)
+              _buildSemesterRenewalCard(context, ref, isDark),
               const SizedBox(height: 20),
 
               // Unified Responsive Multi-Dimensional Analytics Filter Bar
@@ -1838,6 +1844,255 @@ class AdminWebAnalyticsView extends ConsumerWidget {
               },
             ),
         ],
+      ),
+    );
+  }
+
+  // ── Semester-End Archiving & System Renewal Card (Milestone 2) ────────
+  Widget _buildSemesterRenewalCard(BuildContext context, WidgetRef ref, bool isDark) {
+    final renewalState = ref.watch(semesterRenewalControllerProvider);
+
+    final cardBg = isDark ? AppTheme.darkSurface : Colors.white;
+    final borderColor = isDark ? AppTheme.darkBorder : AppTheme.lightBorder;
+    final primaryTextColor = isDark ? AppTheme.darkTextBright : AppTheme.lightText;
+    final secondaryTextColor = isDark ? AppTheme.darkTextSecondary : AppTheme.lightTextSecondary;
+
+    final isVerified = renewalState.isArchiveVerified && (renewalState.verificationResult?.isValid == true);
+
+    return Container(
+      key: const Key('semester_renewal_card'),
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: cardBg,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: borderColor),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: isDark ? 0.2 : 0.04),
+            blurRadius: 8,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          final isNarrow = constraints.maxWidth < 750;
+
+          final headerAndStatus = Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(8),
+                    decoration: BoxDecoration(
+                      color: isVerified
+                          ? (isDark ? AppTheme.darkSuccess.withValues(alpha: 0.15) : const Color(0xFFDCFCE7))
+                          : (isDark ? AppTheme.darkWarning.withValues(alpha: 0.15) : const Color(0xFFFEF3C7)),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: Icon(
+                      isVerified ? Icons.verified_user_rounded : Icons.pending_actions_rounded,
+                      color: isVerified
+                          ? (isDark ? AppTheme.darkSuccess : Colors.green.shade700)
+                          : (isDark ? AppTheme.darkWarning : Colors.amber.shade800),
+                      size: 22,
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'Semester-End Record Archiving & System Renewal',
+                          style: TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.bold,
+                            color: primaryTextColor,
+                          ),
+                        ),
+                        const SizedBox(height: 2),
+                        Text(
+                          'Safely archive institutional student transcripts and purge transient academic data for the new term.',
+                          style: TextStyle(
+                            fontSize: 12.5,
+                            color: secondaryTextColor,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 12),
+              // Status Badge
+              Container(
+                key: const Key('archive_status_badge'),
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                decoration: BoxDecoration(
+                  color: isVerified
+                      ? (isDark ? AppTheme.darkSuccess.withValues(alpha: 0.15) : const Color(0xFFDCFCE7))
+                      : (isDark ? AppTheme.darkWarning.withValues(alpha: 0.15) : const Color(0xFFFEF3C7)),
+                  borderRadius: BorderRadius.circular(6),
+                  border: Border.all(
+                    color: isVerified
+                        ? (isDark ? AppTheme.darkSuccess : Colors.green.shade400)
+                        : (isDark ? AppTheme.darkWarning : Colors.amber.shade400),
+                  ),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(
+                      isVerified ? Icons.check_circle_rounded : Icons.lock_clock_rounded,
+                      size: 14,
+                      color: isVerified
+                          ? (isDark ? AppTheme.darkSuccess : Colors.green.shade700)
+                          : (isDark ? AppTheme.darkWarning : Colors.amber.shade800),
+                    ),
+                    const SizedBox(width: 6),
+                    Text(
+                      isVerified
+                          ? 'Archive Verified (${renewalState.verificationResult?.studentCount ?? 0} Students) — Reset Trigger Unlocked'
+                          : 'Archive Pending — Reset Trigger Safeguarded & Locked',
+                      style: TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
+                        color: isVerified
+                            ? (isDark ? AppTheme.darkSuccess : Colors.green.shade800)
+                            : (isDark ? AppTheme.darkWarning : Colors.amber.shade900),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          );
+
+          // Buttons
+          final actionButtons = Wrap(
+            spacing: 10,
+            runSpacing: 10,
+            children: [
+              // Action 1: Generate & Download Archive
+              ElevatedButton.icon(
+                key: const Key('btn_generate_archive'),
+                onPressed: renewalState.isArchiveGenerating
+                    ? null
+                    : () async {
+                        final result = await ref
+                            .read(semesterRenewalControllerProvider.notifier)
+                            .generateAndDownloadArchive();
+                        if (context.mounted) {
+                          if (result != null && result.isValid) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(
+                                content: Text(
+                                  'PDF Archive verified successfully (${result.studentCount} students). Download dispatched.',
+                                ),
+                                backgroundColor: AppTheme.success,
+                                behavior: SnackBarBehavior.floating,
+                              ),
+                            );
+                          } else {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(
+                                content: Text(
+                                  result?.errorMessage ?? 'Failed to generate archive.',
+                                ),
+                                backgroundColor: AppTheme.danger,
+                                behavior: SnackBarBehavior.floating,
+                              ),
+                            );
+                          }
+                        }
+                      },
+                icon: renewalState.isArchiveGenerating
+                    ? const SizedBox(
+                        width: 16,
+                        height: 16,
+                        child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                      )
+                    : const Icon(Icons.picture_as_pdf_outlined, size: 16),
+                label: Text(
+                  renewalState.isArchiveGenerating
+                      ? 'Compiling Archive...'
+                      : 'Generate & Download Archive',
+                  style: const TextStyle(fontWeight: FontWeight.w600),
+                ),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: isDark ? AppTheme.darkPrimary : AppTheme.lightPrimary,
+                  foregroundColor: Colors.white,
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                  minimumSize: const Size(0, 40),
+                ),
+              ),
+
+              // Action 2: End of Semester Reset (Guarded)
+              Tooltip(
+                message: renewalState.isResetUnlocked
+                    ? 'Execute guarded multi-step academic semester reset'
+                    : 'Archive generation and verification is required to unlock semester reset',
+                child: ElevatedButton.icon(
+                  key: const Key('btn_end_of_semester_reset'),
+                  onPressed: renewalState.isResetUnlocked
+                      ? () {
+                          showDialog(
+                            context: context,
+                            barrierDismissible: false,
+                            builder: (_) => const AcademicTermResetModal(),
+                          );
+                        }
+                      : null,
+                  icon: Icon(
+                    renewalState.isResetUnlocked
+                        ? Icons.restart_alt_rounded
+                        : Icons.lock_outline_rounded,
+                    size: 16,
+                  ),
+                  label: Text(
+                    renewalState.isResetUnlocked
+                        ? 'End of Semester Reset'
+                        : 'End of Semester Reset (Locked)',
+                    style: const TextStyle(fontWeight: FontWeight.w600),
+                  ),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.red.shade700,
+                    foregroundColor: Colors.white,
+                    disabledBackgroundColor: isDark ? AppTheme.darkSurfaceElevated : Colors.grey.shade300,
+                    disabledForegroundColor: isDark ? AppTheme.darkTextMuted : Colors.grey.shade600,
+                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                    minimumSize: const Size(0, 40),
+                  ),
+                ),
+              ),
+            ],
+          );
+
+          if (isNarrow) {
+            return Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                headerAndStatus,
+                const SizedBox(height: 16),
+                actionButtons,
+              ],
+            );
+          }
+
+          return Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            crossAxisAlignment: CrossAxisAlignment.center,
+            children: [
+              Expanded(child: headerAndStatus),
+              const SizedBox(width: 20),
+              actionButtons,
+            ],
+          );
+        },
       ),
     );
   }
