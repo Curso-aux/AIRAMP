@@ -35,6 +35,12 @@ class _AcademicTermResetModalState
   // Step 1 State
   bool _isAcknowledged = false;
 
+  // Step 1 Term Labels
+  final TextEditingController _previousSemesterController =
+      TextEditingController(text: '1st Semester AY 2025-2026');
+  final TextEditingController _newSemesterController =
+      TextEditingController(text: '2nd Semester AY 2025-2026');
+
   // Step 2 State
   final TextEditingController _passwordController = TextEditingController();
   bool _isPasswordObscured = true;
@@ -48,6 +54,8 @@ class _AcademicTermResetModalState
 
   @override
   void dispose() {
+    _previousSemesterController.dispose();
+    _newSemesterController.dispose();
     _passwordController.dispose();
     _confirmationPhraseController.dispose();
     super.dispose();
@@ -155,6 +163,8 @@ class _AcademicTermResetModalState
       await ref.read(semesterRenewalControllerProvider.notifier).executeReset(
             adminId: effectiveAdminId,
             schoolId: effectiveSchoolId,
+            previousSemester: _previousSemesterController.text.trim(),
+            newSemester: _newSemesterController.text.trim(),
           );
     } catch (e) {
       debugPrint('[AcademicTermResetModal] Purge error note: $e');
@@ -177,11 +187,11 @@ class _AcademicTermResetModalState
         borderRadius: BorderRadius.circular(16),
         side: BorderSide(color: borderColor, width: 1),
       ),
-      insetPadding: const EdgeInsets.symmetric(horizontal: 24, vertical: 24),
+      insetPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
       child: ConstrainedBox(
         constraints: const BoxConstraints(maxWidth: 580),
         child: Padding(
-          padding: const EdgeInsets.all(28.0),
+          padding: const EdgeInsets.symmetric(horizontal: 20.0, vertical: 18.0),
           child: AnimatedSwitcher(
             duration: const Duration(milliseconds: 250),
             child: renewalState.purgeSummary != null
@@ -209,7 +219,7 @@ class _AcademicTermResetModalState
           crossAxisAlignment: CrossAxisAlignment.center,
           children: [
             Container(
-              padding: const EdgeInsets.all(10),
+              padding: const EdgeInsets.all(8),
               decoration: BoxDecoration(
                 color: Colors.red.withValues(alpha: 0.12),
                 shape: BoxShape.circle,
@@ -217,10 +227,10 @@ class _AcademicTermResetModalState
               child: const Icon(
                 Icons.warning_amber_rounded,
                 color: Colors.red,
-                size: 26,
+                size: 24,
               ),
             ),
-            const SizedBox(width: 14),
+            const SizedBox(width: 12),
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -228,16 +238,16 @@ class _AcademicTermResetModalState
                   Text(
                     'End of Semester Reset',
                     style: TextStyle(
-                      fontSize: 18,
+                      fontSize: 17,
                       fontWeight: FontWeight.bold,
                       color: primaryTextColor,
                     ),
                   ),
-                  const SizedBox(height: 2),
+                  const SizedBox(height: 1),
                   Text(
                     'Step $_currentStep of 3: ${_getStepTitle(_currentStep)}',
                     style: TextStyle(
-                      fontSize: 13,
+                      fontSize: 12.5,
                       fontWeight: FontWeight.w600,
                       color: Colors.red.shade700,
                     ),
@@ -246,15 +256,15 @@ class _AcademicTermResetModalState
               ),
             ),
             IconButton(
-              icon: Icon(Icons.close, color: secondaryTextColor),
+              icon: Icon(Icons.close, color: secondaryTextColor, size: 20),
               onPressed: renewalState.isPurging ? null : () => Navigator.of(context).pop(),
               tooltip: 'Cancel and Close',
             ),
           ],
         ),
-        const SizedBox(height: 20),
+        const SizedBox(height: 12),
         const Divider(height: 1),
-        const SizedBox(height: 20),
+        const SizedBox(height: 12),
 
         // Step-Specific Body
         if (_currentStep == 1)
@@ -264,7 +274,7 @@ class _AcademicTermResetModalState
         else
           _buildStep3PhraseExecution(renewalState, isDark, primaryTextColor, secondaryTextColor, borderColor),
 
-        const SizedBox(height: 24),
+        const SizedBox(height: 16),
 
         // Bottom Action Buttons
         _buildBottomActions(renewalState),
@@ -297,57 +307,115 @@ class _AcademicTermResetModalState
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(
-          'Please carefully review the scope of data affected by this irreversible reset operation. Ensure your institutional PDF records have been downloaded and verified before proceeding.',
-          style: TextStyle(fontSize: 13.5, height: 1.4, color: secondaryTextColor),
+          'Please review the scope of data affected by this reset operation. Ensure your institutional records have been archived into .xlsx and .zip before proceeding.',
+          style: TextStyle(fontSize: 12.5, height: 1.3, color: secondaryTextColor),
         ),
-        const SizedBox(height: 16),
+        const SizedBox(height: 10),
+
+        // Semester Transition Term Inputs
+        Row(
+          children: [
+            Expanded(
+              child: TextFormField(
+                key: const Key('previous_semester_field'),
+                controller: _previousSemesterController,
+                style: TextStyle(fontSize: 12, color: primaryTextColor),
+                decoration: InputDecoration(
+                  labelText: 'Previous Semester',
+                  labelStyle: TextStyle(fontSize: 11, color: secondaryTextColor),
+                  isDense: true,
+                  contentPadding:
+                      const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(6),
+                    borderSide: BorderSide(color: borderColor),
+                  ),
+                ),
+              ),
+            ),
+            const Padding(
+              padding: EdgeInsets.symmetric(horizontal: 6.0),
+              child: Icon(Icons.arrow_forward_rounded, size: 16),
+            ),
+            Expanded(
+              child: TextFormField(
+                key: const Key('new_semester_field'),
+                controller: _newSemesterController,
+                style: TextStyle(fontSize: 12, color: primaryTextColor),
+                decoration: InputDecoration(
+                  labelText: 'New Semester',
+                  labelStyle: TextStyle(fontSize: 11, color: secondaryTextColor),
+                  isDense: true,
+                  contentPadding:
+                      const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(6),
+                    borderSide: BorderSide(color: borderColor),
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 10),
 
         // Scope Grid
         Container(
-          padding: const EdgeInsets.all(14),
+          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
           decoration: BoxDecoration(
             color: isDark ? const Color(0xFF1E293B) : const Color(0xFFF8FAFC),
-            borderRadius: BorderRadius.circular(10),
+            borderRadius: BorderRadius.circular(8),
             border: Border.all(color: borderColor),
           ),
           child: Column(
             children: [
+              _buildScopeRow(
+                icon: Icons.folder_zip_outlined,
+                iconColor: Colors.blue.shade700,
+                title: 'Data to be Archived into .xlsx / .zip:',
+                items: [
+                  'Student Personal Info, Demographics & Section Assignments',
+                  'Semester Grades, GPA & DepEd Honors Achievements',
+                  'Subjects, Assignments & Quizzes with item scores and timestamps',
+                ],
+                isDark: isDark,
+              ),
+              const SizedBox(height: 6),
+              const Divider(height: 1),
+              const SizedBox(height: 6),
               _buildScopeRow(
                 icon: Icons.delete_outline_rounded,
                 iconColor: Colors.red,
                 title: 'Data to be Permanently Purged:',
                 items: [
                   'Subjects and recursive module contents',
-                  'Assignments and student submissions',
-                  'Quizzes, quiz attempts, and scores',
-                  'Term-specific grade logs and learning outcomes progress',
+                  'Assignments, submissions, quizzes, and quiz attempts',
+                  'Term-specific grade logs, student_progress, and learning outcomes',
                 ],
                 isDark: isDark,
               ),
-              const SizedBox(height: 12),
+              const SizedBox(height: 6),
               const Divider(height: 1),
-              const SizedBox(height: 12),
+              const SizedBox(height: 6),
               _buildScopeRow(
                 icon: Icons.shield_outlined,
                 iconColor: Colors.green,
                 title: 'Data Strictly Preserved Intact:',
                 items: [
                   'Core user accounts (Students, Teachers, Admins)',
-                  'Passwords, authentication credentials, and security salts',
-                  'Role permissions and institutional access rights',
-                  'Base student and teacher profile records (enrolled subjects reset to 0)',
-                  'Section and classroom structure definitions',
+                  'Passwords, authentication credentials, security salts & permissions',
+                  'Base profile records (student enrolled subjects reset to 0)',
                 ],
                 isDark: isDark,
               ),
             ],
           ),
         ),
-        const SizedBox(height: 18),
+        const SizedBox(height: 12),
 
         // Mandatory Acknowledgement Checkbox
         Container(
-          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
           decoration: BoxDecoration(
             color: _isAcknowledged
                 ? (isDark ? Colors.red.withValues(alpha: 0.12) : const Color(0xFFFEF2F2))
@@ -358,7 +426,7 @@ class _AcademicTermResetModalState
             ),
           ),
           child: Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
+            crossAxisAlignment: CrossAxisAlignment.center,
             children: [
               Checkbox(
                 key: const Key('acknowledgement_checkbox'),
@@ -370,7 +438,7 @@ class _AcademicTermResetModalState
                   });
                 },
               ),
-              const SizedBox(width: 8),
+              const SizedBox(width: 6),
               Expanded(
                 child: GestureDetector(
                   onTap: () {
@@ -378,16 +446,13 @@ class _AcademicTermResetModalState
                       _isAcknowledged = !_isAcknowledged;
                     });
                   },
-                  child: Padding(
-                    padding: const EdgeInsets.only(top: 8),
-                    child: Text(
-                      'I acknowledge and understand the impact of purging transient academic data.',
-                      style: TextStyle(
-                        fontSize: 13,
-                        fontWeight: FontWeight.w600,
-                        color: primaryTextColor,
-                        height: 1.3,
-                      ),
+                  child: Text(
+                    'I acknowledge and understand the impact of purging transient academic data.',
+                    style: TextStyle(
+                      fontSize: 12.5,
+                      fontWeight: FontWeight.w600,
+                      color: primaryTextColor,
+                      height: 1.2,
                     ),
                   ),
                 ),
@@ -409,8 +474,8 @@ class _AcademicTermResetModalState
     return Row(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Icon(icon, color: iconColor, size: 20),
-        const SizedBox(width: 10),
+        Icon(icon, color: iconColor, size: 16),
+        const SizedBox(width: 8),
         Expanded(
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -418,24 +483,24 @@ class _AcademicTermResetModalState
               Text(
                 title,
                 style: TextStyle(
-                  fontSize: 13,
+                  fontSize: 12,
                   fontWeight: FontWeight.bold,
                   color: iconColor,
                 ),
               ),
-              const SizedBox(height: 6),
+              const SizedBox(height: 3),
               ...items.map(
                 (item) => Padding(
-                  padding: const EdgeInsets.only(bottom: 3),
+                  padding: const EdgeInsets.only(bottom: 2),
                   child: Row(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text('• ', style: TextStyle(color: iconColor, fontSize: 13)),
+                      Text('• ', style: TextStyle(color: iconColor, fontSize: 11)),
                       Expanded(
                         child: Text(
                           item,
                           style: TextStyle(
-                            fontSize: 12.5,
+                            fontSize: 11.5,
                             color: isDark ? const Color(0xFFCBD5E1) : const Color(0xFF334155),
                           ),
                         ),
@@ -767,7 +832,10 @@ class _AcademicTermResetModalState
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
-        Text(label, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w500)),
+        Expanded(
+          child: Text(label, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w500)),
+        ),
+        const SizedBox(width: 8),
         Text(
           value,
           style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: valueColor),

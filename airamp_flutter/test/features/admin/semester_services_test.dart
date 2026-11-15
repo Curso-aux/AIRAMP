@@ -1,12 +1,13 @@
+// ignore_for_file: subtype_of_sealed_class
 import 'dart:typed_data';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:crypto/crypto.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';
+import 'package:sqflite/sqflite.dart' show Sqflite;
 import 'package:syncfusion_flutter_pdf/pdf.dart';
 
-import 'package:airamp_flutter/src/core/database/database_helper.dart';
 import 'package:airamp_flutter/src/core/database/firestore_service.dart';
 import 'package:airamp_flutter/src/features/admin/domain/semester_archive_models.dart';
 import 'package:airamp_flutter/src/features/admin/data/semester_record_archiving_service.dart';
@@ -38,7 +39,7 @@ class TestWriteBatch implements WriteBatch {
   }
 
   @override
-  void update(DocumentReference document, Map<String, dynamic> data) {
+  void update<T>(DocumentReference<T> document, T data) {
     operationsInCurrentBatch++;
   }
 }
@@ -652,6 +653,24 @@ void main() {
       expect(auditLogs.length, 1);
       expect(auditLogs.first['actor_id'], 'A-100-0001');
       expect(auditLogs.first['details'], contains('Preserved 4 user accounts'));
+    });
+
+    test('executeSelectivePurge falls back to default term strings when empty strings are passed', () async {
+      final purgeService = SemesterSelectivePurgeService(database: testDb);
+      final summary = await purgeService.executeSelectivePurge(
+        adminId: 'A-100-0001',
+        schoolId: 'sch_main',
+        previousSemester: '   ',
+        newSemester: '',
+      );
+
+      expect(summary, isNotNull);
+      final rolloverLogs = await testDb.query(
+        'system_audit_logs',
+        where: "action = 'SEMESTER_ROLLOVER'",
+      );
+      expect(rolloverLogs.isNotEmpty, isTrue);
+      expect(rolloverLogs.last['details'], contains('1st Semester AY 2025-2026 -> 2nd Semester AY 2025-2026'));
     });
   });
 

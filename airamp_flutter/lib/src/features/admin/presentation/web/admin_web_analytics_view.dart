@@ -1876,7 +1876,7 @@ class AdminWebAnalyticsView extends ConsumerWidget {
       ),
       child: LayoutBuilder(
         builder: (context, constraints) {
-          final isNarrow = constraints.maxWidth < 750;
+          final isNarrow = constraints.maxWidth < 980;
 
           final headerAndStatus = Column(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -1942,7 +1942,7 @@ class AdminWebAnalyticsView extends ConsumerWidget {
                   ),
                 ),
                 child: Row(
-                  mainAxisSize: MainAxisSize.min,
+                  mainAxisSize: isNarrow ? MainAxisSize.max : MainAxisSize.min,
                   children: [
                     Icon(
                       isVerified ? Icons.check_circle_rounded : Icons.lock_clock_rounded,
@@ -1952,18 +1952,34 @@ class AdminWebAnalyticsView extends ConsumerWidget {
                           : (isDark ? AppTheme.darkWarning : Colors.amber.shade800),
                     ),
                     const SizedBox(width: 6),
-                    Text(
-                      isVerified
-                          ? 'Archive Verified (${renewalState.verificationResult?.studentCount ?? 0} Students) — Reset Trigger Unlocked'
-                          : 'Archive Pending — Reset Trigger Safeguarded & Locked',
-                      style: TextStyle(
-                        fontSize: 12,
-                        fontWeight: FontWeight.w600,
-                        color: isVerified
-                            ? (isDark ? AppTheme.darkSuccess : Colors.green.shade800)
-                            : (isDark ? AppTheme.darkWarning : Colors.amber.shade900),
+                    if (isNarrow)
+                      Expanded(
+                        child: Text(
+                          isVerified
+                              ? 'Archive Verified (${renewalState.verificationResult?.studentCount ?? 0} Students) — Reset Trigger Unlocked'
+                              : 'Archive Pending — Reset Trigger Safeguarded & Locked',
+                          style: TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.w600,
+                            color: isVerified
+                                ? (isDark ? AppTheme.darkSuccess : Colors.green.shade800)
+                                : (isDark ? AppTheme.darkWarning : Colors.amber.shade900),
+                          ),
+                        ),
+                      )
+                    else
+                      Text(
+                        isVerified
+                            ? 'Archive Verified (${renewalState.verificationResult?.studentCount ?? 0} Students) — Reset Trigger Unlocked'
+                            : 'Archive Pending — Reset Trigger Safeguarded & Locked',
+                        style: TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w600,
+                          color: isVerified
+                              ? (isDark ? AppTheme.darkSuccess : Colors.green.shade800)
+                              : (isDark ? AppTheme.darkWarning : Colors.amber.shade900),
+                        ),
                       ),
-                    ),
                   ],
                 ),
               ),
@@ -1989,7 +2005,7 @@ class AdminWebAnalyticsView extends ConsumerWidget {
                             ScaffoldMessenger.of(context).showSnackBar(
                               SnackBar(
                                 content: Text(
-                                  'PDF Archive verified successfully (${result.studentCount} students). Download dispatched.',
+                                  'Excel & ZIP Archive verified successfully (${result.studentCount} students). Download dispatched.',
                                 ),
                                 backgroundColor: AppTheme.success,
                                 behavior: SnackBarBehavior.floating,
@@ -2014,7 +2030,7 @@ class AdminWebAnalyticsView extends ConsumerWidget {
                         height: 16,
                         child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
                       )
-                    : const Icon(Icons.picture_as_pdf_outlined, size: 16),
+                    : const Icon(Icons.folder_zip_outlined, size: 16),
                 label: Text(
                   renewalState.isArchiveGenerating
                       ? 'Compiling Archive...'

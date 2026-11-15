@@ -52,7 +52,7 @@ class SemesterRenewalState {
   }
 }
 
-/// Notifier controlling the institutional PDF archiving, verification,
+/// Notifier controlling the institutional Excel/ZIP archiving, verification,
 /// file download dispatch, and guarded selective academic database purge.
 class SemesterRenewalNotifier extends Notifier<SemesterRenewalState> {
   final ISemesterRecordArchivingService? _customArchivingService;
@@ -94,24 +94,35 @@ class SemesterRenewalNotifier extends Notifier<SemesterRenewalState> {
     }
   }
 
-  /// Queries all student records, compiles them into a structured PDF archive,
-  /// validates byte integrity, and dispatches browser download if verified.
-  Future<ArchiveVerificationResult?> generateAndDownloadArchive() async {
+  /// Primary method: Queries all student records, compiles them into structured
+  /// Excel (.xlsx) workbooks bundled in a .zip archive, validates byte integrity,
+  /// and dispatches browser download if verified.
+  Future<ArchiveVerificationResult?> generateAndDownloadExcelZipArchive({
+    String? academicYear,
+    String? semester,
+  }) async {
     state = state.copyWith(isArchiveGenerating: true, clearErrorMessage: true);
 
     try {
       final records = await archivingService.fetchAllStudentRecords();
-      final pdfBytes = await archivingService.generatePdfArchive(records);
-      final result = archivingService.verifyPdfArchive(pdfBytes, records.length);
+      final ay = academicYear ?? 'AY2025-2026';
+      final sem = semester ?? '1stSemester';
+      final zipBytes = await archivingService.generateExcelZipArchive(
+        records: records,
+        academicYear: ay,
+        semester: sem,
+      );
+      final result = archivingService.verifyZipArchive(zipBytes, records.length);
 
       if (result.isValid) {
-        // Trigger browser or client download gracefully across platforms
         try {
           final timestamp = DateTime.now().millisecondsSinceEpoch;
+          final cleanAy = ay.replaceAll(' ', '_');
+          final cleanSem = sem.replaceAll(' ', '_');
           downloadBinaryFileWeb(
-            pdfBytes,
-            'AIRAMP_Semester_Archive_$timestamp.pdf',
-            'application/pdf',
+            zipBytes,
+            'CampusRecords_${cleanAy}_${cleanSem}_$timestamp.zip',
+            'application/zip',
           );
         } catch (downloadErr) {
           debugPrint('[SemesterRenewalNotifier] Download dispatch note: $downloadErr');
@@ -133,7 +144,8 @@ class SemesterRenewalNotifier extends Notifier<SemesterRenewalState> {
         );
       }
       return result;
-    } catch (e) {
+    } catch (e, st) {
+      debugPrint('[SemesterRenewalNotifier] generateAndDownloadExcelZipArchive error: $e\n$st');
       state = state.copyWith(
         isArchiveGenerating: false,
         isArchiveVerified: false,
@@ -143,11 +155,24 @@ class SemesterRenewalNotifier extends Notifier<SemesterRenewalState> {
     }
   }
 
+  /// Alias for backward compatibility with existing tests and calls.
+  Future<ArchiveVerificationResult?> generateAndDownloadArchive({
+    String? academicYear,
+    String? semester,
+  }) async {
+    return generateAndDownloadExcelZipArchive(
+      academicYear: academicYear,
+      semester: semester,
+    );
+  }
+
   /// Executes the selective academic database purge guarded strictly by archive verification.
   /// Throws a [StateError] if triggered before archive verification has succeeded.
   Future<PurgeSummary> executeReset({
     required String adminId,
     required String schoolId,
+    String? previousSemester,
+    String? newSemester,
   }) async {
     if (!state.isResetUnlocked) {
       throw StateError(
@@ -161,6 +186,8 @@ class SemesterRenewalNotifier extends Notifier<SemesterRenewalState> {
       final summary = await purgeService.executeSelectivePurge(
         adminId: adminId,
         schoolId: schoolId,
+        previousSemester: previousSemester,
+        newSemester: newSemester,
       );
 
       state = state.copyWith(

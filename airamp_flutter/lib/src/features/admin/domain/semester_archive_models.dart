@@ -1,5 +1,62 @@
 import 'dart:typed_data';
 
+/// Represents an individual graded item (Quiz attempt or Assignment submission).
+class AssessmentItemRecord {
+  final String itemType; // 'Quiz' | 'Assignment'
+  final String title;
+  final double maxPoints;
+  final double score;
+  final double percentage;
+  final String status; // 'graded' | 'submitted' | 'missing'
+  final DateTime timestamp;
+  final String? subjectId;
+  final String? subjectCode;
+  final String? subjectName;
+
+  const AssessmentItemRecord({
+    required this.itemType,
+    required this.title,
+    required this.maxPoints,
+    required this.score,
+    required this.percentage,
+    required this.status,
+    required this.timestamp,
+    this.subjectId,
+    this.subjectCode,
+    this.subjectName,
+  });
+
+  Map<String, dynamic> toMap() => {
+        'item_type': itemType,
+        'title': title,
+        'max_points': maxPoints,
+        'score': score,
+        'percentage': percentage,
+        'status': status,
+        'timestamp': timestamp.toIso8601String(),
+        'subject_id': subjectId,
+        'subject_code': subjectCode,
+        'subject_name': subjectName,
+      };
+
+  factory AssessmentItemRecord.fromMap(Map<String, dynamic> map) {
+    return AssessmentItemRecord(
+      itemType: map['item_type']?.toString() ?? 'Quiz',
+      title: map['title']?.toString() ?? 'Untitled Assessment',
+      maxPoints: (map['max_points'] as num?)?.toDouble() ?? 100.0,
+      score: (map['score'] as num?)?.toDouble() ?? 0.0,
+      percentage: (map['percentage'] as num?)?.toDouble() ?? 0.0,
+      status: map['status']?.toString() ?? 'graded',
+      timestamp: map['timestamp'] != null
+          ? DateTime.tryParse(map['timestamp'].toString()) ?? DateTime.now()
+          : DateTime.now(),
+      subjectId: map['subject_id']?.toString(),
+      subjectCode: map['subject_code']?.toString(),
+      subjectName: map['subject_name']?.toString(),
+    );
+  }
+}
+
 /// Represents a student's completed academic performance in an individual subject.
 class SubjectGradeRecord {
   final String subjectId;
@@ -8,6 +65,7 @@ class SubjectGradeRecord {
   final String teacherName;
   final List<double> quizScores;
   final List<double> assignmentGrades;
+  final List<AssessmentItemRecord> assessments;
   final double averageScore;
   final bool isPassed;
 
@@ -18,6 +76,7 @@ class SubjectGradeRecord {
     required this.teacherName,
     this.quizScores = const [],
     this.assignmentGrades = const [],
+    this.assessments = const [],
     required this.averageScore,
     required this.isPassed,
   });
@@ -30,6 +89,8 @@ class SubjectGradeRecord {
       ? 0.0
       : assignmentGrades.reduce((a, b) => a + b) / assignmentGrades.length;
 
+  double get finalGrade => averageScore;
+
   Map<String, dynamic> toMap() => {
         'subject_id': subjectId,
         'subject_name': subjectName,
@@ -37,6 +98,7 @@ class SubjectGradeRecord {
         'teacher_name': teacherName,
         'quiz_scores': quizScores,
         'assignment_grades': assignmentGrades,
+        'assessments': assessments.map((a) => a.toMap()).toList(),
         'average_score': averageScore,
         'is_passed': isPassed,
       };
@@ -55,6 +117,10 @@ class SubjectGradeRecord {
               ?.map((e) => (e as num).toDouble())
               .toList() ??
           const [],
+      assessments: (map['assessments'] as List<dynamic>?)
+              ?.map((e) => AssessmentItemRecord.fromMap(e as Map<String, dynamic>))
+              .toList() ??
+          const [],
       averageScore: (map['average_score'] as num?)?.toDouble() ?? 0.0,
       isPassed: map['is_passed'] == true || map['is_passed'] == 1,
     );
@@ -68,6 +134,8 @@ class AcademicAchievementRecord {
   final int totalAssessmentsPassed;
   final int competenciesMasteredCount;
   final String honorsTitle;
+  final int totalQuizzesCompleted;
+  final int totalAssignmentsSubmitted;
 
   const AcademicAchievementRecord({
     required this.gpa,
@@ -75,6 +143,8 @@ class AcademicAchievementRecord {
     required this.totalAssessmentsPassed,
     required this.competenciesMasteredCount,
     required this.honorsTitle,
+    this.totalQuizzesCompleted = 0,
+    this.totalAssignmentsSubmitted = 0,
   });
 
   static String computeHonorsTitle(double gpa) {
@@ -90,6 +160,8 @@ class AcademicAchievementRecord {
     required int totalAssessmentsTaken,
     required int totalAssessmentsPassed,
     required int competenciesMasteredCount,
+    int totalQuizzesCompleted = 0,
+    int totalAssignmentsSubmitted = 0,
   }) {
     return AcademicAchievementRecord(
       gpa: gpa,
@@ -97,6 +169,8 @@ class AcademicAchievementRecord {
       totalAssessmentsPassed: totalAssessmentsPassed,
       competenciesMasteredCount: competenciesMasteredCount,
       honorsTitle: computeHonorsTitle(gpa),
+      totalQuizzesCompleted: totalQuizzesCompleted,
+      totalAssignmentsSubmitted: totalAssignmentsSubmitted,
     );
   }
 
@@ -106,6 +180,8 @@ class AcademicAchievementRecord {
         'total_assessments_passed': totalAssessmentsPassed,
         'competencies_mastered_count': competenciesMasteredCount,
         'honors_title': honorsTitle,
+        'total_quizzes_completed': totalQuizzesCompleted,
+        'total_assignments_submitted': totalAssignmentsSubmitted,
       };
 
   factory AcademicAchievementRecord.fromMap(Map<String, dynamic> map) {
@@ -120,6 +196,10 @@ class AcademicAchievementRecord {
           (map['competencies_mastered_count'] as num?)?.toInt() ?? 0,
       honorsTitle:
           map['honors_title']?.toString() ?? computeHonorsTitle(gpaVal),
+      totalQuizzesCompleted:
+          (map['total_quizzes_completed'] as num?)?.toInt() ?? 0,
+      totalAssignmentsSubmitted:
+          (map['total_assignments_submitted'] as num?)?.toInt() ?? 0,
     );
   }
 }
@@ -131,6 +211,9 @@ class StudentArchiveRecord {
   final String section;
   final String gradeLevel;
   final String studentType;
+  final String email;
+  final String schoolId;
+  final String status;
   final String? specialNotes;
   final List<SubjectGradeRecord> grades;
   final AcademicAchievementRecord achievements;
@@ -141,10 +224,18 @@ class StudentArchiveRecord {
     required this.section,
     required this.gradeLevel,
     this.studentType = 'regular',
+    this.email = '',
+    this.schoolId = '',
+    this.status = 'active',
     this.specialNotes,
     this.grades = const [],
     required this.achievements,
   });
+
+  double get gpa => achievements.gpa;
+
+  List<AssessmentItemRecord> get assessments =>
+      grades.expand((g) => g.assessments).toList();
 
   Map<String, dynamic> toMap() => {
         'student_id': studentId,
@@ -152,6 +243,9 @@ class StudentArchiveRecord {
         'section': section,
         'grade_level': gradeLevel,
         'student_type': studentType,
+        'email': email,
+        'school_id': schoolId,
+        'status': status,
         'special_notes': specialNotes,
         'grades': grades.map((g) => g.toMap()).toList(),
         'achievements': achievements.toMap(),
@@ -164,6 +258,9 @@ class StudentArchiveRecord {
       section: map['section']?.toString() ?? 'Unassigned',
       gradeLevel: map['grade_level']?.toString() ?? 'N/A',
       studentType: map['student_type']?.toString() ?? 'regular',
+      email: map['email']?.toString() ?? '',
+      schoolId: map['school_id']?.toString() ?? '',
+      status: map['status']?.toString() ?? 'active',
       specialNotes: map['special_notes']?.toString(),
       grades: (map['grades'] as List<dynamic>?)
               ?.map(
@@ -183,28 +280,36 @@ class StudentArchiveRecord {
   }
 }
 
-/// Cryptographic and binary verification output for generated archive PDF documents.
+/// Cryptographic and binary verification output for generated archive PDF or ZIP documents.
 class ArchiveVerificationResult {
   final bool isValid;
   final int studentCount;
   final int byteLength;
+  final int fileCount;
   final String checksum;
   final String? errorMessage;
-  final Uint8List pdfBytes;
+  final Uint8List? pdfBytes;
+  final Uint8List? zipBytes;
 
   const ArchiveVerificationResult({
     required this.isValid,
     required this.studentCount,
     required this.byteLength,
+    this.fileCount = 1,
     required this.checksum,
     this.errorMessage,
-    required this.pdfBytes,
+    this.pdfBytes,
+    this.zipBytes,
   });
+
+  String get sha256Checksum => checksum;
+  int get pageCount => fileCount;
 
   Map<String, dynamic> toMap() => {
         'is_valid': isValid,
         'student_count': studentCount,
         'byte_length': byteLength,
+        'file_count': fileCount,
         'checksum': checksum,
         'error_message': errorMessage,
       };

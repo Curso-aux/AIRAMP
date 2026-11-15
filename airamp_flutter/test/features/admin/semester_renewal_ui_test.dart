@@ -6,8 +6,6 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 
 import 'package:airamp_flutter/src/core/theme/app_theme.dart';
-import 'package:airamp_flutter/src/core/database/database_helper.dart';
-import 'package:airamp_flutter/src/features/auth/application/auth_provider.dart';
 import 'package:airamp_flutter/src/features/admin/domain/semester_archive_models.dart';
 import 'package:airamp_flutter/src/features/admin/data/semester_record_archiving_service.dart';
 import 'package:airamp_flutter/src/features/admin/data/semester_selective_purge_service.dart';
@@ -33,13 +31,25 @@ class MockArchivingService implements ISemesterRecordArchivingService {
   }
 
   @override
-  Future<Uint8List> generatePdfArchive(List<StudentArchiveRecord> records) async {
+  Future<Uint8List> generatePdfArchive(
+    List<StudentArchiveRecord> records,
+  ) async {
     // Standard mock PDF header
-    return Uint8List.fromList([0x25, 0x50, 0x44, 0x46, 0x2D, ...List.filled(2000, 65)]);
+    return Uint8List.fromList([
+      0x25,
+      0x50,
+      0x44,
+      0x46,
+      0x2D,
+      ...List.filled(2000, 65),
+    ]);
   }
 
   @override
-  ArchiveVerificationResult verifyPdfArchive(Uint8List pdfBytes, int expectedStudentCount) {
+  ArchiveVerificationResult verifyPdfArchive(
+    Uint8List pdfBytes,
+    int expectedStudentCount,
+  ) {
     if (shouldVerifyPass) {
       return ArchiveVerificationResult(
         isValid: true,
@@ -60,22 +70,76 @@ class MockArchivingService implements ISemesterRecordArchivingService {
       );
     }
   }
+
+  @override
+  Future<Uint8List> generateExcelWorkbook(
+    List<StudentArchiveRecord> records, {
+    String? academicYear,
+    String? semester,
+  }) async {
+    return Uint8List.fromList([0x50, 0x4B, 0x03, 0x04, ...List.filled(100, 0)]);
+  }
+
+  @override
+  Future<Uint8List> generateExcelZipArchive({
+    List<StudentArchiveRecord>? records,
+    String? academicYear,
+    String? semester,
+  }) async {
+    return Uint8List.fromList([0x50, 0x4B, 0x03, 0x04, ...List.filled(100, 0)]);
+  }
+
+  @override
+  ArchiveVerificationResult verifyZipArchive(
+    Uint8List zipBytes, [
+    int expectedStudentCount = 0,
+  ]) {
+    if (shouldVerifyPass) {
+      return ArchiveVerificationResult(
+        isValid: true,
+        studentCount: expectedStudentCount > 0
+            ? expectedStudentCount
+            : mockRecords.length,
+        byteLength: zipBytes.length,
+        fileCount: 2,
+        checksum: 'mock_zip_checksum_123',
+        errorMessage: null,
+        zipBytes: zipBytes,
+      );
+    } else {
+      return ArchiveVerificationResult(
+        isValid: false,
+        studentCount: 0,
+        byteLength: zipBytes.length,
+        fileCount: 0,
+        checksum: 'mock_checksum_invalid',
+        errorMessage: 'Mock archive verification failure',
+        zipBytes: zipBytes,
+      );
+    }
+  }
 }
 
 class MockSelectivePurgeService implements ISemesterSelectivePurgeService {
   int purgeCalls = 0;
   String? lastAdminId;
   String? lastSchoolId;
+  String? lastPreviousSemester;
+  String? lastNewSemester;
   PurgeSummary? customSummary;
 
   @override
   Future<PurgeSummary> executeSelectivePurge({
     required String adminId,
     required String schoolId,
+    String? previousSemester,
+    String? newSemester,
   }) async {
     purgeCalls++;
     lastAdminId = adminId;
     lastSchoolId = schoolId;
+    lastPreviousSemester = previousSemester;
+    lastNewSemester = newSemester;
 
     return customSummary ??
         PurgeSummary(
@@ -115,21 +179,28 @@ class MockAdminAnalyticsNotifier extends AdminAnalyticsNotifier {
   }
 
   @override
-  Future<void> loadAnalytics({AnalyticsFilter? filter, bool syncCloud = false}) async {}
+  Future<void> loadAnalytics({
+    AnalyticsFilter? filter,
+    bool syncCloud = false,
+  }) async {}
 }
 
 class MockSubjectsNotifier extends SubjectsNotifier {
   @override
   List<Map<String, dynamic>> build() => [
-        {'id': 1, 'name': 'Computer Systems Servicing', 'subject_code': 'CSS-NC-II'},
-      ];
+    {
+      'id': 1,
+      'name': 'Computer Systems Servicing',
+      'subject_code': 'CSS-NC-II',
+    },
+  ];
 }
 
 class MockSectionsNotifier extends SectionsNotifier {
   @override
   List<Map<String, dynamic>> build() => [
-        {'id': 1, 'name': 'Diamond', 'grade': 'Grade 10'},
-      ];
+    {'id': 1, 'name': 'Diamond', 'grade': 'Grade 10'},
+  ];
 }
 
 // ── Test Suite ───────────────────────────────────────────────────────────────
@@ -181,7 +252,9 @@ void main() {
         await tester.pumpWidget(
           ProviderScope(
             overrides: [
-              adminAnalyticsProvider.overrideWith(() => MockAdminAnalyticsNotifier()),
+              adminAnalyticsProvider.overrideWith(
+                () => MockAdminAnalyticsNotifier(),
+              ),
               subjectsProvider.overrideWith(() => MockSubjectsNotifier()),
               sectionsProvider.overrideWith(() => MockSectionsNotifier()),
               semesterArchivingServiceProvider.overrideWithValue(mockArchiving),
@@ -189,14 +262,13 @@ void main() {
             ],
             child: MaterialApp(
               theme: AppTheme.darkTheme,
-              home: const Scaffold(
-                body: SingleChildScrollView(child: AdminWebAnalyticsView()),
-              ),
+              home: const AdminWebAnalyticsView(),
             ),
           ),
         );
 
-        await tester.pumpAndSettle();
+        await tester.pump();
+        await tester.pump(const Duration(milliseconds: 300));
 
         // 1. Verify card is present
         expect(find.byKey(const Key('semester_renewal_card')), findsOneWidget);
@@ -209,13 +281,19 @@ void main() {
         );
 
         // 3. Verify Reset button is locked and disabled
-        final resetBtnFinder = find.byKey(const Key('btn_end_of_semester_reset'));
+        final resetBtnFinder = find.byKey(
+          const Key('btn_end_of_semester_reset'),
+        );
         expect(resetBtnFinder, findsOneWidget);
         expect(find.text('End of Semester Reset (Locked)'), findsOneWidget);
 
         final elevatedButton = tester.widget<ElevatedButton>(resetBtnFinder);
-        expect(elevatedButton.onPressed, isNull,
-            reason: 'Reset button MUST be strictly disabled when archive is not verified');
+        expect(
+          elevatedButton.onPressed,
+          isNull,
+          reason:
+              'Reset button MUST be strictly disabled when archive is not verified',
+        );
       },
     );
 
@@ -233,7 +311,9 @@ void main() {
         await tester.pumpWidget(
           ProviderScope(
             overrides: [
-              adminAnalyticsProvider.overrideWith(() => MockAdminAnalyticsNotifier()),
+              adminAnalyticsProvider.overrideWith(
+                () => MockAdminAnalyticsNotifier(),
+              ),
               subjectsProvider.overrideWith(() => MockSubjectsNotifier()),
               sectionsProvider.overrideWith(() => MockSectionsNotifier()),
               semesterArchivingServiceProvider.overrideWithValue(mockArchiving),
@@ -241,21 +321,21 @@ void main() {
             ],
             child: MaterialApp(
               theme: AppTheme.darkTheme,
-              home: const Scaffold(
-                body: SingleChildScrollView(child: AdminWebAnalyticsView()),
-              ),
+              home: const AdminWebAnalyticsView(),
             ),
           ),
         );
 
-        await tester.pumpAndSettle();
+        await tester.pump();
+        await tester.pump(const Duration(milliseconds: 300));
 
         // 1. Find and tap "Generate & Download Archive" button
         final generateBtnFinder = find.byKey(const Key('btn_generate_archive'));
         expect(generateBtnFinder, findsOneWidget);
 
         await tester.tap(generateBtnFinder);
-        await tester.pumpAndSettle();
+        await tester.pump();
+        await tester.pump(const Duration(milliseconds: 300));
 
         // 2. Verify Status Badge is now Verified & Unlocked
         expect(
@@ -264,12 +344,18 @@ void main() {
         );
 
         // 3. Verify Reset Button is now UNLOCKED & ENABLED
-        final resetBtnFinder = find.byKey(const Key('btn_end_of_semester_reset'));
+        final resetBtnFinder = find.byKey(
+          const Key('btn_end_of_semester_reset'),
+        );
         expect(find.text('End of Semester Reset'), findsOneWidget);
 
         final elevatedButton = tester.widget<ElevatedButton>(resetBtnFinder);
-        expect(elevatedButton.onPressed, isNotNull,
-            reason: 'Reset button MUST be enabled after archive verification succeeds');
+        expect(
+          elevatedButton.onPressed,
+          isNotNull,
+          reason:
+              'Reset button MUST be enabled after archive verification succeeds',
+        );
       },
     );
 
@@ -291,9 +377,7 @@ void main() {
               semesterPurgeServiceProvider.overrideWithValue(mockPurge),
             ],
             child: const MaterialApp(
-              home: Scaffold(
-                body: AcademicTermResetModal(),
-              ),
+              home: Scaffold(body: AcademicTermResetModal()),
             ),
           ),
         );
@@ -302,29 +386,51 @@ void main() {
 
         // 1. Step 1 View should be visible
         expect(find.byKey(const Key('step_1_view')), findsOneWidget);
-        expect(find.textContaining('Step 1 of 3: Warning & Scope Review'), findsOneWidget);
+        expect(
+          find.textContaining('Step 1 of 3: Warning & Scope Review'),
+          findsOneWidget,
+        );
 
         // 2. Scope review contents
+        expect(
+          find.text('Data to be Archived into .xlsx / .zip:'),
+          findsOneWidget,
+        );
         expect(find.text('Data to be Permanently Purged:'), findsOneWidget);
         expect(find.text('Data Strictly Preserved Intact:'), findsOneWidget);
+        expect(
+          find.byKey(const Key('previous_semester_field')),
+          findsOneWidget,
+        );
+        expect(find.byKey(const Key('new_semester_field')), findsOneWidget);
 
         // 3. Proceed button is disabled initially
         final proceedBtnFinder = find.byKey(const Key('step_1_proceed_button'));
         expect(proceedBtnFinder, findsOneWidget);
         var proceedBtn = tester.widget<ElevatedButton>(proceedBtnFinder);
-        expect(proceedBtn.onPressed, isNull,
-            reason: 'Proceed button must remain disabled until checkbox is checked');
+        expect(
+          proceedBtn.onPressed,
+          isNull,
+          reason:
+              'Proceed button must remain disabled until checkbox is checked',
+        );
 
         // 4. Tap acknowledgement checkbox
-        final checkboxFinder = find.byKey(const Key('acknowledgement_checkbox'));
+        final checkboxFinder = find.byKey(
+          const Key('acknowledgement_checkbox'),
+        );
         expect(checkboxFinder, findsOneWidget);
         await tester.tap(checkboxFinder);
         await tester.pumpAndSettle();
 
         // 5. Proceed button is now ENABLED
         proceedBtn = tester.widget<ElevatedButton>(proceedBtnFinder);
-        expect(proceedBtn.onPressed, isNotNull,
-            reason: 'Proceed button must become enabled after acknowledging impact');
+        expect(
+          proceedBtn.onPressed,
+          isNotNull,
+          reason:
+              'Proceed button must become enabled after acknowledging impact',
+        );
 
         // 6. Tap Proceed to transition to Step 2
         await tester.tap(proceedBtnFinder);
@@ -332,7 +438,10 @@ void main() {
 
         // 7. Verify transition to Step 2
         expect(find.byKey(const Key('step_2_view')), findsOneWidget);
-        expect(find.textContaining('Step 2 of 3: Admin Re-Authentication'), findsOneWidget);
+        expect(
+          find.textContaining('Step 2 of 3: Admin Re-Authentication'),
+          findsOneWidget,
+        );
       },
     );
 
@@ -389,7 +498,9 @@ void main() {
         // Verify rejection error message is displayed
         expect(find.byKey(const Key('password_error_banner')), findsOneWidget);
         expect(
-          find.text('Incorrect administrator password. Re-authentication failed.'),
+          find.text(
+            'Incorrect administrator password. Re-authentication failed.',
+          ),
           findsOneWidget,
         );
 
@@ -426,7 +537,10 @@ void main() {
         await container
             .read(semesterRenewalControllerProvider.notifier)
             .generateAndDownloadArchive();
-        expect(container.read(semesterRenewalControllerProvider).isResetUnlocked, isTrue);
+        expect(
+          container.read(semesterRenewalControllerProvider).isResetUnlocked,
+          isTrue,
+        );
 
         await tester.pumpWidget(
           UncontrolledProviderScope(
@@ -436,7 +550,8 @@ void main() {
                 body: AcademicTermResetModal(
                   adminId: 'admin_audit_user',
                   schoolId: 'sch_main',
-                  passwordVerifier: (entered) async => entered == 'ValidPass2026',
+                  passwordVerifier: (entered) async =>
+                      entered == 'ValidPass2026',
                 ),
               ),
             ),
@@ -462,14 +577,20 @@ void main() {
 
         // Step 3: Confirmation phrase view
         expect(find.byKey(const Key('step_3_view')), findsOneWidget);
-        expect(find.textContaining('Step 3 of 3: Confirmation Phrase & Execution'), findsOneWidget);
+        expect(
+          find.textContaining('Step 3 of 3: Confirmation Phrase & Execution'),
+          findsOneWidget,
+        );
 
         // Execute button is disabled initially
         final executeBtnFinder = find.byKey(const Key('execute_reset_button'));
         expect(executeBtnFinder, findsOneWidget);
         var execBtn = tester.widget<ElevatedButton>(executeBtnFinder);
-        expect(execBtn.onPressed, isNull,
-            reason: 'Execute button must be disabled until exact phrase is typed');
+        expect(
+          execBtn.onPressed,
+          isNull,
+          reason: 'Execute button must be disabled until exact phrase is typed',
+        );
 
         // Enter incorrect or partial phrase
         await tester.enterText(
@@ -478,8 +599,11 @@ void main() {
         );
         await tester.pumpAndSettle();
         execBtn = tester.widget<ElevatedButton>(executeBtnFinder);
-        expect(execBtn.onPressed, isNull,
-            reason: 'Execute button must remain disabled with incomplete phrase');
+        expect(
+          execBtn.onPressed,
+          isNull,
+          reason: 'Execute button must remain disabled with incomplete phrase',
+        );
 
         // Enter EXACT phrase
         await tester.enterText(
@@ -489,8 +613,11 @@ void main() {
         await tester.pumpAndSettle();
 
         execBtn = tester.widget<ElevatedButton>(executeBtnFinder);
-        expect(execBtn.onPressed, isNotNull,
-            reason: 'Execute button must be enabled when exact phrase matches');
+        expect(
+          execBtn.onPressed,
+          isNotNull,
+          reason: 'Execute button must be enabled when exact phrase matches',
+        );
 
         // Tap Execute Reset
         await tester.tap(executeBtnFinder);
@@ -500,6 +627,11 @@ void main() {
         expect(mockPurge.purgeCalls, equals(1));
         expect(mockPurge.lastAdminId, equals('admin_audit_user'));
         expect(mockPurge.lastSchoolId, equals('sch_main'));
+        expect(
+          mockPurge.lastPreviousSemester,
+          equals('1st Semester AY 2025-2026'),
+        );
+        expect(mockPurge.lastNewSemester, equals('2nd Semester AY 2025-2026'));
 
         // Verify completion view is displayed
         expect(find.byKey(const Key('purge_success_view')), findsOneWidget);
@@ -521,7 +653,9 @@ void main() {
         );
         addTearDown(container.dispose);
 
-        final notifier = container.read(semesterRenewalControllerProvider.notifier);
+        final notifier = container.read(
+          semesterRenewalControllerProvider.notifier,
+        );
         final initialState = container.read(semesterRenewalControllerProvider);
 
         // 1. Initial State: isResetUnlocked MUST be false
@@ -536,12 +670,17 @@ void main() {
             isA<StateError>().having(
               (e) => e.message,
               'message',
-              contains('Cannot execute semester reset: Archive generation and verification is required.'),
+              contains(
+                'Cannot execute semester reset: Archive generation and verification is required.',
+              ),
             ),
           ),
         );
-        expect(mockPurge.purgeCalls, equals(0),
-            reason: 'Purge service must never be invoked when locked');
+        expect(
+          mockPurge.purgeCalls,
+          equals(0),
+          reason: 'Purge service must never be invoked when locked',
+        );
 
         // 3. Generate and verify archive
         final result = await notifier.generateAndDownloadArchive();
@@ -563,7 +702,9 @@ void main() {
         expect(mockPurge.purgeCalls, equals(1));
         expect(mockPurge.lastAdminId, equals('admin_authorized'));
 
-        final completedState = container.read(semesterRenewalControllerProvider);
+        final completedState = container.read(
+          semesterRenewalControllerProvider,
+        );
         expect(completedState.isPurging, isFalse);
         expect(completedState.purgeSummary, isNotNull);
         expect(completedState.purgeSummary!.deletedSubjectsCount, equals(8));

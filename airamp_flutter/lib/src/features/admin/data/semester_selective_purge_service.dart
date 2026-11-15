@@ -11,6 +11,8 @@ abstract class ISemesterSelectivePurgeService {
   Future<PurgeSummary> executeSelectivePurge({
     required String adminId,
     required String schoolId,
+    String? previousSemester,
+    String? newSemester,
   });
 }
 
@@ -24,14 +26,18 @@ class ChunkedBatchQueue {
   int _pendingOps = 0;
   int _totalCommitted = 0;
 
-  ChunkedBatchQueue(FirebaseFirestore this.firestore, {this.maxOpsPerBatch = 400})
-      : _batchFactory = null,
-        _currentBatch = firestore.batch();
+  ChunkedBatchQueue(
+    FirebaseFirestore this.firestore, {
+    this.maxOpsPerBatch = 400,
+  }) : _batchFactory = null,
+       _currentBatch = firestore.batch();
 
-  ChunkedBatchQueue.custom(WriteBatch Function() batchFactory, {this.maxOpsPerBatch = 400})
-      : firestore = null,
-        _batchFactory = batchFactory,
-        _currentBatch = batchFactory();
+  ChunkedBatchQueue.custom(
+    WriteBatch Function() batchFactory, {
+    this.maxOpsPerBatch = 400,
+  }) : firestore = null,
+       _batchFactory = batchFactory,
+       _currentBatch = batchFactory();
 
   int get pendingOps => _pendingOps;
   int get totalCommitted => _totalCommitted;
@@ -44,7 +50,10 @@ class ChunkedBatchQueue {
     }
   }
 
-  Future<void> update(DocumentReference docRef, Map<String, dynamic> data) async {
+  Future<void> update(
+    DocumentReference docRef,
+    Map<String, dynamic> data,
+  ) async {
     _currentBatch.update(docRef, data);
     _pendingOps++;
     if (_pendingOps >= maxOpsPerBatch) {
@@ -52,7 +61,11 @@ class ChunkedBatchQueue {
     }
   }
 
-  Future<void> set(DocumentReference docRef, Map<String, dynamic> data, [SetOptions? options]) async {
+  Future<void> set(
+    DocumentReference docRef,
+    Map<String, dynamic> data, [
+    SetOptions? options,
+  ]) async {
     _currentBatch.set(docRef, data, options);
     _pendingOps++;
     if (_pendingOps >= maxOpsPerBatch) {
@@ -76,16 +89,14 @@ class ChunkedBatchQueue {
 
 class SemesterSelectivePurgeService implements ISemesterSelectivePurgeService {
   final FirebaseFirestore? _firestoreInstance;
-  final DatabaseHelper? _dbHelper;
-  final Database? _database;
+  final DatabaseHelper? dbHelper;
+  final Database? database;
 
   SemesterSelectivePurgeService({
     FirebaseFirestore? firestore,
-    DatabaseHelper? dbHelper,
-    Database? database,
-  })  : _firestoreInstance = firestore,
-        _dbHelper = dbHelper,
-        _database = database;
+    this.dbHelper,
+    this.database,
+  }) : _firestoreInstance = firestore;
 
   FirebaseFirestore? get _firestore {
     if (_firestoreInstance != null) return _firestoreInstance;
@@ -98,8 +109,9 @@ class SemesterSelectivePurgeService implements ISemesterSelectivePurgeService {
   }
 
   Future<Database> _getDatabase() async {
-    if (_database != null) return _database!;
-    final helper = _dbHelper;
+    final db = database;
+    if (db != null) return db;
+    final helper = dbHelper;
     if (helper != null) return await helper.database;
     return await DatabaseHelper().database;
   }
@@ -108,8 +120,16 @@ class SemesterSelectivePurgeService implements ISemesterSelectivePurgeService {
   Future<PurgeSummary> executeSelectivePurge({
     required String adminId,
     required String schoolId,
+    String? previousSemester,
+    String? newSemester,
   }) async {
     final executedAt = DateTime.now();
+    final prevSem = (previousSemester?.trim().isNotEmpty == true)
+        ? previousSemester!.trim()
+        : '1st Semester AY 2025-2026';
+    final nextSem = (newSemester?.trim().isNotEmpty == true)
+        ? newSemester!.trim()
+        : '2nd Semester AY 2025-2026';
 
     int deletedSubjectsCount = 0;
     int deletedModulesCount = 0;
@@ -132,7 +152,9 @@ class SemesterSelectivePurgeService implements ISemesterSelectivePurgeService {
       final subjectsSnap = await fs.collection('subjects').get();
       deletedSubjectsCount = subjectsSnap.docs.length;
       for (final subjectDoc in subjectsSnap.docs) {
-        final modulesSnap = await subjectDoc.reference.collection('modules').get();
+        final modulesSnap = await subjectDoc.reference
+            .collection('modules')
+            .get();
         deletedModulesCount += modulesSnap.docs.length;
         for (final moduleDoc in modulesSnap.docs) {
           await queue.delete(moduleDoc.reference);
@@ -158,6 +180,7 @@ class SemesterSelectivePurgeService implements ISemesterSelectivePurgeService {
       deletedSchedulesCount = await purgeCollection('class_schedules');
       deletedEnrollmentKeysCount = await purgeCollection('enrollment_keys');
       await purgeCollection('reg_links');
+      await purgeCollection('student_progress');
 
       // 3. Strict User Preservation & Student Enrollment Reset
       final usersSnap = await fs.collection('users').get();
@@ -206,12 +229,23 @@ class SemesterSelectivePurgeService implements ISemesterSelectivePurgeService {
           try {
             await txn.delete(table);
           } catch (e) {
-            debugPrint('[SemesterSelectivePurge] Note deleting table $table: $e');
+            debugPrint(
+              '[SemesterSelectivePurge] Note deleting table $table: $e',
+            );
           }
         }
       });
     } catch (e) {
       debugPrint('[SemesterSelectivePurge] SQLite transaction note: $e');
+    }
+
+    // Fallback: If running without Firestore, count preserved users from SQLite
+    if (preservedUsersCount == 0) {
+      try {
+        final db = await _getDatabase();
+        final usersList = await db.query('users');
+        preservedUsersCount = usersList.length;
+      } catch (_) {}
     }
 
     // 6. Clean SharedPreferences tombstones for subjects
@@ -236,17 +270,22 @@ class SemesterSelectivePurgeService implements ISemesterSelectivePurgeService {
       resetStudentEnrollmentsCount: resetStudentEnrollmentsCount,
     );
 
-    // 8. Dual Audit Logging
+    // 8. Dual Audit Logging with Semester Rollover Metadata
     if (fs != null) {
       try {
         final auditDocId = 'audit_purge_${executedAt.millisecondsSinceEpoch}';
         await fs.collection('system_audit_logs').doc(auditDocId).set({
           'id': auditDocId,
-          'action': 'SEMESTER_SELECTIVE_PURGE',
+          'action': 'SEMESTER_ROLLOVER',
+          'previous_semester': prevSem,
+          'new_semester': nextSem,
+          'timestamp': executedAt.toUtc().toIso8601String(),
+          'admin_id': adminId,
           'actor_id': adminId,
           'school_id': schoolId,
           'created_at': executedAt.toIso8601String(),
-          'details': 'Academic semester reset executed. Preserved $preservedUsersCount users.',
+          'details':
+              'Academic semester reset executed ($prevSem -> $nextSem). Preserved $preservedUsersCount users.',
           'summary': summary.toMap(),
         });
       } catch (e) {
@@ -255,22 +294,42 @@ class SemesterSelectivePurgeService implements ISemesterSelectivePurgeService {
     }
 
     try {
-      if (_database != null) {
+      final db = database;
+      if (db != null) {
         final auditDocId = 'audit_purge_${executedAt.millisecondsSinceEpoch}';
-        await _database!.insert('system_audit_logs', {
+        await db.insert('system_audit_logs', {
           'id': auditDocId,
           'action': 'SEMESTER_SELECTIVE_PURGE',
           'actor_id': adminId,
           'actor_name': 'Campus Admin',
           'school_id': schoolId,
           'created_at': executedAt.toIso8601String(),
-          'details': 'Semester academic data purged. Preserved $preservedUsersCount user accounts. Deleted $deletedSubjectsCount subjects, $deletedQuizzesCount quizzes, $deletedAssignmentsCount assignments, $deletedSubmissionsCount submissions.',
+          'details':
+              'Semester academic data purged ($prevSem -> $nextSem). Preserved $preservedUsersCount user accounts. Deleted $deletedSubjectsCount subjects, $deletedQuizzesCount quizzes, $deletedAssignmentsCount assignments, $deletedSubmissionsCount submissions.',
+        });
+        await db.insert('system_audit_logs', {
+          'id': '${auditDocId}_rollover',
+          'action': 'SEMESTER_ROLLOVER',
+          'actor_id': adminId,
+          'actor_name': 'Campus Admin',
+          'school_id': schoolId,
+          'created_at': executedAt.toIso8601String(),
+          'details':
+              'Semester rollover recorded ($prevSem -> $nextSem). Preserved $preservedUsersCount user accounts.',
         });
       } else {
-        final helper = _dbHelper ?? DatabaseHelper();
+        final helper = dbHelper ?? DatabaseHelper();
         await helper.logAuditEvent(
           action: 'SEMESTER_SELECTIVE_PURGE',
-          details: 'Semester academic data purged. Preserved $preservedUsersCount user accounts. Deleted $deletedSubjectsCount subjects, $deletedQuizzesCount quizzes, $deletedAssignmentsCount assignments, $deletedSubmissionsCount submissions.',
+          details:
+              'Semester academic data purged ($prevSem -> $nextSem). Preserved $preservedUsersCount user accounts. Deleted $deletedSubjectsCount subjects, $deletedQuizzesCount quizzes, $deletedAssignmentsCount assignments, $deletedSubmissionsCount submissions.',
+          actorId: adminId,
+          schoolId: schoolId,
+        );
+        await helper.logAuditEvent(
+          action: 'SEMESTER_ROLLOVER',
+          details:
+              'Semester rollover recorded ($prevSem -> $nextSem). Preserved $preservedUsersCount user accounts.',
           actorId: adminId,
           schoolId: schoolId,
         );

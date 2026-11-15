@@ -159,7 +159,8 @@ void main() {
         ),
       );
 
-      await tester.pumpAndSettle();
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 300));
 
       expect(find.text('Filter Analytics'), findsOneWidget);
       expect(find.text('All Time'), findsOneWidget);
@@ -167,7 +168,8 @@ void main() {
 
       // Tap Filter Analytics button to expand panel on desktop
       await tester.tap(find.text('Filter Analytics'));
-      await tester.pumpAndSettle();
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 300));
 
       expect(find.text('Filter Dimensions (Combinable via AND Logic)'), findsOneWidget);
       expect(find.text('Subject'), findsOneWidget);
@@ -200,7 +202,8 @@ void main() {
         ),
       );
 
-      await tester.pumpAndSettle();
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 300));
 
       // On narrow mobile, renders compact 'Filters' button without overflow
       expect(find.text('Filters'), findsOneWidget);
@@ -208,7 +211,8 @@ void main() {
 
       // Tap opens modal bottom sheet
       await tester.tap(find.text('Filters'));
-      await tester.pumpAndSettle();
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 300));
 
       expect(find.text('Analytics Filters'), findsOneWidget);
       expect(find.text('Apply & Close'), findsOneWidget);
@@ -233,7 +237,8 @@ void main() {
         ),
       );
 
-      await tester.pumpAndSettle();
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 300));
 
       expect(find.text('School Analytics & Operations'), findsOneWidget);
       expect(find.byType(AnalyticsFilterBar), findsOneWidget);

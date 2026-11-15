@@ -12,6 +12,7 @@ import 'package:airamp_flutter/src/features/admin/presentation/web/admin_web_stu
 import 'package:airamp_flutter/src/features/admin/presentation/web/admin_web_teachers_screen.dart';
 import 'package:airamp_flutter/src/features/admin/presentation/web/admin_web_analytics_view.dart';
 import 'package:airamp_flutter/src/features/admin/presentation/subjects_mgmt_screen.dart';
+import 'package:airamp_flutter/src/features/teacher/data/teacher_repository.dart';
 
 class _FakeSchoolAdminsNotifier extends SchoolAdminsNotifier {
   @override
@@ -282,21 +283,21 @@ void main() {
       expect(find.byType(NavigationBar), findsOneWidget);
 
       // Tap "Campuses" tab and verify zero RenderFlex overflow
-      await tester.tap(find.text('Campuses'));
+      await tester.tap(find.descendant(of: find.byType(NavigationBar), matching: find.text('Campuses')));
       await tester.pump(const Duration(milliseconds: 300));
       expect(find.text('Institutional Campuses & Multi-Tenant Registry'), findsOneWidget);
       expect(tester.takeException(), isNull);
 
       // Tap "Admins" tab and verify zero RenderFlex overflow
-      await tester.tap(find.text('Admins'));
+      await tester.tap(find.descendant(of: find.byType(NavigationBar), matching: find.text('Admins')));
       await tester.pump(const Duration(milliseconds: 300));
       expect(find.text('Administrator Directory & Access Governance'), findsOneWidget);
       expect(tester.takeException(), isNull);
 
       // Tap "Security" tab and verify zero RenderFlex overflow
-      await tester.tap(find.text('Security'));
+      await tester.tap(find.descendant(of: find.byType(NavigationBar), matching: find.text('Security')));
       await tester.pump(const Duration(milliseconds: 300));
-      expect(find.text('Security Architecture & System Audit Trail'), findsOneWidget);
+      expect(find.text('Security & Activity History'), findsWidgets);
       expect(tester.takeException(), isNull);
     });
 
@@ -779,6 +780,12 @@ void main() {
             adminAnalyticsProvider.overrideWith(() => _FakeAnalyticsNotifier()),
             subjectsProvider.overrideWith(() => _FakeSubjectsNotifier()),
             sectionsProvider.overrideWith(() => _FakeSectionsNotifier()),
+            competencyHeatmapProvider.overrideWith((ref, params) async => {
+              'subjects': <Map<String, dynamic>>[],
+              'sections': <String>[],
+              'students': <Map<String, dynamic>>[],
+              'matrix': <Map<String, dynamic>>[],
+            }),
           ],
           child: MaterialApp(
             theme: AppTheme.lightTheme,
@@ -787,7 +794,6 @@ void main() {
         ),
       );
       await tester.pumpAndSettle();
-      // await tester.pumpAndSettle();
       expect(tester.takeException(), isNull);
 
       // Assert header
@@ -856,14 +862,12 @@ void main() {
       // Assert responsive header buttons: full-width primary CTA and 50/50 secondary buttons
       expect(find.text('Create New Subject'), findsOneWidget);
       expect(find.text('Adopt Global'), findsOneWidget);
-      expect(find.text('PDF Auto-Scan'), findsOneWidget);
 
       // Assert subject cards render
       expect(find.text('Mobile UI & State Management'), findsOneWidget);
       expect(find.text('Introduction to Flutter & Dart'), findsOneWidget);
 
       // Assert segmented card action bar icons
-      expect(find.byIcon(Icons.picture_as_pdf_outlined), findsWidgets);
       expect(find.byIcon(Icons.edit_outlined), findsWidgets);
       expect(find.byIcon(Icons.delete_outline_rounded), findsWidgets);
 

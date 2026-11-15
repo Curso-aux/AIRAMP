@@ -206,6 +206,7 @@ class SemesterRenewalState {
 
 class SemesterRenewalService {
   final ISemesterFirestoreGateway gateway;
+  static int _auditLogCounter = 0;
 
   const SemesterRenewalService(this.gateway);
 
@@ -667,10 +668,11 @@ class SemesterRenewalService {
       executedAt: DateTime.now().toUtc(),
     );
 
-    // Append audit log event
+    // Append audit log event with monotonic sequence suffix to prevent Windows clock tick collisions
+    final auditSuffix = '${DateTime.now().microsecondsSinceEpoch}_${_auditLogCounter++}';
     await gateway.setDocument(
       'system_audit_logs',
-      'AUDIT-${DateTime.now().millisecondsSinceEpoch}',
+      'AUDIT-$auditSuffix',
       {
         'event': 'SEMESTER_SELECTIVE_PURGE',
         'admin_id': adminId,

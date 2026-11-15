@@ -922,11 +922,12 @@ class _SuperAdminSecurityTabState extends ConsumerState<SuperAdminSecurityTab> {
         alignment: WrapAlignment.spaceBetween,
         crossAxisAlignment: WrapCrossAlignment.center,
         children: [
-          Row(
-            mainAxisSize: MainAxisSize.min,
+          Wrap(
+            spacing: 10,
+            runSpacing: 8,
             children: [
               Container(
-                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                 decoration: BoxDecoration(
                   color: gTheme.successBg,
                   borderRadius: BorderRadius.circular(6),
@@ -948,9 +949,8 @@ class _SuperAdminSecurityTabState extends ConsumerState<SuperAdminSecurityTab> {
                   ],
                 ),
               ),
-              const SizedBox(width: 10),
               Container(
-                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                 decoration: BoxDecoration(
                   color: gTheme.primarySubtle,
                   borderRadius: BorderRadius.circular(6),

@@ -306,7 +306,7 @@ class _LoMasteryMatrixState extends ConsumerState<LoMasteryMatrix> {
                   mainAxisSize: MainAxisSize.min,
                   children: [
                     _buildDimensionButton(
-                      label: 'Class Sections',
+                      label: isMobile ? 'Sections' : 'Class Sections',
                       icon: Icons.domain_rounded,
                       isActive: _viewDimension == 'section',
                       isDark: isDark,
@@ -316,7 +316,7 @@ class _LoMasteryMatrixState extends ConsumerState<LoMasteryMatrix> {
                       },
                     ),
                     _buildDimensionButton(
-                      label: 'Individual Students',
+                      label: isMobile ? 'Students' : 'Individual Students',
                       icon: Icons.person_search_rounded,
                       isActive: _viewDimension == 'student',
                       isDark: isDark,
