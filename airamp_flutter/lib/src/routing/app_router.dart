@@ -79,9 +79,11 @@ final routerProvider = Provider<GoRouter>((ref) {
 
   final initialAuth = ref.read(authProvider);
   final initialLoc = (initialAuth != null && initialAuth.mustChangePassword)
-      ? ((initialAuth.role == 'admin' || initialAuth.role == 'super_admin')
-          ? '/admin/profile'
-          : (initialAuth.role == 'teacher' ? '/teacher/profile' : '/student/profile'))
+      ? (initialAuth.role == 'super_admin'
+          ? '/super-admin/profile'
+          : (initialAuth.role == 'admin'
+              ? '/admin/profile'
+              : (initialAuth.role == 'teacher' ? '/teacher/profile' : '/student/profile')))
       : (initialAuth != null && initialAuth.role == 'super_admin')
           ? '/super-admin'
           : (initialAuth != null && initialAuth.role == 'admin')
@@ -483,6 +485,13 @@ final routerProvider = Provider<GoRouter>((ref) {
         pageBuilder: (context, state) => AppPageTransitions.fadeThrough(
           key: state.pageKey,
           child: const SuperAdminPortalScreen(),
+        ),
+      ),
+      GoRoute(
+        path: '/super-admin/profile',
+        pageBuilder: (context, state) => AppPageTransitions.fadeThrough(
+          key: state.pageKey,
+          child: const SuperAdminPortalScreen(initialTabIndex: 4),
         ),
       ),
       GoRoute(

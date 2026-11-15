@@ -459,11 +459,14 @@ class _StudentProfileScreenState extends ConsumerState<StudentProfileScreen>
             },
             style: ElevatedButton.styleFrom(
               backgroundColor: AppTheme.primary,
-              foregroundColor: Colors.black,
+              foregroundColor: Colors.white,
             ),
             child: const Text(
               'Proceed',
-              style: TextStyle(fontWeight: FontWeight.bold),
+              style: TextStyle(
+                fontWeight: FontWeight.bold,
+                color: Colors.white,
+              ),
             ),
           ),
         ],
@@ -531,14 +534,17 @@ class _StudentProfileScreenState extends ConsumerState<StudentProfileScreen>
             onPressed: () => Navigator.of(ctx).pop(),
             style: ElevatedButton.styleFrom(
               backgroundColor: AppTheme.primary,
-              foregroundColor: Colors.black,
+              foregroundColor: Colors.white,
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(10),
               ),
             ),
             child: const Text(
               'Set Password Now',
-              style: TextStyle(fontWeight: FontWeight.bold),
+              style: TextStyle(
+                fontWeight: FontWeight.bold,
+                color: Colors.white,
+              ),
             ),
           ),
         ],
@@ -607,7 +613,7 @@ class _StudentProfileScreenState extends ConsumerState<StudentProfileScreen>
                     },
                     style: ElevatedButton.styleFrom(
                       backgroundColor: AppTheme.primary,
-                      foregroundColor: Colors.black,
+                      foregroundColor: Colors.white,
                       shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(12),
                       ),
@@ -618,6 +624,7 @@ class _StudentProfileScreenState extends ConsumerState<StudentProfileScreen>
                       style: const TextStyle(
                         fontWeight: FontWeight.bold,
                         fontSize: 14,
+                        color: Colors.white,
                       ),
                     ),
                   ),
@@ -1350,7 +1357,9 @@ class _StudentProfileScreenState extends ConsumerState<StudentProfileScreen>
 
                       // New Password Field
                       TextField(
-                        key: ValueKey('student_mand_new_pass_$_obscureNewPassword'),
+                        key: ValueKey(
+                          'student_mand_new_pass_$_obscureNewPassword',
+                        ),
                         focusNode: _newPasswordFocusNode,
                         controller: _newPasswordController,
                         obscureText: _obscureNewPassword,
@@ -1364,7 +1373,10 @@ class _StudentProfileScreenState extends ConsumerState<StudentProfileScreen>
                             size: 20,
                           ),
                           suffixIcon: IconButton(
-                            focusNode: FocusNode(canRequestFocus: false, skipTraversal: true),
+                            focusNode: FocusNode(
+                              canRequestFocus: false,
+                              skipTraversal: true,
+                            ),
                             icon: Icon(
                               _obscureNewPassword
                                   ? Icons.visibility_off_outlined
@@ -1411,7 +1423,9 @@ class _StudentProfileScreenState extends ConsumerState<StudentProfileScreen>
 
                       // Confirm Password Field
                       TextField(
-                        key: ValueKey('student_mand_confirm_pass_$_obscureConfirmPassword'),
+                        key: ValueKey(
+                          'student_mand_confirm_pass_$_obscureConfirmPassword',
+                        ),
                         focusNode: _confirmPasswordFocusNode,
                         controller: _confirmPasswordController,
                         obscureText: _obscureConfirmPassword,
@@ -1425,7 +1439,10 @@ class _StudentProfileScreenState extends ConsumerState<StudentProfileScreen>
                             size: 20,
                           ),
                           suffixIcon: IconButton(
-                            focusNode: FocusNode(canRequestFocus: false, skipTraversal: true),
+                            focusNode: FocusNode(
+                              canRequestFocus: false,
+                              skipTraversal: true,
+                            ),
                             icon: Icon(
                               _obscureConfirmPassword
                                   ? Icons.visibility_off_outlined
@@ -2677,7 +2694,10 @@ class _StudentProfileScreenState extends ConsumerState<StudentProfileScreen>
                       counterText: '',
                       hintStyle: TextStyle(color: AppTheme.textMuted),
                       suffixIcon: IconButton(
-                        focusNode: FocusNode(canRequestFocus: false, skipTraversal: true),
+                        focusNode: FocusNode(
+                          canRequestFocus: false,
+                          skipTraversal: true,
+                        ),
                         icon: Icon(
                           _obscureNewPassword
                               ? Icons.visibility_off_outlined
@@ -2723,7 +2743,9 @@ class _StudentProfileScreenState extends ConsumerState<StudentProfileScreen>
 
                   // Confirm Password
                   TextField(
-                    key: ValueKey('student_confirm_pass_$_obscureConfirmPassword'),
+                    key: ValueKey(
+                      'student_confirm_pass_$_obscureConfirmPassword',
+                    ),
                     focusNode: _confirmPasswordFocusNode,
                     controller: _confirmPasswordController,
                     maxLength: 16,
@@ -2741,7 +2763,10 @@ class _StudentProfileScreenState extends ConsumerState<StudentProfileScreen>
                       counterText: '',
                       hintStyle: TextStyle(color: AppTheme.textMuted),
                       suffixIcon: IconButton(
-                        focusNode: FocusNode(canRequestFocus: false, skipTraversal: true),
+                        focusNode: FocusNode(
+                          canRequestFocus: false,
+                          skipTraversal: true,
+                        ),
                         icon: Icon(
                           _obscureConfirmPassword
                               ? Icons.visibility_off_outlined

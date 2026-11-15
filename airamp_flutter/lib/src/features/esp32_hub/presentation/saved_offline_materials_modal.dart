@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:open_filex/open_filex.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/components/app_toast.dart';
 import '../data/saved_materials_service.dart';
@@ -142,6 +143,193 @@ class _SavedOfflineMaterialsModalState extends State<SavedOfflineMaterialsModal>
       context: context,
       barrierDismissible: true,
       builder: (ctx) => OfflineMaterialReaderDialog(item: item),
+    );
+  }
+
+  Future<void> _openExternalViewer(HubMaterialItem item) async {
+    final result = await SavedMaterialsService.instance.openMaterial(item);
+    if (!mounted) return;
+    if (result.type != ResultType.done) {
+      if (result.type == ResultType.fileNotFound) {
+        AppToast.showWarning(context, 'File not found in local cache. Please sync with the ESP32 Hub.');
+      } else if (result.type == ResultType.noAppToOpen) {
+        AppToast.showError(context, 'No app found on your device to open this type of file.');
+      } else {
+        AppToast.showError(context, result.message.isNotEmpty ? result.message : 'Could not open file.');
+      }
+    }
+  }
+
+  Future<void> _exportMaterial(HubMaterialItem item) async {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (bottomSheetCtx) => Material(
+        color: AppTheme.surface,
+        borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
+        child: SafeArea(
+          child: SingleChildScrollView(
+            padding: const EdgeInsets.all(20),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(8),
+                      decoration: BoxDecoration(
+                        color: AppTheme.primary.withValues(alpha: 0.12),
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: Icon(Icons.file_download_outlined, color: AppTheme.primary, size: 22),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'Save to Device Storage',
+                            style: TextStyle(
+                              fontSize: 16,
+                              fontWeight: FontWeight.bold,
+                              color: AppTheme.text,
+                            ),
+                          ),
+                          Text(
+                            item.title,
+                            style: TextStyle(fontSize: 12, color: AppTheme.textMuted),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ],
+                      ),
+                    ),
+                    IconButton(
+                      icon: const Icon(Icons.close, size: 20),
+                      onPressed: () => Navigator.pop(bottomSheetCtx),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 14),
+                Text(
+                  'Redirect this learning material from the app sandbox into your phone internal storage to read in any app, share, or print.',
+                  style: TextStyle(fontSize: 12.5, color: AppTheme.textSecondary, height: 1.35),
+                ),
+                const SizedBox(height: 16),
+                ListTile(
+                  contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 4),
+                  tileColor: AppTheme.surfaceLight,
+                  leading: Container(
+                    padding: const EdgeInsets.all(8),
+                    decoration: BoxDecoration(
+                      color: AppTheme.success.withValues(alpha: 0.12),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: Icon(Icons.download_rounded, color: AppTheme.success, size: 20),
+                  ),
+                  title: Text(
+                    'Save to Downloads Folder',
+                    style: TextStyle(fontSize: 13.5, fontWeight: FontWeight.w600, color: AppTheme.text),
+                  ),
+                  subtitle: Text(
+                    'Instantly copies file to /Downloads/AIRAMP/',
+                    style: TextStyle(fontSize: 11.5, color: AppTheme.textMuted),
+                  ),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(10),
+                    side: BorderSide(color: AppTheme.border),
+                  ),
+                  onTap: () async {
+                    Navigator.pop(bottomSheetCtx);
+                    final path = await SavedMaterialsService.instance.exportDirectlyToDownloads(item);
+                    if (mounted) {
+                      if (path != null) {
+                        AppToast.showSuccess(
+                          context,
+                          'Saved to Downloads: ${item.fileName ?? item.title}',
+                          actionLabel: 'Open',
+                          onAction: () => _openExternalViewer(item),
+                        );
+                      } else {
+                        AppToast.showError(context, 'Could not save file to Downloads.');
+                      }
+                    }
+                  },
+                ),
+                const SizedBox(height: 10),
+                ListTile(
+                  contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 4),
+                  tileColor: AppTheme.surfaceLight,
+                  leading: Container(
+                    padding: const EdgeInsets.all(8),
+                    decoration: BoxDecoration(
+                      color: AppTheme.primary.withValues(alpha: 0.12),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: Icon(Icons.drive_file_move_outlined, color: AppTheme.primary, size: 20),
+                  ),
+                  title: Text(
+                    'Choose Storage Folder...',
+                    style: TextStyle(fontSize: 13.5, fontWeight: FontWeight.w600, color: AppTheme.text),
+                  ),
+                  subtitle: Text(
+                    'Pick SD card, Documents, or any folder via system manager',
+                    style: TextStyle(fontSize: 11.5, color: AppTheme.textMuted),
+                  ),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(10),
+                    side: BorderSide(color: AppTheme.border),
+                  ),
+                  onTap: () async {
+                    Navigator.pop(bottomSheetCtx);
+                    final path = await SavedMaterialsService.instance.exportToInternalStorage(item);
+                    if (mounted && path != null) {
+                      AppToast.showSuccess(
+                        context,
+                        'Saved to device storage!',
+                        actionLabel: 'Open',
+                        onAction: () => _openExternalViewer(item),
+                      );
+                    }
+                  },
+                ),
+                const SizedBox(height: 10),
+                ListTile(
+                  contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 4),
+                  tileColor: AppTheme.surfaceLight,
+                  leading: Container(
+                    padding: const EdgeInsets.all(8),
+                    decoration: BoxDecoration(
+                      color: Colors.purple.withValues(alpha: 0.12),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: const Icon(Icons.open_in_new, color: Colors.purple, size: 20),
+                  ),
+                  title: Text(
+                    'Open in Default System Viewer',
+                    style: TextStyle(fontSize: 13.5, fontWeight: FontWeight.w600, color: AppTheme.text),
+                  ),
+                  subtitle: Text(
+                    'View with Adobe Acrobat, Google PDF Viewer, or WPS Office',
+                    style: TextStyle(fontSize: 11.5, color: AppTheme.textMuted),
+                  ),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(10),
+                    side: BorderSide(color: AppTheme.border),
+                  ),
+                  onTap: () {
+                    Navigator.pop(bottomSheetCtx);
+                    _openExternalViewer(item);
+                  },
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
     );
   }
 
@@ -614,11 +802,85 @@ class _SavedOfflineMaterialsModalState extends State<SavedOfflineMaterialsModal>
                       ),
                     ),
 
-                    // Delete / Options Menu
+                    // Action Buttons (Save/Export + Menu)
                     IconButton(
-                      icon: Icon(Icons.delete_outline, size: 20, color: AppTheme.textMuted),
-                      tooltip: 'Remove from device cache',
-                      onPressed: () => _confirmDelete(item),
+                      icon: Icon(Icons.file_download_outlined, size: 20, color: AppTheme.primary),
+                      tooltip: 'Save to device internal storage',
+                      onPressed: () => _exportMaterial(item),
+                    ),
+                    PopupMenuButton<String>(
+                      icon: Icon(Icons.more_vert, size: 20, color: AppTheme.textMuted),
+                      tooltip: 'Options',
+                      color: AppTheme.surface,
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                      onSelected: (val) {
+                        switch (val) {
+                          case 'open':
+                            _openExternalViewer(item);
+                            break;
+                          case 'export_downloads':
+                            SavedMaterialsService.instance.exportDirectlyToDownloads(item).then((path) {
+                              if (mounted && path != null) {
+                                AppToast.showSuccess(
+                                  context,
+                                  'Saved to Downloads: ${item.fileName ?? item.title}',
+                                  actionLabel: 'Open',
+                                  onAction: () => _openExternalViewer(item),
+                                );
+                              }
+                            });
+                            break;
+                          case 'export_custom':
+                            _exportMaterial(item);
+                            break;
+                          case 'delete':
+                            _confirmDelete(item);
+                            break;
+                        }
+                      },
+                      itemBuilder: (ctx) => [
+                        const PopupMenuItem(
+                          value: 'open',
+                          child: Row(
+                            children: [
+                              Icon(Icons.open_in_new, size: 16),
+                              SizedBox(width: 8),
+                              Text('Open with System App', style: TextStyle(fontSize: 13)),
+                            ],
+                          ),
+                        ),
+                        const PopupMenuItem(
+                          value: 'export_downloads',
+                          child: Row(
+                            children: [
+                              Icon(Icons.download_rounded, size: 16),
+                              SizedBox(width: 8),
+                              Text('Save to Downloads', style: TextStyle(fontSize: 13)),
+                            ],
+                          ),
+                        ),
+                        const PopupMenuItem(
+                          value: 'export_custom',
+                          child: Row(
+                            children: [
+                              Icon(Icons.folder_open, size: 16),
+                              SizedBox(width: 8),
+                              Text('Choose Save Folder...', style: TextStyle(fontSize: 13)),
+                            ],
+                          ),
+                        ),
+                        const PopupMenuDivider(),
+                        PopupMenuItem(
+                          value: 'delete',
+                          child: Row(
+                            children: [
+                              Icon(Icons.delete_outline, size: 16, color: AppTheme.error),
+                              const SizedBox(width: 8),
+                              Text('Remove from App Cache', style: TextStyle(fontSize: 13, color: AppTheme.error)),
+                            ],
+                          ),
+                        ),
+                      ],
                     ),
                   ],
                 ),
@@ -645,21 +907,44 @@ class _SavedOfflineMaterialsModalState extends State<SavedOfflineMaterialsModal>
                         overflow: TextOverflow.ellipsis,
                       ),
                     ),
-                    const SizedBox(width: 8),
+                    const SizedBox(width: 6),
+                    Tooltip(
+                      message: 'Save to Device Internal Storage',
+                      child: OutlinedButton(
+                        onPressed: () => _exportMaterial(item),
+                        style: OutlinedButton.styleFrom(
+                          foregroundColor: AppTheme.primary,
+                          side: BorderSide(color: AppTheme.primary.withValues(alpha: 0.35)),
+                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+                          minimumSize: const Size(0, 32),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                          textStyle: const TextStyle(fontSize: 11, fontWeight: FontWeight.w600),
+                        ),
+                        child: const Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(Icons.file_download_outlined, size: 13),
+                            SizedBox(width: 3),
+                            Text('Save'),
+                          ],
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 6),
                     ElevatedButton.icon(
                       onPressed: () => _openReader(item),
                       icon: Icon(
                         item.fileType == HubFileType.quiz ? Icons.play_arrow_rounded : Icons.menu_book_rounded,
-                        size: 15,
+                        size: 14,
                       ),
-                      label: Text(item.fileType == HubFileType.quiz ? 'Take Quiz Offline' : 'Read Offline'),
+                      label: Text(item.fileType == HubFileType.quiz ? 'Take Quiz' : 'Read Offline'),
                       style: ElevatedButton.styleFrom(
                         backgroundColor: typeColor,
                         foregroundColor: Colors.white,
-                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
                         minimumSize: const Size(0, 32),
                         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                        textStyle: const TextStyle(fontSize: 11.5, fontWeight: FontWeight.bold),
+                        textStyle: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold),
                       ),
                     ),
                   ],
@@ -896,7 +1181,49 @@ class _OfflineMaterialReaderDialogState extends State<OfflineMaterialReaderDialo
   final Map<int, String> _quizAnswers = {};
   bool _quizSubmitted = false;
   int _score = 0;
-  double _fontSize = 14.0;
+  final double _fontSize = 14.0;
+
+  Future<void> _openExternalViewer() async {
+    final result = await SavedMaterialsService.instance.openMaterial(widget.item);
+    if (!mounted) return;
+    if (result.type != ResultType.done) {
+      if (result.type == ResultType.fileNotFound) {
+        AppToast.showWarning(context, 'File not found in local cache. Please sync with the ESP32 Hub.');
+      } else if (result.type == ResultType.noAppToOpen) {
+        AppToast.showError(context, 'No viewer app installed on this device for this file format.');
+      } else {
+        AppToast.showError(context, result.message.isNotEmpty ? result.message : 'Could not open file.');
+      }
+    }
+  }
+
+  Future<void> _exportToDevice() async {
+    final path = await SavedMaterialsService.instance.exportToInternalStorage(widget.item);
+    if (mounted && path != null) {
+      AppToast.showSuccess(
+        context,
+        'Saved to device storage!',
+        actionLabel: 'Open',
+        onAction: _openExternalViewer,
+      );
+    }
+  }
+
+  Future<void> _saveToDownloads() async {
+    final path = await SavedMaterialsService.instance.exportDirectlyToDownloads(widget.item);
+    if (mounted) {
+      if (path != null) {
+        AppToast.showSuccess(
+          context,
+          'Saved to Downloads: ${widget.item.fileName ?? widget.item.title}',
+          actionLabel: 'Open',
+          onAction: _openExternalViewer,
+        );
+      } else {
+        AppToast.showError(context, 'Could not save file to Downloads.');
+      }
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -961,22 +1288,21 @@ class _OfflineMaterialReaderDialogState extends State<OfflineMaterialReaderDialo
                   ),
                   if (!isQuiz) ...[
                     IconButton(
-                      icon: const Icon(Icons.text_decrease, size: 18),
-                      tooltip: 'Decrease font size',
-                      onPressed: () {
-                        if (_fontSize > 12) setState(() => _fontSize -= 1.5);
-                      },
+                      icon: const Icon(Icons.file_download_outlined, size: 18),
+                      tooltip: 'Save to Device Storage',
+                      visualDensity: VisualDensity.compact,
+                      onPressed: _exportToDevice,
                     ),
                     IconButton(
-                      icon: const Icon(Icons.text_increase, size: 18),
-                      tooltip: 'Increase font size',
-                      onPressed: () {
-                        if (_fontSize < 20) setState(() => _fontSize += 1.5);
-                      },
+                      icon: const Icon(Icons.open_in_new, size: 18),
+                      tooltip: 'Open with System App (PDF Viewer/Office)',
+                      visualDensity: VisualDensity.compact,
+                      onPressed: _openExternalViewer,
                     ),
                   ],
                   IconButton(
                     icon: const Icon(Icons.close, size: 20),
+                    visualDensity: VisualDensity.compact,
                     onPressed: () => Navigator.pop(context),
                   ),
                 ],
@@ -993,30 +1319,47 @@ class _OfflineMaterialReaderDialogState extends State<OfflineMaterialReaderDialo
 
             // Bottom Bar
             Container(
-              padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 12),
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
               decoration: BoxDecoration(
                 color: AppTheme.surfaceLight,
                 borderRadius: const BorderRadius.vertical(bottom: Radius.circular(18)),
                 border: Border(top: BorderSide(color: AppTheme.border)),
               ),
               child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  Row(
-                    children: [
-                      Icon(Icons.offline_pin, size: 14, color: AppTheme.success),
-                      const SizedBox(width: 5),
-                      Text(
-                        'Stored on device · No internet needed',
-                        style: TextStyle(fontSize: 11.5, color: AppTheme.textMuted),
-                      ),
-                    ],
+                  Icon(Icons.offline_pin, size: 14, color: AppTheme.success),
+                  const SizedBox(width: 5),
+                  Expanded(
+                    child: Text(
+                      'Stored on device · 100% Offline',
+                      style: TextStyle(fontSize: 11, color: AppTheme.textMuted),
+                      overflow: TextOverflow.ellipsis,
+                    ),
                   ),
+                  const SizedBox(width: 8),
+                  if (!isQuiz) ...[
+                    OutlinedButton.icon(
+                      onPressed: _exportToDevice,
+                      icon: const Icon(Icons.file_download_outlined, size: 13),
+                      label: const Text('Save'),
+                      style: OutlinedButton.styleFrom(
+                        foregroundColor: AppTheme.text,
+                        side: BorderSide(color: AppTheme.border),
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+                        minimumSize: const Size(0, 32),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                        textStyle: const TextStyle(fontSize: 11, fontWeight: FontWeight.w600),
+                      ),
+                    ),
+                    const SizedBox(width: 6),
+                  ],
                   ElevatedButton(
                     onPressed: () => Navigator.pop(context),
                     style: ElevatedButton.styleFrom(
                       backgroundColor: AppTheme.primary,
                       foregroundColor: Colors.white,
+                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                      minimumSize: const Size(0, 32),
                       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
                     ),
                     child: const Text('Done'),
@@ -1031,6 +1374,8 @@ class _OfflineMaterialReaderDialogState extends State<OfflineMaterialReaderDialo
   }
 
   Widget _buildDocumentBody() {
+    final hasTextContent = widget.item.content != null && widget.item.content!.isNotEmpty;
+    final isPdfOrDoc = widget.item.fileType == HubFileType.pdf || widget.item.fileType == HubFileType.doc || widget.item.fileType == HubFileType.module;
     final content = widget.item.content ?? 'No content preview available offline.';
     final sections = content.split('\n\n');
 
@@ -1053,12 +1398,15 @@ class _OfflineMaterialReaderDialogState extends State<OfflineMaterialReaderDialo
                 children: [
                   Icon(Icons.info_outline, size: 16, color: AppTheme.primary),
                   const SizedBox(width: 6),
-                  Text(
-                    'Offline Learning Module Guide',
-                    style: TextStyle(
-                      fontSize: 12.5,
-                      fontWeight: FontWeight.bold,
-                      color: AppTheme.primary,
+                  Expanded(
+                    child: Text(
+                      'Offline Learning Module Guide',
+                      style: TextStyle(
+                        fontSize: 12.5,
+                        fontWeight: FontWeight.bold,
+                        color: AppTheme.primary,
+                      ),
+                      overflow: TextOverflow.ellipsis,
                     ),
                   ),
                 ],
@@ -1071,34 +1419,159 @@ class _OfflineMaterialReaderDialogState extends State<OfflineMaterialReaderDialo
             ],
           ),
         ),
-        const SizedBox(height: 18),
+        const SizedBox(height: 14),
 
-        // Text Sections
-        for (final sec in sections) ...[
-          if (sec.startsWith('## ') || sec.startsWith('### '))
-            Padding(
-              padding: const EdgeInsets.only(top: 12, bottom: 6),
-              child: Text(
-                sec.replaceAll('### ', '').replaceAll('## ', ''),
-                style: TextStyle(
-                  fontSize: _fontSize * 1.2,
-                  fontWeight: FontWeight.bold,
-                  color: AppTheme.primary,
-                ),
-              ),
-            )
-          else
-            Padding(
-              padding: const EdgeInsets.only(bottom: 12),
-              child: Text(
-                sec.replaceAll('**', ''),
-                style: TextStyle(
-                  fontSize: _fontSize,
-                  height: 1.5,
-                  color: AppTheme.text,
-                ),
-              ),
+        // System Viewer & Storage Redirection Card
+        if (isPdfOrDoc) ...[
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.all(14),
+            decoration: BoxDecoration(
+              color: AppTheme.surfaceLight,
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: AppTheme.border),
             ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(10),
+                      decoration: BoxDecoration(
+                        color: (widget.item.fileType == HubFileType.pdf ? Colors.redAccent : AppTheme.primary).withValues(alpha: 0.12),
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      child: Icon(
+                        widget.item.fileType == HubFileType.pdf ? Icons.picture_as_pdf : Icons.description,
+                        color: widget.item.fileType == HubFileType.pdf ? Colors.redAccent : AppTheme.primary,
+                        size: 24,
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            widget.item.fileName ?? '${widget.item.id}.${widget.item.fileType == HubFileType.pdf ? "pdf" : "docx"}',
+                            style: TextStyle(
+                              fontSize: 13.5,
+                              fontWeight: FontWeight.bold,
+                              color: AppTheme.text,
+                            ),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                          const SizedBox(height: 3),
+                          Text(
+                            '${widget.item.formattedSize} · ${widget.item.localPath != null ? "Cached on device" : "Stored in app"}',
+                            style: TextStyle(fontSize: 11, color: AppTheme.textMuted),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 12),
+                Wrap(
+                  spacing: 8,
+                  runSpacing: 8,
+                  children: [
+                    ElevatedButton.icon(
+                      onPressed: _openExternalViewer,
+                      icon: const Icon(Icons.open_in_new, size: 15),
+                      label: const Text('Open in System Reader'),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: AppTheme.primary,
+                        foregroundColor: Colors.white,
+                        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                        textStyle: const TextStyle(fontSize: 11.5, fontWeight: FontWeight.bold),
+                      ),
+                    ),
+                    OutlinedButton.icon(
+                      onPressed: _saveToDownloads,
+                      icon: const Icon(Icons.download_rounded, size: 15),
+                      label: const Text('Save to Downloads'),
+                      style: OutlinedButton.styleFrom(
+                        foregroundColor: AppTheme.text,
+                        side: BorderSide(color: AppTheme.border),
+                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                        textStyle: const TextStyle(fontSize: 11.5, fontWeight: FontWeight.w600),
+                      ),
+                    ),
+                    OutlinedButton.icon(
+                      onPressed: _exportToDevice,
+                      icon: const Icon(Icons.drive_file_move_outlined, size: 15),
+                      label: const Text('Choose Folder...'),
+                      style: OutlinedButton.styleFrom(
+                        foregroundColor: AppTheme.textSecondary,
+                        side: BorderSide(color: AppTheme.border),
+                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                        textStyle: const TextStyle(fontSize: 11.5, fontWeight: FontWeight.w600),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 14),
+        ],
+
+        // Text Sections or Document Help
+        if (hasTextContent) ...[
+          for (final sec in sections) ...[
+            if (sec.startsWith('## ') || sec.startsWith('### '))
+              Padding(
+                padding: const EdgeInsets.only(top: 12, bottom: 6),
+                child: Text(
+                  sec.replaceAll('### ', '').replaceAll('## ', ''),
+                  style: TextStyle(
+                    fontSize: _fontSize * 1.2,
+                    fontWeight: FontWeight.bold,
+                    color: AppTheme.primary,
+                  ),
+                ),
+              )
+            else
+              Padding(
+                padding: const EdgeInsets.only(bottom: 12),
+                child: Text(
+                  sec.replaceAll('**', ''),
+                  style: TextStyle(
+                    fontSize: _fontSize,
+                    height: 1.5,
+                    color: AppTheme.text,
+                  ),
+                ),
+              ),
+          ],
+        ] else ...[
+          Container(
+            padding: const EdgeInsets.all(14),
+            decoration: BoxDecoration(
+              color: AppTheme.surfaceLight,
+              borderRadius: BorderRadius.circular(10),
+              border: Border.all(color: AppTheme.border),
+            ),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Icon(Icons.help_outline, color: AppTheme.textSecondary, size: 18),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Text(
+                    'This learning module is saved as a complete file on your device. Use the "Open in System Reader" button above to view it in full fidelity with your device\'s default viewer (Adobe Acrobat, Google Drive, WPS Office), or save a copy into your Downloads folder.',
+                    style: TextStyle(fontSize: 12, color: AppTheme.textSecondary, height: 1.4),
+                  ),
+                ),
+              ],
+            ),
+          ),
         ],
 
         const SizedBox(height: 14),

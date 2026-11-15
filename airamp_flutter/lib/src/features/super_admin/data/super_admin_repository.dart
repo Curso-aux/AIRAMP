@@ -8,5 +8,5 @@ final superAdminStatsProvider = FutureProvider<Map<String, dynamic>>((ref) async
 
 // --- System Audit Logs Provider ---
 final superAdminAuditLogsProvider = FutureProvider<List<Map<String, dynamic>>>((ref) async {
-  return await DatabaseHelper().getAuditLogs(limit: 40);
+  return await DatabaseHelper().getAuditLogs(limit: 200);
 });

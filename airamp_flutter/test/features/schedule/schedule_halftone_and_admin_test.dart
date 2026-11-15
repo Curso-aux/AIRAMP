@@ -263,7 +263,7 @@ void main() {
       expect(find.text('Mr. Santos'), findsWidgets);
     });
 
-    testWidgets('6. CreateEditScheduleDialog custom section toggle allows typing arbitrary section names', (tester) async {
+    testWidgets('6. CreateEditScheduleDialog uses searchable section picker and enforces directory connection', (tester) async {
       await tester.pumpWidget(
         ProviderScope(
           overrides: [
@@ -279,7 +279,9 @@ void main() {
             subjectsProvider.overrideWith(() => _FakeSubjectsNotifier([
               {'id': 101, 'name': 'General Mathematics'}
             ])),
-            sectionsProvider.overrideWith(() => _FakeSectionsNotifier([])),
+            sectionsProvider.overrideWith(() => _FakeSectionsNotifier([
+              {'id': 1, 'name': 'Grade 12 - Sapphire', 'grade': '12', 'student_count': 35}
+            ])),
           ],
           child: const MaterialApp(
             home: Scaffold(
@@ -290,12 +292,19 @@ void main() {
       );
       await tester.pumpAndSettle();
 
-      expect(find.text('Type custom section'), findsOneWidget);
-      await tester.tap(find.text('Type custom section'));
+      // Custom section toggle is removed per specification
+      expect(find.text('Type custom section'), findsNothing);
+
+      // Section selector is rendered with directory section
+      expect(find.text('Class Section *'), findsOneWidget);
+      expect(find.text('Grade 12 - Sapphire'), findsOneWidget);
+
+      // Tapping the section selector opens the searchable picker modal
+      await tester.tap(find.text('Grade 12 - Sapphire'));
       await tester.pumpAndSettle();
 
-      expect(find.text('Choose from list'), findsOneWidget);
-      expect(find.byType(TextFormField), findsWidgets);
+      expect(find.text('Select Class Section'), findsOneWidget);
+      expect(find.text('Search section name, grade level, or room...'), findsOneWidget);
     });
 
     testWidgets('7. Teacher role is locked to own account in CreateEditScheduleDialog', (tester) async {
@@ -326,10 +335,14 @@ void main() {
       );
       await tester.pumpAndSettle();
 
-      // Dropdown for teacher should be disabled (onChanged == null)
-      final dropdowns = tester.widgetList<DropdownButton<String>>(find.byType(DropdownButton<String>));
-      final teacherDropdown = dropdowns.firstWhere((d) => d.value == 'teacher_1');
-      expect(teacherDropdown.onChanged, isNull);
+      // Teacher role displays locked badge
+      expect(find.text('Assigned to you'), findsOneWidget);
+      expect(find.text('Sir John Reyes'), findsWidgets);
+
+      // Tapping the locked teacher selector should not open the teacher search modal
+      await tester.tap(find.text('Sir John Reyes').first);
+      await tester.pumpAndSettle();
+      expect(find.text('Select Faculty / Instructor'), findsNothing);
     });
   });
 }

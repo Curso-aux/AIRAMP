@@ -350,7 +350,7 @@ class _SectionsMgmtScreenState extends ConsumerState<SectionsMgmtScreen> {
               ),
               actions: [
                 TextButton(
-                  onPressed: () => Navigator.pop(context),
+                  onPressed: () => Navigator.pop(dialogCtx),
                   child: const Text('Cancel'),
                 ),
                 ElevatedButton(
@@ -362,7 +362,7 @@ class _SectionsMgmtScreenState extends ConsumerState<SectionsMgmtScreen> {
                             'Are you sure you want to update this section?',
                         onConfirm: () async {
                           final sectionId = section['id'];
-                          final nav = Navigator.of(context);
+                          final nav = Navigator.of(dialogCtx);
                           if (sectionId is int) {
                             final rawKey = editKeyController.text
                                 .trim()
@@ -938,6 +938,7 @@ class _SectionsMgmtScreenState extends ConsumerState<SectionsMgmtScreen> {
                           builder: (context, cRef, _) {
                             final teachers = cRef.watch(adminTeachersProvider);
                             return DropdownButtonFormField<String>(
+                              isExpanded: true,
                               initialValue: addSelectedTeacherId,
                               dropdownColor: Theme.of(
                                 context,

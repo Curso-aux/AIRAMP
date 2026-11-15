@@ -151,11 +151,32 @@ class Esp32ClientService {
       debugPrint('[Esp32ClientService] File download error ($fileName): $e');
     }
 
-    // Graceful fallback if file is not on SD card but item was listed in hub manifest
+    // Graceful fallback if file is not on SD card but item has content from the hub manifest
+    try {
+      if (item.content != null && item.content!.isNotEmpty) {
+        final docsDir = await getApplicationDocumentsDirectory();
+        final modulesDir = Directory('${docsDir.path}/modules');
+        if (!await modulesDir.exists()) {
+          await modulesDir.create(recursive: true);
+        }
+        final fallbackPath = '${modulesDir.path}/$fileName';
+        final file = File(fallbackPath);
+        await file.writeAsString(item.content!);
+        return item.copyWith(
+          localPath: fallbackPath,
+          downloadStatus: HubDownloadStatus.downloaded,
+          downloadProgress: 1.0,
+          savedAt: 'Synced ${DateTime.now().month}/${DateTime.now().day}/${DateTime.now().year}',
+        );
+      }
+    } catch (fallbackError) {
+      debugPrint('[Esp32ClientService] Fallback write error: $fallbackError');
+    }
+
+    // If download failed and there is no offline content, mark as not downloaded
     return item.copyWith(
-      downloadStatus: HubDownloadStatus.downloaded,
-      downloadProgress: 1.0,
-      savedAt: 'Synced ${DateTime.now().month}/${DateTime.now().day}/${DateTime.now().year}',
+      downloadStatus: HubDownloadStatus.notDownloaded,
+      downloadProgress: 0.0,
     );
   }
 

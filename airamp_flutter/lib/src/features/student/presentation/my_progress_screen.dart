@@ -96,7 +96,11 @@ class _MyProgressScreenState extends ConsumerState<MyProgressScreen> {
         if (!widget.isEmbedded) ...[
           Text(
             'Progress',
-            style: TextStyle(fontSize: 28, fontWeight: FontWeight.bold, color: AppTheme.text),
+            style: TextStyle(
+              fontSize: 28,
+              fontWeight: FontWeight.bold,
+              color: AppTheme.text,
+            ),
           ),
           const SizedBox(height: 4),
           Text(
@@ -106,106 +110,142 @@ class _MyProgressScreenState extends ConsumerState<MyProgressScreen> {
           const SizedBox(height: 24),
         ],
 
-                if (courses.isEmpty)
-                  Container(
-                    width: double.infinity,
-                    padding: const EdgeInsets.all(32),
-                    decoration: BoxDecoration(
-                      color: AppTheme.surface,
-                      borderRadius: BorderRadius.circular(16),
-                      border: Border.all(color: AppTheme.border),
-                    ),
-                    child: Center(
-                      child: Column(
-                        children: [
-                          Icon(Icons.bar_chart_outlined, size: 48, color: AppTheme.textMuted),
-                          const SizedBox(height: 12),
-                          Text('No enrolled courses yet.', style: TextStyle(color: AppTheme.textMuted, fontSize: 16)),
-                          const SizedBox(height: 8),
-                          Text('Enroll in a course from My Courses to view your progress here.',
-                              textAlign: TextAlign.center,
-                              style: TextStyle(color: AppTheme.textSecondary, fontSize: 13)),
-                          const SizedBox(height: 16),
-                          ElevatedButton(
-                            onPressed: () => context.go('/student/courses'),
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: AppTheme.primary,
-                              foregroundColor: Colors.black,
-                            ),
-                            child: const Text('Go to My Courses', style: TextStyle(fontWeight: FontWeight.bold)),
-                          ),
-                        ],
-                      ),
-                    ),
-                  )
-                else ...[
-                  // Subject Chips
-                  SizedBox(
-                    height: 40,
-                    child: ListView.builder(
-                      scrollDirection: Axis.horizontal,
-                      itemCount: courses.length,
-                      itemBuilder: (context, index) {
-                        final isActive = _selectedSubjectIndex == index;
-                        final sub = courses[index];
-                        final label = sub['subject_code']?.toString() ?? sub['name']?.toString() ?? 'Course';
-                        return GestureDetector(
-                          onTap: () {
-                            setState(() => _selectedSubjectIndex = index);
-                            _loadSelectedHierarchy();
-                          },
-                          child: Container(
-                            margin: const EdgeInsets.only(right: 12),
-                            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                            decoration: BoxDecoration(
-                              color: isActive ? AppTheme.primary : AppTheme.surface,
-                              borderRadius: BorderRadius.circular(20),
-                              border: Border.all(color: isActive ? AppTheme.primary : AppTheme.border),
-                            ),
-                            alignment: Alignment.center,
-                            child: Text(
-                              label,
-                              style: TextStyle(
-                                color: isActive ? Colors.black : AppTheme.textSecondary,
-                                fontWeight: isActive ? FontWeight.bold : FontWeight.normal,
-                              ),
-                            ),
-                          ),
-                        );
-                      },
+        if (courses.isEmpty)
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.all(32),
+            decoration: BoxDecoration(
+              color: AppTheme.surface,
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(color: AppTheme.border),
+            ),
+            child: Center(
+              child: Column(
+                children: [
+                  Icon(
+                    Icons.bar_chart_outlined,
+                    size: 48,
+                    color: AppTheme.textMuted,
+                  ),
+                  const SizedBox(height: 12),
+                  Text(
+                    'No enrolled courses yet.',
+                    style: TextStyle(color: AppTheme.textMuted, fontSize: 16),
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    'Enroll in a course from My Courses to view your progress here.',
+                    textAlign: TextAlign.center,
+                    style: TextStyle(
+                      color: AppTheme.textSecondary,
+                      fontSize: 13,
                     ),
                   ),
-                  const SizedBox(height: 24),
-
-                  // Selected Subject Overview
-                  _buildSelectedOverview(courses),
-
-                  const SizedBox(height: 24),
-
-                  // COC / Topic Cards
-                  if (_loadingHierarchy)
-                    const SkeletonListView(itemCount: 3)
-                  else if (topics.isEmpty)
-                    Container(
-                      width: double.infinity,
-                      decoration: BoxDecoration(
-                        color: AppTheme.surface,
-                        borderRadius: BorderRadius.circular(12),
-                        border: Border.all(color: AppTheme.border),
+                  const SizedBox(height: 16),
+                  ElevatedButton(
+                    onPressed: () => context.go('/student/courses'),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: AppTheme.primary,
+                      foregroundColor: Colors.white,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(10),
                       ),
-                      child: const AppEmptyState(
-                        compact: true,
-                        icon: Icons.topic_outlined,
-                        title: 'No Topics Available',
-                        message: 'Curriculum topics for this subject will appear once your teacher publishes them.',
+                    ),
+                    child: const Text(
+                      'Go to My Courses',
+                      style: TextStyle(
+                        fontWeight: FontWeight.bold,
+                        color: Colors.white,
                       ),
-                    )
-                  else
-                    ..._buildDynamicTopicCards(topics, courses[_selectedSubjectIndex.clamp(0, courses.length - 1)]['id'] as int),
+                    ),
+                  ),
                 ],
-                const SizedBox(height: 40),
-              ],
-            );
+              ),
+            ),
+          )
+        else ...[
+          // Subject Chips
+          SizedBox(
+            height: 40,
+            child: ListView.builder(
+              scrollDirection: Axis.horizontal,
+              itemCount: courses.length,
+              itemBuilder: (context, index) {
+                final isActive = _selectedSubjectIndex == index;
+                final sub = courses[index];
+                final label =
+                    sub['subject_code']?.toString() ??
+                    sub['name']?.toString() ??
+                    'Course';
+                return GestureDetector(
+                  onTap: () {
+                    setState(() => _selectedSubjectIndex = index);
+                    _loadSelectedHierarchy();
+                  },
+                  child: Container(
+                    margin: const EdgeInsets.only(right: 12),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 16,
+                      vertical: 8,
+                    ),
+                    decoration: BoxDecoration(
+                      color: isActive ? AppTheme.primary : AppTheme.surface,
+                      borderRadius: BorderRadius.circular(20),
+                      border: Border.all(
+                        color: isActive ? AppTheme.primary : AppTheme.border,
+                      ),
+                    ),
+                    alignment: Alignment.center,
+                    child: Text(
+                      label,
+                      style: TextStyle(
+                        color: isActive ? Colors.black : AppTheme.textSecondary,
+                        fontWeight: isActive
+                            ? FontWeight.bold
+                            : FontWeight.normal,
+                      ),
+                    ),
+                  ),
+                );
+              },
+            ),
+          ),
+          const SizedBox(height: 24),
+
+          // Selected Subject Overview
+          _buildSelectedOverview(courses),
+
+          const SizedBox(height: 24),
+
+          // COC / Topic Cards
+          if (_loadingHierarchy)
+            const SkeletonListView(itemCount: 3)
+          else if (topics.isEmpty)
+            Container(
+              width: double.infinity,
+              decoration: BoxDecoration(
+                color: AppTheme.surface,
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: AppTheme.border),
+              ),
+              child: const AppEmptyState(
+                compact: true,
+                icon: Icons.topic_outlined,
+                title: 'No Topics Available',
+                message:
+                    'Curriculum topics for this subject will appear once your teacher publishes them.',
+              ),
+            )
+          else
+            ..._buildDynamicTopicCards(
+              topics,
+              courses[_selectedSubjectIndex.clamp(0, courses.length - 1)]['id']
+                  as int,
+            ),
+        ],
+        const SizedBox(height: 40),
+      ],
+    );
 
     if (widget.isEmbedded) {
       return columnBody;
@@ -240,7 +280,8 @@ class _MyProgressScreenState extends ConsumerState<MyProgressScreen> {
     final totalLos = (selectedSubject['total_los'] as int?) ?? 0;
     final completedLos = (selectedSubject['completed_los'] as int?) ?? 0;
     final progress = (selectedSubject['progress'] as int?) ?? 0;
-    final unlockType = selectedSubject['unlock_type']?.toString() ?? 'Sequential';
+    final unlockType =
+        selectedSubject['unlock_type']?.toString() ?? 'Sequential';
 
     return _buildOverviewCard(
       name: '$code: $name',
@@ -252,11 +293,16 @@ class _MyProgressScreenState extends ConsumerState<MyProgressScreen> {
     );
   }
 
-  List<Widget> _buildDynamicTopicCards(List<Map<String, dynamic>> topics, int subjectId) {
+  List<Widget> _buildDynamicTopicCards(
+    List<Map<String, dynamic>> topics,
+    int subjectId,
+  ) {
     return topics.asMap().entries.map((entry) {
       final tIdx = entry.key;
       final topic = entry.value;
-      final los = (topic['learning_outcomes'] as List?)?.cast<Map<String, dynamic>>() ?? [];
+      final los =
+          (topic['learning_outcomes'] as List?)?.cast<Map<String, dynamic>>() ??
+          [];
 
       int topicCompleted = 0;
       for (final lo in los) {
@@ -265,7 +311,9 @@ class _MyProgressScreenState extends ConsumerState<MyProgressScreen> {
         }
       }
       final topicTotal = los.length;
-      final topicPct = topicTotal > 0 ? (topicCompleted / topicTotal) * 100 : 0.0;
+      final topicPct = topicTotal > 0
+          ? (topicCompleted / topicTotal) * 100
+          : 0.0;
 
       return Padding(
         padding: const EdgeInsets.only(bottom: 16),
@@ -284,9 +332,13 @@ class _MyProgressScreenState extends ConsumerState<MyProgressScreen> {
 
             String? scoreText;
             if (isCompleted) {
-              scoreText = score != null ? 'Score: $score / ${questions.length} (Passed)' : 'Completed (Passed)';
+              scoreText = score != null
+                  ? 'Score: $score / ${questions.length} (Passed)'
+                  : 'Completed (Passed)';
             } else {
-              scoreText = questions.isNotEmpty ? 'Assessment: ${questions.length} questions' : 'Reading material only';
+              scoreText = questions.isNotEmpty
+                  ? 'Assessment: ${questions.length} questions'
+                  : 'Reading material only';
             }
 
             return InkWell(
@@ -330,7 +382,11 @@ class _MyProgressScreenState extends ConsumerState<MyProgressScreen> {
               Expanded(
                 child: Text(
                   name,
-                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: AppTheme.text),
+                  style: TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold,
+                    color: AppTheme.text,
+                  ),
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                 ),
@@ -338,7 +394,10 @@ class _MyProgressScreenState extends ConsumerState<MyProgressScreen> {
             ],
           ),
           const SizedBox(height: 4),
-          Text(meta, style: TextStyle(color: AppTheme.textSecondary, fontSize: 13)),
+          Text(
+            meta,
+            style: TextStyle(color: AppTheme.textSecondary, fontSize: 13),
+          ),
           const SizedBox(height: 20),
           LinearProgressIndicator(
             value: progress / 100,
@@ -364,7 +423,9 @@ class _MyProgressScreenState extends ConsumerState<MyProgressScreen> {
                 Icon(
                   unlockType == 'sequential' ? Icons.lock : Icons.lock_open,
                   size: 16,
-                  color: unlockType == 'sequential' ? AppTheme.warning : AppTheme.primary,
+                  color: unlockType == 'sequential'
+                      ? AppTheme.warning
+                      : AppTheme.primary,
                 ),
                 const SizedBox(width: 8),
                 Expanded(
@@ -372,7 +433,10 @@ class _MyProgressScreenState extends ConsumerState<MyProgressScreen> {
                     unlockType == 'sequential'
                         ? 'Sequential: Each LO unlocks after passing the preceding assessment'
                         : 'Flexible: All lessons and assessments are accessible anytime',
-                    style: TextStyle(fontSize: 12, color: AppTheme.textSecondary),
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: AppTheme.textSecondary,
+                    ),
                   ),
                 ),
               ],
@@ -408,12 +472,19 @@ class _MyProgressScreenState extends ConsumerState<MyProgressScreen> {
                     Expanded(
                       child: Text(
                         title,
-                        style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15, color: AppTheme.text),
+                        style: TextStyle(
+                          fontWeight: FontWeight.bold,
+                          fontSize: 15,
+                          color: AppTheme.text,
+                        ),
                       ),
                     ),
                     Text(
                       '$completed/$total',
-                      style: TextStyle(fontWeight: FontWeight.bold, color: AppTheme.textSecondary),
+                      style: TextStyle(
+                        fontWeight: FontWeight.bold,
+                        color: AppTheme.textSecondary,
+                      ),
                     ),
                   ],
                 ),
@@ -432,7 +503,10 @@ class _MyProgressScreenState extends ConsumerState<MyProgressScreen> {
           if (items.isEmpty)
             Padding(
               padding: const EdgeInsets.all(16),
-              child: Text('No learning outcomes in this topic.', style: TextStyle(color: AppTheme.textMuted, fontSize: 12)),
+              child: Text(
+                'No learning outcomes in this topic.',
+                style: TextStyle(color: AppTheme.textMuted, fontSize: 12),
+              ),
             )
           else
             ...items,
@@ -441,7 +515,13 @@ class _MyProgressScreenState extends ConsumerState<MyProgressScreen> {
     );
   }
 
-  Widget _buildLoItem(String number, String title, bool hasProgress, String? scoreText, bool isPassed) {
+  Widget _buildLoItem(
+    String number,
+    String title,
+    bool hasProgress,
+    String? scoreText,
+    bool isPassed,
+  ) {
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
@@ -454,7 +534,9 @@ class _MyProgressScreenState extends ConsumerState<MyProgressScreen> {
             width: 28,
             height: 28,
             decoration: BoxDecoration(
-              color: isPassed ? AppTheme.success.withValues(alpha: 0.15) : AppTheme.background,
+              color: isPassed
+                  ? AppTheme.success.withValues(alpha: 0.15)
+                  : AppTheme.background,
               borderRadius: BorderRadius.circular(8),
             ),
             alignment: Alignment.center,
@@ -473,27 +555,42 @@ class _MyProgressScreenState extends ConsumerState<MyProgressScreen> {
               children: [
                 Text(
                   title,
-                  style: TextStyle(fontWeight: FontWeight.bold, color: AppTheme.text),
+                  style: TextStyle(
+                    fontWeight: FontWeight.bold,
+                    color: AppTheme.text,
+                  ),
                 ),
                 if (scoreText != null) ...[
                   const SizedBox(height: 4),
                   Text(
                     scoreText,
-                    style: TextStyle(fontSize: 12, color: isPassed ? AppTheme.success : AppTheme.textSecondary),
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: isPassed
+                          ? AppTheme.success
+                          : AppTheme.textSecondary,
+                    ),
                   ),
                 ],
                 const SizedBox(height: 8),
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 8,
+                    vertical: 4,
+                  ),
                   decoration: BoxDecoration(
-                    color: isPassed ? AppTheme.success.withValues(alpha: 0.1) : AppTheme.border.withValues(alpha: 0.3),
+                    color: isPassed
+                        ? AppTheme.success.withValues(alpha: 0.1)
+                        : AppTheme.border.withValues(alpha: 0.3),
                     borderRadius: BorderRadius.circular(4),
                   ),
                   child: Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
                       Icon(
-                        isPassed ? Icons.check_circle : Icons.radio_button_unchecked,
+                        isPassed
+                            ? Icons.check_circle
+                            : Icons.radio_button_unchecked,
                         size: 12,
                         color: isPassed ? AppTheme.success : AppTheme.textMuted,
                       ),
@@ -503,7 +600,9 @@ class _MyProgressScreenState extends ConsumerState<MyProgressScreen> {
                         style: TextStyle(
                           fontSize: 10,
                           fontWeight: FontWeight.bold,
-                          color: isPassed ? AppTheme.success : AppTheme.textMuted,
+                          color: isPassed
+                              ? AppTheme.success
+                              : AppTheme.textMuted,
                         ),
                       ),
                     ],
@@ -522,4 +621,3 @@ class _MyProgressScreenState extends ConsumerState<MyProgressScreen> {
     );
   }
 }
-

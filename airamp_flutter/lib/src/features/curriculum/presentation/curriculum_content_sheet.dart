@@ -866,8 +866,9 @@ class _EditContentSheetState extends ConsumerState<EditContentSheet> {
           ? bytes.length
           : (length > 0 ? length : 0);
       _pickedFilePath = item.path;
-      if (bytes != null && bytes.isNotEmpty)
+      if (bytes != null && bytes.isNotEmpty) {
         _pickedFileBytes = base64Encode(bytes);
+      }
     });
   }
 

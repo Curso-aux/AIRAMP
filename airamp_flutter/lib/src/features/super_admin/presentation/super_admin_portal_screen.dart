@@ -16,9 +16,15 @@ import 'tabs/super_admin_overview_tab.dart';
 import 'tabs/super_admin_campuses_tab.dart';
 import 'tabs/super_admin_admins_tab.dart';
 import 'tabs/super_admin_security_tab.dart';
+import 'tabs/super_admin_profile_tab.dart';
 
 class SuperAdminPortalScreen extends ConsumerStatefulWidget {
-  const SuperAdminPortalScreen({super.key});
+  final int initialTabIndex;
+
+  const SuperAdminPortalScreen({
+    super.key,
+    this.initialTabIndex = 0,
+  });
 
   @override
   ConsumerState<SuperAdminPortalScreen> createState() =>
@@ -27,13 +33,14 @@ class SuperAdminPortalScreen extends ConsumerStatefulWidget {
 
 class _SuperAdminPortalScreenState
     extends ConsumerState<SuperAdminPortalScreen> {
-  int _activeTabIndex = 0;
+  late int _activeTabIndex;
   bool _isSidebarCollapsed = false;
   final GlobalKey<ScaffoldState> _scaffoldKey = GlobalKey<ScaffoldState>();
 
   @override
   void initState() {
     super.initState();
+    _activeTabIndex = widget.initialTabIndex;
     WidgetsBinding.instance.addPostFrameCallback((_) {
       ref.read(schoolsListProvider.notifier).loadSchools();
       ref.read(schoolAdminsProvider.notifier).loadAdmins();
@@ -1009,15 +1016,17 @@ Portal Login: https://aira-app-database.web.app/#/login?role=admin
   String _getTabTitle(int index) {
     switch (index) {
       case 0:
-        return 'Overview & Global Metrics';
+        return 'Overview & Metrics';
       case 1:
-        return 'Campus Management & Access';
+        return 'Campuses & Schools';
       case 2:
-        return 'Administrator Directory & Roles';
+        return 'Administrator Accounts';
       case 3:
-        return 'Security Architecture & Audit';
+        return 'Security & Activity History';
+      case 4:
+        return 'My Profile & Account';
       default:
-        return 'Super Admin Governance';
+        return 'Admin Portal';
     }
   }
 
@@ -1045,9 +1054,14 @@ Portal Login: https://aira-app-database.web.app/#/login?role=admin
         Icons.admin_panel_settings_rounded,
       ),
       _NavDescriptor(
-        'Security & Audit Log',
+        'Security & Activity Log',
         Icons.verified_user_outlined,
         Icons.verified_user_rounded,
+      ),
+      _NavDescriptor(
+        'My Profile & Account',
+        Icons.manage_accounts_outlined,
+        Icons.manage_accounts_rounded,
       ),
     ];
 
@@ -1223,6 +1237,11 @@ Portal Login: https://aira-app-database.web.app/#/login?role=admin
                       selectedIcon: Icon(Icons.verified_user_rounded),
                       label: 'Security',
                     ),
+                    NavigationDestination(
+                      icon: Icon(Icons.manage_accounts_outlined),
+                      selectedIcon: Icon(Icons.manage_accounts_rounded),
+                      label: 'Profile',
+                    ),
                   ],
                 ),
               ),
@@ -1300,6 +1319,8 @@ Portal Login: https://aira-app-database.web.app/#/login?role=admin
         );
       case 3:
         return SuperAdminSecurityTab();
+      case 4:
+        return const SuperAdminProfileTab();
       default:
         return SuperAdminOverviewTab(
           onNavigateTab: (index) => setState(() => _activeTabIndex = index),
@@ -1350,7 +1371,7 @@ Portal Login: https://aira-app-database.web.app/#/login?role=admin
             mainAxisSize: MainAxisSize.min,
             children: [
               Text(
-                'Governance',
+                'Admin Portal',
                 style: TextStyle(
                   fontSize: 13,
                   color: gTheme.textMuted,
@@ -1585,61 +1606,96 @@ Portal Login: https://aira-app-database.web.app/#/login?role=admin
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Container(
-                height: 44,
-                padding: const EdgeInsets.symmetric(horizontal: 4),
-                child: Row(
-                  children: [
-                    SizedBox(
-                      width: 44,
-                      child: Center(
-                        child: UserAvatarWidget(
-                          imageSource: currentUser?.profileImage,
-                          fallbackInitial:
-                              currentUser?.fullName.isNotEmpty == true
-                              ? currentUser!.fullName[0].toUpperCase()
-                              : 'S',
-                          size: 32,
-                          backgroundColor: gTheme.surfaceSubtle,
-                          textColor: gTheme.textSecondary,
-                        ),
+              InkWell(
+                onTap: () {
+                  if (isDrawer) Navigator.pop(context);
+                  setState(() => _activeTabIndex = 4);
+                },
+                borderRadius: BorderRadius.circular(10),
+                child: Tooltip(
+                  message: 'My Profile & Account',
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 6),
+                    decoration: BoxDecoration(
+                      color: _activeTabIndex == 4
+                          ? gTheme.primarySubtle
+                          : Colors.transparent,
+                      borderRadius: BorderRadius.circular(10),
+                      border: Border.all(
+                        color: _activeTabIndex == 4
+                            ? gTheme.primaryBorder
+                            : Colors.transparent,
                       ),
                     ),
-                    Expanded(
-                      child: Opacity(
-                        opacity: isCollapsed ? 0.0 : 1.0,
-                        child: Padding(
-                          padding: const EdgeInsets.only(left: 6),
-                          child: Column(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                currentUser?.fullName ?? 'Super Administrator',
-                                style: TextStyle(
-                                  fontSize: 13,
-                                  fontWeight: FontWeight.bold,
-                                  color: gTheme.textPrimary,
-                                ),
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                              ),
-                              Text(
-                                currentUser?.email ??
-                                    'evangelistachristian88@gmail.com',
-                                style: TextStyle(
-                                  fontSize: 11,
-                                  color: gTheme.textMuted,
-                                ),
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                              ),
-                            ],
+                    child: Row(
+                      children: [
+                        SizedBox(
+                          width: 36,
+                          child: Center(
+                            child: UserAvatarWidget(
+                              imageSource: currentUser?.profileImage,
+                              fallbackInitial:
+                                  currentUser?.fullName.isNotEmpty == true
+                                  ? currentUser!.fullName[0].toUpperCase()
+                                  : 'S',
+                              size: 32,
+                              backgroundColor: gTheme.surfaceSubtle,
+                              textColor: gTheme.textSecondary,
+                            ),
                           ),
                         ),
-                      ),
+                        Expanded(
+                          child: Opacity(
+                            opacity: isCollapsed ? 0.0 : 1.0,
+                            child: Padding(
+                              padding: const EdgeInsets.only(left: 6),
+                              child: Column(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Row(
+                                    children: [
+                                      Expanded(
+                                        child: Text(
+                                          currentUser?.fullName ?? 'Super Administrator',
+                                          style: TextStyle(
+                                            fontSize: 12.5,
+                                            fontWeight: FontWeight.bold,
+                                            color: _activeTabIndex == 4
+                                                ? gTheme.primary
+                                                : gTheme.textPrimary,
+                                          ),
+                                          maxLines: 1,
+                                          overflow: TextOverflow.ellipsis,
+                                        ),
+                                      ),
+                                      Icon(
+                                        Icons.tune_rounded,
+                                        size: 13,
+                                        color: _activeTabIndex == 4
+                                            ? gTheme.primary
+                                            : gTheme.textMuted,
+                                      ),
+                                    ],
+                                  ),
+                                  Text(
+                                    currentUser?.email ??
+                                        'evangelistachristian88@gmail.com',
+                                    style: TextStyle(
+                                      fontSize: 10.5,
+                                      color: gTheme.textMuted,
+                                    ),
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
+                        ),
+                      ],
                     ),
-                  ],
+                  ),
                 ),
               ),
               const SizedBox(height: 10),

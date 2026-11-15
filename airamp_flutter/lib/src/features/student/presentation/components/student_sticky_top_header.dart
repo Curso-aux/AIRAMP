@@ -25,11 +25,13 @@ import 'student_announcements_sheet.dart';
 class StudentStickyTopHeader extends ConsumerWidget {
   final bool? isCompact;
   final List<Widget>? extraActions;
+  final bool showQrScanner;
 
   const StudentStickyTopHeader({
     super.key,
     this.isCompact,
     this.extraActions,
+    this.showQrScanner = false,
   });
 
   @override
@@ -42,7 +44,7 @@ class StudentStickyTopHeader extends ConsumerWidget {
 
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final screenWidth = MediaQuery.of(context).size.width;
-    final compact = isCompact ?? (screenWidth < 400);
+    final compact = isCompact ?? (screenWidth < 420);
 
     final displayName = currentUser.fullName.isNotEmpty ? currentUser.fullName : 'Student Learner';
     final sectionStr = currentUser.section?.trim();
@@ -73,8 +75,14 @@ class StudentStickyTopHeader extends ConsumerWidget {
     final completionPct = totalLessons > 0 ? ((completedLessons / totalLessons) * 100).round() : 0;
 
     return Container(
-      margin: const EdgeInsets.fromLTRB(16, 6, 16, 6),
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+      margin: EdgeInsets.symmetric(
+        horizontal: compact ? 10 : 16,
+        vertical: compact ? 4 : 6,
+      ),
+      padding: EdgeInsets.symmetric(
+        horizontal: compact ? 10 : 14,
+        vertical: compact ? 6 : 8,
+      ),
       decoration: BoxDecoration(
         color: AppTheme.surface,
         borderRadius: BorderRadius.circular(18),
@@ -105,15 +113,14 @@ class StudentStickyTopHeader extends ConsumerWidget {
               child: Padding(
                 padding: const EdgeInsets.symmetric(vertical: 2),
                 child: Row(
-                  mainAxisSize: MainAxisSize.min,
                   children: [
                     _StudentHeaderAvatarButton(
                       currentUser: currentUser,
                       onTap: () => context.go('/student/profile'),
                       isCompact: compact,
                     ),
-                    const SizedBox(width: 12),
-                    Flexible(
+                    SizedBox(width: compact ? 8 : 12),
+                    Expanded(
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         mainAxisSize: MainAxisSize.min,
@@ -127,27 +134,27 @@ class StudentStickyTopHeader extends ConsumerWidget {
                                   maxLines: 1,
                                   overflow: TextOverflow.ellipsis,
                                   style: TextStyle(
-                                    fontSize: compact ? 13.5 : 14.5,
+                                    fontSize: compact ? 13.0 : 14.5,
                                     fontWeight: FontWeight.w700,
                                     color: AppTheme.text,
                                     letterSpacing: -0.2,
                                   ),
                                 ),
                               ),
-                              const SizedBox(width: 5),
+                              const SizedBox(width: 4),
                               Icon(
                                 Icons.verified_rounded,
-                                size: 14,
+                                size: compact ? 12 : 14,
                                 color: AppTheme.primary,
                               ),
                             ],
                           ),
-                          const SizedBox(height: 2.5),
+                          const SizedBox(height: 2.0),
                           Row(
                             mainAxisSize: MainAxisSize.min,
                             children: [
                               Container(
-                                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1.5),
+                                padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
                                 decoration: BoxDecoration(
                                   color: AppTheme.primary.withValues(alpha: 0.10),
                                   borderRadius: BorderRadius.circular(4),
@@ -155,26 +162,28 @@ class StudentStickyTopHeader extends ConsumerWidget {
                                 child: Text(
                                   'STUDENT',
                                   style: TextStyle(
-                                    fontSize: 9.5,
+                                    fontSize: compact ? 8.5 : 9.5,
                                     fontWeight: FontWeight.w700,
                                     color: AppTheme.primary,
                                     letterSpacing: 0.3,
                                   ),
                                 ),
                               ),
-                              const SizedBox(width: 6),
-                              Flexible(
-                                child: Text(
-                                  (sectionStr != null && sectionStr.isNotEmpty) ? sectionStr : 'DepEd SHS',
-                                  maxLines: 1,
-                                  overflow: TextOverflow.ellipsis,
-                                  style: TextStyle(
-                                    fontSize: 11,
-                                    fontWeight: FontWeight.w500,
-                                    color: AppTheme.textSecondary,
+                              if (sectionStr != null && sectionStr.isNotEmpty) ...[
+                                const SizedBox(width: 5),
+                                Flexible(
+                                  child: Text(
+                                    sectionStr,
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                    style: TextStyle(
+                                      fontSize: compact ? 10.0 : 11,
+                                      fontWeight: FontWeight.w500,
+                                      color: AppTheme.textSecondary,
+                                    ),
                                   ),
                                 ),
-                              ),
+                              ],
                             ],
                           ),
                         ],
@@ -188,30 +197,33 @@ class StudentStickyTopHeader extends ConsumerWidget {
 
           const SizedBox(width: 8),
 
-          // Right: Action Buttons (QR Scanner, Analytics, Notifications Bell, extraActions)
+          // Right: Action Buttons (Analytics, Notifications Bell, extraActions, optional QR)
           Row(
             mainAxisSize: MainAxisSize.min,
             children: [
               ...?extraActions,
-              _buildQrScanButton(
-                context,
-                ref,
-                isDark: isDark,
-                isCompact: compact,
-              ),
-              const SizedBox(width: 8),
+              if (showQrScanner) ...[
+                _buildQrScanButton(
+                  context,
+                  ref,
+                  isDark: isDark,
+                  isCompact: compact,
+                ),
+                SizedBox(width: compact ? 6 : 8),
+              ],
               _buildAnalyticsHeaderButton(
                 context,
                 completionPct: completionPct,
                 isDark: isDark,
                 isCompact: compact,
               ),
-              const SizedBox(width: 8),
+              SizedBox(width: compact ? 6 : 8),
               _buildBellButton(
                 context,
                 studentAnnouncements,
                 unreadNotifs: unreadNotifs,
                 isDark: isDark,
+                isCompact: compact,
               ),
             ],
           ),
@@ -458,8 +470,8 @@ class StudentStickyTopHeader extends ConsumerWidget {
           },
           child: AnimatedContainer(
             duration: const Duration(milliseconds: 180),
-            height: 36,
-            padding: EdgeInsets.symmetric(horizontal: isCompact ? 8 : 10),
+            height: isCompact ? 32 : 36,
+            padding: EdgeInsets.symmetric(horizontal: isCompact ? 6 : 10),
             decoration: BoxDecoration(
               color: primary.withValues(alpha: isDark ? 0.18 : 0.09),
               borderRadius: BorderRadius.circular(10),
@@ -482,23 +494,23 @@ class StudentStickyTopHeader extends ConsumerWidget {
                 Icon(
                   Icons.insights_rounded,
                   color: primary,
-                  size: 15,
+                  size: isCompact ? 13 : 15,
                 ),
-                const SizedBox(width: 5),
+                SizedBox(width: isCompact ? 3.5 : 5),
                 Text(
                   labelText,
                   style: TextStyle(
-                    fontSize: 11.5,
+                    fontSize: isCompact ? 10.5 : 11.5,
                     fontWeight: FontWeight.w700,
                     color: primary,
                     letterSpacing: -0.1,
                   ),
                 ),
-                const SizedBox(width: 3.5),
+                SizedBox(width: isCompact ? 2.5 : 3.5),
                 Icon(
                   Icons.arrow_forward_ios_rounded,
                   color: primary.withValues(alpha: 0.75),
-                  size: 9.5,
+                  size: isCompact ? 8.5 : 9.5,
                 ),
               ],
             ),
@@ -513,14 +525,18 @@ class StudentStickyTopHeader extends ConsumerWidget {
     List<Map<String, dynamic>> announcements, {
     required int unreadNotifs,
     required bool isDark,
+    bool isCompact = false,
   }) {
     final hasUnread = unreadNotifs > 0;
     final hasAnnouncements = announcements.isNotEmpty;
+    final buttonSize = isCompact ? 32.0 : 36.0;
 
     return Stack(
       clipBehavior: Clip.none,
       children: [
         Container(
+          width: buttonSize,
+          height: buttonSize,
           decoration: BoxDecoration(
             color: AppTheme.surfaceLight,
             borderRadius: BorderRadius.circular(10),
@@ -530,10 +546,14 @@ class StudentStickyTopHeader extends ConsumerWidget {
             ),
           ),
           child: IconButton(
-            icon: Icon(Icons.notifications_none_rounded, color: AppTheme.text, size: 20),
+            icon: Icon(
+              Icons.notifications_none_rounded,
+              color: AppTheme.text,
+              size: isCompact ? 17 : 20,
+            ),
             tooltip: 'Announcements & Notifications',
-            constraints: const BoxConstraints(minWidth: 36, minHeight: 36),
-            padding: const EdgeInsets.all(7),
+            constraints: BoxConstraints(minWidth: buttonSize, minHeight: buttonSize),
+            padding: EdgeInsets.zero,
             onPressed: () => showStudentAnnouncementsSheet(context, announcements),
           ),
         ),
@@ -563,8 +583,8 @@ class StudentStickyTopHeader extends ConsumerWidget {
           )
         else if (hasAnnouncements)
           Positioned(
-            top: 7,
-            right: 7,
+            top: 6,
+            right: 6,
             child: Container(
               width: 6,
               height: 6,

@@ -1032,12 +1032,16 @@ class _StudentHomeScreenState extends ConsumerState<StudentHomeScreen> {
           children: [
             Icon(Icons.play_circle_outline, color: AppTheme.primary, size: 20),
             const SizedBox(width: 8),
-            Text(
-              'Continue Learning',
-              style: TextStyle(
-                fontSize: 18,
-                fontWeight: FontWeight.bold,
-                color: AppTheme.text,
+            Expanded(
+              child: Text(
+                'Continue Learning',
+                style: TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.bold,
+                  color: AppTheme.text,
+                ),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
               ),
             ),
           ],

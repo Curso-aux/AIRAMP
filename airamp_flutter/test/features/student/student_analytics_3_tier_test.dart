@@ -92,11 +92,12 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    // Verify header title and 3-tier tab switcher
+    // Verify header title and 4-tier tab switcher
     expect(find.text('My Progress & Analytics'), findsOneWidget);
     expect(find.text('Overview'), findsOneWidget);
+    expect(find.text('Diagnostics'), findsOneWidget);
     expect(find.text('Forecast'), findsOneWidget);
-    expect(find.text('Next Steps'), findsOneWidget);
+    expect(find.text('Action Plan'), findsOneWidget);
 
     // Verify Descriptive elements
     expect(find.text('Active Courses'), findsOneWidget);
@@ -107,7 +108,42 @@ void main() {
     expect(find.text('CS202'), findsOneWidget);
   });
 
-  testWidgets('2. Tapping Forecast tab transitions to completion pace and risk trajectory', (tester) async {
+  testWidgets('2. Tapping Diagnostics tab transitions to competency breakdown and gap analysis', (tester) async {
+    tester.view.physicalSize = const Size(1280, 900);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(() => tester.view.resetPhysicalSize());
+
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          studentCoursesProvider.overrideWith(() => _MockCoursesNotifier(mockCourses)),
+          studentProgressProvider.overrideWith(() => _MockProgressNotifier(mockProgress)),
+          studentQuizAssignmentsProvider.overrideWith(() => _MockQuizzesNotifier(mockQuizzes)),
+        ],
+        child: const MaterialApp(
+          home: Scaffold(
+            body: Center(
+              child: StudentAnalyticsSheet(isDesktop: true),
+            ),
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    // Tap Diagnostics Tab
+    await tester.tap(find.text('Diagnostics'));
+    await tester.pumpAndSettle();
+
+    // Verify Diagnostic elements
+    expect(find.text('Subject Competency Diagnostics'), findsOneWidget);
+    expect(find.text('Diagnostic Tier'), findsOneWidget);
+    expect(find.text('Competencies Mastered'), findsOneWidget);
+    expect(find.text('Quiz Pass Consistency'), findsOneWidget);
+    expect(find.text('Average Performance'), findsOneWidget);
+  });
+
+  testWidgets('3. Tapping Forecast tab transitions to completion pace and risk trajectory', (tester) async {
     tester.view.physicalSize = const Size(1280, 900);
     tester.view.devicePixelRatio = 1.0;
     addTearDown(() => tester.view.resetPhysicalSize());
@@ -141,7 +177,7 @@ void main() {
     expect(find.text('Elevated Risk: 1 Overdue Assessment'), findsOneWidget);
   });
 
-  testWidgets('3. Tapping Next Steps tab renders prioritized actionable interventions with CTAs', (tester) async {
+  testWidgets('4. Tapping Action Plan tab renders prioritized actionable interventions with CTAs', (tester) async {
     tester.view.physicalSize = const Size(1280, 900);
     tester.view.devicePixelRatio = 1.0;
     addTearDown(() => tester.view.resetPhysicalSize());
@@ -164,8 +200,8 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    // Tap Next Steps Tab
-    await tester.tap(find.text('Next Steps'));
+    // Tap Action Plan Tab
+    await tester.tap(find.text('Action Plan'));
     await tester.pumpAndSettle();
 
     // Verify Prescriptive elements
@@ -177,7 +213,7 @@ void main() {
     expect(find.text('Next Goals & Study Tips'), findsOneWidget);
   });
 
-  testWidgets('4. Mobile viewport (375x812) renders all 3 tabs without overflow', (tester) async {
+  testWidgets('5. Mobile viewport (375x812) renders all 4 tabs without overflow', (tester) async {
     tester.view.physicalSize = const Size(375, 812);
     tester.view.devicePixelRatio = 1.0;
     addTearDown(() => tester.view.resetPhysicalSize());
@@ -203,16 +239,22 @@ void main() {
 
     // Verify Overview tab on mobile
     expect(find.text('Overview'), findsOneWidget);
+    expect(find.text('Diagnostics'), findsOneWidget);
     expect(find.text('Forecast'), findsOneWidget);
-    expect(find.text('Next Steps'), findsOneWidget);
+    expect(find.text('Action Plan'), findsOneWidget);
+
+    // Switch to Diagnostics
+    await tester.tap(find.text('Diagnostics'));
+    await tester.pumpAndSettle();
+    expect(find.text('Subject Competency Diagnostics'), findsOneWidget);
 
     // Switch to Forecast
     await tester.tap(find.text('Forecast'));
     await tester.pumpAndSettle();
     expect(find.text('Learning Pace & Timeline'), findsOneWidget);
 
-    // Switch to Next Steps
-    await tester.tap(find.text('Next Steps'));
+    // Switch to Action Plan
+    await tester.tap(find.text('Action Plan'));
     await tester.pumpAndSettle();
     expect(find.text('Recommended Next Actions'), findsOneWidget);
   });

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../../../../core/animations/app_transitions.dart';
 import '../../../../core/components/components.dart';
 import '../../../../core/database/database_helper.dart';
 import '../../../../core/theme/app_theme.dart';
@@ -23,7 +24,7 @@ class QuizItemAnalysisDialog extends ConsumerStatefulWidget {
     int? initialQuizId,
     int? subjectId,
   }) {
-    return showDialog(
+    return AppModalTransitions.showSmoothDialog(
       context: context,
       barrierDismissible: true,
       builder: (ctx) => QuizItemAnalysisDialog(
@@ -541,47 +542,37 @@ class _QuizItemAnalysisDialogState
                   style: TextStyle(color: AppTheme.error),
                 ),
               ),
-              data: (quizList) {
-                if (quizList.isEmpty) {
-                  return Container(
-                    padding: const EdgeInsets.all(12),
-                    decoration: BoxDecoration(
-                      color: AppTheme.background,
-                      borderRadius: BorderRadius.circular(12),
-                      border: Border.all(color: AppTheme.border),
-                    ),
-                    child: Row(
-                      children: [
-                        Icon(
-                          Icons.info_outline,
-                          color: AppTheme.textMuted,
-                          size: 20,
-                        ),
-                        const SizedBox(width: 8),
-                        Text(
-                          'No quizzes available for analysis yet.',
-                          style: TextStyle(
-                            color: AppTheme.textSecondary,
-                            fontSize: 13,
-                          ),
-                        ),
-                      ],
-                    ),
-                  );
-                }
+              data: (rawList) {
+                final sanitizedList = rawList.where((q) {
+                  final title = (q['title']?.toString() ?? '').toLowerCase().trim();
+                  return !title.startsWith('diagnostic quiz') &&
+                      !title.startsWith('quantum mechanics') &&
+                      !title.startsWith('world war 2') &&
+                      !title.startsWith('photosynthesis') &&
+                      !title.startsWith('initial science') &&
+                      !title.startsWith('updated science') &&
+                      !title.startsWith('math roster quiz') &&
+                      !title.startsWith('loop science') &&
+                      !title.startsWith('db quiz') &&
+                      !title.contains('1794') &&
+                      title != '1' &&
+                      title.isNotEmpty;
+                }).toList();
 
-                // If no quiz is selected yet, select the first one
-                if (_selectedQuizId == null && quizList.isNotEmpty) {
-                  WidgetsBinding.instance.addPostFrameCallback((_) {
-                    if (mounted) {
-                      setState(() {
-                        _selectedQuizId = quizList.first['id'] as int;
-                      });
-                    }
-                  });
-                }
+                final quizList = _onlyWithAttempts
+                    ? sanitizedList
+                          .where((q) => ((q['attempt_count'] as num?)?.toInt() ?? 0) > 0)
+                          .toList()
+                    : sanitizedList;
 
-                return _buildQuizDropdown(quizList);
+                final int? effectiveQuizId = quizList.any((q) => q['id'] == _selectedQuizId)
+                    ? _selectedQuizId
+                    : (quizList.isNotEmpty ? (quizList.first['id'] as int) : null);
+
+                // Safely synchronize current selection
+                _selectedQuizId = effectiveQuizId;
+
+                return _buildQuizDropdown(rawList, quizList, effectiveQuizId);
               },
             ),
 
@@ -664,95 +655,113 @@ class _QuizItemAnalysisDialogState
     );
   }
 
-  Widget _buildQuizDropdown(List<Map<String, dynamic>> rawList) {
-    final sanitizedList = rawList.where((q) {
-      final title = (q['title']?.toString() ?? '').toLowerCase().trim();
-      return !title.startsWith('diagnostic quiz') &&
-          !title.startsWith('quantum mechanics') &&
-          !title.startsWith('world war 2') &&
-          !title.startsWith('photosynthesis') &&
-          !title.startsWith('initial science') &&
-          !title.startsWith('updated science') &&
-          !title.startsWith('math roster quiz') &&
-          !title.startsWith('loop science') &&
-          !title.startsWith('db quiz') &&
-          !title.contains('1794') &&
-          title != '1' &&
-          title.isNotEmpty;
-    }).toList();
+  Widget _buildFilterHeader(int totalCount, int shownCount) {
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      children: [
+        Expanded(
+          child: Text(
+            'Select Quiz ($shownCount of $totalCount shown)',
+            style: TextStyle(
+              fontSize: 12,
+              fontWeight: FontWeight.w600,
+              color: AppTheme.textSecondary,
+            ),
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+          ),
+        ),
+        const SizedBox(width: 8),
+        InkWell(
+          borderRadius: BorderRadius.circular(8),
+          onTap: () {
+            setState(() {
+              _onlyWithAttempts = !_onlyWithAttempts;
+            });
+          },
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(
+                  _onlyWithAttempts
+                      ? Icons.check_box_rounded
+                      : Icons.check_box_outline_blank_rounded,
+                  size: 16,
+                  color: _onlyWithAttempts
+                      ? AppTheme.primary
+                      : AppTheme.textMuted,
+                ),
+                const SizedBox(width: 5),
+                Text(
+                  'With submissions only',
+                  style: TextStyle(
+                    fontSize: 11.5,
+                    fontWeight: _onlyWithAttempts
+                        ? FontWeight.bold
+                        : FontWeight.normal,
+                    color: _onlyWithAttempts
+                        ? AppTheme.primary
+                        : AppTheme.textSecondary,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ],
+    );
+  }
 
-    final quizList = _onlyWithAttempts
-        ? sanitizedList
-              .where((q) => ((q['attempt_count'] as num?)?.toInt() ?? 0) > 0)
-              .toList()
-        : sanitizedList;
-
-    if (_selectedQuizId != null &&
-        quizList.isNotEmpty &&
-        !quizList.any((q) => q['id'] == _selectedQuizId)) {
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (mounted) {
-          setState(() {
-            _selectedQuizId = quizList.first['id'] as int;
-          });
-        }
-      });
+  Widget _buildQuizDropdown(
+    List<Map<String, dynamic>> rawList,
+    List<Map<String, dynamic>> quizList,
+    int? effectiveQuizId,
+  ) {
+    if (quizList.isEmpty) {
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          _buildFilterHeader(rawList.length, 0),
+          const SizedBox(height: 6),
+          Container(
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: AppTheme.background,
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: AppTheme.border),
+            ),
+            child: Row(
+              children: [
+                Icon(
+                  Icons.info_outline,
+                  color: AppTheme.textMuted,
+                  size: 20,
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    _onlyWithAttempts
+                        ? 'No quizzes have student submissions yet. Toggle filter above to view all.'
+                        : 'No quizzes available for analysis yet.',
+                    style: TextStyle(
+                      color: AppTheme.textSecondary,
+                      fontSize: 12.5,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      );
     }
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: [
-            Text(
-              'Select Quiz (${quizList.length} of ${rawList.length} shown)',
-              style: TextStyle(
-                fontSize: 12,
-                fontWeight: FontWeight.w600,
-                color: AppTheme.textSecondary,
-              ),
-            ),
-            InkWell(
-              borderRadius: BorderRadius.circular(8),
-              onTap: () {
-                setState(() {
-                  _onlyWithAttempts = !_onlyWithAttempts;
-                });
-              },
-              child: Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Icon(
-                      _onlyWithAttempts
-                          ? Icons.check_box_rounded
-                          : Icons.check_box_outline_blank_rounded,
-                      size: 16,
-                      color: _onlyWithAttempts
-                          ? AppTheme.primary
-                          : AppTheme.textMuted,
-                    ),
-                    const SizedBox(width: 5),
-                    Text(
-                      'Show only quizzes with submissions',
-                      style: TextStyle(
-                        fontSize: 11.5,
-                        fontWeight: _onlyWithAttempts
-                            ? FontWeight.bold
-                            : FontWeight.normal,
-                        color: _onlyWithAttempts
-                            ? AppTheme.primary
-                            : AppTheme.textSecondary,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ),
-          ],
-        ),
+        _buildFilterHeader(rawList.length, quizList.length),
         const SizedBox(height: 6),
         Container(
           padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 4),
@@ -764,7 +773,7 @@ class _QuizItemAnalysisDialogState
           child: DropdownButtonHideUnderline(
             child: DropdownButton<int>(
               isExpanded: true,
-              value: _selectedQuizId,
+              value: effectiveQuizId,
               hint: Row(
                 children: [
                   Icon(Icons.quiz_outlined, size: 18, color: AppTheme.primary),
@@ -1631,7 +1640,7 @@ class _QuizItemAnalysisDialogState
           ClipRRect(
             borderRadius: BorderRadius.circular(4),
             child: LinearProgressIndicator(
-              value: pct / 100.0,
+              value: (pct / 100.0).clamp(0.0, 1.0),
               minHeight: 5,
               backgroundColor: AppTheme.surface,
               valueColor: AlwaysStoppedAnimation<Color>(

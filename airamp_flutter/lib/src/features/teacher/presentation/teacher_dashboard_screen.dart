@@ -1798,7 +1798,7 @@ class _TeacherDashboardScreenState extends ConsumerState<TeacherDashboardScreen>
             effectiveSection: effectiveSection,
           ),
 
-        // Rich Educational Analytics Tiers: Descriptive, Predictive, and Prescriptive
+        // Four-Tier Educational Analytics Framework: Descriptive, Diagnostic, Predictive, and Prescriptive
         if (_analyticsViewIndex != 3) ...[
           const SizedBox(height: 22),
 
@@ -1814,7 +1814,20 @@ class _TeacherDashboardScreenState extends ConsumerState<TeacherDashboardScreen>
           ),
           const SizedBox(height: 18),
 
-          // 2. Predictive Analytics: Learning Forecast & Attention Needed
+          // 2. Diagnostic Analytics: Psychometric Item Analysis & Competency Gaps
+          _buildDiagnosticSection(
+            context,
+            isDesktop: isDesktop,
+            totalAttempts: totalAttempts,
+            isDark: isDark,
+            onOpenHeatmap: () {
+              setState(() => _analyticsViewIndex = 3);
+              onStateChanged?.call();
+            },
+          ),
+          const SizedBox(height: 18),
+
+          // 3. Predictive Analytics: Learning Forecast & Attention Needed
           _buildPredictiveSection(
             context,
             isDesktop: isDesktop,
@@ -1833,7 +1846,7 @@ class _TeacherDashboardScreenState extends ConsumerState<TeacherDashboardScreen>
           ),
           const SizedBox(height: 18),
 
-          // 3. Prescriptive Analytics: Suggested Next Steps for Today
+          // 4. Prescriptive Analytics: Suggested Next Steps for Today
           _buildPrescriptiveSection(
             context,
             isDesktop: isDesktop,
@@ -2979,6 +2992,22 @@ class _TeacherDashboardScreenState extends ConsumerState<TeacherDashboardScreen>
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                 decoration: BoxDecoration(
+                  color: AppTheme.primary.withValues(alpha: 0.10),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Text(
+                  'Tier 1: Descriptive',
+                  style: TextStyle(
+                    fontSize: 10.5,
+                    fontWeight: FontWeight.w700,
+                    color: AppTheme.primary,
+                  ),
+                ),
+              ),
+              const SizedBox(width: 6),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                decoration: BoxDecoration(
                   color: (totalAttempts > 0 ? AppTheme.primary : AppTheme.textSecondary).withValues(alpha: 0.10),
                   borderRadius: BorderRadius.circular(8),
                 ),
@@ -3176,6 +3205,147 @@ class _TeacherDashboardScreenState extends ConsumerState<TeacherDashboardScreen>
     );
   }
 
+  // ── DIAGNOSTIC ANALYTICS: ITEM & COMPETENCY DIAGNOSIS ──────────────────────
+  Widget _buildDiagnosticSection(
+    BuildContext context, {
+    required bool isDesktop,
+    required int totalAttempts,
+    required bool isDark,
+    VoidCallback? onOpenHeatmap,
+  }) {
+    return Container(
+      padding: const EdgeInsets.all(18),
+      decoration: BoxDecoration(
+        color: isDark ? AppTheme.darkSurfaceLight : Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: AppTheme.border.withValues(alpha: 0.6)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(6),
+                decoration: BoxDecoration(
+                  color: AppTheme.accent.withValues(alpha: 0.12),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Icon(Icons.troubleshoot_rounded, size: 16, color: AppTheme.accent),
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  'Diagnostic Analytics & Competency Drop-Off',
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    fontSize: 13.5,
+                    fontWeight: FontWeight.bold,
+                    color: AppTheme.text,
+                  ),
+                ),
+              ),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                decoration: BoxDecoration(
+                  color: AppTheme.accent.withValues(alpha: 0.10),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Text(
+                  'Tier 2: Diagnostic',
+                  style: TextStyle(
+                    fontSize: 10.5,
+                    fontWeight: FontWeight.w700,
+                    color: AppTheme.accent,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 14),
+
+          // Diagnostic KPI Strip
+          Container(
+            padding: const EdgeInsets.all(14),
+            decoration: BoxDecoration(
+              color: isDark ? AppTheme.darkBackground : const Color(0xFFF8FAFC),
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: AppTheme.border.withValues(alpha: 0.5)),
+            ),
+            child: Column(
+              children: [
+                Row(
+                  children: [
+                    Icon(Icons.psychology_outlined, size: 16, color: AppTheme.accent),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        totalAttempts > 0
+                            ? 'Psychometric Item Diagnostics Active: Item difficulty (p), discrimination (D), and distractor plausibility are continuously evaluated.'
+                            : 'Psychometric Diagnostics will calibrate automatically as quizzes are attempted by your students.',
+                        style: TextStyle(
+                          fontSize: 11.5,
+                          color: AppTheme.textSecondary,
+                          height: 1.35,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 12),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.end,
+                  children: [
+                    if (onOpenHeatmap != null) ...[
+                      OutlinedButton.icon(
+                        style: OutlinedButton.styleFrom(
+                          visualDensity: VisualDensity.compact,
+                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                          side: BorderSide(color: AppTheme.accent.withValues(alpha: 0.5)),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                        ),
+                        onPressed: onOpenHeatmap,
+                        icon: Icon(Icons.grid_on_rounded, size: 14, color: AppTheme.accent),
+                        label: Text(
+                          'Competency Heatmap',
+                          style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: AppTheme.accent),
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                    ],
+                    ElevatedButton.icon(
+                      style: ElevatedButton.styleFrom(
+                        visualDensity: VisualDensity.compact,
+                        backgroundColor: AppTheme.accent,
+                        foregroundColor: Colors.white,
+                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                      ),
+                      onPressed: () {
+                        Navigator.of(context).pop();
+                        Future.microtask(() {
+                          if (context.mounted) {
+                            QuizItemAnalysisDialog.show(context);
+                          }
+                        });
+                      },
+                      icon: const Icon(Icons.analytics_outlined, size: 14),
+                      label: const Text(
+                        'Item Analysis',
+                        style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   // ── PREDICTIVE ANALYTICS: FORECAST & STUDENTS NEEDING ATTENTION ──────────────
   Widget _buildPredictiveSection(
     BuildContext context, {
@@ -3226,7 +3396,7 @@ class _TeacherDashboardScreenState extends ConsumerState<TeacherDashboardScreen>
                   borderRadius: BorderRadius.circular(8),
                 ),
                 child: Text(
-                  'Assessment Health',
+                  'Tier 3: Predictive',
                   style: TextStyle(
                     fontSize: 10.5,
                     fontWeight: FontWeight.w700,
@@ -3453,7 +3623,7 @@ class _TeacherDashboardScreenState extends ConsumerState<TeacherDashboardScreen>
                   borderRadius: BorderRadius.circular(8),
                 ),
                 child: Text(
-                  'Next Steps',
+                  'Tier 4: Prescriptive',
                   style: TextStyle(
                     fontSize: 10.5,
                     fontWeight: FontWeight.w700,
@@ -3550,13 +3720,21 @@ class _TeacherDashboardScreenState extends ConsumerState<TeacherDashboardScreen>
                 if (actionType == 'create_quiz') {
                   context.go('/teacher/subjects');
                 } else if (actionType == 'post_announcement') {
-                  PostAnnouncementDialog.show(context);
+                  Future.microtask(() {
+                    if (context.mounted) {
+                      PostAnnouncementDialog.show(context);
+                    }
+                  });
                 } else if (actionType == 'view_roster' || actionType == 'view_students') {
                   context.go('/teacher/students');
                 } else if (actionType == 'create_subject') {
                   context.go('/teacher/subjects');
                 } else if (actionType == 'item_analysis') {
-                  QuizItemAnalysisDialog.show(context);
+                  Future.microtask(() {
+                    if (context.mounted) {
+                      QuizItemAnalysisDialog.show(context);
+                    }
+                  });
                 }
               },
               child: Text(

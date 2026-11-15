@@ -876,11 +876,11 @@ class _MyCoursesScreenState extends ConsumerState<MyCoursesScreen> {
                             );
                           }
                         },
-                        icon: const Icon(Icons.check, size: 18),
+                        icon: const Icon(Icons.check, size: 18, color: Colors.white),
                         label: const Text('Confirm & Load Subjects'),
                         style: ElevatedButton.styleFrom(
                           backgroundColor: Theme.of(context).colorScheme.primary,
-                          foregroundColor: Colors.black,
+                          foregroundColor: Colors.white,
                           padding: const EdgeInsets.symmetric(vertical: 14),
                           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                           textStyle: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
@@ -1003,27 +1003,32 @@ class _MyCoursesScreenState extends ConsumerState<MyCoursesScreen> {
                       ),
                     ),
                     if (_activeTab == 0)
-                      ValueListenableBuilder<List<HubMaterialItem>>(
-                        valueListenable: SavedMaterialsService.instance.savedMaterialsNotifier,
-                        builder: (context, savedList, _) {
-                          return Material(
+                      Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Material(
                             color: Colors.transparent,
                             child: InkWell(
                               borderRadius: BorderRadius.circular(10),
                               onTap: () {
-                                SavedOfflineMaterialsModal.show(
-                                  context,
-                                  studentName: user?.fullName ?? 'Student',
-                                  studentSection: user?.section,
+                                HapticFeedback.lightImpact();
+                                AiraQrScannerDialog.show(
+                                  context: context,
+                                  title: 'Scan Section Enrollment QR',
+                                  subtitle: 'Point camera at classroom projector display',
+                                  onKeyScanned: (scannedKey) {
+                                    _keyController.text = scannedKey;
+                                    _handleSectionKeyVerification(scannedKey);
+                                  },
                                 );
                               },
                               child: Container(
-                                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
+                                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
                                 decoration: BoxDecoration(
-                                  color: isDark ? AppTheme.darkSurfaceLight : const Color(0xFFF1F5F9),
+                                  color: primary.withValues(alpha: isDark ? 0.20 : 0.08),
                                   borderRadius: BorderRadius.circular(10),
                                   border: Border.all(
-                                    color: isDark ? AppTheme.darkBorder : const Color(0xFFE2E8F0),
+                                    color: primary.withValues(alpha: isDark ? 0.45 : 0.35),
                                     width: 1,
                                   ),
                                 ),
@@ -1031,25 +1036,74 @@ class _MyCoursesScreenState extends ConsumerState<MyCoursesScreen> {
                                   mainAxisSize: MainAxisSize.min,
                                   children: [
                                     Icon(
-                                      Icons.folder_outlined,
+                                      Icons.qr_code_scanner_rounded,
                                       size: 15,
-                                      color: isDark ? AppTheme.darkTextSecondary : const Color(0xFF475569),
+                                      color: primary,
                                     ),
-                                    const SizedBox(width: 6),
+                                    const SizedBox(width: 5),
                                     Text(
-                                      savedList.isNotEmpty ? 'Materials (${savedList.length})' : 'Materials',
+                                      'Scan QR',
                                       style: TextStyle(
-                                        fontWeight: FontWeight.w600,
+                                        fontWeight: FontWeight.bold,
                                         fontSize: 12.5,
-                                        color: isDark ? AppTheme.darkText : const Color(0xFF1E293B),
+                                        color: primary,
                                       ),
                                     ),
                                   ],
                                 ),
                               ),
                             ),
-                          );
-                        },
+                          ),
+                          const SizedBox(width: 8),
+                          ValueListenableBuilder<List<HubMaterialItem>>(
+                            valueListenable: SavedMaterialsService.instance.savedMaterialsNotifier,
+                            builder: (context, savedList, _) {
+                              return Material(
+                                color: Colors.transparent,
+                                child: InkWell(
+                                  borderRadius: BorderRadius.circular(10),
+                                  onTap: () {
+                                    SavedOfflineMaterialsModal.show(
+                                      context,
+                                      studentName: user?.fullName ?? 'Student',
+                                      studentSection: user?.section,
+                                    );
+                                  },
+                                  child: Container(
+                                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
+                                    decoration: BoxDecoration(
+                                      color: isDark ? AppTheme.darkSurfaceLight : const Color(0xFFF1F5F9),
+                                      borderRadius: BorderRadius.circular(10),
+                                      border: Border.all(
+                                        color: isDark ? AppTheme.darkBorder : const Color(0xFFE2E8F0),
+                                        width: 1,
+                                      ),
+                                    ),
+                                    child: Row(
+                                      mainAxisSize: MainAxisSize.min,
+                                      children: [
+                                        Icon(
+                                          Icons.folder_outlined,
+                                          size: 15,
+                                          color: isDark ? AppTheme.darkTextSecondary : const Color(0xFF475569),
+                                        ),
+                                        const SizedBox(width: 6),
+                                        Text(
+                                          savedList.isNotEmpty ? 'Materials (${savedList.length})' : 'Materials',
+                                          style: TextStyle(
+                                            fontWeight: FontWeight.w600,
+                                            fontSize: 12.5,
+                                            color: isDark ? AppTheme.darkText : const Color(0xFF1E293B),
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                ),
+                              );
+                            },
+                          ),
+                        ],
                       ),
                   ],
                 ),
@@ -1263,11 +1317,11 @@ class _MyCoursesScreenState extends ConsumerState<MyCoursesScreen> {
                           const SizedBox(height: 16),
                           ElevatedButton.icon(
                             onPressed: () => _showEnterKeyDialog(),
-                            icon: const Icon(Icons.vpn_key_rounded, size: 16),
+                            icon: const Icon(Icons.vpn_key_rounded, size: 16, color: Colors.white),
                             label: const Text('Enter Section Key'),
                             style: ElevatedButton.styleFrom(
                               backgroundColor: Theme.of(context).colorScheme.primary,
-                              foregroundColor: Colors.black,
+                              foregroundColor: Colors.white,
                               padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
                               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
                             ),

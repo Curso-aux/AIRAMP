@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../core/animations/app_transitions.dart';
 import '../../../../core/components/aira_action_toast.dart';
+import '../../../../core/components/aira_search_picker_modal.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../../core/database/database_helper.dart';
 import '../../../admin/data/admin_repository.dart';
@@ -53,9 +54,8 @@ class _CreateEditScheduleDialogState extends ConsumerState<CreateEditScheduleDia
   String? _selectedTeacherName;
   int? _selectedSubjectId;
   String? _selectedSubjectName;
+  int? _selectedSectionId;
   String? _selectedSection;
-  bool _isCustomSection = false;
-  final _customSectionController = TextEditingController();
   String _selectedDay = 'Monday';
   TimeOfDay _startTime = const TimeOfDay(hour: 8, minute: 0);
   TimeOfDay _endTime = const TimeOfDay(hour: 9, minute: 30);
@@ -92,8 +92,8 @@ class _CreateEditScheduleDialogState extends ConsumerState<CreateEditScheduleDia
       _selectedTeacherName = init['teacher_name'] as String?;
       _selectedSubjectId = init['subject_id'] as int?;
       _selectedSubjectName = init['subject_name'] as String?;
+      _selectedSectionId = init['section_id'] as int?;
       _selectedSection = (init['section_name'] as String?)?.trim();
-      _customSectionController.text = _selectedSection ?? '';
       _selectedDay = (init['day_of_week'] as String?) ?? 'Monday';
       _roomController.text = (init['room'] as String?) ?? '';
       _selectedColor = (init['color_code'] as String?) ?? '#0D9488';
@@ -118,7 +118,6 @@ class _CreateEditScheduleDialogState extends ConsumerState<CreateEditScheduleDia
   @override
   void dispose() {
     _roomController.dispose();
-    _customSectionController.dispose();
     super.dispose();
   }
 
@@ -222,14 +221,12 @@ class _CreateEditScheduleDialogState extends ConsumerState<CreateEditScheduleDia
       );
       return;
     }
-    final sectionToSave = _isCustomSection
-        ? _customSectionController.text.trim()
-        : (_selectedSection?.trim() ?? '');
+    final sectionToSave = _selectedSection?.trim() ?? '';
     if (sectionToSave.isEmpty) {
       AiraActionToast.show(
         context,
         title: 'Section Required',
-        message: 'Please select or specify a class section.',
+        message: 'Please select a class section from the school directory.',
         type: AiraToastType.warning,
       );
       return;
@@ -271,35 +268,27 @@ class _CreateEditScheduleDialogState extends ConsumerState<CreateEditScheduleDia
         return;
       }
 
+      final schedulePayload = <String, dynamic>{
+        'teacher_id': _selectedTeacherId!,
+        'teacher_name': _selectedTeacherName!,
+        'subject_id': _selectedSubjectId!,
+        'subject_name': _selectedSubjectName!,
+        'section_id': _selectedSectionId,
+        'section_name': _selectedSection!,
+        'day_of_week': _selectedDay,
+        'start_time': startTimeStr,
+        'end_time': endTimeStr,
+        'room': roomStr.isNotEmpty ? roomStr : null,
+        'color_code': _selectedColor,
+      };
+
       if (widget.initialSchedule != null) {
         await DatabaseHelper().updateClassSchedule(
           widget.initialSchedule!['id'] as String,
-          {
-            'teacher_id': _selectedTeacherId!,
-            'teacher_name': _selectedTeacherName!,
-            'subject_id': _selectedSubjectId!,
-            'subject_name': _selectedSubjectName!,
-            'section_name': _selectedSection!,
-            'day_of_week': _selectedDay,
-            'start_time': startTimeStr,
-            'end_time': endTimeStr,
-            'room': roomStr.isNotEmpty ? roomStr : null,
-            'color_code': _selectedColor,
-          },
+          schedulePayload,
         );
       } else {
-        await DatabaseHelper().createClassSchedule({
-          'teacher_id': _selectedTeacherId!,
-          'teacher_name': _selectedTeacherName!,
-          'subject_id': _selectedSubjectId!,
-          'subject_name': _selectedSubjectName!,
-          'section_name': _selectedSection!,
-          'day_of_week': _selectedDay,
-          'start_time': startTimeStr,
-          'end_time': endTimeStr,
-          'room': roomStr.isNotEmpty ? roomStr : null,
-          'color_code': _selectedColor,
-        });
+        await DatabaseHelper().createClassSchedule(schedulePayload);
       }
 
       // Invalidate riverpod providers
@@ -344,6 +333,118 @@ class _CreateEditScheduleDialogState extends ConsumerState<CreateEditScheduleDia
         });
       }
     }
+  }
+
+  Widget _buildSearchSelectorField({
+    required String label,
+    required String? valueTitle,
+    String? valueSubtitle,
+    Widget? leading,
+    String hintText = 'Tap to select',
+    VoidCallback? onTap,
+    bool isLocked = false,
+  }) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Expanded(
+              child: Text(
+                label,
+                style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: AppTheme.text),
+                overflow: TextOverflow.ellipsis,
+              ),
+            ),
+            if (isLocked) ...[
+              const SizedBox(width: 8),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                decoration: BoxDecoration(
+                  color: AppTheme.textMuted.withValues(alpha: 0.1),
+                  borderRadius: BorderRadius.circular(6),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(Icons.lock_rounded, size: 11, color: AppTheme.textMuted),
+                    const SizedBox(width: 4),
+                    Text(
+                      'Assigned to you',
+                      style: TextStyle(fontSize: 10.5, fontWeight: FontWeight.w600, color: AppTheme.textMuted),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ],
+        ),
+        const SizedBox(height: 6),
+        InkWell(
+          onTap: isLocked ? null : onTap,
+          borderRadius: BorderRadius.circular(12),
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 11),
+            decoration: BoxDecoration(
+              color: isLocked ? AppTheme.surface : AppTheme.background,
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: AppTheme.border),
+            ),
+            child: Row(
+              children: [
+                if (leading != null) ...[
+                  leading,
+                  const SizedBox(width: 10),
+                ],
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(
+                        valueTitle ?? hintText,
+                        style: TextStyle(
+                          fontSize: 13,
+                          fontWeight: valueTitle != null ? FontWeight.w600 : FontWeight.normal,
+                          color: valueTitle != null ? AppTheme.text : AppTheme.textMuted,
+                        ),
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                      if (valueSubtitle != null && valueSubtitle.isNotEmpty) ...[
+                        const SizedBox(height: 1),
+                        Text(
+                          valueSubtitle,
+                          style: TextStyle(fontSize: 11, color: AppTheme.textMuted),
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ],
+                    ],
+                  ),
+                ),
+                const SizedBox(width: 8),
+                if (!isLocked)
+                  Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.all(4),
+                        decoration: BoxDecoration(
+                          color: AppTheme.primary.withValues(alpha: 0.08),
+                          borderRadius: BorderRadius.circular(6),
+                        ),
+                        child: Icon(Icons.search_rounded, size: 15, color: AppTheme.primary),
+                      ),
+                      const SizedBox(width: 4),
+                      Icon(Icons.keyboard_arrow_down_rounded, size: 18, color: AppTheme.textMuted),
+                    ],
+                  ),
+              ],
+            ),
+          ),
+        ),
+      ],
+    );
   }
 
   @override
@@ -409,36 +510,76 @@ class _CreateEditScheduleDialogState extends ConsumerState<CreateEditScheduleDia
         ? _selectedSubjectId
         : (safeSubjects.isNotEmpty ? safeSubjects.first['id'] as int? : null);
 
-    // Section options: combine initial section, handled sections of teacher, and school sections
-    final Set<String> sectionOptions = {};
-    if (_selectedSection != null && _selectedSection!.trim().isNotEmpty) {
-      sectionOptions.add(_selectedSection!.trim());
+    // Section options: combine school sections, handled sections of teacher, and initial schedule section
+    final Map<String, Map<String, dynamic>> sectionMap = {};
+    for (final sec in allSections) {
+      final name = (sec['name'] as String?)?.trim();
+      if (name != null && name.isNotEmpty) {
+        sectionMap[name] = Map<String, dynamic>.from(sec);
+      }
     }
     if (widget.initialSchedule != null) {
       final initSec = (widget.initialSchedule!['section_name'] as String?)?.trim();
-      if (initSec != null && initSec.isNotEmpty) {
-        sectionOptions.add(initSec);
+      if (initSec != null && initSec.isNotEmpty && !sectionMap.containsKey(initSec)) {
+        sectionMap[initSec] = {
+          'id': widget.initialSchedule!['section_id'],
+          'name': initSec,
+          'grade': '',
+          'room': widget.initialSchedule!['room'],
+          'student_count': 0,
+        };
       }
     }
     for (final sec in teacherMatch['handled_sections'] as List? ?? []) {
       final s = sec.toString().trim();
-      if (s.isNotEmpty) sectionOptions.add(s);
+      if (s.isNotEmpty && !sectionMap.containsKey(s)) {
+        sectionMap[s] = {'id': null, 'name': s, 'grade': '', 'student_count': 0};
+      }
     }
-    for (final sec in allSections) {
-      final name = (sec['name'] as String?)?.trim();
-      if (name != null && name.isNotEmpty) sectionOptions.add(name);
-    }
-    if (sectionOptions.isEmpty) {
-      sectionOptions.addAll(['STEM 12-A', 'STEM 12-B', 'ABM 12-A', 'HUMSS 12-A', 'Grade 10 - Emerald']);
-    }
-
-    if (_selectedSection == null || (!_isCustomSection && !sectionOptions.contains(_selectedSection))) {
-      _selectedSection = sectionOptions.isNotEmpty ? sectionOptions.first : null;
+    if (sectionMap.isEmpty) {
+      for (final s in ['Grade 12 - Sapphire', 'STEM 12-A', 'STEM 12-B', 'ABM 12-A', 'HUMSS 12-A', 'Grade 10 - Emerald']) {
+        sectionMap[s] = {'id': null, 'name': s, 'grade': '', 'student_count': 0};
+      }
     }
 
-    final effectiveSelectedSection = (_selectedSection != null && sectionOptions.contains(_selectedSection))
-        ? _selectedSection
-        : (sectionOptions.isNotEmpty ? sectionOptions.first : null);
+    if (_selectedSection == null || !sectionMap.containsKey(_selectedSection)) {
+      _selectedSection = sectionMap.isNotEmpty ? sectionMap.keys.first : null;
+      if (_selectedSection != null) {
+        _selectedSectionId = sectionMap[_selectedSection]?['id'] as int?;
+      }
+    } else if (_selectedSectionId == null && sectionMap.containsKey(_selectedSection)) {
+      _selectedSectionId = sectionMap[_selectedSection]?['id'] as int?;
+    }
+
+    // Active display data
+    final activeTeacher = safeTeachers.firstWhere(
+      (t) => t['id'] == effectiveTeacherId,
+      orElse: () => {},
+    );
+    final activeTeacherName = _selectedTeacherName ?? (activeTeacher['full_name'] as String?);
+    final activeTeacherEmail = activeTeacher['email'] as String? ?? (isTeacher ? currentUser?.email : null);
+
+    final activeSubject = safeSubjects.firstWhere(
+      (s) => s['id'] == effectiveSubjectId,
+      orElse: () => {},
+    );
+    final activeSubjectCode = activeSubject['subject_code'] as String? ?? '';
+    final activeSubjectName = _selectedSubjectName ?? (activeSubject['name'] as String?);
+    final activeSubjectDisplay = activeSubjectName != null
+        ? (activeSubjectCode.isNotEmpty ? '$activeSubjectCode - $activeSubjectName' : activeSubjectName)
+        : null;
+
+    final activeSectionData = _selectedSection != null ? sectionMap[_selectedSection] : null;
+    final activeSectionGrade = (activeSectionData?['grade'] as String?)?.trim() ?? '';
+    final activeSectionRoom = (activeSectionData?['room'] as String?)?.trim() ?? '';
+    final activeSectionStudents = activeSectionData?['student_count'] as int? ?? 0;
+    final List<String> activeSectionSubDetails = [];
+    if (activeSectionGrade.isNotEmpty) activeSectionSubDetails.add('Grade $activeSectionGrade');
+    if (activeSectionStudents > 0) activeSectionSubDetails.add('$activeSectionStudents Students');
+    if (activeSectionRoom.isNotEmpty) activeSectionSubDetails.add('Room: $activeSectionRoom');
+    final activeSectionSubtitle = activeSectionSubDetails.isNotEmpty
+        ? activeSectionSubDetails.join(' • ')
+        : (_selectedSection != null ? 'Connected to Student Directory' : null);
 
     return Dialog(
       backgroundColor: AppTheme.surface,
@@ -542,208 +683,204 @@ class _CreateEditScheduleDialogState extends ConsumerState<CreateEditScheduleDia
                             ),
                           ),
 
-                        // Faculty / Teacher Selection Dropdown
-                        Text(
-                          'Assigned Faculty / Instructor *',
-                          style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: AppTheme.text),
-                        ),
-                        const SizedBox(height: 6),
-                        Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 14),
-                          decoration: BoxDecoration(
-                            color: isTeacher ? AppTheme.surface : AppTheme.background,
-                            borderRadius: BorderRadius.circular(12),
-                            border: Border.all(color: AppTheme.border),
-                          ),
-                          child: DropdownButtonHideUnderline(
-                            child: DropdownButton<String>(
-                              isExpanded: true,
-                              value: effectiveTeacherId,
-                              hint: Text('Select Instructor', style: TextStyle(color: AppTheme.textMuted)),
-                              dropdownColor: AppTheme.surface,
-                              items: safeTeachers.map((t) {
-                                final tid = t['id'] as String;
-                                final tname = t['full_name'] as String? ?? 'Teacher';
-                                return DropdownMenuItem<String>(
-                                  value: tid,
-                                  child: Row(
-                                    children: [
-                                      CircleAvatar(
-                                        radius: 12,
-                                        backgroundColor: AppTheme.primary.withValues(alpha: 0.15),
-                                        child: Text(
-                                          tname.isNotEmpty ? tname[0].toUpperCase() : 'T',
-                                          style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: AppTheme.primary),
-                                        ),
-                                      ),
-                                      const SizedBox(width: 10),
-                                      Expanded(
-                                        child: Text(
-                                          tname,
-                                          style: TextStyle(color: AppTheme.text, fontSize: 13, fontWeight: FontWeight.w600),
-                                          overflow: TextOverflow.ellipsis,
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                );
-                              }).toList(),
-                              onChanged: isTeacher
-                                  ? null
-                                  : (val) {
-                                      if (val != null) {
-                                        final match = safeTeachers.firstWhere((t) => t['id'] == val, orElse: () => {});
-                                        setState(() {
-                                          _selectedTeacherId = val;
-                                          _selectedTeacherName = match['full_name'] as String?;
-                                          _conflictError = null;
-                                        });
-                                        _validateConflict();
-                                      }
-                                    },
+                        // Searchable Faculty / Teacher Selection
+                        _buildSearchSelectorField(
+                          label: 'Assigned Faculty / Instructor *',
+                          valueTitle: activeTeacherName,
+                          valueSubtitle: activeTeacherEmail,
+                          hintText: 'Search or select instructor...',
+                          isLocked: isTeacher,
+                          leading: CircleAvatar(
+                            radius: 14,
+                            backgroundColor: AppTheme.primary.withValues(alpha: 0.15),
+                            child: Text(
+                              (activeTeacherName != null && activeTeacherName.isNotEmpty)
+                                  ? activeTeacherName[0].toUpperCase()
+                                  : 'T',
+                              style: TextStyle(
+                                fontSize: 12,
+                                fontWeight: FontWeight.bold,
+                                color: AppTheme.primary,
+                              ),
                             ),
                           ),
-                        ),
-                        const SizedBox(height: 16),
-
-                        // Subject Selection Dropdown
-                        Text(
-                          'Class Subject *',
-                          style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: AppTheme.text),
-                        ),
-                        const SizedBox(height: 6),
-                        Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 14),
-                          decoration: BoxDecoration(
-                            color: AppTheme.background,
-                            borderRadius: BorderRadius.circular(12),
-                            border: Border.all(color: AppTheme.border),
-                          ),
-                          child: DropdownButtonHideUnderline(
-                            child: DropdownButton<int>(
-                              isExpanded: true,
-                              value: effectiveSubjectId,
-                              hint: Text('Select Subject', style: TextStyle(color: AppTheme.textMuted)),
-                              dropdownColor: AppTheme.surface,
-                              items: safeSubjects.map((sub) {
-                                final id = sub['id'] as int;
-                                final name = sub['name'] as String? ?? 'Subject';
-                                final code = sub['subject_code'] as String? ?? '';
-                                return DropdownMenuItem<int>(
-                                  value: id,
+                          onTap: () async {
+                            final items = safeTeachers.map((t) {
+                              final tid = t['id'] as String;
+                              final tname = t['full_name'] as String? ?? 'Teacher';
+                              final email = t['email'] as String? ?? '';
+                              final dept = (t['department'] as String?) ?? (t['role'] as String?) ?? 'Faculty';
+                              return AiraSearchPickerItem<String>(
+                                value: tid,
+                                title: tname,
+                                subtitle: email.isNotEmpty ? email : dept,
+                                badge: dept != 'Faculty' ? dept : null,
+                                searchKeywords: [tname, email, dept, tid],
+                                leading: CircleAvatar(
+                                  radius: 14,
+                                  backgroundColor: AppTheme.primary.withValues(alpha: 0.15),
                                   child: Text(
-                                    code.isNotEmpty ? '$code - $name' : name,
-                                    style: TextStyle(color: AppTheme.text, fontSize: 13),
-                                    overflow: TextOverflow.ellipsis,
+                                    tname.isNotEmpty ? tname[0].toUpperCase() : 'T',
+                                    style: TextStyle(
+                                      fontSize: 12,
+                                      fontWeight: FontWeight.bold,
+                                      color: AppTheme.primary,
+                                    ),
                                   ),
-                                );
-                              }).toList(),
-                              onChanged: (val) {
-                                if (val != null) {
-                                  final match = safeSubjects.firstWhere((s) => s['id'] == val, orElse: () => {});
-                                  setState(() {
-                                    _selectedSubjectId = val;
-                                    _selectedSubjectName = match['name'] as String?;
-                                  });
-                                }
-                              },
-                            ),
-                          ),
+                                ),
+                              );
+                            }).toList();
+
+                            final selected = await AiraSearchPickerModal.show<String>(
+                              context: context,
+                              title: 'Select Faculty / Instructor',
+                              searchHint: 'Search teacher name, email, or dept...',
+                              items: items,
+                              selectedValue: _selectedTeacherId,
+                              emptyMessage: 'No instructors found in directory.',
+                            );
+
+                            if (selected != null) {
+                              final match = safeTeachers.firstWhere((t) => t['id'] == selected, orElse: () => {});
+                              setState(() {
+                                _selectedTeacherId = selected;
+                                _selectedTeacherName = match['full_name'] as String?;
+                                _conflictError = null;
+                              });
+                              _validateConflict();
+                            }
+                          },
                         ),
                         const SizedBox(height: 16),
 
-                        // Section Selection Dropdown with Custom Input Toggle
-                        Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                          children: [
-                            Text(
-                              'Class Section *',
-                              style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: AppTheme.text),
-                            ),
-                            TextButton.icon(
-                              style: TextButton.styleFrom(
-                                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                                minimumSize: Size.zero,
-                                tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                              ),
-                              onPressed: () {
-                                setState(() {
-                                  _isCustomSection = !_isCustomSection;
-                                  if (_isCustomSection) {
-                                    _customSectionController.text = _selectedSection ?? '';
-                                  } else {
-                                    if (_customSectionController.text.trim().isNotEmpty) {
-                                      _selectedSection = _customSectionController.text.trim();
-                                    }
-                                  }
-                                });
-                              },
-                              icon: Icon(_isCustomSection ? Icons.list_rounded : Icons.edit_note_rounded, size: 14, color: AppTheme.primary),
-                              label: Text(
-                                _isCustomSection ? 'Choose from list' : 'Type custom section',
-                                style: TextStyle(fontSize: 11, color: AppTheme.primary, fontWeight: FontWeight.w600),
-                              ),
-                            ),
-                          ],
-                        ),
-                        const SizedBox(height: 6),
-                        if (_isCustomSection)
-                          TextFormField(
-                            controller: _customSectionController,
-                            maxLength: 40,
-                            buildCounter: (context, {required currentLength, required isFocused, maxLength}) => null,
-                            decoration: InputDecoration(
-                              hintText: 'e.g. Grade 12 - STEM A',
-                              counterText: '',
-                              prefixIcon: const Icon(Icons.class_outlined, size: 18),
-                              border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
-                              filled: true,
-                              fillColor: AppTheme.background,
-                              contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-                            ),
-                            style: TextStyle(color: AppTheme.text, fontSize: 13, fontWeight: FontWeight.w600),
-                            onChanged: (val) {
-                              _selectedSection = val.trim();
-                              _validateConflict();
-                            },
-                            validator: (val) {
-                              if (val == null || val.trim().isEmpty) return 'Section name cannot be empty';
-                              return null;
-                            },
-                          )
-                        else
-                          Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 14),
+                        // Searchable Subject Selection
+                        _buildSearchSelectorField(
+                          label: 'Class Subject *',
+                          valueTitle: activeSubjectDisplay,
+                          valueSubtitle: activeSubject['description'] as String?,
+                          hintText: 'Search or select subject...',
+                          leading: Container(
+                            padding: const EdgeInsets.all(7),
                             decoration: BoxDecoration(
-                              color: AppTheme.background,
-                              borderRadius: BorderRadius.circular(12),
-                              border: Border.all(color: AppTheme.border),
+                              color: AppTheme.primary.withValues(alpha: 0.12),
+                              borderRadius: BorderRadius.circular(8),
                             ),
-                            child: DropdownButtonHideUnderline(
-                              child: DropdownButton<String>(
-                                isExpanded: true,
-                                value: effectiveSelectedSection,
-                                hint: Text('Select Section', style: TextStyle(color: AppTheme.textMuted)),
-                                dropdownColor: AppTheme.surface,
-                                items: sectionOptions.map((sec) {
-                                  return DropdownMenuItem<String>(
-                                    value: sec,
-                                    child: Text(
-                                      sec,
-                                      style: TextStyle(color: AppTheme.text, fontSize: 13, fontWeight: FontWeight.w600),
-                                    ),
-                                  );
-                                }).toList(),
-                                onChanged: (val) {
-                                  setState(() {
-                                    _selectedSection = val;
-                                    _conflictError = null;
-                                  });
-                                  _validateConflict();
-                                },
-                              ),
-                            ),
+                            child: Icon(Icons.menu_book_rounded, color: AppTheme.primary, size: 16),
                           ),
+                          onTap: () async {
+                            final items = safeSubjects.map((sub) {
+                              final sid = sub['id'] as int;
+                              final sname = sub['name'] as String? ?? 'Subject';
+                              final scode = sub['subject_code'] as String? ?? '';
+                              final sgrade = sub['grade_level'] != null && sub['grade_level'].toString().isNotEmpty
+                                  ? 'Grade ${sub['grade_level']}'
+                                  : null;
+                              final sdesc = sub['description'] as String? ?? '';
+                              return AiraSearchPickerItem<int>(
+                                value: sid,
+                                title: scode.isNotEmpty ? '$scode - $sname' : sname,
+                                subtitle: sdesc.isNotEmpty ? sdesc : (scode.isNotEmpty ? 'Subject Code: $scode' : null),
+                                badge: sgrade,
+                                searchKeywords: [sname, scode, sdesc, ?sgrade],
+                                leading: Container(
+                                  padding: const EdgeInsets.all(8),
+                                  decoration: BoxDecoration(
+                                    color: AppTheme.primary.withValues(alpha: 0.12),
+                                    borderRadius: BorderRadius.circular(8),
+                                  ),
+                                  child: Icon(Icons.menu_book_rounded, color: AppTheme.primary, size: 16),
+                                ),
+                              );
+                            }).toList();
+
+                            final selected = await AiraSearchPickerModal.show<int>(
+                              context: context,
+                              title: 'Select Class Subject',
+                              searchHint: 'Search subject name or course code...',
+                              items: items,
+                              selectedValue: _selectedSubjectId,
+                              emptyMessage: 'No subjects found matching your search.',
+                            );
+
+                            if (selected != null) {
+                              final match = safeSubjects.firstWhere((s) => s['id'] == selected, orElse: () => {});
+                              setState(() {
+                                _selectedSubjectId = selected;
+                                _selectedSubjectName = match['name'] as String?;
+                              });
+                            }
+                          },
+                        ),
+                        const SizedBox(height: 16),
+
+                        // Searchable Class Section Selection
+                        _buildSearchSelectorField(
+                          label: 'Class Section *',
+                          valueTitle: _selectedSection,
+                          valueSubtitle: activeSectionSubtitle,
+                          hintText: 'Search or select classroom section...',
+                          leading: Container(
+                            padding: const EdgeInsets.all(7),
+                            decoration: BoxDecoration(
+                              color: AppTheme.accent.withValues(alpha: 0.12),
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                            child: Icon(Icons.groups_rounded, color: AppTheme.accent, size: 16),
+                          ),
+                          onTap: () async {
+                            final items = sectionMap.values.map((sec) {
+                              final sname = sec['name'] as String;
+                              final sgrade = (sec['grade'] as String?)?.trim() ?? '';
+                              final sroom = (sec['room'] as String?)?.trim() ?? '';
+                              final studentCount = sec['student_count'] as int? ?? 0;
+
+                              final List<String> details = [];
+                              if (sgrade.isNotEmpty) details.add('Grade $sgrade');
+                              if (studentCount > 0) details.add('$studentCount Students');
+                              if (sroom.isNotEmpty) details.add('Room: $sroom');
+                              final subtitle = details.isNotEmpty ? details.join(' • ') : 'School Directory Section';
+
+                              return AiraSearchPickerItem<String>(
+                                value: sname,
+                                title: sname,
+                                subtitle: subtitle,
+                                badge: sgrade.isNotEmpty ? 'Grade $sgrade' : null,
+                                searchKeywords: [sname, sgrade, sroom, if (studentCount > 0) '$studentCount students'],
+                                leading: Container(
+                                  padding: const EdgeInsets.all(8),
+                                  decoration: BoxDecoration(
+                                    color: AppTheme.accent.withValues(alpha: 0.12),
+                                    borderRadius: BorderRadius.circular(8),
+                                  ),
+                                  child: Icon(Icons.groups_rounded, color: AppTheme.accent, size: 16),
+                                ),
+                              );
+                            }).toList();
+
+                            final selected = await AiraSearchPickerModal.show<String>(
+                              context: context,
+                              title: 'Select Class Section',
+                              searchHint: 'Search section name, grade level, or room...',
+                              items: items,
+                              selectedValue: _selectedSection,
+                              emptyMessage: 'No class section found in school directory matching your search.',
+                            );
+
+                            if (selected != null) {
+                              final secData = sectionMap[selected];
+                              setState(() {
+                                _selectedSection = selected;
+                                _selectedSectionId = secData?['id'] as int?;
+                                final assignedRoom = secData?['room'] as String?;
+                                if (assignedRoom != null && assignedRoom.isNotEmpty && _roomController.text.trim().isEmpty) {
+                                  _roomController.text = assignedRoom;
+                                }
+                                _conflictError = null;
+                              });
+                              _validateConflict();
+                            }
+                          },
+                        ),
                         const SizedBox(height: 16),
 
                         // Day of Week

@@ -300,10 +300,12 @@ class SkeletonCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
 
+    final isCompact = height != null && height! < 100;
+
     return Container(
       height: height,
       margin: margin ?? const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-      padding: padding ?? const EdgeInsets.all(16),
+      padding: padding ?? EdgeInsets.all(isCompact ? 10 : 16),
       decoration: BoxDecoration(
         color: isDark ? AppTheme.darkSurface : Colors.white,
         borderRadius: BorderRadius.circular(16),
@@ -318,8 +320,8 @@ class SkeletonCard extends StatelessWidget {
           Row(
             children: [
               SkeletonLoader(
-                width: 36,
-                height: 36,
+                width: isCompact ? 28 : 36,
+                height: isCompact ? 28 : 36,
                 borderRadius: BorderRadius.circular(10),
                 animateStandalone: false,
               ),
@@ -330,42 +332,47 @@ class SkeletonCard extends StatelessWidget {
                   children: [
                     SkeletonLoader(
                       width: 140,
-                      height: 14,
+                      height: isCompact ? 12 : 14,
                       borderRadius: BorderRadius.circular(4),
                       animateStandalone: false,
                     ),
-                    const SizedBox(height: 6),
-                    SkeletonLoader(
-                      width: 80,
-                      height: 10,
-                      borderRadius: BorderRadius.circular(4),
-                      animateStandalone: false,
-                    ),
+                    if (!isCompact) ...[
+                      const SizedBox(height: 6),
+                      SkeletonLoader(
+                        width: 80,
+                        height: 10,
+                        borderRadius: BorderRadius.circular(4),
+                        animateStandalone: false,
+                      ),
+                    ],
                   ],
                 ),
               ),
-              SkeletonLoader(
-                width: 60,
-                height: 24,
-                borderRadius: BorderRadius.circular(8),
-                animateStandalone: false,
-              ),
+              if (!isCompact)
+                SkeletonLoader(
+                  width: 60,
+                  height: 24,
+                  borderRadius: BorderRadius.circular(8),
+                  animateStandalone: false,
+                ),
             ],
           ),
-          const SizedBox(height: 16),
-          SkeletonLoader(
-            width: double.infinity,
-            height: 12,
-            borderRadius: BorderRadius.circular(4),
-            animateStandalone: false,
-          ),
-          const SizedBox(height: 8),
-          SkeletonLoader(
-            width: 200,
-            height: 12,
-            borderRadius: BorderRadius.circular(4),
-            animateStandalone: false,
-          ),
+          if (!isCompact) ...[
+            const SizedBox(height: 16),
+            SkeletonLoader(
+              width: double.infinity,
+              height: 12,
+              borderRadius: BorderRadius.circular(4),
+              animateStandalone: false,
+            ),
+            const SizedBox(height: 8),
+            SkeletonLoader(
+              width: 200,
+              height: 12,
+              borderRadius: BorderRadius.circular(4),
+              animateStandalone: false,
+            ),
+          ],
         ],
       ),
     );

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 import 'package:airamp_flutter/src/features/admin/presentation/sections_mgmt_screen.dart';
 import 'package:airamp_flutter/src/features/admin/data/admin_repository.dart';
 
@@ -15,7 +16,16 @@ class MockSectionsNotifier extends SectionsNotifier {
   }
 }
 
+class MockSubjectsNotifier extends SubjectsNotifier {
+  @override
+  List<Map<String, dynamic>> build() => [];
+}
+
 void main() {
+  setUpAll(() {
+    sqfliteFfiInit();
+    databaseFactory = databaseFactoryFfi;
+  });
   final mockSections = [
     {
       'id': 1,
@@ -41,6 +51,7 @@ void main() {
     return ProviderScope(
       overrides: [
         sectionsProvider.overrideWith(() => MockSectionsNotifier(customSections ?? mockSections)),
+        subjectsProvider.overrideWith(() => MockSubjectsNotifier()),
       ],
       child: const MaterialApp(
         home: SectionsMgmtScreen(),
@@ -193,6 +204,41 @@ void main() {
 
       // Verify Enrollment Key input field is present in the dialog
       expect(find.text('Enrollment Key (optional)'), findsOneWidget);
+    });
+
+    testWidgets('Clicking Edit button on section card and clicking Cancel returns to sections list without blank view', (tester) async {
+      tester.view.physicalSize = const Size(1200, 900);
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(() => tester.view.resetPhysicalSize());
+
+      await tester.pumpWidget(createWidgetUnderTest());
+      await tester.pumpAndSettle();
+
+      // Verify sections are visible initially
+      expect(find.text('Grade 10 - Emerald'), findsOneWidget);
+      expect(find.text('Grade 11 - STEM B'), findsOneWidget);
+
+      // Tap the Edit button on the first section card
+      final editButton = find.widgetWithIcon(IconButton, Icons.edit_outlined).first;
+      await tester.tap(editButton);
+      await tester.pumpAndSettle();
+
+      // Verify Edit Section dialog is open
+      expect(find.byType(AlertDialog), findsOneWidget);
+      expect(find.text('Edit Section'), findsOneWidget);
+
+      // Tap the Cancel button in the dialog
+      final cancelButton = find.widgetWithText(TextButton, 'Cancel');
+      await tester.tap(cancelButton);
+      await tester.pumpAndSettle();
+
+      // Verify Edit Section dialog is closed
+      expect(find.byType(AlertDialog), findsNothing);
+
+      // Verify sections list remains rendered and NOT blank
+      expect(find.text('Manage Sections'), findsOneWidget);
+      expect(find.text('Grade 10 - Emerald'), findsOneWidget);
+      expect(find.text('Grade 11 - STEM B'), findsOneWidget);
     });
   });
 }

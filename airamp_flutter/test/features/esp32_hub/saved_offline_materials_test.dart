@@ -4,8 +4,10 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:airamp_flutter/src/features/esp32_hub/data/saved_materials_service.dart';
 import 'package:airamp_flutter/src/features/esp32_hub/domain/esp32_hub_models.dart';
 import 'package:airamp_flutter/src/features/esp32_hub/presentation/saved_offline_materials_modal.dart';
+import 'package:open_filex/open_filex.dart';
 
 import 'dart:convert';
+import 'dart:io';
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
@@ -116,6 +118,69 @@ void main() {
       final afterAdd = await SavedMaterialsService.instance.getSavedMaterials();
       expect(afterAdd.any((m) => m.id == 'new_item_99'), isTrue);
     });
+
+    test('exportDirectlyToDownloads writes file and returns path', () async {
+      const itemToExport = HubMaterialItem(
+        id: 'test_export_1',
+        title: 'Exportable Lesson Note',
+        subjectName: 'Science',
+        fileType: HubFileType.pdf,
+        sizeBytes: 4096,
+        fileName: 'lesson_note_exported.pdf',
+        content: '# Mitosis and Cytokinesis Guide\n\nCellular biology review.',
+      );
+
+      final exportedPath = await SavedMaterialsService.instance.exportDirectlyToDownloads(itemToExport);
+      expect(exportedPath, isNotNull);
+      final file = File(exportedPath!);
+      expect(await file.exists(), isTrue);
+      final content = await file.readAsString();
+      expect(content, contains('Mitosis and Cytokinesis'));
+
+      // Clean up test file
+      await file.delete();
+    });
+
+    test('removeMaterial deletes physical file from disk when localPath is set', () async {
+      final tempDir = Directory.systemTemp.createTempSync('airamp_test_');
+      final tempFile = File('${tempDir.path}/test_cleanup_material.pdf');
+      await tempFile.writeAsString('Dummy material data');
+      expect(await tempFile.exists(), isTrue);
+
+      final itemWithLocalFile = HubMaterialItem(
+        id: 'test_item_cleanup',
+        title: 'Cleanup Test Material',
+        subjectName: 'Test Subject',
+        fileType: HubFileType.pdf,
+        sizeBytes: 100,
+        localPath: tempFile.path,
+      );
+
+      await SavedMaterialsService.instance.saveMaterials([itemWithLocalFile]);
+      final savedList = await SavedMaterialsService.instance.getSavedMaterials();
+      expect(savedList.any((m) => m.id == 'test_item_cleanup'), isTrue);
+
+      await SavedMaterialsService.instance.removeMaterial('test_item_cleanup');
+      final updatedList = await SavedMaterialsService.instance.getSavedMaterials();
+      expect(updatedList.any((m) => m.id == 'test_item_cleanup'), isFalse);
+      expect(await tempFile.exists(), isFalse);
+
+      tempDir.deleteSync(recursive: true);
+    });
+
+    test('openMaterial returns fileNotFound when local file does not exist and has no content', () async {
+      const missingItem = HubMaterialItem(
+        id: 'missing_123',
+        title: 'Non-existent item',
+        subjectName: 'General',
+        fileType: HubFileType.pdf,
+        sizeBytes: 500,
+        localPath: '/non/existent/path/file.pdf',
+      );
+
+      final result = await SavedMaterialsService.instance.openMaterial(missingItem);
+      expect(result.type, equals(ResultType.fileNotFound));
+    });
   });
 
   group('SavedOfflineMaterialsModal Widget Tests', () {
@@ -188,6 +253,55 @@ void main() {
 
       expect(find.text('Module 1: Cellular Biology & Mitosis'), findsOneWidget);
       expect(find.text('Unit 2: Quadratic Functions & Parabolas'), findsNothing);
+    });
+
+    testWidgets('renders Save button and opens export options modal when tapped', (tester) async {
+      await tester.binding.setSurfaceSize(const Size(400, 800));
+
+      await tester.pumpWidget(
+        const MaterialApp(
+          home: Scaffold(
+            body: SavedOfflineMaterialsModal(
+              studentName: 'Juan Dela Cruz',
+              studentSection: 'Grade 10 - Emerald',
+            ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      // Find the "Save" button on a material card
+      final saveBtnFinder = find.widgetWithText(OutlinedButton, 'Save');
+      expect(saveBtnFinder, findsWidgets);
+
+      await tester.tap(saveBtnFinder.first);
+      await tester.pumpAndSettle();
+
+      // Verify bottom sheet appears with export options
+      expect(find.text('Save to Device Storage'), findsOneWidget);
+      expect(find.text('Save to Downloads Folder'), findsOneWidget);
+      expect(find.text('Choose Storage Folder...'), findsOneWidget);
+      expect(find.text('Open in Default System Viewer'), findsOneWidget);
+    });
+
+    testWidgets('OfflineMaterialReaderDialog renders document action buttons for PDF files', (tester) async {
+      await tester.binding.setSurfaceSize(const Size(400, 800));
+
+      final pdfItem = initialTestItems.first; // Module 1: Cellular Biology & Mitosis (pdf)
+
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            body: OfflineMaterialReaderDialog(item: pdfItem),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.text('Open in System Reader'), findsOneWidget);
+      expect(find.text('Save to Downloads'), findsOneWidget);
+      expect(find.text('Choose Folder...'), findsOneWidget);
+      expect(find.textContaining('This learning module is saved as a complete file'), findsOneWidget);
     });
   });
 

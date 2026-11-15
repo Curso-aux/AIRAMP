@@ -43,7 +43,7 @@ class StudentAnalyticsSheet extends ConsumerStatefulWidget {
 }
 
 class _StudentAnalyticsSheetState extends ConsumerState<StudentAnalyticsSheet> {
-  // 0: Descriptive, 1: Predictive, 2: Prescriptive
+  // Four-Tier Analytics: 0: Descriptive, 1: Diagnostic, 2: Predictive, 3: Prescriptive
   int _viewIndex = 0;
 
   @override
@@ -203,7 +203,7 @@ class _StudentAnalyticsSheetState extends ConsumerState<StudentAnalyticsSheet> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  // 3-Pillar Friendly Switcher: Overview, Forecast, Next Steps
+                  // Four-Tier Analytics Switcher: Overview, Diagnostics, Forecast, Action Plan
                   Container(
                     padding: const EdgeInsets.all(3),
                     decoration: BoxDecoration(
@@ -216,8 +216,9 @@ class _StudentAnalyticsSheetState extends ConsumerState<StudentAnalyticsSheet> {
                     child: Row(
                       children: [
                         _buildModeTab(0, 'Overview', Icons.analytics_outlined, isDark),
-                        _buildModeTab(1, 'Forecast', Icons.auto_graph_rounded, isDark),
-                        _buildModeTab(2, 'Next Steps', Icons.tips_and_updates_rounded, isDark),
+                        _buildModeTab(1, 'Diagnostics', Icons.troubleshoot_rounded, isDark),
+                        _buildModeTab(2, 'Forecast', Icons.auto_graph_rounded, isDark),
+                        _buildModeTab(3, 'Action Plan', Icons.tips_and_updates_rounded, isDark),
                       ],
                     ),
                   ),
@@ -232,8 +233,10 @@ class _StudentAnalyticsSheetState extends ConsumerState<StudentAnalyticsSheet> {
                           _viewIndex == 0
                               ? Icons.history_edu_rounded
                               : _viewIndex == 1
-                                  ? Icons.trending_up_rounded
-                                  : Icons.lightbulb_outline_rounded,
+                                  ? Icons.troubleshoot_rounded
+                                  : _viewIndex == 2
+                                      ? Icons.trending_up_rounded
+                                      : Icons.lightbulb_outline_rounded,
                           size: 14,
                           color: primary,
                         ),
@@ -241,10 +244,12 @@ class _StudentAnalyticsSheetState extends ConsumerState<StudentAnalyticsSheet> {
                         Expanded(
                           child: Text(
                             _viewIndex == 0
-                                ? 'Overview: Real-time progress, completed lessons & quiz performance'
+                                ? 'Overview (Descriptive): Real-time progress, completed lessons & quiz performance'
                                 : _viewIndex == 1
-                                    ? 'Forecast: Projected finish date, learning speed & assessment readiness'
-                                    : 'Next Steps: Recommended study tasks, urgent reminders & tips to improve',
+                                    ? 'Diagnostics: Competency breakdown, learning outcome gaps & missed concept analysis'
+                                    : _viewIndex == 2
+                                        ? 'Forecast (Predictive): Projected finish date, learning speed & assessment readiness'
+                                        : 'Action Plan (Prescriptive): Recommended study tasks, urgent reminders & tips to improve',
                             style: TextStyle(
                               fontSize: 11.5,
                               fontWeight: FontWeight.w600,
@@ -283,13 +288,16 @@ class _StudentAnalyticsSheetState extends ConsumerState<StudentAnalyticsSheet> {
 
                   // Contextual Lower Section depending on selected analytics mode
                   if (_viewIndex == 0) ...[
-                    // DESCRIPTIVE LOWER SECTION: Course Progress Grid & Assessment Snapshot
+                    // 1. DESCRIPTIVE LOWER SECTION: Course Progress Grid & Assessment Snapshot
                     _buildDescriptiveLowerSection(courses, activeCourses, pendingQuizzes, completedQuizzes, primary, isDark, isDesktop),
                   ] else if (_viewIndex == 1) ...[
-                    // PREDICTIVE LOWER SECTION: Subject Risk Matrix & Assessment Deadline Risk
+                    // 2. DIAGNOSTIC LOWER SECTION: Competency Mastery & Drop-off Breakdown
+                    _buildDiagnosticLowerSection(courses, quizzes, progress, primary, isDark, isDesktop),
+                  ] else if (_viewIndex == 2) ...[
+                    // 3. PREDICTIVE LOWER SECTION: Subject Risk Matrix & Assessment Deadline Risk
                     _buildPredictiveLowerSection(courses, quizzes, overdueQuizzes, progress, primary, isDark, isDesktop),
                   ] else ...[
-                    // PRESCRIPTIVE LOWER SECTION: Strategic Learning Roadmap & Milestone Goal
+                    // 4. PRESCRIPTIVE LOWER SECTION: Strategic Learning Roadmap & Milestone Goal
                     _buildPrescriptiveLowerSection(courses, quizzes, overdueQuizzes, lessonsDone, pending, completionPct, primary, isDark, isDesktop),
                   ],
                 ],
@@ -361,7 +369,7 @@ class _StudentAnalyticsSheetState extends ConsumerState<StudentAnalyticsSheet> {
   }
 
   // ---------------------------------------------------------------------------
-  // Top View Branching (0: Descriptive, 1: Predictive, 2: Prescriptive)
+  // Top View Branching (0: Descriptive, 1: Diagnostic, 2: Predictive, 3: Prescriptive)
   // ---------------------------------------------------------------------------
 
   Widget _buildSelectedView(
@@ -377,13 +385,318 @@ class _StudentAnalyticsSheetState extends ConsumerState<StudentAnalyticsSheet> {
   ) {
     switch (_viewIndex) {
       case 1:
-        return _buildPredictiveTopView(courses, progress, quizzes, lessonsDone, pending, completionPct, isDark, isDesktop);
+        return _buildDiagnosticTopView(courses, progress, quizzes, isDark, isDesktop);
       case 2:
+        return _buildPredictiveTopView(courses, progress, quizzes, lessonsDone, pending, completionPct, isDark, isDesktop);
+      case 3:
         return _buildPrescriptiveTopView(courses, progress, quizzes, lessonsDone, pending, completionPct, isDark, isDesktop);
       case 0:
       default:
         return _buildDescriptiveTopView(activeCourses, lessonsDone, pending, completionPct, isDark, isDesktop);
     }
+  }
+
+  // ---------------------------------------------------------------------------
+  // 2. DIAGNOSTIC VIEW (Competency mastery breakdown, gaps & drop-off analysis)
+  // ---------------------------------------------------------------------------
+
+  Widget _buildDiagnosticTopView(
+    List<Map<String, dynamic>> courses,
+    Map<String, dynamic> progress,
+    List<Map<String, dynamic>> quizzes,
+    bool isDark,
+    bool isDesktop,
+  ) {
+    final completedLos = progress['completed'] as int? ?? 0;
+    final pendingLos = progress['pending'] as int? ?? 0;
+    final totalLos = completedLos + pendingLos;
+    final loRate = totalLos > 0 ? ((completedLos / totalLos) * 100).round() : 0;
+    final avgScore = (progress['avgScore'] as num?)?.toDouble() ?? 0.0;
+    final totalAttempts = progress['totalAttempts'] as int? ?? 0;
+    final passedAttempts = progress['passedAttempts'] as int? ?? 0;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        if (isDesktop)
+          Row(
+            children: [
+              Expanded(
+                child: _buildMetricTile(
+                  label: 'Competencies Mastered',
+                  value: '$completedLos / $totalLos LOs ($loRate%)',
+                  icon: Icons.verified_outlined,
+                  accentColor: isDark ? const Color(0xFF34D399) : const Color(0xFF16A34A),
+                  isDark: isDark,
+                ),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: _buildMetricTile(
+                  label: 'Quiz Pass Consistency',
+                  value: totalAttempts > 0 ? '$passedAttempts / $totalAttempts Passed' : 'No Submissions',
+                  icon: Icons.track_changes_rounded,
+                  accentColor: AppTheme.primary,
+                  isDark: isDark,
+                ),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: _buildMetricTile(
+                  label: 'Average Performance',
+                  value: '${avgScore.toStringAsFixed(1)}%',
+                  icon: Icons.speed_rounded,
+                  accentColor: avgScore >= 75
+                      ? (isDark ? const Color(0xFF34D399) : const Color(0xFF16A34A))
+                      : Colors.orange,
+                  isDark: isDark,
+                ),
+              ),
+            ],
+          )
+        else
+          Column(
+            children: [
+              Row(
+                children: [
+                  Expanded(
+                    child: _buildMetricTile(
+                      label: 'Mastered LOs',
+                      value: '$completedLos/$totalLos ($loRate%)',
+                      icon: Icons.verified_outlined,
+                      accentColor: isDark ? const Color(0xFF34D399) : const Color(0xFF16A34A),
+                      isDark: isDark,
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: _buildMetricTile(
+                      label: 'Avg Score',
+                      value: '${avgScore.toStringAsFixed(1)}%',
+                      icon: Icons.speed_rounded,
+                      accentColor: avgScore >= 75
+                          ? (isDark ? const Color(0xFF34D399) : const Color(0xFF16A34A))
+                          : Colors.orange,
+                      isDark: isDark,
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 8),
+              _buildMetricTile(
+                label: 'Assessment Accuracy',
+                value: totalAttempts > 0
+                    ? '$passedAttempts of $totalAttempts Quizzes Passed (${((passedAttempts / totalAttempts) * 100).round()}%)'
+                    : 'No quiz attempts recorded yet',
+                icon: Icons.track_changes_rounded,
+                accentColor: AppTheme.primary,
+                isDark: isDark,
+              ),
+            ],
+          ),
+        const SizedBox(height: 14),
+        Container(
+          padding: const EdgeInsets.all(12),
+          decoration: BoxDecoration(
+            color: AppTheme.primary.withValues(alpha: isDark ? 0.12 : 0.06),
+            borderRadius: BorderRadius.circular(10),
+            border: Border.all(color: AppTheme.primary.withValues(alpha: 0.25)),
+          ),
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Icon(Icons.troubleshoot_rounded, size: 18, color: AppTheme.primary),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Text(
+                  loRate >= 80
+                      ? 'Solid Competency Foundation: Your learning outcome coverage is strong. Focus on reviewing missed quiz concepts to maintain your high mastery standing.'
+                      : totalLos > 0
+                          ? 'Diagnostic Gap Detected: Completing your $pendingLos pending learning outcomes directly bridges concept gaps before major examinations.'
+                          : 'Initial Phase: Complete enrolled module lessons to diagnose and map your individual competency strengths and gaps.',
+                  style: TextStyle(
+                    fontSize: 11.5,
+                    color: isDark ? AppTheme.darkTextSecondary : const Color(0xFF334155),
+                    height: 1.4,
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildDiagnosticLowerSection(
+    List<Map<String, dynamic>> courses,
+    List<Map<String, dynamic>> quizzes,
+    Map<String, dynamic> progress,
+    Color primary,
+    bool isDark,
+    bool isDesktop,
+  ) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Expanded(
+              child: Row(
+                children: [
+                  Icon(Icons.account_tree_outlined, size: 18, color: primary),
+                  const SizedBox(width: 8),
+                  Flexible(
+                    child: Text(
+                      'Subject Competency Diagnostics',
+                      style: TextStyle(
+                        fontSize: 15,
+                        fontWeight: FontWeight.bold,
+                        color: isDark ? AppTheme.darkText : AppTheme.lightText,
+                      ),
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(width: 8),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+              decoration: BoxDecoration(
+                color: primary.withValues(alpha: 0.1),
+                borderRadius: BorderRadius.circular(6),
+              ),
+              child: Text(
+                'Diagnostic Tier',
+                style: TextStyle(
+                  fontSize: 10.5,
+                  fontWeight: FontWeight.bold,
+                  color: primary,
+                ),
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 12),
+        if (courses.isEmpty)
+          Container(
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: isDark ? AppTheme.darkSurface : Colors.white,
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: isDark ? AppTheme.darkBorder : const Color(0xFFE2E8F0)),
+            ),
+            child: Center(
+              child: Text(
+                'No enrolled courses to diagnose yet.',
+                style: TextStyle(fontSize: 12, color: AppTheme.textSecondary),
+              ),
+            ),
+          )
+        else
+          Column(
+            children: courses.map((c) {
+              final title = c['name']?.toString() ?? c['subject_name']?.toString() ?? 'Subject';
+              final code = c['code']?.toString() ?? c['subject_code']?.toString() ?? '';
+              final totalLos = (c['total_los'] as num?)?.toInt() ?? 0;
+              final completedLos = (c['completed_los'] as num?)?.toInt() ?? 0;
+              final pct = totalLos > 0 ? ((completedLos / totalLos) * 100).round() : 0;
+
+              final Color statusColor = pct >= 80
+                  ? (isDark ? const Color(0xFF34D399) : const Color(0xFF16A34A))
+                  : pct >= 50
+                      ? Colors.orange
+                      : (isDark ? const Color(0xFFF87171) : const Color(0xFFDC2626));
+
+              final String statusLabel = pct >= 80
+                  ? 'High Mastery'
+                  : pct >= 50
+                      ? 'Progressing'
+                      : 'Needs Focus';
+
+              return Container(
+                margin: const EdgeInsets.only(bottom: 10),
+                padding: const EdgeInsets.all(14),
+                decoration: BoxDecoration(
+                  color: isDark ? AppTheme.darkSurface : Colors.white,
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: isDark ? AppTheme.darkBorder : const Color(0xFFE2E8F0)),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                title,
+                                style: TextStyle(
+                                  fontSize: 13,
+                                  fontWeight: FontWeight.bold,
+                                  color: isDark ? AppTheme.darkText : AppTheme.lightText,
+                                ),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                              if (code.isNotEmpty)
+                                Text(
+                                  code,
+                                  style: TextStyle(fontSize: 11, color: AppTheme.textSecondary),
+                                ),
+                            ],
+                          ),
+                        ),
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                          decoration: BoxDecoration(
+                            color: statusColor.withValues(alpha: 0.12),
+                            borderRadius: BorderRadius.circular(6),
+                            border: Border.all(color: statusColor.withValues(alpha: 0.3)),
+                          ),
+                          child: Text(
+                            statusLabel,
+                            style: TextStyle(fontSize: 10.5, fontWeight: FontWeight.bold, color: statusColor),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 10),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: ClipRRect(
+                            borderRadius: BorderRadius.circular(4),
+                            child: LinearProgressIndicator(
+                              value: (pct / 100.0).clamp(0.0, 1.0),
+                              minHeight: 6,
+                              backgroundColor: isDark ? AppTheme.darkBorder : const Color(0xFFE2E8F0),
+                              valueColor: AlwaysStoppedAnimation<Color>(statusColor),
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 10),
+                        Text(
+                          '$completedLos/$totalLos LOs ($pct%)',
+                          style: TextStyle(
+                            fontSize: 11,
+                            fontWeight: FontWeight.bold,
+                            color: isDark ? AppTheme.darkTextSecondary : const Color(0xFF475569),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              );
+            }).toList(),
+          ),
+      ],
+    );
   }
 
   // ---------------------------------------------------------------------------

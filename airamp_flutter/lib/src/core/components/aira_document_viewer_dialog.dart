@@ -183,22 +183,11 @@ class _AiraDocumentViewerDialogState extends State<AiraDocumentViewerDialog> {
   bool _isLoading = true;
   String? _errorMessage;
   Uint8List? _documentBytes;
-  List<String> _pages = [];
-  int _currentPageIndex = 0;
-  double _fontSizeScale = 1.0;
-  late final ScrollController _pageScrollController;
 
   @override
   void initState() {
     super.initState();
-    _pageScrollController = ScrollController();
     _loadDocumentContent();
-  }
-
-  @override
-  void dispose() {
-    _pageScrollController.dispose();
-    super.dispose();
   }
 
   Future<void> _loadDocumentContent() async {
@@ -270,31 +259,8 @@ class _AiraDocumentViewerDialogState extends State<AiraDocumentViewerDialog> {
 
       _documentBytes = bytes;
 
-      // 6. Extract text pages using Syncfusion PDF
-      final List<String> extractedPages = [];
-      try {
-        final PdfDocument doc = PdfDocument(inputBytes: bytes);
-        final pageCount = doc.pages.count;
-        if (pageCount > 0) {
-          final extractor = PdfTextExtractor(doc);
-          for (int i = 0; i < pageCount; i++) {
-            final pageText = extractor.extractText(startPageIndex: i, endPageIndex: i);
-            extractedPages.add(pageText.trim().isEmpty ? '(Page ${i + 1} contains graphical or tabular content)' : pageText.trim());
-          }
-        }
-        doc.dispose();
-      } catch (e) {
-        debugPrint('[AiraDocumentViewerDialog] Text extraction fallback: $e');
-      }
-
-      if (extractedPages.isEmpty) {
-        final notes = info?.description ?? widget.content['content_data']?.toString() ?? 'Learning module reading material.';
-        extractedPages.add(notes);
-      }
-
       if (mounted) {
         setState(() {
-          _pages = extractedPages;
           _isLoading = false;
         });
       }
@@ -321,8 +287,28 @@ class _AiraDocumentViewerDialogState extends State<AiraDocumentViewerDialog> {
   }
 
   Future<void> _openInSystemViewer() async {
+    final rawPath = (widget.fileInfo?.filePath ?? '').trim();
+    final rawData = (widget.content['content_data']?.toString() ?? '').trim();
+    final potentialUrl = rawPath.startsWith('http://') || rawPath.startsWith('https://')
+        ? rawPath
+        : (rawData.startsWith('http://') || rawData.startsWith('https://') ? rawData : null);
+
+    if (potentialUrl != null) {
+      try {
+        final uri = Uri.parse(potentialUrl);
+        if (await canLaunchUrl(uri)) {
+          await launchUrl(uri, mode: LaunchMode.externalApplication);
+          return;
+        }
+      } catch (e) {
+        debugPrint('[AiraDocumentViewerDialog] Remote URL launch error: $e');
+      }
+    }
+
     if (_documentBytes == null || _documentBytes!.isEmpty) {
-      AppToast.showWarning(context, 'Document is still preparing. Please wait.');
+      if (mounted) {
+        AppToast.showWarning(context, 'Document is still preparing. Please wait.');
+      }
       return;
     }
 
@@ -346,12 +332,6 @@ class _AiraDocumentViewerDialogState extends State<AiraDocumentViewerDialog> {
     }
   }
 
-  void _copyCurrentPageText() {
-    if (_pages.isEmpty) return;
-    Clipboard.setData(ClipboardData(text: _pages[_currentPageIndex]));
-    AppToast.showSuccess(context, 'Page text copied to clipboard!');
-  }
-
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
@@ -365,7 +345,10 @@ class _AiraDocumentViewerDialogState extends State<AiraDocumentViewerDialog> {
       backgroundColor: Colors.transparent,
       insetPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 20),
       child: Container(
-        constraints: const BoxConstraints(maxWidth: 820, maxHeight: 900),
+        constraints: BoxConstraints(
+          maxWidth: 540,
+          maxHeight: MediaQuery.sizeOf(context).height * 0.85,
+        ),
         decoration: BoxDecoration(
           color: surface,
           borderRadius: BorderRadius.circular(20),
@@ -384,6 +367,7 @@ class _AiraDocumentViewerDialogState extends State<AiraDocumentViewerDialog> {
         child: ClipRRect(
           borderRadius: BorderRadius.circular(20),
           child: Column(
+            mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               // ── Header Bar ──
@@ -434,7 +418,7 @@ class _AiraDocumentViewerDialogState extends State<AiraDocumentViewerDialog> {
                             [
                               rawName,
                               if (fileSizeStr.isNotEmpty) fileSizeStr,
-                              if (_pages.isNotEmpty) '${_pages.length} Pages',
+                              'Curriculum Resource',
                             ].join(' • '),
                             style: TextStyle(
                               fontSize: 11.5,
@@ -447,55 +431,6 @@ class _AiraDocumentViewerDialogState extends State<AiraDocumentViewerDialog> {
                       ),
                     ),
                     const SizedBox(width: 6),
-
-                    // Open in External / Native Reader Button
-                    IconButton(
-                      icon: const Icon(Icons.open_in_new_rounded, size: 19),
-                      tooltip: 'Open in System PDF Viewer',
-                      onPressed: _openInSystemViewer,
-                    ),
-
-                    // Font Zoom Control
-                    IconButton(
-                      icon: const Icon(Icons.text_fields_rounded, size: 20),
-                      tooltip: 'Toggle Font Size',
-                      onPressed: () {
-                        setState(() {
-                          _fontSizeScale = _fontSizeScale >= 1.3 ? 0.9 : _fontSizeScale + 0.15;
-                        });
-                      },
-                    ),
-
-                    // Copy Page Text
-                    IconButton(
-                      icon: const Icon(Icons.copy_rounded, size: 18),
-                      tooltip: 'Copy text',
-                      onPressed: _copyCurrentPageText,
-                    ),
-
-                    const SizedBox(width: 4),
-
-                    // Download Action Button (Opens Modal Loading Screen)
-                    ElevatedButton.icon(
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: primary,
-                        foregroundColor: Colors.black,
-                        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-                        elevation: 0,
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(10),
-                        ),
-                      ),
-                      onPressed: _handleDownload,
-                      icon: const Icon(Icons.download_rounded, size: 16),
-                      label: const Text(
-                        'Download',
-                        style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
-                      ),
-                    ),
-                    const SizedBox(width: 6),
-
-                    // Close Modal Button
                     IconButton(
                       icon: const Icon(Icons.close_rounded, size: 20),
                       tooltip: 'Close',
@@ -505,179 +440,218 @@ class _AiraDocumentViewerDialogState extends State<AiraDocumentViewerDialog> {
                 ),
               ),
 
-              // ── Reader Body ──
-              Expanded(
-                child: _isLoading
-                    ? Center(
-                        child: Column(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            CircularProgressIndicator(color: primary),
-                            const SizedBox(height: 16),
-                            Text(
-                              'Loading & rendering curriculum material...',
-                              style: TextStyle(
-                                color: AppTheme.textSecondary,
-                                fontSize: 13,
-                              ),
-                            ),
-                          ],
-                        ),
-                      )
-                    : _errorMessage != null
-                        ? Center(
-                            child: Padding(
-                              padding: const EdgeInsets.all(24),
-                              child: Column(
-                                mainAxisSize: MainAxisSize.min,
-                                children: [
-                                  Icon(Icons.error_outline_rounded, size: 48, color: AppTheme.error),
-                                  const SizedBox(height: 12),
-                                  Text(
-                                    _errorMessage!,
-                                    textAlign: TextAlign.center,
-                                    style: TextStyle(color: AppTheme.text, fontSize: 13),
+              // ── Body ──
+              Flexible(
+                child: SingleChildScrollView(
+                  padding: const EdgeInsets.all(20),
+                  child: _isLoading
+                      ? Padding(
+                          padding: const EdgeInsets.symmetric(vertical: 40),
+                          child: Center(
+                            child: Column(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                CircularProgressIndicator(color: primary),
+                                const SizedBox(height: 16),
+                                Text(
+                                  'Loading curriculum material...',
+                                  style: TextStyle(
+                                    color: AppTheme.textSecondary,
+                                    fontSize: 13,
                                   ),
-                                  const SizedBox(height: 16),
-                                  ElevatedButton(
-                                    onPressed: _loadDocumentContent,
-                                    child: const Text('Try Again'),
-                                  ),
-                                ],
-                              ),
+                                ),
+                              ],
                             ),
-                          )
-                        : Container(
-                            color: isDark ? const Color(0xFF0F172A) : const Color(0xFFF1F5F9),
-                            padding: const EdgeInsets.all(16),
-                            child: Center(
-                              child: ConstrainedBox(
-                                constraints: const BoxConstraints(maxWidth: 720),
-                                child: Container(
+                          ),
+                        )
+                      : _errorMessage != null
+                          ? Padding(
+                              padding: const EdgeInsets.symmetric(vertical: 32),
+                              child: Center(
+                                child: Column(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    Icon(Icons.error_outline_rounded, size: 48, color: AppTheme.error),
+                                    const SizedBox(height: 12),
+                                    Text(
+                                      _errorMessage!,
+                                      textAlign: TextAlign.center,
+                                      style: TextStyle(color: AppTheme.text, fontSize: 13),
+                                    ),
+                                    const SizedBox(height: 16),
+                                    ElevatedButton(
+                                      onPressed: _loadDocumentContent,
+                                      child: const Text('Try Again'),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            )
+                          : Column(
+                              mainAxisSize: MainAxisSize.min,
+                              crossAxisAlignment: CrossAxisAlignment.stretch,
+                              children: [
+                                // Material Details Card
+                                Container(
+                                  padding: const EdgeInsets.all(16),
                                   decoration: BoxDecoration(
-                                    color: surface,
+                                    color: isDark ? const Color(0xFF0F172A) : const Color(0xFFF8FAFC),
                                     borderRadius: BorderRadius.circular(14),
-                                    boxShadow: [
-                                      BoxShadow(
-                                        color: Colors.black.withValues(alpha: isDark ? 0.3 : 0.08),
-                                        blurRadius: 18,
-                                        offset: const Offset(0, 4),
-                                      ),
-                                    ],
+                                    border: Border.all(
+                                      color: isDark ? AppTheme.darkBorder : AppTheme.lightBorder,
+                                    ),
                                   ),
-                                  padding: const EdgeInsets.all(24),
                                   child: Column(
-                                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                                    crossAxisAlignment: CrossAxisAlignment.start,
                                     children: [
-                                      // Top Page Sub-Header
                                       Row(
-                                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
                                         children: [
-                                          Text(
-                                            'OFFICIAL STUDY HANDOUT',
-                                            style: TextStyle(
-                                              fontSize: 10,
-                                              fontWeight: FontWeight.bold,
-                                              letterSpacing: 1.2,
-                                              color: primary,
+                                          Container(
+                                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                            decoration: BoxDecoration(
+                                              color: primary.withValues(alpha: 0.15),
+                                              borderRadius: BorderRadius.circular(6),
                                             ),
-                                          ),
-                                          Text(
-                                            _pages.isNotEmpty
-                                                ? 'Page ${_currentPageIndex + 1} of ${_pages.length}'
-                                                : '',
-                                            style: TextStyle(
-                                              fontSize: 11,
-                                              color: AppTheme.textMuted,
-                                              fontWeight: FontWeight.w600,
-                                            ),
-                                          ),
-                                        ],
-                                      ),
-                                      const Divider(height: 20),
-
-                                      // Extracted Document Text View
-                                      Expanded(
-                                        child: Scrollbar(
-                                          controller: _pageScrollController,
-                                          thumbVisibility: true,
-                                          child: SingleChildScrollView(
-                                            controller: _pageScrollController,
-                                            padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 8),
-                                            child: SelectableText(
-                                              _pages.isNotEmpty ? _pages[_currentPageIndex] : '',
+                                            child: Text(
+                                              (widget.fileInfo?.fileExtension.isNotEmpty == true
+                                                      ? widget.fileInfo!.fileExtension
+                                                      : 'PDF')
+                                                  .toUpperCase(),
                                               style: TextStyle(
-                                                fontSize: 14 * _fontSizeScale,
-                                                height: 1.65,
-                                                color: Theme.of(context).colorScheme.onSurface,
+                                                fontSize: 11,
+                                                fontWeight: FontWeight.bold,
+                                                color: primary,
                                               ),
                                             ),
                                           ),
+                                          const SizedBox(width: 8),
+                                          if (fileSizeStr.isNotEmpty)
+                                            Text(
+                                              fileSizeStr,
+                                              style: TextStyle(
+                                                fontSize: 12,
+                                                color: AppTheme.textMuted,
+                                              ),
+                                            ),
+                                        ],
+                                      ),
+                                      const SizedBox(height: 10),
+                                      Text(
+                                        title,
+                                        style: TextStyle(
+                                          fontSize: 16,
+                                          fontWeight: FontWeight.w600,
+                                          color: Theme.of(context).colorScheme.onSurface,
+                                        ),
+                                      ),
+                                      if (widget.fileInfo?.description != null &&
+                                          widget.fileInfo!.description!.trim().isNotEmpty) ...[
+                                        const SizedBox(height: 6),
+                                        Text(
+                                          widget.fileInfo!.description!.trim(),
+                                          style: TextStyle(
+                                            fontSize: 13,
+                                            color: AppTheme.textSecondary,
+                                            height: 1.4,
+                                          ),
+                                        ),
+                                      ],
+                                      const SizedBox(height: 12),
+                                      Container(
+                                        padding: const EdgeInsets.all(10),
+                                        decoration: BoxDecoration(
+                                          color: primary.withValues(alpha: 0.08),
+                                          borderRadius: BorderRadius.circular(8),
+                                        ),
+                                        child: Row(
+                                          children: [
+                                            Icon(
+                                              Icons.info_outline_rounded,
+                                              size: 16,
+                                              color: primary,
+                                            ),
+                                            const SizedBox(width: 8),
+                                            Expanded(
+                                              child: Text(
+                                                'Download this file to your device or view it directly in your preferred system PDF reader application.',
+                                                style: TextStyle(
+                                                  fontSize: 11.5,
+                                                  color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.8),
+                                                ),
+                                              ),
+                                            ),
+                                          ],
                                         ),
                                       ),
                                     ],
                                   ),
                                 ),
-                              ),
-                            ),
-                          ),
-              ),
+                                const SizedBox(height: 20),
 
-              // ── Navigation Bottom Bar ──
-              if (_pages.length > 1)
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
-                  decoration: BoxDecoration(
-                    color: isDark ? const Color(0xFF1E293B) : const Color(0xFFF8FAFC),
-                    border: Border(
-                      top: BorderSide(
-                        color: isDark ? AppTheme.darkBorder : AppTheme.lightBorder,
-                      ),
-                    ),
-                  ),
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      OutlinedButton.icon(
-                        icon: const Icon(Icons.chevron_left_rounded, size: 18),
-                        label: const Text('Previous'),
-                        onPressed: _currentPageIndex > 0
-                            ? () {
-                                setState(() {
-                                  _currentPageIndex--;
-                                  _pageScrollController.jumpTo(0);
-                                });
-                              }
-                            : null,
-                      ),
-                      Text(
-                        'Page ${_currentPageIndex + 1} of ${_pages.length}',
-                        style: TextStyle(
-                          fontSize: 12.5,
-                          fontWeight: FontWeight.bold,
-                          color: Theme.of(context).colorScheme.onSurface,
-                        ),
-                      ),
-                      ElevatedButton.icon(
-                        icon: const Icon(Icons.chevron_right_rounded, size: 18),
-                        label: const Text('Next'),
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: primary,
-                          foregroundColor: Colors.black,
-                          elevation: 0,
-                        ),
-                        onPressed: _currentPageIndex < _pages.length - 1
-                            ? () {
-                                setState(() {
-                                  _currentPageIndex++;
-                                  _pageScrollController.jumpTo(0);
-                                });
-                              }
-                            : null,
-                      ),
-                    ],
-                  ),
+                                // Responsive Action Buttons
+                                LayoutBuilder(
+                                  builder: (context, constraints) {
+                                    final isNarrow = constraints.maxWidth < 340;
+                                    final downloadButton = ElevatedButton.icon(
+                                      style: ElevatedButton.styleFrom(
+                                        backgroundColor: primary,
+                                        foregroundColor: Colors.black,
+                                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                                        shape: RoundedRectangleBorder(
+                                          borderRadius: BorderRadius.circular(10),
+                                        ),
+                                        elevation: 0,
+                                      ),
+                                      onPressed: _handleDownload,
+                                      icon: const Icon(Icons.download_rounded, size: 18),
+                                      label: const Text(
+                                        'Download Material',
+                                        style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+                                      ),
+                                    );
+
+                                    final viewPdfButton = OutlinedButton.icon(
+                                      style: OutlinedButton.styleFrom(
+                                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                                        side: BorderSide(
+                                          color: isDark ? AppTheme.darkBorder : AppTheme.lightBorder,
+                                        ),
+                                        shape: RoundedRectangleBorder(
+                                          borderRadius: BorderRadius.circular(10),
+                                        ),
+                                      ),
+                                      onPressed: _openInSystemViewer,
+                                      icon: const Icon(Icons.open_in_new_rounded, size: 18),
+                                      label: const Text(
+                                        'View PDF in System App',
+                                        style: TextStyle(fontSize: 13),
+                                      ),
+                                    );
+
+                                    if (isNarrow) {
+                                      return Column(
+                                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                                        children: [
+                                          downloadButton,
+                                          const SizedBox(height: 10),
+                                          viewPdfButton,
+                                        ],
+                                      );
+                                    }
+
+                                    return Row(
+                                      children: [
+                                        Expanded(child: downloadButton),
+                                        const SizedBox(width: 12),
+                                        Expanded(child: viewPdfButton),
+                                      ],
+                                    );
+                                  },
+                                ),
+                              ],
+                            ),
                 ),
+              ),
             ],
           ),
         ),

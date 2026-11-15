@@ -109,28 +109,28 @@ class _QuizScreenState extends ConsumerState<QuizScreen> {
       return;
     }
 
-    // Check if student already completed this quiz
     final student = ref.read(authProvider);
     final studentId = student?.id ?? '';
     final isTeacher = widget.isTeacherPreview || (student?.role == 'teacher');
-    if (!isTeacher) {
-      // After teacher reset, attempts are deleted so student can retake
-      final canAttempt = await DatabaseHelper().hasStudentCompletedQuiz(
-        studentId: studentId,
-        quizId: parsedId,
-      );
-      if (!canAttempt && mounted) {
-        setState(() {
-          _loading = false;
-          _hasAlreadyTaken = true;
-        });
-        return;
-      }
-    }
 
     // 1. Try loading as first-class quiz from `quizzes` table
     final quizData = await DatabaseHelper().getQuizById(parsedId);
     if (quizData != null && mounted) {
+      if (!isTeacher) {
+        // After teacher reset, attempts are deleted so student can retake
+        final canAttempt = await DatabaseHelper().hasStudentCompletedQuiz(
+          studentId: studentId,
+          quizId: parsedId,
+        );
+        if (!canAttempt && mounted) {
+          setState(() {
+            _loading = false;
+            _hasAlreadyTaken = true;
+          });
+          return;
+        }
+      }
+
       final qList = (quizData['questions'] as List?)?.cast<Map<String, dynamic>>() ?? [];
       final tLimit = (quizData['time_limit_minutes'] as int?) ?? 0;
       _scheduleStart = quizData['schedule_start'] as String?;
@@ -201,6 +201,21 @@ class _QuizScreenState extends ConsumerState<QuizScreen> {
     final loData = await DatabaseHelper().getLoQuiz(parsedId);
     if (mounted) {
       if (loData != null) {
+        final qList = (loData['questions'] as List?)?.cast<Map<String, dynamic>>() ?? [];
+        if (qList.isEmpty) {
+          // If no questions exist, it is not completed - it's an unpopulated assessment
+          setState(() {
+            _quizId = null;
+            _loId = parsedId;
+            _quizData = loData;
+            _questions = [];
+            _quizTitle = loData['title']?.toString() ?? 'Learning Outcome';
+            _hasAlreadyTaken = false;
+            _loading = false;
+          });
+          return;
+        }
+
         if (!isTeacher) {
           final canAttemptLo = await DatabaseHelper().hasStudentCompletedLoQuiz(
             studentId: studentId,
@@ -214,7 +229,6 @@ class _QuizScreenState extends ConsumerState<QuizScreen> {
             return;
           }
         }
-        final qList = (loData['questions'] as List?)?.cast<Map<String, dynamic>>() ?? [];
         setState(() {
           _quizId = null;
           _loId = parsedId;
@@ -439,13 +453,13 @@ class _QuizScreenState extends ConsumerState<QuizScreen> {
             children: [
               SkeletonLoader(width: double.infinity, height: 18),
               SizedBox(height: 16),
-              SkeletonCard(height: 110),
+              SkeletonCard(),
               SizedBox(height: 14),
-              SkeletonCard(height: 56),
+              SkeletonLoader(width: double.infinity, height: 52, borderRadius: BorderRadius.all(Radius.circular(12))),
               SizedBox(height: 8),
-              SkeletonCard(height: 56),
+              SkeletonLoader(width: double.infinity, height: 52, borderRadius: BorderRadius.all(Radius.circular(12))),
               SizedBox(height: 8),
-              SkeletonCard(height: 56),
+              SkeletonLoader(width: double.infinity, height: 52, borderRadius: BorderRadius.all(Radius.circular(12))),
             ],
           ),
         ),
@@ -453,10 +467,11 @@ class _QuizScreenState extends ConsumerState<QuizScreen> {
     }
 
     if (_quizData == null || _questions.isEmpty) {
+      final isActuallyTaken = _hasAlreadyTaken && _questions.isNotEmpty;
       return Scaffold(
         backgroundColor: AppTheme.background,
         appBar: AppBar(
-          title: Text('Assessment', style: TextStyle(color: AppTheme.text)),
+          title: Text(_quizTitle.isNotEmpty ? _quizTitle : 'Assessment', style: TextStyle(color: AppTheme.text)),
           iconTheme: IconThemeData(color: AppTheme.text),
         ),
         body: Center(
@@ -468,12 +483,12 @@ class _QuizScreenState extends ConsumerState<QuizScreen> {
                 Icon(Icons.assignment_outlined, size: 64, color: AppTheme.textMuted),
                 const SizedBox(height: 16),
                 Text(
-                  _hasAlreadyTaken ? 'Quiz Already Completed' : 'No Assessment Questions',
+                  isActuallyTaken ? 'Quiz Already Completed' : 'No Assessment Questions',
                   style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: AppTheme.text),
                 ),
                 const SizedBox(height: 8),
                 Text(
-                  _hasAlreadyTaken
+                  isActuallyTaken
                       ? 'You have already completed this quiz. Only your instructor can reset this quiz if a retake is permitted.'
                       : 'The instructor has not added quiz questions for this assessment yet.',
                   textAlign: TextAlign.center,
@@ -484,7 +499,7 @@ class _QuizScreenState extends ConsumerState<QuizScreen> {
                   onPressed: () => context.pop(),
                   style: ElevatedButton.styleFrom(
                     backgroundColor: AppTheme.primary,
-                    foregroundColor: Colors.black,
+                    foregroundColor: Colors.white,
                   ),
                   child: const Text('Back to Course', style: TextStyle(fontWeight: FontWeight.bold)),
                 ),

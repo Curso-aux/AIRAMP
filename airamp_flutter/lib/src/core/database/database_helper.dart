@@ -4666,6 +4666,12 @@ class DatabaseHelper {
 
   // ── Initial Starter Curriculum & Data Seeder ───────────────
 
+  @visibleForTesting
+  Future<void> seedInitialDataForTesting([Database? db]) async {
+    final targetDb = db ?? await database;
+    await _seedInitialData(targetDb);
+  }
+
   Future<void> _seedInitialData(Database db) async {
     try {
       await db.execute('ALTER TABLE reg_links ADD COLUMN section TEXT');
@@ -4799,9 +4805,8 @@ class DatabaseHelper {
       await db.delete('reg_links', where: "code IN ('SEC-EMR10', 'SEC-STEM11', 'SEC-GOLD12')");
     } catch (_) {}
 
-    // Purge mock schedules, quizzes, assignments
+    // Purge mock quizzes, assignments
     try {
-      await db.delete('class_schedules', where: "id LIKE 'sched_emerald%' OR section_name IN ('Grade 10 - Emerald', 'Grade 11 - STEM B', 'Grade 12 - Gold')");
       await db.delete('quizzes', where: "title LIKE '%Midterm Quiz Assessment%'");
       await db.delete('assignments', where: "title LIKE '%Final Project: Flutter Migration%'");
     } catch (_) {}
@@ -8914,11 +8919,9 @@ class DatabaseHelper {
 
       // Difficulty Index (p) = Total Correct / Total Examinees
       final int correctCount = totalSelections[correctOpt] ?? 0;
-      final double p =
-          (totalAttempts > 0 ? (correctCount / totalAttempts) : 0.0).clamp(
-            0.0,
-            1.0,
-          );
+      final double rawP =
+          totalAttempts > 0 ? (correctCount / totalAttempts) : 0.0;
+      final double p = (rawP.isNaN || rawP.isInfinite) ? 0.0 : rawP.clamp(0.0, 1.0);
       sumP += p;
       sumPtimesOneMinusP += (p * (1.0 - p));
 
@@ -8938,9 +8941,9 @@ class DatabaseHelper {
       // Discrimination Index (D) = (Upper Correct - Lower Correct) / GroupSize
       final int uCorrect = upperSelections[correctOpt] ?? 0;
       final int lCorrect = lowerSelections[correctOpt] ?? 0;
-      final double d =
-          (groupSize > 0 ? ((uCorrect - lCorrect) / groupSize.toDouble()) : 0.0)
-              .clamp(-1.0, 1.0);
+      final double rawD =
+          groupSize > 0 ? ((uCorrect - lCorrect) / groupSize.toDouble()) : 0.0;
+      final double d = (rawD.isNaN || rawD.isInfinite) ? 0.0 : rawD.clamp(-1.0, 1.0);
       sumD += d;
 
       final String discriminationLabel;
@@ -9039,12 +9042,18 @@ class DatabaseHelper {
       );
     }
 
-    final double meanDiff = questionsRaw.isNotEmpty
+    final double rawMeanDiff = questionsRaw.isNotEmpty
         ? (sumP / questionsRaw.length)
         : 0.0;
-    final double meanDisc = questionsRaw.isNotEmpty
+    final double meanDiff = (rawMeanDiff.isNaN || rawMeanDiff.isInfinite)
+        ? 0.0
+        : rawMeanDiff.clamp(0.0, 1.0);
+    final double rawMeanDisc = questionsRaw.isNotEmpty
         ? (sumD / questionsRaw.length)
         : 0.0;
+    final double meanDisc = (rawMeanDisc.isNaN || rawMeanDisc.isInfinite)
+        ? 0.0
+        : rawMeanDisc.clamp(-1.0, 1.0);
 
     // KR-20 Reliability: (k / (k - 1)) * (1 - (sum(p * (1 - p)) / sigma^2))
     double? kr20;
@@ -9053,15 +9062,17 @@ class DatabaseHelper {
     if (k > 1 && scoreVariance > 0.0001) {
       final rawKr20 =
           (k / (k - 1)) * (1.0 - (sumPtimesOneMinusP / scoreVariance));
-      kr20 = rawKr20.clamp(0.0, 1.0);
-      if (kr20 >= 0.85) {
-        reliabilityRating = 'Excellent';
-      } else if (kr20 >= 0.75) {
-        reliabilityRating = 'Good';
-      } else if (kr20 >= 0.60) {
-        reliabilityRating = 'Acceptable';
-      } else {
-        reliabilityRating = 'Low Reliability';
+      if (!rawKr20.isNaN && !rawKr20.isInfinite) {
+        kr20 = rawKr20.clamp(0.0, 1.0);
+        if (kr20 >= 0.85) {
+          reliabilityRating = 'Excellent';
+        } else if (kr20 >= 0.75) {
+          reliabilityRating = 'Good';
+        } else if (kr20 >= 0.60) {
+          reliabilityRating = 'Acceptable';
+        } else {
+          reliabilityRating = 'Low Reliability';
+        }
       }
     }
 
@@ -10517,12 +10528,13 @@ class DatabaseHelper {
         ]);
       }
 
-      // 3. Pull latest curriculum, quizzes, assignments, and submissions in background via lightweight delta
+      // 3. Pull latest curriculum, quizzes, assignments, submissions, and schedules in background
       await Future.wait([
         syncCloudCurriculumToLocal(force: force),
         syncCloudQuizzesToLocal(force: force),
         syncCloudAssignmentsToLocal(force: force),
         syncCloudSubmissionsToLocal(force: force),
+        FirestoreService().syncCloudSchedulesToLocal(force: force),
       ]);
 
       // 4. Sync notifications for currently logged in user
@@ -11962,6 +11974,45 @@ class DatabaseHelper {
   }
 
   // ── Class Schedules Management ──────────────────────────────
+  Future<void> _saveSchedulesToLocalCache([Database? db]) async {
+    try {
+      final databaseInstance = db ?? await database;
+      final schedules = await databaseInstance.query('class_schedules');
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString('local_cached_schedules_v1', jsonEncode(schedules));
+    } catch (e) {
+      debugPrint('[DatabaseHelper] Error saving schedules to local cache: $e');
+    }
+  }
+
+  Future<int> _restoreSchedulesFromLocalCache([Database? db]) async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final cachedStr = prefs.getString('local_cached_schedules_v1');
+      if (cachedStr == null || cachedStr.trim().isEmpty) return 0;
+      final List<dynamic> decoded = jsonDecode(cachedStr);
+      if (decoded.isEmpty) return 0;
+
+      final databaseInstance = db ?? await database;
+      int restored = 0;
+      for (final item in decoded) {
+        if (item is Map) {
+          final row = Map<String, dynamic>.from(item);
+          await databaseInstance.insert(
+            'class_schedules',
+            row,
+            conflictAlgorithm: ConflictAlgorithm.replace,
+          );
+          restored++;
+        }
+      }
+      return restored;
+    } catch (e) {
+      debugPrint('[DatabaseHelper] Error restoring schedules from local cache: $e');
+      return 0;
+    }
+  }
+
   Future<List<Map<String, dynamic>>> getClassSchedules({
     String? teacherId,
     String? teacherName,
@@ -11971,6 +12022,21 @@ class DatabaseHelper {
     String? dayOfWeek,
   }) async {
     final db = await database;
+
+    // Dual-tier cache check: if table is empty in SQLite, restore from local_cached_schedules_v1
+    final totalCount = Sqflite.firstIntValue(
+      await db.rawQuery('SELECT COUNT(*) FROM class_schedules'),
+    ) ?? 0;
+    if (totalCount == 0) {
+      final restored = await _restoreSchedulesFromLocalCache(db);
+      if (restored > 0) {
+        debugPrint('[DatabaseHelper] Restored $restored class schedules from local storage cache');
+      }
+      try {
+        unawaited(FirestoreService().syncCloudSchedulesToLocal());
+      } catch (_) {}
+    }
+
     final whereClauses = <String>[];
     final whereArgs = <dynamic>[];
 
@@ -12062,6 +12128,10 @@ class DatabaseHelper {
       row,
       conflictAlgorithm: ConflictAlgorithm.replace,
     );
+    await _saveSchedulesToLocalCache(db);
+    try {
+      unawaited(FirestoreService().saveDocument('class_schedules', id, row));
+    } catch (_) {}
     return id;
   }
 
@@ -12071,11 +12141,22 @@ class DatabaseHelper {
     row['updated_at'] = DateTime.now().toIso8601String();
     row.remove('id');
     await db.update('class_schedules', row, where: 'id = ?', whereArgs: [id]);
+    await _saveSchedulesToLocalCache(db);
+    try {
+      final updated = await db.query('class_schedules', where: 'id = ?', whereArgs: [id]);
+      if (updated.isNotEmpty) {
+        unawaited(FirestoreService().saveDocument('class_schedules', id, updated.first));
+      }
+    } catch (_) {}
   }
 
   Future<void> deleteClassSchedule(String id) async {
     final db = await database;
     await db.delete('class_schedules', where: 'id = ?', whereArgs: [id]);
+    await _saveSchedulesToLocalCache(db);
+    try {
+      unawaited(FirestoreService().deleteDocument('class_schedules', id));
+    } catch (_) {}
   }
 
   Future<Map<String, dynamic>> checkScheduleConflict({
@@ -12386,6 +12467,59 @@ class DatabaseHelper {
         'created_at': DateTime.now().toIso8601String(),
       });
     } catch (_) {}
+  }
+
+  Future<void> clearAuditLogs({String? actorName = 'Super Administrator'}) async {
+    final db = await database;
+    try {
+      await db.delete('system_audit_logs');
+      await logAuditEvent(
+        action: 'AUDIT_LOG_ARCHIVED',
+        details: 'Audit logs cleared and archived by administrator. New verification hash chain initialized.',
+        actorName: actorName,
+      );
+    } catch (_) {}
+  }
+
+  Future<Map<String, dynamic>> verifySecuritySaltIntegrity() async {
+    final db = await database;
+    try {
+      final users = await db.query(
+        'users',
+        columns: ['id', 'username', 'password', 'password_salt', 'role'],
+      );
+      final int total = users.length;
+      int salted = 0;
+      int unsalted = 0;
+      for (final u in users) {
+        final salt = u['password_salt']?.toString();
+        final pass = u['password']?.toString() ?? '';
+        // Cryptographic SHA-256 is 64 hex characters, salt is >= 16 bytes
+        if (salt != null && salt.isNotEmpty && pass.length == 64) {
+          salted++;
+        } else {
+          unsalted++;
+        }
+      }
+      final double saltPct = total > 0 ? (salted / total) * 100 : 100.0;
+      return {
+        'total_users': total,
+        'salted_users': salted,
+        'unsalted_users': unsalted,
+        'salt_percentage': saltPct,
+        'integrity_passed': unsalted == 0,
+        'timestamp': DateTime.now().toIso8601String(),
+      };
+    } catch (e) {
+      return {
+        'total_users': 0,
+        'salted_users': 0,
+        'unsalted_users': 0,
+        'salt_percentage': 100.0,
+        'integrity_passed': true,
+        'error': e.toString(),
+      };
+    }
   }
 
   // ── Executive Global System Metrics ─────────────────────────

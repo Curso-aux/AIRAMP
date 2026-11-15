@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -247,6 +248,49 @@ void main() {
     await tester.tap(find.text('Close Overview'));
     await tester.pumpAndSettle();
     expect(find.text('Close Overview'), findsNothing);
+  });
+
+  testWidgets('6. Oppo A94 mobile viewport (360x800) renders StudentStickyTopHeader with zero overflow and QR button removed from header', (tester) async {
+    // Simulate exact Oppo A94 mobile device constraints
+    tester.view.physicalSize = const Size(360, 800);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(() => tester.view.resetPhysicalSize());
+
+    FlutterErrorDetails? caughtDetails;
+    final originalOnError = FlutterError.onError;
+    FlutterError.onError = (details) {
+      caughtDetails = details;
+    };
+
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          authProvider.overrideWith(() => _MockAuthNotifier()),
+          studentQuizAssignmentsProvider.overrideWith(() => _MockQuizAssignmentsNotifier([])),
+        ],
+        child: const MaterialApp(home: Scaffold(body: StudentHomeScreen())),
+      ),
+    );
+    await tester.pump(const Duration(milliseconds: 200));
+
+    FlutterError.onError = originalOnError;
+
+    // Ensure zero render flex overflow exceptions were caught
+    expect(caughtDetails, isNull, reason: caughtDetails?.toString());
+
+    // Verify StudentStickyTopHeader is rendered
+    expect(find.byType(StudentStickyTopHeader), findsOneWidget);
+
+    // Verify QR code scanner button is REMOVED from the header
+    expect(find.byTooltip('Scan Section QR Code'), findsNothing);
+    expect(find.byIcon(Icons.qr_code_scanner_rounded), findsNothing);
+
+    // Verify student identity, Progress, and Notifications are present
+    expect(find.text('Maria Lopez'), findsOneWidget);
+    expect(find.text('STUDENT'), findsOneWidget);
+    expect(find.byTooltip('Announcements & Notifications'), findsOneWidget);
+
+    expect(caughtDetails, isNull);
   });
 }
 

@@ -1407,8 +1407,9 @@ class SubjectDetailNotifier extends Notifier<List<Map<String, dynamic>>> {
                   where: 'id = ?',
                   whereArgs: [tId],
                 );
-                if (tRows.isNotEmpty)
+                if (tRows.isNotEmpty) {
                   targetSubId = tRows.first['subject_id'] as int?;
+                }
               }
             }
           }
@@ -1449,8 +1450,9 @@ class SubjectDetailNotifier extends Notifier<List<Map<String, dynamic>>> {
                   where: 'id = ?',
                   whereArgs: [tId],
                 );
-                if (tRows.isNotEmpty)
+                if (tRows.isNotEmpty) {
                   targetSubId = tRows.first['subject_id'] as int?;
+                }
               }
             }
           }

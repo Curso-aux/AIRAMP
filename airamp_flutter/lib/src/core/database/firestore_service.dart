@@ -1610,6 +1610,101 @@ class FirestoreService {
     }
   }
 
+  DateTime? _lastSchedulesSyncTime;
+
+  /// Syncs class schedules from Cloud Firestore to local SQLite and SharedPreferences cache.
+  Future<void> syncCloudSchedulesToLocal({bool force = false}) async {
+    try {
+      final db = await DatabaseHelper().database;
+      SharedPreferences? prefs;
+      try {
+        prefs = await SharedPreferences.getInstance();
+      } catch (_) {}
+
+      // 1. Check local count in SQLite
+      int localCount = 0;
+      try {
+        localCount = Sqflite.firstIntValue(
+          await db.rawQuery('SELECT COUNT(*) FROM class_schedules'),
+        ) ?? 0;
+      } catch (_) {}
+
+      // 2. Instant cache restore if SQLite is empty
+      if (localCount == 0 && prefs != null) {
+        final cachedStr = prefs.getString('local_cached_schedules_v1');
+        if (cachedStr != null && cachedStr.isNotEmpty) {
+          try {
+            final List<dynamic> decoded = jsonDecode(cachedStr);
+            for (final item in decoded) {
+              if (item is Map) {
+                await db.insert(
+                  'class_schedules',
+                  Map<String, dynamic>.from(item),
+                  conflictAlgorithm: ConflictAlgorithm.replace,
+                );
+              }
+            }
+            localCount = Sqflite.firstIntValue(
+              await db.rawQuery('SELECT COUNT(*) FROM class_schedules'),
+            ) ?? 0;
+          } catch (_) {}
+        }
+      }
+
+      final now = DateTime.now();
+      if (!force && localCount > 0 && !kIsWeb && _lastSchedulesSyncTime != null &&
+          now.difference(_lastSchedulesSyncTime!) < const Duration(minutes: 3)) {
+        return;
+      }
+      _lastSchedulesSyncTime = now;
+
+      final cloudDocs = await fetchAllDocuments('class_schedules');
+      if (cloudDocs.isEmpty) return;
+
+      for (final doc in cloudDocs) {
+        final schedId = doc['id']?.toString() ?? doc['_docId']?.toString() ?? '';
+        if (schedId.isEmpty) continue;
+
+        final rowData = <String, dynamic>{
+          'id': schedId,
+          'school_id': doc['school_id']?.toString() ?? 'sch_main',
+          'teacher_id': doc['teacher_id']?.toString() ?? '',
+          'teacher_name': doc['teacher_name']?.toString() ?? '',
+          'subject_id': int.tryParse(doc['subject_id']?.toString() ?? '0') ?? 0,
+          'subject_name': doc['subject_name']?.toString() ?? '',
+          'section_id': int.tryParse(doc['section_id']?.toString() ?? ''),
+          'section_name': doc['section_name']?.toString() ?? '',
+          'day_of_week': doc['day_of_week']?.toString() ?? 'Monday',
+          'start_time': doc['start_time']?.toString() ?? '08:00 AM',
+          'end_time': doc['end_time']?.toString() ?? '09:00 AM',
+          'room': doc['room']?.toString(),
+          'color_code': doc['color_code']?.toString(),
+          'created_at': doc['created_at']?.toString() ?? DateTime.now().toIso8601String(),
+          'updated_at': doc['updated_at']?.toString(),
+        };
+
+        await db.insert(
+          'class_schedules',
+          rowData,
+          conflictAlgorithm: ConflictAlgorithm.replace,
+        );
+      }
+
+      // Persist full set to local storage cache
+      if (prefs != null) {
+        try {
+          final all = await db.query('class_schedules');
+          await prefs.setString('local_cached_schedules_v1', jsonEncode(all));
+        } catch (_) {}
+      }
+
+      debugPrint('[FirestoreService] Synced ${cloudDocs.length} cloud schedules to local SQLite');
+      notifySyncListeners();
+    } catch (e) {
+      debugPrint('[FirestoreService] Error syncing cloud schedules to local SQLite: $e');
+    }
+  }
+
   DateTime? _lastConversationsSyncTime;
 
   /// Syncs section and group conversations from Cloud Firestore to local SQLite
