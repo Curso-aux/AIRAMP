@@ -1,6 +1,7 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/database/database_helper.dart';
+import '../../../core/database/firestore_service.dart';
 import '../../../core/utils/cache_manager.dart';
 import '../../admin/data/admin_repository.dart';
 import '../../auth/application/auth_provider.dart';
@@ -173,6 +174,11 @@ class TeacherSubjectsNotifier extends Notifier<List<Map<String, dynamic>>> {
       if (ref.mounted) state = [];
       return;
     }
+    if (kIsWeb) {
+      try {
+        await FirestoreService().syncCloudSubjectsToLocal(force: true);
+      } catch (_) {}
+    }
     final results = await DatabaseHelper().getSubjectsForTeacher(teacherId);
     if (!ref.mounted) return;
     state = results;
@@ -183,21 +189,41 @@ class TeacherSubjectsNotifier extends Notifier<List<Map<String, dynamic>>> {
   Future<Map<String, dynamic>?> getSubjectById(int id) async {
     final teacherId = _getTeacherId();
     if (teacherId == null) return null;
+    if (kIsWeb) {
+      try {
+        await FirestoreService().syncCloudSubjectsToLocal(force: true);
+      } catch (_) {}
+    }
     final db = await DatabaseHelper().database;
     final results = await db
         .query('subjects', where: 'id = ? AND teacher_id = ?', whereArgs: [id, teacherId]);
     if (results.isNotEmpty) return results.first;
+    final fallback = await db.query('subjects', where: 'id = ?', whereArgs: [id]);
+    if (fallback.isNotEmpty) return fallback.first;
     return null;
   }
 }
 
 // Subject Quizzes Provider
 final subjectQuizzesProvider = FutureProvider.family<List<Map<String, dynamic>>, int>((ref, subjectId) async {
+  try {
+    if (kIsWeb) {
+      await FirestoreService().syncCloudSubjectsToLocal(force: true);
+    }
+    await DatabaseHelper().syncCloudQuizzesToLocal(force: true);
+  } catch (e) {
+    debugPrint('[subjectQuizzesProvider] syncCloudQuizzesToLocal note: $e');
+  }
   return await DatabaseHelper().getQuizzesForSubject(subjectId);
 });
 
 // Quiz Roster Provider
 final quizRosterProvider = FutureProvider.family<List<Map<String, dynamic>>, int>((ref, quizId) async {
+  try {
+    await DatabaseHelper().syncCloudQuizzesToLocal(force: true);
+  } catch (e) {
+    debugPrint('[quizRosterProvider] syncCloudQuizzesToLocal note: $e');
+  }
   return await DatabaseHelper().getQuizAssignmentRoster(quizId);
 });
 
@@ -322,6 +348,11 @@ class TeacherAnnouncementsNotifier extends Notifier<List<Map<String, dynamic>>> 
 
 /// Returns quizzes available for Item Analysis (optionally filtered by subject)
 final teacherQuizzesForAnalysisProvider = FutureProvider.autoDispose.family<List<Map<String, dynamic>>, int?>((ref, subjectId) async {
+  try {
+    await DatabaseHelper().syncCloudQuizzesToLocal(force: true);
+  } catch (e) {
+    debugPrint('[teacherQuizzesForAnalysisProvider] syncCloudQuizzesToLocal note: $e');
+  }
   final user = ref.watch(authProvider);
   final teacherId = user?.role == 'teacher' ? user?.id : null;
   return await DatabaseHelper().getQuizzesAvailableForAnalysis(

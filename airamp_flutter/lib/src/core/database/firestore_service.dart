@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:convert';
+import 'dart:io' show Platform;
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:dio/dio.dart';
 import 'package:firebase_core/firebase_core.dart';
@@ -286,6 +287,7 @@ class FirestoreService {
   /// Generic helper to fetch all documents from any collection in Cloud Firestore via direct REST
   Future<List<Map<String, dynamic>>> fetchDocumentsRest(String collection) async {
     final list = <Map<String, dynamic>>[];
+    if (_isTestEnv) return list;
     try {
       final dio = _dio;
       String? pageToken;
@@ -2170,6 +2172,9 @@ class FirestoreService {
 
   bool get _isTestEnv {
     try {
+      if (!kIsWeb && Platform.environment.containsKey('FLUTTER_TEST')) {
+        return true;
+      }
       final binding = WidgetsBinding.instance;
       return binding.runtimeType.toString().contains('Test');
     } catch (_) {
@@ -2213,8 +2218,9 @@ class FirestoreService {
       final url = 'https://firestore.googleapis.com/v1/projects/$projectId/databases/(default)/documents/$collection/$cleanDocId?$maskQuery$keyParam';
       await dio.patch(url, data: {'fields': fields});
       debugPrint('[FirestoreService] Successfully saved $collection/$cleanDocId via REST');
-    } catch (e) {
-      debugPrint('[FirestoreService] REST saveDocument error: $e');
+    } catch (e, st) {
+      debugPrint('[FirestoreService] REST saveDocument error: $e\n$st');
+      rethrow;
     }
   }
 

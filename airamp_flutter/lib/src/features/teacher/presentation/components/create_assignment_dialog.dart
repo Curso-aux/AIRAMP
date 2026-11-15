@@ -106,11 +106,11 @@ class _CreateAssignmentDialogState
       if (files.isNotEmpty) {
         final file = files.first;
         final size = await file.length();
-        if (size > 50 * 1024 * 1024) {
+        if (size > 10 * 1024 * 1024) {
           if (mounted) {
             AppToast.showError(
               context,
-              'Attachment (${(size / (1024 * 1024)).toStringAsFixed(1)} MB) exceeds the 50 MB limit. Please select a smaller file.',
+              'Attachment (${(size / (1024 * 1024)).toStringAsFixed(1)} MB) exceeds the 10 MB limit. Please select a document under 10 MB.',
             );
           }
           return;
@@ -614,119 +614,214 @@ class _CreateAssignmentDialogState
                             child: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
+                                // Mode Toggle Buttons
                                 Row(
                                   children: [
-                                    Icon(
-                                      _isAllSections
-                                          ? Icons.public
-                                          : Icons.filter_alt_outlined,
-                                      size: 18,
-                                      color: AppTheme.primary,
+                                    Expanded(
+                                      child: InkWell(
+                                        onTap: () {
+                                          setState(() {
+                                            _isAllSections = true;
+                                            _selectedSections.clear();
+                                          });
+                                        },
+                                        borderRadius: BorderRadius.circular(8),
+                                        child: Container(
+                                          padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 10),
+                                          decoration: BoxDecoration(
+                                            color: _isAllSections
+                                                ? AppTheme.primary
+                                                : AppTheme.surface,
+                                            borderRadius: BorderRadius.circular(8),
+                                            border: Border.all(
+                                              color: _isAllSections ? AppTheme.primary : AppTheme.border,
+                                            ),
+                                          ),
+                                          alignment: Alignment.center,
+                                          child: Row(
+                                            mainAxisAlignment: MainAxisAlignment.center,
+                                            children: [
+                                              Icon(
+                                                Icons.public,
+                                                size: 14,
+                                                color: _isAllSections ? Colors.white : AppTheme.textSecondary,
+                                              ),
+                                              const SizedBox(width: 6),
+                                              Flexible(
+                                                child: Text(
+                                                  'All Sections (Broadcast)',
+                                                  style: TextStyle(
+                                                    fontSize: 11.5,
+                                                    fontWeight: FontWeight.bold,
+                                                    color: _isAllSections ? Colors.white : AppTheme.text,
+                                                  ),
+                                                  overflow: TextOverflow.ellipsis,
+                                                ),
+                                              ),
+                                            ],
+                                          ),
+                                        ),
+                                      ),
                                     ),
                                     const SizedBox(width: 8),
                                     Expanded(
-                                      child: Text(
-                                        _isAllSections
-                                            ? 'Broadcast Scope: Visible to ALL sections enrolled in this subject'
-                                            : 'Targeted Scope: Visible ONLY to ${_selectedSections.join(', ')}',
-                                        style: TextStyle(
-                                          fontSize: 12,
-                                          fontWeight: FontWeight.w600,
-                                          color: _isAllSections
-                                              ? AppTheme.textSecondary
-                                              : AppTheme.primary,
+                                      child: InkWell(
+                                        onTap: () {
+                                          setState(() {
+                                            _isAllSections = false;
+                                            if (_selectedSections.isEmpty && cleanSections.isNotEmpty) {
+                                              _selectedSections.add(cleanSections.first);
+                                            }
+                                          });
+                                        },
+                                        borderRadius: BorderRadius.circular(8),
+                                        child: Container(
+                                          padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 10),
+                                          decoration: BoxDecoration(
+                                            color: !_isAllSections
+                                                ? AppTheme.primary
+                                                : AppTheme.surface,
+                                            borderRadius: BorderRadius.circular(8),
+                                            border: Border.all(
+                                              color: !_isAllSections ? AppTheme.primary : AppTheme.border,
+                                            ),
+                                          ),
+                                          alignment: Alignment.center,
+                                          child: Row(
+                                            mainAxisAlignment: MainAxisAlignment.center,
+                                            children: [
+                                              Icon(
+                                                Icons.filter_alt_outlined,
+                                                size: 14,
+                                                color: !_isAllSections ? Colors.white : AppTheme.textSecondary,
+                                              ),
+                                              const SizedBox(width: 6),
+                                              Flexible(
+                                                child: Text(
+                                                  !_isAllSections && _selectedSections.isNotEmpty
+                                                      ? 'Specific (${_selectedSections.length})'
+                                                      : 'Specific Sections',
+                                                  style: TextStyle(
+                                                    fontSize: 11.5,
+                                                    fontWeight: FontWeight.bold,
+                                                    color: !_isAllSections ? Colors.white : AppTheme.text,
+                                                  ),
+                                                  overflow: TextOverflow.ellipsis,
+                                                ),
+                                              ),
+                                            ],
+                                          ),
                                         ),
                                       ),
                                     ),
                                   ],
                                 ),
                                 const SizedBox(height: 10),
-                                Wrap(
-                                  spacing: 8,
-                                  runSpacing: 8,
-                                  crossAxisAlignment: WrapCrossAlignment.center,
-                                  children: [
-                                    ChoiceChip(
-                                      avatar: Icon(
-                                        Icons.groups_outlined,
-                                        size: 15,
-                                        color: _isAllSections
-                                            ? Colors.white
-                                            : AppTheme.primary,
-                                      ),
-                                      label: const Text(
-                                        'All Enrolled Sections',
-                                      ),
-                                      selected: _isAllSections,
-                                      selectedColor: AppTheme.primary,
-                                      backgroundColor: AppTheme.surface,
-                                      labelStyle: TextStyle(
-                                        color: _isAllSections
-                                            ? Colors.white
-                                            : AppTheme.text,
-                                        fontWeight: _isAllSections
-                                            ? FontWeight.bold
-                                            : FontWeight.w500,
-                                        fontSize: 12,
-                                      ),
-                                      onSelected: (selected) {
-                                        if (selected) {
-                                          setState(() {
-                                            _isAllSections = true;
-                                            _selectedSections.clear();
-                                          });
-                                        }
-                                      },
+
+                                if (_isAllSections) ...[
+                                  Container(
+                                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                                    decoration: BoxDecoration(
+                                      color: AppTheme.surface,
+                                      borderRadius: BorderRadius.circular(8),
+                                      border: Border.all(color: AppTheme.border.withValues(alpha: 0.5)),
                                     ),
-                                    ...cleanSections.map((sec) {
-                                      final isSelected =
-                                          !_isAllSections &&
-                                          _selectedSections.contains(sec);
-                                      return FilterChip(
-                                        avatar: Icon(
-                                          Icons.class_outlined,
-                                          size: 14,
-                                          color: isSelected
-                                              ? AppTheme.primary
-                                              : AppTheme.textMuted,
+                                    child: Row(
+                                      children: [
+                                        Icon(Icons.check_circle_outline, size: 15, color: AppTheme.success),
+                                        const SizedBox(width: 8),
+                                        Expanded(
+                                          child: Text(
+                                            cleanSections.isNotEmpty
+                                                ? 'Broadcast to all ${cleanSections.length} enrolled classroom sections in this subject.'
+                                                : 'Broadcast to all enrolled classroom sections.',
+                                            style: TextStyle(fontSize: 11.5, color: AppTheme.textSecondary),
+                                          ),
                                         ),
-                                        label: Text(sec),
-                                        selected: isSelected,
-                                        selectedColor: AppTheme.primary
-                                            .withValues(alpha: 0.18),
-                                        checkmarkColor: AppTheme.primary,
-                                        backgroundColor: AppTheme.surface,
-                                        side: BorderSide(
-                                          color: isSelected
-                                              ? AppTheme.primary
-                                              : AppTheme.border,
-                                        ),
-                                        labelStyle: TextStyle(
-                                          color: isSelected
-                                              ? AppTheme.primary
-                                              : AppTheme.text,
-                                          fontWeight: isSelected
-                                              ? FontWeight.bold
-                                              : FontWeight.normal,
-                                          fontSize: 12,
-                                        ),
-                                        onSelected: (selected) {
-                                          setState(() {
-                                            if (selected) {
-                                              _isAllSections = false;
-                                              _selectedSections.add(sec);
-                                            } else {
-                                              _selectedSections.remove(sec);
-                                              if (_selectedSections.isEmpty) {
-                                                _isAllSections = true;
-                                              }
-                                            }
-                                          });
-                                        },
-                                      );
-                                    }),
-                                  ],
-                                ),
+                                      ],
+                                    ),
+                                  ),
+                                ] else ...[
+                                  // Specific Sections Selection Controls
+                                  Row(
+                                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                    children: [
+                                      Text(
+                                        '${_selectedSections.length} of ${cleanSections.length} sections selected',
+                                        style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.bold, color: AppTheme.primary),
+                                      ),
+                                      Row(
+                                        children: [
+                                          InkWell(
+                                            onTap: () {
+                                              setState(() {
+                                                _selectedSections.addAll(cleanSections);
+                                              });
+                                            },
+                                            child: Padding(
+                                              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                              child: Text('Select All', style: TextStyle(fontSize: 11, color: AppTheme.primary, fontWeight: FontWeight.w600)),
+                                            ),
+                                          ),
+                                          Text(' • ', style: TextStyle(color: AppTheme.textMuted)),
+                                          InkWell(
+                                            onTap: () {
+                                              setState(() {
+                                                _selectedSections.clear();
+                                              });
+                                            },
+                                            child: Padding(
+                                              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                              child: Text('Clear', style: TextStyle(fontSize: 11, color: AppTheme.textMuted, fontWeight: FontWeight.w600)),
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    ],
+                                  ),
+                                  const SizedBox(height: 8),
+                                  ConstrainedBox(
+                                    constraints: const BoxConstraints(maxHeight: 130),
+                                    child: SingleChildScrollView(
+                                      child: Wrap(
+                                        spacing: 8,
+                                        runSpacing: 8,
+                                        children: cleanSections.map((sec) {
+                                          final isSelected = _selectedSections.contains(sec);
+                                          return FilterChip(
+                                            avatar: Icon(
+                                              Icons.class_outlined,
+                                              size: 13,
+                                              color: isSelected ? AppTheme.primary : AppTheme.textMuted,
+                                            ),
+                                            label: Text(sec),
+                                            selected: isSelected,
+                                            selectedColor: AppTheme.primary.withValues(alpha: 0.18),
+                                            checkmarkColor: AppTheme.primary,
+                                            backgroundColor: AppTheme.surface,
+                                            side: BorderSide(
+                                              color: isSelected ? AppTheme.primary : AppTheme.border,
+                                            ),
+                                            labelStyle: TextStyle(
+                                              color: isSelected ? AppTheme.primary : AppTheme.text,
+                                              fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+                                              fontSize: 11.5,
+                                            ),
+                                            onSelected: (selected) {
+                                              setState(() {
+                                                if (selected) {
+                                                  _selectedSections.add(sec);
+                                                } else {
+                                                  _selectedSections.remove(sec);
+                                                }
+                                              });
+                                            },
+                                          );
+                                        }).toList(),
+                                      ),
+                                    ),
+                                  ),
+                                ],
                                 if (cleanSections.isEmpty &&
                                     sectionsAsync.isLoading) ...[
                                   const SizedBox(height: 8),
@@ -1000,14 +1095,18 @@ class _CreateAssignmentDialogState
                       Row(
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
-                          Text(
-                            'Google Drive Submission Folder',
-                            style: TextStyle(
-                              fontSize: 13,
-                              fontWeight: FontWeight.w600,
-                              color: AppTheme.textSecondary,
+                          Expanded(
+                            child: Text(
+                              'Google Drive Submission Folder',
+                              style: TextStyle(
+                                fontSize: 13,
+                                fontWeight: FontWeight.w600,
+                                color: AppTheme.textSecondary,
+                              ),
+                              overflow: TextOverflow.ellipsis,
                             ),
                           ),
+                          const SizedBox(width: 8),
                           Container(
                             padding: const EdgeInsets.symmetric(
                               horizontal: 7,
@@ -1077,14 +1176,18 @@ class _CreateAssignmentDialogState
                       Row(
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
-                          Text(
-                            'Attach Worksheet / Rubric / Handout',
-                            style: TextStyle(
-                              fontSize: 13,
-                              fontWeight: FontWeight.w600,
-                              color: AppTheme.textSecondary,
+                          Expanded(
+                            child: Text(
+                              'Attach Worksheet / Rubric / Handout',
+                              style: TextStyle(
+                                fontSize: 13,
+                                fontWeight: FontWeight.w600,
+                                color: AppTheme.textSecondary,
+                              ),
+                              overflow: TextOverflow.ellipsis,
                             ),
                           ),
+                          const SizedBox(width: 8),
                           Container(
                             padding: const EdgeInsets.symmetric(
                               horizontal: 7,
@@ -1098,7 +1201,7 @@ class _CreateAssignmentDialogState
                               ),
                             ),
                             child: Text(
-                              'MAX 50 MB',
+                              'MAX 10 MB',
                               style: TextStyle(
                                 fontSize: 10,
                                 fontWeight: FontWeight.bold,
@@ -1170,7 +1273,7 @@ class _CreateAssignmentDialogState
                             color: AppTheme.primary,
                           ),
                           label: Text(
-                            'Upload Assignment Handout / Brief (Max 50 MB)',
+                            'Upload Assignment Handout / Brief (Max 10 MB)',
                             style: TextStyle(
                               color: AppTheme.primary,
                               fontSize: 12,

@@ -146,8 +146,13 @@ void main() {
       // Edit button (Icons.edit_outlined) MUST be present for admin
       expect(find.byIcon(Icons.edit_outlined), findsNWidgets(2));
 
-      // Delete button (Icons.delete_outline) MUST be present for admin
-      expect(find.byIcon(Icons.delete_outline), findsNWidgets(2));
+      // Delete button (Icons.delete_outline_rounded) MUST be present for admin
+      expect(
+        find.byWidgetPredicate(
+          (w) => w is Icon && (w.icon == Icons.delete_outline || w.icon == Icons.delete_outline_rounded),
+        ),
+        findsNWidgets(2),
+      );
     });
 
     testWidgets('3. Teacher can set Progression Mode to Sequential or Flexible via interactive badge', (tester) async {

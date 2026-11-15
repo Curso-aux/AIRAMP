@@ -140,7 +140,8 @@ class _StudentHomeScreenState extends ConsumerState<StudentHomeScreen> {
                   }
                   ref.invalidate(allClassSchedulesProvider);
                   ref.invalidate(scheduledSectionsProvider);
-                  await DatabaseHelper().syncAllCloudData(force: true);
+                  // Use fast delta-sync on pull-to-refresh to avoid full table rewrites and locks
+                  await DatabaseHelper().syncAllCloudData(force: false);
                   await Future.wait([
                     ref.read(studentCoursesProvider.notifier).reload(),
                     ref.read(studentProgressProvider.notifier).loadProgress(),

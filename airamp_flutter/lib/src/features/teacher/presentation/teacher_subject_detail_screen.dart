@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -6,6 +7,7 @@ import '../../../core/components/app_toast.dart';
 import '../../../core/components/empty_state.dart';
 import '../../../core/components/skeleton_loader.dart';
 import '../../../core/database/database_helper.dart';
+import '../../../core/database/firestore_service.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/theme/theme_provider.dart';
 import '../../admin/data/admin_repository.dart';
@@ -45,6 +47,13 @@ class _TeacherSubjectDetailScreenState
   Future<void> _loadSubject() async {
     final id = int.tryParse(widget.subjectId);
     if (id == null) return;
+    if (kIsWeb) {
+      try {
+        await FirestoreService().syncCloudSubjectsToLocal(force: true);
+        await DatabaseHelper().syncCloudQuizzesToLocal(force: true);
+        await DatabaseHelper().syncCloudAssignmentsToLocal(force: true);
+      } catch (_) {}
+    }
     final subject = await ref
         .read(teacherSubjectsProvider.notifier)
         .getSubjectById(id);
@@ -68,8 +77,12 @@ class _TeacherSubjectDetailScreenState
       ),
     );
     if (created == true && mounted) {
+      try {
+        await DatabaseHelper().syncCloudQuizzesToLocal(force: true);
+      } catch (_) {}
       ref.invalidate(subjectQuizzesProvider(int.parse(widget.subjectId)));
       ref.invalidate(teacherDashboardProvider);
+      ref.invalidate(teacherSubjectsProvider);
     }
   }
 
@@ -565,68 +578,84 @@ class _TeacherSubjectDetailScreenState
       ),
       data: (quizzes) {
         if (quizzes.isEmpty) {
-          return Center(
+          return RefreshIndicator(
+            onRefresh: () async {
+              try {
+                await DatabaseHelper().syncCloudQuizzesToLocal(force: true);
+              } catch (_) {}
+              ref.invalidate(subjectQuizzesProvider(subjectId));
+            },
             child: SingleChildScrollView(
+              physics: const AlwaysScrollableScrollPhysics(),
               padding: const EdgeInsets.all(32),
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Container(
-                    width: 88,
-                    height: 88,
-                    decoration: BoxDecoration(
-                      color: AppTheme.primary.withValues(alpha: 0.1),
-                      shape: BoxShape.circle,
-                    ),
-                    child: Icon(
-                      Icons.assignment_outlined,
-                      size: 44,
-                      color: AppTheme.primary,
-                    ),
-                  ),
-                  const SizedBox(height: 20),
-                  Text(
-                    'No quizzes yet',
-                    style: TextStyle(
-                      fontSize: 18,
-                      fontWeight: FontWeight.bold,
-                      color: AppTheme.text,
-                    ),
-                  ),
-                  const SizedBox(height: 8),
-                  Text(
-                    'Create your first quiz to assess students, automate grading, and track subject performance.',
-                    textAlign: TextAlign.center,
-                    style: TextStyle(
-                      color: AppTheme.textSecondary,
-                      fontSize: 13,
-                      height: 1.4,
-                    ),
-                  ),
-                  const SizedBox(height: 24),
-                  ElevatedButton.icon(
-                    onPressed: _openCreateQuiz,
-                    icon: const Icon(Icons.add_task_rounded, size: 18),
-                    label: const Text('Create First Quiz'),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: AppTheme.primary,
-                      foregroundColor: Colors.black,
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 24,
-                        vertical: 12,
+              child: Center(
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Container(
+                      width: 88,
+                      height: 88,
+                      decoration: BoxDecoration(
+                        color: AppTheme.primary.withValues(alpha: 0.1),
+                        shape: BoxShape.circle,
                       ),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12),
+                      child: Icon(
+                        Icons.assignment_outlined,
+                        size: 44,
+                        color: AppTheme.primary,
                       ),
-                      elevation: 2,
                     ),
-                  ),
-                ],
+                    const SizedBox(height: 20),
+                    Text(
+                      'No quizzes yet',
+                      style: TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.bold,
+                        color: AppTheme.text,
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    Text(
+                      'Create your first quiz to assess students, automate grading, and track subject performance.',
+                      textAlign: TextAlign.center,
+                      style: TextStyle(
+                        color: AppTheme.textSecondary,
+                        fontSize: 13,
+                        height: 1.4,
+                      ),
+                    ),
+                    const SizedBox(height: 24),
+                    ElevatedButton.icon(
+                      onPressed: _openCreateQuiz,
+                      icon: const Icon(Icons.add_task_rounded, size: 18),
+                      label: const Text('Create First Quiz'),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: AppTheme.primary,
+                        foregroundColor: Colors.black,
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 24,
+                          vertical: 12,
+                        ),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        elevation: 2,
+                      ),
+                    ),
+                  ],
+                ),
               ),
             ),
           );
         }
-        return ListView.builder(
+        return RefreshIndicator(
+          onRefresh: () async {
+            try {
+              await DatabaseHelper().syncCloudQuizzesToLocal(force: true);
+            } catch (_) {}
+            ref.invalidate(subjectQuizzesProvider(subjectId));
+          },
+          child: ListView.builder(
           padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
           itemCount: quizzes.length + 1,
           itemBuilder: (context, index) {
@@ -933,8 +962,9 @@ class _TeacherSubjectDetailScreenState
               ),
             );
           },
-        );
-      },
+        ),
+      );
+    },
     );
   }
 
@@ -1000,7 +1030,11 @@ class _TeacherSubjectDetailScreenState
     );
 
     if (created == true && mounted) {
+      try {
+        await DatabaseHelper().syncCloudAssignmentsToLocal(force: true);
+      } catch (_) {}
       ref.invalidate(subjectAssignmentsProvider(subId));
+      ref.invalidate(teacherSubjectsProvider);
     }
   }
 
@@ -1067,58 +1101,69 @@ class _TeacherSubjectDetailScreenState
       ),
       data: (assignments) {
         if (assignments.isEmpty) {
-          return Center(
-            child: Padding(
-              padding: const EdgeInsets.all(32.0),
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Icon(
-                    Icons.assignment_outlined,
-                    size: 56,
-                    color: AppTheme.textMuted,
-                  ),
-                  const SizedBox(height: 16),
-                  Text(
-                    'No Assignments Created',
-                    style: TextStyle(
-                      fontSize: 18,
-                      fontWeight: FontWeight.bold,
-                      color: AppTheme.text,
-                    ),
-                  ),
-                  const SizedBox(height: 8),
-                  Text(
-                    'Create assignments and projects for your students to submit files or project links.',
-                    style: TextStyle(
-                      color: AppTheme.textSecondary,
-                      fontSize: 13,
-                    ),
-                    textAlign: TextAlign.center,
-                  ),
-                  const SizedBox(height: 24),
-                  ElevatedButton.icon(
-                    onPressed: _openCreateAssignment,
-                    icon: const Icon(Icons.add, color: Colors.black),
-                    label: const Text(
-                      'Create First Assignment',
-                      style: TextStyle(
-                        color: Colors.black,
-                        fontWeight: FontWeight.bold,
+          return RefreshIndicator(
+            onRefresh: () async {
+              try {
+                await DatabaseHelper().syncCloudAssignmentsToLocal(force: true);
+              } catch (_) {}
+              ref.invalidate(subjectAssignmentsProvider(subjectId));
+            },
+            child: SingleChildScrollView(
+              physics: const AlwaysScrollableScrollPhysics(),
+              child: Center(
+                child: Padding(
+                  padding: const EdgeInsets.all(32.0),
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Icon(
+                        Icons.assignment_outlined,
+                        size: 56,
+                        color: AppTheme.textMuted,
                       ),
-                    ),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: AppTheme.primary,
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 20,
-                        vertical: 12,
+                      const SizedBox(height: 16),
+                      Text(
+                        'No Assignments Created',
+                        style: TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.bold,
+                          color: AppTheme.text,
+                        ),
                       ),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12),
+                      const SizedBox(height: 8),
+                      Text(
+                        'Create assignments and projects for your students to submit files or project links.',
+                        style: TextStyle(
+                          color: AppTheme.textSecondary,
+                          fontSize: 13,
+                        ),
+                        textAlign: TextAlign.center,
                       ),
-                    ),
+                      const SizedBox(height: 24),
+                      ElevatedButton.icon(
+                        onPressed: _openCreateAssignment,
+                        icon: const Icon(Icons.add, color: Colors.black),
+                        label: const Text(
+                          'Create First Assignment',
+                          style: TextStyle(
+                            color: Colors.black,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: AppTheme.primary,
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 20,
+                            vertical: 12,
+                          ),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                        ),
+                      ),
+                    ],
                   ),
-                ],
+                ),
               ),
             ),
           );
@@ -1126,6 +1171,9 @@ class _TeacherSubjectDetailScreenState
 
         return RefreshIndicator(
           onRefresh: () async {
+            try {
+              await DatabaseHelper().syncCloudAssignmentsToLocal(force: true);
+            } catch (_) {}
             ref.invalidate(subjectAssignmentsProvider(subjectId));
           },
           child: ListView.builder(

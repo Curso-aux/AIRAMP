@@ -2,6 +2,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import '../../../core/database/database_helper.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/theme/theme_provider.dart';
 import '../../../core/utils/philippine_time_helper.dart';
@@ -112,6 +113,12 @@ class _QuizHistoryScreenState extends ConsumerState<QuizHistoryScreen> {
             final subjectId = _selectedSubjectIndex == 0 || _selectedSubjectIndex > enrolledCourses.length
                 ? null
                 : (enrolledCourses[_selectedSubjectIndex - 1]['id'] as int?);
+            // Sync latest quizzes, assignments, and attempts from cloud to local cache
+            try {
+              await DatabaseHelper().syncCloudQuizzesToLocal(force: true);
+            } catch (e) {
+              debugPrint('[QuizHistoryScreen] onRefresh sync error: $e');
+            }
             await ref.read(studentQuizAssignmentsProvider.notifier).loadAssignedQuizzes(subjectId: subjectId);
             await ref.read(studentQuizAttemptsProvider.notifier).loadAttempts(subjectId: subjectId);
             await ref.read(studentCoursesProvider.notifier).reload();

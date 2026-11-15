@@ -57,6 +57,14 @@ class _AssignmentRosterDialogState extends ConsumerState<AssignmentRosterDialog>
 
   Future<void> _loadRoster() async {
     setState(() => _loading = true);
+    try {
+      await DatabaseHelper().syncCloudSubmissionsToLocal(
+        assignmentId: widget.assignmentId,
+        force: true,
+      );
+    } catch (e) {
+      debugPrint('[AssignmentRoster] sync error: $e');
+    }
     final list = await DatabaseHelper().getActivityRosterForTeacher(widget.assignmentId);
     if (mounted) {
       setState(() {

@@ -74,14 +74,11 @@ service cloud.firestore {
 
     // ── SUBMISSIONS & ASSIGNMENTS ─────────────────────────────
     match /assignments/{assignmentId} {
-      allow read: if request.auth != null || true;
-      allow write: if request.auth != null;
+      allow read, write: if true;
     }
 
     match /submissions/{submissionId} {
-      allow read: if request.auth != null || true;
-      allow create, update: if request.auth != null;
-      allow delete: if request.auth != null;
+      allow read, write: if true;
     }
 
     // ── FLASHCARDS & GIZMOS ───────────────────────────────────

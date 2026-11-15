@@ -2668,7 +2668,9 @@ class DatabaseHelper {
           'answers': answersJson,
         }),
       );
-    } catch (_) {}
+    } catch (e, st) {
+      debugPrint('[DatabaseHelper] recordQuizAttempt Firestore sync error: $e\n$st');
+    }
 
     if (isPassed && loId > 0) {
       await db.insert('student_progress', {
@@ -3231,6 +3233,52 @@ class DatabaseHelper {
             .trim(),
         'created_at': q['created_at'] ?? now,
       });
+    }
+
+    // Sync updated quiz to Cloud Firestore
+    try {
+      final sub = await db.query(
+        'subjects',
+        where: 'id = ?',
+        whereArgs: [subjectId],
+      );
+      final subCode = sub.isNotEmpty
+          ? sub.first['subject_code'] as String? ?? 'SUBJ'
+          : 'SUBJ';
+      final subName = sub.isNotEmpty
+          ? sub.first['name'] as String? ?? 'Subject'
+          : 'Subject';
+      final cleanSubCode = subCode.replaceAll(
+        RegExp(r'[^a-zA-Z0-9]'),
+        '_',
+      );
+      final cleanTitle = title.toLowerCase().replaceAll(
+        RegExp(r'[^a-z0-9]'),
+        '_',
+      );
+      final cloudDocId = 'quiz_${cleanSubCode}_${cleanTitle}_$quizId';
+
+      await FirestoreService().saveDocument('quizzes', cloudDocId, {
+        'id': quizId,
+        'title': title.trim(),
+        'description': description?.trim(),
+        'subject_id': subjectId,
+        'subject_code': subCode,
+        'subject_name': subName,
+        'time_limit_minutes': timeLimitMinutes,
+        'passing_score': passingScore,
+        'status': status ?? 'published',
+        'due_date': dueDate,
+        'schedule_start': scheduleStart,
+        'schedule_end': scheduleEnd,
+        'updated_at': now,
+        'questions': questions,
+      });
+    } catch (e, st) {
+      debugPrint('[DatabaseHelper] updateQuiz Firestore write error: $e\n$st');
+      if (kIsWeb) {
+        rethrow;
+      }
     }
   }
 
@@ -7781,11 +7829,15 @@ class DatabaseHelper {
       final subName = sub.isNotEmpty
           ? sub.first['name'] as String? ?? 'Subject'
           : 'Subject';
+      final cleanSubCode = subCode.replaceAll(
+        RegExp(r'[^a-zA-Z0-9]'),
+        '_',
+      );
       final cleanTitle = title.toLowerCase().replaceAll(
         RegExp(r'[^a-z0-9]'),
         '_',
       );
-      final cloudDocId = 'quiz_${subCode}_${cleanTitle}_$quizId';
+      final cloudDocId = 'quiz_${cleanSubCode}_${cleanTitle}_$quizId';
 
       await FirestoreService().saveDocument('quizzes', cloudDocId, {
         'id': quizId,
@@ -7806,7 +7858,16 @@ class DatabaseHelper {
         'created_at': now,
         'questions': questions,
       });
-    } catch (_) {}
+    } catch (e, st) {
+      debugPrint('[DatabaseHelper] createQuiz Firestore write error: $e\n$st');
+      if (kIsWeb) {
+        try {
+          await db.delete('quizzes', where: 'id = ?', whereArgs: [quizId]);
+          await db.delete('questions', where: 'quiz_id = ?', whereArgs: [quizId]);
+        } catch (_) {}
+        rethrow;
+      }
+    }
 
     return quizId;
   }
@@ -7878,7 +7939,12 @@ class DatabaseHelper {
           });
         }
       }
-    } catch (_) {}
+    } catch (e, st) {
+      debugPrint('[DatabaseHelper] assignQuizToStudents Firestore sync error: $e\n$st');
+      if (kIsWeb) {
+        rethrow;
+      }
+    }
     return assigned;
   }
 
@@ -8070,7 +8136,9 @@ class DatabaseHelper {
           'completed_at': now,
         }),
       );
-    } catch (_) {}
+    } catch (e, st) {
+      debugPrint('[DatabaseHelper] completeQuizAssignment Firestore sync error: $e\n$st');
+    }
 
     // Also ensure quiz_attempts has an entry if not already logged
     final existing = await db.query(
@@ -8206,9 +8274,29 @@ class DatabaseHelper {
 
   Future<void> deleteQuiz(int quizId) async {
     final db = await database;
+    final quizRows = await db.query('quizzes', where: 'id = ?', whereArgs: [quizId]);
+    final quizRow = quizRows.isNotEmpty ? quizRows.first : null;
+    final cleanTitle = (quizRow?['title'] as String? ?? '').toLowerCase().replaceAll(
+      RegExp(r'[^a-z0-9]'),
+      '_',
+    );
+    final subId = quizRow?['subject_id'];
+    String cleanSubCode = 'SUBJ';
+    if (subId != null) {
+      final subRows = await db.query('subjects', where: 'id = ?', whereArgs: [subId]);
+      if (subRows.isNotEmpty) {
+        cleanSubCode = (subRows.first['subject_code'] as String? ?? 'SUBJ').replaceAll(
+          RegExp(r'[^a-zA-Z0-9]'),
+          '_',
+        );
+      }
+    }
+
     // 1. Delete associated attempts, scores, assignments, questions, and the quiz itself
     await db.delete('quiz_attempts', where: 'quiz_id = ?', whereArgs: [quizId]);
-    await db.delete('student_scores', where: 'quiz_id = ?', whereArgs: [quizId]);
+    try {
+      await db.delete('student_scores', where: 'quiz_id = ?', whereArgs: [quizId]);
+    } catch (_) {}
     await db.delete(
       'quiz_assignments',
       where: 'quiz_id = ?',
@@ -8220,10 +8308,24 @@ class DatabaseHelper {
     // 2. Cloud Firestore deletion so the quiz and its attempts do not resurrect on web or sync
     try {
       unawaited(FirestoreService().deleteDocument('quizzes', quizId.toString()));
+      if (cleanTitle.isNotEmpty) {
+        unawaited(FirestoreService().deleteDocument('quizzes', 'quiz_${cleanSubCode}_${cleanTitle}_$quizId'));
+        unawaited(FirestoreService().deleteDocument('quizzes', 'quiz_${subId}_${cleanTitle}_$quizId'));
+      }
+      final cloudQuizzes = await FirestoreService().fetchAllDocuments('quizzes');
+      for (final doc in cloudQuizzes) {
+        final rawQId = doc['id'];
+        final docId = doc['_docId']?.toString() ?? doc['id']?.toString() ?? doc['document_id']?.toString() ?? '';
+        if (rawQId == quizId || rawQId?.toString() == quizId.toString() || docId.endsWith('_$quizId') || docId == quizId.toString()) {
+          if (docId.isNotEmpty) {
+            unawaited(FirestoreService().deleteDocument('quizzes', docId));
+          }
+        }
+      }
       final cloudAttempts = await FirestoreService().fetchAllDocuments('quiz_attempts');
       for (final doc in cloudAttempts) {
         final rawQId = doc['quiz_id'];
-        final docId = doc['id']?.toString() ?? doc['document_id']?.toString() ?? '';
+        final docId = doc['_docId']?.toString() ?? doc['id']?.toString() ?? doc['document_id']?.toString() ?? '';
         if (rawQId == quizId || rawQId?.toString() == quizId.toString()) {
           if (docId.isNotEmpty) {
             unawaited(FirestoreService().deleteDocument('quiz_attempts', docId));
@@ -8233,14 +8335,16 @@ class DatabaseHelper {
       final cloudAssignments = await FirestoreService().fetchAllDocuments('quiz_assignments');
       for (final doc in cloudAssignments) {
         final rawQId = doc['quiz_id'];
-        final docId = doc['id']?.toString() ?? doc['document_id']?.toString() ?? '';
+        final docId = doc['_docId']?.toString() ?? doc['id']?.toString() ?? doc['document_id']?.toString() ?? '';
         if (rawQId == quizId || rawQId?.toString() == quizId.toString()) {
           if (docId.isNotEmpty) {
             unawaited(FirestoreService().deleteDocument('quiz_assignments', docId));
           }
         }
       }
-    } catch (_) {}
+    } catch (e, st) {
+      debugPrint('[DatabaseHelper] deleteQuiz Firestore error: $e\n$st');
+    }
   }
 
   /// Purges test artifacts, orphan duplicate quizzes, and test runner quiz attempts.
@@ -8317,10 +8421,12 @@ class DatabaseHelper {
         'DELETE FROM quiz_attempts WHERE quiz_id IN ($placeholders)',
         idArgs,
       );
-      deletedCount += await db.rawDelete(
-        'DELETE FROM student_scores WHERE quiz_id IN ($placeholders)',
-        idArgs,
-      );
+      try {
+        deletedCount += await db.rawDelete(
+          'DELETE FROM student_scores WHERE quiz_id IN ($placeholders)',
+          idArgs,
+        );
+      } catch (_) {}
       await db.rawDelete(
         'DELETE FROM quiz_assignments WHERE quiz_id IN ($placeholders)',
         idArgs,
@@ -8352,19 +8458,21 @@ class DatabaseHelper {
            OR (quiz_id IS NOT NULL AND quiz_id NOT IN (SELECT id FROM quizzes))
       ''');
 
-      deletedCount += await db.rawDelete('''
-        DELETE FROM student_scores
-        WHERE student_id LIKE 'student_loop_%'
-           OR student_id LIKE 'bulk_student_%'
-           OR student_id LIKE 's_anticheat_%'
-           OR student_id LIKE 'student_reset_%'
-           OR student_id LIKE 'student_lo_reset_%'
-           OR student_id LIKE 's_lo_%'
-           OR student_id LIKE 'test_%'
-           OR student_id LIKE '%1794%'
-           OR student_id IN ('student_1', 'student_2', 'student_3', 'student_4', 'student_5', 'student_6', 'student_7', 'student_8', 'student_9')
-           OR (quiz_id IS NOT NULL AND quiz_id NOT IN (SELECT id FROM quizzes))
-      ''');
+      try {
+        deletedCount += await db.rawDelete('''
+          DELETE FROM student_scores
+          WHERE student_id LIKE 'student_loop_%'
+             OR student_id LIKE 'bulk_student_%'
+             OR student_id LIKE 's_anticheat_%'
+             OR student_id LIKE 'student_reset_%'
+             OR student_id LIKE 'student_lo_reset_%'
+             OR student_id LIKE 's_lo_%'
+             OR student_id LIKE 'test_%'
+             OR student_id LIKE '%1794%'
+             OR student_id IN ('student_1', 'student_2', 'student_3', 'student_4', 'student_5', 'student_6', 'student_7', 'student_8', 'student_9')
+             OR (quiz_id IS NOT NULL AND quiz_id NOT IN (SELECT id FROM quizzes))
+        ''');
+      } catch (_) {}
     }
 
     // 3. Purge Cloud Firestore collections so artifacts never resurrect
@@ -9204,7 +9312,15 @@ class DatabaseHelper {
         canonicalCloudId,
         assignmentMap,
       );
-    } catch (_) {}
+    } catch (e, st) {
+      debugPrint('[DatabaseHelper] createAssignment Firestore sync error: $e\n$st');
+      if (kIsWeb) {
+        try {
+          await db.delete('assignments', where: 'id = ?', whereArgs: [id]);
+        } catch (_) {}
+        rethrow;
+      }
+    }
 
     // 2. Generate notifications for all enrolled students in this subject
     try {
@@ -9257,7 +9373,7 @@ class DatabaseHelper {
       } catch (_) {}
       final localCountRes = await db.rawQuery('SELECT COUNT(*) as cnt FROM assignments');
       final localCount = (localCountRes.first['cnt'] as num?)?.toInt() ?? 0;
-      final lastSync = (force || localCount == 0) ? null : prefs?.getString('last_synced_at_assignments');
+      final lastSync = (force || kIsWeb || localCount == 0) ? null : prefs?.getString('last_synced_at_assignments');
       var cloudDocs = await FirestoreService().fetchDeltaDocuments(
         'assignments',
         since: lastSync,
@@ -9274,7 +9390,9 @@ class DatabaseHelper {
       for (final doc in cloudDocs) {
         final title = doc['title']?.toString() ?? 'Assignment';
         final description = doc['description']?.toString();
-        final rawSubId = (doc['subject_id'] as num?)?.toInt() ?? 1;
+        final rawSubId = (doc['subject_id'] is num)
+            ? (doc['subject_id'] as num).toInt()
+            : int.tryParse(doc['subject_id']?.toString() ?? '') ?? 1;
         final subCode = doc['subject_code']?.toString().trim();
         final subName = doc['subject_name']?.toString().trim();
         final cloudId = doc['cloud_id']?.toString() ?? doc['id']?.toString();
@@ -9316,21 +9434,37 @@ class DatabaseHelper {
           whereArgs: [targetSubjectId],
         );
         if (checkSub.isEmpty) {
-          final anySub = await db.query('subjects', limit: 1);
-          if (anySub.isNotEmpty) targetSubjectId = anySub.first['id'] as int;
+          try {
+            await db.insert('subjects', {
+              'id': targetSubjectId,
+              'name': subName ?? 'Subject $targetSubjectId',
+              'subject_code': subCode ?? 'SUBJ_$targetSubjectId',
+              'description': subName ?? 'Subject $targetSubjectId',
+              'teacher_id': doc['teacher_id']?.toString() ?? 'teacher_1',
+              'teacher_name': doc['teacher_name']?.toString(),
+              'created_at': doc['created_at']?.toString() ?? DateTime.now().toIso8601String(),
+            });
+          } catch (_) {
+            final anySub = await db.query('subjects', limit: 1);
+            if (anySub.isNotEmpty) targetSubjectId = anySub.first['id'] as int;
+          }
         }
 
         final teacherId = doc['teacher_id']?.toString() ?? 'teacher_1';
         final teacherName = doc['teacher_name']?.toString();
         final dueDate = doc['due_date']?.toString();
-        final totalPoints = (doc['total_points'] as num?)?.toInt() ?? 100;
+        final totalPoints = (doc['total_points'] is num)
+            ? (doc['total_points'] as num).toInt()
+            : int.tryParse(doc['total_points']?.toString() ?? '') ?? 100;
         final submissionType = doc['submission_type']?.toString() ?? 'both';
         final status = doc['status']?.toString() ?? 'active';
         final createdAt =
             doc['created_at']?.toString() ?? DateTime.now().toIso8601String();
         final attachmentName = doc['attachment_name']?.toString();
         final attachmentPath = doc['attachment_path']?.toString();
-        final attachmentSize = (doc['attachment_size'] as num?)?.toInt();
+        final attachmentSize = (doc['attachment_size'] is num)
+            ? (doc['attachment_size'] as num).toInt()
+            : int.tryParse(doc['attachment_size']?.toString() ?? '');
         final attachmentBytes = doc['attachment_bytes']?.toString();
 
         final existing = await db.query(
@@ -9591,7 +9725,7 @@ class DatabaseHelper {
       } catch (_) {}
       final localQuizCountRes = await db.rawQuery('SELECT COUNT(*) as cnt FROM quizzes');
       final localQuizCount = (localQuizCountRes.first['cnt'] as num?)?.toInt() ?? 0;
-      final lastSync = (force || localQuizCount == 0) ? null : prefs?.getString('last_synced_at_quizzes');
+      final lastSync = (force || kIsWeb || localQuizCount == 0) ? null : prefs?.getString('last_synced_at_quizzes');
       var cloudQuizzes = await FirestoreService().fetchDeltaDocuments(
         'quizzes',
         since: lastSync,
@@ -9621,33 +9755,15 @@ class DatabaseHelper {
 
       for (final doc in cloudQuizzes) {
         final title = doc['title']?.toString() ?? 'Quiz';
-        final docId = doc['id']?.toString() ?? doc['document_id']?.toString() ?? '';
-        final lowerTitle = title.toLowerCase().trim();
-        final isGarbageQuiz = title.contains('1794') ||
-            title == '1' ||
-            title == '' ||
-            lowerTitle.contains('math roster quiz') ||
-            lowerTitle.startsWith('diagnostic quiz') ||
-            lowerTitle.startsWith('quantum mechanics') ||
-            lowerTitle.startsWith('world war 2') ||
-            lowerTitle.startsWith('photosynthesis') ||
-            lowerTitle.startsWith('initial science') ||
-            lowerTitle.startsWith('updated science') ||
-            lowerTitle.startsWith('loop science') ||
-            lowerTitle.startsWith('db quiz') ||
-            lowerTitle.startsWith('test') ||
-            lowerTitle.contains('dummy') ||
-            lowerTitle.contains('temp');
-        if (isGarbageQuiz) {
-          if (docId.isNotEmpty) {
-            unawaited(FirestoreService().deleteDocument('quizzes', docId));
-          }
+        if (title.trim().isEmpty || title == '1') {
           continue;
         }
         final description = doc['description']?.toString();
         final subCode = doc['subject_code']?.toString().trim();
         final subName = doc['subject_name']?.toString().trim();
-        final rawSubId = (doc['subject_id'] as num?)?.toInt() ?? 1;
+        final rawSubId = (doc['subject_id'] is num)
+            ? (doc['subject_id'] as num).toInt()
+            : int.tryParse(doc['subject_id']?.toString() ?? '') ?? 1;
 
         int targetSubjectId = rawSubId;
         if (subCode != null && subCode.isNotEmpty) {
@@ -9684,14 +9800,30 @@ class DatabaseHelper {
           whereArgs: [targetSubjectId],
         );
         if (checkSub.isEmpty) {
-          final anySub = await db.query('subjects', limit: 1);
-          if (anySub.isNotEmpty) targetSubjectId = anySub.first['id'] as int;
+          try {
+            await db.insert('subjects', {
+              'id': targetSubjectId,
+              'name': subName ?? 'Subject $targetSubjectId',
+              'subject_code': subCode ?? 'SUBJ_$targetSubjectId',
+              'description': subName ?? 'Subject $targetSubjectId',
+              'teacher_id': doc['teacher_id']?.toString() ?? 'teacher_1',
+              'teacher_name': doc['teacher_name']?.toString(),
+              'created_at': doc['created_at']?.toString() ?? DateTime.now().toIso8601String(),
+            });
+          } catch (_) {
+            final anySub = await db.query('subjects', limit: 1);
+            if (anySub.isNotEmpty) targetSubjectId = anySub.first['id'] as int;
+          }
         }
 
         final teacherId = doc['teacher_id']?.toString() ?? 'teacher_1';
         final teacherName = doc['teacher_name']?.toString();
-        final timeLimit = (doc['time_limit_minutes'] as num?)?.toInt() ?? 0;
-        final passingScore = (doc['passing_score'] as num?)?.toInt() ?? 70;
+        final timeLimit = (doc['time_limit_minutes'] is num)
+            ? (doc['time_limit_minutes'] as num).toInt()
+            : int.tryParse(doc['time_limit_minutes']?.toString() ?? '') ?? 0;
+        final passingScore = (doc['passing_score'] is num)
+            ? (doc['passing_score'] as num).toInt()
+            : int.tryParse(doc['passing_score']?.toString() ?? '') ?? 70;
         final status = doc['status']?.toString() ?? 'published';
         final dueDate = doc['due_date']?.toString();
         final schedStart = doc['schedule_start']?.toString();
@@ -9740,15 +9872,25 @@ class DatabaseHelper {
           );
         }
 
-        final questions =
-            (doc['questions'] as List?)?.cast<Map<String, dynamic>>() ?? [];
+        final questions = (doc['questions'] as List?)
+                ?.map((item) => (item is Map) ? Map<String, dynamic>.from(item) : null)
+                .whereType<Map<String, dynamic>>()
+                .toList() ??
+            [];
         if (questions.isNotEmpty) {
           final existingQ = await db.query(
             'questions',
             where: 'quiz_id = ?',
             whereArgs: [localQuizId],
           );
-          if (existingQ.isEmpty) {
+          if (existingQ.isEmpty || force) {
+            if (force && existingQ.isNotEmpty) {
+              await db.delete(
+                'questions',
+                where: 'quiz_id = ?',
+                whereArgs: [localQuizId],
+              );
+            }
             for (final q in questions) {
               await db.insert('questions', {
                 'quiz_id': localQuizId,
@@ -11152,7 +11294,9 @@ class DatabaseHelper {
           'id': id,
         }),
       );
-    } catch (_) {}
+    } catch (e, st) {
+      debugPrint('[DatabaseHelper] submitAssignment Firestore sync error: $e\n$st');
+    }
 
     // 2. Automatically notify the assignment's teacher!
     if (assignment != null && assignment['teacher_id'] != null) {
@@ -11254,7 +11398,9 @@ class DatabaseHelper {
           );
         }
       }
-    } catch (_) {}
+    } catch (e, st) {
+      debugPrint('[DatabaseHelper] gradeSubmission Firestore sync error: $e\n$st');
+    }
 
     return updated;
   }
@@ -11263,6 +11409,10 @@ class DatabaseHelper {
     final db = await database;
     final assign = await getAssignmentById(id);
     final cloudId = assign?['cloud_id'] as String?;
+    final cleanTitle = (assign?['title'] as String? ?? '').toLowerCase().replaceAll(
+      RegExp(r'[^a-z0-9]'),
+      '_',
+    );
     await db.delete('submissions', where: 'assignment_id = ?', whereArgs: [id]);
     final deleted = await db.delete(
       'assignments',
@@ -11276,7 +11426,30 @@ class DatabaseHelper {
       unawaited(
         FirestoreService().deleteDocument('assignments', id.toString()),
       );
-    } catch (_) {}
+      final cloudAssignments = await FirestoreService().fetchAllDocuments('assignments');
+      for (final doc in cloudAssignments) {
+        final rawId = doc['local_id'] ?? doc['id'];
+        final docId = doc['_docId']?.toString() ?? doc['id']?.toString() ?? doc['document_id']?.toString() ?? '';
+        if (rawId == id || rawId?.toString() == id.toString() || docId == cloudId || docId.endsWith('_$id') || (cleanTitle.isNotEmpty && docId.contains(cleanTitle))) {
+          if (docId.isNotEmpty) {
+            unawaited(FirestoreService().deleteDocument('assignments', docId));
+          }
+        }
+      }
+      final cloudSubs = await FirestoreService().fetchAllDocuments('submissions');
+      for (final doc in cloudSubs) {
+        final rawAId = doc['assignment_id'];
+        final rawCId = doc['assignment_cloud_id']?.toString();
+        final docId = doc['_docId']?.toString() ?? doc['id']?.toString() ?? doc['document_id']?.toString() ?? '';
+        if (rawAId == id || rawAId?.toString() == id.toString() || (cloudId != null && rawCId == cloudId)) {
+          if (docId.isNotEmpty) {
+            unawaited(FirestoreService().deleteDocument('submissions', docId));
+          }
+        }
+      }
+    } catch (e, st) {
+      debugPrint('[DatabaseHelper] deleteAssignment Firestore error: $e\n$st');
+    }
     return deleted;
   }
 

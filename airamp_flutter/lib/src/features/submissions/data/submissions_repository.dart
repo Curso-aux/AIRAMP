@@ -1,5 +1,7 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/database/database_helper.dart';
+import '../../../core/database/firestore_service.dart';
 
 class Assignment {
   final int id;
@@ -349,6 +351,9 @@ final studentSubmissionProvider = FutureProvider.family<Submission?, ({int assig
 final subjectAssignmentsProvider = FutureProvider.family<List<Assignment>, int>((ref, subjectId) async {
   final repo = ref.watch(submissionsRepositoryProvider);
   try {
+    if (kIsWeb) {
+      await FirestoreService().syncCloudSubjectsToLocal(force: true);
+    }
     await DatabaseHelper().syncCloudAssignmentsToLocal(force: true);
     await DatabaseHelper().syncCloudSubmissionsToLocal(force: true);
   } catch (_) {}

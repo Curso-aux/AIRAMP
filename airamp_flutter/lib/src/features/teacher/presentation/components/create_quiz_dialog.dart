@@ -761,25 +761,27 @@ Answer: B''';
                     Text('Time Limit (Minutes)', style: TextStyle(fontWeight: FontWeight.bold, color: AppTheme.text, fontSize: 13)),
                     const SizedBox(height: 6),
                     DropdownButtonFormField<int>(
+                      isExpanded: true,
                       initialValue: _timeLimitMinutes,
                       dropdownColor: AppTheme.surface,
-                      style: TextStyle(color: AppTheme.text, fontSize: 14),
+                      style: TextStyle(color: AppTheme.text, fontSize: 13),
                       decoration: InputDecoration(
                         filled: true,
                         fillColor: AppTheme.surface,
+                        contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
                         border: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: BorderSide(color: AppTheme.border)),
                         enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: BorderSide(color: AppTheme.border)),
                         focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: BorderSide(color: AppTheme.primary, width: 1.5)),
                       ),
                       items: const [
-                        DropdownMenuItem(value: 0, child: Text('No Limit')),
-                        DropdownMenuItem(value: 5, child: Text('5 Minutes')),
-                        DropdownMenuItem(value: 10, child: Text('10 Minutes')),
-                        DropdownMenuItem(value: 15, child: Text('15 Minutes')),
-                        DropdownMenuItem(value: 20, child: Text('20 Minutes')),
-                        DropdownMenuItem(value: 30, child: Text('30 Minutes')),
-                        DropdownMenuItem(value: 45, child: Text('45 Minutes')),
-                        DropdownMenuItem(value: 60, child: Text('60 Minutes')),
+                        DropdownMenuItem(value: 0, child: Text('No Limit', overflow: TextOverflow.ellipsis)),
+                        DropdownMenuItem(value: 5, child: Text('5 Minutes', overflow: TextOverflow.ellipsis)),
+                        DropdownMenuItem(value: 10, child: Text('10 Minutes', overflow: TextOverflow.ellipsis)),
+                        DropdownMenuItem(value: 15, child: Text('15 Minutes', overflow: TextOverflow.ellipsis)),
+                        DropdownMenuItem(value: 20, child: Text('20 Minutes', overflow: TextOverflow.ellipsis)),
+                        DropdownMenuItem(value: 30, child: Text('30 Minutes', overflow: TextOverflow.ellipsis)),
+                        DropdownMenuItem(value: 45, child: Text('45 Minutes', overflow: TextOverflow.ellipsis)),
+                        DropdownMenuItem(value: 60, child: Text('60 Minutes', overflow: TextOverflow.ellipsis)),
                       ],
                       onChanged: (val) {
                         if (val != null) setState(() => _timeLimitMinutes = val);
@@ -802,8 +804,8 @@ Answer: B''';
                     ),
                     const SizedBox(height: 6),
                     Container(
-                      height: 48,
-                      padding: const EdgeInsets.symmetric(horizontal: 14),
+                      constraints: const BoxConstraints(minHeight: 48),
+                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
                       decoration: BoxDecoration(
                         color: AppTheme.surfaceElevated,
                         borderRadius: BorderRadius.circular(8),
@@ -812,22 +814,23 @@ Answer: B''';
                       child: Row(
                         children: [
                           Icon(Icons.verified_outlined, size: 16, color: AppTheme.primary),
-                          const SizedBox(width: 8),
+                          const SizedBox(width: 6),
                           Expanded(
                             child: Text(
                               '$_passingScore% (Fixed Standard)',
-                              style: TextStyle(color: AppTheme.text, fontWeight: FontWeight.bold, fontSize: 13),
+                              style: TextStyle(color: AppTheme.text, fontWeight: FontWeight.bold, fontSize: 12),
+                              overflow: TextOverflow.ellipsis,
                             ),
                           ),
                           Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                            padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
                             decoration: BoxDecoration(
                               color: AppTheme.primary.withValues(alpha: 0.15),
                               borderRadius: BorderRadius.circular(4),
                             ),
                             child: Text(
                               'LOCKED',
-                              style: TextStyle(color: AppTheme.primary, fontWeight: FontWeight.w800, fontSize: 9),
+                              style: TextStyle(color: AppTheme.primary, fontWeight: FontWeight.w800, fontSize: 8.5),
                             ),
                           ),
                         ],
@@ -1024,12 +1027,14 @@ Answer: B''';
           Text('Quiz Status', style: TextStyle(fontWeight: FontWeight.bold, color: AppTheme.text, fontSize: 13)),
           const SizedBox(height: 6),
           DropdownButtonFormField<String>(
+            isExpanded: true,
             initialValue: _quizStatus,
             dropdownColor: AppTheme.surface,
-            style: TextStyle(color: AppTheme.text, fontSize: 14),
+            style: TextStyle(color: AppTheme.text, fontSize: 13),
             decoration: InputDecoration(
               filled: true,
               fillColor: AppTheme.surface,
+              contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
               prefixIcon: Icon(
                 _quizStatus == 'published' ? Icons.check_circle_outline : Icons.edit_note,
                 color: _quizStatus == 'published' ? AppTheme.success : Colors.orange,
@@ -1041,11 +1046,17 @@ Answer: B''';
             items: const [
               DropdownMenuItem(
                 value: 'published',
-                child: Text('Published — Active for assigned students'),
+                child: Text(
+                  'Published — Active for assigned students',
+                  overflow: TextOverflow.ellipsis,
+                ),
               ),
               DropdownMenuItem(
                 value: 'draft',
-                child: Text('Draft — Saved as draft, hidden from students'),
+                child: Text(
+                  'Draft — Saved as draft, hidden from students',
+                  overflow: TextOverflow.ellipsis,
+                ),
               ),
             ],
             onChanged: (val) {

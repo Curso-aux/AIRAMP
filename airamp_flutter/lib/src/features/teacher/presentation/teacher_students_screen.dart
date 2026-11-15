@@ -28,7 +28,8 @@ class TeacherStudentsScreen extends ConsumerStatefulWidget {
   });
 
   @override
-  ConsumerState<TeacherStudentsScreen> createState() => _TeacherStudentsScreenState();
+  ConsumerState<TeacherStudentsScreen> createState() =>
+      _TeacherStudentsScreenState();
 }
 
 class _TeacherStudentsScreenState extends ConsumerState<TeacherStudentsScreen> {
@@ -43,7 +44,8 @@ class _TeacherStudentsScreenState extends ConsumerState<TeacherStudentsScreen> {
   void initState() {
     super.initState();
     _activeTab = widget.initialTab;
-    _selectedSection = (widget.initialSection != null && widget.initialSection!.isNotEmpty)
+    _selectedSection =
+        (widget.initialSection != null && widget.initialSection!.isNotEmpty)
         ? widget.initialSection!
         : 'All Sections';
 
@@ -51,8 +53,12 @@ class _TeacherStudentsScreenState extends ConsumerState<TeacherStudentsScreen> {
 
     // Initial load with selected section if provided
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      ref.read(teacherStudentsProvider.notifier).reload(
-            section: _selectedSection == 'All Sections' ? null : _selectedSection,
+      ref
+          .read(teacherStudentsProvider.notifier)
+          .reload(
+            section: _selectedSection == 'All Sections'
+                ? null
+                : _selectedSection,
             query: _searchController.text.trim(),
           );
     });
@@ -61,7 +67,8 @@ class _TeacherStudentsScreenState extends ConsumerState<TeacherStudentsScreen> {
   @override
   void didUpdateWidget(covariant TeacherStudentsScreen oldWidget) {
     super.didUpdateWidget(oldWidget);
-    if (widget.initialTab != oldWidget.initialTab && widget.initialTab != _activeTab) {
+    if (widget.initialTab != oldWidget.initialTab &&
+        widget.initialTab != _activeTab) {
       setState(() {
         _activeTab = widget.initialTab;
       });
@@ -72,8 +79,12 @@ class _TeacherStudentsScreenState extends ConsumerState<TeacherStudentsScreen> {
       setState(() {
         _selectedSection = widget.initialSection!;
       });
-      ref.read(teacherStudentsProvider.notifier).reload(
-            section: _selectedSection == 'All Sections' ? null : _selectedSection,
+      ref
+          .read(teacherStudentsProvider.notifier)
+          .reload(
+            section: _selectedSection == 'All Sections'
+                ? null
+                : _selectedSection,
             query: _searchController.text.trim(),
           );
     }
@@ -86,8 +97,12 @@ class _TeacherStudentsScreenState extends ConsumerState<TeacherStudentsScreen> {
       setState(() {
         _displayLimit = _pageSize;
       });
-      ref.read(teacherStudentsProvider.notifier).reload(
-            section: _selectedSection == 'All Sections' ? null : _selectedSection,
+      ref
+          .read(teacherStudentsProvider.notifier)
+          .reload(
+            section: _selectedSection == 'All Sections'
+                ? null
+                : _selectedSection,
             query: _searchController.text.trim(),
           );
     });
@@ -116,7 +131,9 @@ class _TeacherStudentsScreenState extends ConsumerState<TeacherStudentsScreen> {
         : '/teacher/students';
     context.go(targetPath);
 
-    ref.read(teacherStudentsProvider.notifier).reload(
+    ref
+        .read(teacherStudentsProvider.notifier)
+        .reload(
           section: section == 'All Sections' ? null : section,
           query: _searchController.text.trim(),
         );
@@ -183,7 +200,9 @@ class _TeacherStudentsScreenState extends ConsumerState<TeacherStudentsScreen> {
     ref.watch(themeProvider);
     final students = ref.watch(teacherStudentsProvider);
     final isLoading = ref.watch(isTeacherStudentsLoadingProvider);
-    final sectionsDetailsAsync = ref.watch(teacherHandledSectionsDetailsProvider);
+    final sectionsDetailsAsync = ref.watch(
+      teacherHandledSectionsDetailsProvider,
+    );
     final sectionsListAsync = ref.watch(availableSectionsProvider);
 
     final handledSections = sectionsDetailsAsync.value ?? [];
@@ -242,21 +261,28 @@ class _TeacherStudentsScreenState extends ConsumerState<TeacherStudentsScreen> {
         'name': _selectedSection,
         'grade': '',
         'room': '',
-        'enrollment_key':
-            SectionKeyHelper.generateKey(sectionName: _selectedSection),
+        'enrollment_key': SectionKeyHelper.generateKey(
+          sectionName: _selectedSection,
+        ),
         'student_count': students.length,
       },
     );
     final activeKey =
-        (activeSectionData['enrollment_key'] as String?)?.trim().toUpperCase() ??
-            SectionKeyHelper.generateKey(sectionName: _selectedSection);
+        (activeSectionData['enrollment_key'] as String?)
+            ?.trim()
+            .toUpperCase() ??
+        SectionKeyHelper.generateKey(sectionName: _selectedSection);
 
-    final handledNames =
-        effectiveSections.map((s) => s['name'] as String).toList();
-    final sectionChipNames =
-        handledNames.isNotEmpty ? handledNames : fallbackSections;
-    final combinedSections =
-        <String>{'All Sections', ...sectionChipNames}.toList();
+    final handledNames = effectiveSections
+        .map((s) => s['name'] as String)
+        .toList();
+    final sectionChipNames = handledNames.isNotEmpty
+        ? handledNames
+        : fallbackSections;
+    final combinedSections = <String>{
+      'All Sections',
+      ...sectionChipNames,
+    }.toList();
 
     final totalStudentCount = effectiveSections.fold<int>(
       0,
@@ -322,11 +348,17 @@ class _TeacherStudentsScreenState extends ConsumerState<TeacherStudentsScreen> {
                   ? RefreshIndicator(
                       onRefresh: () async {
                         await Future.wait([
-                          ref.read(teacherStudentsProvider.notifier).reload(
-                                section: _selectedSection == 'All Sections' ? null : _selectedSection,
+                          ref
+                              .read(teacherStudentsProvider.notifier)
+                              .reload(
+                                section: _selectedSection == 'All Sections'
+                                    ? null
+                                    : _selectedSection,
                                 query: _searchController.text.trim(),
                               ),
-                          ref.refresh(teacherHandledSectionsDetailsProvider.future),
+                          ref.refresh(
+                            teacherHandledSectionsDetailsProvider.future,
+                          ),
                           ref.refresh(teacherHandledSectionsProvider.future),
                         ]);
                       },
@@ -336,501 +368,899 @@ class _TeacherStudentsScreenState extends ConsumerState<TeacherStudentsScreen> {
                           Padding(
                             padding: const EdgeInsets.fromLTRB(20, 12, 20, 12),
                             child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    // Header title & count
-                    Row(
-                      children: [
-                        Container(
-                          padding: const EdgeInsets.all(10),
-                          decoration: BoxDecoration(
-                            color: AppTheme.primary.withValues(alpha: 0.12),
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                          child: Icon(Icons.school_rounded, color: AppTheme.primary, size: 24),
-                        ),
-                        const SizedBox(width: 12),
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                'Classrooms & Students',
-                                style: TextStyle(
-                                  fontSize: 20,
-                                  fontWeight: FontWeight.bold,
-                                  color: AppTheme.text,
-                                  letterSpacing: -0.4,
-                                ),
-                              ),
-                              const SizedBox(height: 2),
-                              Text(
-                                'Select a classroom first to view its enrolled students and learning progress',
-                                style: TextStyle(fontSize: 12, color: AppTheme.textSecondary),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 16),
-
-                    // Classroom Selection Hub (Classroom First Cards)
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Icon(Icons.meeting_room_rounded, size: 16, color: AppTheme.primary),
-                            const SizedBox(width: 6),
-                            Text(
-                              'Assigned Classrooms',
-                              style: TextStyle(
-                                fontSize: 13,
-                                fontWeight: FontWeight.bold,
-                                color: AppTheme.text,
-                              ),
-                            ),
-                          ],
-                        ),
-                        if (_selectedSection != 'All Sections')
-                          InkWell(
-                            onTap: () => _onSelectSection('All Sections'),
-                            child: Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                Icon(Icons.clear_all_rounded, size: 14, color: AppTheme.primary),
-                                const SizedBox(width: 4),
-                                Text(
-                                  'View All Classrooms',
-                                  style: TextStyle(
-                                    fontSize: 12,
-                                    fontWeight: FontWeight.w600,
-                                    color: AppTheme.primary,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                      ],
-                    ),
-                    const SizedBox(height: 8),
-                    SizedBox(
-                      height: 94,
-                      child: SingleChildScrollView(
-                        scrollDirection: Axis.horizontal,
-                        physics: const BouncingScrollPhysics(),
-                        clipBehavior: Clip.none,
-                        child: Row(
-                          children: [
-                            // "All Sections" Card
-                            _buildSectionCard(
-                              name: 'All Sections',
-                              grade: 'All Levels',
-                              studentCount: totalStudentCount > 0 ? totalStudentCount : students.length,
-                              isSelected: _selectedSection == 'All Sections',
-                              onTap: () => _onSelectSection('All Sections'),
-                              isAllCard: true,
-                            ),
-                            // Individual Handled Section Cards
-                            ...effectiveSections.map((sec) {
-                              final name = sec['name'] as String? ?? 'Section';
-                              final grade = sec['grade'] as String? ?? '';
-                              final count = sec['student_count'] as int? ?? 0;
-                              final secKey = (sec['enrollment_key'] as String?)?.trim().toUpperCase() ??
-                                  SectionKeyHelper.generateKey(sectionName: name, gradeLevel: grade);
-                              final isSelected =
-                                  _selectedSection.toLowerCase() == name.toLowerCase();
-
-                              return _buildSectionCard(
-                                name: name,
-                                grade: grade,
-                                studentCount: count,
-                                enrollmentKey: secKey,
-                                isSelected: isSelected,
-                                onTap: () => _onSelectSection(name),
-                                onProject: () {
-                                  _showClassroomProjectionDialog(
-                                    context: context,
-                                    sectionName: name,
-                                    grade: grade,
-                                    enrollmentKey: secKey,
-                                    studentCount: count,
-                                  );
-                                },
-                              );
-                            }),
-                          ],
-                        ),
-                      ),
-                    ),
-                    const SizedBox(height: 12),
-
-                    // Active Classroom Context Banner with Projection Actions
-                    Container(
-                      margin: const EdgeInsets.only(bottom: 12),
-                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-                      decoration: BoxDecoration(
-                        color: _selectedSection != 'All Sections'
-                            ? AppTheme.primary.withValues(alpha: 0.08)
-                            : AppTheme.surface,
-                        borderRadius: BorderRadius.circular(12),
-                        border: Border.all(
-                          color: _selectedSection != 'All Sections'
-                              ? AppTheme.primary.withValues(alpha: 0.25)
-                              : AppTheme.border,
-                        ),
-                      ),
-                      child: Row(
-                        children: [
-                          Container(
-                            padding: const EdgeInsets.all(7),
-                            decoration: BoxDecoration(
-                              color: _selectedSection != 'All Sections'
-                                  ? AppTheme.primary.withValues(alpha: 0.16)
-                                  : AppTheme.border.withValues(alpha: 0.4),
-                              shape: BoxShape.circle,
-                            ),
-                            child: Icon(
-                              _selectedSection != 'All Sections'
-                                  ? Icons.meeting_room_rounded
-                                  : Icons.groups_rounded,
-                              size: 16,
-                              color: _selectedSection != 'All Sections'
-                                  ? AppTheme.primary
-                                  : AppTheme.textSecondary,
-                            ),
-                          ),
-                          const SizedBox(width: 10),
-                          Expanded(
-                            child: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
+                                // Header title & count
                                 Row(
                                   children: [
-                                    Text(
-                                      _selectedSection != 'All Sections'
-                                          ? 'Classroom: ${_cleanSectionName(_selectedSection)}'
-                                          : 'All Classrooms Roster',
-                                      style: TextStyle(
-                                        fontSize: 13,
-                                        fontWeight: FontWeight.bold,
-                                        color: _selectedSection != 'All Sections'
-                                            ? AppTheme.primary
-                                            : AppTheme.text,
+                                    Container(
+                                      padding: const EdgeInsets.all(10),
+                                      decoration: BoxDecoration(
+                                        color: AppTheme.primary.withValues(
+                                          alpha: 0.12,
+                                        ),
+                                        borderRadius: BorderRadius.circular(12),
+                                      ),
+                                      child: Icon(
+                                        Icons.school_rounded,
+                                        color: AppTheme.primary,
+                                        size: 24,
                                       ),
                                     ),
-                                    if (_selectedSection != 'All Sections' && activeKey.isNotEmpty) ...[
-                                      const SizedBox(width: 8),
-                                      InkWell(
-                                        onTap: () {
-                                          Clipboard.setData(ClipboardData(text: activeKey));
-                                          AppToast.showSuccess(context, 'Section Key "$activeKey" copied to clipboard!');
-                                        },
-                                        borderRadius: BorderRadius.circular(6),
-                                        child: Container(
-                                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                                          decoration: BoxDecoration(
-                                            color: AppTheme.primary.withValues(alpha: 0.12),
-                                            borderRadius: BorderRadius.circular(6),
-                                            border: Border.all(
-                                              color: AppTheme.primary.withValues(alpha: 0.3),
-                                              width: 0.8,
+                                    const SizedBox(width: 12),
+                                    Expanded(
+                                      child: Column(
+                                        crossAxisAlignment:
+                                            CrossAxisAlignment.start,
+                                        children: [
+                                          Text(
+                                            'Classrooms & Students',
+                                            style: TextStyle(
+                                              fontSize: 20,
+                                              fontWeight: FontWeight.bold,
+                                              color: AppTheme.text,
+                                              letterSpacing: -0.4,
                                             ),
                                           ),
-                                          child: Row(
-                                            mainAxisSize: MainAxisSize.min,
+                                          const SizedBox(height: 2),
+                                          Text(
+                                            'Select a classroom first to view its enrolled students and learning progress',
+                                            style: TextStyle(
+                                              fontSize: 12,
+                                              color: AppTheme.textSecondary,
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                                const SizedBox(height: 16),
+
+                                // Classroom Selection Hub (Classroom First Cards)
+                                Row(
+                                  mainAxisAlignment:
+                                      MainAxisAlignment.spaceBetween,
+                                  children: [
+                                    Row(
+                                      mainAxisSize: MainAxisSize.min,
+                                      children: [
+                                        Icon(
+                                          Icons.meeting_room_rounded,
+                                          size: 16,
+                                          color: AppTheme.primary,
+                                        ),
+                                        const SizedBox(width: 6),
+                                        Text(
+                                          'Assigned Classrooms',
+                                          style: TextStyle(
+                                            fontSize: 13,
+                                            fontWeight: FontWeight.bold,
+                                            color: AppTheme.text,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                    if (_selectedSection != 'All Sections')
+                                      InkWell(
+                                        onTap: () =>
+                                            _onSelectSection('All Sections'),
+                                        child: Row(
+                                          mainAxisSize: MainAxisSize.min,
+                                          children: [
+                                            Icon(
+                                              Icons.clear_all_rounded,
+                                              size: 14,
+                                              color: AppTheme.primary,
+                                            ),
+                                            const SizedBox(width: 4),
+                                            Text(
+                                              'View All Classrooms',
+                                              style: TextStyle(
+                                                fontSize: 12,
+                                                fontWeight: FontWeight.w600,
+                                                color: AppTheme.primary,
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+                                      ),
+                                  ],
+                                ),
+                                const SizedBox(height: 8),
+                                SizedBox(
+                                  height: 94,
+                                  child: SingleChildScrollView(
+                                    scrollDirection: Axis.horizontal,
+                                    physics: const BouncingScrollPhysics(),
+                                    clipBehavior: Clip.none,
+                                    child: Row(
+                                      children: [
+                                        // "All Sections" Card
+                                        _buildSectionCard(
+                                          name: 'All Sections',
+                                          grade: 'All Levels',
+                                          studentCount: totalStudentCount > 0
+                                              ? totalStudentCount
+                                              : students.length,
+                                          isSelected:
+                                              _selectedSection ==
+                                              'All Sections',
+                                          onTap: () =>
+                                              _onSelectSection('All Sections'),
+                                          isAllCard: true,
+                                        ),
+                                        // Individual Handled Section Cards
+                                        ...effectiveSections.map((sec) {
+                                          final name =
+                                              sec['name'] as String? ??
+                                              'Section';
+                                          final grade =
+                                              sec['grade'] as String? ?? '';
+                                          final count =
+                                              sec['student_count'] as int? ?? 0;
+                                          final secKey =
+                                              (sec['enrollment_key'] as String?)
+                                                  ?.trim()
+                                                  .toUpperCase() ??
+                                              SectionKeyHelper.generateKey(
+                                                sectionName: name,
+                                                gradeLevel: grade,
+                                              );
+                                          final isSelected =
+                                              _selectedSection.toLowerCase() ==
+                                              name.toLowerCase();
+
+                                          return _buildSectionCard(
+                                            name: name,
+                                            grade: grade,
+                                            studentCount: count,
+                                            enrollmentKey: secKey,
+                                            isSelected: isSelected,
+                                            onTap: () => _onSelectSection(name),
+                                            onProject: () {
+                                              _showClassroomProjectionDialog(
+                                                context: context,
+                                                sectionName: name,
+                                                grade: grade,
+                                                enrollmentKey: secKey,
+                                                studentCount: count,
+                                              );
+                                            },
+                                          );
+                                        }),
+                                      ],
+                                    ),
+                                  ),
+                                ),
+                                const SizedBox(height: 12),
+
+                                // Active Classroom Context Banner with Projection Actions
+                                LayoutBuilder(
+                                  builder: (context, bannerConstraints) {
+                                    final isCompact =
+                                        bannerConstraints.maxWidth < 620;
+                                    final isAll =
+                                        _selectedSection == 'All Sections';
+
+                                    return Container(
+                                      margin: const EdgeInsets.only(bottom: 12),
+                                      padding: const EdgeInsets.symmetric(
+                                        horizontal: 14,
+                                        vertical: 10,
+                                      ),
+                                      decoration: BoxDecoration(
+                                        color: !isAll
+                                            ? AppTheme.primary.withValues(
+                                                alpha: 0.08,
+                                              )
+                                            : AppTheme.surface,
+                                        borderRadius: BorderRadius.circular(12),
+                                        border: Border.all(
+                                          color: !isAll
+                                              ? AppTheme.primary.withValues(
+                                                  alpha: 0.25,
+                                                )
+                                              : AppTheme.border,
+                                        ),
+                                      ),
+                                      child: Column(
+                                        crossAxisAlignment:
+                                            CrossAxisAlignment.start,
+                                        children: [
+                                          Row(
                                             children: [
-                                              Icon(Icons.key_rounded, size: 11, color: AppTheme.primary),
-                                              const SizedBox(width: 3),
-                                              Text(
-                                                activeKey,
-                                                style: TextStyle(
-                                                  fontSize: 10.5,
-                                                  fontFamily: 'monospace',
-                                                  fontWeight: FontWeight.bold,
-                                                  color: AppTheme.primary,
+                                              Container(
+                                                padding: const EdgeInsets.all(
+                                                  7,
+                                                ),
+                                                decoration: BoxDecoration(
+                                                  color: !isAll
+                                                      ? AppTheme.primary
+                                                            .withValues(
+                                                              alpha: 0.16,
+                                                            )
+                                                      : AppTheme.border
+                                                            .withValues(
+                                                              alpha: 0.4,
+                                                            ),
+                                                  shape: BoxShape.circle,
+                                                ),
+                                                child: Icon(
+                                                  !isAll
+                                                      ? Icons
+                                                            .meeting_room_rounded
+                                                      : Icons.groups_rounded,
+                                                  size: 16,
+                                                  color: !isAll
+                                                      ? AppTheme.primary
+                                                      : AppTheme.textSecondary,
                                                 ),
                                               ),
-                                              const SizedBox(width: 3),
-                                              Icon(Icons.copy_rounded, size: 10, color: AppTheme.primary),
+                                              const SizedBox(width: 10),
+                                              Expanded(
+                                                child: Column(
+                                                  crossAxisAlignment:
+                                                      CrossAxisAlignment.start,
+                                                  children: [
+                                                    Wrap(
+                                                      crossAxisAlignment:
+                                                          WrapCrossAlignment
+                                                              .center,
+                                                      spacing: 8,
+                                                      runSpacing: 4,
+                                                      children: [
+                                                        Text(
+                                                          !isAll
+                                                              ? 'Classroom: ${_cleanSectionName(_selectedSection)}'
+                                                              : 'All Classrooms Roster',
+                                                          style: TextStyle(
+                                                            fontSize: 13,
+                                                            fontWeight:
+                                                                FontWeight.bold,
+                                                            color: !isAll
+                                                                ? AppTheme
+                                                                      .primary
+                                                                : AppTheme.text,
+                                                          ),
+                                                        ),
+                                                        if (!isAll &&
+                                                            activeKey
+                                                                .isNotEmpty)
+                                                          InkWell(
+                                                            onTap: () {
+                                                              Clipboard.setData(
+                                                                ClipboardData(
+                                                                  text:
+                                                                      activeKey,
+                                                                ),
+                                                              );
+                                                              AppToast.showSuccess(
+                                                                context,
+                                                                'Section Key "$activeKey" copied to clipboard!',
+                                                              );
+                                                            },
+                                                            borderRadius:
+                                                                BorderRadius.circular(
+                                                                  6,
+                                                                ),
+                                                            child: Container(
+                                                              padding:
+                                                                  const EdgeInsets.symmetric(
+                                                                    horizontal:
+                                                                        6,
+                                                                    vertical: 2,
+                                                                  ),
+                                                              decoration: BoxDecoration(
+                                                                color: AppTheme
+                                                                    .primary
+                                                                    .withValues(
+                                                                      alpha:
+                                                                          0.12,
+                                                                    ),
+                                                                borderRadius:
+                                                                    BorderRadius.circular(
+                                                                      6,
+                                                                    ),
+                                                                border: Border.all(
+                                                                  color: AppTheme
+                                                                      .primary
+                                                                      .withValues(
+                                                                        alpha:
+                                                                            0.3,
+                                                                      ),
+                                                                  width: 0.8,
+                                                                ),
+                                                              ),
+                                                              child: Row(
+                                                                mainAxisSize:
+                                                                    MainAxisSize
+                                                                        .min,
+                                                                children: [
+                                                                  Icon(
+                                                                    Icons
+                                                                        .key_rounded,
+                                                                    size: 11,
+                                                                    color: AppTheme
+                                                                        .primary,
+                                                                  ),
+                                                                  const SizedBox(
+                                                                    width: 3,
+                                                                  ),
+                                                                  Text(
+                                                                    activeKey,
+                                                                    style: TextStyle(
+                                                                      fontSize:
+                                                                          10.5,
+                                                                      fontFamily:
+                                                                          'monospace',
+                                                                      fontWeight:
+                                                                          FontWeight
+                                                                              .bold,
+                                                                      color: AppTheme
+                                                                          .primary,
+                                                                    ),
+                                                                  ),
+                                                                  const SizedBox(
+                                                                    width: 3,
+                                                                  ),
+                                                                  Icon(
+                                                                    Icons
+                                                                        .copy_rounded,
+                                                                    size: 10,
+                                                                    color: AppTheme
+                                                                        .primary,
+                                                                  ),
+                                                                ],
+                                                              ),
+                                                            ),
+                                                          ),
+                                                      ],
+                                                    ),
+                                                    Text(
+                                                      !isAll
+                                                          ? '${students.length} ${students.length == 1 ? 'student enrolled' : 'students enrolled'} in Section $_selectedSection'
+                                                          : '${students.length} ${students.length == 1 ? 'student' : 'students'} across your assigned sections',
+                                                      style: TextStyle(
+                                                        fontSize: 11.5,
+                                                        color: AppTheme
+                                                            .textSecondary,
+                                                      ),
+                                                    ),
+                                                  ],
+                                                ),
+                                              ),
+                                              if (!isCompact) ...[
+                                                if (!isAll) ...[
+                                                  ElevatedButton.icon(
+                                                    icon: const Icon(
+                                                      Icons.qr_code_2_rounded,
+                                                      size: 16,
+                                                    ),
+                                                    label: const Text(
+                                                      'Project QR',
+                                                      style: TextStyle(
+                                                        fontSize: 11.5,
+                                                        fontWeight:
+                                                            FontWeight.bold,
+                                                      ),
+                                                    ),
+                                                    style: ElevatedButton.styleFrom(
+                                                      backgroundColor:
+                                                          AppTheme.primary,
+                                                      foregroundColor:
+                                                          Colors.white,
+                                                      padding:
+                                                          const EdgeInsets.symmetric(
+                                                            horizontal: 10,
+                                                            vertical: 7,
+                                                          ),
+                                                      shape: RoundedRectangleBorder(
+                                                        borderRadius:
+                                                            BorderRadius.circular(
+                                                              8,
+                                                            ),
+                                                      ),
+                                                      elevation: 0,
+                                                    ),
+                                                    onPressed: () {
+                                                      _showClassroomProjectionDialog(
+                                                        context: context,
+                                                        sectionName:
+                                                            _selectedSection,
+                                                        grade:
+                                                            activeSectionData['grade']
+                                                                as String? ??
+                                                            '',
+                                                        enrollmentKey:
+                                                            activeKey,
+                                                        studentCount:
+                                                            students.length,
+                                                      );
+                                                    },
+                                                  ),
+                                                  const SizedBox(width: 8),
+                                                  InkWell(
+                                                    onTap: () =>
+                                                        _onSelectSection(
+                                                          'All Sections',
+                                                        ),
+                                                    borderRadius:
+                                                        BorderRadius.circular(
+                                                          8,
+                                                        ),
+                                                    child: Container(
+                                                      padding:
+                                                          const EdgeInsets.symmetric(
+                                                            horizontal: 8,
+                                                            vertical: 6,
+                                                          ),
+                                                      decoration: BoxDecoration(
+                                                        color: AppTheme.surface,
+                                                        borderRadius:
+                                                            BorderRadius.circular(
+                                                              8,
+                                                            ),
+                                                        border: Border.all(
+                                                          color:
+                                                              AppTheme.border,
+                                                        ),
+                                                      ),
+                                                      child: Row(
+                                                        mainAxisSize:
+                                                            MainAxisSize.min,
+                                                        children: [
+                                                          Icon(
+                                                            Icons.close_rounded,
+                                                            size: 13,
+                                                            color: AppTheme
+                                                                .textMuted,
+                                                          ),
+                                                          const SizedBox(
+                                                            width: 3,
+                                                          ),
+                                                          Text(
+                                                            'Clear',
+                                                            style: TextStyle(
+                                                              fontSize: 11,
+                                                              fontWeight:
+                                                                  FontWeight
+                                                                      .w600,
+                                                              color: AppTheme
+                                                                  .textSecondary,
+                                                            ),
+                                                          ),
+                                                        ],
+                                                      ),
+                                                    ),
+                                                  ),
+                                                ] else if (effectiveSections
+                                                    .isNotEmpty) ...[
+                                                  OutlinedButton.icon(
+                                                    icon: const Icon(
+                                                      Icons.qr_code_2_rounded,
+                                                      size: 15,
+                                                    ),
+                                                    label: const Text(
+                                                      'Project Section QR',
+                                                      style: TextStyle(
+                                                        fontSize: 11.5,
+                                                        fontWeight:
+                                                            FontWeight.w600,
+                                                      ),
+                                                    ),
+                                                    style: OutlinedButton.styleFrom(
+                                                      foregroundColor:
+                                                          AppTheme.primary,
+                                                      side: BorderSide(
+                                                        color: AppTheme.primary
+                                                            .withValues(
+                                                              alpha: 0.4,
+                                                            ),
+                                                      ),
+                                                      padding:
+                                                          const EdgeInsets.symmetric(
+                                                            horizontal: 10,
+                                                            vertical: 6,
+                                                          ),
+                                                      shape: RoundedRectangleBorder(
+                                                        borderRadius:
+                                                            BorderRadius.circular(
+                                                              8,
+                                                            ),
+                                                      ),
+                                                    ),
+                                                    onPressed: () =>
+                                                        _showSectionSelectionForProjection(
+                                                          context,
+                                                          effectiveSections,
+                                                        ),
+                                                  ),
+                                                ],
+                                              ] else if (!isAll) ...[
+                                                IconButton(
+                                                  icon: const Icon(
+                                                    Icons.close_rounded,
+                                                    size: 18,
+                                                  ),
+                                                  color: AppTheme.textMuted,
+                                                  tooltip: 'Clear filter',
+                                                  padding: EdgeInsets.zero,
+                                                  constraints:
+                                                      const BoxConstraints(),
+                                                  onPressed: () =>
+                                                      _onSelectSection(
+                                                        'All Sections',
+                                                      ),
+                                                ),
+                                              ],
                                             ],
+                                          ),
+                                          if (isCompact) ...[
+                                            const SizedBox(height: 10),
+                                            if (!isAll) ...[
+                                              SizedBox(
+                                                width: double.infinity,
+                                                child: ElevatedButton.icon(
+                                                  icon: const Icon(
+                                                    Icons.qr_code_2_rounded,
+                                                    size: 16,
+                                                  ),
+                                                  label: Text(
+                                                    'Project QR ($_selectedSection)',
+                                                    style: const TextStyle(
+                                                      fontSize: 12,
+                                                      fontWeight:
+                                                          FontWeight.bold,
+                                                    ),
+                                                  ),
+                                                  style: ElevatedButton.styleFrom(
+                                                    backgroundColor:
+                                                        AppTheme.primary,
+                                                    foregroundColor:
+                                                        Colors.white,
+                                                    padding:
+                                                        const EdgeInsets.symmetric(
+                                                          vertical: 8,
+                                                        ),
+                                                    shape: RoundedRectangleBorder(
+                                                      borderRadius:
+                                                          BorderRadius.circular(
+                                                            8,
+                                                          ),
+                                                    ),
+                                                    elevation: 0,
+                                                  ),
+                                                  onPressed: () {
+                                                    _showClassroomProjectionDialog(
+                                                      context: context,
+                                                      sectionName:
+                                                          _selectedSection,
+                                                      grade:
+                                                          activeSectionData['grade']
+                                                              as String? ??
+                                                          '',
+                                                      enrollmentKey: activeKey,
+                                                      studentCount:
+                                                          students.length,
+                                                    );
+                                                  },
+                                                ),
+                                              ),
+                                            ] else if (effectiveSections
+                                                .isNotEmpty) ...[
+                                              SizedBox(
+                                                width: double.infinity,
+                                                child: OutlinedButton.icon(
+                                                  icon: const Icon(
+                                                    Icons.qr_code_2_rounded,
+                                                    size: 15,
+                                                  ),
+                                                  label: const Text(
+                                                    'Project Classroom QR...',
+                                                    style: TextStyle(
+                                                      fontSize: 12,
+                                                      fontWeight:
+                                                          FontWeight.w600,
+                                                    ),
+                                                  ),
+                                                  style: OutlinedButton.styleFrom(
+                                                    foregroundColor:
+                                                        AppTheme.primary,
+                                                    side: BorderSide(
+                                                      color: AppTheme.primary
+                                                          .withValues(
+                                                            alpha: 0.4,
+                                                          ),
+                                                    ),
+                                                    padding:
+                                                        const EdgeInsets.symmetric(
+                                                          vertical: 8,
+                                                        ),
+                                                    shape: RoundedRectangleBorder(
+                                                      borderRadius:
+                                                          BorderRadius.circular(
+                                                            8,
+                                                          ),
+                                                    ),
+                                                  ),
+                                                  onPressed: () =>
+                                                      _showSectionSelectionForProjection(
+                                                        context,
+                                                        effectiveSections,
+                                                      ),
+                                                ),
+                                              ),
+                                            ],
+                                          ],
+                                        ],
+                                      ),
+                                    );
+                                  },
+                                ),
+
+                                // Responsive Search & Unified Filter Bar
+                                LayoutBuilder(
+                                  builder: (context, constraints) {
+                                    final isWide = constraints.maxWidth >= 640;
+                                    final searchField = SizedBox(
+                                      height: 44,
+                                      child: TextField(
+                                        controller: _searchController,
+                                        maxLength: 60,
+                                        buildCounter:
+                                            (
+                                              context, {
+                                              required currentLength,
+                                              required isFocused,
+                                              maxLength,
+                                            }) => null,
+                                        style: TextStyle(
+                                          color: AppTheme.text,
+                                          fontSize: 13.5,
+                                        ),
+                                        decoration: InputDecoration(
+                                          hintText:
+                                              _selectedSection == 'All Sections'
+                                              ? 'Search students across all classrooms...'
+                                              : 'Search students in ${_cleanSectionName(_selectedSection)}...',
+                                          counterText: '',
+                                          hintStyle: TextStyle(
+                                            color: AppTheme.textMuted,
+                                            fontSize: 13,
+                                          ),
+                                          prefixIcon: Icon(
+                                            Icons.search_rounded,
+                                            color: AppTheme.textMuted,
+                                            size: 19,
+                                          ),
+                                          suffixIcon:
+                                              _searchController.text.isNotEmpty
+                                              ? IconButton(
+                                                  icon: Icon(
+                                                    Icons.clear_rounded,
+                                                    color: AppTheme.textMuted,
+                                                    size: 17,
+                                                  ),
+                                                  onPressed: () {
+                                                    _searchController.clear();
+                                                  },
+                                                )
+                                              : null,
+                                          filled: true,
+                                          fillColor: AppTheme.surface,
+                                          isDense: true,
+                                          contentPadding:
+                                              const EdgeInsets.symmetric(
+                                                vertical: 10,
+                                                horizontal: 14,
+                                              ),
+                                          border: OutlineInputBorder(
+                                            borderRadius: BorderRadius.circular(
+                                              12,
+                                            ),
+                                            borderSide: BorderSide(
+                                              color: AppTheme.border,
+                                            ),
+                                          ),
+                                          enabledBorder: OutlineInputBorder(
+                                            borderRadius: BorderRadius.circular(
+                                              12,
+                                            ),
+                                            borderSide: BorderSide(
+                                              color: AppTheme.border,
+                                            ),
+                                          ),
+                                          focusedBorder: OutlineInputBorder(
+                                            borderRadius: BorderRadius.circular(
+                                              12,
+                                            ),
+                                            borderSide: BorderSide(
+                                              color: AppTheme.primary,
+                                              width: 1.5,
+                                            ),
                                           ),
                                         ),
                                       ),
-                                    ],
-                                  ],
-                                ),
-                                Text(
-                                  _selectedSection != 'All Sections'
-                                      ? '${students.length} ${students.length == 1 ? 'student enrolled' : 'students enrolled'} in Section $_selectedSection'
-                                      : '${students.length} ${students.length == 1 ? 'student' : 'students'} across your assigned sections',
-                                  style: TextStyle(
-                                    fontSize: 11.5,
-                                    color: AppTheme.textSecondary,
-                                  ),
+                                    );
+
+                                    if (isWide) {
+                                      return Row(
+                                        children: [
+                                          Expanded(
+                                            child: ConstrainedBox(
+                                              constraints: const BoxConstraints(
+                                                maxWidth: 480,
+                                              ),
+                                              child: searchField,
+                                            ),
+                                          ),
+                                          const SizedBox(width: 12),
+                                          Container(
+                                            padding: const EdgeInsets.symmetric(
+                                              horizontal: 11,
+                                              vertical: 7,
+                                            ),
+                                            decoration: BoxDecoration(
+                                              color: AppTheme.surface,
+                                              borderRadius:
+                                                  BorderRadius.circular(10),
+                                              border: Border.all(
+                                                color: AppTheme.border,
+                                              ),
+                                            ),
+                                            child: Text(
+                                              '${students.length} ${students.length == 1 ? 'Student' : 'Students'}',
+                                              style: TextStyle(
+                                                fontSize: 12,
+                                                fontWeight: FontWeight.w600,
+                                                color: AppTheme.textSecondary,
+                                              ),
+                                            ),
+                                          ),
+                                        ],
+                                      );
+                                    }
+
+                                    return Column(
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.start,
+                                      children: [
+                                        searchField,
+                                        const SizedBox(height: 6),
+                                        Align(
+                                          alignment: Alignment.centerRight,
+                                          child: Text(
+                                            '${students.length} ${students.length == 1 ? 'Student' : 'Students'}',
+                                            style: TextStyle(
+                                              fontSize: 11.5,
+                                              color: AppTheme.textSecondary,
+                                            ),
+                                          ),
+                                        ),
+                                      ],
+                                    );
+                                  },
                                 ),
                               ],
                             ),
                           ),
-                          if (_selectedSection != 'All Sections') ...[
-                            ElevatedButton.icon(
-                              icon: const Icon(Icons.qr_code_2_rounded, size: 16),
-                              label: const Text('Project QR', style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.bold)),
-                              style: ElevatedButton.styleFrom(
-                                backgroundColor: AppTheme.primary,
-                                foregroundColor: Colors.white,
-                                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
-                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                                elevation: 0,
-                              ),
-                              onPressed: () {
-                                _showClassroomProjectionDialog(
-                                  context: context,
-                                  sectionName: _selectedSection,
-                                  grade: activeSectionData['grade'] as String? ?? '',
-                                  enrollmentKey: activeKey,
-                                  studentCount: students.length,
-                                );
-                              },
-                            ),
-                            const SizedBox(width: 8),
-                            InkWell(
-                              onTap: () => _onSelectSection('All Sections'),
-                              borderRadius: BorderRadius.circular(8),
-                              child: Container(
-                                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
-                                decoration: BoxDecoration(
-                                  color: AppTheme.surface,
-                                  borderRadius: BorderRadius.circular(8),
-                                  border: Border.all(
-                                    color: AppTheme.border,
-                                  ),
-                                ),
-                                child: Row(
-                                  mainAxisSize: MainAxisSize.min,
-                                  children: [
-                                    Icon(Icons.close_rounded, size: 13, color: AppTheme.textMuted),
-                                    const SizedBox(width: 3),
-                                    Text(
-                                      'Clear',
-                                      style: TextStyle(
-                                        fontSize: 11,
-                                        fontWeight: FontWeight.w600,
-                                        color: AppTheme.textSecondary,
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              ),
-                            ),
-                          ] else if (effectiveSections.isNotEmpty) ...[
-                            OutlinedButton.icon(
-                              icon: const Icon(Icons.qr_code_2_rounded, size: 15),
-                              label: const Text('Project QR', style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.w600)),
-                              style: OutlinedButton.styleFrom(
-                                foregroundColor: AppTheme.primary,
-                                side: BorderSide(color: AppTheme.primary.withValues(alpha: 0.4)),
-                                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                              ),
-                              onPressed: () {
-                                final firstSec = effectiveSections.first;
-                                final firstKey = (firstSec['enrollment_key'] as String?)?.trim().toUpperCase() ??
-                                    SectionKeyHelper.generateKey(sectionName: firstSec['name'] as String? ?? '');
-                                _showClassroomProjectionDialog(
-                                  context: context,
-                                  sectionName: firstSec['name'] as String? ?? 'Section',
-                                  grade: firstSec['grade'] as String? ?? '',
-                                  enrollmentKey: firstKey,
-                                  studentCount: firstSec['student_count'] as int? ?? 0,
-                                );
-                              },
-                            ),
-                          ],
-                        ],
-                      ),
-                    ),
 
-                    // Responsive Search & Unified Filter Bar
-                    LayoutBuilder(
-                      builder: (context, constraints) {
-                        final isWide = constraints.maxWidth >= 640;
-                        final searchField = SizedBox(
-                          height: 44,
-                          child: TextField(
-                            controller: _searchController,
-                            maxLength: 60,
-                            buildCounter: (context, {required currentLength, required isFocused, maxLength}) => null,
-                            style: TextStyle(color: AppTheme.text, fontSize: 13.5),
-                            decoration: InputDecoration(
-                              hintText: _selectedSection == 'All Sections'
-                                  ? 'Search students across all classrooms...'
-                                  : 'Search students in ${_cleanSectionName(_selectedSection)}...',
-                              counterText: '',
-                              hintStyle: TextStyle(color: AppTheme.textMuted, fontSize: 13),
-                              prefixIcon: Icon(Icons.search_rounded, color: AppTheme.textMuted, size: 19),
-                              suffixIcon: _searchController.text.isNotEmpty
-                                  ? IconButton(
-                                      icon: Icon(Icons.clear_rounded, color: AppTheme.textMuted, size: 17),
-                                      onPressed: () {
-                                        _searchController.clear();
-                                      },
-                                    )
-                                  : null,
-                              filled: true,
-                              fillColor: AppTheme.surface,
-                              isDense: true,
-                              contentPadding: const EdgeInsets.symmetric(vertical: 10, horizontal: 14),
-                              border: OutlineInputBorder(
-                                borderRadius: BorderRadius.circular(12),
-                                borderSide: BorderSide(color: AppTheme.border),
-                              ),
-                              enabledBorder: OutlineInputBorder(
-                                borderRadius: BorderRadius.circular(12),
-                                borderSide: BorderSide(color: AppTheme.border),
-                              ),
-                              focusedBorder: OutlineInputBorder(
-                                borderRadius: BorderRadius.circular(12),
-                                borderSide: BorderSide(color: AppTheme.primary, width: 1.5),
-                              ),
-                            ),
-                          ),
-                        );
+                          Divider(height: 1, color: AppTheme.border),
 
-                        if (isWide) {
-                          return Row(
-                            children: [
-                              Expanded(
-                                child: ConstrainedBox(
-                                  constraints: const BoxConstraints(maxWidth: 480),
-                                  child: searchField,
-                                ),
-                              ),
-                              const SizedBox(width: 12),
-                              Container(
-                                padding: const EdgeInsets.symmetric(horizontal: 11, vertical: 7),
-                                decoration: BoxDecoration(
-                                  color: AppTheme.surface,
-                                  borderRadius: BorderRadius.circular(10),
-                                  border: Border.all(color: AppTheme.border),
-                                ),
-                                child: Text(
-                                  '${students.length} ${students.length == 1 ? 'Student' : 'Students'}',
-                                  style: TextStyle(
-                                    fontSize: 12,
-                                    fontWeight: FontWeight.w600,
-                                    color: AppTheme.textSecondary,
-                                  ),
-                                ),
-                              ),
-                            ],
-                          );
-                        }
-
-                        return Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            searchField,
-                            const SizedBox(height: 6),
-                            Align(
-                              alignment: Alignment.centerRight,
-                              child: Text(
-                                '${students.length} ${students.length == 1 ? 'Student' : 'Students'}',
-                                style: TextStyle(fontSize: 11.5, color: AppTheme.textSecondary),
-                              ),
-                            ),
-                          ],
-                        );
-                      },
-                    ),
-                  ],
-                ),
-              ),
-
-              Divider(height: 1, color: AppTheme.border),
-
-              // Student list with Skeleton Shimmer loader
-              Expanded(
-                child: isLoading
-                    ? LayoutBuilder(
-                        builder: (context, constraints) {
-                          final isDesktop = constraints.maxWidth >= 768;
-                          return _buildSkeletonList(isDesktop);
-                        },
-                      )
-                    : students.isEmpty
-                        ? _searchController.text.isNotEmpty
-                            ? AppEmptyState.search(
-                                query: _searchController.text,
-                                onClearSearch: () => _searchController.clear(),
-                              )
-                            : _selectedSection != 'All Sections'
-                                ? AppEmptyState(
-                                    icon: Icons.group_off_outlined,
-                                    title: 'No Students in Section $_selectedSection',
-                                    message:
-                                        'No students are currently enrolled in section "$_selectedSection". Select below to view all classrooms.',
-                                    actionLabel: 'View All Classrooms',
-                                    actionIcon: Icons.groups_outlined,
-                                    onAction: () => _onSelectSection('All Sections'),
-                                  )
-                                : AppEmptyState(
-                                    icon: Icons.people_outline,
-                                    title: 'No Students Found',
-                                    message:
-                                        'No students have been assigned to your classes yet. Select below to refresh your student list.',
-                                    actionLabel: 'Refresh Students',
-                                    actionIcon: Icons.refresh_rounded,
-                                    onAction: () {
-                                      ref.read(teacherStudentsProvider.notifier).reload(
-                                            section: null,
-                                            query: '',
-                                          );
+                          // Student list with Skeleton Shimmer loader
+                          Expanded(
+                            child: isLoading
+                                ? LayoutBuilder(
+                                    builder: (context, constraints) {
+                                      final isDesktop =
+                                          constraints.maxWidth >= 768;
+                                      return _buildSkeletonList(isDesktop);
                                     },
                                   )
-                        : LayoutBuilder(
-                            builder: (context, constraints) {
-                              final isDesktop = constraints.maxWidth >= 768;
-                              final bottomPad = isDesktop ? 24.0 : 100.0;
-                              final itemCount = students.length > _displayLimit
-                                  ? _displayLimit + 1
-                                  : students.length;
+                                : students.isEmpty
+                                ? _searchController.text.isNotEmpty
+                                      ? AppEmptyState.search(
+                                          query: _searchController.text,
+                                          onClearSearch: () =>
+                                              _searchController.clear(),
+                                        )
+                                      : _selectedSection != 'All Sections'
+                                      ? AppEmptyState(
+                                          icon: Icons.group_off_outlined,
+                                          title:
+                                              'No Students in Section $_selectedSection',
+                                          message:
+                                              'No students are currently enrolled in section "$_selectedSection". Select below to view all classrooms.',
+                                          actionLabel: 'View All Classrooms',
+                                          actionIcon: Icons.groups_outlined,
+                                          onAction: () =>
+                                              _onSelectSection('All Sections'),
+                                        )
+                                      : AppEmptyState(
+                                          icon: Icons.people_outline,
+                                          title: 'No Students Found',
+                                          message:
+                                              'No students have been assigned to your classes yet. Select below to refresh your student list.',
+                                          actionLabel: 'Refresh Students',
+                                          actionIcon: Icons.refresh_rounded,
+                                          onAction: () {
+                                            ref
+                                                .read(
+                                                  teacherStudentsProvider
+                                                      .notifier,
+                                                )
+                                                .reload(
+                                                  section: null,
+                                                  query: '',
+                                                );
+                                          },
+                                        )
+                                : LayoutBuilder(
+                                    builder: (context, constraints) {
+                                      final isDesktop =
+                                          constraints.maxWidth >= 768;
+                                      final bottomPad = isDesktop
+                                          ? 24.0
+                                          : 100.0;
+                                      final itemCount =
+                                          students.length > _displayLimit
+                                          ? _displayLimit + 1
+                                          : students.length;
 
-                              if (isDesktop) {
-                                return GridView.builder(
-                                  padding: EdgeInsets.fromLTRB(20, 12, 20, bottomPad),
-                                  gridDelegate:
-                                      const SliverGridDelegateWithMaxCrossAxisExtent(
-                                    maxCrossAxisExtent: 480,
-                                    mainAxisExtent: 118,
-                                    crossAxisSpacing: 14,
-                                    mainAxisSpacing: 12,
+                                      if (isDesktop) {
+                                        return GridView.builder(
+                                          padding: EdgeInsets.fromLTRB(
+                                            20,
+                                            12,
+                                            20,
+                                            bottomPad,
+                                          ),
+                                          gridDelegate:
+                                              const SliverGridDelegateWithMaxCrossAxisExtent(
+                                                maxCrossAxisExtent: 480,
+                                                mainAxisExtent: 118,
+                                                crossAxisSpacing: 14,
+                                                mainAxisSpacing: 12,
+                                              ),
+                                          itemCount: itemCount,
+                                          itemBuilder: (context, index) =>
+                                              _buildStudentListItem(
+                                                context,
+                                                index,
+                                                students,
+                                              ),
+                                        );
+                                      }
+
+                                      return ListView.builder(
+                                        padding: EdgeInsets.fromLTRB(
+                                          20,
+                                          12,
+                                          20,
+                                          bottomPad,
+                                        ),
+                                        itemCount: itemCount,
+                                        itemBuilder: (context, index) =>
+                                            _buildStudentListItem(
+                                              context,
+                                              index,
+                                              students,
+                                            ),
+                                      );
+                                    },
                                   ),
-                                  itemCount: itemCount,
-                                  itemBuilder: (context, index) =>
-                                      _buildStudentListItem(context, index, students),
-                                );
-                              }
-
-                              return ListView.builder(
-                                padding: EdgeInsets.fromLTRB(20, 12, 20, bottomPad),
-                                itemCount: itemCount,
-                                itemBuilder: (context, index) =>
-                                    _buildStudentListItem(context, index, students),
-                              );
-                            },
                           ),
-              ),
-            ],
-          ),
-        )
-      : ScoresScreen(
-          isEmbedded: true,
-          initialSection: _selectedSection == 'All Sections' ? null : _selectedSection,
-          sections: combinedSections,
-        ),
+                        ],
+                      ),
+                    )
+                  : ScoresScreen(
+                      isEmbedded: true,
+                      initialSection: _selectedSection == 'All Sections'
+                          ? null
+                          : _selectedSection,
+                      sections: combinedSections,
+                    ),
             ),
           ],
         ),
@@ -838,7 +1268,11 @@ class _TeacherStudentsScreenState extends ConsumerState<TeacherStudentsScreen> {
     );
   }
 
-  Widget _buildStudentListItem(BuildContext context, int index, List<Map<String, dynamic>> students) {
+  Widget _buildStudentListItem(
+    BuildContext context,
+    int index,
+    List<Map<String, dynamic>> students,
+  ) {
     if (index == _displayLimit && students.length > _displayLimit) {
       final remaining = students.length - _displayLimit;
       return Center(
@@ -865,7 +1299,11 @@ class _TeacherStudentsScreenState extends ConsumerState<TeacherStudentsScreen> {
             child: Row(
               mainAxisSize: MainAxisSize.min,
               children: [
-                Icon(Icons.expand_more_rounded, size: 18, color: AppTheme.primary),
+                Icon(
+                  Icons.expand_more_rounded,
+                  size: 18,
+                  color: AppTheme.primary,
+                ),
                 const SizedBox(width: 8),
                 Text(
                   'Load More Students ($remaining remaining)',
@@ -890,7 +1328,8 @@ class _TeacherStudentsScreenState extends ConsumerState<TeacherStudentsScreen> {
     final grade = student['grade']?.toString() ?? '';
     final completedLos = student['completed_los'] as int? ?? 0;
     final enrolledSubjects = student['enrolled_subjects'] as int? ?? 0;
-    final isEnrolled = student['is_enrolled'] == true || (student['is_enrolled'] == 1);
+    final isEnrolled =
+        student['is_enrolled'] == true || (student['is_enrolled'] == 1);
 
     final initial = name.isNotEmpty ? name[0].toUpperCase() : 'S';
 
@@ -909,7 +1348,9 @@ class _TeacherStudentsScreenState extends ConsumerState<TeacherStudentsScreen> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           UserAvatarWidget(
-            imageSource: (student['profile_image'] ?? student['profileImage']) as String?,
+            imageSource:
+                (student['profile_image'] ?? student['profileImage'])
+                    as String?,
             fallbackInitial: initial,
             size: 42,
             fontSize: 15,
@@ -935,7 +1376,10 @@ class _TeacherStudentsScreenState extends ConsumerState<TeacherStudentsScreen> {
                     ),
                     const SizedBox(width: 6),
                     Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 7,
+                        vertical: 2,
+                      ),
                       decoration: BoxDecoration(
                         color: AppTheme.border.withValues(alpha: 0.5),
                         borderRadius: BorderRadius.circular(6),
@@ -954,7 +1398,10 @@ class _TeacherStudentsScreenState extends ConsumerState<TeacherStudentsScreen> {
                 const SizedBox(height: 2),
                 Text(
                   email,
-                  style: TextStyle(fontSize: 11.5, color: AppTheme.textSecondary),
+                  style: TextStyle(
+                    fontSize: 11.5,
+                    color: AppTheme.textSecondary,
+                  ),
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                 ),
@@ -966,22 +1413,36 @@ class _TeacherStudentsScreenState extends ConsumerState<TeacherStudentsScreen> {
                     Row(
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        Icon(Icons.check_circle_outline, size: 13, color: AppTheme.success),
+                        Icon(
+                          Icons.check_circle_outline,
+                          size: 13,
+                          color: AppTheme.success,
+                        ),
                         const SizedBox(width: 4),
                         Text(
                           '$completedLos LOs Completed',
-                          style: TextStyle(fontSize: 10.5, color: AppTheme.text),
+                          style: TextStyle(
+                            fontSize: 10.5,
+                            color: AppTheme.text,
+                          ),
                         ),
                       ],
                     ),
                     Row(
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        Icon(Icons.book_outlined, size: 13, color: AppTheme.primary),
+                        Icon(
+                          Icons.book_outlined,
+                          size: 13,
+                          color: AppTheme.primary,
+                        ),
                         const SizedBox(width: 4),
                         Text(
                           '$enrolledSubjects Subjects',
-                          style: TextStyle(fontSize: 10.5, color: AppTheme.text),
+                          style: TextStyle(
+                            fontSize: 10.5,
+                            color: AppTheme.text,
+                          ),
                         ),
                       ],
                     ),
@@ -992,7 +1453,11 @@ class _TeacherStudentsScreenState extends ConsumerState<TeacherStudentsScreen> {
           ),
           const SizedBox(width: 6),
           IconButton(
-            icon: Icon(Icons.chat_bubble_outline, color: AppTheme.primary, size: 19),
+            icon: Icon(
+              Icons.chat_bubble_outline,
+              color: AppTheme.primary,
+              size: 19,
+            ),
             tooltip: 'Message $name',
             onPressed: () async {
               if (studentId.isNotEmpty) {
@@ -1137,8 +1602,10 @@ class _TeacherStudentsScreenState extends ConsumerState<TeacherStudentsScreen> {
     final displayGrade = isAllCard
         ? 'All Levels'
         : (grade.isNotEmpty
-            ? grade
-            : (name.startsWith('Grade') ? name.split('-').first.trim() : 'Section'));
+              ? grade
+              : (name.startsWith('Grade')
+                    ? name.split('-').first.trim()
+                    : 'Section'));
 
     return Material(
       color: Colors.transparent,
@@ -1154,7 +1621,9 @@ class _TeacherStudentsScreenState extends ConsumerState<TeacherStudentsScreen> {
           margin: const EdgeInsets.only(right: 10),
           padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
           decoration: BoxDecoration(
-            color: isSelected ? AppTheme.primary.withValues(alpha: 0.12) : AppTheme.surface,
+            color: isSelected
+                ? AppTheme.primary.withValues(alpha: 0.12)
+                : AppTheme.surface,
             borderRadius: BorderRadius.circular(14),
             border: Border.all(
               color: isSelected ? AppTheme.primary : AppTheme.border,
@@ -1186,9 +1655,13 @@ class _TeacherStudentsScreenState extends ConsumerState<TeacherStudentsScreen> {
                       borderRadius: BorderRadius.circular(7),
                     ),
                     child: Icon(
-                      isAllCard ? Icons.grid_view_rounded : Icons.layers_rounded,
+                      isAllCard
+                          ? Icons.grid_view_rounded
+                          : Icons.layers_rounded,
                       size: 15,
-                      color: isSelected ? AppTheme.primary : AppTheme.textSecondary,
+                      color: isSelected
+                          ? AppTheme.primary
+                          : AppTheme.textSecondary,
                     ),
                   ),
                   const SizedBox(width: 8),
@@ -1203,7 +1676,11 @@ class _TeacherStudentsScreenState extends ConsumerState<TeacherStudentsScreen> {
                   ),
                   if (isSelected) ...[
                     const SizedBox(width: 6),
-                    Icon(Icons.check_circle_rounded, size: 14, color: AppTheme.primary),
+                    Icon(
+                      Icons.check_circle_rounded,
+                      size: 14,
+                      color: AppTheme.primary,
+                    ),
                   ],
                   if (!isAllCard && onProject != null) ...[
                     const SizedBox(width: 6),
@@ -1223,7 +1700,9 @@ class _TeacherStudentsScreenState extends ConsumerState<TeacherStudentsScreen> {
                           child: Icon(
                             Icons.qr_code_2_rounded,
                             size: 13,
-                            color: isSelected ? AppTheme.primary : AppTheme.textSecondary,
+                            color: isSelected
+                                ? AppTheme.primary
+                                : AppTheme.textSecondary,
                           ),
                         ),
                       ),
@@ -1245,7 +1724,10 @@ class _TeacherStudentsScreenState extends ConsumerState<TeacherStudentsScreen> {
                   ),
                   const SizedBox(width: 8),
                   Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 7,
+                      vertical: 2,
+                    ),
                     decoration: BoxDecoration(
                       color: isSelected
                           ? AppTheme.primary.withValues(alpha: 0.22)
@@ -1261,7 +1743,9 @@ class _TeacherStudentsScreenState extends ConsumerState<TeacherStudentsScreen> {
                       ),
                     ),
                   ),
-                  if (!isAllCard && enrollmentKey != null && enrollmentKey.isNotEmpty) ...[
+                  if (!isAllCard &&
+                      enrollmentKey != null &&
+                      enrollmentKey.isNotEmpty) ...[
                     const SizedBox(width: 6),
                     Text(
                       enrollmentKey,
@@ -1269,11 +1753,147 @@ class _TeacherStudentsScreenState extends ConsumerState<TeacherStudentsScreen> {
                         fontSize: 9.5,
                         fontFamily: 'monospace',
                         fontWeight: FontWeight.bold,
-                        color: isSelected ? AppTheme.primary : AppTheme.textMuted,
+                        color: isSelected
+                            ? AppTheme.primary
+                            : AppTheme.textMuted,
                       ),
                     ),
                   ],
                 ],
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  void _showSectionSelectionForProjection(
+    BuildContext context,
+    List<Map<String, dynamic>> sections,
+  ) {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: AppTheme.surface,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (ctx) => SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Icon(
+                    Icons.qr_code_2_rounded,
+                    color: AppTheme.primary,
+                    size: 22,
+                  ),
+                  const SizedBox(width: 10),
+                  Text(
+                    'Select Classroom to Project QR',
+                    style: TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.bold,
+                      color: AppTheme.text,
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 6),
+              Text(
+                'Choose which assigned section you want to project on screen for student enrollment:',
+                style: TextStyle(fontSize: 12, color: AppTheme.textSecondary),
+              ),
+              const SizedBox(height: 14),
+              Flexible(
+                child: ListView.separated(
+                  shrinkWrap: true,
+                  itemCount: sections.length,
+                  separatorBuilder: (_, _) => const Divider(height: 1),
+                  itemBuilder: (context, idx) {
+                    final sec = sections[idx];
+                    final name = sec['name'] as String? ?? 'Section';
+                    final grade = sec['grade'] as String? ?? '';
+                    final count = sec['student_count'] as int? ?? 0;
+                    final key =
+                        (sec['enrollment_key'] as String?)
+                            ?.trim()
+                            .toUpperCase() ??
+                        SectionKeyHelper.generateKey(
+                          sectionName: name,
+                          gradeLevel: grade,
+                        );
+
+                    return ListTile(
+                      contentPadding: const EdgeInsets.symmetric(
+                        horizontal: 8,
+                        vertical: 4,
+                      ),
+                      leading: CircleAvatar(
+                        backgroundColor: AppTheme.primary.withValues(
+                          alpha: 0.15,
+                        ),
+                        child: Text(
+                          name.isNotEmpty ? name[0].toUpperCase() : 'S',
+                          style: TextStyle(
+                            color: AppTheme.primary,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ),
+                      title: Text(
+                        name,
+                        style: TextStyle(
+                          fontWeight: FontWeight.bold,
+                          color: AppTheme.text,
+                        ),
+                      ),
+                      subtitle: Text(
+                        '$grade • $count students enrolled • Key: $key',
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: AppTheme.textSecondary,
+                        ),
+                      ),
+                      trailing: ElevatedButton(
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: AppTheme.primary,
+                          foregroundColor: Colors.white,
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 12,
+                            vertical: 6,
+                          ),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          elevation: 0,
+                        ),
+                        onPressed: () {
+                          Navigator.pop(ctx);
+                          _onSelectSection(name);
+                          _showClassroomProjectionDialog(
+                            context: context,
+                            sectionName: name,
+                            grade: grade,
+                            enrollmentKey: key,
+                            studentCount: count,
+                          );
+                        },
+                        child: const Text(
+                          'Project',
+                          style: TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ),
+                    );
+                  },
+                ),
               ),
             ],
           ),
@@ -1299,7 +1919,10 @@ class _TeacherStudentsScreenState extends ConsumerState<TeacherStudentsScreen> {
 
           return Dialog(
             backgroundColor: Colors.transparent,
-            insetPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 20),
+            insetPadding: const EdgeInsets.symmetric(
+              horizontal: 16,
+              vertical: 20,
+            ),
             child: Container(
               constraints: const BoxConstraints(maxWidth: 480),
               decoration: BoxDecoration(
@@ -1333,7 +1956,11 @@ class _TeacherStudentsScreenState extends ConsumerState<TeacherStudentsScreen> {
                               color: primary.withValues(alpha: 0.12),
                               borderRadius: BorderRadius.circular(14),
                             ),
-                            child: Icon(Icons.qr_code_2_rounded, color: primary, size: 26),
+                            child: Icon(
+                              Icons.qr_code_2_rounded,
+                              color: primary,
+                              size: 26,
+                            ),
                           ),
                           const SizedBox(width: 14),
                           Expanded(
@@ -1376,7 +2003,10 @@ class _TeacherStudentsScreenState extends ConsumerState<TeacherStudentsScreen> {
                         decoration: BoxDecoration(
                           color: Colors.white,
                           borderRadius: BorderRadius.circular(20),
-                          border: Border.all(color: Colors.black.withValues(alpha: 0.1), width: 1.5),
+                          border: Border.all(
+                            color: Colors.black.withValues(alpha: 0.1),
+                            width: 1.5,
+                          ),
                           boxShadow: [
                             BoxShadow(
                               color: Colors.black.withValues(alpha: 0.08),
@@ -1409,14 +2039,22 @@ class _TeacherStudentsScreenState extends ConsumerState<TeacherStudentsScreen> {
                       InkWell(
                         onTap: () {
                           Clipboard.setData(ClipboardData(text: enrollmentKey));
-                          AppToast.showSuccess(context, 'Section Key "$enrollmentKey" copied to clipboard!');
+                          AppToast.showSuccess(
+                            context,
+                            'Section Key "$enrollmentKey" copied to clipboard!',
+                          );
                         },
                         borderRadius: BorderRadius.circular(14),
                         child: Container(
                           width: double.infinity,
-                          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 16,
+                            vertical: 12,
+                          ),
                           decoration: BoxDecoration(
-                            color: isDark ? const Color(0xFF1E293B) : const Color(0xFFF1F5F9),
+                            color: isDark
+                                ? const Color(0xFF1E293B)
+                                : const Color(0xFFF1F5F9),
                             borderRadius: BorderRadius.circular(14),
                             border: Border.all(
                               color: primary.withValues(alpha: 0.35),
@@ -1449,7 +2087,11 @@ class _TeacherStudentsScreenState extends ConsumerState<TeacherStudentsScreen> {
                                     ),
                                   ),
                                   const SizedBox(width: 10),
-                                  Icon(Icons.copy_rounded, color: primary, size: 20),
+                                  Icon(
+                                    Icons.copy_rounded,
+                                    color: primary,
+                                    size: 20,
+                                  ),
                                 ],
                               ),
                             ],
@@ -1462,10 +2104,14 @@ class _TeacherStudentsScreenState extends ConsumerState<TeacherStudentsScreen> {
                       Container(
                         padding: const EdgeInsets.all(12),
                         decoration: BoxDecoration(
-                          color: isDark ? const Color(0xFF1E293B).withValues(alpha: 0.5) : const Color(0xFFF8FAFC),
+                          color: isDark
+                              ? const Color(0xFF1E293B).withValues(alpha: 0.5)
+                              : const Color(0xFFF8FAFC),
                           borderRadius: BorderRadius.circular(12),
                           border: Border.all(
-                            color: isDark ? AppTheme.darkBorder : AppTheme.lightBorder,
+                            color: isDark
+                                ? AppTheme.darkBorder
+                                : AppTheme.lightBorder,
                           ),
                         ),
                         child: Column(
@@ -1473,7 +2119,11 @@ class _TeacherStudentsScreenState extends ConsumerState<TeacherStudentsScreen> {
                           children: [
                             Row(
                               children: [
-                                Icon(Icons.info_outline_rounded, size: 14, color: primary),
+                                Icon(
+                                  Icons.info_outline_rounded,
+                                  size: 14,
+                                  color: primary,
+                                ),
                                 const SizedBox(width: 6),
                                 Text(
                                   'Student Onboarding Steps',
@@ -1486,9 +2136,18 @@ class _TeacherStudentsScreenState extends ConsumerState<TeacherStudentsScreen> {
                               ],
                             ),
                             const SizedBox(height: 8),
-                            _buildInstructionStep('1', 'Open AIRAMP and go to My Courses'),
-                            _buildInstructionStep('2', 'Tap "Scan Classroom QR" or enter key'),
-                            _buildInstructionStep('3', 'Verify & auto-enroll in all $displayName subjects'),
+                            _buildInstructionStep(
+                              '1',
+                              'Open AIRAMP and go to My Courses',
+                            ),
+                            _buildInstructionStep(
+                              '2',
+                              'Tap "Scan Classroom QR" or enter key',
+                            ),
+                            _buildInstructionStep(
+                              '3',
+                              'Verify & auto-enroll in all $displayName subjects',
+                            ),
                           ],
                         ),
                       ),
@@ -1501,8 +2160,12 @@ class _TeacherStudentsScreenState extends ConsumerState<TeacherStudentsScreen> {
                             child: OutlinedButton(
                               onPressed: () => Navigator.pop(dialogCtx),
                               style: OutlinedButton.styleFrom(
-                                padding: const EdgeInsets.symmetric(vertical: 12),
-                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                                padding: const EdgeInsets.symmetric(
+                                  vertical: 12,
+                                ),
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(10),
+                                ),
                               ),
                               child: const Text('Close'),
                             ),
@@ -1515,13 +2178,22 @@ class _TeacherStudentsScreenState extends ConsumerState<TeacherStudentsScreen> {
                               style: ElevatedButton.styleFrom(
                                 backgroundColor: primary,
                                 foregroundColor: Colors.white,
-                                padding: const EdgeInsets.symmetric(vertical: 12),
-                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                                padding: const EdgeInsets.symmetric(
+                                  vertical: 12,
+                                ),
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(10),
+                                ),
                                 elevation: 0,
                               ),
                               onPressed: () {
-                                Clipboard.setData(ClipboardData(text: enrollmentKey));
-                                AppToast.showSuccess(context, 'Section Key "$enrollmentKey" copied to clipboard!');
+                                Clipboard.setData(
+                                  ClipboardData(text: enrollmentKey),
+                                );
+                                AppToast.showSuccess(
+                                  context,
+                                  'Section Key "$enrollmentKey" copied to clipboard!',
+                                );
                               },
                             ),
                           ),
