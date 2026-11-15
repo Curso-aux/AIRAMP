@@ -419,6 +419,8 @@ Answer: B''';
         String msg = e.toString().replaceFirst("Exception: ", "");
         if (msg.contains('DatabaseException') || msg.contains('SQLITE_ERROR')) {
           msg = 'Unable to save quiz. Please verify your inputs and try again.';
+        } else if (msg.contains('DioException') || msg.contains('429') || msg.contains('RESOURCE_EXHAUSTED')) {
+          msg = 'Cloud server is temporarily busy. Your quiz has been saved locally.';
         }
         AppToast.showError(context, msg);
       }

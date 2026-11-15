@@ -18,20 +18,19 @@ class DefaultFirebaseOptions {
   }
 
   static const FirebaseOptions web = FirebaseOptions(
-    apiKey: 'AIzaSyC5W7a4lOwSrdS27n8G3mfDmqgTbxfBFhs',
-    appId: '1:156822326046:web:03e651e72a4bf67413570f',
-    messagingSenderId: '156822326046',
-    projectId: 'aira-app-database',
-    authDomain: 'aira-app-database.firebaseapp.com',
-    storageBucket: 'aira-app-database.firebasestorage.app',
-    measurementId: 'G-K6FW07JLFC',
+    apiKey: 'AIzaSyDVz4mcgxDT0AHbLUFSQc9YNhRYgZ-eAtw',
+    appId: '1:486787192480:web:69017c792fd0f695651bc5',
+    messagingSenderId: '486787192480',
+    projectId: 'aira-demo-live',
+    authDomain: 'aira-demo-live.firebaseapp.com',
+    storageBucket: 'aira-demo-live.firebasestorage.app',
   );
 
   static const FirebaseOptions android = FirebaseOptions(
-    apiKey: 'AIzaSyB56Kbnq0LniUexk1lDVn6kMMUGW-VSigU',
-    appId: '1:156822326046:android:95cbf986b55a0e7113570f',
-    messagingSenderId: '156822326046',
-    projectId: 'aira-app-database',
-    storageBucket: 'aira-app-database.firebasestorage.app',
+    apiKey: 'AIzaSyCD7usspGqXEnW4l2DoUWy8iDeQDdYlKyc',
+    appId: '1:486787192480:android:3a719741896542f3651bc5',
+    messagingSenderId: '486787192480',
+    projectId: 'aira-demo-live',
+    storageBucket: 'aira-demo-live.firebasestorage.app',
   );
 }

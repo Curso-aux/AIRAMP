@@ -1,5 +1,7 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/database/database_helper.dart';
+import '../../../core/database/firestore_service.dart';
 import '../../auth/application/auth_provider.dart';
 
 /// Helper to get current weekday name ('Monday', 'Tuesday', etc.)
@@ -37,7 +39,7 @@ class TeacherScheduleNotifier extends Notifier<List<Map<String, dynamic>>> {
     return user?.id;
   }
 
-  Future<void> _load() async {
+  Future<void> _load({bool syncCloud = false}) async {
     final user = ref.read(authProvider);
     final teacherId = user?.id;
     final teacherName = user?.fullName;
@@ -45,6 +47,9 @@ class TeacherScheduleNotifier extends Notifier<List<Map<String, dynamic>>> {
       if (ref.mounted) state = [];
       return;
     }
+    try {
+      await FirestoreService().syncCloudSchedulesToLocal(force: syncCloud || kIsWeb);
+    } catch (_) {}
     var results = await DatabaseHelper().getClassSchedules(
       teacherId: teacherId,
       teacherName: teacherName,
@@ -71,7 +76,7 @@ class TeacherScheduleNotifier extends Notifier<List<Map<String, dynamic>>> {
     await _load();
   }
 
-  Future<void> reload() async => _load();
+  Future<void> reload() async => _load(syncCloud: true);
 
   /// Check conflict before saving
   Future<Map<String, dynamic>> checkConflict({
@@ -212,6 +217,10 @@ final todayTeacherSchedulesProvider = FutureProvider<List<Map<String, dynamic>>>
   final teacherName = user?.fullName;
   if (teacherId == null) return [];
 
+  try {
+    await FirestoreService().syncCloudSchedulesToLocal(force: kIsWeb);
+  } catch (_) {}
+
   final today = getCurrentDayOfWeek();
   var list = await DatabaseHelper().getClassSchedules(
     teacherId: teacherId,
@@ -233,6 +242,9 @@ final todayTeacherSchedulesProvider = FutureProvider<List<Map<String, dynamic>>>
 /// Schedules for a specific section (Used by student view and timetable)
 final sectionSchedulesProvider = FutureProvider.family<List<Map<String, dynamic>>, String>((ref, sectionName) async {
   if (sectionName.trim().isEmpty) return [];
+  try {
+    await FirestoreService().syncCloudSchedulesToLocal(force: kIsWeb);
+  } catch (_) {}
   if (sectionName == 'All Sections') {
     return await DatabaseHelper().getClassSchedules();
   }
@@ -241,11 +253,17 @@ final sectionSchedulesProvider = FutureProvider.family<List<Map<String, dynamic>
 
 /// All class schedules across school (Used by student timetable and calendar view)
 final allClassSchedulesProvider = FutureProvider<List<Map<String, dynamic>>>((ref) async {
+  try {
+    await FirestoreService().syncCloudSchedulesToLocal(force: kIsWeb);
+  } catch (_) {}
   return await DatabaseHelper().getClassSchedules();
 });
 
 /// Distinct section names that currently have uploaded schedules
 final scheduledSectionsProvider = FutureProvider<List<String>>((ref) async {
+  try {
+    await FirestoreService().syncCloudSchedulesToLocal(force: kIsWeb);
+  } catch (_) {}
   final all = await DatabaseHelper().getClassSchedules();
   final sections = all
       .map((s) => s['section_name'] as String?)

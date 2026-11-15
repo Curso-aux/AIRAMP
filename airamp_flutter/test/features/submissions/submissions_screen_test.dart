@@ -157,10 +157,11 @@ void main() {
       await tester.pump();
       await tester.pump(const Duration(milliseconds: 200));
 
-      // Verify success state displayed
+      // Verify success state displayed and editing is locked unless teacher permits
       expect(find.text('Submitted Successfully!'), findsOneWidget);
       expect(find.text('https://github.com/flowstudent/flutter-app'), findsOneWidget);
-      expect(find.text('Edit / Resubmit'), findsOneWidget);
+      expect(find.textContaining('Submission Locked'), findsOneWidget);
+      expect(find.text('Edit / Resubmit'), findsNothing);
 
       // Verify saved in DB
       Map<String, dynamic>? savedSub;

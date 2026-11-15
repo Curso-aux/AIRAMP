@@ -1,5 +1,6 @@
 {
   "projects": {
-    "default": "aira-app-database"
+    "default": "aira-demo-live",
+    "prod": "aira-app-database"
   }
 }

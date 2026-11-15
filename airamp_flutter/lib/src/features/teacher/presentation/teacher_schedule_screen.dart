@@ -8,6 +8,8 @@ import '../../../core/theme/theme_provider.dart';
 import '../../student/presentation/components/student_schedule_widget.dart';
 import '../data/teacher_repository.dart';
 import '../data/teacher_schedule_repository.dart';
+import '../../auth/application/auth_provider.dart';
+import 'components/create_edit_schedule_dialog.dart';
 import 'components/halftone_pattern.dart';
 
 enum ScheduleViewMode { grid, calendar, agenda }
@@ -254,7 +256,7 @@ class _TeacherScheduleScreenState extends ConsumerState<TeacherScheduleScreen> {
                               borderRadius: BorderRadius.circular(12),
                             ),
                             child: const Text(
-                              'Admin Assigned',
+                              'Faculty & Admin',
                               style: TextStyle(
                                 color: Colors.purple,
                                 fontSize: 10,
@@ -305,23 +307,56 @@ class _TeacherScheduleScreenState extends ConsumerState<TeacherScheduleScreen> {
                     ),
                   );
 
+                  final addScheduleBtn = ElevatedButton.icon(
+                    onPressed: () async {
+                      final user = ref.read(authProvider);
+                      final day = (_selectedDay != 'All Days') ? _selectedDay : 'Monday';
+                      final saved = await CreateEditScheduleDialog.show(
+                        context,
+                        defaultDay: day,
+                        preselectedTeacherId: user?.id,
+                        preselectedTeacherName: user?.fullName,
+                      );
+                      if (saved == true) {
+                        ref.read(teacherSchedulesProvider.notifier).reload();
+                      }
+                    },
+                    icon: const Icon(Icons.add_rounded, size: 16),
+                    label: const Text('Add Schedule'),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: AppTheme.primary,
+                      foregroundColor: Colors.white,
+                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                      textStyle: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
+                      elevation: 0,
+                    ),
+                  );
+
                   if (isCompact) {
-                    return Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      crossAxisAlignment: CrossAxisAlignment.center,
+                    return Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Expanded(child: titleWidget),
-                        const SizedBox(width: 8),
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            Expanded(child: titleWidget),
+                            addScheduleBtn,
+                          ],
+                        ),
+                        const SizedBox(height: 8),
                         switcherWidget,
                       ],
                     );
                   }
 
                   return Row(
-                    crossAxisAlignment: CrossAxisAlignment.start,
+                    crossAxisAlignment: CrossAxisAlignment.center,
                     children: [
                       Expanded(child: titleWidget),
                       const SizedBox(width: 12),
+                      addScheduleBtn,
+                      const SizedBox(width: 8),
                       switcherWidget,
                     ],
                   );
@@ -568,17 +603,27 @@ class _TeacherScheduleScreenState extends ConsumerState<TeacherScheduleScreen> {
             title: hasActiveFilter ? 'No Matching Schedules Found' : 'No Class Schedules Assigned',
             message: hasActiveFilter
                 ? 'No classes match your active day or section filters. Tap below to clear filters and show all classes.'
-                : 'Your schedule is maintained and assigned by school administration. When assigned, your classes will appear here.',
-            actionLabel: hasActiveFilter ? 'Reset Filters' : 'Refresh Schedule',
-            actionIcon: hasActiveFilter ? Icons.clear_all_rounded : Icons.refresh_rounded,
-            onAction: () {
+                : 'No class hours are scheduled yet. You can add a timetable schedule slot or refresh if recently assigned.',
+            actionLabel: hasActiveFilter ? 'Reset Filters' : 'Add Class Schedule',
+            actionIcon: hasActiveFilter ? Icons.clear_all_rounded : Icons.add_rounded,
+            onAction: () async {
               if (hasActiveFilter) {
                 setState(() {
                   _selectedDay = 'All Days';
                   _selectedSection = 'All Handled Sections';
                 });
               } else {
-                ref.read(teacherSchedulesProvider.notifier).reload();
+                final user = ref.read(authProvider);
+                final day = (_selectedDay != 'All Days') ? _selectedDay : 'Monday';
+                final saved = await CreateEditScheduleDialog.show(
+                  context,
+                  defaultDay: day,
+                  preselectedTeacherId: user?.id,
+                  preselectedTeacherName: user?.fullName,
+                );
+                if (saved == true) {
+                  ref.read(teacherSchedulesProvider.notifier).reload();
+                }
               }
             },
           ),
@@ -803,38 +848,79 @@ class _TeacherScheduleScreenState extends ConsumerState<TeacherScheduleScreen> {
                               // Empty state watermark / overlay when no classes are scheduled
                               if (schedules.isEmpty)
                                 Positioned.fill(
-                                  child: IgnorePointer(
-                                    child: Center(
-                                      child: Container(
-                                        padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
-                                        decoration: BoxDecoration(
-                                          color: AppTheme.surface.withValues(alpha: isDark ? 0.90 : 0.94),
-                                          borderRadius: BorderRadius.circular(16),
-                                          border: Border.all(color: AppTheme.border),
-                                          boxShadow: [
-                                            BoxShadow(
-                                              color: Colors.black.withValues(alpha: isDark ? 0.25 : 0.05),
-                                              blurRadius: 16,
-                                              offset: const Offset(0, 4),
-                                            ),
-                                          ],
-                                        ),
-                                        child: Column(
-                                          mainAxisSize: MainAxisSize.min,
-                                          children: [
-                                            Icon(Icons.calendar_today_outlined, size: 36, color: AppTheme.primary),
-                                            const SizedBox(height: 10),
-                                            Text(
-                                              'No Classes Scheduled',
-                                              style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: AppTheme.text),
-                                            ),
-                                            const SizedBox(height: 4),
-                                            Text(
-                                              'Your assigned class hours and sections will appear here.',
-                                              style: TextStyle(fontSize: 12, color: AppTheme.textSecondary),
-                                            ),
-                                          ],
-                                        ),
+                                  child: Center(
+                                    child: Container(
+                                      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 20),
+                                      decoration: BoxDecoration(
+                                        color: AppTheme.surface.withValues(alpha: isDark ? 0.94 : 0.97),
+                                        borderRadius: BorderRadius.circular(16),
+                                        border: Border.all(color: AppTheme.border),
+                                        boxShadow: [
+                                          BoxShadow(
+                                            color: Colors.black.withValues(alpha: isDark ? 0.25 : 0.05),
+                                            blurRadius: 16,
+                                            offset: const Offset(0, 4),
+                                          ),
+                                        ],
+                                      ),
+                                      child: Column(
+                                        mainAxisSize: MainAxisSize.min,
+                                        children: [
+                                          Icon(Icons.calendar_today_outlined, size: 36, color: AppTheme.primary),
+                                          const SizedBox(height: 10),
+                                          Text(
+                                            'No Classes Scheduled',
+                                            style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: AppTheme.text),
+                                          ),
+                                          const SizedBox(height: 4),
+                                          Text(
+                                            'Your assigned class hours and sections will appear here.',
+                                            style: TextStyle(fontSize: 12, color: AppTheme.textSecondary),
+                                          ),
+                                          const SizedBox(height: 14),
+                                          Row(
+                                            mainAxisSize: MainAxisSize.min,
+                                            children: [
+                                              OutlinedButton.icon(
+                                                onPressed: () {
+                                                  ref.read(teacherSchedulesProvider.notifier).reload();
+                                                },
+                                                icon: const Icon(Icons.refresh_rounded, size: 16),
+                                                label: const Text('Refresh'),
+                                                style: OutlinedButton.styleFrom(
+                                                  foregroundColor: AppTheme.text,
+                                                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                                                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                                                ),
+                                              ),
+                                              const SizedBox(width: 8),
+                                              ElevatedButton.icon(
+                                                onPressed: () async {
+                                                  final user = ref.read(authProvider);
+                                                  final day = (_selectedDay != 'All Days') ? _selectedDay : 'Monday';
+                                                  final saved = await CreateEditScheduleDialog.show(
+                                                    context,
+                                                    defaultDay: day,
+                                                    preselectedTeacherId: user?.id,
+                                                    preselectedTeacherName: user?.fullName,
+                                                  );
+                                                  if (saved == true) {
+                                                    ref.read(teacherSchedulesProvider.notifier).reload();
+                                                  }
+                                                },
+                                                icon: const Icon(Icons.add_rounded, size: 16),
+                                                label: const Text('Add Class Schedule'),
+                                                style: ElevatedButton.styleFrom(
+                                                  backgroundColor: AppTheme.primary,
+                                                  foregroundColor: Colors.white,
+                                                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                                                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                                                  elevation: 0,
+                                                ),
+                                              ),
+                                            ],
+                                          ),
+                                        ],
                                       ),
                                     ),
                                   ),
@@ -1270,18 +1356,77 @@ class _TeacherScheduleScreenState extends ConsumerState<TeacherScheduleScreen> {
                 ),
                 const SizedBox(height: 14),
 
-                // Dismiss Button
-                SizedBox(
-                  width: double.infinity,
-                  child: OutlinedButton(
-                    onPressed: () => Navigator.of(ctx).pop(),
-                    style: OutlinedButton.styleFrom(
-                      padding: const EdgeInsets.symmetric(vertical: 12),
-                      side: BorderSide(color: AppTheme.border),
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                // Action Buttons (Close, Delete, Edit)
+                Row(
+                  children: [
+                    Expanded(
+                      child: OutlinedButton(
+                        onPressed: () => Navigator.of(ctx).pop(),
+                        style: OutlinedButton.styleFrom(
+                          padding: const EdgeInsets.symmetric(vertical: 12),
+                          side: BorderSide(color: AppTheme.border),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                        ),
+                        child: Text('Close', style: TextStyle(color: AppTheme.text, fontWeight: FontWeight.w600)),
+                      ),
                     ),
-                    child: Text('Close', style: TextStyle(color: AppTheme.text, fontWeight: FontWeight.w600)),
-                  ),
+                    const SizedBox(width: 8),
+                    IconButton(
+                      tooltip: 'Delete Schedule',
+                      onPressed: () async {
+                        final schedId = c['id']?.toString();
+                        if (schedId == null) return;
+                        final confirm = await showDialog<bool>(
+                          context: ctx,
+                          builder: (delCtx) => AlertDialog(
+                            title: const Text('Delete Schedule?'),
+                            content: Text('Are you sure you want to delete this schedule slot for $subject?'),
+                            actions: [
+                              TextButton(
+                                onPressed: () => Navigator.pop(delCtx, false),
+                                child: const Text('Cancel'),
+                              ),
+                              TextButton(
+                                onPressed: () => Navigator.pop(delCtx, true),
+                                style: TextButton.styleFrom(foregroundColor: AppTheme.error),
+                                child: const Text('Delete'),
+                              ),
+                            ],
+                          ),
+                        );
+                        if (confirm == true) {
+                          if (ctx.mounted) Navigator.of(ctx).pop();
+                          await ref.read(teacherSchedulesProvider.notifier).deleteSchedule(schedId);
+                        }
+                      },
+                      icon: Icon(Icons.delete_outline_rounded, color: AppTheme.error),
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: ElevatedButton.icon(
+                        onPressed: () async {
+                          Navigator.of(ctx).pop();
+                          if (!mounted) return;
+                          final saved = await CreateEditScheduleDialog.show(
+                            context,
+                            initialSchedule: c,
+                          );
+                          if (saved == true) {
+                            ref.read(teacherSchedulesProvider.notifier).reload();
+                          }
+                        },
+                        icon: const Icon(Icons.edit_rounded, size: 16),
+                        label: const Text('Edit'),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: AppTheme.primary,
+                          foregroundColor: Colors.white,
+                          padding: const EdgeInsets.symmetric(vertical: 12),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                          elevation: 0,
+                        ),
+                      ),
+                    ),
+                  ],
                 ),
               ],
             );

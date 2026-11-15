@@ -84,8 +84,9 @@ class _CreateAssignmentDialogState
         fieldKey: 'gdriveFolder',
       ),
     );
-    // Default due date: 7 days from now
-    _dueDate = DateTime.now().add(const Duration(days: 7, hours: 4));
+    // Default due date: 7 days from now at 11:59 PM
+    final future = DateTime.now().add(const Duration(days: 7));
+    _dueDate = DateTime(future.year, future.month, future.day, 23, 59);
   }
 
   Future<void> _pickAttachment() async {
@@ -146,10 +147,11 @@ class _CreateAssignmentDialogState
   }
 
   Future<void> _pickDueDate() async {
+    final base = _dueDate ?? DateTime.now().add(const Duration(days: 7));
     final pickedDate = await showDatePicker(
       context: context,
-      initialDate: _dueDate ?? DateTime.now().add(const Duration(days: 7)),
-      firstDate: DateTime.now(),
+      initialDate: base,
+      firstDate: DateTime.now().subtract(const Duration(days: 1)),
       lastDate: DateTime.now().add(const Duration(days: 365)),
       builder: (context, child) {
         return Theme(
@@ -166,50 +168,89 @@ class _CreateAssignmentDialogState
     );
 
     if (pickedDate != null && mounted) {
-      final pickedTime = await showTimePicker(
-        context: context,
-        initialTime: TimeOfDay.fromDateTime(_dueDate ?? DateTime.now()),
-        builder: (context, child) {
-          return Theme(
-            data: Theme.of(context).copyWith(
-              colorScheme: ColorScheme.dark(
-                primary: AppTheme.primary,
-                surface: AppTheme.surface,
-                onSurface: AppTheme.text,
-              ),
-            ),
-            child: child!,
-          );
-        },
-      );
-
-      if (pickedTime != null) {
-        setState(() {
-          _dueDate = DateTime(
-            pickedDate.year,
-            pickedDate.month,
-            pickedDate.day,
-            pickedTime.hour,
-            pickedTime.minute,
-          );
-        });
-      } else {
-        setState(() {
-          _dueDate = DateTime(
-            pickedDate.year,
-            pickedDate.month,
-            pickedDate.day,
-            23,
-            59,
-          );
-        });
-      }
+      setState(() {
+        _dueDate = DateTime(
+          pickedDate.year,
+          pickedDate.month,
+          pickedDate.day,
+          base.hour,
+          base.minute,
+        );
+      });
     }
   }
 
-  String _formatDueDate(DateTime? dt) {
-    if (dt == null) return 'No due date';
-    final months = [
+  Future<void> _pickDueTime() async {
+    final base = _dueDate ?? DateTime.now().add(const Duration(days: 7));
+    final pickedTime = await showTimePicker(
+      context: context,
+      initialTime: TimeOfDay(hour: base.hour, minute: base.minute),
+      builder: (context, child) {
+        return Theme(
+          data: Theme.of(context).copyWith(
+            colorScheme: ColorScheme.dark(
+              primary: AppTheme.primary,
+              surface: AppTheme.surface,
+              onSurface: AppTheme.text,
+            ),
+          ),
+          child: child!,
+        );
+      },
+    );
+
+    if (pickedTime != null && mounted) {
+      setState(() {
+        _dueDate = DateTime(
+          base.year,
+          base.month,
+          base.day,
+          pickedTime.hour,
+          pickedTime.minute,
+        );
+      });
+    }
+  }
+
+  void _setDueTimePreset(int hour, int minute) {
+    setState(() {
+      final base = _dueDate ?? DateTime.now().add(const Duration(days: 7));
+      _dueDate = DateTime(base.year, base.month, base.day, hour, minute);
+    });
+  }
+
+  Widget _buildTimePresetChip(String label, int hour, int minute) {
+    final isSelected =
+        _dueDate != null && _dueDate!.hour == hour && _dueDate!.minute == minute;
+    return InkWell(
+      onTap: () => _setDueTimePreset(hour, minute),
+      borderRadius: BorderRadius.circular(6),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+        decoration: BoxDecoration(
+          color: isSelected
+              ? AppTheme.primary.withValues(alpha: 0.2)
+              : AppTheme.background,
+          borderRadius: BorderRadius.circular(6),
+          border: Border.all(
+            color: isSelected ? AppTheme.primary : AppTheme.border,
+          ),
+        ),
+        child: Text(
+          label,
+          style: TextStyle(
+            fontSize: 11,
+            fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+            color: isSelected ? AppTheme.primary : AppTheme.textMuted,
+          ),
+        ),
+      ),
+    );
+  }
+
+  String _formatDateOnly(DateTime? dt) {
+    if (dt == null) return 'Select date';
+    const months = [
       'Jan',
       'Feb',
       'Mar',
@@ -223,10 +264,20 @@ class _CreateAssignmentDialogState
       'Nov',
       'Dec',
     ];
+    return '${months[dt.month - 1]} ${dt.day}, ${dt.year}';
+  }
+
+  String _formatTimeOnly(DateTime? dt) {
+    if (dt == null) return 'Select time';
     final hour = dt.hour > 12 ? dt.hour - 12 : (dt.hour == 0 ? 12 : dt.hour);
     final amPm = dt.hour >= 12 ? 'PM' : 'AM';
     final min = dt.minute.toString().padLeft(2, '0');
-    return '${months[dt.month - 1]} ${dt.day}, ${dt.year} $hour:$min $amPm';
+    return '$hour:$min $amPm';
+  }
+
+  String _formatDueDate(DateTime? dt) {
+    if (dt == null) return 'No due date';
+    return '${_formatDateOnly(dt)} at ${_formatTimeOnly(dt)}';
   }
 
   Future<void> _save() async {
@@ -928,66 +979,10 @@ class _CreateAssignmentDialogState
                       ),
                       const SizedBox(height: 16),
 
-                      // Due Date & Points Row
+                      // Total Points Row
                       Row(
                         children: [
                           Expanded(
-                            flex: 3,
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(
-                                  'Due Date',
-                                  style: TextStyle(
-                                    fontSize: 13,
-                                    fontWeight: FontWeight.w600,
-                                    color: AppTheme.textSecondary,
-                                  ),
-                                ),
-                                const SizedBox(height: 6),
-                                InkWell(
-                                  onTap: _pickDueDate,
-                                  borderRadius: BorderRadius.circular(12),
-                                  child: Container(
-                                    padding: const EdgeInsets.symmetric(
-                                      horizontal: 12,
-                                      vertical: 14,
-                                    ),
-                                    decoration: BoxDecoration(
-                                      color: AppTheme.background,
-                                      borderRadius: BorderRadius.circular(12),
-                                      border: Border.all(
-                                        color: AppTheme.border,
-                                      ),
-                                    ),
-                                    child: Row(
-                                      children: [
-                                        Icon(
-                                          Icons.calendar_today_outlined,
-                                          size: 16,
-                                          color: AppTheme.primary,
-                                        ),
-                                        const SizedBox(width: 8),
-                                        Expanded(
-                                          child: Text(
-                                            _formatDueDate(_dueDate),
-                                            style: TextStyle(
-                                              color: AppTheme.text,
-                                              fontSize: 12,
-                                            ),
-                                            overflow: TextOverflow.ellipsis,
-                                          ),
-                                        ),
-                                      ],
-                                    ),
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                          const SizedBox(width: 12),
-                          Expanded(
-                            flex: 2,
                             child: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
@@ -1038,6 +1033,195 @@ class _CreateAssignmentDialogState
                                       borderSide: BorderSide(
                                         color: AppTheme.primary,
                                       ),
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 16),
+
+                      // Deadline (Date & Time) Section
+                      Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'Deadline (Date & Time)',
+                            style: TextStyle(
+                              fontSize: 13,
+                              fontWeight: FontWeight.w600,
+                              color: AppTheme.textSecondary,
+                            ),
+                          ),
+                          const SizedBox(height: 6),
+                          Row(
+                            children: [
+                              // Date Picker
+                              Expanded(
+                                flex: 3,
+                                child: InkWell(
+                                  onTap: _pickDueDate,
+                                  borderRadius: BorderRadius.circular(12),
+                                  child: Container(
+                                    padding: const EdgeInsets.symmetric(
+                                      horizontal: 12,
+                                      vertical: 12,
+                                    ),
+                                    decoration: BoxDecoration(
+                                      color: AppTheme.background,
+                                      borderRadius: BorderRadius.circular(12),
+                                      border: Border.all(
+                                        color: AppTheme.border,
+                                      ),
+                                    ),
+                                    child: Row(
+                                      children: [
+                                        Icon(
+                                          Icons.calendar_month_outlined,
+                                          size: 18,
+                                          color: AppTheme.primary,
+                                        ),
+                                        const SizedBox(width: 8),
+                                        Expanded(
+                                          child: Column(
+                                            crossAxisAlignment:
+                                                CrossAxisAlignment.start,
+                                            children: [
+                                              Text(
+                                                'Deadline Date',
+                                                style: TextStyle(
+                                                  color: AppTheme.textMuted,
+                                                  fontSize: 10,
+                                                ),
+                                              ),
+                                              Text(
+                                                _formatDateOnly(_dueDate),
+                                                style: TextStyle(
+                                                  color: AppTheme.text,
+                                                  fontSize: 13,
+                                                  fontWeight: FontWeight.w600,
+                                                ),
+                                                overflow: TextOverflow.ellipsis,
+                                              ),
+                                            ],
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                ),
+                              ),
+                              const SizedBox(width: 10),
+                              // Time Picker
+                              Expanded(
+                                flex: 2,
+                                child: InkWell(
+                                  onTap: _pickDueTime,
+                                  borderRadius: BorderRadius.circular(12),
+                                  child: Container(
+                                    padding: const EdgeInsets.symmetric(
+                                      horizontal: 12,
+                                      vertical: 12,
+                                    ),
+                                    decoration: BoxDecoration(
+                                      color: AppTheme.background,
+                                      borderRadius: BorderRadius.circular(12),
+                                      border: Border.all(
+                                        color: AppTheme.border,
+                                      ),
+                                    ),
+                                    child: Row(
+                                      children: [
+                                        Icon(
+                                          Icons.access_time_outlined,
+                                          size: 18,
+                                          color: AppTheme.primary,
+                                        ),
+                                        const SizedBox(width: 8),
+                                        Expanded(
+                                          child: Column(
+                                            crossAxisAlignment:
+                                                CrossAxisAlignment.start,
+                                            children: [
+                                              Text(
+                                                'Deadline Time',
+                                                style: TextStyle(
+                                                  color: AppTheme.textMuted,
+                                                  fontSize: 10,
+                                                ),
+                                              ),
+                                              Text(
+                                                _formatTimeOnly(_dueDate),
+                                                style: TextStyle(
+                                                  color: AppTheme.text,
+                                                  fontSize: 13,
+                                                  fontWeight: FontWeight.w600,
+                                                ),
+                                                overflow: TextOverflow.ellipsis,
+                                              ),
+                                            ],
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 8),
+                          Wrap(
+                            spacing: 6,
+                            runSpacing: 6,
+                            crossAxisAlignment: WrapCrossAlignment.center,
+                            children: [
+                              Text(
+                                'Quick presets:',
+                                style: TextStyle(
+                                  color: AppTheme.textMuted,
+                                  fontSize: 11,
+                                ),
+                              ),
+                              _buildTimePresetChip(
+                                '11:59 PM (End of day)',
+                                23,
+                                59,
+                              ),
+                              _buildTimePresetChip(
+                                '5:00 PM (After class)',
+                                17,
+                                0,
+                              ),
+                              _buildTimePresetChip('8:00 AM (Morning)', 8, 0),
+                            ],
+                          ),
+                          const SizedBox(height: 8),
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 10,
+                              vertical: 8,
+                            ),
+                            decoration: BoxDecoration(
+                              color: AppTheme.surface,
+                              borderRadius: BorderRadius.circular(8),
+                              border: Border.all(color: AppTheme.border),
+                            ),
+                            child: Row(
+                              children: [
+                                Icon(
+                                  Icons.info_outline,
+                                  size: 14,
+                                  color: AppTheme.primary,
+                                ),
+                                const SizedBox(width: 6),
+                                Expanded(
+                                  child: Text(
+                                    'Deadline: ${_formatDueDate(_dueDate)} · Includes 3-day grace period for late submissions before closing.',
+                                    style: TextStyle(
+                                      color: AppTheme.textMuted,
+                                      fontSize: 11,
                                     ),
                                   ),
                                 ),

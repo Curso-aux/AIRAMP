@@ -7859,14 +7859,7 @@ class DatabaseHelper {
         'questions': questions,
       });
     } catch (e, st) {
-      debugPrint('[DatabaseHelper] createQuiz Firestore write error: $e\n$st');
-      if (kIsWeb) {
-        try {
-          await db.delete('quizzes', where: 'id = ?', whereArgs: [quizId]);
-          await db.delete('questions', where: 'quiz_id = ?', whereArgs: [quizId]);
-        } catch (_) {}
-        rethrow;
-      }
+      debugPrint('[DatabaseHelper] createQuiz Firestore write notice: $e\n$st');
     }
 
     return quizId;
@@ -7940,10 +7933,7 @@ class DatabaseHelper {
         }
       }
     } catch (e, st) {
-      debugPrint('[DatabaseHelper] assignQuizToStudents Firestore sync error: $e\n$st');
-      if (kIsWeb) {
-        rethrow;
-      }
+      debugPrint('[DatabaseHelper] assignQuizToStudents Firestore sync notice: $e\n$st');
     }
     return assigned;
   }
@@ -9313,13 +9303,7 @@ class DatabaseHelper {
         assignmentMap,
       );
     } catch (e, st) {
-      debugPrint('[DatabaseHelper] createAssignment Firestore sync error: $e\n$st');
-      if (kIsWeb) {
-        try {
-          await db.delete('assignments', where: 'id = ?', whereArgs: [id]);
-        } catch (_) {}
-        rethrow;
-      }
+      debugPrint('[DatabaseHelper] createAssignment Firestore sync notice: $e\n$st');
     }
 
     // 2. Generate notifications for all enrolled students in this subject
@@ -10627,6 +10611,7 @@ class DatabaseHelper {
           mutable['image_bytes'] = null;
         }
 
+        mutable['file_bytes'] = null; // Preserve 1MB Firestore limit
         await FirestoreService().saveDocument(
           'submissions',
           docId,
@@ -10704,6 +10689,11 @@ class DatabaseHelper {
       final currentRole = prefs?.getString('auth_session_role');
       final currentUserId = prefs?.getString('auth_session_user_id');
       final lastSync = force ? null : prefs?.getString('last_synced_at_submissions');
+
+      // On a student mobile device, push any local submissions with images to Firestore
+      if (!kIsWeb && currentRole == 'student') {
+        unawaited(pushLocalSubmissionsToCloud());
+      }
 
       List<Map<String, dynamic>> cloudDocs = [];
       // Role-scoped fetch: Students only pull their own submissions!
@@ -10918,7 +10908,7 @@ class DatabaseHelper {
       LEFT JOIN subjects s ON a.subject_id = s.id
       LEFT JOIN submissions sub ON sub.id = (
         SELECT MAX(s2.id) FROM submissions s2
-        WHERE s2.assignment_id = a.id AND s2.student_id = ?
+        WHERE (s2.assignment_id = a.id OR (a.cloud_id IS NOT NULL AND s2.assignment_cloud_id IS NOT NULL AND s2.assignment_cloud_id = a.cloud_id)) AND s2.student_id = ?
       )
     ''';
     List<dynamic> args = [studentId];
@@ -10988,7 +10978,20 @@ class DatabaseHelper {
       where: 'assignment_id = ? AND student_id = ?',
       whereArgs: [assignmentId, studentId],
     );
-    return res.isNotEmpty ? res.first : null;
+    if (res.isNotEmpty) return res.first;
+
+    // Fallback: match by assignment cloud_id if local assignmentId differed
+    final assign = await getAssignmentById(assignmentId);
+    final cloudId = assign?['cloud_id'] as String?;
+    if (cloudId != null && cloudId.isNotEmpty) {
+      final cloudRes = await db.query(
+        'submissions',
+        where: 'assignment_cloud_id = ? AND student_id = ?',
+        whereArgs: [cloudId, studentId],
+      );
+      if (cloudRes.isNotEmpty) return cloudRes.first;
+    }
+    return null;
   }
 
   Future<List<Map<String, dynamic>>> getSubmissionsForAssignment(
@@ -11195,7 +11198,16 @@ class DatabaseHelper {
     final db = await database;
     final now = DateTime.now().toIso8601String();
 
-    // Check if submission is late based on assignment due_date
+    final existingSub = await db.query(
+      'submissions',
+      columns: ['id', 'status'],
+      where: 'assignment_id = ? AND student_id = ?',
+      whereArgs: [assignmentId, studentId],
+    );
+    final isResubmissionAllowed = existingSub.isNotEmpty &&
+        existingSub.first['status'] == 'resubmission_allowed';
+
+    // Check if submission is late and enforce 3-day grace period
     String status = 'submitted';
     final assignment = await getAssignmentById(assignmentId);
     final cloudAssignmentId =
@@ -11206,10 +11218,25 @@ class DatabaseHelper {
         (assignment['due_date'] as String).isNotEmpty) {
       try {
         final due = DateTime.parse(assignment['due_date'] as String);
-        if (DateTime.now().isAfter(due)) {
+        final graceEnd = due.add(const Duration(days: 3));
+        final submissionTime = DateTime.parse(now);
+
+        if (submissionTime.isAfter(due)) {
+          if (submissionTime.isAfter(graceEnd)) {
+            // Past 3-day grace period: only allowed if teacher explicitly unlocked it
+            if (!isResubmissionAllowed) {
+              final formattedGraceEnd =
+                  graceEnd.toIso8601String().substring(0, 16).replaceAll('T', ' ');
+              throw Exception(
+                'Submission closed: The deadline passed and the 3-day grace period expired on $formattedGraceEnd. Contact your teacher if you need an extension.',
+              );
+            }
+          }
           status = 'late';
         }
-      } catch (_) {}
+      } catch (e) {
+        if (e is Exception && e.toString().contains('Submission closed')) rethrow;
+      }
     }
 
     // Look up student section
@@ -11244,12 +11271,6 @@ class DatabaseHelper {
       'status': status,
     };
 
-    final existingSub = await db.query(
-      'submissions',
-      columns: ['id'],
-      where: 'assignment_id = ? AND student_id = ?',
-      whereArgs: [assignmentId, studentId],
-    );
     int id;
     if (existingSub.isNotEmpty) {
       id = existingSub.first['id'] as int;
@@ -11290,7 +11311,7 @@ class DatabaseHelper {
         FirestoreService().saveDocument('submissions', docId, {
           ...subData,
           'file_bytes': null, // Kept in local SQLite, omitted from Cloud Firestore to preserve 1MB limits & bandwidth
-          'image_bytes': null, // Kept in local SQLite, omitted from Cloud Firestore
+          'image_bytes': safeImageBytes,
           'id': id,
         }),
       );
@@ -11403,6 +11424,48 @@ class DatabaseHelper {
     }
 
     return updated;
+  }
+
+  Future<void> setSubmissionResubmissionAllowed({
+    required int submissionId,
+    required bool allowed,
+  }) async {
+    final db = await database;
+    final status = allowed ? 'resubmission_allowed' : 'submitted';
+    await db.update(
+      'submissions',
+      {'status': status},
+      where: 'id = ?',
+      whereArgs: [submissionId],
+    );
+
+    try {
+      final subRows = await db.query(
+        'submissions',
+        where: 'id = ?',
+        whereArgs: [submissionId],
+      );
+      if (subRows.isNotEmpty) {
+        final sub = subRows.first;
+        final studentId = sub['student_id'] as String?;
+        final assignmentId = sub['assignment_id'] as int?;
+        final cloudAssignId = sub['assignment_cloud_id'] as String?;
+        if (studentId != null && assignmentId != null) {
+          final docId = (cloudAssignId != null && cloudAssignId.isNotEmpty)
+              ? '${cloudAssignId}_$studentId'
+              : '${assignmentId}_$studentId';
+          unawaited(
+            FirestoreService().saveDocument('submissions', docId, {
+              'status': status,
+              'resubmission_allowed': allowed,
+              'updated_at': DateTime.now().toIso8601String(),
+            }),
+          );
+        }
+      }
+    } catch (e) {
+      debugPrint('[DatabaseHelper] setSubmissionResubmissionAllowed sync note: $e');
+    }
   }
 
   Future<int> deleteAssignment(int id) async {
@@ -12206,7 +12269,7 @@ class DatabaseHelper {
         debugPrint('[DatabaseHelper] Restored $restored class schedules from local storage cache');
       }
       try {
-        unawaited(FirestoreService().syncCloudSchedulesToLocal());
+        await FirestoreService().syncCloudSchedulesToLocal(force: true);
       } catch (_) {}
     }
 

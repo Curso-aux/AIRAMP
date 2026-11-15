@@ -10,6 +10,7 @@ import 'package:path_provider/path_provider.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../../../core/components/empty_state.dart';
 import '../../../core/components/skeleton_loader.dart';
+import '../../../core/database/database_helper.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/theme/theme_provider.dart';
 import '../../../core/services/cloud_storage_service.dart';
@@ -207,6 +208,8 @@ class _SubmissionsScreenState extends ConsumerState<SubmissionsScreen> {
     }
   }
 
+  static const Duration gracePeriod = Duration(days: 3);
+
   bool _isOverdue(String? isoString) {
     if (isoString == null || isoString.isEmpty) return false;
     try {
@@ -217,7 +220,61 @@ class _SubmissionsScreenState extends ConsumerState<SubmissionsScreen> {
     }
   }
 
+  bool _isGracePeriodExpired(String? isoString) {
+    if (isoString == null || isoString.isEmpty) return false;
+    try {
+      final due = DateTime.parse(isoString);
+      final graceEnd = due.add(gracePeriod);
+      return DateTime.now().isAfter(graceEnd);
+    } catch (_) {
+      return false;
+    }
+  }
+
+  DateTime? _getGracePeriodEnd(String? isoString) {
+    if (isoString == null || isoString.isEmpty) return null;
+    try {
+      final due = DateTime.parse(isoString);
+      return due.add(gracePeriod);
+    } catch (_) {
+      return null;
+    }
+  }
+
+  String _formatTime(DateTime dt) {
+    final hour = dt.hour > 12 ? dt.hour - 12 : (dt.hour == 0 ? 12 : dt.hour);
+    final amPm = dt.hour >= 12 ? 'PM' : 'AM';
+    final min = dt.minute.toString().padLeft(2, '0');
+    return '$hour:$min $amPm';
+  }
+
   void _confirmAndSubmit(Assignment assignment, Submission? existing) {
+    final canResubmit = existing?.status == 'resubmission_allowed';
+    final isGraceExpired = _isGracePeriodExpired(assignment.dueDate);
+
+    if (existing != null && !canResubmit) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Submission locked: Your teacher has not allowed resubmission.'),
+          backgroundColor: Colors.orange,
+        ),
+      );
+      return;
+    }
+
+    if (isGraceExpired && existing == null && !canResubmit) {
+      final graceEnd = _getGracePeriodEnd(assignment.dueDate);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            'Submission closed: The deadline passed and the 3-day grace period ended on ${_formatDate(graceEnd?.toIso8601String())}.',
+          ),
+          backgroundColor: AppTheme.error,
+        ),
+      );
+      return;
+    }
+
     final text = _textResponseController.text.trim();
     final link = _linkController.text.trim();
     final hasFile = _pickedFileName != null;
@@ -442,6 +499,36 @@ class _SubmissionsScreenState extends ConsumerState<SubmissionsScreen> {
   }
 
   Future<void> _submit(Submission? existing, [Assignment? assignment]) async {
+    final canResubmit = existing?.status == 'resubmission_allowed';
+    final isGraceExpired = _isGracePeriodExpired(assignment?.dueDate);
+
+    if (existing != null && !canResubmit) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Submission locked: Your teacher has not allowed resubmission.'),
+            backgroundColor: Colors.orange,
+          ),
+        );
+      }
+      return;
+    }
+
+    if (isGraceExpired && existing == null && !canResubmit) {
+      final graceEnd = _getGracePeriodEnd(assignment?.dueDate);
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              'Submission closed: The deadline passed and the 3-day grace period ended on ${_formatDate(graceEnd?.toIso8601String())}.',
+            ),
+            backgroundColor: AppTheme.error,
+          ),
+        );
+      }
+      return;
+    }
+
     final text = _textResponseController.text.trim();
     final link = _linkController.text.trim();
     final hasFile = _pickedFileName != null;
@@ -579,10 +666,15 @@ class _SubmissionsScreenState extends ConsumerState<SubmissionsScreen> {
           _isSubmitting = false;
           _isEditingExisting = false;
         });
+        final isLate = assignment != null && _isOverdue(assignment.dueDate);
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: const Text('Activity submitted successfully!'),
-            backgroundColor: AppTheme.success,
+            content: Text(
+              isLate
+                  ? 'Activity submitted (Late - within 3-day grace period). Logged at ${_formatTime(DateTime.now())}.'
+                  : 'Activity submitted successfully! Logged at ${_formatTime(DateTime.now())}.',
+            ),
+            backgroundColor: isLate ? Colors.orange : AppTheme.success,
           ),
         );
         context.go('/student/home');
@@ -590,14 +682,70 @@ class _SubmissionsScreenState extends ConsumerState<SubmissionsScreen> {
     } catch (e) {
       if (mounted) {
         setState(() => _isSubmitting = false);
+        final errText = e.toString().replaceFirst('Exception: ', '');
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Error submitting activity: $e'),
+            content: Text(errText),
             backgroundColor: AppTheme.error,
           ),
         );
       }
     }
+  }
+
+  Widget _buildClosedState(Assignment assignment) {
+    final graceEnd = _getGracePeriodEnd(assignment.dueDate);
+    return Center(
+      child: Container(
+        constraints: const BoxConstraints(maxWidth: 500),
+        padding: const EdgeInsets.all(28),
+        margin: const EdgeInsets.all(20),
+        decoration: BoxDecoration(
+          color: AppTheme.surface,
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(color: AppTheme.error.withValues(alpha: 0.3)),
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: AppTheme.error.withValues(alpha: 0.15),
+                shape: BoxShape.circle,
+              ),
+              child: Icon(Icons.event_busy_outlined, color: AppTheme.error, size: 48),
+            ),
+            const SizedBox(height: 18),
+            Text(
+              'Submissions Closed',
+              style: TextStyle(
+                fontSize: 20,
+                fontWeight: FontWeight.bold,
+                color: AppTheme.text,
+              ),
+            ),
+            const SizedBox(height: 10),
+            Text(
+              'The deadline for "${assignment.title}" was ${_formatDate(assignment.dueDate)}.\n\nThe 3-day grace period expired on ${_formatDate(graceEnd?.toIso8601String())}. Late submissions are no longer accepted unless your teacher unlocks permission.',
+              textAlign: TextAlign.center,
+              style: TextStyle(color: AppTheme.textMuted, fontSize: 13, height: 1.5),
+            ),
+            const SizedBox(height: 24),
+            ElevatedButton(
+              onPressed: () => context.pop(),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppTheme.primary,
+                foregroundColor: Colors.black,
+                padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+              ),
+              child: const Text('Go Back', style: TextStyle(fontWeight: FontWeight.bold)),
+            ),
+          ],
+        ),
+      ),
+    );
   }
 
   @override
@@ -619,6 +767,34 @@ class _SubmissionsScreenState extends ConsumerState<SubmissionsScreen> {
         backgroundColor: AppTheme.surface,
         elevation: 0,
         iconTheme: IconThemeData(color: AppTheme.text),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.sync_rounded),
+            tooltip: 'Sync Submissions with Cloud',
+            onPressed: () async {
+              try {
+                await DatabaseHelper().pushLocalSubmissionsToCloud();
+                await DatabaseHelper().syncCloudSubmissionsToLocal(assignmentId: _parsedId, force: true);
+                ref.invalidate(studentSubmissionProvider((assignmentId: _parsedId, studentId: studentId)));
+                ref.invalidate(assignmentDetailProvider(_parsedId));
+                if (context.mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                      content: Text('Offline submissions synced successfully!'),
+                      backgroundColor: Colors.teal,
+                    ),
+                  );
+                }
+              } catch (_) {
+                if (context.mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('Offline: Saved locally and will sync once connected.')),
+                  );
+                }
+              }
+            },
+          ),
+        ],
       ),
       body: assignmentAsync.when(
         loading: () => const Padding(
@@ -649,7 +825,14 @@ class _SubmissionsScreenState extends ConsumerState<SubmissionsScreen> {
           }
 
           final submission = submissionAsync.value;
-          final isSubmitted = submission != null && !_isEditingExisting;
+          final canResubmit = submission?.status == 'resubmission_allowed';
+          final isSubmitted = submission != null && (!_isEditingExisting || !canResubmit);
+          final isGraceExpired = _isGracePeriodExpired(assignment.dueDate);
+          final isClosed = !isSubmitted && isGraceExpired && !canResubmit;
+
+          if (isClosed) {
+            return _buildClosedState(assignment);
+          }
 
           return SingleChildScrollView(
             padding: const EdgeInsets.all(20.0),
@@ -760,12 +943,13 @@ class _SubmissionsScreenState extends ConsumerState<SubmissionsScreen> {
                 Container(
                   padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                   decoration: BoxDecoration(
-                    color: AppTheme.error.withValues(alpha: 0.15),
+                    color: Colors.amber.withValues(alpha: 0.15),
                     borderRadius: BorderRadius.circular(4),
+                    border: Border.all(color: Colors.amber.withValues(alpha: 0.4)),
                   ),
-                  child: Text(
-                    'OVERDUE',
-                    style: TextStyle(color: AppTheme.error, fontSize: 10, fontWeight: FontWeight.bold),
+                  child: const Text(
+                    'LATE (3-DAY GRACE PERIOD)',
+                    style: TextStyle(color: Colors.amber, fontSize: 10, fontWeight: FontWeight.bold),
                   ),
                 ),
               ],
@@ -1619,44 +1803,96 @@ class _SubmissionsScreenState extends ConsumerState<SubmissionsScreen> {
                 const SizedBox(height: 14),
               ],
 
-              // Actions: Edit / Resubmit or Go Back
-              Row(
-                children: [
-                  Expanded(
-                    child: OutlinedButton.icon(
-                      onPressed: () {
-                        setState(() {
-                          _isEditingExisting = true;
-                          _textResponseController.text = submission.textResponse ?? '';
-                          _linkController.text = submission.contentLink ?? '';
-                          _notesController.text = submission.notes ?? '';
-                        });
-                      },
-                      icon: const Icon(Icons.edit_outlined, size: 18),
-                      label: const Text('Edit / Resubmit'),
-                      style: OutlinedButton.styleFrom(
-                        foregroundColor: AppTheme.text,
-                        side: BorderSide(color: AppTheme.border),
-                        padding: const EdgeInsets.symmetric(vertical: 12),
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+              // Resubmission Lock Status Card
+              Builder(
+                builder: (context) {
+                  final canResubmit = submission.status == 'resubmission_allowed';
+                  return Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                    margin: const EdgeInsets.only(bottom: 16),
+                    decoration: BoxDecoration(
+                      color: canResubmit
+                          ? AppTheme.success.withValues(alpha: 0.12)
+                          : Colors.amber.withValues(alpha: 0.12),
+                      borderRadius: BorderRadius.circular(10),
+                      border: Border.all(
+                        color: canResubmit
+                            ? AppTheme.success.withValues(alpha: 0.4)
+                            : Colors.amber.withValues(alpha: 0.4),
                       ),
                     ),
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: ElevatedButton(
-                      onPressed: () => context.pop(),
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: AppTheme.primary,
-                        foregroundColor: Colors.black,
-                        padding: const EdgeInsets.symmetric(vertical: 12),
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                        elevation: 0,
-                      ),
-                      child: const Text('Go Back', style: TextStyle(fontWeight: FontWeight.bold)),
+                    child: Row(
+                      children: [
+                        Icon(
+                          canResubmit ? Icons.lock_open_rounded : Icons.lock_outline_rounded,
+                          color: canResubmit ? AppTheme.success : Colors.amber,
+                          size: 20,
+                        ),
+                        const SizedBox(width: 10),
+                        Expanded(
+                          child: Text(
+                            canResubmit
+                                ? 'Resubmission Allowed: Your teacher has unlocked this activity. You may update and resubmit your work.'
+                                : 'Submission Locked: You have submitted this assignment. Editing is disabled unless your teacher unlocks it.',
+                            style: TextStyle(
+                              color: canResubmit ? AppTheme.success : AppTheme.text,
+                              fontSize: 12,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ),
+                      ],
                     ),
-                  ),
-                ],
+                  );
+                },
+              ),
+
+              // Actions: Edit / Resubmit (only if teacher allowed) or Go Back
+              Builder(
+                builder: (context) {
+                  final canResubmit = submission.status == 'resubmission_allowed';
+                  return Row(
+                    children: [
+                      if (canResubmit) ...[
+                        Expanded(
+                          child: OutlinedButton.icon(
+                            onPressed: () {
+                              setState(() {
+                                _isEditingExisting = true;
+                                _textResponseController.text = submission.textResponse ?? '';
+                                _linkController.text = submission.contentLink ?? '';
+                                _notesController.text = submission.notes ?? '';
+                              });
+                            },
+                            icon: const Icon(Icons.edit_outlined, size: 18),
+                            label: const Text('Edit / Resubmit'),
+                            style: OutlinedButton.styleFrom(
+                              foregroundColor: AppTheme.primary,
+                              side: BorderSide(color: AppTheme.primary),
+                              padding: const EdgeInsets.symmetric(vertical: 12),
+                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                      ],
+                      Expanded(
+                        child: ElevatedButton(
+                          onPressed: () => context.pop(),
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: AppTheme.primary,
+                            foregroundColor: Colors.black,
+                            padding: const EdgeInsets.symmetric(vertical: 12),
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                            elevation: 0,
+                          ),
+                          child: const Text('Go Back', style: TextStyle(fontWeight: FontWeight.bold)),
+                        ),
+                      ),
+                    ],
+                  );
+                },
               ),
             ],
           ),

@@ -2379,29 +2379,51 @@ class _StudentCourseDetailScreenState
     final points = assignment['total_points'] ?? 100;
     final dueDateStr = assignment['due_date']?.toString();
     final submissionStatus = assignment['submission_status']?.toString();
+    final isResubmissionAllowed = submissionStatus == 'resubmission_allowed';
     final isSubmitted = submissionStatus != null;
     final isGraded = submissionStatus == 'graded';
     final grade = assignment['grade'];
 
     String formattedDue = 'No due date';
     bool isOverdue = false;
+    bool isGraceActive = false;
+    bool isGraceExpired = false;
+
     if (dueDateStr != null && dueDateStr.isNotEmpty) {
       formattedDue = 'Due: ${PhilippineTimeHelper.formatDate(dueDateStr)}';
       isOverdue = PhilippineTimeHelper.isDatePassed(dueDateStr);
+      final dt = PhilippineTimeHelper.parseToPht(dueDateStr);
+      if (dt != null) {
+        final graceEnd = dt.add(const Duration(days: 3));
+        final nowPht = PhilippineTimeHelper.now();
+        isGraceExpired = nowPht.isAfter(graceEnd);
+        isGraceActive = isOverdue && !isGraceExpired;
+      }
     }
 
     Color statusColor = AppTheme.warning;
     String statusLabel = 'PENDING';
-    if (isGraded) {
+    if (isResubmissionAllowed) {
+      statusColor = Colors.amber;
+      statusLabel = 'RESUBMISSION ALLOWED';
+    } else if (isGraded) {
       statusColor = AppTheme.success;
       statusLabel =
           'GRADED: ${grade is num ? grade.toStringAsFixed(0) : grade}/$points';
     } else if (isSubmitted) {
-      statusColor = AppTheme.primary;
-      statusLabel = 'SUBMITTED';
-    } else if (isOverdue) {
+      if (submissionStatus == 'late') {
+        statusColor = Colors.orange;
+        statusLabel = 'SUBMITTED (LATE)';
+      } else {
+        statusColor = AppTheme.primary;
+        statusLabel = 'SUBMITTED';
+      }
+    } else if (isGraceExpired) {
       statusColor = AppTheme.error;
-      statusLabel = 'OVERDUE';
+      statusLabel = 'CLOSED (GRACE EXPIRED)';
+    } else if (isGraceActive) {
+      statusColor = Colors.orange;
+      statusLabel = 'LATE (3-DAY GRACE PERIOD)';
     }
 
     return Container(
@@ -2497,10 +2519,18 @@ class _StudentCourseDetailScreenState
                 color: isSubmitted ? AppTheme.text : Colors.white,
               ),
               label: Text(
-                isSubmitted ? 'View Submission' : 'Submit Assignment',
+                isResubmissionAllowed
+                    ? 'Resubmit Assignment'
+                    : (isSubmitted
+                        ? 'View Submission'
+                        : (isGraceExpired
+                            ? 'Submission Closed'
+                            : (isGraceActive
+                                ? 'Submit Late (Grace Period)'
+                                : 'Submit Assignment'))),
                 style: TextStyle(
                   fontWeight: FontWeight.bold,
-                  color: isSubmitted ? AppTheme.text : Colors.white,
+                  color: (isSubmitted && !isResubmissionAllowed) ? AppTheme.text : Colors.white,
                 ),
               ),
               style: ElevatedButton.styleFrom(

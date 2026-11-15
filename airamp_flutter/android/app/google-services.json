@@ -1,13 +1,13 @@
 {
   "project_info": {
-    "project_number": "156822326046",
-    "project_id": "aira-app-database",
-    "storage_bucket": "aira-app-database.firebasestorage.app"
+    "project_number": "486787192480",
+    "project_id": "aira-demo-live",
+    "storage_bucket": "aira-demo-live.firebasestorage.app"
   },
   "client": [
     {
       "client_info": {
-        "mobilesdk_app_id": "1:156822326046:android:95cbf986b55a0e7113570f",
+        "mobilesdk_app_id": "1:486787192480:android:3a719741896542f3651bc5",
         "android_client_info": {
           "package_name": "com.aral.airamp_flutter"
         }
@@ -15,7 +15,7 @@
       "oauth_client": [],
       "api_key": [
         {
-          "current_key": "AIzaSyB56Kbnq0LniUexk1lDVn6kMMUGW-VSigU"
+          "current_key": "AIzaSyCD7usspGqXEnW4l2DoUWy8iDeQDdYlKyc"
         }
       ],
       "services": {

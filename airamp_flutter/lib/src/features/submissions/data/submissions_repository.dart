@@ -98,8 +98,10 @@ class Assignment {
       cloudId: map['cloud_id'] as String?,
       targetSections: map['target_sections'] as String?,
       storageUrl: map['storage_url'] as String?,
-      gdriveFolderUrl: map['gdrive_folder_url'] as String? ??
-          (map['storage_url'] != null && map['storage_url'].toString().contains('drive.google.com')
+      gdriveFolderUrl:
+          map['gdrive_folder_url'] as String? ??
+          (map['storage_url'] != null &&
+                  map['storage_url'].toString().contains('drive.google.com')
               ? map['storage_url'] as String?
               : null),
       submissionId: map['submission_id'] as int?,
@@ -176,10 +178,14 @@ class Submission {
       assignmentId: map['assignment_id'] as int,
       assignmentCloudId: map['assignment_cloud_id'] as String?,
       studentId: map['student_id'] as String,
-      studentName: map['student_name'] as String? ?? map['full_name'] as String?,
+      studentName:
+          map['student_name'] as String? ?? map['full_name'] as String?,
       studentEmail: map['email'] as String?,
-      studentSection: map['student_section'] as String? ?? map['section'] as String?,
-      studentGradeLevel: map['student_grade_level'] as String? ?? (map['grade'] is String ? map['grade'] as String : null),
+      studentSection:
+          map['student_section'] as String? ?? map['section'] as String?,
+      studentGradeLevel:
+          map['student_grade_level'] as String? ??
+          (map['grade'] is String ? map['grade'] as String : null),
       submissionType: map['submission_type'] as String? ?? 'link',
       contentLink: map['content_link'] as String?,
       fileName: map['file_name'] as String?,
@@ -193,7 +199,9 @@ class Submission {
       notes: map['notes'] as String?,
       submittedAt: map['submitted_at'] as String? ?? '',
       status: map['status'] as String? ?? 'submitted',
-      grade: (map['grade'] is num) ? (map['grade'] as num).toDouble() : double.tryParse(map['grade']?.toString() ?? ''),
+      grade: (map['grade'] is num)
+          ? (map['grade'] as num).toDouble()
+          : double.tryParse(map['grade']?.toString() ?? ''),
       feedback: map['feedback'] as String?,
       gradedAt: map['graded_at'] as String?,
       gradedBy: map['graded_by'] as String?,
@@ -217,13 +225,22 @@ class SubmissionsRepository {
     return list.map((m) => Assignment.fromMap(m)).toList();
   }
 
-  Future<List<Assignment>> getAssignmentsForStudent(String studentId, {int? subjectId}) async {
-    final list = await _dbHelper.getAssignmentsForStudent(studentId, subjectId: subjectId);
+  Future<List<Assignment>> getAssignmentsForStudent(
+    String studentId, {
+    int? subjectId,
+  }) async {
+    final list = await _dbHelper.getAssignmentsForStudent(
+      studentId,
+      subjectId: subjectId,
+    );
     return list.map((m) => Assignment.fromMap(m)).toList();
   }
 
   Future<Submission?> getSubmission(int assignmentId, String studentId) async {
-    final map = await _dbHelper.getSubmissionForAssignment(assignmentId, studentId);
+    final map = await _dbHelper.getSubmissionForAssignment(
+      assignmentId,
+      studentId,
+    );
     if (map == null) return null;
     return Submission.fromMap(map);
   }
@@ -233,11 +250,16 @@ class SubmissionsRepository {
     return list.map((m) => Submission.fromMap(m)).toList();
   }
 
-  Future<List<Map<String, dynamic>>> getActivityRosterForTeacher(int assignmentId) {
+  Future<List<Map<String, dynamic>>> getActivityRosterForTeacher(
+    int assignmentId,
+  ) {
     return _dbHelper.getActivityRosterForTeacher(assignmentId);
   }
 
-  Future<List<Map<String, dynamic>>> getRecentSubmissionsForTeacher(String teacherId, {int limit = 10}) {
+  Future<List<Map<String, dynamic>>> getRecentSubmissionsForTeacher(
+    String teacherId, {
+    int limit = 10,
+  }) {
     return _dbHelper.getRecentSubmissionsForTeacher(teacherId, limit: limit);
   }
 
@@ -331,6 +353,16 @@ class SubmissionsRepository {
   Future<int> deleteAssignment(int id) {
     return _dbHelper.deleteAssignment(id);
   }
+
+  Future<void> setResubmissionAllowed({
+    required int submissionId,
+    required bool allowed,
+  }) {
+    return _dbHelper.setSubmissionResubmissionAllowed(
+      submissionId: submissionId,
+      allowed: allowed,
+    );
+  }
 }
 
 // Providers
@@ -338,62 +370,96 @@ final submissionsRepositoryProvider = Provider<SubmissionsRepository>((ref) {
   return SubmissionsRepository(DatabaseHelper());
 });
 
-final assignmentDetailProvider = FutureProvider.family<Assignment?, int>((ref, assignmentId) async {
+final assignmentDetailProvider = FutureProvider.family<Assignment?, int>((
+  ref,
+  assignmentId,
+) async {
   final repo = ref.watch(submissionsRepositoryProvider);
   return repo.getAssignmentById(assignmentId);
 });
 
-final studentSubmissionProvider = FutureProvider.family<Submission?, ({int assignmentId, String studentId})>((ref, arg) async {
-  final repo = ref.watch(submissionsRepositoryProvider);
-  return repo.getSubmission(arg.assignmentId, arg.studentId);
-});
+final studentSubmissionProvider =
+    FutureProvider.family<Submission?, ({int assignmentId, String studentId})>((
+      ref,
+      arg,
+    ) async {
+      final repo = ref.watch(submissionsRepositoryProvider);
+      return repo.getSubmission(arg.assignmentId, arg.studentId);
+    });
 
-final subjectAssignmentsProvider = FutureProvider.family<List<Assignment>, int>((ref, subjectId) async {
-  final repo = ref.watch(submissionsRepositoryProvider);
-  try {
-    if (kIsWeb) {
-      await FirestoreService().syncCloudSubjectsToLocal(force: true);
-    }
-    await DatabaseHelper().syncCloudAssignmentsToLocal(force: true);
-    await DatabaseHelper().syncCloudSubmissionsToLocal(force: true);
-  } catch (_) {}
-  return repo.getAssignmentsForSubject(subjectId);
-});
+final subjectAssignmentsProvider = FutureProvider.family<List<Assignment>, int>(
+  (ref, subjectId) async {
+    final repo = ref.watch(submissionsRepositoryProvider);
+    try {
+      if (kIsWeb) {
+        await FirestoreService().syncCloudSubjectsToLocal(force: true);
+      }
+      await DatabaseHelper().syncCloudAssignmentsToLocal(force: true);
+      await DatabaseHelper().syncCloudSubmissionsToLocal(force: true);
+    } catch (_) {}
+    return repo.getAssignmentsForSubject(subjectId);
+  },
+);
 
-final studentAssignmentsProvider = FutureProvider.family<List<Assignment>, ({String studentId, int? subjectId})>((ref, arg) async {
-  final repo = ref.watch(submissionsRepositoryProvider);
-  try {
-    await DatabaseHelper().syncCloudAssignmentsToLocal(force: true);
-    await DatabaseHelper().syncCloudSubmissionsToLocal(force: true);
-  } catch (_) {}
-  return repo.getAssignmentsForStudent(arg.studentId, subjectId: arg.subjectId);
-});
+final studentAssignmentsProvider =
+    FutureProvider.family<
+      List<Assignment>,
+      ({String studentId, int? subjectId})
+    >((ref, arg) async {
+      final repo = ref.watch(submissionsRepositoryProvider);
+      try {
+        await DatabaseHelper().syncCloudAssignmentsToLocal(force: true);
+        await DatabaseHelper().syncCloudSubmissionsToLocal(force: true);
+      } catch (_) {}
+      return repo.getAssignmentsForStudent(
+        arg.studentId,
+        subjectId: arg.subjectId,
+      );
+    });
 
-final assignmentSubmissionsProvider = FutureProvider.family<List<Submission>, int>((ref, assignmentId) async {
-  final repo = ref.watch(submissionsRepositoryProvider);
-  return repo.getSubmissionsForAssignment(assignmentId);
-});
+final assignmentSubmissionsProvider =
+    FutureProvider.family<List<Submission>, int>((ref, assignmentId) async {
+      final repo = ref.watch(submissionsRepositoryProvider);
+      return repo.getSubmissionsForAssignment(assignmentId);
+    });
 
-final activityRosterProvider = FutureProvider.family<List<Map<String, dynamic>>, int>((ref, assignmentId) async {
-  final repo = ref.watch(submissionsRepositoryProvider);
-  try {
-    await DatabaseHelper().syncCloudSubmissionsToLocal(assignmentId: assignmentId);
-  } catch (_) {}
-  return repo.getActivityRosterForTeacher(assignmentId);
-});
+final activityRosterProvider =
+    FutureProvider.family<List<Map<String, dynamic>>, int>((
+      ref,
+      assignmentId,
+    ) async {
+      final repo = ref.watch(submissionsRepositoryProvider);
+      try {
+        await DatabaseHelper().syncCloudSubmissionsToLocal(
+          assignmentId: assignmentId,
+        );
+      } catch (_) {}
+      return repo.getActivityRosterForTeacher(assignmentId);
+    });
 
-final teacherRecentSubmissionsProvider = FutureProvider.family<List<Map<String, dynamic>>, String>((ref, teacherId) async {
-  final repo = ref.watch(submissionsRepositoryProvider);
-  try {
-    await DatabaseHelper().syncCloudSubmissionsToLocal();
-  } catch (_) {}
-  return repo.getRecentSubmissionsForTeacher(teacherId);
-});
+final teacherRecentSubmissionsProvider =
+    FutureProvider.family<List<Map<String, dynamic>>, String>((
+      ref,
+      teacherId,
+    ) async {
+      final repo = ref.watch(submissionsRepositoryProvider);
+      try {
+        await DatabaseHelper().syncCloudSubmissionsToLocal();
+      } catch (_) {}
+      return repo.getRecentSubmissionsForTeacher(teacherId);
+    });
 
-final userNotificationsProvider = FutureProvider.family<List<Map<String, dynamic>>, String>((ref, userId) async {
-  return DatabaseHelper().getNotificationsForUser(userId);
-});
+final userNotificationsProvider =
+    FutureProvider.family<List<Map<String, dynamic>>, String>((
+      ref,
+      userId,
+    ) async {
+      return DatabaseHelper().getNotificationsForUser(userId);
+    });
 
-final unreadNotificationsCountProvider = FutureProvider.family<int, String>((ref, userId) async {
+final unreadNotificationsCountProvider = FutureProvider.family<int, String>((
+  ref,
+  userId,
+) async {
   return DatabaseHelper().getUnreadNotificationCount(userId);
 });

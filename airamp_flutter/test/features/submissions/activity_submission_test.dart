@@ -385,5 +385,88 @@ void main() {
       await dbHelper.markAllNotificationsRead(studentId);
       expect(await dbHelper.getUnreadNotificationCount(studentId), equals(0));
     });
+
+    test('6. 3-day grace period rejects submissions older than 3 days unless unlocked', () async {
+      final now = DateTime.now().millisecondsSinceEpoch;
+      final teacherId = 'teacher_grace_$now';
+      final studentId = 'student_grace_$now';
+      final db = await dbHelper.database;
+
+      await db.insert('users', {
+        'id': teacherId,
+        'email': '$teacherId@school.edu',
+        'username': teacherId,
+        'password': 'hashed_pass',
+        'role': 'teacher',
+        'full_name': 'Teacher Grace',
+        'created_at': DateTime.now().toIso8601String(),
+      });
+
+      await db.insert('users', {
+        'id': studentId,
+        'email': '$studentId@school.edu',
+        'username': studentId,
+        'password': 'hashed_pass',
+        'role': 'student',
+        'full_name': 'Student Grace',
+        'created_at': DateTime.now().toIso8601String(),
+      });
+
+      final subjectId = await db.insert('subjects', {
+        'name': 'Grace Period Test Subj $now',
+        'subject_code': 'GRACE-$now',
+        'description': 'Grace period test subject description',
+        'teacher_id': teacherId,
+        'teacher_name': 'Teacher Grace',
+        'created_at': DateTime.now().toIso8601String(),
+      });
+
+      // Assignment deadline passed 4 days ago (grace period expired)
+      final fourDaysAgo = DateTime.now().subtract(const Duration(days: 4)).toIso8601String();
+      final assignmentId = await dbHelper.createAssignment(
+        title: 'Expired Grace Assignment',
+        subjectId: subjectId,
+        teacherId: teacherId,
+        dueDate: fourDaysAgo,
+        totalPoints: 100,
+      );
+
+      // Attempting to submit after 3-day grace period should throw exception
+      expect(
+        () => dbHelper.submitAssignment(
+          assignmentId: assignmentId,
+          studentId: studentId,
+          studentName: 'Student Grace',
+          submissionType: 'text',
+          textResponse: 'Trying to submit after 4 days',
+        ),
+        throwsA(isA<Exception>().having(
+          (e) => e.toString(),
+          'message',
+          contains('Submission closed'),
+        )),
+      );
+
+      // But an assignment within 2 days (within 3-day grace period) succeeds with status 'late'
+      final twoDaysAgo = DateTime.now().subtract(const Duration(days: 2)).toIso8601String();
+      final activeGraceAssignId = await dbHelper.createAssignment(
+        title: 'Active Grace Assignment',
+        subjectId: subjectId,
+        teacherId: teacherId,
+        dueDate: twoDaysAgo,
+        totalPoints: 100,
+      );
+
+      final lateSubId = await dbHelper.submitAssignment(
+        assignmentId: activeGraceAssignId,
+        studentId: studentId,
+        studentName: 'Student Grace',
+        submissionType: 'text',
+        textResponse: 'Submitted on day 2 of grace period',
+      );
+      expect(lateSubId, isPositive);
+      final sub = await dbHelper.getSubmissionForAssignment(activeGraceAssignId, studentId);
+      expect(sub?['status'], equals('late'));
+    });
   });
 }

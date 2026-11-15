@@ -10,6 +10,7 @@ import '../../../core/database/database_helper.dart';
 import '../../../core/database/firestore_service.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/theme/theme_provider.dart';
+import '../../../core/utils/philippine_time_helper.dart';
 import '../../admin/data/admin_repository.dart';
 import '../../curriculum/presentation/curriculum_hierarchy_widgets.dart';
 import '../../teacher/data/teacher_repository.dart';
@@ -1226,6 +1227,27 @@ class _TeacherSubjectDetailScreenState
                                   fontSize: 12,
                                   color: AppTheme.textSecondary,
                                 ),
+                              ),
+                              const SizedBox(height: 3),
+                              Row(
+                                children: [
+                                  Icon(
+                                    Icons.access_time,
+                                    size: 13,
+                                    color: a.dueDate != null ? AppTheme.primary : AppTheme.textMuted,
+                                  ),
+                                  const SizedBox(width: 4),
+                                  Text(
+                                    a.dueDate != null
+                                        ? 'Due: ${PhilippineTimeHelper.formatDate(a.dueDate)} · 3d grace period'
+                                        : 'No deadline set',
+                                    style: TextStyle(
+                                      fontSize: 11,
+                                      fontWeight: FontWeight.w600,
+                                      color: a.dueDate != null ? AppTheme.primary : AppTheme.textMuted,
+                                    ),
+                                  ),
+                                ],
                               ),
                               if (a.targetSections != null &&
                                   a.targetSections!.isNotEmpty) ...[

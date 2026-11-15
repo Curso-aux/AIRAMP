@@ -246,12 +246,18 @@ void drawHubScreen() {
 // GET /api/ping -> Device handshake
 void handlePing() {
   soundBeep(80); // Quick chirp to indicate mobile client reached the hub
-  StaticJsonDocument<128> doc;
+  StaticJsonDocument<256> doc;
   doc["status"] = "online";
   doc["hub_id"] = "AIRAMP-HUB-01";
   doc["version"] = "2.0.0";
   doc["sd_ready"] = sdReady;
   doc["clients"] = WiFi.softAPgetStationNum();
+  doc["ssid"] = AP_SSID;
+  doc["password"] = AP_PASS;
+  if (sdReady) {
+    doc["card_size_mb"] = (uint32_t)(SD.cardSize() / (1024 * 1024));
+    doc["used_bytes"] = (uint32_t)SD.usedBytes();
+  }
 
   String res;
   serializeJson(doc, res);
@@ -268,15 +274,68 @@ void handleManifest() {
 
   File file = SD.open("/manifest.json", FILE_READ);
   if (!file) {
-    // If manifest doesn't exist yet, return a clean default fallback
-    String fallback = "{\"hub_id\":\"AIRAMP-HUB-01\",\"title\":\"AIRA Offline "
-                      "Hub\",\"version\":\"1.0\",\"materials\":[]}";
+    // If manifest doesn't exist yet, return a clean default fallback with items: []
+    String fallback = "{\"hubId\":\"AIRAMP-HUB-01\",\"hubName\":\"AIRA Classroom "
+                      "Station\",\"version\":\"1.0\",\"items\":[]}";
     server.send(200, "application/json", fallback);
     return;
   }
 
   server.streamFile(file, "application/json");
   file.close();
+}
+
+// POST /api/manifest -> Saves updated manifest JSON from Teacher App to MicroSD
+void handleSaveManifest() {
+  if (!sdReady) {
+    server.send(503, "application/json", "{\"error\":\"MicroSD card not ready\"}");
+    return;
+  }
+
+  if (!server.hasArg("plain")) {
+    server.send(400, "application/json", "{\"error\":\"No manifest data received\"}");
+    return;
+  }
+
+  String manifestBody = server.arg("plain");
+  File file = SD.open("/manifest.json", FILE_WRITE);
+  if (!file) {
+    server.send(500, "application/json", "{\"error\":\"Failed to write manifest.json to MicroSD\"}");
+    return;
+  }
+
+  file.print(manifestBody);
+  file.close();
+  Serial.printf("[MANIFEST] Successfully saved manifest.json (%d bytes)\n", manifestBody.length());
+  soundBeep(120, 1);
+  server.send(200, "application/json", "{\"status\":\"success\",\"message\":\"Manifest updated successfully\"}");
+}
+
+// POST /api/delete?file=... -> Deletes a material file from MicroSD
+void handleDeleteFile() {
+  if (!sdReady) {
+    server.send(503, "application/json", "{\"error\":\"MicroSD card not ready\"}");
+    return;
+  }
+
+  if (!server.hasArg("file")) {
+    server.send(400, "application/json", "{\"error\":\"Missing file parameter\"}");
+    return;
+  }
+
+  String filePath = server.arg("file");
+  if (!filePath.startsWith("/")) {
+    filePath = "/" + filePath;
+  }
+
+  if (SD.exists(filePath)) {
+    SD.remove(filePath);
+    Serial.printf("[SD] Deleted file: %s\n", filePath.c_str());
+    soundBeep(80, 1);
+    server.send(200, "application/json", "{\"status\":\"success\",\"message\":\"File deleted\"}");
+  } else {
+    server.send(404, "application/json", "{\"error\":\"File not found\"}");
+  }
 }
 
 // GET /download?file=... -> Streams PDF/module directly from MicroSD to phone
@@ -458,6 +517,8 @@ void setup() {
   server.on("/", HTTP_GET, handleRoot);
   server.on("/api/ping", HTTP_GET, handlePing);
   server.on("/api/manifest", HTTP_GET, handleManifest);
+  server.on("/api/manifest", HTTP_POST, handleSaveManifest);
+  server.on("/api/delete", HTTP_POST, handleDeleteFile);
   server.on("/download", HTTP_GET, handleFileDownload);
   server.on("/upload", HTTP_GET, []() {
     String page = "<!DOCTYPE html><html><body "

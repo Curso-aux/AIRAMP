@@ -33,13 +33,16 @@ class AssignmentRosterDialog extends ConsumerStatefulWidget {
   });
 
   @override
-  ConsumerState<AssignmentRosterDialog> createState() => _AssignmentRosterDialogState();
+  ConsumerState<AssignmentRosterDialog> createState() =>
+      _AssignmentRosterDialogState();
 }
 
-class _AssignmentRosterDialogState extends ConsumerState<AssignmentRosterDialog> {
+class _AssignmentRosterDialogState
+    extends ConsumerState<AssignmentRosterDialog> {
   List<Map<String, dynamic>> _roster = [];
   bool _loading = true;
-  String _activeFilter = 'all'; // 'all', 'not submitted', 'submitted', 'late', 'graded'
+  String _activeFilter =
+      'all'; // 'all', 'not submitted', 'submitted', 'late', 'graded'
   String _searchQuery = '';
   final TextEditingController _searchController = TextEditingController();
 
@@ -65,7 +68,9 @@ class _AssignmentRosterDialogState extends ConsumerState<AssignmentRosterDialog>
     } catch (e) {
       debugPrint('[AssignmentRoster] sync error: $e');
     }
-    final list = await DatabaseHelper().getActivityRosterForTeacher(widget.assignmentId);
+    final list = await DatabaseHelper().getActivityRosterForTeacher(
+      widget.assignmentId,
+    );
     if (mounted) {
       setState(() {
         _roster = list;
@@ -78,7 +83,20 @@ class _AssignmentRosterDialogState extends ConsumerState<AssignmentRosterDialog>
     if (isoString == null || isoString.isEmpty) return 'N/A';
     try {
       final dt = DateTime.parse(isoString);
-      final months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+      final months = [
+        'Jan',
+        'Feb',
+        'Mar',
+        'Apr',
+        'May',
+        'Jun',
+        'Jul',
+        'Aug',
+        'Sep',
+        'Oct',
+        'Nov',
+        'Dec',
+      ];
       final hour = dt.hour > 12 ? dt.hour - 12 : (dt.hour == 0 ? 12 : dt.hour);
       final amPm = dt.hour >= 12 ? 'PM' : 'AM';
       final min = dt.minute.toString().padLeft(2, '0');
@@ -96,7 +114,8 @@ class _AssignmentRosterDialogState extends ConsumerState<AssignmentRosterDialog>
 
   List<Map<String, dynamic>> get _filteredRoster {
     return _roster.where((student) {
-      final status = (student['computed_status'] as String? ?? 'not submitted').toLowerCase();
+      final status = (student['computed_status'] as String? ?? 'not submitted')
+          .toLowerCase();
       if (_activeFilter != 'all' && status != _activeFilter) {
         return false;
       }
@@ -116,25 +135,39 @@ class _AssignmentRosterDialogState extends ConsumerState<AssignmentRosterDialog>
   Future<void> _openLink(String url) async {
     try {
       final target = url.trim();
-      final uri = Uri.parse(target.startsWith('http://') || target.startsWith('https://') ? target : 'https://$target');
+      final uri = Uri.parse(
+        target.startsWith('http://') || target.startsWith('https://')
+            ? target
+            : 'https://$target',
+      );
       await launchUrl(uri, mode: LaunchMode.externalApplication);
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Could not open link: $e')));
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('Could not open link: $e')));
       }
     }
   }
 
-  void _openImagePreview(String? imagePath, String? imageBytes, String? storageUrl, String studentName) {
+  void _openImagePreview(
+    String? imagePath,
+    String? imageBytes,
+    String? storageUrl,
+    String studentName,
+  ) {
     Widget imageWidget;
     final decodedBytes = ImageCompressHelper.safeDecodeBase64(imageBytes);
     if (decodedBytes != null && decodedBytes.isNotEmpty) {
       imageWidget = Image.memory(
         decodedBytes,
         fit: BoxFit.contain,
-        errorBuilder: (_, _, _) => const Icon(Icons.broken_image, size: 60, color: Colors.grey),
+        errorBuilder: (_, _, _) =>
+            const Icon(Icons.broken_image, size: 60, color: Colors.grey),
       );
-    } else if (storageUrl != null && (storageUrl.startsWith('http://') || storageUrl.startsWith('https://'))) {
+    } else if (storageUrl != null &&
+        (storageUrl.startsWith('http://') ||
+            storageUrl.startsWith('https://'))) {
       imageWidget = Image.network(
         storageUrl,
         fit: BoxFit.contain,
@@ -142,16 +175,19 @@ class _AssignmentRosterDialogState extends ConsumerState<AssignmentRosterDialog>
           if (progress == null) return child;
           return const Center(child: CircularProgressIndicator());
         },
-        errorBuilder: (_, _, _) => const Icon(Icons.broken_image, size: 60, color: Colors.grey),
+        errorBuilder: (_, _, _) =>
+            const Icon(Icons.broken_image, size: 60, color: Colors.grey),
       );
     } else if (imagePath != null && imagePath.isNotEmpty) {
       if (!kIsWeb && File(imagePath).existsSync()) {
         imageWidget = Image.file(File(imagePath), fit: BoxFit.contain);
-      } else if (imagePath.startsWith('http://') || imagePath.startsWith('https://')) {
+      } else if (imagePath.startsWith('http://') ||
+          imagePath.startsWith('https://')) {
         imageWidget = Image.network(
           imagePath,
           fit: BoxFit.contain,
-          errorBuilder: (_, _, _) => const Icon(Icons.broken_image, size: 60, color: Colors.grey),
+          errorBuilder: (_, _, _) =>
+              const Icon(Icons.broken_image, size: 60, color: Colors.grey),
         );
       } else {
         imageWidget = Center(
@@ -162,7 +198,11 @@ class _AssignmentRosterDialogState extends ConsumerState<AssignmentRosterDialog>
               const SizedBox(height: 12),
               Text(
                 'Submitted: ${imagePath.split("/").last}',
-                style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 13),
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontWeight: FontWeight.bold,
+                  fontSize: 13,
+                ),
               ),
               const SizedBox(height: 6),
               const Padding(
@@ -192,7 +232,10 @@ class _AssignmentRosterDialogState extends ConsumerState<AssignmentRosterDialog>
             AppBar(
               backgroundColor: Colors.transparent,
               elevation: 0,
-              title: Text('$studentName - Submitted Work', style: const TextStyle(color: Colors.white, fontSize: 15)),
+              title: Text(
+                '$studentName - Submitted Work',
+                style: const TextStyle(color: Colors.white, fontSize: 15),
+              ),
               leading: IconButton(
                 icon: const Icon(Icons.close, color: Colors.white),
                 onPressed: () => Navigator.pop(ctx),
@@ -214,14 +257,23 @@ class _AssignmentRosterDialogState extends ConsumerState<AssignmentRosterDialog>
     );
   }
 
-  Future<void> _openFile(String? fileName, String? filePath, String? fileBytes, [String? storageUrl]) async {
+  Future<void> _openFile(
+    String? fileName,
+    String? filePath,
+    String? fileBytes, [
+    String? storageUrl,
+  ]) async {
     try {
-      final cleanName = (fileName != null && fileName.isNotEmpty) ? fileName : 'student_submission.pdf';
+      final cleanName = (fileName != null && fileName.isNotEmpty)
+          ? fileName
+          : 'student_submission.pdf';
       final isPdf = cleanName.toLowerCase().endsWith('.pdf');
       final mimeType = isPdf ? 'application/pdf' : 'application/octet-stream';
 
       // 1. If Cloud Storage URL is available, download / open via remote URL
-      if (storageUrl != null && (storageUrl.startsWith('http://') || storageUrl.startsWith('https://'))) {
+      if (storageUrl != null &&
+          (storageUrl.startsWith('http://') ||
+              storageUrl.startsWith('https://'))) {
         if (kIsWeb) {
           triggerWebUrlDownload(storageUrl, cleanName);
           return;
@@ -248,7 +300,10 @@ class _AssignmentRosterDialogState extends ConsumerState<AssignmentRosterDialog>
       }
 
       // 3. Fallback to local file path on desktop/mobile if present
-      if (!kIsWeb && filePath != null && filePath.isNotEmpty && File(filePath).existsSync()) {
+      if (!kIsWeb &&
+          filePath != null &&
+          filePath.isNotEmpty &&
+          File(filePath).existsSync()) {
         final uri = Uri.file(filePath);
         await launchUrl(uri, mode: LaunchMode.externalApplication);
         return;
@@ -261,8 +316,9 @@ class _AssignmentRosterDialogState extends ConsumerState<AssignmentRosterDialog>
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Could not open file: $e')));
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('Could not open file: $e')));
       }
     }
   }
@@ -273,7 +329,10 @@ class _AssignmentRosterDialogState extends ConsumerState<AssignmentRosterDialog>
       builder: (ctx) => AlertDialog(
         backgroundColor: AppTheme.surface,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        title: Text('Written Response: $studentName', style: TextStyle(color: AppTheme.text, fontSize: 16)),
+        title: Text(
+          'Written Response: $studentName',
+          style: TextStyle(color: AppTheme.text, fontSize: 16),
+        ),
         content: SizedBox(
           width: 500,
           child: SingleChildScrollView(
@@ -284,7 +343,10 @@ class _AssignmentRosterDialogState extends ConsumerState<AssignmentRosterDialog>
           ),
         ),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Close')),
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('Close'),
+          ),
         ],
       ),
     );
@@ -294,24 +356,31 @@ class _AssignmentRosterDialogState extends ConsumerState<AssignmentRosterDialog>
     final subId = student['submission_id'] as int?;
     if (subId == null) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Cannot grade: student has not submitted yet.')),
+        const SnackBar(
+          content: Text('Cannot grade: student has not submitted yet.'),
+        ),
       );
       return;
     }
 
     final currentGrade = student['grade'] != null
         ? (student['grade'] is num
-            ? (student['grade'] as num).toStringAsFixed(0)
-            : student['grade'].toString())
+              ? (student['grade'] as num).toStringAsFixed(0)
+              : student['grade'].toString())
         : '';
     final currentFeedback = student['feedback']?.toString() ?? '';
 
     final gradeController = TextEditingController(text: currentGrade);
     final feedbackController = TextEditingController(text: currentFeedback);
-    final formId = 'teacher_grading_${widget.assignmentId}_${student['student_id']}';
+    final formId =
+        'teacher_grading_${widget.assignmentId}_${student['student_id']}';
     final disposer = SessionDraftDisposer();
-    disposer.add(gradeController.bindSessionDraft(formId: formId, fieldKey: 'grade'));
-    disposer.add(feedbackController.bindSessionDraft(formId: formId, fieldKey: 'feedback'));
+    disposer.add(
+      gradeController.bindSessionDraft(formId: formId, fieldKey: 'grade'),
+    );
+    disposer.add(
+      feedbackController.bindSessionDraft(formId: formId, fieldKey: 'feedback'),
+    );
 
     showDialog(
       context: context,
@@ -320,15 +389,25 @@ class _AssignmentRosterDialogState extends ConsumerState<AssignmentRosterDialog>
           builder: (context, setDialogState) {
             return AlertDialog(
               backgroundColor: AppTheme.surface,
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(16),
+              ),
               title: Row(
                 children: [
-                  Icon(Icons.rate_review_outlined, color: AppTheme.primary, size: 22),
+                  Icon(
+                    Icons.rate_review_outlined,
+                    color: AppTheme.primary,
+                    size: 22,
+                  ),
                   const SizedBox(width: 8),
                   Expanded(
                     child: Text(
                       'Grade: ${student['full_name'] ?? "Student"}',
-                      style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: AppTheme.text),
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.bold,
+                        color: AppTheme.text,
+                      ),
                     ),
                   ),
                 ],
@@ -341,14 +420,26 @@ class _AssignmentRosterDialogState extends ConsumerState<AssignmentRosterDialog>
                   children: [
                     Text(
                       'Score (out of ${widget.totalPoints} pts) *',
-                      style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: AppTheme.textSecondary),
+                      style: TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w600,
+                        color: AppTheme.textSecondary,
+                      ),
                     ),
                     const SizedBox(height: 6),
                     TextField(
                       controller: gradeController,
                       maxLength: 4,
-                      buildCounter: (context, {required currentLength, required isFocused, maxLength}) => null,
-                      keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                      buildCounter:
+                          (
+                            context, {
+                            required currentLength,
+                            required isFocused,
+                            maxLength,
+                          }) => null,
+                      keyboardType: const TextInputType.numberWithOptions(
+                        decimal: true,
+                      ),
                       style: TextStyle(color: AppTheme.text),
                       decoration: InputDecoration(
                         hintText: 'e.g. 95',
@@ -365,7 +456,11 @@ class _AssignmentRosterDialogState extends ConsumerState<AssignmentRosterDialog>
                     const SizedBox(height: 16),
                     Text(
                       'Teacher Feedback / Evaluation',
-                      style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: AppTheme.textSecondary),
+                      style: TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w600,
+                        color: AppTheme.textSecondary,
+                      ),
                     ),
                     const SizedBox(height: 6),
                     TextField(
@@ -374,7 +469,8 @@ class _AssignmentRosterDialogState extends ConsumerState<AssignmentRosterDialog>
                       maxLines: 3,
                       style: TextStyle(color: AppTheme.text),
                       decoration: InputDecoration(
-                        hintText: 'Great analysis, thorough responses and well-structured...',
+                        hintText:
+                            'Great analysis, thorough responses and well-structured...',
                         hintStyle: TextStyle(color: AppTheme.textMuted),
                         filled: true,
                         fillColor: AppTheme.background,
@@ -390,14 +486,19 @@ class _AssignmentRosterDialogState extends ConsumerState<AssignmentRosterDialog>
               actions: [
                 TextButton(
                   onPressed: () => Navigator.pop(ctx),
-                  child: Text('Cancel', style: TextStyle(color: AppTheme.textMuted)),
+                  child: Text(
+                    'Cancel',
+                    style: TextStyle(color: AppTheme.textMuted),
+                  ),
                 ),
                 ElevatedButton(
                   onPressed: () async {
                     final score = double.tryParse(gradeController.text.trim());
                     if (score == null) {
                       ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(content: Text('Please enter a valid numeric grade.')),
+                        const SnackBar(
+                          content: Text('Please enter a valid numeric grade.'),
+                        ),
                       );
                       return;
                     }
@@ -411,16 +512,24 @@ class _AssignmentRosterDialogState extends ConsumerState<AssignmentRosterDialog>
                       await DatabaseHelper().gradeSubmission(
                         submissionId: subId,
                         grade: score,
-                        feedback: feedbackController.text.trim().isNotEmpty ? feedbackController.text.trim() : null,
+                        feedback: feedbackController.text.trim().isNotEmpty
+                            ? feedbackController.text.trim()
+                            : null,
                         gradedBy: teacherName,
                       );
 
-                      ref.invalidate(studentSubmissionProvider((
-                        assignmentId: widget.assignmentId,
-                        studentId: student['student_id'].toString(),
-                      )));
-                      ref.invalidate(activityRosterProvider(widget.assignmentId));
-                      ref.invalidate(assignmentSubmissionsProvider(widget.assignmentId));
+                      ref.invalidate(
+                        studentSubmissionProvider((
+                          assignmentId: widget.assignmentId,
+                          studentId: student['student_id'].toString(),
+                        )),
+                      );
+                      ref.invalidate(
+                        activityRosterProvider(widget.assignmentId),
+                      );
+                      ref.invalidate(
+                        assignmentSubmissionsProvider(widget.assignmentId),
+                      );
 
                       SessionDraftService.instance.clearForm(formId);
 
@@ -432,7 +541,9 @@ class _AssignmentRosterDialogState extends ConsumerState<AssignmentRosterDialog>
                         await _loadRoster();
                         messenger.showSnackBar(
                           SnackBar(
-                            content: const Text('Grade & feedback recorded! Student notified.'),
+                            content: const Text(
+                              'Grade & feedback recorded! Student notified.',
+                            ),
                             backgroundColor: AppTheme.success,
                           ),
                         );
@@ -441,7 +552,9 @@ class _AssignmentRosterDialogState extends ConsumerState<AssignmentRosterDialog>
                       if (mounted) {
                         messenger.showSnackBar(
                           SnackBar(
-                            content: Text('Failed to save grade: ${e.toString().replaceFirst("Exception: ", "")}'),
+                            content: Text(
+                              'Failed to save grade: ${e.toString().replaceFirst("Exception: ", "")}',
+                            ),
                             backgroundColor: AppTheme.error,
                           ),
                         );
@@ -452,7 +565,10 @@ class _AssignmentRosterDialogState extends ConsumerState<AssignmentRosterDialog>
                     backgroundColor: AppTheme.primary,
                     foregroundColor: Colors.black,
                   ),
-                  child: const Text('Save Grade', style: TextStyle(fontWeight: FontWeight.bold)),
+                  child: const Text(
+                    'Save Grade',
+                    style: TextStyle(fontWeight: FontWeight.bold),
+                  ),
                 ),
               ],
             );
@@ -462,7 +578,11 @@ class _AssignmentRosterDialogState extends ConsumerState<AssignmentRosterDialog>
     );
   }
 
-  Widget _buildStatusBadge(String status, dynamic grade) {
+  Widget _buildStatusBadge(
+    String status,
+    dynamic grade, [
+    bool isResubmissionAllowed = false,
+  ]) {
     Color bg;
     Color text;
     String label;
@@ -498,32 +618,68 @@ class _AssignmentRosterDialogState extends ConsumerState<AssignmentRosterDialog>
         break;
     }
 
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-      decoration: BoxDecoration(
-        color: bg,
-        borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: text.withValues(alpha: 0.4)),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(icon, size: 12, color: text),
-          const SizedBox(width: 5),
-          Text(
-            label,
-            style: TextStyle(
-              color: text,
-              fontWeight: FontWeight.bold,
-              fontSize: 11,
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+          decoration: BoxDecoration(
+            color: bg,
+            borderRadius: BorderRadius.circular(8),
+            border: Border.all(color: text.withValues(alpha: 0.4)),
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(icon, size: 12, color: text),
+              const SizedBox(width: 5),
+              Text(
+                label,
+                style: TextStyle(
+                  color: text,
+                  fontWeight: FontWeight.bold,
+                  fontSize: 11,
+                ),
+              ),
+            ],
+          ),
+        ),
+        if (isResubmissionAllowed) ...[
+          const SizedBox(width: 6),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+            decoration: BoxDecoration(
+              color: Colors.amber.withValues(alpha: 0.15),
+              borderRadius: BorderRadius.circular(8),
+              border: Border.all(color: Colors.amber.withValues(alpha: 0.5)),
+            ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: const [
+                Icon(Icons.lock_open, size: 11, color: Colors.amber),
+                SizedBox(width: 4),
+                Text(
+                  'Resubmission Allowed',
+                  style: TextStyle(
+                    color: Colors.amber,
+                    fontWeight: FontWeight.bold,
+                    fontSize: 10,
+                  ),
+                ),
+              ],
             ),
           ),
         ],
-      ),
+      ],
     );
   }
 
-  Widget _buildFilterTab(String key, String label, int count, Color activeColor) {
+  Widget _buildFilterTab(
+    String key,
+    String label,
+    int count,
+    Color activeColor,
+  ) {
     final isSelected = _activeFilter == key;
     return InkWell(
       onTap: () => setState(() => _activeFilter = key),
@@ -531,7 +687,9 @@ class _AssignmentRosterDialogState extends ConsumerState<AssignmentRosterDialog>
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
         decoration: BoxDecoration(
-          color: isSelected ? activeColor.withValues(alpha: 0.18) : AppTheme.background,
+          color: isSelected
+              ? activeColor.withValues(alpha: 0.18)
+              : AppTheme.background,
           borderRadius: BorderRadius.circular(10),
           border: Border.all(
             color: isSelected ? activeColor : AppTheme.border,
@@ -553,7 +711,9 @@ class _AssignmentRosterDialogState extends ConsumerState<AssignmentRosterDialog>
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
               decoration: BoxDecoration(
-                color: isSelected ? activeColor : AppTheme.border.withValues(alpha: 0.4),
+                color: isSelected
+                    ? activeColor
+                    : AppTheme.border.withValues(alpha: 0.4),
                 borderRadius: BorderRadius.circular(10),
               ),
               child: Text(
@@ -576,10 +736,18 @@ class _AssignmentRosterDialogState extends ConsumerState<AssignmentRosterDialog>
     ref.watch(themeProvider);
 
     final totalCount = _roster.length;
-    final notSubmittedCount = _roster.where((r) => r['computed_status'] == 'not submitted').length;
-    final submittedCount = _roster.where((r) => r['computed_status'] == 'submitted').length;
-    final lateCount = _roster.where((r) => r['computed_status'] == 'late').length;
-    final gradedCount = _roster.where((r) => r['computed_status'] == 'graded').length;
+    final notSubmittedCount = _roster
+        .where((r) => r['computed_status'] == 'not submitted')
+        .length;
+    final submittedCount = _roster
+        .where((r) => r['computed_status'] == 'submitted')
+        .length;
+    final lateCount = _roster
+        .where((r) => r['computed_status'] == 'late')
+        .length;
+    final gradedCount = _roster
+        .where((r) => r['computed_status'] == 'graded')
+        .length;
 
     final filtered = _filteredRoster;
 
@@ -588,7 +756,9 @@ class _AssignmentRosterDialogState extends ConsumerState<AssignmentRosterDialog>
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
       child: Container(
         width: 720,
-        constraints: BoxConstraints(maxHeight: MediaQuery.of(context).size.height * 0.88),
+        constraints: BoxConstraints(
+          maxHeight: MediaQuery.of(context).size.height * 0.88,
+        ),
         padding: const EdgeInsets.all(22),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -602,7 +772,11 @@ class _AssignmentRosterDialogState extends ConsumerState<AssignmentRosterDialog>
                     color: AppTheme.primary.withValues(alpha: 0.15),
                     borderRadius: BorderRadius.circular(10),
                   ),
-                  child: Icon(Icons.assignment_ind_outlined, color: AppTheme.primary, size: 24),
+                  child: Icon(
+                    Icons.assignment_ind_outlined,
+                    color: AppTheme.primary,
+                    size: 24,
+                  ),
                 ),
                 const SizedBox(width: 12),
                 Expanded(
@@ -611,20 +785,31 @@ class _AssignmentRosterDialogState extends ConsumerState<AssignmentRosterDialog>
                     children: [
                       Text(
                         widget.assignmentTitle,
-                        style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: AppTheme.text),
+                        style: TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.bold,
+                          color: AppTheme.text,
+                        ),
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                       ),
                       Text(
                         'Student Activity Roster • ${widget.totalPoints} Total Points • Due: ${_formatDate(widget.dueDate)}',
-                        style: TextStyle(fontSize: 12, color: AppTheme.textMuted),
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: AppTheme.textMuted,
+                        ),
                       ),
                     ],
                   ),
                 ),
-                if (widget.gdriveFolderUrl != null && widget.gdriveFolderUrl!.isNotEmpty) ...[
+                if (widget.gdriveFolderUrl != null &&
+                    widget.gdriveFolderUrl!.isNotEmpty) ...[
                   IconButton(
-                    icon: const Icon(Icons.folder_shared_outlined, color: Colors.green),
+                    icon: const Icon(
+                      Icons.folder_shared_outlined,
+                      color: Colors.green,
+                    ),
                     tooltip: 'Open Submissions in Google Drive',
                     onPressed: () => _openLink(widget.gdriveFolderUrl!),
                   ),
@@ -641,14 +826,24 @@ class _AssignmentRosterDialogState extends ConsumerState<AssignmentRosterDialog>
             TextField(
               controller: _searchController,
               maxLength: 60,
-              buildCounter: (context, {required currentLength, required isFocused, maxLength}) => null,
+              buildCounter:
+                  (
+                    context, {
+                    required currentLength,
+                    required isFocused,
+                    maxLength,
+                  }) => null,
               onChanged: (val) => setState(() => _searchQuery = val.trim()),
               style: TextStyle(color: AppTheme.text, fontSize: 13),
               decoration: InputDecoration(
                 hintText: 'Search student name, section, or email...',
                 counterText: '',
                 hintStyle: TextStyle(color: AppTheme.textMuted, fontSize: 12),
-                prefixIcon: Icon(Icons.search, size: 18, color: AppTheme.primary),
+                prefixIcon: Icon(
+                  Icons.search,
+                  size: 18,
+                  color: AppTheme.primary,
+                ),
                 suffixIcon: _searchQuery.isNotEmpty
                     ? IconButton(
                         icon: const Icon(Icons.clear, size: 16),
@@ -660,7 +855,10 @@ class _AssignmentRosterDialogState extends ConsumerState<AssignmentRosterDialog>
                     : null,
                 filled: true,
                 fillColor: AppTheme.background,
-                contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                contentPadding: const EdgeInsets.symmetric(
+                  horizontal: 12,
+                  vertical: 10,
+                ),
                 border: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(10),
                   borderSide: BorderSide(color: AppTheme.border),
@@ -674,15 +872,40 @@ class _AssignmentRosterDialogState extends ConsumerState<AssignmentRosterDialog>
               scrollDirection: Axis.horizontal,
               child: Row(
                 children: [
-                  _buildFilterTab('all', 'All Students', totalCount, AppTheme.primary),
+                  _buildFilterTab(
+                    'all',
+                    'All Students',
+                    totalCount,
+                    AppTheme.primary,
+                  ),
                   const SizedBox(width: 8),
-                  _buildFilterTab('not submitted', 'Not Submitted', notSubmittedCount, Colors.grey.shade400),
+                  _buildFilterTab(
+                    'not submitted',
+                    'Not Submitted',
+                    notSubmittedCount,
+                    Colors.grey.shade400,
+                  ),
                   const SizedBox(width: 8),
-                  _buildFilterTab('submitted', 'Submitted', submittedCount, AppTheme.primary),
+                  _buildFilterTab(
+                    'submitted',
+                    'Submitted',
+                    submittedCount,
+                    AppTheme.primary,
+                  ),
                   const SizedBox(width: 8),
-                  _buildFilterTab('late', 'Late', lateCount, Colors.amber.shade400),
+                  _buildFilterTab(
+                    'late',
+                    'Late',
+                    lateCount,
+                    Colors.amber.shade400,
+                  ),
                   const SizedBox(width: 8),
-                  _buildFilterTab('graded', 'Graded', gradedCount, AppTheme.success),
+                  _buildFilterTab(
+                    'graded',
+                    'Graded',
+                    gradedCount,
+                    AppTheme.success,
+                  ),
                 ],
               ),
             ),
@@ -691,395 +914,763 @@ class _AssignmentRosterDialogState extends ConsumerState<AssignmentRosterDialog>
             // Roster Content
             Expanded(
               child: _loading
-                  ? Center(child: CircularProgressIndicator(color: AppTheme.primary))
+                  ? Center(
+                      child: CircularProgressIndicator(color: AppTheme.primary),
+                    )
                   : filtered.isEmpty
-                      ? Center(
-                          child: Column(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              Icon(Icons.person_search_outlined, size: 52, color: AppTheme.textMuted),
-                              const SizedBox(height: 10),
-                              Text(
-                                'No students match current filter',
-                                style: TextStyle(color: AppTheme.text, fontSize: 15, fontWeight: FontWeight.bold),
-                              ),
-                              const SizedBox(height: 4),
-                              Text(
-                                _searchQuery.isNotEmpty
-                                    ? 'Try adjusting your search keywords.'
-                                    : 'No students currently in the "$_activeFilter" category.',
-                                style: TextStyle(color: AppTheme.textMuted, fontSize: 12),
-                              ),
-                            ],
+                  ? Center(
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(
+                            Icons.person_search_outlined,
+                            size: 52,
+                            color: AppTheme.textMuted,
                           ),
-                        )
-                      : ListView.separated(
-                          itemCount: filtered.length,
-                          separatorBuilder: (context, index) => const SizedBox(height: 12),
-                          itemBuilder: (context, index) {
-                            final student = filtered[index];
-                            final studentName = student['full_name'] ?? 'Unknown Student';
-                            final section = student['section'] ?? '';
-                            final gradeLevel = student['student_grade_level'] ?? '';
-                            final status = student['computed_status'] as String? ?? 'not submitted';
-                            final hasSubmission = student['submission_id'] != null;
-                            final submittedAt = student['submitted_at'];
-                            final link = student['content_link'];
-                            final fileName = student['file_name'];
-                            final fileSize = student['file_size'];
-                            final textResponse = student['text_response'];
-                            final imagePath = student['image_path'];
-                            final imageBytes = student['image_bytes'] as String?;
-                            final filePath = student['file_path'] as String?;
-                            final fileBytes = student['file_bytes'] as String?;
-                            final storageUrl = student['storage_url'] as String?;
-                            final notes = student['notes'];
-                            final grade = student['grade'];
-                            final feedback = student['feedback'];
-                            final isGraded = status == 'graded';
+                          const SizedBox(height: 10),
+                          Text(
+                            'No students match current filter',
+                            style: TextStyle(
+                              color: AppTheme.text,
+                              fontSize: 15,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                          const SizedBox(height: 4),
+                          Text(
+                            _searchQuery.isNotEmpty
+                                ? 'Try adjusting your search keywords.'
+                                : 'No students currently in the "$_activeFilter" category.',
+                            style: TextStyle(
+                              color: AppTheme.textMuted,
+                              fontSize: 12,
+                            ),
+                          ),
+                        ],
+                      ),
+                    )
+                  : ListView.separated(
+                      itemCount: filtered.length,
+                      separatorBuilder: (c, i) =>
+                          const SizedBox(height: 12),
+                      itemBuilder: (itemCtx, index) {
+                        final student = filtered[index];
+                        final studentName =
+                            student['full_name'] ?? 'Unknown Student';
+                        final section = student['section'] ?? '';
+                        final gradeLevel = student['student_grade_level'] ?? '';
+                        final status =
+                            student['computed_status'] as String? ??
+                            'not submitted';
+                        final hasSubmission = student['submission_id'] != null;
+                        final submittedAt = student['submitted_at'];
+                        final link = student['content_link'];
+                        final fileName = student['file_name'];
+                        final fileSize = student['file_size'];
+                        final textResponse = student['text_response'];
+                        final imagePath = student['image_path'];
+                        final imageBytes = student['image_bytes'] as String?;
+                        final filePath = student['file_path'] as String?;
+                        final fileBytes = student['file_bytes'] as String?;
+                        final storageUrl = student['storage_url'] as String?;
+                        final notes = student['notes'];
+                        final grade = student['grade'];
+                        final feedback = student['feedback'];
+                        final isGraded = status == 'graded';
+                        final rawStatus =
+                            (student['raw_status'] ?? student['status'])
+                                ?.toString();
+                        final isResubmissionAllowed =
+                            rawStatus == 'resubmission_allowed';
+                        final submissionId =
+                            (student['submission_id'] ?? student['id']) as int?;
 
-                            return Container(
-                              padding: const EdgeInsets.all(16),
-                              decoration: BoxDecoration(
-                                color: AppTheme.background,
-                                borderRadius: BorderRadius.circular(14),
-                                border: Border.all(
-                                  color: isGraded
-                                      ? AppTheme.success.withValues(alpha: 0.3)
-                                      : (status == 'late'
-                                          ? Colors.amber.withValues(alpha: 0.3)
-                                          : AppTheme.border),
-                                ),
-                              ),
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
+                        return Container(
+                          padding: const EdgeInsets.all(16),
+                          decoration: BoxDecoration(
+                            color: AppTheme.background,
+                            borderRadius: BorderRadius.circular(14),
+                            border: Border.all(
+                              color: isGraded
+                                  ? AppTheme.success.withValues(alpha: 0.3)
+                                  : (status == 'late'
+                                        ? Colors.amber.withValues(alpha: 0.3)
+                                        : AppTheme.border),
+                            ),
+                          ),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              // Top row: Student Avatar + Name + Section + Status Badge
+                              Row(
                                 children: [
-                                  // Top row: Student Avatar + Name + Section + Status Badge
-                                  Row(
-                                    children: [
-                                      UserAvatarWidget(
-                                        imageSource: (student['profile_image'] ?? student['profileImage']) as String?,
-                                        fallbackInitial: studentName,
-                                        size: 36,
-                                        fontSize: 14,
-                                      ),
-                                      const SizedBox(width: 12),
-                                      Expanded(
-                                        child: Column(
-                                          crossAxisAlignment: CrossAxisAlignment.start,
-                                          children: [
-                                            Text(
-                                              studentName,
-                                              style: TextStyle(
-                                                fontWeight: FontWeight.bold,
-                                                fontSize: 14,
-                                                color: AppTheme.text,
-                                              ),
-                                            ),
-                                            Row(
-                                              children: [
-                                                if (section.isNotEmpty)
-                                                  Text('Sec: $section', style: TextStyle(fontSize: 11, color: AppTheme.textMuted)),
-                                                if (section.isNotEmpty && gradeLevel.isNotEmpty)
-                                                  Text(' • ', style: TextStyle(fontSize: 11, color: AppTheme.textMuted)),
-                                                if (gradeLevel.isNotEmpty)
-                                                  Text('Grade $gradeLevel', style: TextStyle(fontSize: 11, color: AppTheme.textMuted)),
-                                              ],
-                                            ),
-                                          ],
-                                        ),
-                                      ),
-                                      _buildStatusBadge(status, grade),
-                                    ],
+                                  UserAvatarWidget(
+                                    imageSource:
+                                        (student['profile_image'] ??
+                                                student['profileImage'])
+                                            as String?,
+                                    fallbackInitial: studentName,
+                                    size: 36,
+                                    fontSize: 14,
                                   ),
-
-                                  // Submission Artifacts section if student submitted
-                                  if (hasSubmission) ...[
-                                    const SizedBox(height: 12),
-                                    const Divider(height: 1),
-                                    const SizedBox(height: 10),
-
-                                    // Submission timestamp
-                                    Row(
+                                  const SizedBox(width: 12),
+                                  Expanded(
+                                    child: Column(
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.start,
                                       children: [
-                                        Icon(Icons.schedule, size: 13, color: AppTheme.textMuted),
-                                        const SizedBox(width: 5),
                                         Text(
-                                          'Submitted: ${_formatDate(submittedAt)}',
-                                          style: TextStyle(color: AppTheme.textMuted, fontSize: 11),
+                                          studentName,
+                                          style: TextStyle(
+                                            fontWeight: FontWeight.bold,
+                                            fontSize: 14,
+                                            color: AppTheme.text,
+                                          ),
+                                        ),
+                                        Row(
+                                          children: [
+                                            if (section.isNotEmpty)
+                                              Text(
+                                                'Sec: $section',
+                                                style: TextStyle(
+                                                  fontSize: 11,
+                                                  color: AppTheme.textMuted,
+                                                ),
+                                              ),
+                                            if (section.isNotEmpty &&
+                                                gradeLevel.isNotEmpty)
+                                              Text(
+                                                ' • ',
+                                                style: TextStyle(
+                                                  fontSize: 11,
+                                                  color: AppTheme.textMuted,
+                                                ),
+                                              ),
+                                            if (gradeLevel.isNotEmpty)
+                                              Text(
+                                                'Grade $gradeLevel',
+                                                style: TextStyle(
+                                                  fontSize: 11,
+                                                  color: AppTheme.textMuted,
+                                                ),
+                                              ),
+                                          ],
                                         ),
                                       ],
                                     ),
-                                    const SizedBox(height: 8),
+                                  ),
+                                  _buildStatusBadge(
+                                    status,
+                                    grade,
+                                    isResubmissionAllowed,
+                                  ),
+                                ],
+                              ),
 
-                                    // 1. Text response
-                                    if (textResponse != null && textResponse.isNotEmpty) ...[
-                                      Row(
-                                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                                        children: [
-                                          Text('Written Response:', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: AppTheme.textSecondary)),
-                                          if (textResponse.length > 150)
-                                            InkWell(
-                                              onTap: () => _showFullTextDialog(studentName, textResponse),
-                                              child: Text('Read Full Response', style: TextStyle(fontSize: 11, color: AppTheme.primary, fontWeight: FontWeight.bold)),
+                              // Submission Artifacts section if student submitted
+                              if (hasSubmission) ...[
+                                const SizedBox(height: 12),
+                                const Divider(height: 1),
+                                const SizedBox(height: 10),
+
+                                // Submission timestamp
+                                Row(
+                                  children: [
+                                    Icon(
+                                      Icons.schedule,
+                                      size: 13,
+                                      color: AppTheme.textMuted,
+                                    ),
+                                    const SizedBox(width: 5),
+                                    Text(
+                                      'Submitted: ${_formatDate(submittedAt)}',
+                                      style: TextStyle(
+                                        color: AppTheme.textMuted,
+                                        fontSize: 11,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                                const SizedBox(height: 8),
+
+                                // 1. Text response
+                                if (textResponse != null &&
+                                    textResponse.isNotEmpty) ...[
+                                  Row(
+                                    mainAxisAlignment:
+                                        MainAxisAlignment.spaceBetween,
+                                    children: [
+                                      Text(
+                                        'Written Response:',
+                                        style: TextStyle(
+                                          fontSize: 11,
+                                          fontWeight: FontWeight.bold,
+                                          color: AppTheme.textSecondary,
+                                        ),
+                                      ),
+                                      if (textResponse.length > 150)
+                                        InkWell(
+                                          onTap: () => _showFullTextDialog(
+                                            studentName,
+                                            textResponse,
+                                          ),
+                                          child: Text(
+                                            'Read Full Response',
+                                            style: TextStyle(
+                                              fontSize: 11,
+                                              color: AppTheme.primary,
+                                              fontWeight: FontWeight.bold,
                                             ),
-                                        ],
-                                      ),
-                                      const SizedBox(height: 4),
-                                      Container(
-                                        width: double.infinity,
-                                        padding: const EdgeInsets.all(10),
-                                        decoration: BoxDecoration(
-                                          color: AppTheme.surface,
-                                          borderRadius: BorderRadius.circular(8),
-                                          border: Border.all(color: AppTheme.border),
+                                          ),
                                         ),
-                                        child: Text(
-                                          textResponse,
-                                          style: TextStyle(color: AppTheme.text, fontSize: 12, height: 1.4),
-                                          maxLines: 4,
-                                          overflow: TextOverflow.ellipsis,
-                                        ),
-                                      ),
-                                      const SizedBox(height: 8),
                                     ],
+                                  ),
+                                  const SizedBox(height: 4),
+                                  Container(
+                                    width: double.infinity,
+                                    padding: const EdgeInsets.all(10),
+                                    decoration: BoxDecoration(
+                                      color: AppTheme.surface,
+                                      borderRadius: BorderRadius.circular(8),
+                                      border: Border.all(
+                                        color: AppTheme.border,
+                                      ),
+                                    ),
+                                    child: Text(
+                                      textResponse,
+                                      style: TextStyle(
+                                        color: AppTheme.text,
+                                        fontSize: 12,
+                                        height: 1.4,
+                                      ),
+                                      maxLines: 4,
+                                      overflow: TextOverflow.ellipsis,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 8),
+                                ],
 
-                                    // 2. Image attachment
-                                    if ((imagePath != null && imagePath.isNotEmpty) || (imageBytes != null && imageBytes.isNotEmpty)) ...[
-                                      Container(
-                                        margin: const EdgeInsets.only(bottom: 8),
-                                        padding: const EdgeInsets.all(10),
-                                        decoration: BoxDecoration(
-                                          color: AppTheme.surface,
-                                          borderRadius: BorderRadius.circular(10),
-                                          border: Border.all(color: AppTheme.border),
+                                // 2. Image attachment
+                                if ((imagePath != null &&
+                                        imagePath.isNotEmpty) ||
+                                    (imageBytes != null &&
+                                        imageBytes.isNotEmpty)) ...[
+                                  Container(
+                                    margin: const EdgeInsets.only(bottom: 8),
+                                    padding: const EdgeInsets.all(10),
+                                    decoration: BoxDecoration(
+                                      color: AppTheme.surface,
+                                      borderRadius: BorderRadius.circular(10),
+                                      border: Border.all(
+                                        color: AppTheme.border,
+                                      ),
+                                    ),
+                                    child: Row(
+                                      children: [
+                                        ClipRRect(
+                                          borderRadius: BorderRadius.circular(
+                                            6,
+                                          ),
+                                          child: Container(
+                                            width: 44,
+                                            height: 44,
+                                            color: AppTheme.background,
+                                            child: Builder(
+                                              builder: (context) {
+                                                final decoded =
+                                                    ImageCompressHelper.safeDecodeBase64(
+                                                      imageBytes,
+                                                    );
+                                                if (decoded != null &&
+                                                    decoded.isNotEmpty) {
+                                                  return Image.memory(
+                                                    decoded,
+                                                    fit: BoxFit.cover,
+                                                    errorBuilder: (_, _, _) =>
+                                                        Icon(
+                                                          Icons.image,
+                                                          color:
+                                                              AppTheme.primary,
+                                                        ),
+                                                  );
+                                                }
+                                                if (imagePath != null &&
+                                                    !kIsWeb &&
+                                                    File(
+                                                      imagePath,
+                                                    ).existsSync()) {
+                                                  return Image.file(
+                                                    File(imagePath),
+                                                    fit: BoxFit.cover,
+                                                    errorBuilder: (_, _, _) =>
+                                                        Icon(
+                                                          Icons.image,
+                                                          color:
+                                                              AppTheme.primary,
+                                                        ),
+                                                  );
+                                                }
+                                                if (imagePath != null &&
+                                                    (imagePath.startsWith(
+                                                          'http://',
+                                                        ) ||
+                                                        imagePath.startsWith(
+                                                          'https://',
+                                                        ))) {
+                                                  return Image.network(
+                                                    imagePath,
+                                                    fit: BoxFit.cover,
+                                                    errorBuilder: (_, _, _) =>
+                                                        Icon(
+                                                          Icons.image,
+                                                          color:
+                                                              AppTheme.primary,
+                                                        ),
+                                                  );
+                                                }
+                                                return Icon(
+                                                  Icons.image,
+                                                  color: AppTheme.primary,
+                                                );
+                                              },
+                                            ),
+                                          ),
                                         ),
-                                        child: Row(
-                                          children: [
-                                            ClipRRect(
-                                              borderRadius: BorderRadius.circular(6),
-                                              child: Container(
-                                                width: 44,
-                                                height: 44,
-                                                color: AppTheme.background,
-                                                child: Builder(
-                                                  builder: (context) {
-                                                    final decoded = ImageCompressHelper.safeDecodeBase64(imageBytes);
-                                                    if (decoded != null && decoded.isNotEmpty) {
-                                                      return Image.memory(
-                                                        decoded,
-                                                        fit: BoxFit.cover,
-                                                        errorBuilder: (_, _, _) => Icon(Icons.image, color: AppTheme.primary),
-                                                      );
-                                                    }
-                                                    if (imagePath != null && !kIsWeb && File(imagePath).existsSync()) {
-                                                      return Image.file(
-                                                        File(imagePath),
-                                                        fit: BoxFit.cover,
-                                                        errorBuilder: (_, _, _) => Icon(Icons.image, color: AppTheme.primary),
-                                                      );
-                                                    }
-                                                    if (imagePath != null && (imagePath.startsWith('http://') || imagePath.startsWith('https://'))) {
-                                                      return Image.network(
-                                                        imagePath,
-                                                        fit: BoxFit.cover,
-                                                        errorBuilder: (_, _, _) => Icon(Icons.image, color: AppTheme.primary),
-                                                      );
-                                                    }
-                                                    return Icon(Icons.image, color: AppTheme.primary);
-                                                  },
+                                        const SizedBox(width: 10),
+                                        Expanded(
+                                          child: Column(
+                                            crossAxisAlignment:
+                                                CrossAxisAlignment.start,
+                                            children: [
+                                              Text(
+                                                'Photo / Image Submission',
+                                                style: TextStyle(
+                                                  fontWeight: FontWeight.bold,
+                                                  fontSize: 12,
+                                                  color: AppTheme.text,
                                                 ),
                                               ),
-                                            ),
-                                            const SizedBox(width: 10),
-                                            Expanded(
-                                              child: Column(
-                                                crossAxisAlignment: CrossAxisAlignment.start,
-                                                children: [
-                                                  Text('Photo / Image Submission', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12, color: AppTheme.text)),
-                                                  Text('Tap button to inspect in full resolution', style: TextStyle(fontSize: 11, color: AppTheme.textSecondary)),
-                                                ],
+                                              Text(
+                                                'Tap button to inspect in full resolution',
+                                                style: TextStyle(
+                                                  fontSize: 11,
+                                                  color: AppTheme.textSecondary,
+                                                ),
                                               ),
-                                            ),
-                                            ElevatedButton.icon(
-                                              onPressed: () => _openImagePreview(imagePath, imageBytes, storageUrl, studentName),
-                                              icon: const Icon(Icons.zoom_in, size: 14),
-                                              label: const Text('View Image', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold)),
-                                              style: ElevatedButton.styleFrom(
-                                                backgroundColor: AppTheme.primary,
-                                                foregroundColor: Colors.black,
-                                                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                                                visualDensity: VisualDensity.compact,
-                                              ),
-                                            ),
-                                          ],
+                                            ],
+                                          ),
                                         ),
-                                      ),
-                                    ],
+                                        ElevatedButton.icon(
+                                          onPressed: () => _openImagePreview(
+                                            imagePath,
+                                            imageBytes,
+                                            storageUrl,
+                                            studentName,
+                                          ),
+                                          icon: const Icon(
+                                            Icons.zoom_in,
+                                            size: 14,
+                                          ),
+                                          label: const Text(
+                                            'View Image',
+                                            style: TextStyle(
+                                              fontSize: 11,
+                                              fontWeight: FontWeight.bold,
+                                            ),
+                                          ),
+                                          style: ElevatedButton.styleFrom(
+                                            backgroundColor: AppTheme.primary,
+                                            foregroundColor: Colors.black,
+                                            padding: const EdgeInsets.symmetric(
+                                              horizontal: 10,
+                                              vertical: 6,
+                                            ),
+                                            visualDensity:
+                                                VisualDensity.compact,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                ],
 
-                                    // 3. File attachment
-                                    if (fileName != null && fileName.isNotEmpty) ...[
-                                      Container(
-                                        margin: const EdgeInsets.only(bottom: 8),
-                                        padding: const EdgeInsets.all(10),
-                                        decoration: BoxDecoration(
-                                          color: AppTheme.surface,
-                                          borderRadius: BorderRadius.circular(10),
-                                          border: Border.all(color: AppTheme.border),
-                                        ),
-                                        child: Row(
-                                          children: [
-                                            Icon(Icons.insert_drive_file_outlined, size: 24, color: AppTheme.primary),
-                                            const SizedBox(width: 10),
-                                            Expanded(
-                                              child: Column(
-                                                crossAxisAlignment: CrossAxisAlignment.start,
-                                                children: [
-                                                  Text(
-                                                    fileName,
-                                                    style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12, color: AppTheme.text),
-                                                    maxLines: 1,
-                                                    overflow: TextOverflow.ellipsis,
-                                                  ),
-                                                  Text(
-                                                    fileSize != null ? _formatFileSize(fileSize) : 'Attached document',
-                                                    style: TextStyle(fontSize: 11, color: AppTheme.textSecondary),
-                                                  ),
-                                                ],
-                                              ),
-                                            ),
-                                            const SizedBox(width: 8),
-                                            ElevatedButton.icon(
-                                              onPressed: () => _openFile(fileName, filePath, fileBytes, storageUrl),
-                                              icon: const Icon(Icons.open_in_new, size: 14),
-                                              label: const Text('Open File', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold)),
-                                              style: ElevatedButton.styleFrom(
-                                                backgroundColor: AppTheme.primary.withValues(alpha: 0.15),
-                                                foregroundColor: AppTheme.primary,
-                                                side: BorderSide(color: AppTheme.primary.withValues(alpha: 0.3)),
-                                                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                                                visualDensity: VisualDensity.compact,
-                                                elevation: 0,
-                                              ),
-                                            ),
-                                          ],
-                                        ),
+                                // 3. File attachment
+                                if (fileName != null &&
+                                    fileName.isNotEmpty) ...[
+                                  Container(
+                                    margin: const EdgeInsets.only(bottom: 8),
+                                    padding: const EdgeInsets.all(10),
+                                    decoration: BoxDecoration(
+                                      color: AppTheme.surface,
+                                      borderRadius: BorderRadius.circular(10),
+                                      border: Border.all(
+                                        color: AppTheme.border,
                                       ),
-                                    ],
-
-                                    // 4. Link
-                                    if (link != null && link.isNotEmpty) ...[
-                                      Container(
-                                        margin: const EdgeInsets.only(bottom: 8),
-                                        padding: const EdgeInsets.all(10),
-                                        decoration: BoxDecoration(
-                                          color: AppTheme.surface,
-                                          borderRadius: BorderRadius.circular(10),
-                                          border: Border.all(color: AppTheme.border),
+                                    ),
+                                    child: Row(
+                                      children: [
+                                        Icon(
+                                          Icons.insert_drive_file_outlined,
+                                          size: 24,
+                                          color: AppTheme.primary,
                                         ),
-                                        child: Row(
-                                          children: [
-                                            Icon(Icons.link, size: 20, color: AppTheme.primary),
-                                            const SizedBox(width: 8),
-                                            Expanded(
-                                              child: Text(
-                                                link,
-                                                style: TextStyle(color: AppTheme.primary, fontSize: 12, decoration: TextDecoration.underline),
+                                        const SizedBox(width: 10),
+                                        Expanded(
+                                          child: Column(
+                                            crossAxisAlignment:
+                                                CrossAxisAlignment.start,
+                                            children: [
+                                              Text(
+                                                fileName,
+                                                style: TextStyle(
+                                                  fontWeight: FontWeight.bold,
+                                                  fontSize: 12,
+                                                  color: AppTheme.text,
+                                                ),
                                                 maxLines: 1,
                                                 overflow: TextOverflow.ellipsis,
                                               ),
-                                            ),
-                                            const SizedBox(width: 6),
-                                            IconButton(
-                                              icon: const Icon(Icons.copy, size: 16),
-                                              tooltip: 'Copy Link',
-                                              color: AppTheme.textMuted,
-                                              onPressed: () {
-                                                Clipboard.setData(ClipboardData(text: link));
-                                                ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Link copied!')));
-                                              },
-                                            ),
-                                            ElevatedButton.icon(
-                                              onPressed: () => _openLink(link),
-                                              icon: const Icon(Icons.open_in_browser, size: 14),
-                                              label: const Text('Open Link', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold)),
-                                              style: ElevatedButton.styleFrom(
-                                                backgroundColor: AppTheme.primary,
-                                                foregroundColor: Colors.black,
-                                                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                                                visualDensity: VisualDensity.compact,
+                                              Text(
+                                                fileSize != null
+                                                    ? _formatFileSize(fileSize)
+                                                    : 'Attached document',
+                                                style: TextStyle(
+                                                  fontSize: 11,
+                                                  color: AppTheme.textSecondary,
+                                                ),
                                               ),
+                                            ],
+                                          ),
+                                        ),
+                                        const SizedBox(width: 8),
+                                        ElevatedButton.icon(
+                                          onPressed: () => _openFile(
+                                            fileName,
+                                            filePath,
+                                            fileBytes,
+                                            storageUrl,
+                                          ),
+                                          icon: const Icon(
+                                            Icons.open_in_new,
+                                            size: 14,
+                                          ),
+                                          label: const Text(
+                                            'Open File',
+                                            style: TextStyle(
+                                              fontSize: 11,
+                                              fontWeight: FontWeight.bold,
                                             ),
-                                          ],
-                                        ),
-                                      ),
-                                    ],
-
-                                    // 5. Notes
-                                    if (notes != null && notes.isNotEmpty) ...[
-                                      Text(
-                                        'Note: "$notes"',
-                                        style: TextStyle(color: AppTheme.textMuted, fontSize: 11, fontStyle: FontStyle.italic),
-                                      ),
-                                      const SizedBox(height: 6),
-                                    ],
-
-                                    // 6. Feedback if graded
-                                    if (feedback != null && feedback.isNotEmpty) ...[
-                                      Container(
-                                        width: double.infinity,
-                                        padding: const EdgeInsets.all(8),
-                                        decoration: BoxDecoration(
-                                          color: AppTheme.surface,
-                                          borderRadius: BorderRadius.circular(8),
-                                          border: Border.all(color: AppTheme.border),
-                                        ),
-                                        child: Text(
-                                          'Teacher feedback: $feedback',
-                                          style: TextStyle(color: AppTheme.textSecondary, fontSize: 11),
-                                        ),
-                                      ),
-                                      const SizedBox(height: 8),
-                                    ],
-
-                                    // Action Button for Teacher
-                                    Align(
-                                      alignment: Alignment.centerRight,
-                                      child: ElevatedButton.icon(
-                                        onPressed: () => _openGradingDialog(student),
-                                        icon: Icon(isGraded ? Icons.edit : Icons.grade, size: 14),
-                                        label: Text(
-                                          isGraded ? 'Edit Grade' : 'Grade Submission',
-                                          style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
-                                        ),
-                                        style: ElevatedButton.styleFrom(
-                                          backgroundColor: isGraded ? AppTheme.surface : AppTheme.primary,
-                                          foregroundColor: isGraded ? AppTheme.text : Colors.black,
-                                          side: isGraded ? BorderSide(color: AppTheme.border) : null,
-                                          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-                                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                                        ),
-                                      ),
-                                    ),
-                                  ] else ...[
-                                    // Student has not submitted yet
-                                    const SizedBox(height: 8),
-                                    Row(
-                                      children: [
-                                        Icon(Icons.hourglass_empty, size: 13, color: AppTheme.textMuted),
-                                        const SizedBox(width: 5),
-                                        Text(
-                                          'Awaiting student submission',
-                                          style: TextStyle(color: AppTheme.textMuted, fontSize: 11, fontStyle: FontStyle.italic),
+                                          ),
+                                          style: ElevatedButton.styleFrom(
+                                            backgroundColor: AppTheme.primary
+                                                .withValues(alpha: 0.15),
+                                            foregroundColor: AppTheme.primary,
+                                            side: BorderSide(
+                                              color: AppTheme.primary
+                                                  .withValues(alpha: 0.3),
+                                            ),
+                                            padding: const EdgeInsets.symmetric(
+                                              horizontal: 10,
+                                              vertical: 6,
+                                            ),
+                                            visualDensity:
+                                                VisualDensity.compact,
+                                            elevation: 0,
+                                          ),
                                         ),
                                       ],
                                     ),
-                                  ],
+                                  ),
                                 ],
-                              ),
-                            );
-                          },
-                        ),
+
+                                // 4. Link
+                                if (link != null && link.isNotEmpty) ...[
+                                  Container(
+                                    margin: const EdgeInsets.only(bottom: 8),
+                                    padding: const EdgeInsets.all(10),
+                                    decoration: BoxDecoration(
+                                      color: AppTheme.surface,
+                                      borderRadius: BorderRadius.circular(10),
+                                      border: Border.all(
+                                        color: AppTheme.border,
+                                      ),
+                                    ),
+                                    child: Row(
+                                      children: [
+                                        Icon(
+                                          Icons.link,
+                                          size: 20,
+                                          color: AppTheme.primary,
+                                        ),
+                                        const SizedBox(width: 8),
+                                        Expanded(
+                                          child: Text(
+                                            link,
+                                            style: TextStyle(
+                                              color: AppTheme.primary,
+                                              fontSize: 12,
+                                              decoration:
+                                                  TextDecoration.underline,
+                                            ),
+                                            maxLines: 1,
+                                            overflow: TextOverflow.ellipsis,
+                                          ),
+                                        ),
+                                        const SizedBox(width: 6),
+                                        IconButton(
+                                          icon: const Icon(
+                                            Icons.copy,
+                                            size: 16,
+                                          ),
+                                          tooltip: 'Copy Link',
+                                          color: AppTheme.textMuted,
+                                          onPressed: () {
+                                            Clipboard.setData(
+                                              ClipboardData(text: link),
+                                            );
+                                            ScaffoldMessenger.of(
+                                              context,
+                                            ).showSnackBar(
+                                              const SnackBar(
+                                                content: Text('Link copied!'),
+                                              ),
+                                            );
+                                          },
+                                        ),
+                                        ElevatedButton.icon(
+                                          onPressed: () => _openLink(link),
+                                          icon: const Icon(
+                                            Icons.open_in_browser,
+                                            size: 14,
+                                          ),
+                                          label: const Text(
+                                            'Open Link',
+                                            style: TextStyle(
+                                              fontSize: 11,
+                                              fontWeight: FontWeight.bold,
+                                            ),
+                                          ),
+                                          style: ElevatedButton.styleFrom(
+                                            backgroundColor: AppTheme.primary,
+                                            foregroundColor: Colors.black,
+                                            padding: const EdgeInsets.symmetric(
+                                              horizontal: 10,
+                                              vertical: 6,
+                                            ),
+                                            visualDensity:
+                                                VisualDensity.compact,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                ],
+
+                                // 5. Notes
+                                if (notes != null && notes.isNotEmpty) ...[
+                                  Text(
+                                    'Note: "$notes"',
+                                    style: TextStyle(
+                                      color: AppTheme.textMuted,
+                                      fontSize: 11,
+                                      fontStyle: FontStyle.italic,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 6),
+                                ],
+
+                                // 6. Feedback if graded
+                                if (feedback != null &&
+                                    feedback.isNotEmpty) ...[
+                                  Container(
+                                    width: double.infinity,
+                                    padding: const EdgeInsets.all(8),
+                                    decoration: BoxDecoration(
+                                      color: AppTheme.surface,
+                                      borderRadius: BorderRadius.circular(8),
+                                      border: Border.all(
+                                        color: AppTheme.border,
+                                      ),
+                                    ),
+                                    child: Text(
+                                      'Teacher feedback: $feedback',
+                                      style: TextStyle(
+                                        color: AppTheme.textSecondary,
+                                        fontSize: 11,
+                                      ),
+                                    ),
+                                  ),
+                                  const SizedBox(height: 8),
+                                ],
+
+                                // Action Buttons for Teacher
+                                Align(
+                                  alignment: Alignment.centerRight,
+                                  child: Wrap(
+                                    spacing: 8,
+                                    runSpacing: 8,
+                                    alignment: WrapAlignment.end,
+                                    crossAxisAlignment:
+                                        WrapCrossAlignment.center,
+                                    children: [
+                                      if (submissionId != null)
+                                        OutlinedButton.icon(
+                                          onPressed: () async {
+                                            final messenger =
+                                                ScaffoldMessenger.of(context);
+                                            final newAllowed =
+                                                !isResubmissionAllowed;
+                                            try {
+                                              await DatabaseHelper()
+                                                  .setSubmissionResubmissionAllowed(
+                                                    submissionId: submissionId,
+                                                    allowed: newAllowed,
+                                                  );
+                                              ref.invalidate(
+                                                activityRosterProvider(
+                                                  widget.assignmentId,
+                                                ),
+                                              );
+                                              await _loadRoster();
+                                              if (mounted) {
+                                                messenger.showSnackBar(
+                                                  SnackBar(
+                                                    content: Text(
+                                                      newAllowed
+                                                          ? 'Resubmission unlocked for $studentName. Student can now edit and resubmit.'
+                                                          : 'Resubmission locked for $studentName.',
+                                                    ),
+                                                    backgroundColor: newAllowed
+                                                        ? AppTheme.success
+                                                        : Colors.orange,
+                                                    duration: const Duration(
+                                                      seconds: 3,
+                                                    ),
+                                                  ),
+                                                );
+                                              }
+                                            } catch (e) {
+                                              if (mounted) {
+                                                messenger.showSnackBar(
+                                                  SnackBar(
+                                                    content: Text(
+                                                      'Failed to update status: $e',
+                                                    ),
+                                                  ),
+                                                );
+                                              }
+                                            }
+                                          },
+                                          icon: Icon(
+                                            isResubmissionAllowed
+                                                ? Icons.lock
+                                                : Icons.lock_open,
+                                            size: 14,
+                                            color: isResubmissionAllowed
+                                                ? Colors.amber
+                                                : AppTheme.primary,
+                                          ),
+                                          label: Text(
+                                            isResubmissionAllowed
+                                                ? 'Lock Resubmission'
+                                                : 'Allow Resubmission',
+                                            style: TextStyle(
+                                              fontSize: 12,
+                                              fontWeight: FontWeight.bold,
+                                              color: isResubmissionAllowed
+                                                  ? Colors.amber
+                                                  : AppTheme.primary,
+                                            ),
+                                          ),
+                                          style: OutlinedButton.styleFrom(
+                                            side: BorderSide(
+                                              color: isResubmissionAllowed
+                                                  ? Colors.amber.withValues(
+                                                      alpha: 0.6,
+                                                    )
+                                                  : AppTheme.primary.withValues(
+                                                      alpha: 0.6,
+                                                    ),
+                                            ),
+                                            padding: const EdgeInsets.symmetric(
+                                              horizontal: 12,
+                                              vertical: 8,
+                                            ),
+                                            shape: RoundedRectangleBorder(
+                                              borderRadius:
+                                                  BorderRadius.circular(8),
+                                            ),
+                                          ),
+                                        ),
+                                      ElevatedButton.icon(
+                                        onPressed: () =>
+                                            _openGradingDialog(student),
+                                        icon: Icon(
+                                          isGraded ? Icons.edit : Icons.grade,
+                                          size: 14,
+                                        ),
+                                        label: Text(
+                                          isGraded
+                                              ? 'Edit Grade'
+                                              : 'Grade Submission',
+                                          style: const TextStyle(
+                                            fontSize: 12,
+                                            fontWeight: FontWeight.bold,
+                                          ),
+                                        ),
+                                        style: ElevatedButton.styleFrom(
+                                          backgroundColor: isGraded
+                                              ? AppTheme.surface
+                                              : AppTheme.primary,
+                                          foregroundColor: isGraded
+                                              ? AppTheme.text
+                                              : Colors.black,
+                                          side: isGraded
+                                              ? BorderSide(
+                                                  color: AppTheme.border,
+                                                )
+                                              : null,
+                                          padding: const EdgeInsets.symmetric(
+                                            horizontal: 14,
+                                            vertical: 8,
+                                          ),
+                                          shape: RoundedRectangleBorder(
+                                            borderRadius: BorderRadius.circular(
+                                              8,
+                                            ),
+                                          ),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ] else ...[
+                                // Student has not submitted yet
+                                const SizedBox(height: 8),
+                                Row(
+                                  children: [
+                                    Icon(
+                                      Icons.hourglass_empty,
+                                      size: 13,
+                                      color: AppTheme.textMuted,
+                                    ),
+                                    const SizedBox(width: 5),
+                                    Text(
+                                      'Awaiting student submission',
+                                      style: TextStyle(
+                                        color: AppTheme.textMuted,
+                                        fontSize: 11,
+                                        fontStyle: FontStyle.italic,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ],
+                            ],
+                          ),
+                        );
+                      },
+                    ),
             ),
           ],
         ),

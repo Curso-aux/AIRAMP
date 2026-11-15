@@ -135,7 +135,7 @@ class FirestoreService {
     try {
       return DefaultFirebaseOptions.currentPlatform.projectId;
     } catch (_) {}
-    return 'aira-app-database';
+    return 'aira-demo-live';
   }
 
   FirebaseFirestore? _firestore;
