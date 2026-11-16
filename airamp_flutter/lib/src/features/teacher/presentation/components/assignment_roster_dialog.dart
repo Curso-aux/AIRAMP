@@ -10,6 +10,7 @@ import '../../../../core/components/user_avatar_widget.dart';
 import '../../../../core/database/database_helper.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../../core/theme/theme_provider.dart';
+import '../../../../core/services/cloudflare_r2_service.dart';
 import '../../../../core/services/session_draft_service.dart';
 import '../../../../core/utils/file_download_helper.dart';
 import '../../../../core/utils/image_compress_helper.dart';
@@ -168,8 +169,9 @@ class _AssignmentRosterDialogState
     } else if (storageUrl != null &&
         (storageUrl.startsWith('http://') ||
             storageUrl.startsWith('https://'))) {
+      final accessibleUrl = CloudflareR2Service.instance.getAccessibleUrl(storageUrl);
       imageWidget = Image.network(
-        storageUrl,
+        accessibleUrl,
         fit: BoxFit.contain,
         loadingBuilder: (context, child, progress) {
           if (progress == null) return child;
@@ -274,11 +276,12 @@ class _AssignmentRosterDialogState
       if (storageUrl != null &&
           (storageUrl.startsWith('http://') ||
               storageUrl.startsWith('https://'))) {
+        final accessibleUrl = CloudflareR2Service.instance.getAccessibleUrl(storageUrl);
         if (kIsWeb) {
-          triggerWebUrlDownload(storageUrl, cleanName);
+          triggerWebUrlDownload(accessibleUrl, cleanName);
           return;
         }
-        final uri = Uri.parse(storageUrl);
+        final uri = Uri.parse(accessibleUrl);
         await launchUrl(uri, mode: LaunchMode.externalApplication);
         return;
       }
@@ -814,6 +817,12 @@ class _AssignmentRosterDialogState
                     onPressed: () => _openLink(widget.gdriveFolderUrl!),
                   ),
                 ],
+                IconButton(
+                  icon: const Icon(Icons.refresh),
+                  tooltip: 'Refresh & Sync Submissions',
+                  color: AppTheme.primary,
+                  onPressed: _loadRoster,
+                ),
                 IconButton(
                   icon: Icon(Icons.close, color: AppTheme.textMuted),
                   onPressed: () => Navigator.pop(context),

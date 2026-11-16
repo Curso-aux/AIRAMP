@@ -270,118 +270,109 @@ class _ClassOverviewWidgetState extends ConsumerState<ClassOverviewWidget> {
           ),
           const SizedBox(height: 14),
 
-          // Student Activity List or Collapsed State with smooth slide animation
-          AnimatedSize(
-            duration: const Duration(milliseconds: 300),
-            curve: Curves.easeInOutCubic,
-            child: _isCollapsed
-                ? InkWell(
-                    key: const ValueKey('student_list_collapsed'),
-                    onTap: () => setState(() => _isCollapsed = false),
-                    borderRadius: BorderRadius.circular(10),
-                    child: Container(
-                      width: double.infinity,
-                      padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 14),
-                      decoration: BoxDecoration(
-                        color: AppTheme.background,
-                        borderRadius: BorderRadius.circular(10),
-                        border: Border.all(color: AppTheme.border),
-                      ),
-                      child: Row(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          Icon(Icons.unfold_more, size: 16, color: AppTheme.primary),
-                          const SizedBox(width: 6),
-                          Text(
-                            'Showing ${filteredStudents.length} students (Collapsed) • Tap to view',
-                            style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: AppTheme.primary),
-                          ),
-                        ],
-                      ),
+          // Student Activity List or Collapsed State (direct layout without oscillation-prone AnimatedSize)
+          if (_isCollapsed)
+            InkWell(
+              key: const ValueKey('student_list_collapsed'),
+              onTap: () => setState(() => _isCollapsed = false),
+              borderRadius: BorderRadius.circular(10),
+              child: Container(
+                width: double.infinity,
+                padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 14),
+                decoration: BoxDecoration(
+                  color: AppTheme.background,
+                  borderRadius: BorderRadius.circular(10),
+                  border: Border.all(color: AppTheme.border),
+                ),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(Icons.unfold_more, size: 16, color: AppTheme.primary),
+                    const SizedBox(width: 6),
+                    Text(
+                      'Showing ${filteredStudents.length} students (Collapsed) • Tap to view',
+                      style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: AppTheme.primary),
                     ),
-                  )
-                : filteredStudents.isEmpty
-                    ? Container(
-                        key: const ValueKey('student_list_empty'),
-                        padding: const EdgeInsets.symmetric(vertical: 24),
-                        alignment: Alignment.center,
-                        child: Column(
-                          children: [
-                            Icon(Icons.person_search_outlined, size: 32, color: AppTheme.textMuted),
-                            const SizedBox(height: 6),
-                            Text(
-                              'No students match "$_activityFilter" in $_activeSection',
-                              style: TextStyle(color: AppTheme.textSecondary, fontSize: 12),
-                            ),
-                          ],
-                        ),
-                      )
-                    : Column(
-                        key: const ValueKey('student_list_expanded'),
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          ListView.separated(
-                            shrinkWrap: true,
-                            physics: const NeverScrollableScrollPhysics(),
-                            itemCount: displayStudents.length,
-                            separatorBuilder: (_, _) => const SizedBox(height: 8),
-                            itemBuilder: (context, index) {
-                              final student = displayStudents[index];
-                              return _buildStudentRow(student, context);
-                            },
-                          ),
-                          const SizedBox(height: 12),
-                          // Controls: Show More / Show Less & View All in Roster
-                          Wrap(
-                            alignment: WrapAlignment.spaceBetween,
-                            crossAxisAlignment: WrapCrossAlignment.center,
-                            spacing: 8,
-                            runSpacing: 8,
+                  ],
+                ),
+              ),
+            )
+          else if (filteredStudents.isEmpty)
+            Container(
+              key: const ValueKey('student_list_empty'),
+              padding: const EdgeInsets.symmetric(vertical: 24),
+              alignment: Alignment.center,
+              child: Column(
+                children: [
+                  Icon(Icons.person_search_outlined, size: 32, color: AppTheme.textMuted),
+                  const SizedBox(height: 6),
+                  Text(
+                    'No students match "$_activityFilter" in $_activeSection',
+                    style: TextStyle(color: AppTheme.textSecondary, fontSize: 12),
+                  ),
+                ],
+              ),
+            )
+          else
+            Column(
+              key: const ValueKey('student_list_expanded'),
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                for (int i = 0; i < displayStudents.length; i++) ...[
+                  if (i > 0) const SizedBox(height: 8),
+                  _buildStudentRow(displayStudents[i], context),
+                ],
+                const SizedBox(height: 12),
+                // Controls: Show More / Show Less & View All in Roster
+                Wrap(
+                  alignment: WrapAlignment.spaceBetween,
+                  crossAxisAlignment: WrapCrossAlignment.center,
+                  spacing: 8,
+                  runSpacing: 8,
+                  children: [
+                    if (sortedStudents.length > 3)
+                      InkWell(
+                        onTap: () => setState(() => _showAllStudents = !_showAllStudents),
+                        borderRadius: BorderRadius.circular(8),
+                        child: Padding(
+                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
                             children: [
-                              if (sortedStudents.length > 3)
-                                InkWell(
-                                  onTap: () => setState(() => _showAllStudents = !_showAllStudents),
-                                  borderRadius: BorderRadius.circular(8),
-                                  child: Padding(
-                                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
-                                    child: Row(
-                                      mainAxisSize: MainAxisSize.min,
-                                      children: [
-                                        Icon(
-                                          _showAllStudents ? Icons.keyboard_arrow_up : Icons.keyboard_arrow_down,
-                                          size: 16,
-                                          color: AppTheme.primary,
-                                        ),
-                                        const SizedBox(width: 4),
-                                        Text(
-                                          _showAllStudents
-                                              ? 'Show Less'
-                                              : 'Show More (${sortedStudents.length - 3} more)',
-                                          style: TextStyle(
-                                            color: AppTheme.primary,
-                                            fontWeight: FontWeight.bold,
-                                            fontSize: 12,
-                                          ),
-                                        ),
-                                      ],
-                                    ),
-                                  ),
-                                )
-                              else
-                                const SizedBox.shrink(),
-                              TextButton.icon(
-                                onPressed: () => context.go('/teacher/students?section=$_activeSection'),
-                                icon: const Icon(Icons.arrow_forward, size: 14),
-                                label: Text(
-                                  'View All (${sectionStudents.length}) in Roster',
-                                  style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12),
+                              Icon(
+                                _showAllStudents ? Icons.keyboard_arrow_up : Icons.keyboard_arrow_down,
+                                size: 16,
+                                color: AppTheme.primary,
+                              ),
+                              const SizedBox(width: 4),
+                              Text(
+                                _showAllStudents
+                                    ? 'Show Less'
+                                    : 'Show More (${sortedStudents.length - 3} more)',
+                                style: TextStyle(
+                                  color: AppTheme.primary,
+                                  fontWeight: FontWeight.bold,
+                                  fontSize: 12,
                                 ),
                               ),
                             ],
                           ),
-                        ],
+                        ),
+                      )
+                    else
+                      const SizedBox.shrink(),
+                    TextButton.icon(
+                      onPressed: () => context.go('/teacher/students?section=$_activeSection'),
+                      icon: const Icon(Icons.arrow_forward, size: 14),
+                      label: Text(
+                        'View All (${sectionStudents.length}) in Roster',
+                        style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12),
                       ),
-          ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
         ],
       ),
     );

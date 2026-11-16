@@ -2188,10 +2188,16 @@ class FirestoreService {
     }
   }
 
+  static DateTime? _messagesSyncBackoffUntil;
+
   /// Syncs all locally stored messages from SQLite up to Cloud Firestore.
   /// Guarantees that any messages sent on physical Android devices while offline/prior
   /// become instantly available to Web browsers.
   Future<void> syncLocalMessagesToCloud() async {
+    if (_messagesSyncBackoffUntil != null &&
+        DateTime.now().isBefore(_messagesSyncBackoffUntil!)) {
+      return;
+    }
     try {
       final db = await DatabaseHelper().database;
       final localMessages = await db.query('messages');
@@ -2218,6 +2224,9 @@ class FirestoreService {
       }
       debugPrint('[FirestoreService] Synced ${localMessages.length} local messages up to Cloud Firestore');
     } catch (e) {
+      if (e.toString().contains('429')) {
+        _messagesSyncBackoffUntil = DateTime.now().add(const Duration(minutes: 5));
+      }
       debugPrint('[FirestoreService] syncLocalMessagesToCloud error: $e');
     }
   }

@@ -13,6 +13,7 @@ import '../utils/section_key_helper.dart';
 import '../utils/image_compress_helper.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'firestore_service.dart';
+import 'supabase_service.dart';
 import '../services/email_service.dart';
 import '../services/cloud_storage_service.dart';
 import '../../features/teacher/domain/item_analysis_model.dart';
@@ -73,6 +74,22 @@ class DatabaseHelper {
     } catch (_) {}
     try {
       await db.execute('ALTER TABLE announcements ADD COLUMN author_role TEXT');
+    } catch (_) {}
+    try {
+      await db.execute('ALTER TABLE quizzes ADD COLUMN cloud_id TEXT');
+    } catch (_) {}
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final delQ = prefs.getStringList('permanently_deleted_quizzes') ?? [];
+      final cleanedQ = delQ.where((item) => !RegExp(r'^\d+$').hasMatch(item)).toList();
+      if (cleanedQ.length != delQ.length) {
+        await prefs.setStringList('permanently_deleted_quizzes', cleanedQ);
+      }
+      final delA = prefs.getStringList('permanently_deleted_assignments') ?? [];
+      final cleanedA = delA.where((item) => !RegExp(r'^\d+$').hasMatch(item)).toList();
+      if (cleanedA.length != delA.length) {
+        await prefs.setStringList('permanently_deleted_assignments', cleanedA);
+      }
     } catch (_) {}
     try {
       await db.execute('ALTER TABLE users ADD COLUMN password_salt TEXT');
@@ -3258,6 +3275,21 @@ class DatabaseHelper {
       );
       final cloudDocId = 'quiz_${cleanSubCode}_${cleanTitle}_$quizId';
 
+      // 1. Save to Supabase (primary database with zero quota limits)
+      try {
+        await SupabaseService.instance.saveQuiz(
+          id: quizId.toString(),
+          title: title,
+          subjectId: subjectId.toString(),
+          subjectName: subName,
+          subjectCode: subCode,
+          timeLimitMinutes: timeLimitMinutes,
+          questions: questions,
+        );
+      } catch (e) {
+        debugPrint('[DatabaseHelper] createQuiz Supabase notice: $e');
+      }
+
       await FirestoreService().saveDocument('quizzes', cloudDocId, {
         'id': quizId,
         'title': title.trim(),
@@ -4744,6 +4776,16 @@ class DatabaseHelper {
       if (cleanedList.length != deletedList.length) {
         await prefs.setStringList('permanently_deleted_accounts', cleanedList);
       }
+      final delQ = prefs.getStringList('permanently_deleted_quizzes') ?? [];
+      final cleanedQ = delQ.where((item) => !RegExp(r'^\d+$').hasMatch(item)).toList();
+      if (cleanedQ.length != delQ.length) {
+        await prefs.setStringList('permanently_deleted_quizzes', cleanedQ);
+      }
+      final delA = prefs.getStringList('permanently_deleted_assignments') ?? [];
+      final cleanedA = delA.where((item) => !RegExp(r'^\d+$').hasMatch(item)).toList();
+      if (cleanedA.length != delA.length) {
+        await prefs.setStringList('permanently_deleted_assignments', cleanedA);
+      }
     } catch (_) {}
 
     // Ensure demo accounts (admin_2, teacher_1, student_1) are permanently purged from local database
@@ -4967,6 +5009,7 @@ class DatabaseHelper {
           await db.rawUpdate('UPDATE OR IGNORE enrollments SET subject_id = ? WHERE subject_id = ?', [keepId, deleteId]);
           await db.delete('enrollments', where: 'subject_id = ?', whereArgs: [deleteId]);
           await db.update('assignments', {'subject_id': keepId}, where: 'subject_id = ?', whereArgs: [deleteId]);
+          await db.update('quizzes', {'subject_id': keepId}, where: 'subject_id = ?', whereArgs: [deleteId]);
           await db.update('topics', {'subject_id': keepId}, where: 'subject_id = ?', whereArgs: [deleteId]);
           await db.delete('subjects', where: 'id = ?', whereArgs: [deleteId]);
 
@@ -7783,8 +7826,14 @@ class DatabaseHelper {
   }) async {
     final db = await database;
     final now = DateTime.now().toIso8601String();
+    final cleanTitle = title.toLowerCase().replaceAll(
+      RegExp(r'[^a-z0-9]'),
+      '_',
+    );
+    final canonicalCloudId = 'quiz_${DateTime.now().millisecondsSinceEpoch}_$cleanTitle';
 
     final quizId = await db.insert('quizzes', {
+      'cloud_id': canonicalCloudId,
       'title': title,
       'description': description,
       'subject_id': subjectId,
@@ -7799,6 +7848,23 @@ class DatabaseHelper {
       'schedule_end': scheduleEnd,
       'created_at': now,
     });
+
+    // Un-tombstone newly created quiz so it is never hidden or purged
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final delQ = prefs.getStringList('permanently_deleted_quizzes') ?? [];
+      final rawTitle = title.toLowerCase().trim();
+      final cleanedQ = delQ.where((item) =>
+        item != quizId.toString() &&
+        item != canonicalCloudId &&
+        item != cleanTitle &&
+        item != rawTitle &&
+        !RegExp(r'^\d+$').hasMatch(item)
+      ).toList();
+      if (cleanedQ.length != delQ.length) {
+        await prefs.setStringList('permanently_deleted_quizzes', cleanedQ);
+      }
+    } catch (_) {}
 
     for (final q in questions) {
       await db.insert('questions', {
@@ -7833,11 +7899,22 @@ class DatabaseHelper {
         RegExp(r'[^a-zA-Z0-9]'),
         '_',
       );
-      final cleanTitle = title.toLowerCase().replaceAll(
-        RegExp(r'[^a-z0-9]'),
-        '_',
-      );
       final cloudDocId = 'quiz_${cleanSubCode}_${cleanTitle}_$quizId';
+
+      // 1. Save to Supabase (primary database with zero quota limits)
+      try {
+        await SupabaseService.instance.saveQuiz(
+          id: canonicalCloudId,
+          title: title,
+          subjectId: subjectId.toString(),
+          subjectName: subName,
+          subjectCode: subCode,
+          timeLimitMinutes: timeLimitMinutes,
+          questions: questions,
+        );
+      } catch (e) {
+        debugPrint('[DatabaseHelper] createQuiz Supabase notice: $e');
+      }
 
       await FirestoreService().saveDocument('quizzes', cloudDocId, {
         'id': quizId,
@@ -7940,16 +8017,58 @@ class DatabaseHelper {
 
   Future<List<Map<String, dynamic>>> getQuizzesForSubject(int subjectId) async {
     final db = await database;
+
+    // Resolve any subject IDs with matching subject_code or name to handle multi-client auto-increment variations
+    final List<int> matchingSubIds = [subjectId];
+    String? localSubCode;
+    String? localSubName;
+    try {
+      final curSub = await db.query('subjects', where: 'id = ?', whereArgs: [subjectId]);
+      if (curSub.isNotEmpty) {
+        localSubCode = curSub.first['subject_code']?.toString().toUpperCase();
+        localSubName = curSub.first['name']?.toString().trim().toUpperCase();
+        if (localSubCode != null && localSubCode.isNotEmpty) {
+          final sameCode = await db.query('subjects', where: 'UPPER(subject_code) = ?', whereArgs: [localSubCode]);
+          for (final s in sameCode) {
+            final id = s['id'] as int;
+            if (!matchingSubIds.contains(id)) matchingSubIds.add(id);
+          }
+        }
+        if (localSubName != null && localSubName.isNotEmpty) {
+          final sameName = await db.query('subjects', where: 'UPPER(TRIM(name)) = ?', whereArgs: [localSubName]);
+          for (final s in sameName) {
+            final id = s['id'] as int;
+            if (!matchingSubIds.contains(id)) matchingSubIds.add(id);
+          }
+        }
+      }
+    } catch (_) {}
+
+    final inClause = matchingSubIds.map((_) => '?').join(',');
     final quizzes = await db.query(
       'quizzes',
-      where: 'subject_id = ?',
-      whereArgs: [subjectId],
+      where: 'subject_id IN ($inClause)',
+      whereArgs: matchingSubIds,
       orderBy: 'created_at DESC',
     );
 
+    SharedPreferences? prefs;
+    try {
+      prefs = await SharedPreferences.getInstance();
+    } catch (_) {}
+    final deletedQuizzes = prefs?.getStringList('permanently_deleted_quizzes') ?? [];
+
     final List<Map<String, dynamic>> enriched = [];
     for (final q in quizzes) {
-      final qId = q['id'] as int;
+      final qId = (q['id'] is num) ? (q['id'] as num).toInt() : int.tryParse(q['id']?.toString() ?? '') ?? 0;
+      final cloudId = q['cloud_id']?.toString() ?? '';
+      final title = (q['title'] as String? ?? '').trim();
+      final cleanTitle = title.toLowerCase().replaceAll(RegExp(r'[^a-z0-9]'), '_');
+      final isDeleted = (cloudId.isNotEmpty && !RegExp(r'^\d+$').hasMatch(cloudId) && deletedQuizzes.contains(cloudId)) ||
+                        (cleanTitle.isNotEmpty && deletedQuizzes.contains(cleanTitle));
+      if (isDeleted) {
+        continue;
+      }
       final qCountRes = await db.rawQuery(
         'SELECT COUNT(*) as count FROM questions WHERE quiz_id = ?',
         [qId],
@@ -7970,11 +8089,51 @@ class DatabaseHelper {
 
       enriched.add({
         ...q,
+        'id': qId,
         'question_count': qCount,
         'assigned_count': assignCount,
         'completed_count': compCount,
       });
     }
+
+    // Direct Supabase Fallback: On Web or if SQLite is still empty, load live from Supabase!
+    if (enriched.isEmpty && SupabaseService.instance.isInitialized) {
+      try {
+        final supaQuizzes = await SupabaseService.instance.fetchQuizzes(
+          subjectId.toString(),
+          subjectCode: localSubCode,
+          subjectName: localSubName,
+        );
+        for (final sq in supaQuizzes) {
+          final title = (sq['title'] as String? ?? '').trim();
+          final cleanTitle = title.toLowerCase().replaceAll(RegExp(r'[^a-z0-9]'), '_');
+          final qIdStr = sq['id']?.toString() ?? '';
+          if ((!RegExp(r'^\d+$').hasMatch(qIdStr) && deletedQuizzes.contains(qIdStr)) ||
+              (cleanTitle.isNotEmpty && deletedQuizzes.contains(cleanTitle))) {
+            continue;
+          }
+          final qId = int.tryParse(qIdStr) ?? 1;
+          final questions = (sq['questions_json'] is List) ? (sq['questions_json'] as List) : [];
+          enriched.add({
+            'id': qId,
+            'cloud_id': qIdStr,
+            'title': title,
+            'description': sq['description']?.toString() ?? '',
+            'subject_id': subjectId,
+            'time_limit_minutes': sq['time_limit_minutes'] ?? 0,
+            'passing_score': sq['passing_score'] ?? 70,
+            'status': sq['status']?.toString() ?? 'published',
+            'question_count': questions.length,
+            'assigned_count': 1,
+            'completed_count': 0,
+            'created_at': sq['created_at']?.toString() ?? DateTime.now().toIso8601String(),
+          });
+        }
+      } catch (e) {
+        debugPrint('[DatabaseHelper] getQuizzesForSubject Supabase fallback notice: $e');
+      }
+    }
+
     return enriched;
   }
 
@@ -8037,7 +8196,20 @@ class DatabaseHelper {
     query +=
         ' ORDER BY CASE WHEN COALESCE(qa.status, \'pending\') = \'pending\' THEN 0 ELSE 1 END, COALESCE(qa.assigned_at, q.created_at) DESC';
 
-    return await db.rawQuery(query, args);
+    final rows = await db.rawQuery(query, args);
+    SharedPreferences? prefs;
+    try {
+      prefs = await SharedPreferences.getInstance();
+    } catch (_) {}
+    final deletedQuizzes = prefs?.getStringList('permanently_deleted_quizzes') ?? [];
+    if (deletedQuizzes.isEmpty) return rows;
+    return rows.where((r) {
+      final qId = r['quiz_id']?.toString() ?? '';
+      final t = (r['title']?.toString() ?? '').trim().toLowerCase().replaceAll(RegExp(r'[^a-z0-9]'), '_');
+      final isDeleted = (!RegExp(r'^\d+$').hasMatch(qId) && deletedQuizzes.contains(qId)) ||
+                        (t.isNotEmpty && deletedQuizzes.contains(t));
+      return !isDeleted;
+    }).toList();
   }
 
   /// Mark a quiz assignment as missed when student failed to take it before the deadline
@@ -8282,6 +8454,8 @@ class DatabaseHelper {
       }
     }
 
+    final cloudId = quizRow?['cloud_id']?.toString();
+
     // 1. Delete associated attempts, scores, assignments, questions, and the quiz itself
     await db.delete('quiz_attempts', where: 'quiz_id = ?', whereArgs: [quizId]);
     try {
@@ -8295,12 +8469,35 @@ class DatabaseHelper {
     await db.delete('questions', where: 'quiz_id = ?', whereArgs: [quizId]);
     await db.delete('quizzes', where: 'id = ?', whereArgs: [quizId]);
 
+    // Track tombstone so cloud delta/full sync never resurrects this quiz
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final deletedQuizzes = prefs.getStringList('permanently_deleted_quizzes') ?? [];
+      if (cloudId != null && cloudId.isNotEmpty && !RegExp(r'^\d+$').hasMatch(cloudId) && !deletedQuizzes.contains(cloudId)) {
+        deletedQuizzes.add(cloudId);
+      }
+      final cloudDocId = 'quiz_${cleanSubCode}_${cleanTitle}_$quizId';
+      if (!deletedQuizzes.contains(cloudDocId)) deletedQuizzes.add(cloudDocId);
+      if (cleanTitle.isNotEmpty && !deletedQuizzes.contains(cleanTitle)) deletedQuizzes.add(cleanTitle);
+      await prefs.setStringList('permanently_deleted_quizzes', deletedQuizzes);
+    } catch (_) {}
+
+    // Delete from Supabase
+    try {
+      if (SupabaseService.instance.isInitialized) {
+        if (cloudId != null && cloudId.isNotEmpty) {
+          await SupabaseService.instance.deleteQuiz(cloudId);
+        }
+        await SupabaseService.instance.deleteQuiz(quizId.toString());
+      }
+    } catch (_) {}
+
     // 2. Cloud Firestore deletion so the quiz and its attempts do not resurrect on web or sync
     try {
-      unawaited(FirestoreService().deleteDocument('quizzes', quizId.toString()));
+      await FirestoreService().deleteDocument('quizzes', quizId.toString());
       if (cleanTitle.isNotEmpty) {
-        unawaited(FirestoreService().deleteDocument('quizzes', 'quiz_${cleanSubCode}_${cleanTitle}_$quizId'));
-        unawaited(FirestoreService().deleteDocument('quizzes', 'quiz_${subId}_${cleanTitle}_$quizId'));
+        await FirestoreService().deleteDocument('quizzes', 'quiz_${cleanSubCode}_${cleanTitle}_$quizId');
+        await FirestoreService().deleteDocument('quizzes', 'quiz_${subId}_${cleanTitle}_$quizId');
       }
       final cloudQuizzes = await FirestoreService().fetchAllDocuments('quizzes');
       for (final doc in cloudQuizzes) {
@@ -8308,7 +8505,7 @@ class DatabaseHelper {
         final docId = doc['_docId']?.toString() ?? doc['id']?.toString() ?? doc['document_id']?.toString() ?? '';
         if (rawQId == quizId || rawQId?.toString() == quizId.toString() || docId.endsWith('_$quizId') || docId == quizId.toString()) {
           if (docId.isNotEmpty) {
-            unawaited(FirestoreService().deleteDocument('quizzes', docId));
+            await FirestoreService().deleteDocument('quizzes', docId);
           }
         }
       }
@@ -8318,7 +8515,7 @@ class DatabaseHelper {
         final docId = doc['_docId']?.toString() ?? doc['id']?.toString() ?? doc['document_id']?.toString() ?? '';
         if (rawQId == quizId || rawQId?.toString() == quizId.toString()) {
           if (docId.isNotEmpty) {
-            unawaited(FirestoreService().deleteDocument('quiz_attempts', docId));
+            await FirestoreService().deleteDocument('quiz_attempts', docId);
           }
         }
       }
@@ -8328,7 +8525,7 @@ class DatabaseHelper {
         final docId = doc['_docId']?.toString() ?? doc['id']?.toString() ?? doc['document_id']?.toString() ?? '';
         if (rawQId == quizId || rawQId?.toString() == quizId.toString()) {
           if (docId.isNotEmpty) {
-            unawaited(FirestoreService().deleteDocument('quiz_assignments', docId));
+            await FirestoreService().deleteDocument('quiz_assignments', docId);
           }
         }
       }
@@ -8790,7 +8987,20 @@ class DatabaseHelper {
       args.add(teacherId);
     }
     query += ' ORDER BY attempt_count DESC, q.created_at DESC, q.id DESC';
-    return await db.rawQuery(query, args);
+    final rows = await db.rawQuery(query, args);
+    SharedPreferences? prefs;
+    try {
+      prefs = await SharedPreferences.getInstance();
+    } catch (_) {}
+    final deletedQuizzes = prefs?.getStringList('permanently_deleted_quizzes') ?? [];
+    if (deletedQuizzes.isEmpty) return rows;
+    return rows.where((r) {
+      final qId = r['quiz_id']?.toString() ?? '';
+      final t = (r['title']?.toString() ?? '').trim().toLowerCase().replaceAll(RegExp(r'[^a-z0-9]'), '_');
+      final isDeleted = (!RegExp(r'^\d+$').hasMatch(qId) && deletedQuizzes.contains(qId)) ||
+                        (t.isNotEmpty && deletedQuizzes.contains(t));
+      return !isDeleted;
+    }).toList();
   }
 
   /// Calculates DepEd-compliant psychometric Item Analysis for a given quiz.
@@ -9258,6 +9468,23 @@ class DatabaseHelper {
       'created_at': now,
     });
 
+    // Un-tombstone newly created assignment so it is never hidden or purged
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final delA = prefs.getStringList('permanently_deleted_assignments') ?? [];
+      final rawTitle = title.toLowerCase().trim();
+      final cleanedA = delA.where((item) =>
+        item != id.toString() &&
+        item != canonicalCloudId &&
+        item != cleanTitle &&
+        item != rawTitle &&
+        !RegExp(r'^\d+$').hasMatch(item)
+      ).toList();
+      if (cleanedA.length != delA.length) {
+        await prefs.setStringList('permanently_deleted_assignments', cleanedA);
+      }
+    } catch (_) {}
+
     // 1. Sync assignment to Cloud Firestore
     try {
       final sub = await db.query(
@@ -9271,6 +9498,22 @@ class DatabaseHelper {
       final subName = sub.isNotEmpty
           ? sub.first['name'] as String? ?? 'Subject'
           : 'Subject';
+
+      // 0. Save to Supabase (primary database with zero quota limits)
+      try {
+        await SupabaseService.instance.saveAssignment(
+          id: canonicalCloudId,
+          title: title,
+          subjectId: subjectId.toString(),
+          subjectName: subName,
+          subjectCode: subCode,
+          description: description,
+          dueDate: dueDate,
+          attachmentUrl: storageUrl ?? gdriveFolderUrl,
+        );
+      } catch (e) {
+        debugPrint('[DatabaseHelper] createAssignment Supabase notice: $e');
+      }
 
       final assignmentMap = {
         'id': canonicalCloudId,
@@ -9358,13 +9601,85 @@ class DatabaseHelper {
       final localCountRes = await db.rawQuery('SELECT COUNT(*) as cnt FROM assignments');
       final localCount = (localCountRes.first['cnt'] as num?)?.toInt() ?? 0;
       final lastSync = (force || kIsWeb || localCount == 0) ? null : prefs?.getString('last_synced_at_assignments');
-      var cloudDocs = await FirestoreService().fetchDeltaDocuments(
-        'assignments',
-        since: lastSync,
-      );
-      if (cloudDocs.isEmpty && localCount == 0) {
-        cloudDocs = await FirestoreService().fetchAllDocuments('assignments');
+
+      // 1. Fetch from Supabase first (unlimited reads, zero quota constraints)
+      bool supabaseConnected = false;
+      var cloudDocs = <Map<String, dynamic>>[];
+      try {
+        if (SupabaseService.instance.isInitialized) {
+          final supaAssignments = await SupabaseService.instance.fetchAllAssignments();
+          supabaseConnected = true;
+          for (final sa in supaAssignments) {
+            final subMap = sa['subjects'] is Map ? Map<String, dynamic>.from(sa['subjects']) : null;
+            cloudDocs.add({
+              'id': sa['id'],
+              'cloud_id': sa['id'],
+              'title': sa['title'],
+              'description': sa['description'],
+              'subject_id': int.tryParse(sa['subject_id']?.toString() ?? '') ?? 1,
+              'subject_code': subMap?['code']?.toString(),
+              'subject_name': subMap?['name']?.toString(),
+              'due_date': sa['due_date'],
+              'storage_url': sa['attachment_url'],
+              'created_at': sa['created_at'],
+            });
+          }
+        }
+      } catch (e) {
+        debugPrint('[DatabaseHelper] syncCloudAssignmentsToLocal Supabase note: $e');
       }
+
+      // 2. Fall back to Firestore ONLY if Supabase was completely unreachable
+      if (!supabaseConnected && !kIsWeb) {
+        try {
+          cloudDocs = await FirestoreService().fetchDeltaDocuments(
+            'assignments',
+            since: lastSync,
+          ).timeout(const Duration(seconds: 2), onTimeout: () => []);
+          if (cloudDocs.isEmpty && (localCount == 0 || force)) {
+            cloudDocs = await FirestoreService().fetchAllDocuments('assignments')
+                .timeout(const Duration(seconds: 2), onTimeout: () => []);
+          }
+        } catch (_) {}
+      }
+
+      // Always purge tombstones so deleted items never resurrect (only for non-numeric cloud IDs)
+      final deletedAssignments = prefs?.getStringList('permanently_deleted_assignments') ?? [];
+      for (final delId in deletedAssignments) {
+        if (!RegExp(r'^\d+$').hasMatch(delId)) {
+          await db.delete('submissions', where: 'assignment_cloud_id = ? OR assignment_id IN (SELECT id FROM assignments WHERE cloud_id = ?)', whereArgs: [delId, delId]);
+          await db.delete('assignments', where: 'cloud_id = ?', whereArgs: [delId]);
+        }
+      }
+
+      // Reconcile: If connected to Supabase (or force refresh from cloud), prune local assignments no longer in the cloud!
+      if (supabaseConnected || force || kIsWeb) {
+        final activeCloudIds = <String>{};
+        final activeCloudTitles = <String>{};
+        for (final doc in cloudDocs) {
+          final idStr = doc['id']?.toString() ?? doc['cloud_id']?.toString() ?? doc['_docId']?.toString() ?? '';
+          if (idStr.isNotEmpty) activeCloudIds.add(idStr);
+          final rawLocalId = doc['local_id']?.toString();
+          if (rawLocalId != null && rawLocalId.isNotEmpty) activeCloudIds.add(rawLocalId);
+          final t = (doc['title']?.toString() ?? '').trim().toLowerCase().replaceAll(RegExp(r'[^a-z0-9]'), '_');
+          if (t.isNotEmpty) activeCloudTitles.add(t);
+        }
+
+        final allLocal = await db.query('assignments');
+        for (final local in allLocal) {
+          final localId = local['id']?.toString() ?? '';
+          final localCloudId = local['cloud_id']?.toString() ?? '';
+          final localTitle = (local['title'] as String? ?? '').trim().toLowerCase().replaceAll(RegExp(r'[^a-z0-9]'), '_');
+          final isPresent = activeCloudIds.contains(localId) ||
+                            (localCloudId.isNotEmpty && activeCloudIds.contains(localCloudId)) ||
+                            (localTitle.isNotEmpty && activeCloudTitles.contains(localTitle));
+          if (!isPresent) {
+            await db.delete('submissions', where: 'assignment_id = ?', whereArgs: [local['id']]);
+            await db.delete('assignments', where: 'id = ?', whereArgs: [local['id']]);
+          }
+        }
+      }
+
       if (cloudDocs.isEmpty) {
         try {
           await prefs?.setString('last_synced_at_assignments', DateTime.now().toIso8601String());
@@ -9373,6 +9688,14 @@ class DatabaseHelper {
       }
       for (final doc in cloudDocs) {
         final title = doc['title']?.toString() ?? 'Assignment';
+        final cleanTitle = title.toLowerCase().replaceAll(RegExp(r'[^a-z0-9]'), '_');
+        final rawId = doc['id']?.toString() ?? doc['cloud_id']?.toString() ?? doc['_docId']?.toString() ?? '';
+        final isDeleted = (!RegExp(r'^\d+$').hasMatch(rawId) && deletedAssignments.contains(rawId)) ||
+                          (cleanTitle.isNotEmpty && deletedAssignments.contains(cleanTitle));
+        if (isDeleted) {
+          // Permanently deleted by user, do not resurrect into SQLite!
+          continue;
+        }
         final description = doc['description']?.toString();
         final rawSubId = (doc['subject_id'] is num)
             ? (doc['subject_id'] as num).toInt()
@@ -9428,10 +9751,7 @@ class DatabaseHelper {
               'teacher_name': doc['teacher_name']?.toString(),
               'created_at': doc['created_at']?.toString() ?? DateTime.now().toIso8601String(),
             });
-          } catch (_) {
-            final anySub = await db.query('subjects', limit: 1);
-            if (anySub.isNotEmpty) targetSubjectId = anySub.first['id'] as int;
-          }
+          } catch (_) {}
         }
 
         final teacherId = doc['teacher_id']?.toString() ?? 'teacher_1';
@@ -9710,36 +10030,103 @@ class DatabaseHelper {
       final localQuizCountRes = await db.rawQuery('SELECT COUNT(*) as cnt FROM quizzes');
       final localQuizCount = (localQuizCountRes.first['cnt'] as num?)?.toInt() ?? 0;
       final lastSync = (force || kIsWeb || localQuizCount == 0) ? null : prefs?.getString('last_synced_at_quizzes');
-      var cloudQuizzes = await FirestoreService().fetchDeltaDocuments(
-        'quizzes',
-        since: lastSync,
-      );
-      if (cloudQuizzes.isEmpty && localQuizCount == 0) {
-        cloudQuizzes = await FirestoreService().fetchAllDocuments('quizzes');
-      }
-      final cloudAssignments = await FirestoreService().fetchDeltaDocuments(
-        'quiz_assignments',
-        since: lastSync,
-      );
-      var cloudAttempts = await FirestoreService().fetchDeltaDocuments(
-        'quiz_attempts',
-        since: lastSync,
-      );
-      final localAttemptCountRes = await db.rawQuery('SELECT COUNT(*) as cnt FROM quiz_attempts');
-      final localAttemptCount = (localAttemptCountRes.first['cnt'] as num?)?.toInt() ?? 0;
-      if (cloudAttempts.isEmpty && (localAttemptCount == 0 || force)) {
-        cloudAttempts = await FirestoreService().fetchAllDocuments('quiz_attempts');
-      }
-      if (cloudQuizzes.isEmpty && cloudAssignments.isEmpty && cloudAttempts.isEmpty) {
-        try {
-          await prefs?.setString('last_synced_at_quizzes', DateTime.now().toIso8601String());
-        } catch (_) {}
-        return;
+
+      // 1. Fetch from Supabase first (unlimited reads, zero quota constraints)
+      bool supabaseConnected = false;
+      var cloudQuizzes = <Map<String, dynamic>>[];
+      try {
+        if (SupabaseService.instance.isInitialized) {
+          final supaQuizzes = await SupabaseService.instance.fetchAllQuizzes();
+          supabaseConnected = true;
+          for (final sq in supaQuizzes) {
+            final subMap = sq['subjects'] is Map ? Map<String, dynamic>.from(sq['subjects']) : null;
+            cloudQuizzes.add({
+              'id': int.tryParse(sq['id']?.toString() ?? '') ?? sq['id'],
+              'cloud_id': sq['id']?.toString(),
+              'title': sq['title'],
+              'subject_id': int.tryParse(sq['subject_id']?.toString() ?? '') ?? 1,
+              'subject_code': subMap?['code']?.toString(),
+              'subject_name': subMap?['name']?.toString(),
+              'time_limit_minutes': sq['time_limit_minutes'] ?? 0,
+              'questions': sq['questions_json'] is List ? sq['questions_json'] : [],
+              'created_at': sq['created_at'],
+            });
+          }
+        }
+      } catch (e) {
+        debugPrint('[DatabaseHelper] syncCloudQuizzesToLocal Supabase note: $e');
       }
 
+      // 2. Fall back to Firestore ONLY if Supabase was completely unreachable
+      if (!supabaseConnected && !kIsWeb) {
+        try {
+          cloudQuizzes = await FirestoreService().fetchDeltaDocuments(
+            'quizzes',
+            since: lastSync,
+          ).timeout(const Duration(seconds: 2), onTimeout: () => []);
+          if (cloudQuizzes.isEmpty && (localQuizCount == 0 || force)) {
+            cloudQuizzes = await FirestoreService().fetchAllDocuments('quizzes')
+                .timeout(const Duration(seconds: 2), onTimeout: () => []);
+          }
+        } catch (_) {}
+      }
+
+      // Always purge tombstones so deleted items never resurrect (only for non-numeric cloud IDs)
+      final deletedQuizzes = prefs?.getStringList('permanently_deleted_quizzes') ?? [];
+      for (final delId in deletedQuizzes) {
+        if (!RegExp(r'^\d+$').hasMatch(delId)) {
+          await db.delete('quiz_attempts', where: 'quiz_id IN (SELECT id FROM quizzes WHERE cloud_id = ?)', whereArgs: [delId]);
+          await db.delete('quiz_assignments', where: 'quiz_id IN (SELECT id FROM quizzes WHERE cloud_id = ?)', whereArgs: [delId]);
+          await db.delete('questions', where: 'quiz_id IN (SELECT id FROM quizzes WHERE cloud_id = ?)', whereArgs: [delId]);
+          await db.delete('quizzes', where: 'cloud_id = ?', whereArgs: [delId]);
+        }
+      }
+
+      // Reconcile: If connected to Supabase (or force refresh from cloud), prune local quizzes no longer in the cloud!
+      if (supabaseConnected || force || kIsWeb) {
+        final activeCloudQuizIds = <String>{};
+        final activeCloudQuizTitles = <String>{};
+        for (final doc in cloudQuizzes) {
+          final idStr = doc['id']?.toString() ?? doc['_docId']?.toString() ?? '';
+          if (idStr.isNotEmpty) activeCloudQuizIds.add(idStr);
+          final rawLocalId = doc['local_id']?.toString();
+          if (rawLocalId != null && rawLocalId.isNotEmpty) activeCloudQuizIds.add(rawLocalId);
+          final t = (doc['title']?.toString() ?? '').trim().toLowerCase().replaceAll(RegExp(r'[^a-z0-9]'), '_');
+          if (t.isNotEmpty) activeCloudQuizTitles.add(t);
+        }
+
+        final allLocalQuizzes = await db.query('quizzes');
+        for (final local in allLocalQuizzes) {
+          final localId = local['id']?.toString() ?? '';
+          final localCloudId = local['cloud_id']?.toString() ?? '';
+          final localTitle = (local['title'] as String? ?? '').trim().toLowerCase().replaceAll(RegExp(r'[^a-z0-9]'), '_');
+          final isPresent = (localCloudId.isNotEmpty && activeCloudQuizIds.contains(localCloudId)) ||
+                            (!RegExp(r'^\d+$').hasMatch(localId) && activeCloudQuizIds.contains(localId)) ||
+                            (localTitle.isNotEmpty && activeCloudQuizTitles.contains(localTitle));
+          if (!isPresent) {
+            await db.delete('quiz_attempts', where: 'quiz_id = ?', whereArgs: [local['id']]);
+            await db.delete('quiz_assignments', where: 'quiz_id = ?', whereArgs: [local['id']]);
+            await db.delete('questions', where: 'quiz_id = ?', whereArgs: [local['id']]);
+            try {
+              await db.delete('student_scores', where: 'quiz_id = ?', whereArgs: [local['id']]);
+            } catch (_) {}
+            await db.delete('quizzes', where: 'id = ?', whereArgs: [local['id']]);
+          }
+        }
+      }
+
+      // Process and insert cloudQuizzes directly into local SQLite
       for (final doc in cloudQuizzes) {
         final title = doc['title']?.toString() ?? 'Quiz';
         if (title.trim().isEmpty || title == '1') {
+          continue;
+        }
+        final cleanTitle = title.toLowerCase().replaceAll(RegExp(r'[^a-z0-9]'), '_');
+        final rawQId = doc['id']?.toString() ?? doc['_docId']?.toString() ?? '';
+        final isDeleted = (!RegExp(r'^\d+$').hasMatch(rawQId) && deletedQuizzes.contains(rawQId)) ||
+                          (cleanTitle.isNotEmpty && deletedQuizzes.contains(cleanTitle));
+        if (isDeleted) {
+          // Permanently deleted by user, do not resurrect into SQLite!
           continue;
         }
         final description = doc['description']?.toString();
@@ -9777,7 +10164,7 @@ class DatabaseHelper {
           if (match.isNotEmpty) targetSubjectId = match.first['id'] as int;
         }
 
-        // Ensure subject exists locally
+        // Ensure subject exists locally with targetSubjectId
         final checkSub = await db.query(
           'subjects',
           where: 'id = ?',
@@ -9794,10 +10181,7 @@ class DatabaseHelper {
               'teacher_name': doc['teacher_name']?.toString(),
               'created_at': doc['created_at']?.toString() ?? DateTime.now().toIso8601String(),
             });
-          } catch (_) {
-            final anySub = await db.query('subjects', limit: 1);
-            if (anySub.isNotEmpty) targetSubjectId = anySub.first['id'] as int;
-          }
+          } catch (_) {}
         }
 
         final teacherId = doc['teacher_id']?.toString() ?? 'teacher_1';
@@ -9824,6 +10208,7 @@ class DatabaseHelper {
         int localQuizId;
         if (existing.isEmpty) {
           localQuizId = await db.insert('quizzes', {
+            'cloud_id': rawQId,
             'title': title,
             'description': description,
             'subject_id': targetSubjectId,
@@ -9842,6 +10227,7 @@ class DatabaseHelper {
           await db.update(
             'quizzes',
             {
+              'cloud_id': rawQId,
               'title': title,
               'description': description,
               'time_limit_minutes': timeLimit,
@@ -9918,6 +10304,27 @@ class DatabaseHelper {
             }
           }
         }
+      }
+
+      var cloudAssignments = <Map<String, dynamic>>[];
+      var cloudAttempts = <Map<String, dynamic>>[];
+      if (!kIsWeb) {
+        try {
+          cloudAssignments = await FirestoreService().fetchDeltaDocuments(
+            'quiz_assignments',
+            since: lastSync,
+          ).timeout(const Duration(seconds: 2), onTimeout: () => []);
+          cloudAttempts = await FirestoreService().fetchDeltaDocuments(
+            'quiz_attempts',
+            since: lastSync,
+          ).timeout(const Duration(seconds: 2), onTimeout: () => []);
+          final localAttemptCountRes = await db.rawQuery('SELECT COUNT(*) as cnt FROM quiz_attempts');
+          final localAttemptCount = (localAttemptCountRes.first['cnt'] as num?)?.toInt() ?? 0;
+          if (cloudAttempts.isEmpty && (localAttemptCount == 0 || force)) {
+            cloudAttempts = await FirestoreService().fetchAllDocuments('quiz_attempts')
+                .timeout(const Duration(seconds: 2), onTimeout: () => []);
+          }
+        } catch (_) {}
       }
 
       // Process delta quiz assignments already fetched above
@@ -10568,7 +10975,7 @@ class DatabaseHelper {
     }
   }
 
-  /// Pushes any local student submissions to Cloud Firestore
+  /// Pushes any local student submissions to Cloud Firestore and Supabase
   Future<void> pushLocalSubmissionsToCloud() async {
     try {
       final db = await database;
@@ -10582,6 +10989,63 @@ class DatabaseHelper {
             ? '${cAssignId}_$sId'
             : '${aId}_$sId';
 
+        // 1. Push to Supabase PostgreSQL (Primary live backend)
+        if (SupabaseService.instance.isInitialized) {
+          try {
+            String canonicalCloudId = cAssignId ?? '';
+            if (canonicalCloudId.isEmpty && aId != null) {
+              final aRow = await db.query(
+                'assignments',
+                columns: ['cloud_id'],
+                where: 'id = ?',
+                whereArgs: [aId],
+              );
+              if (aRow.isNotEmpty) {
+                canonicalCloudId = aRow.first['cloud_id']?.toString() ?? '';
+              }
+            }
+            if (canonicalCloudId.isEmpty) {
+              canonicalCloudId = aId?.toString() ?? 'assign_$docId';
+            }
+
+            // Ensure student user exists in Supabase to satisfy foreign key constraint
+            final userRow = await db.query('users', where: 'id = ?', whereArgs: [sId]);
+            final u = userRow.isNotEmpty ? userRow.first : null;
+            await SupabaseService.instance.upsertUser({
+              'id': sId,
+              'full_name': u?['full_name'] ?? s['student_name'] ?? sId,
+              'email': u?['email'] ?? '$sId@aira.edu',
+              'role': u?['role'] ?? 'student',
+            });
+
+            final meta = {
+              'status': s['status'] ?? 'submitted',
+              'submission_type': s['submission_type'],
+              'content_link': s['content_link'],
+              'file_name': s['file_name'],
+              'file_size': s['file_size'],
+              'storage_url': s['storage_url'],
+              'notes': s['notes'],
+              'student_name': s['student_name'] ?? u?['full_name'],
+              'student_section': s['student_section'] ?? u?['section'],
+            };
+
+            await SupabaseService.instance.submitAssignment(
+              assignmentId: canonicalCloudId,
+              studentId: sId,
+              textResponse: s['text_response']?.toString(),
+              attachmentUrl: (s['storage_url'] ?? s['content_link'])?.toString(),
+              score: (s['grade'] is num) ? (s['grade'] as num).toDouble() : null,
+              feedback: s['feedback']?.toString(),
+              submittedAt: s['submitted_at']?.toString(),
+              metadata: meta,
+            );
+          } catch (supaErr) {
+            debugPrint('[DatabaseHelper] pushLocalSubmissionsToCloud Supabase error: $supaErr');
+          }
+        }
+
+        // 2. Push to Cloud Firestore as fallback
         final mutable = Map<String, dynamic>.from(s);
         var imgBytes = mutable['image_bytes']?.toString();
         final imgPath = mutable['image_path']?.toString();
@@ -10690,40 +11154,170 @@ class DatabaseHelper {
       final currentUserId = prefs?.getString('auth_session_user_id');
       final lastSync = force ? null : prefs?.getString('last_synced_at_submissions');
 
-      // On a student mobile device, push any local submissions with images to Firestore
-      if (!kIsWeb && currentRole == 'student') {
-        unawaited(pushLocalSubmissionsToCloud());
-      }
-
-      List<Map<String, dynamic>> cloudDocs = [];
-      // Role-scoped fetch: Students only pull their own submissions!
-      if (currentRole == 'student' && currentUserId != null && currentUserId.isNotEmpty) {
-        cloudDocs = await FirestoreService().fetchDeltaDocuments(
-          'submissions',
-          whereField: 'student_id',
-          whereValue: currentUserId,
-          since: lastSync,
-        );
-      } else {
-        cloudDocs = await FirestoreService().fetchDeltaDocuments(
-          'submissions',
-          since: lastSync,
-        );
-      }
-
       final db = await database;
-      final localCountRes = await db.rawQuery('SELECT COUNT(*) as cnt FROM submissions');
-      final localCount = (localCountRes.first['cnt'] as num?)?.toInt() ?? 0;
-      if (cloudDocs.isEmpty && (localCount == 0 || force)) {
+
+      // 1. Primary Live Backend: Sync submissions from Supabase PostgreSQL first
+      try {
+        final supaSubs = await SupabaseService.instance.fetchSubmissions(
+          studentId: (currentRole == 'student') ? currentUserId : null,
+        );
+
+        for (final row in supaSubs) {
+          final cAssignId = row['assignment_id']?.toString();
+          final sId = row['student_id']?.toString();
+          if (cAssignId == null || sId == null || sId.isEmpty) continue;
+
+          // Resolve target assignment ID in local SQLite
+          int? targetAssignmentId;
+          final matched = await db.query(
+            'assignments',
+            columns: ['id'],
+            where: 'cloud_id = ? OR id = ?',
+            whereArgs: [cAssignId, int.tryParse(cAssignId) ?? -1],
+          );
+          if (matched.isNotEmpty) {
+            targetAssignmentId = matched.first['id'] as int;
+          } else if (assignmentId != null) {
+            targetAssignmentId = assignmentId;
+          } else {
+            targetAssignmentId = int.tryParse(cAssignId);
+          }
+
+          if (targetAssignmentId == null) {
+            final existingSub = await db.query(
+              'submissions',
+              columns: ['assignment_id'],
+              where: 'assignment_cloud_id = ? AND student_id = ?',
+              whereArgs: [cAssignId, sId],
+            );
+            if (existingSub.isNotEmpty) {
+              targetAssignmentId = existingSub.first['assignment_id'] as int?;
+            }
+          }
+
+          if (targetAssignmentId == null) {
+            final parts = cAssignId.split('_');
+            if (parts.length >= 3) {
+              final slug = parts.sublist(2).join('_');
+              final bySlug = await db.query(
+                'assignments',
+                columns: ['id'],
+                where: "LOWER(REPLACE(title, ' ', '_')) = ? OR cloud_id LIKE ?",
+                whereArgs: [slug, '%_$slug'],
+              );
+              if (bySlug.isNotEmpty) {
+                targetAssignmentId = bySlug.first['id'] as int;
+              }
+            }
+          }
+
+          // Parse text_response JSON if present
+          Map<String, dynamic> meta = {};
+          String? rawText = row['text_response']?.toString();
+          if (rawText != null && rawText.trim().startsWith('{')) {
+            try {
+              final decoded = jsonDecode(rawText);
+              if (decoded is Map<String, dynamic>) {
+                meta = decoded;
+                rawText = meta['raw_text_response']?.toString() ?? meta['text']?.toString();
+              }
+            } catch (_) {}
+          }
+
+          final userObj = row['users'] is Map ? row['users'] as Map<String, dynamic> : null;
+          final studentName = meta['student_name']?.toString() ?? userObj?['full_name']?.toString();
+          final studentSec = meta['student_section']?.toString() ?? userObj?['section']?.toString();
+          final submissionType = meta['submission_type']?.toString() ?? 'both';
+          final contentLink = meta['content_link']?.toString();
+          final fileName = meta['file_name']?.toString();
+          final fileSize = (meta['file_size'] as num?)?.toInt();
+          final storageUrl = (meta['storage_url'] ?? row['attachment_url'])?.toString();
+          final notes = meta['notes']?.toString();
+          final submittedAt = row['submitted_at']?.toString() ?? DateTime.now().toIso8601String();
+          final isResubAllowed = meta['resubmission_allowed'] == true ||
+              meta['status'] == 'resubmission_allowed' ||
+              row['status'] == 'resubmission_allowed';
+          final status = isResubAllowed
+              ? 'resubmission_allowed'
+              : (meta['status']?.toString() ?? row['status']?.toString() ?? (row['score'] != null ? 'graded' : 'submitted'));
+          final grade = (row['score'] is num) ? (row['score'] as num).toDouble() : null;
+          final feedback = row['feedback']?.toString();
+
+          final subMap = {
+            'assignment_id': targetAssignmentId,
+            'assignment_cloud_id': cAssignId,
+            'student_id': sId,
+            'student_name': studentName,
+            'student_section': studentSec,
+            'submission_type': submissionType,
+            'content_link': contentLink,
+            'file_name': fileName,
+            'file_size': fileSize,
+            'storage_url': storageUrl,
+            'text_response': rawText,
+            'notes': notes,
+            'submitted_at': submittedAt,
+            'status': status,
+            'grade': grade,
+            'feedback': feedback,
+          };
+
+          if (targetAssignmentId != null) {
+            final existingSub = await db.query(
+              'submissions',
+              columns: ['id'],
+              where: '(assignment_cloud_id = ? OR assignment_id = ?) AND student_id = ?',
+              whereArgs: [cAssignId, targetAssignmentId, sId],
+            );
+            if (existingSub.isNotEmpty) {
+              await db.update(
+                'submissions',
+                subMap,
+                where: 'id = ?',
+                whereArgs: [existingSub.first['id']],
+              );
+            } else {
+              await db.insert('submissions', subMap);
+            }
+          }
+        }
+      } catch (supaErr) {
+        debugPrint('[DatabaseHelper] syncCloudSubmissionsToLocal Supabase note: $supaErr');
+      }
+
+      // 2. Secondary fallback: Firestore (wrapped in try/catch to protect against 429 quota exhaustion)
+      List<Map<String, dynamic>> cloudDocs = [];
+      try {
         if (currentRole == 'student' && currentUserId != null && currentUserId.isNotEmpty) {
           cloudDocs = await FirestoreService().fetchDeltaDocuments(
             'submissions',
             whereField: 'student_id',
             whereValue: currentUserId,
-          );
+            since: lastSync,
+          ).timeout(const Duration(seconds: 3), onTimeout: () => []);
         } else {
-          cloudDocs = await FirestoreService().fetchAllDocuments('submissions');
+          cloudDocs = await FirestoreService().fetchDeltaDocuments(
+            'submissions',
+            since: lastSync,
+          ).timeout(const Duration(seconds: 3), onTimeout: () => []);
         }
+
+        final localCountRes = await db.rawQuery('SELECT COUNT(*) as cnt FROM submissions');
+        final localCount = (localCountRes.first['cnt'] as num?)?.toInt() ?? 0;
+        if (cloudDocs.isEmpty && (localCount == 0 || force)) {
+          if (currentRole == 'student' && currentUserId != null && currentUserId.isNotEmpty) {
+            cloudDocs = await FirestoreService().fetchDeltaDocuments(
+              'submissions',
+              whereField: 'student_id',
+              whereValue: currentUserId,
+            ).timeout(const Duration(seconds: 3), onTimeout: () => []);
+          } else {
+            cloudDocs = await FirestoreService().fetchAllDocuments('submissions')
+                .timeout(const Duration(seconds: 3), onTimeout: () => []);
+          }
+        }
+      } catch (firestoreErr) {
+        debugPrint('[DatabaseHelper] syncCloudSubmissionsToLocal Firestore skipped (quota/offline): $firestoreErr');
       }
 
       if (cloudDocs.isEmpty) {
@@ -10790,6 +11384,7 @@ class DatabaseHelper {
           'file_size': fileSize,
           'file_path': filePath,
           'file_bytes': fileBytes,
+          'storage_url': doc['storage_url'] ?? doc['attachment_url'],
           'text_response': textResponse,
           'image_path': imagePath,
           'image_bytes': imageBytes,
@@ -10804,11 +11399,16 @@ class DatabaseHelper {
 
         final existingSub = await db.query(
           'submissions',
-          columns: ['id'],
+          columns: ['id', 'status'],
           where: 'assignment_id = ? AND student_id = ?',
           whereArgs: [targetAssignmentId, sId],
         );
         if (existingSub.isNotEmpty) {
+          final existingStatus = existingSub.first['status']?.toString();
+          // Never overwrite an unlocked resubmission state with stale Firestore data
+          if (existingStatus == 'resubmission_allowed' && status != 'resubmission_allowed') {
+            continue;
+          }
           final existingSubId = existingSub.first['id'] as int;
           await db.update(
             'submissions',
@@ -10857,18 +11457,105 @@ class DatabaseHelper {
     int subjectId,
   ) async {
     final db = await database;
+
+    // Resolve any subject IDs with matching subject_code or name to handle multi-client auto-increment variations
+    final List<int> matchingSubIds = [subjectId];
+    String? localSubCode;
+    String? localSubName;
+    try {
+      final curSub = await db.query('subjects', where: 'id = ?', whereArgs: [subjectId]);
+      if (curSub.isNotEmpty) {
+        localSubCode = curSub.first['subject_code']?.toString().toUpperCase();
+        localSubName = curSub.first['name']?.toString().trim().toUpperCase();
+        if (localSubCode != null && localSubCode.isNotEmpty) {
+          final sameCode = await db.query('subjects', where: 'UPPER(subject_code) = ?', whereArgs: [localSubCode]);
+          for (final s in sameCode) {
+            final id = s['id'] as int;
+            if (!matchingSubIds.contains(id)) matchingSubIds.add(id);
+          }
+        }
+        if (localSubName != null && localSubName.isNotEmpty) {
+          final sameName = await db.query('subjects', where: 'UPPER(TRIM(name)) = ?', whereArgs: [localSubName]);
+          for (final s in sameName) {
+            final id = s['id'] as int;
+            if (!matchingSubIds.contains(id)) matchingSubIds.add(id);
+          }
+        }
+      }
+    } catch (_) {}
+
+    final inClause = matchingSubIds.map((_) => '?').join(',');
     final assignments = await db.rawQuery(
       '''
       SELECT a.*,
              (SELECT COUNT(*) FROM submissions WHERE assignment_id = a.id) as submission_count,
              (SELECT COUNT(*) FROM submissions WHERE assignment_id = a.id AND status = 'graded') as graded_count
       FROM assignments a
-      WHERE a.subject_id = ?
+      WHERE a.subject_id IN ($inClause)
       ORDER BY a.created_at DESC
     ''',
-      [subjectId],
+      matchingSubIds,
     );
-    return assignments;
+
+    SharedPreferences? prefs;
+    try {
+      prefs = await SharedPreferences.getInstance();
+    } catch (_) {}
+    final deletedAssignments = prefs?.getStringList('permanently_deleted_assignments') ?? [];
+
+    final List<Map<String, dynamic>> filtered = [];
+    for (final a in assignments) {
+      final cloudId = a['cloud_id']?.toString() ?? '';
+      final title = (a['title'] as String? ?? '').trim();
+      final cleanTitle = title.toLowerCase().replaceAll(RegExp(r'[^a-z0-9]'), '_');
+      final isDeleted = (cloudId.isNotEmpty && !RegExp(r'^\d+$').hasMatch(cloudId) && deletedAssignments.contains(cloudId)) ||
+                        (cleanTitle.isNotEmpty && deletedAssignments.contains(cleanTitle));
+      if (isDeleted) {
+        continue;
+      }
+      filtered.add(a);
+    }
+
+    // Direct Supabase Fallback: On Web or if SQLite is still empty, load live from Supabase!
+    if (filtered.isEmpty && SupabaseService.instance.isInitialized) {
+      try {
+        final supaAssignments = await SupabaseService.instance.fetchAssignments(
+          subjectId.toString(),
+          subjectCode: localSubCode,
+          subjectName: localSubName,
+        );
+        for (final sa in supaAssignments) {
+          final title = (sa['title'] as String? ?? '').trim();
+          final cleanTitle = title.toLowerCase().replaceAll(RegExp(r'[^a-z0-9]'), '_');
+          final aIdStr = sa['id']?.toString() ?? '';
+          if ((!RegExp(r'^\d+$').hasMatch(aIdStr) && deletedAssignments.contains(aIdStr)) ||
+              (cleanTitle.isNotEmpty && deletedAssignments.contains(cleanTitle))) {
+            continue;
+          }
+          final aId = int.tryParse(aIdStr) ?? 1;
+          filtered.add({
+            'id': aId,
+            'cloud_id': aIdStr,
+            'title': title,
+            'description': sa['description']?.toString() ?? '',
+            'subject_id': subjectId,
+            'teacher_id': sa['teacher_id']?.toString() ?? 'teacher_1',
+            'teacher_name': sa['teacher_name']?.toString() ?? '',
+            'due_date': sa['due_date']?.toString(),
+            'total_points': sa['total_points'] ?? 100,
+            'submission_type': sa['submission_type']?.toString() ?? 'both',
+            'status': sa['status']?.toString() ?? 'active',
+            'submission_count': 0,
+            'graded_count': 0,
+            'created_at': sa['created_at']?.toString() ?? DateTime.now().toIso8601String(),
+          });
+        }
+      } catch (e) {
+        debugPrint('[DatabaseHelper] getAssignmentsForSubject Supabase fallback notice: $e');
+      }
+    }
+
+    return filtered;
   }
 
   Future<List<Map<String, dynamic>>> getAssignmentsForStudent(
@@ -10953,9 +11640,24 @@ class DatabaseHelper {
       return targetSet.contains(cleanStudentSec);
     }).toList();
 
+    SharedPreferences? prefs;
+    try {
+      prefs = await SharedPreferences.getInstance();
+    } catch (_) {}
+    final deletedAssignments = prefs?.getStringList('permanently_deleted_assignments') ?? [];
+
     // Deduplicate assignments so that if multiple rows exist for the same assignment, only one is returned (preferring the one with an active submission)
     final Map<String, Map<String, dynamic>> deduped = {};
     for (final a in filtered) {
+      final aId = a['id']?.toString() ?? '';
+      final cloudId = a['cloud_id']?.toString() ?? '';
+      final title = (a['title'] as String? ?? '').trim();
+      final cleanTitle = title.toLowerCase().replaceAll(RegExp(r'[^a-z0-9]'), '_');
+      if (deletedAssignments.contains(aId) ||
+          (cloudId.isNotEmpty && deletedAssignments.contains(cloudId)) ||
+          (cleanTitle.isNotEmpty && deletedAssignments.contains(cleanTitle))) {
+        continue;
+      }
       final key = '${a['title']?.toString().toLowerCase().trim()}_${a['subject_id']}';
       if (!deduped.containsKey(key)) {
         deduped[key] = a;
@@ -10973,24 +11675,44 @@ class DatabaseHelper {
     String studentId,
   ) async {
     final db = await database;
+    final assign = await getAssignmentById(assignmentId);
+    final cloudId = assign?['cloud_id'] as String?;
+
+    // 1. Direct match by local ID or cloud ID for this student (most recent first)
     final res = await db.query(
       'submissions',
-      where: 'assignment_id = ? AND student_id = ?',
-      whereArgs: [assignmentId, studentId],
+      where: '(assignment_id = ? OR (assignment_cloud_id IS NOT NULL AND assignment_cloud_id = ?)) AND student_id = ?',
+      whereArgs: [assignmentId, cloudId ?? '', studentId],
+      orderBy: 'id DESC',
     );
     if (res.isNotEmpty) return res.first;
 
-    // Fallback: match by assignment cloud_id if local assignmentId differed
-    final assign = await getAssignmentById(assignmentId);
-    final cloudId = assign?['cloud_id'] as String?;
-    if (cloudId != null && cloudId.isNotEmpty) {
-      final cloudRes = await db.query(
+    // Fallback: check session user ID from SharedPreferences if passed studentId was generic or unauthenticated
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final savedUserId = prefs.getString('auth_session_user_id');
+      if (savedUserId != null && savedUserId.isNotEmpty && savedUserId != studentId) {
+        final savedRes = await db.query(
+          'submissions',
+          where: '(assignment_id = ? OR (assignment_cloud_id IS NOT NULL AND assignment_cloud_id = ?)) AND student_id = ?',
+          whereArgs: [assignmentId, cloudId ?? '', savedUserId],
+        );
+        if (savedRes.isNotEmpty) return savedRes.first;
+      }
+    } catch (_) {}
+
+    // Ultimate fallback: if generic student ID, return latest submission for this assignment
+    if (studentId == 'student_1' || studentId == 'guest') {
+      final anyRes = await db.query(
         'submissions',
-        where: 'assignment_cloud_id = ? AND student_id = ?',
-        whereArgs: [cloudId, studentId],
+        where: 'assignment_id = ? OR (assignment_cloud_id IS NOT NULL AND assignment_cloud_id = ?)',
+        whereArgs: [assignmentId, cloudId ?? ''],
+        orderBy: 'submitted_at DESC',
+        limit: 1,
       );
-      if (cloudRes.isNotEmpty) return cloudRes.first;
+      if (anyRes.isNotEmpty) return anyRes.first;
     }
+
     return null;
   }
 
@@ -11047,6 +11769,8 @@ class DatabaseHelper {
     if (assignment == null) return [];
 
     final subjectId = (assignment['subject_id'] as int?) ?? 0;
+    final cloudId = assignment['cloud_id']?.toString() ?? '';
+    final cleanTitle = (assignment['title'] as String? ?? '').trim().toLowerCase().replaceAll(RegExp(r'[^a-z0-9]'), '_');
     final dueDateStr = assignment['due_date'] as String?;
     DateTime? dueDate;
     if (dueDateStr != null && dueDateStr.isNotEmpty) {
@@ -11085,11 +11809,15 @@ class DatabaseHelper {
         sub.status as raw_status
       FROM users u
       JOIN enrollments e ON e.student_id = u.id AND e.subject_id = ?
-      LEFT JOIN submissions sub ON sub.assignment_id = ? AND sub.student_id = u.id
+      LEFT JOIN submissions sub ON (
+        sub.assignment_id = ? 
+        OR (sub.assignment_cloud_id IS NOT NULL AND sub.assignment_cloud_id = ?)
+        OR (sub.assignment_cloud_id IS NOT NULL AND ? != '' AND sub.assignment_cloud_id LIKE '%_' || ?)
+      ) AND sub.student_id = u.id
       WHERE u.role = 'student'
       ORDER BY u.full_name ASC
     ''',
-      [subjectId, assignmentId],
+      [subjectId, assignmentId, cloudId, cleanTitle, cleanTitle],
     );
 
     // Also find any submissions by students not currently in enrollments table
@@ -11125,9 +11853,13 @@ class DatabaseHelper {
         sub.status as raw_status
       FROM submissions sub
       LEFT JOIN users u ON sub.student_id = u.id
-      WHERE sub.assignment_id = ?
+      WHERE (
+        sub.assignment_id = ? 
+        OR (sub.assignment_cloud_id IS NOT NULL AND sub.assignment_cloud_id = ?)
+        OR (sub.assignment_cloud_id IS NOT NULL AND ? != '' AND sub.assignment_cloud_id LIKE '%_' || ?)
+      )
     ''',
-      [assignmentId],
+      [assignmentId, cloudId, cleanTitle, cleanTitle],
     );
 
     final allRows = <Map<String, dynamic>>[...rows];
@@ -11279,7 +12011,44 @@ class DatabaseHelper {
       id = await db.insert('submissions', subData);
     }
 
-    // 1. Sync submission to Cloud Firestore
+    // 1. Sync submission to Supabase PostgreSQL (Primary live backend)
+    if (SupabaseService.instance.isInitialized) {
+      try {
+        final userRow = await db.query('users', where: 'id = ?', whereArgs: [studentId]);
+        final u = userRow.isNotEmpty ? userRow.first : null;
+        await SupabaseService.instance.upsertUser({
+          'id': studentId,
+          'full_name': u?['full_name'] ?? studentName ?? studentId,
+          'email': u?['email'] ?? '$studentId@aira.edu',
+          'role': u?['role'] ?? 'student',
+        });
+
+        final meta = {
+          'status': status,
+          'submission_type': submissionType,
+          'content_link': contentLink,
+          'file_name': fileName,
+          'file_size': fileSize,
+          'storage_url': storageUrl,
+          'notes': notes,
+          'student_name': studentName ?? u?['full_name'],
+          'student_section': studentSec ?? u?['section'],
+        };
+
+        await SupabaseService.instance.submitAssignment(
+          assignmentId: cloudAssignmentId,
+          studentId: studentId,
+          textResponse: textResponse,
+          attachmentUrl: storageUrl ?? contentLink,
+          submittedAt: now,
+          metadata: meta,
+        );
+      } catch (supaErr) {
+        debugPrint('[DatabaseHelper] submitAssignment Supabase sync error: $supaErr');
+      }
+    }
+
+    // 2. Sync submission to Cloud Firestore as fallback
     try {
       final docId = '${cloudAssignmentId}_$studentId';
       String? safeImageBytes = imageBytes;
@@ -11377,6 +12146,24 @@ class DatabaseHelper {
         final assignmentId = sub['assignment_id'] as int?;
         final cloudAssignId = sub['assignment_cloud_id'] as String?;
         if (studentId != null && assignmentId != null) {
+          if (SupabaseService.instance.isInitialized &&
+              cloudAssignId != null &&
+              cloudAssignId.isNotEmpty) {
+            try {
+              unawaited(
+                SupabaseService.instance.client
+                    ?.from('submissions')
+                    .update({
+                      'score': grade,
+                      'feedback': feedback,
+                    })
+                    .eq('assignment_id', cloudAssignId)
+                    .eq('student_id', studentId),
+              );
+            } catch (supaErr) {
+              debugPrint('[DatabaseHelper] gradeSubmission Supabase note: $supaErr');
+            }
+          }
           final docId = (cloudAssignId != null && cloudAssignId.isNotEmpty)
               ? '${cloudAssignId}_$studentId'
               : '${assignmentId}_$studentId';
@@ -11449,11 +12236,79 @@ class DatabaseHelper {
         final sub = subRows.first;
         final studentId = sub['student_id'] as String?;
         final assignmentId = sub['assignment_id'] as int?;
-        final cloudAssignId = sub['assignment_cloud_id'] as String?;
+        var cloudAssignId = sub['assignment_cloud_id'] as String?;
+
         if (studentId != null && assignmentId != null) {
-          final docId = (cloudAssignId != null && cloudAssignId.isNotEmpty)
-              ? '${cloudAssignId}_$studentId'
-              : '${assignmentId}_$studentId';
+          if (cloudAssignId == null || cloudAssignId.isEmpty) {
+            final assign = await getAssignmentById(assignmentId);
+            cloudAssignId = assign?['cloud_id'] as String?;
+          }
+
+          final targetCloudAssignId = (cloudAssignId != null && cloudAssignId.isNotEmpty)
+              ? cloudAssignId
+              : assignmentId.toString();
+
+          // 1. Primary Live Backend: Supabase PostgreSQL
+          if (SupabaseService.instance.isInitialized) {
+            try {
+              // Fetch current row from Supabase to preserve all metadata (fileName, storageUrl, studentName, etc.)
+              final existingSupa = await SupabaseService.instance.client
+                  ?.from('submissions')
+                  .select('*')
+                  .eq('student_id', studentId)
+                  .or('assignment_id.eq.$targetCloudAssignId,assignment_id.eq.$assignmentId');
+
+              Map<String, dynamic> mergedMeta = {
+                'status': status,
+                'resubmission_allowed': allowed,
+              };
+
+              if (existingSupa != null && existingSupa.isNotEmpty) {
+                final supaRow = existingSupa.first;
+                final rawText = supaRow['text_response']?.toString();
+                if (rawText != null && rawText.trim().startsWith('{')) {
+                  try {
+                    final decoded = jsonDecode(rawText);
+                    if (decoded is Map<String, dynamic>) {
+                      mergedMeta = Map<String, dynamic>.from(decoded);
+                      mergedMeta['status'] = status;
+                      mergedMeta['resubmission_allowed'] = allowed;
+                    }
+                  } catch (_) {}
+                }
+                final rowId = supaRow['id']?.toString();
+                if (rowId != null && rowId.isNotEmpty) {
+                  await SupabaseService.instance.client
+                      ?.from('submissions')
+                      .update({
+                        'text_response': jsonEncode(mergedMeta),
+                      })
+                      .eq('id', rowId);
+                } else {
+                  await SupabaseService.instance.client
+                      ?.from('submissions')
+                      .update({
+                        'text_response': jsonEncode(mergedMeta),
+                      })
+                      .eq('assignment_id', targetCloudAssignId)
+                      .eq('student_id', studentId);
+                }
+              } else {
+                await SupabaseService.instance.client
+                    ?.from('submissions')
+                    .update({
+                      'text_response': jsonEncode(mergedMeta),
+                    })
+                    .eq('assignment_id', targetCloudAssignId)
+                    .eq('student_id', studentId);
+              }
+            } catch (supaErr) {
+              debugPrint('[DatabaseHelper] setSubmissionResubmissionAllowed Supabase note: $supaErr');
+            }
+          }
+
+          // 2. Secondary fallback: Firestore
+          final docId = '${targetCloudAssignId}_$studentId';
           unawaited(
             FirestoreService().saveDocument('submissions', docId, {
               'status': status,
@@ -11461,6 +12316,32 @@ class DatabaseHelper {
               'updated_at': DateTime.now().toIso8601String(),
             }),
           );
+          if (docId != '${assignmentId}_$studentId') {
+            unawaited(
+              FirestoreService().saveDocument('submissions', '${assignmentId}_$studentId', {
+                'status': status,
+                'resubmission_allowed': allowed,
+                'updated_at': DateTime.now().toIso8601String(),
+              }),
+            );
+          }
+
+          // 3. Notify student when unlocked
+          if (allowed) {
+            final assignment = await getAssignmentById(assignmentId);
+            final title = assignment?['title'] ?? 'Activity';
+            unawaited(
+              createNotification(
+                userId: studentId,
+                type: 'resubmission_allowed',
+                title: 'Resubmission Allowed: $title',
+                message:
+                    'Your teacher has unlocked "$title". You can now edit and resubmit your work.',
+                relatedId: assignmentId.toString(),
+                subjectId: assignment?['subject_id'] as int?,
+              ),
+            );
+          }
         }
       }
     } catch (e) {
@@ -11482,20 +12363,41 @@ class DatabaseHelper {
       where: 'id = ?',
       whereArgs: [id],
     );
+
+    // Track tombstone so cloud delta/full sync never resurrects this assignment
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final deletedAssignments = prefs.getStringList('permanently_deleted_assignments') ?? [];
+      if (cloudId != null && cloudId.isNotEmpty && !RegExp(r'^\d+$').hasMatch(cloudId) && !deletedAssignments.contains(cloudId)) {
+        deletedAssignments.add(cloudId);
+      }
+      if (cleanTitle.isNotEmpty && !deletedAssignments.contains(cleanTitle)) {
+        deletedAssignments.add(cleanTitle);
+      }
+      await prefs.setStringList('permanently_deleted_assignments', deletedAssignments);
+    } catch (_) {}
+
+    // Delete from Supabase
+    try {
+      if (SupabaseService.instance.isInitialized) {
+        if (cloudId != null && cloudId.isNotEmpty) {
+          await SupabaseService.instance.deleteAssignment(cloudId);
+        }
+        await SupabaseService.instance.client?.from('assignments').delete().eq('id', id.toString());
+      }
+    } catch (_) {}
     try {
       if (cloudId != null && cloudId.isNotEmpty) {
-        unawaited(FirestoreService().deleteDocument('assignments', cloudId));
+        await FirestoreService().deleteDocument('assignments', cloudId);
       }
-      unawaited(
-        FirestoreService().deleteDocument('assignments', id.toString()),
-      );
+      await FirestoreService().deleteDocument('assignments', id.toString());
       final cloudAssignments = await FirestoreService().fetchAllDocuments('assignments');
       for (final doc in cloudAssignments) {
         final rawId = doc['local_id'] ?? doc['id'];
         final docId = doc['_docId']?.toString() ?? doc['id']?.toString() ?? doc['document_id']?.toString() ?? '';
         if (rawId == id || rawId?.toString() == id.toString() || docId == cloudId || docId.endsWith('_$id') || (cleanTitle.isNotEmpty && docId.contains(cleanTitle))) {
           if (docId.isNotEmpty) {
-            unawaited(FirestoreService().deleteDocument('assignments', docId));
+            await FirestoreService().deleteDocument('assignments', docId);
           }
         }
       }
@@ -11506,7 +12408,7 @@ class DatabaseHelper {
         final docId = doc['_docId']?.toString() ?? doc['id']?.toString() ?? doc['document_id']?.toString() ?? '';
         if (rawAId == id || rawAId?.toString() == id.toString() || (cloudId != null && rawCId == cloudId)) {
           if (docId.isNotEmpty) {
-            unawaited(FirestoreService().deleteDocument('submissions', docId));
+            await FirestoreService().deleteDocument('submissions', docId);
           }
         }
       }

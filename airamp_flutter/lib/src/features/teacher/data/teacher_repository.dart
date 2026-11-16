@@ -207,9 +207,6 @@ class TeacherSubjectsNotifier extends Notifier<List<Map<String, dynamic>>> {
 // Subject Quizzes Provider
 final subjectQuizzesProvider = FutureProvider.family<List<Map<String, dynamic>>, int>((ref, subjectId) async {
   try {
-    if (kIsWeb) {
-      await FirestoreService().syncCloudSubjectsToLocal(force: true);
-    }
     await DatabaseHelper().syncCloudQuizzesToLocal(force: true);
   } catch (e) {
     debugPrint('[subjectQuizzesProvider] syncCloudQuizzesToLocal note: $e');

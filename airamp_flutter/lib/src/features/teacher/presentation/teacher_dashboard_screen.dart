@@ -490,92 +490,102 @@ class _TeacherDashboardScreenState extends ConsumerState<TeacherDashboardScreen>
 
             // Scrollable Dashboard Body
             Expanded(
-              child: RefreshIndicator(
-                onRefresh: () async {
-                  await Future.wait([
-                    DatabaseHelper().syncAllCloudData(),
-                    ref.read(teacherDashboardProvider.notifier).reload(
-                      section: _analyticsSectionFilter,
-                      studentId: _analyticsStudentFilter,
+              child: Builder(
+                builder: (context) {
+                  final dashboardContent = SingleChildScrollView(
+                    physics: isDesktop ? const ClampingScrollPhysics() : const AlwaysScrollableScrollPhysics(),
+                    padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        // 1. Today's Class Schedule Banner (Time-sensitive daily operational context)
+                        const TodayScheduleBanner(),
+
+                        // 2. ESP32 Offline Learning Hub Management Card (Hardware sync for offline teaching)
+                        _buildEsp32HubCard(context, teacherName, currentUser?.section),
+                        const SizedBox(height: 20),
+
+                        // Responsive Area: 2 Columns on Desktop, 1 Column on Mobile
+                        if (isDesktop)
+                          Row(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              // Left Column: Class Overview & Submissions & Subjects
+                              Expanded(
+                                flex: 7,
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    const ClassOverviewWidget(),
+                                    const SizedBox(height: 28),
+                                    _buildSubmissionsSection(context, recentAttempts),
+                                    const SizedBox(height: 28),
+                                    _buildRecentAssignmentSubmissionsSection(context, currentUser?.id ?? ''),
+                                    const SizedBox(height: 28),
+                                    _buildAssignedSubjectsSection(context, subjects),
+                                  ],
+                                ),
+                              ),
+                              const SizedBox(width: 24),
+                              // Right Column: Handled Sections & Announcements
+                              Expanded(
+                                flex: 5,
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    _buildHandledSectionsSection(context, handledSectionsDetailsAsync),
+                                    const SizedBox(height: 28),
+                                    _buildAnnouncementsSection(currentUser, announcements, handledSections),
+                                  ],
+                                ),
+                              ),
+                            ],
+                          )
+                        else
+                          Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              const ClassOverviewWidget(),
+                              const SizedBox(height: 28),
+                              _buildHandledSectionsSection(context, handledSectionsDetailsAsync),
+                              const SizedBox(height: 28),
+                              _buildAnnouncementsSection(currentUser, announcements, handledSections),
+                              const SizedBox(height: 28),
+                              _buildSubmissionsSection(context, recentAttempts),
+                              const SizedBox(height: 28),
+                              _buildRecentAssignmentSubmissionsSection(context, currentUser?.id ?? ''),
+                              const SizedBox(height: 28),
+                              _buildAssignedSubjectsSection(context, subjects),
+                            ],
+                          ),
+                        SizedBox(height: isDesktop ? 28 : 110),
+                      ],
                     ),
-                    ref.read(teacherSubjectsProvider.notifier).reload(),
-                    ref.read(teacherAnnouncementsProvider.notifier).reload(sectionFilter: _activeSectionFilter),
-                    ref.refresh(teacherHandledSectionsProvider.future),
-                    ref.refresh(teacherHandledSectionsDetailsProvider.future),
-                  ]);
+                  );
+
+                  if (isDesktop) {
+                    return dashboardContent;
+                  }
+
+                  return RefreshIndicator(
+                    onRefresh: () async {
+                      await Future.wait([
+                        DatabaseHelper().syncAllCloudData(force: true),
+                        ref.read(teacherDashboardProvider.notifier).reload(
+                          section: _analyticsSectionFilter,
+                          studentId: _analyticsStudentFilter,
+                        ),
+                        ref.read(teacherSubjectsProvider.notifier).reload(),
+                        ref.read(teacherAnnouncementsProvider.notifier).reload(sectionFilter: _activeSectionFilter),
+                        ref.refresh(teacherHandledSectionsProvider.future),
+                        ref.refresh(teacherHandledSectionsDetailsProvider.future),
+                      ]);
+                    },
+                    child: dashboardContent,
+                  );
                 },
-                child: SingleChildScrollView(
-                  physics: const AlwaysScrollableScrollPhysics(),
-                  padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      // 1. Today's Class Schedule Banner (Time-sensitive daily operational context)
-                      const TodayScheduleBanner(),
-
-                // 2. ESP32 Offline Learning Hub Management Card (Hardware sync for offline teaching)
-                _buildEsp32HubCard(context, teacherName, currentUser?.section),
-                const SizedBox(height: 20),
-
-                // Responsive Area: 2 Columns on Desktop, 1 Column on Mobile
-                if (isDesktop)
-                  Row(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      // Left Column: Class Overview & Submissions & Subjects
-                      Expanded(
-                        flex: 7,
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            const ClassOverviewWidget(),
-                            const SizedBox(height: 28),
-                            _buildSubmissionsSection(context, recentAttempts),
-                            const SizedBox(height: 28),
-                            _buildRecentAssignmentSubmissionsSection(context, currentUser?.id ?? ''),
-                            const SizedBox(height: 28),
-                            _buildAssignedSubjectsSection(context, subjects),
-                          ],
-                        ),
-                      ),
-                      const SizedBox(width: 24),
-                      // Right Column: Handled Sections & Announcements
-                      Expanded(
-                        flex: 5,
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            _buildHandledSectionsSection(context, handledSectionsDetailsAsync),
-                            const SizedBox(height: 28),
-                            _buildAnnouncementsSection(currentUser, announcements, handledSections),
-                          ],
-                        ),
-                      ),
-                    ],
-                  )
-                else
-                  Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      const ClassOverviewWidget(),
-                      const SizedBox(height: 28),
-                      _buildHandledSectionsSection(context, handledSectionsDetailsAsync),
-                      const SizedBox(height: 28),
-                      _buildAnnouncementsSection(currentUser, announcements, handledSections),
-                      const SizedBox(height: 28),
-                      _buildSubmissionsSection(context, recentAttempts),
-                      const SizedBox(height: 28),
-                      _buildRecentAssignmentSubmissionsSection(context, currentUser?.id ?? ''),
-                      const SizedBox(height: 28),
-                      _buildAssignedSubjectsSection(context, subjects),
-                    ],
-                  ),
-                    SizedBox(height: isDesktop ? 28 : 110),
-                  ],
-                ),
               ),
             ),
-          ),
         ],
       ),
     ),

@@ -340,17 +340,18 @@ class CloudStorageService {
     // 1. If storagePath is a direct HTTP URL (e.g. from Cloudflare R2)
     if (storagePath != null && storagePath.startsWith('http')) {
       try {
+        final accessibleUrl = CloudflareR2Service.instance.getAccessibleUrl(storagePath);
         final res = await Dio().get<List<int>>(
-          storagePath,
+          accessibleUrl,
           options: Options(responseType: ResponseType.bytes),
         );
-        if (res.data != null) return Uint8List.fromList(res.data!);
+        if (res.data != null && res.statusCode == 200) return Uint8List.fromList(res.data!);
       } catch (_) {}
     }
 
     // 2. Direct R2 lookup
     if (storagePath != null && storagePath.isNotEmpty) {
-      final r2Url = '${CloudflareR2Service.publicDevUrl}/${storagePath.startsWith('/') ? storagePath.substring(1) : storagePath}';
+      final r2Url = CloudflareR2Service.instance.getAccessibleUrl(storagePath);
       try {
         final res = await Dio().get<List<int>>(
           r2Url,

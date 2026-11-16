@@ -9,6 +9,7 @@ import 'package:path_provider/path_provider.dart';
 import 'package:syncfusion_flutter_pdf/pdf.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../services/cloud_storage_service.dart';
+import '../services/cloudflare_r2_service.dart';
 import '../theme/app_theme.dart';
 import '../utils/file_download_helper.dart';
 import '../../features/curriculum/presentation/curriculum_content_sheet.dart';
@@ -226,8 +227,9 @@ class _AiraDocumentViewerDialogState extends State<AiraDocumentViewerDialog> {
 
       if (bytes == null && potentialUrl != null) {
         try {
+          final accessibleUrl = CloudflareR2Service.instance.getAccessibleUrl(potentialUrl);
           final res = await Dio().get<List<int>>(
-            potentialUrl,
+            accessibleUrl,
             options: Options(responseType: ResponseType.bytes),
           );
           if (res.data != null) {
@@ -295,7 +297,8 @@ class _AiraDocumentViewerDialogState extends State<AiraDocumentViewerDialog> {
 
     if (potentialUrl != null) {
       try {
-        final uri = Uri.parse(potentialUrl);
+        final accessibleUrl = CloudflareR2Service.instance.getAccessibleUrl(potentialUrl);
+        final uri = Uri.parse(accessibleUrl);
         if (await canLaunchUrl(uri)) {
           await launchUrl(uri, mode: LaunchMode.externalApplication);
           return;
@@ -760,8 +763,9 @@ class _AiraDownloadProgressDialogState extends State<AiraDownloadProgressDialog>
             _statusText = 'Streaming from Cloud Storage...';
           });
           try {
+            final accessibleUrl = CloudflareR2Service.instance.getAccessibleUrl(targetUrl);
             final res = await Dio().get<List<int>>(
-              targetUrl,
+              accessibleUrl,
               options: Options(responseType: ResponseType.bytes),
               onReceiveProgress: (received, total) {
                 if (total > 0 && mounted) {

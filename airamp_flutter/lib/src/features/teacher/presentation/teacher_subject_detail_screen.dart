@@ -7,7 +7,6 @@ import '../../../core/components/app_toast.dart';
 import '../../../core/components/empty_state.dart';
 import '../../../core/components/skeleton_loader.dart';
 import '../../../core/database/database_helper.dart';
-import '../../../core/database/firestore_service.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/theme/theme_provider.dart';
 import '../../../core/utils/philippine_time_helper.dart';
@@ -50,7 +49,6 @@ class _TeacherSubjectDetailScreenState
     if (id == null) return;
     if (kIsWeb) {
       try {
-        await FirestoreService().syncCloudSubjectsToLocal(force: true);
         await DatabaseHelper().syncCloudQuizzesToLocal(force: true);
         await DatabaseHelper().syncCloudAssignmentsToLocal(force: true);
       } catch (_) {}
@@ -707,13 +705,13 @@ class _TeacherSubjectDetailScreenState
               );
             }
             final quiz = quizzes[index - 1];
-            final qId = quiz['id'] as int;
+            final qId = (quiz['id'] is num) ? (quiz['id'] as num).toInt() : int.tryParse(quiz['id']?.toString() ?? '') ?? 0;
             final title = quiz['title']?.toString() ?? 'Quiz';
-            final qCount = quiz['question_count'] ?? 0;
-            final assignedCount = quiz['assigned_count'] ?? 0;
-            final compCount = quiz['completed_count'] ?? 0;
-            final timeLimit = quiz['time_limit_minutes'] ?? 0;
-            final passingScore = quiz['passing_score'] ?? 70;
+            final qCount = (quiz['question_count'] is num) ? (quiz['question_count'] as num).toInt() : int.tryParse(quiz['question_count']?.toString() ?? '') ?? 0;
+            final assignedCount = (quiz['assigned_count'] is num) ? (quiz['assigned_count'] as num).toInt() : int.tryParse(quiz['assigned_count']?.toString() ?? '') ?? 0;
+            final compCount = (quiz['completed_count'] is num) ? (quiz['completed_count'] as num).toInt() : int.tryParse(quiz['completed_count']?.toString() ?? '') ?? 0;
+            final timeLimit = (quiz['time_limit_minutes'] is num) ? (quiz['time_limit_minutes'] as num).toInt() : int.tryParse(quiz['time_limit_minutes']?.toString() ?? '') ?? 0;
+            final passingScore = (quiz['passing_score'] is num) ? (quiz['passing_score'] as num).toInt() : int.tryParse(quiz['passing_score']?.toString() ?? '') ?? 70;
             final status = quiz['status']?.toString() ?? 'published';
 
             return Container(

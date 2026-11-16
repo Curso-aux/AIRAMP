@@ -1,3 +1,5 @@
+import 'dart:convert';
+import 'package:dio/dio.dart';
 import 'package:flutter/foundation.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'database_helper.dart';
@@ -88,6 +90,20 @@ class SupabaseService {
       return List<Map<String, dynamic>>.from(data);
     } catch (e) {
       debugPrint('[SupabaseService] fetchSections error: $e');
+      return [];
+    }
+  }
+
+  Future<List<Map<String, dynamic>>> fetchAllSubjects() async {
+    if (!isInitialized) return [];
+    try {
+      final data = await client!
+          .from('subjects')
+          .select()
+          .order('id');
+      return List<Map<String, dynamic>>.from(data);
+    } catch (e) {
+      debugPrint('[SupabaseService] fetchAllSubjects error: $e');
       return [];
     }
   }
@@ -288,18 +304,117 @@ class SupabaseService {
   // ── 5. QUIZZES & ATTEMPTS ───────────────────────────────────────
   // ════════════════════════════════════════════════════════════════
 
-  Future<List<Map<String, dynamic>>> fetchQuizzes(String subjectId) async {
+  Future<void> ensureSubject({
+    required String id,
+    required String name,
+    required String code,
+  }) async {
+    if (!isInitialized) return;
+    try {
+      final existing = await client!.from('subjects').select('id').ilike('code', code).maybeSingle();
+      if (existing != null) return;
+      await client!.from('subjects').upsert({
+        'id': id,
+        'name': name,
+        'code': code,
+      });
+    } catch (e) {
+      debugPrint('[SupabaseService] ensureSubject error: $e');
+    }
+  }
+
+  Future<void> saveQuiz({
+    required String id,
+    required String title,
+    required String subjectId,
+    String? subjectName,
+    String? subjectCode,
+    int timeLimitMinutes = 0,
+    List<Map<String, dynamic>> questions = const [],
+  }) async {
+    if (!isInitialized) return;
+    try {
+      String resolvedSubjectId = subjectId;
+      if (subjectCode != null && subjectCode.isNotEmpty) {
+        try {
+          final existing = await client!.from('subjects').select('id').ilike('code', subjectCode).maybeSingle();
+          if (existing != null && existing['id'] != null) {
+            resolvedSubjectId = existing['id'].toString();
+          } else if (subjectName != null) {
+            await ensureSubject(id: subjectId, name: subjectName, code: subjectCode);
+          }
+        } catch (_) {}
+      }
+      await client!.from('quizzes').upsert({
+        'id': id,
+        'title': title,
+        'subject_id': resolvedSubjectId,
+        'time_limit_minutes': timeLimitMinutes,
+        'questions_json': questions,
+        'created_at': DateTime.now().toIso8601String(),
+      });
+      debugPrint('[SupabaseService] saveQuiz succeeded for $id ($title)');
+    } catch (e) {
+      debugPrint('[SupabaseService] saveQuiz error: $e');
+    }
+  }
+
+  Future<List<Map<String, dynamic>>> fetchAllQuizzes() async {
     if (!isInitialized) return [];
     try {
       final data = await client!
           .from('quizzes')
-          .select()
-          .eq('subject_id', subjectId)
+          .select('*, subjects(code, name)')
           .order('created_at', ascending: false);
       return List<Map<String, dynamic>>.from(data);
     } catch (e) {
+      debugPrint('[SupabaseService] fetchAllQuizzes error: $e');
+      return [];
+    }
+  }
+
+  Future<List<Map<String, dynamic>>> fetchQuizzes(
+    String subjectId, {
+    String? subjectCode,
+    String? subjectName,
+  }) async {
+    if (!isInitialized) return [];
+    try {
+      final all = await fetchAllQuizzes();
+      String? targetCode = subjectCode?.toUpperCase();
+      String? targetName = subjectName?.trim().toUpperCase();
+      if (targetCode == null || targetCode.isEmpty) {
+        try {
+          final sub = await client!.from('subjects').select('code, name').eq('id', subjectId).maybeSingle();
+          targetCode = sub?['code']?.toString().toUpperCase();
+          targetName = sub?['name']?.toString().trim().toUpperCase();
+        } catch (_) {}
+      }
+
+      final matches = all.where((q) {
+        if (q['subject_id']?.toString() == subjectId) return true;
+        final subMap = q['subjects'] is Map ? q['subjects'] as Map<String, dynamic> : null;
+        final code = subMap?['code']?.toString().toUpperCase();
+        final name = subMap?['name']?.toString().trim().toUpperCase();
+        if (targetCode != null && targetCode.isNotEmpty && code == targetCode) return true;
+        if (targetName != null && targetName.isNotEmpty && name == targetName) return true;
+        return false;
+      }).toList();
+
+      return matches.isNotEmpty ? matches : all.where((q) => q['subject_id']?.toString() == subjectId).toList();
+    } catch (e) {
       debugPrint('[SupabaseService] fetchQuizzes error: $e');
       return [];
+    }
+  }
+
+  Future<void> deleteQuiz(String id) async {
+    if (!isInitialized) return;
+    try {
+      await client!.from('quizzes').delete().eq('id', id);
+      debugPrint('[SupabaseService] deleteQuiz succeeded for $id');
+    } catch (e) {
+      debugPrint('[SupabaseService] deleteQuiz error: $e');
     }
   }
 
@@ -326,18 +441,100 @@ class SupabaseService {
   // ── 6. ASSIGNMENTS & SUBMISSIONS ────────────────────────────────
   // ════════════════════════════════════════════════════════════════
 
-  Future<List<Map<String, dynamic>>> fetchAssignments(String subjectId) async {
+  Future<void> saveAssignment({
+    required String id,
+    required String title,
+    required String subjectId,
+    String? subjectName,
+    String? subjectCode,
+    String? description,
+    String? dueDate,
+    String? attachmentUrl,
+  }) async {
+    if (!isInitialized) return;
+    try {
+      String resolvedSubjectId = subjectId;
+      if (subjectCode != null && subjectCode.isNotEmpty) {
+        try {
+          final existing = await client!.from('subjects').select('id').ilike('code', subjectCode).maybeSingle();
+          if (existing != null && existing['id'] != null) {
+            resolvedSubjectId = existing['id'].toString();
+          } else if (subjectName != null) {
+            await ensureSubject(id: subjectId, name: subjectName, code: subjectCode);
+          }
+        } catch (_) {}
+      }
+      await client!.from('assignments').upsert({
+        'id': id,
+        'title': title,
+        'subject_id': resolvedSubjectId,
+        'description': description,
+        'due_date': dueDate,
+        'attachment_url': attachmentUrl,
+        'created_at': DateTime.now().toIso8601String(),
+      });
+      debugPrint('[SupabaseService] saveAssignment succeeded for $id ($title)');
+    } catch (e) {
+      debugPrint('[SupabaseService] saveAssignment error: $e');
+    }
+  }
+
+  Future<List<Map<String, dynamic>>> fetchAllAssignments() async {
     if (!isInitialized) return [];
     try {
       final data = await client!
           .from('assignments')
-          .select()
-          .eq('subject_id', subjectId)
+          .select('*, subjects(code, name)')
           .order('created_at', ascending: false);
       return List<Map<String, dynamic>>.from(data);
     } catch (e) {
+      debugPrint('[SupabaseService] fetchAllAssignments error: $e');
+      return [];
+    }
+  }
+
+  Future<List<Map<String, dynamic>>> fetchAssignments(
+    String subjectId, {
+    String? subjectCode,
+    String? subjectName,
+  }) async {
+    if (!isInitialized) return [];
+    try {
+      final all = await fetchAllAssignments();
+      String? targetCode = subjectCode?.toUpperCase();
+      String? targetName = subjectName?.trim().toUpperCase();
+      if (targetCode == null || targetCode.isEmpty) {
+        try {
+          final sub = await client!.from('subjects').select('code, name').eq('id', subjectId).maybeSingle();
+          targetCode = sub?['code']?.toString().toUpperCase();
+          targetName = sub?['name']?.toString().trim().toUpperCase();
+        } catch (_) {}
+      }
+
+      final matches = all.where((a) {
+        if (a['subject_id']?.toString() == subjectId) return true;
+        final subMap = a['subjects'] is Map ? a['subjects'] as Map<String, dynamic> : null;
+        final code = subMap?['code']?.toString().toUpperCase();
+        final name = subMap?['name']?.toString().trim().toUpperCase();
+        if (targetCode != null && targetCode.isNotEmpty && code == targetCode) return true;
+        if (targetName != null && targetName.isNotEmpty && name == targetName) return true;
+        return false;
+      }).toList();
+
+      return matches.isNotEmpty ? matches : all.where((a) => a['subject_id']?.toString() == subjectId).toList();
+    } catch (e) {
       debugPrint('[SupabaseService] fetchAssignments error: $e');
       return [];
+    }
+  }
+
+  Future<void> deleteAssignment(String id) async {
+    if (!isInitialized) return;
+    try {
+      await client!.from('assignments').delete().eq('id', id);
+      debugPrint('[SupabaseService] deleteAssignment succeeded for $id');
+    } catch (e) {
+      debugPrint('[SupabaseService] deleteAssignment error: $e');
     }
   }
 
@@ -346,18 +543,108 @@ class SupabaseService {
     required String studentId,
     String? textResponse,
     String? attachmentUrl,
+    double? score,
+    String? feedback,
+    String? submittedAt,
+    Map<String, dynamic>? metadata,
   }) async {
     if (!isInitialized) return;
     try {
-      await client!.from('submissions').upsert({
+      String? encodedResponse = textResponse;
+      if (metadata != null && metadata.isNotEmpty) {
+        final payload = {
+          if (textResponse != null && textResponse.isNotEmpty)
+            'raw_text_response': textResponse,
+          ...metadata,
+        };
+        encodedResponse = jsonEncode(payload);
+      }
+
+      final subPayload = <String, dynamic>{
         'assignment_id': assignmentId,
         'student_id': studentId,
-        'text_response': textResponse,
+        'text_response': encodedResponse,
         'attachment_url': attachmentUrl,
-        'submitted_at': DateTime.now().toIso8601String(),
-      }, onConflict: 'assignment_id,student_id');
+        'submitted_at': submittedAt ?? DateTime.now().toIso8601String(),
+      };
+      if (score != null) subPayload['score'] = score;
+      if (feedback != null) subPayload['feedback'] = feedback;
+
+      await client!.from('submissions').upsert(
+        subPayload,
+        onConflict: 'assignment_id,student_id',
+      );
+      debugPrint('[SupabaseService] submitAssignment succeeded for $assignmentId, student $studentId');
     } catch (e) {
       debugPrint('[SupabaseService] submitAssignment error: $e');
     }
+  }
+
+  Future<List<Map<String, dynamic>>> fetchSubmissions({
+    String? assignmentId,
+    String? studentId,
+  }) async {
+    if (isInitialized && client != null) {
+      try {
+        try {
+          var query = client!.from('submissions').select('*, users(full_name, email)');
+          if (assignmentId != null && assignmentId.isNotEmpty) {
+            query = query.eq('assignment_id', assignmentId);
+          }
+          if (studentId != null && studentId.isNotEmpty) {
+            query = query.eq('student_id', studentId);
+          }
+          final data = await query.order('submitted_at', ascending: false);
+          return List<Map<String, dynamic>>.from(data);
+        } catch (joinErr) {
+          debugPrint('[SupabaseService] fetchSubmissions join fallback: $joinErr');
+          var query = client!.from('submissions').select('*');
+          if (assignmentId != null && assignmentId.isNotEmpty) {
+            query = query.eq('assignment_id', assignmentId);
+          }
+          if (studentId != null && studentId.isNotEmpty) {
+            query = query.eq('student_id', studentId);
+          }
+          final data = await query.order('submitted_at', ascending: false);
+          return List<Map<String, dynamic>>.from(data);
+        }
+      } catch (e) {
+        debugPrint('[SupabaseService] fetchSubmissions SDK note: $e');
+      }
+    }
+
+    // Direct REST API fallback via Dio (resilient to uninitialized SDK or platform issues)
+    try {
+      final dio = Dio(
+        BaseOptions(
+          connectTimeout: const Duration(seconds: 5),
+          receiveTimeout: const Duration(seconds: 5),
+          headers: {
+            'apikey': supabasePublishableKey,
+            'Authorization': 'Bearer $supabasePublishableKey',
+          },
+        ),
+      );
+      String url = '$supabaseUrl/rest/v1/submissions?select=*';
+      if (assignmentId != null && assignmentId.isNotEmpty) {
+        url += '&assignment_id=eq.$assignmentId';
+      }
+      if (studentId != null && studentId.isNotEmpty) {
+        url += '&student_id=eq.$studentId';
+      }
+      url += '&order=submitted_at.desc';
+      final resp = await dio.get(url);
+      if (resp.data is List) {
+        return List<Map<String, dynamic>>.from(resp.data);
+      }
+    } catch (e) {
+      debugPrint('[SupabaseService] fetchSubmissions REST error: $e');
+    }
+
+    return [];
+  }
+
+  Future<List<Map<String, dynamic>>> fetchAllSubmissions() async {
+    return fetchSubmissions();
   }
 }

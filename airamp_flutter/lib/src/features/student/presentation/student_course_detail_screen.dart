@@ -2512,11 +2512,15 @@ class _StudentCourseDetailScreenState
                 }
               },
               icon: Icon(
-                isSubmitted
-                    ? Icons.visibility_outlined
-                    : Icons.upload_file_outlined,
-                size: 16,
-                color: isSubmitted ? AppTheme.text : Colors.white,
+                isResubmissionAllowed
+                    ? Icons.edit_note_rounded
+                    : (isSubmitted
+                        ? Icons.visibility_outlined
+                        : Icons.upload_file_outlined),
+                size: 18,
+                color: (isSubmitted && !isResubmissionAllowed)
+                    ? AppTheme.text
+                    : Colors.white,
               ),
               label: Text(
                 isResubmissionAllowed
@@ -2530,20 +2534,26 @@ class _StudentCourseDetailScreenState
                                 : 'Submit Assignment'))),
                 style: TextStyle(
                   fontWeight: FontWeight.bold,
-                  color: (isSubmitted && !isResubmissionAllowed) ? AppTheme.text : Colors.white,
+                  color: (isSubmitted && !isResubmissionAllowed)
+                      ? AppTheme.text
+                      : Colors.white,
                 ),
               ),
               style: ElevatedButton.styleFrom(
-                backgroundColor: isSubmitted
-                    ? AppTheme.surface
-                    : AppTheme.primary,
-                foregroundColor: isSubmitted ? AppTheme.text : Colors.white,
-                side: isSubmitted ? BorderSide(color: AppTheme.border) : null,
+                backgroundColor: isResubmissionAllowed
+                    ? Colors.amber.shade700
+                    : (isSubmitted ? AppTheme.surface : AppTheme.primary),
+                foregroundColor: (isSubmitted && !isResubmissionAllowed)
+                    ? AppTheme.text
+                    : Colors.white,
+                side: (isSubmitted && !isResubmissionAllowed)
+                    ? BorderSide(color: AppTheme.border)
+                    : null,
                 padding: const EdgeInsets.symmetric(vertical: 12),
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(10),
                 ),
-                elevation: 0,
+                elevation: isResubmissionAllowed ? 1 : 0,
               ),
             ),
           ),

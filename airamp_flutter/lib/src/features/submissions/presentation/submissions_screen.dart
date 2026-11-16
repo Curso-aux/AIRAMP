@@ -7,12 +7,14 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:path_provider/path_provider.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../../../core/components/empty_state.dart';
 import '../../../core/components/skeleton_loader.dart';
 import '../../../core/database/database_helper.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/theme/theme_provider.dart';
+import '../../../core/services/cloudflare_r2_service.dart';
 import '../../../core/services/cloud_storage_service.dart';
 import '../../../core/services/session_draft_service.dart';
 import '../../../core/utils/file_download_helper.dart';
@@ -54,21 +56,53 @@ class _SubmissionsScreenState extends ConsumerState<SubmissionsScreen> {
   void initState() {
     super.initState();
     final formId = 'submission_${widget.assignmentId}';
-    _draftDisposer.add(_textResponseController.bindSessionDraft(
-      formId: formId,
-      fieldKey: 'text',
-      onDraftRestored: () => setState(() {}),
-    ));
-    _draftDisposer.add(_linkController.bindSessionDraft(
-      formId: formId,
-      fieldKey: 'link',
-      onDraftRestored: () => setState(() {}),
-    ));
-    _draftDisposer.add(_notesController.bindSessionDraft(
-      formId: formId,
-      fieldKey: 'notes',
-      onDraftRestored: () => setState(() {}),
-    ));
+    _draftDisposer.add(
+      _textResponseController.bindSessionDraft(
+        formId: formId,
+        fieldKey: 'text',
+        onDraftRestored: () => setState(() {}),
+      ),
+    );
+    _draftDisposer.add(
+      _linkController.bindSessionDraft(
+        formId: formId,
+        fieldKey: 'link',
+        onDraftRestored: () => setState(() {}),
+      ),
+    );
+    _draftDisposer.add(
+      _notesController.bindSessionDraft(
+        formId: formId,
+        fieldKey: 'notes',
+        onDraftRestored: () => setState(() {}),
+      ),
+    );
+
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      try {
+        SharedPreferences? prefs;
+        try {
+          prefs = await SharedPreferences.getInstance();
+        } catch (_) {}
+        final savedUserId = prefs?.getString('auth_session_user_id');
+        final user = ref.read(authProvider);
+        final studentId = user?.id ?? savedUserId ?? 'S-100-0001';
+
+        await DatabaseHelper().syncCloudSubmissionsToLocal(
+          assignmentId: _parsedId,
+          force: true,
+        );
+        if (mounted) {
+          ref.invalidate(
+            studentSubmissionProvider((
+              assignmentId: _parsedId,
+              studentId: studentId,
+            )),
+          );
+          ref.invalidate(assignmentDetailProvider(_parsedId));
+        }
+      } catch (_) {}
+    });
   }
 
   @override
@@ -82,7 +116,13 @@ class _SubmissionsScreenState extends ConsumerState<SubmissionsScreen> {
 
   int get _parsedId => int.tryParse(widget.assignmentId) ?? 1;
 
-  Future<void> _pickFile() async {
+  bool _isImageFile(String? name) {
+    if (name == null || name.isEmpty) return false;
+    final ext = name.split('.').last.toLowerCase();
+    return ['jpg', 'jpeg', 'png', 'webp', 'gif', 'bmp'].contains(ext);
+  }
+
+  Future<void> _pickAttachment() async {
     try {
       final files = await FilePicker.pickFiles();
       if (files.isNotEmpty) {
@@ -91,7 +131,11 @@ class _SubmissionsScreenState extends ConsumerState<SubmissionsScreen> {
         if (size <= 0) {
           if (mounted) {
             ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(content: Text('Selected file is empty (0 bytes). Please choose a valid document.')),
+              const SnackBar(
+                content: Text(
+                  'Selected file is empty (0 bytes). Please choose a valid file.',
+                ),
+              ),
             );
           }
           return;
@@ -100,7 +144,9 @@ class _SubmissionsScreenState extends ConsumerState<SubmissionsScreen> {
           if (mounted) {
             ScaffoldMessenger.of(context).showSnackBar(
               SnackBar(
-                content: Text('File size (${_formatFileSize(size)}) exceeds the 10 MB limit. Please select a document under 10 MB.'),
+                content: Text(
+                  'File size (${_formatFileSize(size)}) exceeds the 10 MB limit. Please select a file under 10 MB.',
+                ),
                 backgroundColor: AppTheme.error,
               ),
             );
@@ -111,72 +157,54 @@ class _SubmissionsScreenState extends ConsumerState<SubmissionsScreen> {
         try {
           bytes = await file.readAsBytes();
         } catch (_) {}
+
+        final isImage = _isImageFile(file.name);
+        Uint8List? processedBytes = bytes;
+        if (isImage && bytes != null) {
+          try {
+            processedBytes = await ImageCompressHelper.compressImage(
+              bytes,
+              maxDimension: 1200,
+            );
+          } catch (_) {
+            processedBytes = bytes;
+          }
+        }
+
+        final finalSize = processedBytes?.lengthInBytes ?? size;
         setState(() {
           _pickedFileName = file.name;
-          _pickedFileSize = size;
+          _pickedFileSize = finalSize;
           _pickedFilePath = file.path;
-          _pickedFileBytes = bytes;
+          _pickedFileBytes = processedBytes;
+          if (isImage) {
+            _pickedImageName = file.name;
+            _pickedImageSize = finalSize;
+            _pickedImagePath = file.path;
+            _pickedImageBytes = processedBytes;
+          } else {
+            _pickedImageName = null;
+            _pickedImageSize = 0;
+            _pickedImagePath = null;
+            _pickedImageBytes = null;
+          }
         });
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Failed to pick file: $e')),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('Failed to pick file: $e')));
       }
     }
   }
 
-  void _removeFile() {
+  void _removeAttachment() {
     setState(() {
       _pickedFileName = null;
       _pickedFileSize = 0;
       _pickedFilePath = null;
       _pickedFileBytes = null;
-    });
-  }
-
-  Future<void> _pickImage() async {
-    try {
-      final files = await FilePicker.pickFiles(
-        type: FileType.custom,
-        allowedExtensions: ['jpg', 'jpeg', 'png', 'webp', 'gif'],
-      );
-      if (files.isNotEmpty) {
-        final file = files.first;
-        final size = await file.length();
-        if (size > 10 * 1024 * 1024) {
-          if (mounted) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(
-                content: Text('Image size (${_formatFileSize(size)}) exceeds the 10 MB limit. Please select an image under 10 MB.'),
-                backgroundColor: AppTheme.error,
-              ),
-            );
-          }
-          return;
-        }
-        final rawBytes = await file.readAsBytes();
-        // Downscale image automatically to ensure cloud sync stays well below 500KB
-        final compressedBytes = await ImageCompressHelper.compressImage(rawBytes, maxDimension: 1200);
-        setState(() {
-          _pickedImageName = file.name;
-          _pickedImageSize = compressedBytes.lengthInBytes;
-          _pickedImagePath = file.path;
-          _pickedImageBytes = compressedBytes;
-        });
-      }
-    } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Failed to pick image: $e')),
-        );
-      }
-    }
-  }
-
-  void _removeImage() {
-    setState(() {
       _pickedImageName = null;
       _pickedImageSize = 0;
       _pickedImagePath = null;
@@ -195,8 +223,18 @@ class _SubmissionsScreenState extends ConsumerState<SubmissionsScreen> {
     try {
       final dt = DateTime.parse(isoString);
       final months = [
-        'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
-        'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'
+        'Jan',
+        'Feb',
+        'Mar',
+        'Apr',
+        'May',
+        'Jun',
+        'Jul',
+        'Aug',
+        'Sep',
+        'Oct',
+        'Nov',
+        'Dec',
       ];
       final hour = dt.hour > 12 ? dt.hour - 12 : (dt.hour == 0 ? 12 : dt.hour);
       final amPm = dt.hour >= 12 ? 'PM' : 'AM';
@@ -254,7 +292,9 @@ class _SubmissionsScreenState extends ConsumerState<SubmissionsScreen> {
     if (existing != null && !canResubmit) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text('Submission locked: Your teacher has not allowed resubmission.'),
+          content: Text(
+            'Submission locked: Your teacher has not allowed resubmission.',
+          ),
           backgroundColor: Colors.orange,
         ),
       );
@@ -274,28 +314,24 @@ class _SubmissionsScreenState extends ConsumerState<SubmissionsScreen> {
       return;
     }
 
-    final text = _textResponseController.text.trim();
+    final isEditing = _isEditingExisting || canResubmit;
     final link = _linkController.text.trim();
-    final hasFile = _pickedFileName != null;
-    final hasExistingFile = existing?.fileName != null && !_isEditingExisting;
-    final hasImage = _pickedImageName != null;
-    final hasExistingImage = existing?.imagePath != null && !_isEditingExisting;
-    final hasExistingText = existing?.textResponse != null && !_isEditingExisting;
-    final hasExistingLink = existing?.contentLink != null && !_isEditingExisting;
+    final hasAttachment = _pickedFileName != null || _pickedImageName != null;
+    final hasExistingAttachment =
+        (existing?.fileName != null || existing?.imagePath != null) && isEditing;
+    final hasExistingLink =
+        existing?.contentLink != null && existing!.contentLink!.isNotEmpty && isEditing;
 
-    final hasContent = text.isNotEmpty ||
-        hasFile ||
-        hasExistingFile ||
-        hasImage ||
-        hasExistingImage ||
+    final hasContent =
+        hasAttachment ||
+        hasExistingAttachment ||
         link.isNotEmpty ||
-        hasExistingText ||
         hasExistingLink;
 
     if (!hasContent) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text('Please write a text response, attach an image, attach a file, or enter a link.'),
+          content: Text('Please attach a file or provide a project link.'),
           backgroundColor: Colors.orange,
         ),
       );
@@ -310,17 +346,23 @@ class _SubmissionsScreenState extends ConsumerState<SubmissionsScreen> {
       builder: (dialogCtx) {
         return AlertDialog(
           backgroundColor: AppTheme.surface,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(20),
+          ),
           title: Row(
             children: [
               Container(
                 padding: const EdgeInsets.all(8),
                 decoration: BoxDecoration(
-                  color: isLate ? AppTheme.error.withValues(alpha: 0.15) : AppTheme.primary.withValues(alpha: 0.15),
+                  color: isLate
+                      ? AppTheme.error.withValues(alpha: 0.15)
+                      : AppTheme.primary.withValues(alpha: 0.15),
                   borderRadius: BorderRadius.circular(10),
                 ),
                 child: Icon(
-                  isLate ? Icons.warning_amber_rounded : Icons.check_circle_outline,
+                  isLate
+                      ? Icons.warning_amber_rounded
+                      : Icons.check_circle_outline,
                   color: isLate ? AppTheme.error : AppTheme.primary,
                   size: 24,
                 ),
@@ -349,17 +391,23 @@ class _SubmissionsScreenState extends ConsumerState<SubmissionsScreen> {
                     width: double.infinity,
                     padding: const EdgeInsets.all(12),
                     decoration: BoxDecoration(
-                      color: isLate ? AppTheme.error.withValues(alpha: 0.12) : AppTheme.success.withValues(alpha: 0.12),
+                      color: isLate
+                          ? AppTheme.error.withValues(alpha: 0.12)
+                          : AppTheme.success.withValues(alpha: 0.12),
                       borderRadius: BorderRadius.circular(10),
                       border: Border.all(
-                        color: isLate ? AppTheme.error.withValues(alpha: 0.3) : AppTheme.success.withValues(alpha: 0.3),
+                        color: isLate
+                            ? AppTheme.error.withValues(alpha: 0.3)
+                            : AppTheme.success.withValues(alpha: 0.3),
                       ),
                     ),
                     child: Row(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Icon(
-                          isLate ? Icons.access_time_filled : Icons.check_circle,
+                          isLate
+                              ? Icons.access_time_filled
+                              : Icons.check_circle,
                           size: 18,
                           color: isLate ? AppTheme.error : AppTheme.success,
                         ),
@@ -369,11 +417,15 @@ class _SubmissionsScreenState extends ConsumerState<SubmissionsScreen> {
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
                               Text(
-                                isLate ? 'LATE SUBMISSION WARNING' : 'ON-TIME SUBMISSION',
+                                isLate
+                                    ? 'LATE SUBMISSION WARNING'
+                                    : 'ON-TIME SUBMISSION',
                                 style: TextStyle(
                                   fontWeight: FontWeight.bold,
                                   fontSize: 12,
-                                  color: isLate ? AppTheme.error : AppTheme.success,
+                                  color: isLate
+                                      ? AppTheme.error
+                                      : AppTheme.success,
                                 ),
                               ),
                               const SizedBox(height: 2),
@@ -383,7 +435,9 @@ class _SubmissionsScreenState extends ConsumerState<SubmissionsScreen> {
                                     : 'Due date: ${_formatDate(assignment.dueDate)}.',
                                 style: TextStyle(
                                   fontSize: 11,
-                                  color: isLate ? AppTheme.error : AppTheme.textSecondary,
+                                  color: isLate
+                                      ? AppTheme.error
+                                      : AppTheme.textSecondary,
                                 ),
                               ),
                             ],
@@ -395,42 +449,46 @@ class _SubmissionsScreenState extends ConsumerState<SubmissionsScreen> {
                   const SizedBox(height: 16),
                   Text(
                     'Included in this submission:',
-                    style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: AppTheme.text),
+                    style: TextStyle(
+                      fontSize: 13,
+                      fontWeight: FontWeight.bold,
+                      color: AppTheme.text,
+                    ),
                   ),
                   const SizedBox(height: 10),
 
-                  if (text.isNotEmpty || (hasExistingText && _isEditingExisting)) ...[
+                  if (_pickedFileName != null ||
+                      _pickedImageName != null ||
+                      (hasExistingAttachment && _isEditingExisting)) ...[
                     _buildSummaryItem(
-                      icon: Icons.notes_outlined,
-                      label: 'Written Response',
-                      detail: '${text.isNotEmpty ? text.split(RegExp(r'\s+')).length : 0} words',
+                      icon:
+                          _isImageFile(
+                            _pickedFileName ??
+                                _pickedImageName ??
+                                existing?.fileName ??
+                                existing?.imagePath,
+                          )
+                          ? Icons.image_outlined
+                          : Icons.insert_drive_file_outlined,
+                      label: 'Attachment',
+                      detail:
+                          _pickedFileName ??
+                          _pickedImageName ??
+                          existing?.fileName ??
+                          existing?.imagePath ??
+                          'File attached',
                     ),
                     const SizedBox(height: 6),
                   ],
 
-                  if (_pickedImageName != null || (hasExistingImage && _isEditingExisting)) ...[
-                    _buildSummaryItem(
-                      icon: Icons.image_outlined,
-                      label: 'Image Attachment',
-                      detail: _pickedImageName ?? existing?.imagePath ?? 'Image attached',
-                    ),
-                    const SizedBox(height: 6),
-                  ],
-
-                  if (_pickedFileName != null || (hasExistingFile && _isEditingExisting)) ...[
-                    _buildSummaryItem(
-                      icon: Icons.insert_drive_file_outlined,
-                      label: 'File Attachment',
-                      detail: _pickedFileName ?? existing?.fileName ?? 'File attached',
-                    ),
-                    const SizedBox(height: 6),
-                  ],
-
-                  if (link.isNotEmpty || (hasExistingLink && _isEditingExisting)) ...[
+                  if (link.isNotEmpty ||
+                      (hasExistingLink && _isEditingExisting)) ...[
                     _buildSummaryItem(
                       icon: Icons.link,
                       label: 'Project Link',
-                      detail: link.isNotEmpty ? link : (existing?.contentLink ?? ''),
+                      detail: link.isNotEmpty
+                          ? link
+                          : (existing?.contentLink ?? ''),
                     ),
                     const SizedBox(height: 6),
                   ],
@@ -438,7 +496,11 @@ class _SubmissionsScreenState extends ConsumerState<SubmissionsScreen> {
                   const SizedBox(height: 14),
                   Text(
                     'Once turned in, your faculty teacher will be notified immediately to review and grade your work.',
-                    style: TextStyle(fontSize: 12, color: AppTheme.textMuted, height: 1.4),
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: AppTheme.textMuted,
+                      height: 1.4,
+                    ),
                   ),
                 ],
               ),
@@ -447,7 +509,10 @@ class _SubmissionsScreenState extends ConsumerState<SubmissionsScreen> {
           actions: [
             TextButton(
               onPressed: () => Navigator.pop(dialogCtx),
-              child: Text('Review / Cancel', style: TextStyle(color: AppTheme.textMuted)),
+              child: Text(
+                'Review / Cancel',
+                style: TextStyle(color: AppTheme.textMuted),
+              ),
             ),
             ElevatedButton(
               onPressed: () {
@@ -455,10 +520,14 @@ class _SubmissionsScreenState extends ConsumerState<SubmissionsScreen> {
                 _submit(existing, assignment);
               },
               style: ElevatedButton.styleFrom(
-                backgroundColor: isLate ? Colors.amber.shade700 : AppTheme.primary,
+                backgroundColor: isLate
+                    ? Colors.amber.shade700
+                    : AppTheme.primary,
                 foregroundColor: Colors.black,
                 elevation: 0,
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(10),
+                ),
               ),
               child: Text(
                 _isEditingExisting ? 'Confirm & Update' : 'Confirm & Submit',
@@ -471,7 +540,11 @@ class _SubmissionsScreenState extends ConsumerState<SubmissionsScreen> {
     );
   }
 
-  Widget _buildSummaryItem({required IconData icon, required String label, required String detail}) {
+  Widget _buildSummaryItem({
+    required IconData icon,
+    required String label,
+    required String detail,
+  }) {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
       decoration: BoxDecoration(
@@ -483,11 +556,18 @@ class _SubmissionsScreenState extends ConsumerState<SubmissionsScreen> {
         children: [
           Icon(icon, size: 16, color: AppTheme.primary),
           const SizedBox(width: 8),
-          Text('$label: ', style: TextStyle(color: AppTheme.textMuted, fontSize: 12)),
+          Text(
+            '$label: ',
+            style: TextStyle(color: AppTheme.textMuted, fontSize: 12),
+          ),
           Expanded(
             child: Text(
               detail,
-              style: TextStyle(color: AppTheme.text, fontWeight: FontWeight.w600, fontSize: 12),
+              style: TextStyle(
+                color: AppTheme.text,
+                fontWeight: FontWeight.w600,
+                fontSize: 12,
+              ),
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
             ),
@@ -505,7 +585,9 @@ class _SubmissionsScreenState extends ConsumerState<SubmissionsScreen> {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
-            content: Text('Submission locked: Your teacher has not allowed resubmission.'),
+            content: Text(
+              'Submission locked: Your teacher has not allowed resubmission.',
+            ),
             backgroundColor: Colors.orange,
           ),
         );
@@ -528,18 +610,21 @@ class _SubmissionsScreenState extends ConsumerState<SubmissionsScreen> {
       return;
     }
 
-    final text = _textResponseController.text.trim();
+    final isEditing = _isEditingExisting || canResubmit;
     final link = _linkController.text.trim();
     final hasFile = _pickedFileName != null;
-    final hasExistingFile = existing?.fileName != null && !_isEditingExisting;
+    final hasExistingFile = existing?.fileName != null && isEditing;
     final hasImage = _pickedImageName != null;
-    final hasExistingImage = existing?.imagePath != null && !_isEditingExisting;
+    final hasExistingImage = existing?.imagePath != null && isEditing;
 
-    if (_pickedFileSize > 10 * 1024 * 1024 || _pickedImageSize > 10 * 1024 * 1024) {
+    if (_pickedFileSize > 10 * 1024 * 1024 ||
+        _pickedImageSize > 10 * 1024 * 1024) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: const Text('Selected attachment exceeds the 10 MB limit. Please select a smaller file.'),
+            content: const Text(
+              'Selected attachment exceeds the 10 MB limit. Please select a smaller file.',
+            ),
             backgroundColor: AppTheme.error,
           ),
         );
@@ -559,41 +644,33 @@ class _SubmissionsScreenState extends ConsumerState<SubmissionsScreen> {
 
     try {
       final List<String> types = [];
-      if (text.isNotEmpty || (existing?.textResponse != null && !_isEditingExisting)) types.add('text');
       if (hasImage || hasExistingImage) types.add('image');
       if (hasFile || hasExistingFile) types.add('file');
-      if (link.isNotEmpty || (existing?.contentLink != null && !_isEditingExisting)) types.add('link');
-
-      final submissionType = types.isEmpty ? 'both' : types.join('+');
-
-      String? uploadedStorageUrl = existing?.storageUrl;
-      String? linkToSave = link.isNotEmpty ? link : existing?.contentLink;
-
-      // 1. Upload document directly to Cloud Storage (Cloudflare R2 / Supabase)
-      if (uploadedStorageUrl == null && _pickedFileBytes != null && _pickedFileName != null) {
-        if (mounted) setState(() => _uploadStatusMessage = 'Uploading document to cloud storage...');
-        final res = await CloudStorageService().uploadSubmissionFile(
-          assignmentId: _parsedId,
-          studentId: studentId,
-          fileName: _pickedFileName!,
-          bytes: _pickedFileBytes!,
-          onProgress: (pct) {
-            if (mounted) setState(() => _uploadProgress = pct);
-          },
-        );
-        if (res.success && res.downloadUrl != null) {
-          uploadedStorageUrl = res.downloadUrl;
-        }
+      if (link.isNotEmpty ||
+          (existing?.contentLink != null && isEditing)) {
+        types.add('link');
       }
 
-      // 3. Upload image directly to Cloud Storage if picked and no URL yet
-      if (uploadedStorageUrl == null && _pickedImageBytes != null && _pickedImageName != null) {
-        if (mounted) setState(() => _uploadStatusMessage = 'Uploading image to cloud storage...');
+      final submissionType = types.isEmpty ? 'file' : types.join('+');
+
+      String? uploadedStorageUrl = isEditing ? existing?.storageUrl : null;
+      String? linkToSave = link.isNotEmpty ? link : (isEditing ? existing?.contentLink : null);
+
+      // Upload attachment directly to Cloud Storage (Cloudflare R2 / Supabase)
+      final bytesToUpload = _pickedFileBytes ?? _pickedImageBytes;
+      final nameToUpload = _pickedFileName ?? _pickedImageName;
+      if (bytesToUpload != null && nameToUpload != null) {
+        if (mounted) {
+          setState(
+            () => _uploadStatusMessage =
+                'Uploading attachment to cloud storage...',
+          );
+        }
         final res = await CloudStorageService().uploadSubmissionFile(
           assignmentId: _parsedId,
           studentId: studentId,
-          fileName: _pickedImageName!,
-          bytes: _pickedImageBytes!,
+          fileName: nameToUpload,
+          bytes: bytesToUpload,
           onProgress: (pct) {
             if (mounted) setState(() => _uploadProgress = pct);
           },
@@ -610,24 +687,45 @@ class _SubmissionsScreenState extends ConsumerState<SubmissionsScreen> {
         studentName: studentName,
         submissionType: submissionType,
         contentLink: linkToSave,
-        fileName: _pickedFileName ?? existing?.fileName,
-        fileSize: _pickedFileSize > 0 ? _pickedFileSize : existing?.fileSize,
-        filePath: _pickedFilePath ?? existing?.filePath,
-        fileBytes: _pickedFileBytes != null ? base64Encode(_pickedFileBytes!) : existing?.fileBytes,
-        textResponse: text.isNotEmpty ? text : (existing?.textResponse),
-        imagePath: _pickedImageName != null ? (_pickedImagePath ?? _pickedImageName) : existing?.imagePath,
-        imageBytes: _pickedImageBytes != null ? base64Encode(_pickedImageBytes!) : existing?.imageBytes,
+        fileName:
+            _pickedFileName ?? (isEditing ? existing?.fileName : null),
+        fileSize: _pickedFileSize > 0
+            ? _pickedFileSize
+            : (isEditing ? existing?.fileSize : null),
+        filePath:
+            _pickedFilePath ?? (isEditing ? existing?.filePath : null),
+        fileBytes: _pickedFileBytes != null
+            ? base64Encode(_pickedFileBytes!)
+            : (isEditing ? existing?.fileBytes : null),
+        textResponse: isEditing ? existing?.textResponse : null,
+        imagePath: _pickedImageName != null
+            ? (_pickedImagePath ?? _pickedImageName)
+            : (isEditing ? existing?.imagePath : null),
+        imageBytes: _pickedImageBytes != null
+            ? base64Encode(_pickedImageBytes!)
+            : (isEditing ? existing?.imageBytes : null),
         storageUrl: uploadedStorageUrl,
-        notes: _notesController.text.trim().isNotEmpty ? _notesController.text.trim() : existing?.notes,
+        notes: _notesController.text.trim().isNotEmpty
+            ? _notesController.text.trim()
+            : (isEditing ? existing?.notes : null),
       );
 
-      ref.invalidate(studentSubmissionProvider((assignmentId: _parsedId, studentId: studentId)));
+      ref.invalidate(
+        studentSubmissionProvider((
+          assignmentId: _parsedId,
+          studentId: studentId,
+        )),
+      );
       ref.invalidate(assignmentDetailProvider(_parsedId));
-      ref.invalidate(studentAssignmentsProvider((studentId: studentId, subjectId: null)));
+      ref.invalidate(
+        studentAssignmentsProvider((studentId: studentId, subjectId: null)),
+      );
       ref.invalidate(activityRosterProvider(_parsedId));
       ref.invalidate(assignmentSubmissionsProvider(_parsedId));
 
-      SessionDraftService.instance.clearForm('submission_${widget.assignmentId}');
+      SessionDraftService.instance.clearForm(
+        'submission_${widget.assignmentId}',
+      );
 
       if (mounted) {
         setState(() {
@@ -652,10 +750,7 @@ class _SubmissionsScreenState extends ConsumerState<SubmissionsScreen> {
         setState(() => _isSubmitting = false);
         final errText = e.toString().replaceFirst('Exception: ', '');
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(errText),
-            backgroundColor: AppTheme.error,
-          ),
+          SnackBar(content: Text(errText), backgroundColor: AppTheme.error),
         );
       }
     }
@@ -682,7 +777,11 @@ class _SubmissionsScreenState extends ConsumerState<SubmissionsScreen> {
                 color: AppTheme.error.withValues(alpha: 0.15),
                 shape: BoxShape.circle,
               ),
-              child: Icon(Icons.event_busy_outlined, color: AppTheme.error, size: 48),
+              child: Icon(
+                Icons.event_busy_outlined,
+                color: AppTheme.error,
+                size: 48,
+              ),
             ),
             const SizedBox(height: 18),
             Text(
@@ -697,7 +796,11 @@ class _SubmissionsScreenState extends ConsumerState<SubmissionsScreen> {
             Text(
               'The deadline for "${assignment.title}" was ${_formatDate(assignment.dueDate)}.\n\nThe 3-day grace period expired on ${_formatDate(graceEnd?.toIso8601String())}. Late submissions are no longer accepted unless your teacher unlocks permission.',
               textAlign: TextAlign.center,
-              style: TextStyle(color: AppTheme.textMuted, fontSize: 13, height: 1.5),
+              style: TextStyle(
+                color: AppTheme.textMuted,
+                fontSize: 13,
+                height: 1.5,
+              ),
             ),
             const SizedBox(height: 24),
             ElevatedButton(
@@ -705,10 +808,18 @@ class _SubmissionsScreenState extends ConsumerState<SubmissionsScreen> {
               style: ElevatedButton.styleFrom(
                 backgroundColor: AppTheme.primary,
                 foregroundColor: Colors.black,
-                padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 24,
+                  vertical: 12,
+                ),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(10),
+                ),
               ),
-              child: const Text('Go Back', style: TextStyle(fontWeight: FontWeight.bold)),
+              child: const Text(
+                'Go Back',
+                style: TextStyle(fontWeight: FontWeight.bold),
+              ),
             ),
           ],
         ),
@@ -720,10 +831,15 @@ class _SubmissionsScreenState extends ConsumerState<SubmissionsScreen> {
   Widget build(BuildContext context) {
     ref.watch(themeProvider);
     final user = ref.watch(authProvider);
-    final studentId = user?.id ?? 'student_1';
+    final studentId = user?.id ?? 'S-100-0001';
 
     final assignmentAsync = ref.watch(assignmentDetailProvider(_parsedId));
-    final submissionAsync = ref.watch(studentSubmissionProvider((assignmentId: _parsedId, studentId: studentId)));
+    final submissionAsync = ref.watch(
+      studentSubmissionProvider((
+        assignmentId: _parsedId,
+        studentId: studentId,
+      )),
+    );
 
     return Scaffold(
       backgroundColor: AppTheme.background,
@@ -742,8 +858,16 @@ class _SubmissionsScreenState extends ConsumerState<SubmissionsScreen> {
             onPressed: () async {
               try {
                 await DatabaseHelper().pushLocalSubmissionsToCloud();
-                await DatabaseHelper().syncCloudSubmissionsToLocal(assignmentId: _parsedId, force: true);
-                ref.invalidate(studentSubmissionProvider((assignmentId: _parsedId, studentId: studentId)));
+                await DatabaseHelper().syncCloudSubmissionsToLocal(
+                  assignmentId: _parsedId,
+                  force: true,
+                );
+                ref.invalidate(
+                  studentSubmissionProvider((
+                    assignmentId: _parsedId,
+                    studentId: studentId,
+                  )),
+                );
                 ref.invalidate(assignmentDetailProvider(_parsedId));
                 if (context.mounted) {
                   ScaffoldMessenger.of(context).showSnackBar(
@@ -756,7 +880,11 @@ class _SubmissionsScreenState extends ConsumerState<SubmissionsScreen> {
               } catch (_) {
                 if (context.mounted) {
                   ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('Offline: Saved locally and will sync once connected.')),
+                    const SnackBar(
+                      content: Text(
+                        'Offline: Saved locally and will sync once connected.',
+                      ),
+                    ),
                   );
                 }
               }
@@ -782,11 +910,21 @@ class _SubmissionsScreenState extends ConsumerState<SubmissionsScreen> {
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  Icon(Icons.assignment_late_outlined, color: AppTheme.textMuted, size: 56),
+                  Icon(
+                    Icons.assignment_late_outlined,
+                    color: AppTheme.textMuted,
+                    size: 56,
+                  ),
                   const SizedBox(height: 12),
-                  Text('Activity not found', style: TextStyle(color: AppTheme.textMuted, fontSize: 16)),
+                  Text(
+                    'Activity not found',
+                    style: TextStyle(color: AppTheme.textMuted, fontSize: 16),
+                  ),
                   const SizedBox(height: 16),
-                  OutlinedButton(onPressed: () => context.pop(), child: const Text('Go Back')),
+                  OutlinedButton(
+                    onPressed: () => context.pop(),
+                    child: const Text('Go Back'),
+                  ),
                 ],
               ),
             );
@@ -794,7 +932,8 @@ class _SubmissionsScreenState extends ConsumerState<SubmissionsScreen> {
 
           final submission = submissionAsync.value;
           final canResubmit = submission?.status == 'resubmission_allowed';
-          final isSubmitted = submission != null && (!_isEditingExisting || !canResubmit);
+          final isSubmitted =
+              submission != null && !canResubmit && !_isEditingExisting;
           final isGraceExpired = _isGracePeriodExpired(assignment.dueDate);
           final isClosed = !isSubmitted && isGraceExpired && !canResubmit;
 
@@ -844,38 +983,60 @@ class _SubmissionsScreenState extends ConsumerState<SubmissionsScreen> {
         children: [
           Row(
             children: [
-              if (assignment.subjectCode != null && assignment.subjectCode!.isNotEmpty)
+              if (assignment.subjectCode != null &&
+                  assignment.subjectCode!.isNotEmpty)
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 8,
+                    vertical: 4,
+                  ),
                   decoration: BoxDecoration(
                     color: AppTheme.primary.withValues(alpha: 0.15),
                     borderRadius: BorderRadius.circular(6),
                   ),
                   child: Text(
                     assignment.subjectCode!,
-                    style: TextStyle(color: AppTheme.primary, fontWeight: FontWeight.bold, fontSize: 11),
+                    style: TextStyle(
+                      color: AppTheme.primary,
+                      fontWeight: FontWeight.bold,
+                      fontSize: 11,
+                    ),
                   ),
                 ),
-              if (assignment.subjectName != null && assignment.subjectName!.isNotEmpty) ...[
+              if (assignment.subjectName != null &&
+                  assignment.subjectName!.isNotEmpty) ...[
                 const SizedBox(width: 8),
                 Expanded(
                   child: Text(
                     assignment.subjectName!,
-                    style: TextStyle(color: AppTheme.textSecondary, fontSize: 12, fontWeight: FontWeight.w500),
+                    style: TextStyle(
+                      color: AppTheme.textSecondary,
+                      fontSize: 12,
+                      fontWeight: FontWeight.w500,
+                    ),
                     overflow: TextOverflow.ellipsis,
                   ),
                 ),
               ],
               Container(
-                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 10,
+                  vertical: 4,
+                ),
                 decoration: BoxDecoration(
                   color: AppTheme.primary.withValues(alpha: 0.1),
                   borderRadius: BorderRadius.circular(12),
-                  border: Border.all(color: AppTheme.primary.withValues(alpha: 0.3)),
+                  border: Border.all(
+                    color: AppTheme.primary.withValues(alpha: 0.3),
+                  ),
                 ),
                 child: Text(
                   '${assignment.totalPoints} pts',
-                  style: TextStyle(color: AppTheme.primary, fontWeight: FontWeight.bold, fontSize: 12),
+                  style: TextStyle(
+                    color: AppTheme.primary,
+                    fontWeight: FontWeight.bold,
+                    fontSize: 12,
+                  ),
                 ),
               ),
             ],
@@ -909,21 +1070,31 @@ class _SubmissionsScreenState extends ConsumerState<SubmissionsScreen> {
               if (isOverdue) ...[
                 const SizedBox(width: 8),
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 6,
+                    vertical: 2,
+                  ),
                   decoration: BoxDecoration(
                     color: Colors.amber.withValues(alpha: 0.15),
                     borderRadius: BorderRadius.circular(4),
-                    border: Border.all(color: Colors.amber.withValues(alpha: 0.4)),
+                    border: Border.all(
+                      color: Colors.amber.withValues(alpha: 0.4),
+                    ),
                   ),
                   child: const Text(
                     'LATE (3-DAY GRACE PERIOD)',
-                    style: TextStyle(color: Colors.amber, fontSize: 10, fontWeight: FontWeight.bold),
+                    style: TextStyle(
+                      color: Colors.amber,
+                      fontSize: 10,
+                      fontWeight: FontWeight.bold,
+                    ),
                   ),
                 ),
               ],
             ],
           ),
-          if (assignment.teacherName != null && assignment.teacherName!.isNotEmpty) ...[
+          if (assignment.teacherName != null &&
+              assignment.teacherName!.isNotEmpty) ...[
             const SizedBox(height: 6),
             Row(
               children: [
@@ -942,7 +1113,8 @@ class _SubmissionsScreenState extends ConsumerState<SubmissionsScreen> {
   }
 
   Widget _buildInstructionsCard(Assignment assignment) {
-    final instructions = (assignment.description != null && assignment.description!.isNotEmpty)
+    final instructions =
+        (assignment.description != null && assignment.description!.isNotEmpty)
         ? assignment.description!
         : 'Please complete your activity according to your teacher\'s guidelines. You may type a response, attach screenshots/images, upload files, or provide project links below.';
 
@@ -974,7 +1146,11 @@ class _SubmissionsScreenState extends ConsumerState<SubmissionsScreen> {
           const SizedBox(height: 10),
           Text(
             instructions,
-            style: TextStyle(color: AppTheme.textSecondary, height: 1.5, fontSize: 14),
+            style: TextStyle(
+              color: AppTheme.textSecondary,
+              height: 1.5,
+              fontSize: 14,
+            ),
           ),
         ],
       ),
@@ -982,8 +1158,12 @@ class _SubmissionsScreenState extends ConsumerState<SubmissionsScreen> {
   }
 
   Widget _buildSubmissionForm(Assignment assignment, Submission? existing) {
-    if (_isEditingExisting && existing != null) {
-      if (_textResponseController.text.isEmpty && existing.textResponse != null) {
+    final canResubmit = existing?.status == 'resubmission_allowed';
+    final isEditing = _isEditingExisting || canResubmit;
+
+    if (isEditing && existing != null) {
+      if (_textResponseController.text.isEmpty &&
+          existing.textResponse != null) {
         _textResponseController.text = existing.textResponse!;
       }
       if (_linkController.text.isEmpty && existing.contentLink != null) {
@@ -999,7 +1179,11 @@ class _SubmissionsScreenState extends ConsumerState<SubmissionsScreen> {
       decoration: BoxDecoration(
         color: AppTheme.surface,
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: AppTheme.border),
+        border: Border.all(
+          color: canResubmit
+              ? Colors.amber.shade700.withValues(alpha: 0.5)
+              : AppTheme.border,
+        ),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -1008,14 +1192,16 @@ class _SubmissionsScreenState extends ConsumerState<SubmissionsScreen> {
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               Text(
-                _isEditingExisting ? 'Edit Your Submission' : 'Submit Activity',
+                canResubmit
+                    ? 'Resubmit Assignment'
+                    : (_isEditingExisting ? 'Edit Your Submission' : 'Submit Activity'),
                 style: TextStyle(
                   fontSize: 18,
                   fontWeight: FontWeight.bold,
-                  color: AppTheme.text,
+                  color: canResubmit ? Colors.amber.shade700 : AppTheme.text,
                 ),
               ),
-              if (_isEditingExisting)
+              if (_isEditingExisting && !canResubmit)
                 TextButton(
                   onPressed: () => setState(() => _isEditingExisting = false),
                   child: const Text('Cancel Edit'),
@@ -1023,26 +1209,66 @@ class _SubmissionsScreenState extends ConsumerState<SubmissionsScreen> {
             ],
           ),
           const SizedBox(height: 8),
-          Text(
-            'Provide your submission using text, image, file, or web link.',
-            style: TextStyle(fontSize: 12, color: AppTheme.textMuted),
-          ),
+          if (canResubmit) ...[
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+              margin: const EdgeInsets.symmetric(vertical: 8),
+              decoration: BoxDecoration(
+                color: Colors.amber.withValues(alpha: 0.12),
+                borderRadius: BorderRadius.circular(10),
+                border: Border.all(color: Colors.amber.withValues(alpha: 0.4)),
+              ),
+              child: Row(
+                children: [
+                  const Icon(Icons.lock_open_rounded, color: Colors.amber, size: 20),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Text(
+                      'Your teacher has unlocked this activity for resubmission. You can replace your file or update your link/notes and submit again.',
+                      style: TextStyle(
+                        color: AppTheme.text,
+                        fontSize: 13,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ] else ...[
+            Text(
+              'Provide your submission using a file attachment or project link.',
+              style: TextStyle(fontSize: 12, color: AppTheme.textMuted),
+            ),
+          ],
           const SizedBox(height: 18),
 
           // 1. PROJECT LINK SECTION
           Text(
             'Project Link (URL)',
-            style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: AppTheme.textSecondary),
+            style: TextStyle(
+              fontSize: 13,
+              fontWeight: FontWeight.w600,
+              color: AppTheme.textSecondary,
+            ),
           ),
           const SizedBox(height: 8),
           TextField(
             controller: _linkController,
             maxLength: 250,
-            buildCounter: (context, {required currentLength, required isFocused, maxLength}) => null,
+            buildCounter:
+                (
+                  context, {
+                  required currentLength,
+                  required isFocused,
+                  maxLength,
+                }) => null,
             style: TextStyle(color: AppTheme.text),
             decoration: InputDecoration(
               prefixIcon: Icon(Icons.link, color: AppTheme.primary),
-              hintText: 'e.g. https://github.com/username/project or Google Drive',
+              hintText:
+                  'e.g. https://github.com/username/project or Google Drive',
               counterText: '',
               hintStyle: TextStyle(color: AppTheme.textMuted, fontSize: 13),
               filled: true,
@@ -1063,85 +1289,48 @@ class _SubmissionsScreenState extends ConsumerState<SubmissionsScreen> {
           ),
           const SizedBox(height: 18),
 
-          // 2. TEXT RESPONSE SECTION
+          // 2. ATTACHMENT SECTION (UNIFIED SINGLE ATTACHMENT PICKER)
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               Text(
-                'Written / Text Response',
-                style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: AppTheme.textSecondary),
-              ),
-              ValueListenableBuilder<TextEditingValue>(
-                valueListenable: _textResponseController,
-                builder: (context, value, _) {
-                  final text = value.text.trim();
-                  final wordCount = text.isEmpty ? 0 : text.split(RegExp(r'\s+')).length;
-                  return Text(
-                    '$wordCount words • ${value.text.length} chars',
-                    style: TextStyle(fontSize: 11, color: AppTheme.textMuted),
-                  );
-                },
-              ),
-            ],
-          ),
-          const SizedBox(height: 8),
-          TextField(
-            controller: _textResponseController,
-            maxLength: 5000,
-            style: TextStyle(color: AppTheme.text, height: 1.4),
-            minLines: 4,
-            maxLines: 10,
-            decoration: InputDecoration(
-              hintText: 'Type your essay, written solution, or activity answer here...',
-              hintStyle: TextStyle(color: AppTheme.textMuted, fontSize: 13),
-              filled: true,
-              fillColor: AppTheme.background,
-              border: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(12),
-                borderSide: BorderSide(color: AppTheme.border),
-              ),
-              enabledBorder: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(12),
-                borderSide: BorderSide(color: AppTheme.border),
-              ),
-              focusedBorder: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(12),
-                borderSide: BorderSide(color: AppTheme.primary),
-              ),
-            ),
-          ),
-          const SizedBox(height: 18),
-
-          // 2. IMAGE ATTACHMENT SECTION
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Text(
-                'Attach Image / Screenshot',
-                style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: AppTheme.textSecondary),
+                'Attach File / Document / Image',
+                style: TextStyle(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w600,
+                  color: AppTheme.textSecondary,
+                ),
               ),
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
                 decoration: BoxDecoration(
                   color: AppTheme.primary.withValues(alpha: 0.12),
                   borderRadius: BorderRadius.circular(6),
-                  border: Border.all(color: AppTheme.primary.withValues(alpha: 0.3)),
+                  border: Border.all(
+                    color: AppTheme.primary.withValues(alpha: 0.3),
+                  ),
                 ),
                 child: Text(
                   'MAX 10 MB',
-                  style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: AppTheme.primary),
+                  style: TextStyle(
+                    fontSize: 10,
+                    fontWeight: FontWeight.bold,
+                    color: AppTheme.primary,
+                  ),
                 ),
               ),
             ],
           ),
           const SizedBox(height: 8),
-          if (_pickedImageName != null) ...[
+          if (_pickedFileName != null || _pickedImageName != null) ...[
             Container(
               padding: const EdgeInsets.all(12),
               decoration: BoxDecoration(
                 color: AppTheme.background,
                 borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: AppTheme.primary.withValues(alpha: 0.4)),
+                border: Border.all(
+                  color: AppTheme.primary.withValues(alpha: 0.4),
+                ),
               ),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -1160,38 +1349,56 @@ class _SubmissionsScreenState extends ConsumerState<SubmissionsScreen> {
                   ],
                   Row(
                     children: [
-                      Icon(Icons.image, color: AppTheme.primary, size: 20),
-                      const SizedBox(width: 8),
+                      Icon(
+                        _pickedImageBytes != null
+                            ? Icons.image
+                            : Icons.insert_drive_file_outlined,
+                        color: AppTheme.primary,
+                        size: 24,
+                      ),
+                      const SizedBox(width: 10),
                       Expanded(
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             Text(
-                              _pickedImageName!,
-                              style: TextStyle(color: AppTheme.text, fontWeight: FontWeight.bold, fontSize: 12),
+                              _pickedFileName ?? _pickedImageName!,
+                              style: TextStyle(
+                                color: AppTheme.text,
+                                fontWeight: FontWeight.bold,
+                                fontSize: 13,
+                              ),
                               maxLines: 1,
                               overflow: TextOverflow.ellipsis,
                             ),
-                            if (_pickedImageSize > 0)
-                              Text(
-                                _formatFileSize(_pickedImageSize),
-                                style: TextStyle(color: AppTheme.textMuted, fontSize: 11),
+                            Text(
+                              '${_formatFileSize(_pickedFileSize > 0 ? _pickedFileSize : _pickedImageSize)} • Within 10 MB limit',
+                              style: TextStyle(
+                                color: AppTheme.textMuted,
+                                fontSize: 11,
                               ),
+                            ),
                           ],
                         ),
                       ),
                       IconButton(
-                        icon: Icon(Icons.close, color: AppTheme.error, size: 18),
-                        onPressed: _removeImage,
-                        tooltip: 'Remove Image',
+                        icon: Icon(
+                          Icons.close,
+                          color: AppTheme.error,
+                          size: 20,
+                        ),
+                        onPressed: _removeAttachment,
+                        tooltip: 'Remove Attachment',
                       ),
                     ],
                   ),
                 ],
               ),
             ),
-            const SizedBox(height: 8),
-          ] else if (existing?.imagePath != null && _isEditingExisting) ...[
+            const SizedBox(height: 18),
+          ] else if ((existing?.fileName != null ||
+                  existing?.imagePath != null) &&
+              isEditing) ...[
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
               decoration: BoxDecoration(
@@ -1201,18 +1408,29 @@ class _SubmissionsScreenState extends ConsumerState<SubmissionsScreen> {
               ),
               child: Row(
                 children: [
-                  Icon(Icons.image, color: AppTheme.primary, size: 22),
+                  Icon(
+                    _isImageFile(existing!.fileName ?? existing.imagePath)
+                        ? Icons.image
+                        : Icons.attach_file,
+                    color: AppTheme.primary,
+                    size: 24,
+                  ),
                   const SizedBox(width: 10),
                   Expanded(
                     child: Text(
-                      'Keep existing image: ${existing!.imagePath}',
-                      style: TextStyle(color: AppTheme.textSecondary, fontSize: 12),
-                      overflow: TextOverflow.ellipsis,
+                      'Keep existing: ${existing.fileName ?? existing.imagePath} ${existing.fileSize != null ? "(${_formatFileSize(existing.fileSize!)})" : ""}',
+                      style: TextStyle(
+                        color: AppTheme.textSecondary,
+                        fontSize: 12,
+                      ),
                     ),
                   ),
                   TextButton(
-                    onPressed: _pickImage,
-                    child: const Text('Replace', style: TextStyle(fontSize: 12)),
+                    onPressed: _pickAttachment,
+                    child: const Text(
+                      'Replace',
+                      style: TextStyle(fontSize: 12),
+                    ),
                   ),
                 ],
               ),
@@ -1220,132 +1438,42 @@ class _SubmissionsScreenState extends ConsumerState<SubmissionsScreen> {
             const SizedBox(height: 8),
           ] else ...[
             OutlinedButton.icon(
-              onPressed: _pickImage,
-              icon: Icon(Icons.add_photo_alternate_outlined, color: AppTheme.primary, size: 20),
-              label: Text('Attach Image (JPG, PNG, WebP • Max 10 MB)', style: TextStyle(color: AppTheme.primary)),
-              style: OutlinedButton.styleFrom(
-                side: BorderSide(color: AppTheme.primary.withValues(alpha: 0.5)),
-                padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                minimumSize: const Size(double.infinity, 46),
-              ),
-            ),
-            const SizedBox(height: 8),
-          ],
-          const SizedBox(height: 10),
-
-          // 3. FILE ATTACHMENT SECTION
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Text(
-                'Attach Document / File',
-                style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: AppTheme.textSecondary),
-              ),
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
-                decoration: BoxDecoration(
-                  color: AppTheme.primary.withValues(alpha: 0.12),
-                  borderRadius: BorderRadius.circular(6),
-                  border: Border.all(color: AppTheme.primary.withValues(alpha: 0.3)),
-                ),
-                child: Text(
-                  'MAX 10 MB',
-                  style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: AppTheme.primary),
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 8),
-          if (_pickedFileName != null) ...[
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-              decoration: BoxDecoration(
-                color: AppTheme.primary.withValues(alpha: 0.1),
-                borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: AppTheme.primary.withValues(alpha: 0.3)),
-              ),
-              child: Row(
-                children: [
-                  Icon(Icons.insert_drive_file_outlined, color: AppTheme.primary, size: 28),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          _pickedFileName!,
-                          style: TextStyle(color: AppTheme.text, fontWeight: FontWeight.bold, fontSize: 13),
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                        Text(
-                          '${_formatFileSize(_pickedFileSize)} • Within 10 MB limit',
-                          style: TextStyle(color: AppTheme.textMuted, fontSize: 11),
-                        ),
-                      ],
-                    ),
-                  ),
-                  IconButton(
-                    icon: Icon(Icons.close, color: AppTheme.error, size: 20),
-                    onPressed: _removeFile,
-                    tooltip: 'Remove file',
-                  ),
-                ],
-              ),
-            ),
-            const SizedBox(height: 8),
-          ] else if (existing?.fileName != null && _isEditingExisting) ...[
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-              decoration: BoxDecoration(
-                color: AppTheme.background,
-                borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: AppTheme.border),
-              ),
-              child: Row(
-                children: [
-                  Icon(Icons.attach_file, color: AppTheme.primary, size: 24),
-                  const SizedBox(width: 10),
-                  Expanded(
-                    child: Text(
-                      'Keep existing: ${existing!.fileName} (${existing.fileSize != null ? _formatFileSize(existing.fileSize!) : ""})',
-                      style: TextStyle(color: AppTheme.textSecondary, fontSize: 12),
-                    ),
-                  ),
-                  TextButton(
-                    onPressed: _pickFile,
-                    child: const Text('Replace', style: TextStyle(fontSize: 12)),
-                  ),
-                ],
-              ),
-            ),
-            const SizedBox(height: 8),
-          ] else ...[
-            OutlinedButton.icon(
-              onPressed: _pickFile,
+              onPressed: _pickAttachment,
               icon: Icon(Icons.upload_file_outlined, color: AppTheme.primary),
-              label: Text('Browse or Pick File (PDF, DOCX, ZIP • Max 10 MB)', style: TextStyle(color: AppTheme.primary)),
+              label: Text(
+                'Browse or Pick File (PDF, DOCX, Images, ZIP • Max 10 MB)',
+                style: TextStyle(color: AppTheme.primary),
+              ),
               style: OutlinedButton.styleFrom(
-                side: BorderSide(color: AppTheme.primary.withValues(alpha: 0.5)),
-                padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                minimumSize: const Size(double.infinity, 46),
+                side: BorderSide(
+                  color: AppTheme.primary.withValues(alpha: 0.5),
+                ),
+                padding: const EdgeInsets.symmetric(
+                  vertical: 12,
+                  horizontal: 16,
+                ),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                minimumSize: const Size(double.infinity, 48),
               ),
             ),
-            const SizedBox(height: 8),
+            const SizedBox(height: 18),
           ],
-
 
           // 5. NOTES SECTION
           Text(
             'Notes or Comments (Optional)',
-            style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: AppTheme.textSecondary),
+            style: TextStyle(
+              fontSize: 13,
+              fontWeight: FontWeight.w600,
+              color: AppTheme.textSecondary,
+            ),
           ),
           const SizedBox(height: 8),
           TextField(
             controller: _notesController,
-            maxLength: 500,
+            maxLength: 200,
             style: TextStyle(color: AppTheme.text),
             maxLines: 2,
             decoration: InputDecoration(
@@ -1375,7 +1503,11 @@ class _SubmissionsScreenState extends ConsumerState<SubmissionsScreen> {
               _uploadProgress > 0
                   ? '$_uploadStatusMessage (${(_uploadProgress * 100).toInt()}%)'
                   : _uploadStatusMessage!,
-              style: TextStyle(fontSize: 12, color: AppTheme.primary, fontWeight: FontWeight.w600),
+              style: TextStyle(
+                fontSize: 12,
+                color: AppTheme.primary,
+                fontWeight: FontWeight.w600,
+              ),
             ),
             const SizedBox(height: 8),
             ClipRRect(
@@ -1392,24 +1524,40 @@ class _SubmissionsScreenState extends ConsumerState<SubmissionsScreen> {
 
           // SUBMIT ACTION BUTTON
           ElevatedButton(
-            onPressed: _isSubmitting ? null : () => _confirmAndSubmit(assignment, existing),
+            onPressed: _isSubmitting
+                ? null
+                : () => _confirmAndSubmit(assignment, existing),
             style: ElevatedButton.styleFrom(
-              backgroundColor: AppTheme.primary,
+              backgroundColor: canResubmit
+                  ? Colors.amber.shade700
+                  : AppTheme.primary,
+              foregroundColor: canResubmit ? Colors.white : Colors.black,
               minimumSize: const Size(double.infinity, 50),
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(12),
               ),
-              elevation: 0,
+              elevation: canResubmit ? 2 : 0,
             ),
             child: _isSubmitting
-                ? const SizedBox(
+                ? SizedBox(
                     width: 24,
                     height: 24,
-                    child: CircularProgressIndicator(strokeWidth: 2, color: Colors.black),
+                    child: CircularProgressIndicator(
+                      strokeWidth: 2,
+                      color: canResubmit ? Colors.white : Colors.black,
+                    ),
                   )
                 : Text(
-                    _isEditingExisting ? 'Update Submission' : 'Submit Assignment',
-                    style: const TextStyle(color: Colors.black, fontWeight: FontWeight.bold, fontSize: 16),
+                    canResubmit
+                        ? 'Submit Resubmission'
+                        : (_isEditingExisting
+                            ? 'Update Submission'
+                            : 'Submit Assignment'),
+                    style: TextStyle(
+                      color: canResubmit ? Colors.white : Colors.black,
+                      fontWeight: FontWeight.bold,
+                      fontSize: 16,
+                    ),
                   ),
           ),
         ],
@@ -1420,6 +1568,7 @@ class _SubmissionsScreenState extends ConsumerState<SubmissionsScreen> {
   Widget _buildSubmittedState(Assignment assignment, Submission submission) {
     final isGraded = submission.status == 'graded' && submission.grade != null;
     final isLate = submission.status == 'late';
+    final isResubAllowed = submission.status == 'resubmission_allowed';
 
     Color bannerColor = AppTheme.success;
     Color bannerBg = AppTheme.successSoft;
@@ -1431,6 +1580,11 @@ class _SubmissionsScreenState extends ConsumerState<SubmissionsScreen> {
       bannerIcon = Icons.stars;
       bannerColor = AppTheme.primary;
       bannerBg = AppTheme.primary.withValues(alpha: 0.12);
+    } else if (isResubAllowed) {
+      bannerTitle = 'Resubmission Allowed';
+      bannerIcon = Icons.lock_open_rounded;
+      bannerColor = Colors.amber.shade700;
+      bannerBg = Colors.amber.shade900.withValues(alpha: 0.15);
     } else if (isLate) {
       bannerTitle = 'Submitted Late';
       bannerIcon = Icons.access_time_filled;
@@ -1471,6 +1625,69 @@ class _SubmissionsScreenState extends ConsumerState<SubmissionsScreen> {
         ),
         const SizedBox(height: 16),
 
+        if (isResubAllowed) ...[
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: Colors.amber.withValues(alpha: 0.12),
+              borderRadius: BorderRadius.circular(14),
+              border: Border.all(color: Colors.amber.withValues(alpha: 0.5)),
+            ),
+            child: Column(
+              children: [
+                Row(
+                  children: [
+                    const Icon(Icons.info_outline, color: Colors.amber, size: 20),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        'Your teacher has unlocked this activity for resubmission.',
+                        style: TextStyle(
+                          color: AppTheme.text,
+                          fontWeight: FontWeight.w600,
+                          fontSize: 13,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 12),
+                SizedBox(
+                  width: double.infinity,
+                  child: ElevatedButton.icon(
+                    onPressed: () {
+                      setState(() {
+                        _isEditingExisting = true;
+                        _textResponseController.text =
+                            submission.textResponse ?? '';
+                        _linkController.text =
+                            submission.contentLink ?? '';
+                        _notesController.text = submission.notes ?? '';
+                      });
+                    },
+                    icon: const Icon(Icons.edit_note_rounded, size: 20),
+                    label: const Text(
+                      'Edit & Resubmit Assignment Now',
+                      style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
+                    ),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Colors.amber.shade700,
+                      foregroundColor: Colors.white,
+                      padding: const EdgeInsets.symmetric(vertical: 12),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      elevation: 1,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 16),
+        ],
+
         // Score Card if Graded
         if (isGraded) ...[
           Container(
@@ -1478,12 +1695,17 @@ class _SubmissionsScreenState extends ConsumerState<SubmissionsScreen> {
             padding: const EdgeInsets.all(20),
             decoration: BoxDecoration(
               gradient: LinearGradient(
-                colors: [AppTheme.primary.withValues(alpha: 0.15), AppTheme.surface],
+                colors: [
+                  AppTheme.primary.withValues(alpha: 0.15),
+                  AppTheme.surface,
+                ],
                 begin: Alignment.topLeft,
                 end: Alignment.bottomRight,
               ),
               borderRadius: BorderRadius.circular(16),
-              border: Border.all(color: AppTheme.primary.withValues(alpha: 0.3)),
+              border: Border.all(
+                color: AppTheme.primary.withValues(alpha: 0.3),
+              ),
             ),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -1493,26 +1715,42 @@ class _SubmissionsScreenState extends ConsumerState<SubmissionsScreen> {
                   children: [
                     Text(
                       'Score & Evaluation',
-                      style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: AppTheme.text),
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.bold,
+                        color: AppTheme.text,
+                      ),
                     ),
                     Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 12,
+                        vertical: 6,
+                      ),
                       decoration: BoxDecoration(
                         color: AppTheme.primary,
                         borderRadius: BorderRadius.circular(10),
                       ),
                       child: Text(
                         '${submission.grade!.toStringAsFixed(0)} / ${assignment.totalPoints} pts',
-                        style: const TextStyle(color: Colors.black, fontWeight: FontWeight.bold, fontSize: 14),
+                        style: const TextStyle(
+                          color: Colors.black,
+                          fontWeight: FontWeight.bold,
+                          fontSize: 14,
+                        ),
                       ),
                     ),
                   ],
                 ),
-                if (submission.feedback != null && submission.feedback!.isNotEmpty) ...[
+                if (submission.feedback != null &&
+                    submission.feedback!.isNotEmpty) ...[
                   const SizedBox(height: 14),
                   Text(
                     'Faculty Feedback:',
-                    style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: AppTheme.textSecondary),
+                    style: TextStyle(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w600,
+                      color: AppTheme.textSecondary,
+                    ),
                   ),
                   const SizedBox(height: 6),
                   Container(
@@ -1525,7 +1763,11 @@ class _SubmissionsScreenState extends ConsumerState<SubmissionsScreen> {
                     ),
                     child: Text(
                       submission.feedback!,
-                      style: TextStyle(color: AppTheme.text, height: 1.4, fontStyle: FontStyle.italic),
+                      style: TextStyle(
+                        color: AppTheme.text,
+                        height: 1.4,
+                        fontStyle: FontStyle.italic,
+                      ),
                     ),
                   ),
                 ],
@@ -1559,25 +1801,37 @@ class _SubmissionsScreenState extends ConsumerState<SubmissionsScreen> {
             children: [
               Text(
                 'Submission Artifacts',
-                style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: AppTheme.text),
+                style: TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.bold,
+                  color: AppTheme.text,
+                ),
               ),
               const SizedBox(height: 14),
 
               // Written text response
-              if (submission.textResponse != null && submission.textResponse!.isNotEmpty) ...[
+              if (submission.textResponse != null &&
+                  submission.textResponse!.isNotEmpty) ...[
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    Text('Written Response:', style: TextStyle(color: AppTheme.textMuted, fontSize: 12)),
+                    Text(
+                      'Written Response:',
+                      style: TextStyle(color: AppTheme.textMuted, fontSize: 12),
+                    ),
                     IconButton(
                       icon: const Icon(Icons.copy, size: 16),
                       color: AppTheme.textMuted,
                       padding: EdgeInsets.zero,
                       constraints: const BoxConstraints(),
                       onPressed: () {
-                        Clipboard.setData(ClipboardData(text: submission.textResponse!));
+                        Clipboard.setData(
+                          ClipboardData(text: submission.textResponse!),
+                        );
                         ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(content: Text('Written response copied!')),
+                          const SnackBar(
+                            content: Text('Written response copied!'),
+                          ),
                         );
                       },
                       tooltip: 'Copy Response',
@@ -1595,15 +1849,23 @@ class _SubmissionsScreenState extends ConsumerState<SubmissionsScreen> {
                   ),
                   child: Text(
                     submission.textResponse!,
-                    style: TextStyle(color: AppTheme.text, height: 1.4, fontSize: 13),
+                    style: TextStyle(
+                      color: AppTheme.text,
+                      height: 1.4,
+                      fontSize: 13,
+                    ),
                   ),
                 ),
                 const SizedBox(height: 14),
               ],
 
               // Attached Image
-              if (submission.imagePath != null && submission.imagePath!.isNotEmpty) ...[
-                Text('Attached Image:', style: TextStyle(color: AppTheme.textMuted, fontSize: 12)),
+              if (submission.imagePath != null &&
+                  submission.imagePath!.isNotEmpty) ...[
+                Text(
+                  'Attached Image:',
+                  style: TextStyle(color: AppTheme.textMuted, fontSize: 12),
+                ),
                 const SizedBox(height: 6),
                 Container(
                   padding: const EdgeInsets.all(12),
@@ -1614,12 +1876,20 @@ class _SubmissionsScreenState extends ConsumerState<SubmissionsScreen> {
                   ),
                   child: Row(
                     children: [
-                      Icon(Icons.image_outlined, color: AppTheme.primary, size: 24),
+                      Icon(
+                        Icons.image_outlined,
+                        color: AppTheme.primary,
+                        size: 24,
+                      ),
                       const SizedBox(width: 10),
                       Expanded(
                         child: Text(
                           submission.imagePath!,
-                          style: TextStyle(color: AppTheme.text, fontSize: 13, fontWeight: FontWeight.w600),
+                          style: TextStyle(
+                            color: AppTheme.text,
+                            fontSize: 13,
+                            fontWeight: FontWeight.w600,
+                          ),
                           overflow: TextOverflow.ellipsis,
                         ),
                       ),
@@ -1631,10 +1901,16 @@ class _SubmissionsScreenState extends ConsumerState<SubmissionsScreen> {
 
               // Attached File
               if (submission.fileName != null) ...[
-                Text('Attached File:', style: TextStyle(color: AppTheme.textMuted, fontSize: 12)),
+                Text(
+                  'Attached File:',
+                  style: TextStyle(color: AppTheme.textMuted, fontSize: 12),
+                ),
                 const SizedBox(height: 6),
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 12,
+                    vertical: 10,
+                  ),
                   decoration: BoxDecoration(
                     color: AppTheme.background,
                     borderRadius: BorderRadius.circular(10),
@@ -1642,7 +1918,11 @@ class _SubmissionsScreenState extends ConsumerState<SubmissionsScreen> {
                   ),
                   child: Row(
                     children: [
-                      Icon(Icons.insert_drive_file_outlined, color: AppTheme.primary, size: 22),
+                      Icon(
+                        Icons.insert_drive_file_outlined,
+                        color: AppTheme.primary,
+                        size: 22,
+                      ),
                       const SizedBox(width: 10),
                       Expanded(
                         child: Column(
@@ -1650,22 +1930,34 @@ class _SubmissionsScreenState extends ConsumerState<SubmissionsScreen> {
                           children: [
                             Text(
                               submission.fileName!,
-                              style: TextStyle(color: AppTheme.text, fontWeight: FontWeight.w600, fontSize: 13),
+                              style: TextStyle(
+                                color: AppTheme.text,
+                                fontWeight: FontWeight.w600,
+                                fontSize: 13,
+                              ),
                             ),
                             if (submission.fileSize != null)
                               Text(
                                 _formatFileSize(submission.fileSize!),
-                                style: TextStyle(color: AppTheme.textMuted, fontSize: 11),
+                                style: TextStyle(
+                                  color: AppTheme.textMuted,
+                                  fontSize: 11,
+                                ),
                               ),
                           ],
                         ),
                       ),
-                      if (submission.storageUrl != null || submission.fileBytes != null || submission.filePath != null) ...[
+                      if (submission.storageUrl != null ||
+                          submission.fileBytes != null ||
+                          submission.filePath != null) ...[
                         const SizedBox(width: 8),
                         TextButton.icon(
                           onPressed: () => _openSubmittedFile(submission),
                           icon: const Icon(Icons.open_in_new, size: 14),
-                          label: const Text('View', style: TextStyle(fontSize: 12)),
+                          label: const Text(
+                            'View',
+                            style: TextStyle(fontSize: 12),
+                          ),
                         ),
                       ],
                     ],
@@ -1675,11 +1967,18 @@ class _SubmissionsScreenState extends ConsumerState<SubmissionsScreen> {
               ],
 
               // Link
-              if (submission.contentLink != null && submission.contentLink!.isNotEmpty) ...[
-                Text('Project Link:', style: TextStyle(color: AppTheme.textMuted, fontSize: 12)),
+              if (submission.contentLink != null &&
+                  submission.contentLink!.isNotEmpty) ...[
+                Text(
+                  'Project Link:',
+                  style: TextStyle(color: AppTheme.textMuted, fontSize: 12),
+                ),
                 const SizedBox(height: 6),
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 12,
+                    vertical: 10,
+                  ),
                   decoration: BoxDecoration(
                     color: AppTheme.background,
                     borderRadius: BorderRadius.circular(10),
@@ -1692,7 +1991,10 @@ class _SubmissionsScreenState extends ConsumerState<SubmissionsScreen> {
                       Expanded(
                         child: SelectableText(
                           submission.contentLink!,
-                          style: TextStyle(color: AppTheme.primary, fontSize: 13),
+                          style: TextStyle(
+                            color: AppTheme.primary,
+                            fontSize: 13,
+                          ),
                         ),
                       ),
                       IconButton(
@@ -1701,11 +2003,23 @@ class _SubmissionsScreenState extends ConsumerState<SubmissionsScreen> {
                         onPressed: () async {
                           try {
                             final target = submission.contentLink!.trim();
-                            final uri = Uri.parse(target.startsWith('http://') || target.startsWith('https://') ? target : 'https://$target');
-                            await launchUrl(uri, mode: LaunchMode.externalApplication);
+                            final uri = Uri.parse(
+                              target.startsWith('http://') ||
+                                      target.startsWith('https://')
+                                  ? target
+                                  : 'https://$target',
+                            );
+                            await launchUrl(
+                              uri,
+                              mode: LaunchMode.externalApplication,
+                            );
                           } catch (e) {
                             if (mounted) {
-                              ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Could not open link: $e')));
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                SnackBar(
+                                  content: Text('Could not open link: $e'),
+                                ),
+                              );
                             }
                           }
                         },
@@ -1715,9 +2029,13 @@ class _SubmissionsScreenState extends ConsumerState<SubmissionsScreen> {
                         icon: const Icon(Icons.copy, size: 18),
                         color: AppTheme.textMuted,
                         onPressed: () {
-                          Clipboard.setData(ClipboardData(text: submission.contentLink!));
+                          Clipboard.setData(
+                            ClipboardData(text: submission.contentLink!),
+                          );
                           ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(content: Text('Link copied to clipboard!')),
+                            const SnackBar(
+                              content: Text('Link copied to clipboard!'),
+                            ),
                           );
                         },
                         tooltip: 'Copy Link',
@@ -1730,7 +2048,10 @@ class _SubmissionsScreenState extends ConsumerState<SubmissionsScreen> {
 
               // Notes
               if (submission.notes != null && submission.notes!.isNotEmpty) ...[
-                Text('Your Notes:', style: TextStyle(color: AppTheme.textMuted, fontSize: 12)),
+                Text(
+                  'Your Notes:',
+                  style: TextStyle(color: AppTheme.textMuted, fontSize: 12),
+                ),
                 const SizedBox(height: 6),
                 Container(
                   width: double.infinity,
@@ -1751,10 +2072,14 @@ class _SubmissionsScreenState extends ConsumerState<SubmissionsScreen> {
               // Resubmission Lock Status Card
               Builder(
                 builder: (context) {
-                  final canResubmit = submission.status == 'resubmission_allowed';
+                  final canResubmit =
+                      submission.status == 'resubmission_allowed';
                   return Container(
                     width: double.infinity,
-                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 14,
+                      vertical: 12,
+                    ),
                     margin: const EdgeInsets.only(bottom: 16),
                     decoration: BoxDecoration(
                       color: canResubmit
@@ -1770,7 +2095,9 @@ class _SubmissionsScreenState extends ConsumerState<SubmissionsScreen> {
                     child: Row(
                       children: [
                         Icon(
-                          canResubmit ? Icons.lock_open_rounded : Icons.lock_outline_rounded,
+                          canResubmit
+                              ? Icons.lock_open_rounded
+                              : Icons.lock_outline_rounded,
                           color: canResubmit ? AppTheme.success : Colors.amber,
                           size: 20,
                         ),
@@ -1781,7 +2108,9 @@ class _SubmissionsScreenState extends ConsumerState<SubmissionsScreen> {
                                 ? 'Resubmission Allowed: Your teacher has unlocked this activity. You may update and resubmit your work.'
                                 : 'Submission Locked: You have submitted this assignment. Editing is disabled unless your teacher unlocks it.',
                             style: TextStyle(
-                              color: canResubmit ? AppTheme.success : AppTheme.text,
+                              color: canResubmit
+                                  ? AppTheme.success
+                                  : AppTheme.text,
                               fontSize: 12,
                               fontWeight: FontWeight.w600,
                             ),
@@ -1796,27 +2125,36 @@ class _SubmissionsScreenState extends ConsumerState<SubmissionsScreen> {
               // Actions: Edit / Resubmit (only if teacher allowed) or Go Back
               Builder(
                 builder: (context) {
-                  final canResubmit = submission.status == 'resubmission_allowed';
+                  final canResubmit =
+                      submission.status == 'resubmission_allowed';
                   return Row(
                     children: [
                       if (canResubmit) ...[
                         Expanded(
-                          child: OutlinedButton.icon(
+                          child: ElevatedButton.icon(
                             onPressed: () {
                               setState(() {
                                 _isEditingExisting = true;
-                                _textResponseController.text = submission.textResponse ?? '';
-                                _linkController.text = submission.contentLink ?? '';
+                                _textResponseController.text =
+                                    submission.textResponse ?? '';
+                                _linkController.text =
+                                    submission.contentLink ?? '';
                                 _notesController.text = submission.notes ?? '';
                               });
                             },
-                            icon: const Icon(Icons.edit_outlined, size: 18),
-                            label: const Text('Edit / Resubmit'),
-                            style: OutlinedButton.styleFrom(
-                              foregroundColor: AppTheme.primary,
-                              side: BorderSide(color: AppTheme.primary),
+                            icon: const Icon(Icons.edit_note_rounded, size: 20),
+                            label: const Text(
+                              'Edit & Resubmit',
+                              style: TextStyle(fontWeight: FontWeight.bold),
+                            ),
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: Colors.amber.shade700,
+                              foregroundColor: Colors.white,
                               padding: const EdgeInsets.symmetric(vertical: 12),
-                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                              elevation: 1,
                             ),
                           ),
                         ),
@@ -1826,13 +2164,25 @@ class _SubmissionsScreenState extends ConsumerState<SubmissionsScreen> {
                         child: ElevatedButton(
                           onPressed: () => context.pop(),
                           style: ElevatedButton.styleFrom(
-                            backgroundColor: AppTheme.primary,
-                            foregroundColor: Colors.black,
+                            backgroundColor: canResubmit
+                                ? AppTheme.surface
+                                : AppTheme.primary,
+                            foregroundColor: canResubmit
+                                ? AppTheme.text
+                                : Colors.black,
+                            side: canResubmit
+                                ? BorderSide(color: AppTheme.border)
+                                : null,
                             padding: const EdgeInsets.symmetric(vertical: 12),
-                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(12),
+                            ),
                             elevation: 0,
                           ),
-                          child: const Text('Go Back', style: TextStyle(fontWeight: FontWeight.bold)),
+                          child: const Text(
+                            'Go Back',
+                            style: TextStyle(fontWeight: FontWeight.bold),
+                          ),
                         ),
                       ),
                     ],
@@ -1854,18 +2204,23 @@ class _SubmissionsScreenState extends ConsumerState<SubmissionsScreen> {
 
       // 1. If Cloud Storage URL is present
       if (submission.storageUrl != null &&
-          (submission.storageUrl!.startsWith('http://') || submission.storageUrl!.startsWith('https://'))) {
+          (submission.storageUrl!.startsWith('http://') ||
+              submission.storageUrl!.startsWith('https://'))) {
+        final accessibleUrl = CloudflareR2Service.instance.getAccessibleUrl(
+          submission.storageUrl!,
+        );
         if (kIsWeb) {
-          triggerWebUrlDownload(submission.storageUrl!, cleanName);
+          triggerWebUrlDownload(accessibleUrl, cleanName);
           return;
         }
-        final uri = Uri.parse(submission.storageUrl!);
+        final uri = Uri.parse(accessibleUrl);
         await launchUrl(uri, mode: LaunchMode.externalApplication);
         return;
       }
 
       // 2. If Base64 bytes are stored locally
-      if (submission.fileBytes != null && submission.fileBytes!.trim().isNotEmpty) {
+      if (submission.fileBytes != null &&
+          submission.fileBytes!.trim().isNotEmpty) {
         final cleanB64 = ImageCompressHelper.cleanBase64(submission.fileBytes!);
         final rawBytes = base64Decode(cleanB64);
         if (kIsWeb) {
@@ -1881,7 +2236,9 @@ class _SubmissionsScreenState extends ConsumerState<SubmissionsScreen> {
       }
 
       // 3. If local file path exists
-      if (!kIsWeb && submission.filePath != null && File(submission.filePath!).existsSync()) {
+      if (!kIsWeb &&
+          submission.filePath != null &&
+          File(submission.filePath!).existsSync()) {
         final uri = Uri.file(submission.filePath!);
         await launchUrl(uri, mode: LaunchMode.externalApplication);
         return;
@@ -1894,9 +2251,9 @@ class _SubmissionsScreenState extends ConsumerState<SubmissionsScreen> {
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Could not open file: $e')),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('Could not open file: $e')));
       }
     }
   }

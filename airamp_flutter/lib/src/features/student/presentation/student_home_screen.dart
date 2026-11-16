@@ -140,8 +140,8 @@ class _StudentHomeScreenState extends ConsumerState<StudentHomeScreen> {
                   }
                   ref.invalidate(allClassSchedulesProvider);
                   ref.invalidate(scheduledSectionsProvider);
-                  // Use fast delta-sync on pull-to-refresh to avoid full table rewrites and locks
-                  await DatabaseHelper().syncAllCloudData(force: false);
+                  // Force sync latest cloud data on pull-to-refresh
+                  await DatabaseHelper().syncAllCloudData(force: true);
                   await Future.wait([
                     ref.read(studentCoursesProvider.notifier).reload(),
                     ref.read(studentProgressProvider.notifier).loadProgress(),
@@ -583,6 +583,7 @@ class _StudentHomeScreenState extends ConsumerState<StudentHomeScreen> {
             return Column(
               children: assignments.map((a) {
                 final isSubmitted = a.submissionId != null;
+                final isResubmissionAllowed = a.studentSubmissionStatus == 'resubmission_allowed';
                 final isGraded =
                     a.studentSubmissionStatus == 'graded' ||
                     a.studentGrade != null;
@@ -643,35 +644,41 @@ class _StudentHomeScreenState extends ConsumerState<StudentHomeScreen> {
                             decoration: BoxDecoration(
                               color: isGraded
                                   ? AppTheme.success.withValues(alpha: 0.15)
-                                  : (isSubmitted
-                                        ? AppTheme.primary.withValues(
-                                            alpha: 0.15,
-                                          )
-                                        : (isOverdue
-                                              ? AppTheme.error.withValues(
-                                                  alpha: 0.15,
-                                                )
-                                              : AppTheme.border.withValues(
-                                                  alpha: 0.2,
-                                                ))),
+                                  : (isResubmissionAllowed
+                                        ? Colors.amber.withValues(alpha: 0.15)
+                                        : (isSubmitted
+                                            ? AppTheme.primary.withValues(
+                                                alpha: 0.15,
+                                              )
+                                            : (isOverdue
+                                                ? AppTheme.error.withValues(
+                                                    alpha: 0.15,
+                                                  )
+                                                : AppTheme.border.withValues(
+                                                    alpha: 0.2,
+                                                  )))),
                               borderRadius: BorderRadius.circular(6),
                             ),
                             child: Text(
                               isGraded
                                   ? 'Score: ${a.studentGrade?.toStringAsFixed(0)}/${a.totalPoints}'
-                                  : (isSubmitted
-                                        ? 'Submitted'
-                                        : (isOverdue ? 'Overdue' : 'Due Soon')),
+                                  : (isResubmissionAllowed
+                                        ? 'Resubmission Allowed'
+                                        : (isSubmitted
+                                            ? 'Submitted'
+                                            : (isOverdue ? 'Overdue' : 'Due Soon'))),
                               style: TextStyle(
                                 fontSize: 11,
                                 fontWeight: FontWeight.bold,
                                 color: isGraded
                                     ? AppTheme.success
-                                    : (isSubmitted
-                                          ? AppTheme.primary
-                                          : (isOverdue
-                                                ? AppTheme.error
-                                                : AppTheme.textSecondary)),
+                                    : (isResubmissionAllowed
+                                          ? Colors.amber.shade700
+                                          : (isSubmitted
+                                              ? AppTheme.primary
+                                              : (isOverdue
+                                                    ? AppTheme.error
+                                                    : AppTheme.textSecondary))),
                               ),
                             ),
                           ),
@@ -787,28 +794,36 @@ class _StudentHomeScreenState extends ConsumerState<StudentHomeScreen> {
                             });
                           },
                           icon: Icon(
-                            isSubmitted
-                                ? Icons.visibility_outlined
-                                : Icons.upload_file,
+                            isResubmissionAllowed
+                                ? Icons.edit_note_rounded
+                                : (isSubmitted
+                                    ? Icons.visibility_outlined
+                                    : Icons.upload_file),
                             size: 16,
                           ),
                           label: Text(
-                            isSubmitted
-                                ? 'View / Edit Submission'
-                                : 'Submit Assignment',
+                            isResubmissionAllowed
+                                ? 'Resubmit Assignment'
+                                : (isSubmitted
+                                    ? 'View Submission'
+                                    : 'Submit Assignment'),
                             style: const TextStyle(
                               fontWeight: FontWeight.bold,
                               fontSize: 13,
                             ),
                           ),
                           style: ElevatedButton.styleFrom(
-                            backgroundColor: isSubmitted
-                                ? AppTheme.surface
-                                : AppTheme.primary,
-                            foregroundColor: isSubmitted
-                                ? AppTheme.text
-                                : Colors.black,
-                            side: isSubmitted
+                            backgroundColor: isResubmissionAllowed
+                                ? Colors.amber.shade700
+                                : (isSubmitted
+                                    ? AppTheme.surface
+                                    : AppTheme.primary),
+                            foregroundColor: isResubmissionAllowed
+                                ? Colors.white
+                                : (isSubmitted
+                                    ? AppTheme.text
+                                    : Colors.black),
+                            side: (isSubmitted && !isResubmissionAllowed)
                                 ? BorderSide(color: AppTheme.border)
                                 : null,
                             padding: const EdgeInsets.symmetric(vertical: 10),
