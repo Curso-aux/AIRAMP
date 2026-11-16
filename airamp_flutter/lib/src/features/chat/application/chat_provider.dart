@@ -8,6 +8,7 @@ import '../../auth/application/auth_provider.dart';
 import '../../../core/api/api_client.dart';
 import '../../../core/database/database_helper.dart';
 import '../../../core/database/firestore_service.dart';
+import '../../../core/database/supabase_service.dart';
 import '../../notifications/application/notification_provider.dart';
 
 final chatRepositoryProvider = Provider<ChatRepository>((ref) {
@@ -107,13 +108,13 @@ class ChatNotifier extends Notifier<ChatState> {
     return ChatState();
   }
 
-  /// Reload messages for a specific conversation from DB and Cloud Firestore.
+  /// Reload messages for a specific conversation from DB and Supabase Realtime.
   Future<void> reloadMessages(String conversationId) async {
     try {
       if (_disposed) return;
-      // Sync latest cloud messages from Cloud Firestore first
+      // Sync latest cloud messages from Supabase (Zero daily quota limits!)
       try {
-        await FirestoreService().syncCloudMessagesForConversation(conversationId);
+        await SupabaseService().syncCloudMessagesForConversation(conversationId);
       } catch (_) {}
       if (_disposed) return;
 
@@ -185,8 +186,8 @@ class ChatNotifier extends Notifier<ChatState> {
     // Fetch cloud history immediately
     reloadMessages(cleanConvId);
 
-    // Attach real-time Firestore snapshot listener
-    _activeMessageSubscription = FirestoreService()
+    // Attach real-time Supabase WebSocket stream listener (Zero Quota Limits!)
+    _activeMessageSubscription = SupabaseService()
         .streamConversationMessages(cleanConvId)
         .listen(
       (rawMessages) async {
@@ -200,7 +201,7 @@ class ChatNotifier extends Notifier<ChatState> {
         final List<ChatMessage> chatMsgs = [];
         for (final m in rawMessages) {
           final id = m['id']?.toString() ?? '';
-          final text = m['text']?.toString() ?? '';
+          final text = m['text']?.toString() ?? m['content']?.toString() ?? '';
           final senderId = m['sender_id']?.toString() ?? '';
           final createdAt = m['created_at']?.toString() ?? DateTime.now().toIso8601String();
           final isRead = (m['is_read'] == true || m['is_read'] == 1);
@@ -700,8 +701,8 @@ class ChatNotifier extends Notifier<ChatState> {
       }
     }
 
-    // 4. Push to Cloud Firestore with guaranteed subcollection storage
-    FirestoreService().saveChatMessage(
+    // 4. Push to Supabase PostgreSQL & Realtime (Unlimited quota!)
+    SupabaseService().saveChatMessage(
       conversationId: conversationId,
       messageId: msgId,
       data: {
@@ -711,13 +712,14 @@ class ChatNotifier extends Notifier<ChatState> {
         'sender_name': user.fullName,
         'sender_role': user.role,
         'text': text.trim(),
+        'content': text.trim(),
         'created_at': now,
         'is_read': false,
       },
     ).then((_) {
-      debugPrint('[ChatNotifier] Message $msgId delivered to Cloud Firestore');
+      debugPrint('[ChatNotifier] Message $msgId delivered to Supabase Realtime');
     }).catchError((e) {
-      debugPrint('[ChatNotifier] Firestore push failed: $e');
+      debugPrint('[ChatNotifier] Supabase push failed: $e');
     });
 
     // 5. Send over WebSocket if available (optional fallback)

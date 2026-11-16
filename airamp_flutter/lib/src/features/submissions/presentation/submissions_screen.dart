@@ -14,7 +14,6 @@ import '../../../core/database/database_helper.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/theme/theme_provider.dart';
 import '../../../core/services/cloud_storage_service.dart';
-import '../../../core/services/google_drive_service.dart';
 import '../../../core/services/session_draft_service.dart';
 import '../../../core/utils/file_download_helper.dart';
 import '../../../core/utils/image_compress_helper.dart';
@@ -570,38 +569,7 @@ class _SubmissionsScreenState extends ConsumerState<SubmissionsScreen> {
       String? uploadedStorageUrl = existing?.storageUrl;
       String? linkToSave = link.isNotEmpty ? link : existing?.contentLink;
 
-      // 1. If teacher provided a Google Drive submission folder, upload directly to Google Drive!
-      final targetGdriveFolder = assignment?.gdriveFolderUrl;
-      if (targetGdriveFolder != null && targetGdriveFolder.trim().isNotEmpty && (_pickedFileBytes != null || _pickedImageBytes != null)) {
-        final uploadBytes = _pickedFileBytes ?? _pickedImageBytes!;
-        final uploadName = _pickedFileName ?? _pickedImageName!;
-        final studentSection = user?.section ?? '';
-
-        if (mounted) {
-          setState(() => _uploadStatusMessage = 'Auto-routing file to Teacher\'s Google Drive...');
-        }
-
-        final gdriveRes = await GoogleDriveService.instance.uploadToTeacherDriveFolder(
-          folderUrlOrId: targetGdriveFolder,
-          fileName: uploadName,
-          bytes: uploadBytes,
-          studentName: studentName,
-          studentId: studentId,
-          section: studentSection,
-          onProgress: (pct) {
-            if (mounted) setState(() => _uploadProgress = pct);
-          },
-        );
-
-        if (gdriveRes.success && gdriveRes.viewUrl != null) {
-          uploadedStorageUrl = gdriveRes.viewUrl;
-          if (linkToSave == null || linkToSave.isEmpty) {
-            linkToSave = gdriveRes.viewUrl;
-          }
-        }
-      }
-
-      // 2. Upload document directly to Cloud Storage if picked and not already on GDrive
+      // 1. Upload document directly to Cloud Storage (Cloudflare R2 / Supabase)
       if (uploadedStorageUrl == null && _pickedFileBytes != null && _pickedFileName != null) {
         if (mounted) setState(() => _uploadStatusMessage = 'Uploading document to cloud storage...');
         final res = await CloudStorageService().uploadSubmissionFile(
@@ -1008,29 +976,6 @@ class _SubmissionsScreenState extends ConsumerState<SubmissionsScreen> {
             instructions,
             style: TextStyle(color: AppTheme.textSecondary, height: 1.5, fontSize: 14),
           ),
-          if (assignment.gdriveFolderUrl != null && assignment.gdriveFolderUrl!.isNotEmpty) ...[
-            const SizedBox(height: 12),
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-              decoration: BoxDecoration(
-                color: Colors.green.withValues(alpha: 0.1),
-                borderRadius: BorderRadius.circular(10),
-                border: Border.all(color: Colors.green.withValues(alpha: 0.3)),
-              ),
-              child: Row(
-                children: [
-                  const Icon(Icons.cloud_done_outlined, color: Colors.green, size: 18),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: Text(
-                      'Google Drive Sync Enabled: Uploaded files will be automatically delivered directly into your teacher\'s Google Drive folder.',
-                      style: TextStyle(color: Colors.green.shade700, fontSize: 12, fontWeight: FontWeight.w500),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ],
         ],
       ),
     );

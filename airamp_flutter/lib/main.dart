@@ -3,7 +3,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 import 'firebase_options.dart';
+import 'src/core/database/supabase_service.dart';
 import 'src/routing/app_router.dart';
 import 'src/core/theme/app_theme.dart';
 import 'src/core/theme/theme_provider.dart';
@@ -20,6 +22,17 @@ import 'src/core/utils/web_plugin_helper.dart';
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   ensureWebPluginsInitialized();
+
+  // Initialize Supabase Infrastructure (PostgreSQL & Realtime - Unlimited Quota)
+  try {
+    await Supabase.initialize(
+      url: SupabaseService.supabaseUrl,
+      publishableKey: SupabaseService.supabasePublishableKey,
+    );
+    debugPrint('[Supabase] Initialized successfully: ${SupabaseService.supabaseUrl}');
+  } catch (e) {
+    debugPrint('[Supabase] Initialization note: $e');
+  }
 
   // Initialize Firebase Cloud Infrastructure
   try {

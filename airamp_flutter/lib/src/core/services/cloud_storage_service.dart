@@ -1,7 +1,9 @@
 import 'dart:async';
+import 'package:dio/dio.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_storage/firebase_storage.dart';
 import 'package:flutter/foundation.dart';
+import 'cloudflare_r2_service.dart';
 
 class CloudStorageUploadResult {
   final bool success;
@@ -18,8 +20,9 @@ class CloudStorageUploadResult {
 }
 
 /// Production-ready Cloud Storage Service for AIRAMP.
-/// Handles binary file uploads, progress tracking, and secure direct-to-cloud file links
-/// preventing bloated SQLite base64 text columns and 1MB Firestore document limits.
+/// Implements a hybrid architecture:
+/// - Primary: Cloudflare R2 (10 GB free, $0 egress/bandwidth fees forever)
+/// - Fallback: Firebase Storage (if R2 is temporarily unreachable)
 class CloudStorageService {
   static final CloudStorageService _instance = CloudStorageService._internal();
   factory CloudStorageService() => _instance;
@@ -36,7 +39,8 @@ class CloudStorageService {
     return null;
   }
 
-  bool get isAvailable => _storage != null;
+  /// Cloud storage is always available via Cloudflare R2, with Firebase fallback
+  bool get isAvailable => true;
 
   /// Uploads a student submission document or image directly to Cloud Storage.
   Future<CloudStorageUploadResult> uploadSubmissionFile({
@@ -46,6 +50,30 @@ class CloudStorageService {
     required Uint8List bytes,
     void Function(double progress)? onProgress,
   }) async {
+    final sanitizedName = _sanitizeFileName(fileName);
+    final timestamp = DateTime.now().millisecondsSinceEpoch;
+    final path = 'submissions/assign_$assignmentId/${studentId}_${timestamp}_$sanitizedName';
+
+    // 1. Primary: Cloudflare R2 (Zero bandwidth fees)
+    try {
+      final r2Url = await CloudflareR2Service.instance.uploadBytes(
+        bytes: bytes,
+        path: path,
+        contentType: getMimeType(fileName),
+        onProgress: onProgress,
+      );
+      if (r2Url != null) {
+        return CloudStorageUploadResult(
+          success: true,
+          downloadUrl: r2Url,
+          storagePath: path,
+        );
+      }
+    } catch (e) {
+      debugPrint('[CloudStorageService] Cloudflare R2 submission fallback: $e');
+    }
+
+    // 2. Fallback: Firebase Storage
     final storage = _storage;
     if (storage == null) {
       return const CloudStorageUploadResult(
@@ -55,11 +83,7 @@ class CloudStorageService {
     }
 
     try {
-      final sanitizedName = _sanitizeFileName(fileName);
-      final timestamp = DateTime.now().millisecondsSinceEpoch;
-      final path = 'submissions/assign_$assignmentId/${studentId}_${timestamp}_$sanitizedName';
       final ref = storage.ref().child(path);
-
       final metadata = SettableMetadata(
         contentType: getMimeType(fileName),
         customMetadata: {
@@ -71,7 +95,6 @@ class CloudStorageService {
       );
 
       final uploadTask = ref.putData(bytes, metadata);
-
       if (onProgress != null) {
         uploadTask.snapshotEvents.listen((TaskSnapshot snapshot) {
           if (snapshot.totalBytes > 0) {
@@ -105,6 +128,30 @@ class CloudStorageService {
     required Uint8List bytes,
     void Function(double progress)? onProgress,
   }) async {
+    final sanitizedName = _sanitizeFileName(fileName);
+    final timestamp = DateTime.now().millisecondsSinceEpoch;
+    final path = 'assignments/handouts/${teacherId}_${timestamp}_$sanitizedName';
+
+    // 1. Primary: Cloudflare R2
+    try {
+      final r2Url = await CloudflareR2Service.instance.uploadBytes(
+        bytes: bytes,
+        path: path,
+        contentType: getMimeType(fileName),
+        onProgress: onProgress,
+      );
+      if (r2Url != null) {
+        return CloudStorageUploadResult(
+          success: true,
+          downloadUrl: r2Url,
+          storagePath: path,
+        );
+      }
+    } catch (e) {
+      debugPrint('[CloudStorageService] Cloudflare R2 assignment fallback: $e');
+    }
+
+    // 2. Fallback: Firebase Storage
     final storage = _storage;
     if (storage == null) {
       return const CloudStorageUploadResult(
@@ -114,11 +161,7 @@ class CloudStorageService {
     }
 
     try {
-      final sanitizedName = _sanitizeFileName(fileName);
-      final timestamp = DateTime.now().millisecondsSinceEpoch;
-      final path = 'assignments/handouts/${teacherId}_${timestamp}_$sanitizedName';
       final ref = storage.ref().child(path);
-
       final metadata = SettableMetadata(
         contentType: getMimeType(fileName),
         customMetadata: {
@@ -129,7 +172,6 @@ class CloudStorageService {
       );
 
       final uploadTask = ref.putData(bytes, metadata);
-
       if (onProgress != null) {
         uploadTask.snapshotEvents.listen((TaskSnapshot snapshot) {
           if (snapshot.totalBytes > 0) {
@@ -163,6 +205,30 @@ class CloudStorageService {
     required Uint8List bytes,
     void Function(double progress)? onProgress,
   }) async {
+    final sanitizedName = _sanitizeFileName(fileName);
+    final timestamp = DateTime.now().millisecondsSinceEpoch;
+    final path = 'curriculum/lo_$loId/${timestamp}_$sanitizedName';
+
+    // 1. Primary: Cloudflare R2
+    try {
+      final r2Url = await CloudflareR2Service.instance.uploadBytes(
+        bytes: bytes,
+        path: path,
+        contentType: getMimeType(fileName),
+        onProgress: onProgress,
+      );
+      if (r2Url != null) {
+        return CloudStorageUploadResult(
+          success: true,
+          downloadUrl: r2Url,
+          storagePath: path,
+        );
+      }
+    } catch (e) {
+      debugPrint('[CloudStorageService] Cloudflare R2 curriculum fallback: $e');
+    }
+
+    // 2. Fallback: Firebase Storage
     final storage = _storage;
     if (storage == null) {
       return const CloudStorageUploadResult(
@@ -172,11 +238,7 @@ class CloudStorageService {
     }
 
     try {
-      final sanitizedName = _sanitizeFileName(fileName);
-      final timestamp = DateTime.now().millisecondsSinceEpoch;
-      final path = 'curriculum/lo_$loId/${timestamp}_$sanitizedName';
       final ref = storage.ref().child(path);
-
       final metadata = SettableMetadata(
         contentType: getMimeType(fileName),
         customMetadata: {
@@ -187,7 +249,6 @@ class CloudStorageService {
       );
 
       final uploadTask = ref.putData(bytes, metadata);
-
       if (onProgress != null) {
         uploadTask.snapshotEvents.listen((TaskSnapshot snapshot) {
           if (snapshot.totalBytes > 0) {
@@ -214,16 +275,97 @@ class CloudStorageService {
     }
   }
 
+  /// Uploads a chat image or attachment to Cloudflare R2
+  Future<CloudStorageUploadResult> uploadChatAttachment({
+    required String conversationId,
+    required String senderId,
+    required String fileName,
+    required Uint8List bytes,
+    void Function(double progress)? onProgress,
+  }) async {
+    final sanitizedName = _sanitizeFileName(fileName);
+    final timestamp = DateTime.now().millisecondsSinceEpoch;
+    final path = 'chat/$conversationId/${senderId}_${timestamp}_$sanitizedName';
+
+    // 1. Primary: Cloudflare R2
+    try {
+      final r2Url = await CloudflareR2Service.instance.uploadBytes(
+        bytes: bytes,
+        path: path,
+        contentType: getMimeType(fileName),
+        onProgress: onProgress,
+      );
+      if (r2Url != null) {
+        return CloudStorageUploadResult(
+          success: true,
+          downloadUrl: r2Url,
+          storagePath: path,
+        );
+      }
+    } catch (e) {
+      debugPrint('[CloudStorageService] Cloudflare R2 chat attachment fallback: $e');
+    }
+
+    // 2. Fallback: Firebase Storage
+    final storage = _storage;
+    if (storage == null) {
+      return const CloudStorageUploadResult(
+        success: false,
+        errorMessage: 'Storage unavailable',
+      );
+    }
+
+    try {
+      final ref = storage.ref().child(path);
+      final metadata = SettableMetadata(contentType: getMimeType(fileName));
+      final uploadTask = ref.putData(bytes, metadata);
+      final snapshot = await uploadTask.timeout(const Duration(seconds: 15));
+      final downloadUrl = await snapshot.ref.getDownloadURL();
+      return CloudStorageUploadResult(
+        success: true,
+        downloadUrl: downloadUrl,
+        storagePath: path,
+      );
+    } catch (e) {
+      return CloudStorageUploadResult(success: false, errorMessage: e.toString());
+    }
+  }
+
   /// Attempts to find and download a curriculum material from Cloud Storage
   Future<Uint8List?> downloadCurriculumMaterial({
     required String fileName,
     String? storagePath,
     int? loId,
   }) async {
+    // 1. If storagePath is a direct HTTP URL (e.g. from Cloudflare R2)
+    if (storagePath != null && storagePath.startsWith('http')) {
+      try {
+        final res = await Dio().get<List<int>>(
+          storagePath,
+          options: Options(responseType: ResponseType.bytes),
+        );
+        if (res.data != null) return Uint8List.fromList(res.data!);
+      } catch (_) {}
+    }
+
+    // 2. Direct R2 lookup
+    if (storagePath != null && storagePath.isNotEmpty) {
+      final r2Url = '${CloudflareR2Service.publicDevUrl}/${storagePath.startsWith('/') ? storagePath.substring(1) : storagePath}';
+      try {
+        final res = await Dio().get<List<int>>(
+          r2Url,
+          options: Options(responseType: ResponseType.bytes),
+        );
+        if (res.data != null && res.statusCode == 200) {
+          return Uint8List.fromList(res.data!);
+        }
+      } catch (_) {}
+    }
+
+    // 3. Fallback to Firebase Storage
     final storage = _storage;
     if (storage == null) return null;
     try {
-      // 1. Direct path lookup if storagePath is provided (0 list operations)
       if (storagePath != null && storagePath.isNotEmpty) {
         try {
           return await storage.ref(storagePath).getData(10 * 1024 * 1024);
@@ -231,8 +373,6 @@ class CloudStorageService {
       }
 
       final sanitized = _sanitizeFileName(fileName);
-
-      // 2. Direct reference under loId if provided
       if (loId != null) {
         try {
           return await storage.ref('curriculum/lo_$loId/$sanitized').getData(10 * 1024 * 1024);
@@ -241,7 +381,8 @@ class CloudStorageService {
           final listRes = await storage.ref('curriculum/lo_$loId').list(const ListOptions(maxResults: 20));
           for (final item in listRes.items) {
             final itemName = item.name.toLowerCase();
-            if (itemName.contains(sanitized.toLowerCase()) || sanitized.toLowerCase().contains(itemName.replaceAll(RegExp(r'^\d+_'), ''))) {
+            if (itemName.contains(sanitized.toLowerCase()) ||
+                sanitized.toLowerCase().contains(itemName.replaceAll(RegExp(r'^\d+_'), ''))) {
               return await item.getData(10 * 1024 * 1024);
             }
           }
