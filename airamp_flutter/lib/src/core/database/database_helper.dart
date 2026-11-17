@@ -322,6 +322,21 @@ class DatabaseHelper {
           'created_at': DateTime.now().toIso8601String(),
         });
       }
+      try {
+        await db.execute("ALTER TABLE schools ADD COLUMN academic_year TEXT DEFAULT 'AY 2025-2026'");
+      } catch (_) {}
+      try {
+        await db.execute("ALTER TABLE schools ADD COLUMN current_semester TEXT DEFAULT '1st Semester'");
+      } catch (_) {}
+      try {
+        await db.execute("ALTER TABLE schools ADD COLUMN last_archived_at TEXT");
+      } catch (_) {}
+      try {
+        await db.execute("ALTER TABLE schools ADD COLUMN last_reset_at TEXT");
+      } catch (_) {}
+      try {
+        await db.execute("ALTER TABLE schools ADD COLUMN archive_checksum TEXT");
+      } catch (_) {}
     } catch (_) {}
     try {
       await db.execute('''
@@ -13298,6 +13313,72 @@ class DatabaseHelper {
     final results = await db.query('schools', where: 'id = ?', whereArgs: [id]);
     if (results.isNotEmpty) return results.first;
     return null;
+  }
+
+  Future<Map<String, String>> getSchoolAcademicTerm(String schoolId) async {
+    try {
+      final db = await database;
+      final rows = await db.query('schools', where: 'id = ?', whereArgs: [schoolId]);
+      if (rows.isNotEmpty) {
+        final row = rows.first;
+        return {
+          'academic_year': row['academic_year']?.toString() ?? 'AY 2025-2026',
+          'current_semester': row['current_semester']?.toString() ?? '1st Semester',
+          'last_archived_at': row['last_archived_at']?.toString() ?? '',
+          'last_reset_at': row['last_reset_at']?.toString() ?? '',
+          'archive_checksum': row['archive_checksum']?.toString() ?? '',
+        };
+      }
+    } catch (_) {}
+    return {
+      'academic_year': 'AY 2025-2026',
+      'current_semester': '1st Semester',
+      'last_archived_at': '',
+      'last_reset_at': '',
+      'archive_checksum': '',
+    };
+  }
+
+  Future<void> updateSchoolAcademicTerm({
+    required String schoolId,
+    required String academicYear,
+    required String currentSemester,
+    String? archiveChecksum,
+    bool recordArchivedTimestamp = false,
+    bool recordResetTimestamp = false,
+  }) async {
+    final db = await database;
+    final Map<String, dynamic> updates = {
+      'academic_year': academicYear,
+      'current_semester': currentSemester,
+    };
+    if (archiveChecksum != null) {
+      updates['archive_checksum'] = archiveChecksum;
+    }
+    if (recordArchivedTimestamp) {
+      updates['last_archived_at'] = DateTime.now().toIso8601String();
+    }
+    if (recordResetTimestamp) {
+      updates['last_reset_at'] = DateTime.now().toIso8601String();
+    }
+    try {
+      await db.update('schools', updates, where: 'id = ?', whereArgs: [schoolId]);
+    } catch (_) {}
+
+    // Also sync to Firestore if available
+    try {
+      if (FirestoreService().isAvailable) {
+        final fs = FirestoreService().firestore;
+        if (fs != null) {
+          final docRef = fs.collection('schools').doc(schoolId);
+          try {
+            await docRef.update(updates);
+          } catch (_) {
+            await docRef.set(updates);
+          }
+        }
+      }
+    } catch (_) {}
   }
 
   Future<String> createSchool({

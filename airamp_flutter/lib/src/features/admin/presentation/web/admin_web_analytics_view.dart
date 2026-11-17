@@ -12,6 +12,7 @@ import '../../../../core/components/lo_mastery_matrix.dart';
 import '../../../../core/components/user_avatar_widget.dart';
 import '../controllers/semester_renewal_controller.dart';
 import '../widgets/academic_term_reset_modal.dart';
+import '../../../auth/application/auth_provider.dart';
 
 class AdminWebAnalyticsView extends ConsumerWidget {
   const AdminWebAnalyticsView({super.key});
@@ -1851,6 +1852,26 @@ class AdminWebAnalyticsView extends ConsumerWidget {
   // ── Semester-End Archiving & System Renewal Card (Milestone 2) ────────
   Widget _buildSemesterRenewalCard(BuildContext context, WidgetRef ref, bool isDark) {
     final renewalState = ref.watch(semesterRenewalControllerProvider);
+    final currentUser = ref.watch(authProvider);
+    final activeSchoolId = ref.watch(activeAdminCampusProvider) ?? currentUser?.schoolId ?? 'sch_main';
+    final schools = ref.watch(schoolsListProvider);
+    final currentSchool = schools.firstWhere(
+      (s) => s['id'] == activeSchoolId,
+      orElse: () => <String, dynamic>{
+        'name': 'AIRAMP Demonstration High School',
+        'code': 'ADM-01',
+      },
+    );
+    final schoolName = currentSchool['name']?.toString() ?? 'AIRAMP Demonstration High School';
+    final schoolCode = currentSchool['code']?.toString() ?? 'ADM-01';
+
+    final termDataAsync = ref.watch(campusAcademicTermProvider(activeSchoolId));
+    final termData = termDataAsync.value ?? {
+      'academic_year': 'AY 2025-2026',
+      'current_semester': '1st Semester',
+    };
+    final activeAy = termData['academic_year'] ?? 'AY 2025-2026';
+    final activeSem = termData['current_semester'] ?? '1st Semester';
 
     final cardBg = isDark ? AppTheme.darkSurface : Colors.white;
     final borderColor = isDark ? AppTheme.darkBorder : AppTheme.lightBorder;
@@ -1881,7 +1902,64 @@ class AdminWebAnalyticsView extends ConsumerWidget {
           final headerAndStatus = Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
+              // Top Context Pills: Active Campus Scope + Active Academic Period
+              Wrap(
+                spacing: 8,
+                runSpacing: 6,
+                crossAxisAlignment: WrapCrossAlignment.center,
+                children: [
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                    decoration: BoxDecoration(
+                      color: isDark ? AppTheme.darkSurfaceElevated : const Color(0xFFF1F5F9),
+                      borderRadius: BorderRadius.circular(6),
+                      border: Border.all(color: borderColor),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(Icons.account_balance_outlined, size: 13, color: isDark ? AppTheme.darkPrimary : AppTheme.lightPrimary),
+                        const SizedBox(width: 5),
+                        Text(
+                          '$schoolName ($schoolCode)',
+                          style: TextStyle(
+                            fontSize: 11.5,
+                            fontWeight: FontWeight.bold,
+                            color: primaryTextColor,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                    decoration: BoxDecoration(
+                      color: isDark ? AppTheme.darkPrimary.withValues(alpha: 0.15) : const Color(0xFFEFF6FF),
+                      borderRadius: BorderRadius.circular(6),
+                      border: Border.all(color: isDark ? AppTheme.darkPrimary : Colors.blue.shade200),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(Icons.calendar_month_rounded, size: 13, color: isDark ? AppTheme.darkPrimary : Colors.blue.shade700),
+                        const SizedBox(width: 5),
+                        Text(
+                          'Active Term: $activeSem · $activeAy',
+                          style: TextStyle(
+                            fontSize: 11.5,
+                            fontWeight: FontWeight.bold,
+                            color: isDark ? AppTheme.darkPrimary : Colors.blue.shade800,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 12),
+
               Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Container(
                     padding: const EdgeInsets.all(8),
@@ -1926,6 +2004,38 @@ class AdminWebAnalyticsView extends ConsumerWidget {
                 ],
               ),
               const SizedBox(height: 12),
+
+              // Prerequisites & Guardrail Checklist Helper
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
+                decoration: BoxDecoration(
+                  color: isDark ? const Color(0xFF1E293B) : const Color(0xFFF8FAFC),
+                  borderRadius: BorderRadius.circular(6),
+                  border: Border.all(color: borderColor),
+                ),
+                child: Row(
+                  children: [
+                    Icon(Icons.info_outline_rounded, size: 14, color: isDark ? AppTheme.darkPrimary : AppTheme.lightPrimary),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        isVerified
+                            ? '✓ Requirements Met: Academic ledger compiled and cryptographically verified. Ready to execute semester rollover.'
+                            : 'Prerequisites to Unlock: 1. Generate & download permanent student ledger archive (.xlsx / .zip)  ➔  2. Validate SHA-256 integrity.',
+                        style: TextStyle(
+                          fontSize: 11.5,
+                          fontWeight: FontWeight.w500,
+                          color: isVerified
+                              ? (isDark ? AppTheme.darkSuccess : Colors.green.shade800)
+                              : secondaryTextColor,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 10),
+
               // Status Badge
               Container(
                 key: const Key('archive_status_badge'),
@@ -1999,7 +2109,11 @@ class AdminWebAnalyticsView extends ConsumerWidget {
                     : () async {
                         final result = await ref
                             .read(semesterRenewalControllerProvider.notifier)
-                            .generateAndDownloadArchive();
+                            .generateAndDownloadArchive(
+                              schoolId: activeSchoolId,
+                              academicYear: activeAy,
+                              semester: activeSem,
+                            );
                         if (context.mounted) {
                           if (result != null && result.isValid) {
                             ScaffoldMessenger.of(context).showSnackBar(
@@ -2058,7 +2172,10 @@ class AdminWebAnalyticsView extends ConsumerWidget {
                           showDialog(
                             context: context,
                             barrierDismissible: false,
-                            builder: (_) => const AcademicTermResetModal(),
+                            builder: (_) => AcademicTermResetModal(
+                              schoolId: activeSchoolId,
+                              adminId: currentUser?.id,
+                            ),
                           );
                         }
                       : null,

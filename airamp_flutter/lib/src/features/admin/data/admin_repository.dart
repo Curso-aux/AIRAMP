@@ -2645,3 +2645,9 @@ final activeAdminCampusProvider = Provider<String?>((ref) {
   }
   return user.schoolId ?? 'sch_main';
 });
+
+/// Real-time academic term provider for a given campus schoolId
+final campusAcademicTermProvider = FutureProvider.family<Map<String, String>, String>((ref, schoolId) async {
+  ref.watch(schoolsListProvider);
+  return await DatabaseHelper().getSchoolAcademicTerm(schoolId);
+});

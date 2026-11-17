@@ -26,7 +26,7 @@ class MockArchivingService implements ISemesterRecordArchivingService {
   });
 
   @override
-  Future<List<StudentArchiveRecord>> fetchAllStudentRecords() async {
+  Future<List<StudentArchiveRecord>> fetchAllStudentRecords([String? schoolId]) async {
     return mockRecords;
   }
 

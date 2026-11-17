@@ -270,6 +270,26 @@ class SemesterSelectivePurgeService implements ISemesterSelectivePurgeService {
       resetStudentEnrollmentsCount: resetStudentEnrollmentsCount,
     );
 
+    // 8. Update School Academic Term to New Semester
+    try {
+      final helper = dbHelper ?? DatabaseHelper();
+      String ay = 'AY 2025-2026';
+      String sem = nextSem;
+      if (nextSem.contains('AY')) {
+        final parts = nextSem.split('AY');
+        sem = parts[0].trim();
+        ay = 'AY ${parts[1].trim()}';
+      }
+      await helper.updateSchoolAcademicTerm(
+        schoolId: schoolId,
+        academicYear: ay,
+        currentSemester: sem,
+        recordResetTimestamp: true,
+      );
+    } catch (e) {
+      debugPrint('[SemesterSelectivePurge] School term update note: $e');
+    }
+
     // 8. Dual Audit Logging with Semester Rollover Metadata
     if (fs != null) {
       try {

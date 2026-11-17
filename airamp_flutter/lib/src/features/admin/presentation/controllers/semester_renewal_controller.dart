@@ -98,15 +98,16 @@ class SemesterRenewalNotifier extends Notifier<SemesterRenewalState> {
   /// Excel (.xlsx) workbooks bundled in a .zip archive, validates byte integrity,
   /// and dispatches browser download if verified.
   Future<ArchiveVerificationResult?> generateAndDownloadExcelZipArchive({
+    String? schoolId,
     String? academicYear,
     String? semester,
   }) async {
     state = state.copyWith(isArchiveGenerating: true, clearErrorMessage: true);
 
     try {
-      final records = await archivingService.fetchAllStudentRecords();
-      final ay = academicYear ?? 'AY2025-2026';
-      final sem = semester ?? '1stSemester';
+      final records = await archivingService.fetchAllStudentRecords(schoolId);
+      final ay = academicYear ?? 'AY 2025-2026';
+      final sem = semester ?? '1st Semester';
       final zipBytes = await archivingService.generateExcelZipArchive(
         records: records,
         academicYear: ay,
@@ -157,10 +158,12 @@ class SemesterRenewalNotifier extends Notifier<SemesterRenewalState> {
 
   /// Alias for backward compatibility with existing tests and calls.
   Future<ArchiveVerificationResult?> generateAndDownloadArchive({
+    String? schoolId,
     String? academicYear,
     String? semester,
   }) async {
     return generateAndDownloadExcelZipArchive(
+      schoolId: schoolId,
       academicYear: academicYear,
       semester: semester,
     );

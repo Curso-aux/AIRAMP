@@ -53,6 +53,46 @@ class _AcademicTermResetModalState
   static const String _requiredPhrase = 'CONFIRM SEMESTER RESET';
 
   @override
+  void initState() {
+    super.initState();
+    _loadCurrentCampusTerm();
+  }
+
+  Future<void> _loadCurrentCampusTerm() async {
+    try {
+      final currentUser = ref.read(authProvider);
+      final effectiveSchoolId = widget.schoolId ?? currentUser?.schoolId ?? 'sch_main';
+      final termData = await DatabaseHelper().getSchoolAcademicTerm(effectiveSchoolId);
+      final currentAy = termData['academic_year'] ?? 'AY 2025-2026';
+      final currentSem = termData['current_semester'] ?? '1st Semester';
+      
+      final currentLabel = '$currentSem $currentAy';
+      String nextLabel;
+      if (currentSem.contains('1st')) {
+        nextLabel = '2nd Semester $currentAy';
+      } else if (currentSem.contains('2nd')) {
+        final match = RegExp(r'(\d{4})-(\d{4})').firstMatch(currentAy);
+        if (match != null) {
+          final startY = int.tryParse(match.group(1)!) ?? 2025;
+          final endY = int.tryParse(match.group(2)!) ?? 2026;
+          nextLabel = '1st Semester AY ${startY + 1}-${endY + 1}';
+        } else {
+          nextLabel = '1st Semester AY 2026-2027';
+        }
+      } else {
+        nextLabel = '1st Semester AY 2026-2027';
+      }
+
+      if (mounted) {
+        setState(() {
+          _previousSemesterController.text = currentLabel;
+          _newSemesterController.text = nextLabel;
+        });
+      }
+    } catch (_) {}
+  }
+
+  @override
   void dispose() {
     _previousSemesterController.dispose();
     _newSemesterController.dispose();
@@ -187,11 +227,11 @@ class _AcademicTermResetModalState
         borderRadius: BorderRadius.circular(16),
         side: BorderSide(color: borderColor, width: 1),
       ),
-      insetPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+      insetPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
       child: ConstrainedBox(
         constraints: const BoxConstraints(maxWidth: 580),
         child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 20.0, vertical: 18.0),
+          padding: const EdgeInsets.symmetric(horizontal: 18.0, vertical: 10.0),
           child: AnimatedSwitcher(
             duration: const Duration(milliseconds: 250),
             child: renewalState.purgeSummary != null
@@ -219,7 +259,7 @@ class _AcademicTermResetModalState
           crossAxisAlignment: CrossAxisAlignment.center,
           children: [
             Container(
-              padding: const EdgeInsets.all(8),
+              padding: const EdgeInsets.all(6),
               decoration: BoxDecoration(
                 color: Colors.red.withValues(alpha: 0.12),
                 shape: BoxShape.circle,
@@ -227,10 +267,10 @@ class _AcademicTermResetModalState
               child: const Icon(
                 Icons.warning_amber_rounded,
                 color: Colors.red,
-                size: 24,
+                size: 22,
               ),
             ),
-            const SizedBox(width: 12),
+            const SizedBox(width: 10),
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -262,9 +302,9 @@ class _AcademicTermResetModalState
             ),
           ],
         ),
-        const SizedBox(height: 12),
+        const SizedBox(height: 8),
         const Divider(height: 1),
-        const SizedBox(height: 12),
+        const SizedBox(height: 8),
 
         // Step-Specific Body
         if (_currentStep == 1)
@@ -274,7 +314,7 @@ class _AcademicTermResetModalState
         else
           _buildStep3PhraseExecution(renewalState, isDark, primaryTextColor, secondaryTextColor, borderColor),
 
-        const SizedBox(height: 16),
+        const SizedBox(height: 12),
 
         // Bottom Action Buttons
         _buildBottomActions(renewalState),
@@ -348,6 +388,26 @@ class _AcademicTermResetModalState
                   isDense: true,
                   contentPadding:
                       const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+                  suffixIcon: PopupMenuButton<String>(
+                    icon: const Icon(Icons.arrow_drop_down, size: 20),
+                    tooltip: 'Select target term preset',
+                    onSelected: (val) {
+                      setState(() {
+                        _newSemesterController.text = val;
+                      });
+                    },
+                    itemBuilder: (context) => [
+                      '2nd Semester AY 2025-2026',
+                      'Summer AY 2025-2026',
+                      '1st Semester AY 2026-2027',
+                    ]
+                        .map((preset) => PopupMenuItem(
+                              value: preset,
+                              height: 36,
+                              child: Text(preset, style: const TextStyle(fontSize: 12)),
+                            ))
+                        .toList(),
+                  ),
                   border: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(6),
                     borderSide: BorderSide(color: borderColor),

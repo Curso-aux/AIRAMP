@@ -12,7 +12,7 @@ import '../../../core/database/firestore_service.dart';
 import '../domain/semester_archive_models.dart';
 
 abstract class ISemesterRecordArchivingService {
-  Future<List<StudentArchiveRecord>> fetchAllStudentRecords();
+  Future<List<StudentArchiveRecord>> fetchAllStudentRecords([String? schoolId]);
   Future<Uint8List> generatePdfArchive(List<StudentArchiveRecord> records);
   ArchiveVerificationResult verifyPdfArchive(
     Uint8List pdfBytes,
@@ -56,7 +56,7 @@ class SemesterRecordArchivingService
   }
 
   @override
-  Future<List<StudentArchiveRecord>> fetchAllStudentRecords() async {
+  Future<List<StudentArchiveRecord>> fetchAllStudentRecords([String? schoolId]) async {
     List<Map<String, dynamic>> rawStudents = [];
     List<Map<String, dynamic>> rawSubjects = [];
     List<Map<String, dynamic>> rawQuizzes = [];
@@ -70,10 +70,11 @@ class SemesterRecordArchivingService
     // 1. Fetch Students from Firestore
     if (fs != null) {
       try {
-        final snap = await fs
-            .collection('users')
-            .where('role', isEqualTo: 'student')
-            .get();
+        Query<Map<String, dynamic>> query = fs.collection('users').where('role', isEqualTo: 'student');
+        if (schoolId != null && schoolId.isNotEmpty) {
+          query = query.where('school_id', isEqualTo: schoolId);
+        }
+        final snap = await query.get();
         rawStudents = snap.docs.map((d) {
           final m = Map<String, dynamic>.from(d.data());
           m['id'] = d.id;
@@ -92,9 +93,15 @@ class SemesterRecordArchivingService
         rawStudents = allUsers.where((u) {
           final role = u['role']?.toString().toLowerCase();
           final id = u['id']?.toString() ?? '';
+          final sId = u['school_id']?.toString();
+          final matchesSchool = schoolId == null ||
+              schoolId.isEmpty ||
+              sId == schoolId ||
+              (sId == null && schoolId == 'sch_main');
           return (role == 'student' || id.startsWith('S-')) &&
               u['is_archived'] != true &&
-              u['is_archived'] != 1;
+              u['is_archived'] != 1 &&
+              matchesSchool;
         }).toList();
       } catch (e) {
         debugPrint(
@@ -106,18 +113,24 @@ class SemesterRecordArchivingService
     // Fallback to SQLite if Firestore students empty
     if (rawStudents.isEmpty) {
       final db = await _getDatabase();
+      final hasSchool = schoolId != null && schoolId.isNotEmpty;
+      final schoolWhere = hasSchool ? " AND (school_id = ? OR (school_id IS NULL AND ? = 'sch_main'))" : "";
+      final schoolArgs = hasSchool ? [schoolId, schoolId] : <String>[];
+
       try {
         rawStudents = await db.query(
           'users',
           where:
-              "(role = 'student' OR (role IS NULL AND id LIKE 'S-%')) AND (is_archived IS NULL OR is_archived = 0)",
+              "(role = 'student' OR (role IS NULL AND id LIKE 'S-%')) AND (is_archived IS NULL OR is_archived = 0)$schoolWhere",
+          whereArgs: schoolArgs.isNotEmpty ? schoolArgs : null,
           orderBy: 'full_name ASC',
         );
       } catch (_) {
         try {
           rawStudents = await db.query(
             'users',
-            where: "role = 'student' OR (role IS NULL AND id LIKE 'S-%')",
+            where: "(role = 'student' OR (role IS NULL AND id LIKE 'S-%'))$schoolWhere",
+            whereArgs: schoolArgs.isNotEmpty ? schoolArgs : null,
           );
         } catch (_) {}
       }
@@ -126,7 +139,11 @@ class SemesterRecordArchivingService
     // 2. Fetch Subjects & Academic Collections
     if (fs != null) {
       try {
-        final subSnap = await fs.collection('subjects').get();
+        Query<Map<String, dynamic>> subQuery = fs.collection('subjects');
+        if (schoolId != null && schoolId.isNotEmpty) {
+          subQuery = subQuery.where('school_id', isEqualTo: schoolId);
+        }
+        final subSnap = await subQuery.get();
         rawSubjects = subSnap.docs
             .map((d) => {...d.data(), 'id': d.id})
             .toList();
@@ -165,7 +182,15 @@ class SemesterRecordArchivingService
       try {
         final db = await _getDatabase();
         if (rawSubjects.isEmpty) {
-          rawSubjects = await db.query('subjects');
+          if (schoolId != null && schoolId.isNotEmpty) {
+            rawSubjects = await db.query(
+              'subjects',
+              where: "school_id = ? OR (school_id IS NULL AND ? = 'sch_main')",
+              whereArgs: [schoolId, schoolId],
+            );
+          } else {
+            rawSubjects = await db.query('subjects');
+          }
         }
         if (rawQuizzes.isEmpty) {
           try {
