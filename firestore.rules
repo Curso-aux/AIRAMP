@@ -25,6 +25,11 @@ service cloud.firestore {
                        userId != 'super_admin_christian';
     }
 
+    // ── INSTITUTIONAL CAMPUSES & SCHOOLS ───────────────────────
+    match /schools/{schoolId} {
+      allow read, write: if true;
+    }
+
     // ── SECTIONS & SUBJECTS ──────────────────────────────────
     match /sections/{sectionId} {
       allow read, write: if true;

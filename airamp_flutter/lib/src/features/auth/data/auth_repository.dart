@@ -156,6 +156,43 @@ class AuthRepository {
     }
 
     if (verifiedUsers.isEmpty) {
+      // Check if this account belongs to an unassigned administrator
+      Map<String, dynamic>? candidateAdmin;
+      if (candidateRows.isNotEmpty) {
+        final match = candidateRows.firstWhere(
+          (c) => (c['role'] == 'admin' ||
+              c['category'] == 'admin' ||
+              InstitutionalIdHelper.detectRole(c['id'] as String? ?? '') == 'admin'),
+          orElse: () => <String, Object?>{},
+        );
+        if (match.isNotEmpty) candidateAdmin = Map<String, dynamic>.from(match);
+      }
+      if (candidateAdmin == null && cloudUser != null) {
+        if (cloudUser['role'] == 'admin' ||
+            InstitutionalIdHelper.detectRole(cloudUser['id']?.toString() ?? '') == 'admin') {
+          candidateAdmin = cloudUser;
+        }
+      }
+      if (candidateAdmin == null) {
+        try {
+          final probed = await FirestoreService().findUserById(identifier);
+          if (probed != null &&
+              (probed['role'] == 'admin' ||
+                  InstitutionalIdHelper.detectRole(probed['id']?.toString() ?? '') == 'admin')) {
+            candidateAdmin = probed;
+          }
+        } catch (_) {}
+      }
+
+      if (candidateAdmin != null) {
+        final sId = candidateAdmin['school_id']?.toString().trim();
+        if (sId == null || sId.isEmpty || sId == 'unassigned') {
+          throw Exception(
+            'Access Denied: Administrator is still not assigned to a campus. Please contact the Super Administrator to assign your campus.',
+          );
+        }
+      }
+
       throw Exception('Wrong User ID or password.');
     }
 
@@ -217,16 +254,27 @@ class AuthRepository {
       final schoolId = user['school_id']?.toString().trim();
       if (schoolId == null || schoolId.isEmpty || schoolId == 'unassigned') {
         throw Exception(
-          'Access Denied: This administrator account has not been assigned to a campus yet. Please contact the Super Administrator to assign your institutional campus before logging in.',
+          'Access Denied: Administrator is still not assigned to a campus. Please contact the Super Administrator to assign your campus.',
         );
       }
 
       // Check campus status
-      final schoolRows = await db.query(
+      var schoolRows = await db.query(
         'schools',
         where: 'id = ?',
         whereArgs: [schoolId],
       );
+      if (schoolRows.isEmpty) {
+        // Pull schools from cloud & fast cache if login tab started with fresh in-memory SQLite
+        try {
+          await FirestoreService().syncCloudSchoolsToLocal(force: true);
+          schoolRows = await db.query(
+            'schools',
+            where: 'id = ?',
+            whereArgs: [schoolId],
+          );
+        } catch (_) {}
+      }
       if (schoolRows.isEmpty) {
         throw Exception(
           'Access Denied: The assigned campus ("$schoolId") could not be found. Please contact the Super Administrator.',

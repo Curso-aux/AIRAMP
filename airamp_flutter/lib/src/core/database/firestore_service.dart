@@ -1899,11 +1899,13 @@ class FirestoreService {
     final id = schoolData['id']?.toString().trim();
     if (id == null || id.isEmpty) return;
     try {
-      await saveDocument('schools', id, schoolData);
       final prefs = await SharedPreferences.getInstance();
       final db = await DatabaseHelper().database;
       final all = await db.query('schools', orderBy: 'created_at ASC');
       await prefs.setString('local_cached_schools_v1', jsonEncode(all));
+    } catch (_) {}
+    try {
+      await saveDocument('schools', id, schoolData);
     } catch (e) {
       debugPrint('[FirestoreService] saveSchool error: $e');
     }
@@ -1913,11 +1915,13 @@ class FirestoreService {
     final cleanId = id.trim();
     if (cleanId.isEmpty) return;
     try {
-      await deleteDocument('schools', cleanId);
       final prefs = await SharedPreferences.getInstance();
       final db = await DatabaseHelper().database;
       final all = await db.query('schools', orderBy: 'created_at ASC');
       await prefs.setString('local_cached_schools_v1', jsonEncode(all));
+    } catch (_) {}
+    try {
+      await deleteDocument('schools', cleanId);
     } catch (e) {
       debugPrint('[FirestoreService] deleteSchoolFromCloud error: $e');
     }
@@ -2452,8 +2456,15 @@ class FirestoreService {
       final maskQuery = fields.keys.map((k) => 'updateMask.fieldPaths=$k').join('&');
       final keyParam = apiKey.isNotEmpty ? '&key=$apiKey' : '';
       final url = '$firestoreRestBaseUrl/$collection/$cleanDocId?$maskQuery$keyParam';
-      await dio.patch(url, data: {'fields': fields});
-      debugPrint('[FirestoreService] Successfully saved $collection/$cleanDocId via REST');
+      try {
+        await dio.patch(url, data: {'fields': fields});
+        debugPrint('[FirestoreService] Successfully saved $collection/$cleanDocId via REST (with mask)');
+      } catch (patchErr) {
+        // Fallback: If 404 or mask rejected, perform direct upsert patch without updateMask
+        final fallbackUrl = '$firestoreRestBaseUrl/$collection/$cleanDocId${apiKey.isNotEmpty ? '?key=$apiKey' : ''}';
+        await dio.patch(fallbackUrl, data: {'fields': fields});
+        debugPrint('[FirestoreService] Successfully saved $collection/$cleanDocId via REST (upsert fallback)');
+      }
     } catch (e, st) {
       debugPrint('[FirestoreService] REST saveDocument error: $e\n$st');
       rethrow;
