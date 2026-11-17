@@ -413,6 +413,7 @@ class FirestoreService {
     int? limit,
   }) async {
     final list = <Map<String, dynamic>>[];
+    if (_isTestEnv) return list;
     if (isAvailable) {
       try {
         Query<Map<String, dynamic>> query = firestore.collection(collection);

@@ -554,7 +554,7 @@ class StudentStickyTopHeader extends ConsumerWidget {
             tooltip: 'Announcements & Notifications',
             constraints: BoxConstraints(minWidth: buttonSize, minHeight: buttonSize),
             padding: EdgeInsets.zero,
-            onPressed: () => showStudentAnnouncementsSheet(context, announcements),
+            onPressed: () => context.push('/notifications'),
           ),
         ),
         if (hasUnread)

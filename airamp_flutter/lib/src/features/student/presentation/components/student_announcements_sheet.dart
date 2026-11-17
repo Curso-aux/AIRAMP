@@ -189,6 +189,16 @@ class _NotificationsAndAnnouncementsSheetState
                     ),
                   ),
                 IconButton(
+                  icon: Icon(Icons.open_in_new_rounded, color: AppTheme.text, size: 18),
+                  tooltip: 'Open Notification Center',
+                  padding: EdgeInsets.zero,
+                  constraints: const BoxConstraints(minWidth: 36, minHeight: 36),
+                  onPressed: () {
+                    Navigator.pop(context);
+                    context.push('/notifications');
+                  },
+                ),
+                IconButton(
                   icon: Icon(Icons.close_rounded, color: AppTheme.text),
                   padding: EdgeInsets.zero,
                   constraints: const BoxConstraints(minWidth: 40, minHeight: 40),

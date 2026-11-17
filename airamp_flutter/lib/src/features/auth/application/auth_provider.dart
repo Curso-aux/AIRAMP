@@ -7,6 +7,7 @@ import '../../../core/components/auth/required_change_password_dialog.dart';
 import '../../../core/database/database_helper.dart';
 import '../../../core/database/firestore_service.dart';
 import '../../../core/utils/web_session_helper.dart';
+import '../../notifications/application/notification_sync_service.dart';
 import '../data/auth_repository.dart';
 
 class User {
@@ -160,6 +161,7 @@ class AuthNotifier extends Notifier<User?> {
           if (token.isNotEmpty) {
             ApiClient.setSession(session: token, userId: user.id);
           }
+          NotificationSyncService().startSync(user.id);
           return user;
         }
       } catch (_) {}
@@ -175,6 +177,9 @@ class AuthNotifier extends Notifier<User?> {
       final data = await repository.login(identifier, password);
       final user = User.fromJson(data['user']);
       state = user;
+      if (state != null) {
+        NotificationSyncService().startSync(state!.id);
+      }
       WebSessionHelper.markSessionActive(user.id);
       if (kIsWeb) {
         WebSessionHelper.saveUserProfile(_userToMap(user));
@@ -460,6 +465,9 @@ class AuthNotifier extends Notifier<User?> {
       WebSessionHelper.saveUserProfile(_userToMap(state!));
     }
     ApiClient.setSession(session: session.session, userId: session.userId);
+    if (state != null) {
+      NotificationSyncService().startSync(state!.id);
+    }
 
     // Register real-time sync hook to refresh active user state when background cloud sync updates store
     FirestoreService.addSyncListener(() {
@@ -489,6 +497,9 @@ class AuthNotifier extends Notifier<User?> {
       );
       final user = User.fromJson(data['user']);
       state = user;
+      if (state != null) {
+        NotificationSyncService().startSync(state!.id);
+      }
       WebSessionHelper.markSessionActive(user.id);
       if (kIsWeb) {
         WebSessionHelper.saveUserProfile(_userToMap(user));
@@ -662,6 +673,9 @@ class AuthNotifier extends Notifier<User?> {
     final repository = ref.read(authRepositoryProvider);
     final userId = state?.id;
     isLoading = true;
+    try {
+      NotificationSyncService().stopSync();
+    } catch (_) {}
     try {
       if (userId != null && state?.mustChangePassword != true) {
         final prefs = await SharedPreferences.getInstance();

@@ -158,6 +158,15 @@ class RateLimiter {
     _failureCounters.remove(normalizedKey);
   }
 
+  /// Clears all request logs, lockouts, and counters across all keys.
+  void clear() {
+    _requestLogs.clear();
+    _lastRequestTimes.clear();
+    _lockouts.clear();
+    _lockoutReasons.clear();
+    _failureCounters.clear();
+  }
+
   /// Checks if [key] is currently locked out without recording a request.
   bool isLockedOut(String key) {
     final normalizedKey = key.toLowerCase().trim();

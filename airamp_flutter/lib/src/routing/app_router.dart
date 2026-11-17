@@ -39,6 +39,7 @@ import '../features/teacher/presentation/teacher_students_screen.dart';
 import '../features/teacher/presentation/teacher_subject_detail_screen.dart';
 import '../features/chat/presentation/chat_list_screen.dart';
 import '../features/chat/presentation/chat_room_screen.dart';
+import '../features/notifications/presentation/notification_center_screen.dart';
 import '../features/quiz/presentation/quiz_screen.dart';
 import '../features/quiz/presentation/module_gizmo_review_screen.dart';
 import '../features/submissions/presentation/submissions_screen.dart';
@@ -499,6 +500,17 @@ final routerProvider = Provider<GoRouter>((ref) {
         redirect: (context, state) => '/super-admin',
       ),
       // Shared Routes & Activity Screens
+      GoRoute(
+        path: '/student/history',
+        redirect: (context, state) => '/student/quiz-history',
+      ),
+      GoRoute(
+        path: '/notifications',
+        pageBuilder: (context, state) => AppPageTransitions.page(
+          key: state.pageKey,
+          child: const NotificationCenterScreen(),
+        ),
+      ),
       GoRoute(
         path: '/chat',
         pageBuilder: (context, state) => AppPageTransitions.page(

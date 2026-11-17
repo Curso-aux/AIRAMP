@@ -670,7 +670,7 @@ class _TeacherDashboardScreenState extends ConsumerState<TeacherDashboardScreen>
                       tooltip: 'Activity Notifications',
                       constraints: const BoxConstraints(minWidth: 34, minHeight: 34),
                       padding: const EdgeInsets.all(6),
-                      onPressed: () => _showNotificationsDialog(context, currentUser?.id ?? ''),
+                      onPressed: () => context.push('/notifications'),
                     ),
                   ),
                   if (unreadCount > 0)
@@ -872,7 +872,7 @@ class _TeacherDashboardScreenState extends ConsumerState<TeacherDashboardScreen>
                           tooltip: 'Activity Notifications',
                           constraints: const BoxConstraints(minWidth: 36, minHeight: 36),
                           padding: const EdgeInsets.all(7),
-                          onPressed: () => _showNotificationsDialog(context, currentUser?.id ?? ''),
+                          onPressed: () => context.push('/notifications'),
                         ),
                       ),
                       if (unreadCount > 0)

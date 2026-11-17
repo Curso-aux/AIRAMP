@@ -4,6 +4,7 @@ import 'dart:io';
 import 'dart:math';
 import 'package:crypto/crypto.dart';
 import 'package:flutter/foundation.dart';
+import 'package:flutter/widgets.dart';
 import 'package:path/path.dart';
 import 'package:sqflite/sqflite.dart';
 import 'package:sqflite_common_ffi_web/sqflite_ffi_web.dart';
@@ -22,6 +23,24 @@ class DatabaseHelper {
   static final DatabaseHelper _instance = DatabaseHelper._internal();
   static Database? _database;
   static bool _isSyncingCurriculum = false;
+  static int _notifSeq = 0;
+
+  static bool get _isTestEnv {
+    try {
+      if (!kIsWeb && Platform.environment.containsKey('FLUTTER_TEST')) {
+        return true;
+      }
+      final binding = WidgetsBinding.instance;
+      return binding.runtimeType.toString().contains('Test');
+    } catch (_) {
+      return false;
+    }
+  }
+
+  @visibleForTesting
+  static void resetForTesting() {
+    _database = null;
+  }
 
   factory DatabaseHelper() => _instance;
 
@@ -536,8 +555,9 @@ class DatabaseHelper {
       }
     }
 
-    final databasesPath = await getDatabasesPath();
-    final path = join(databasesPath, 'airamp_local.db');
+    final path = _isTestEnv
+        ? inMemoryDatabasePath
+        : join(await getDatabasesPath(), 'airamp_local.db');
 
     return await openDatabase(
       path,
@@ -12434,7 +12454,7 @@ class DatabaseHelper {
     final db = await database;
     final now = DateTime.now().toIso8601String();
     final id =
-        'notif_${DateTime.now().millisecondsSinceEpoch}_${(userId.hashCode % 1000).abs()}';
+        'notif_${DateTime.now().microsecondsSinceEpoch}_${_notifSeq++}_${Random().nextInt(10000)}_${(userId.hashCode % 1000).abs()}';
     final notifData = {
       'id': id,
       'user_id': userId,
@@ -12449,7 +12469,7 @@ class DatabaseHelper {
       'actor_id': actorId,
       'actor_name': actorName,
     };
-    await db.insert('notifications', notifData);
+    await db.insert('notifications', notifData, conflictAlgorithm: ConflictAlgorithm.replace);
 
     // Sync notification to Cloud Firestore
     try {
@@ -12466,6 +12486,7 @@ class DatabaseHelper {
     try {
       final cleanUid = userId.trim();
       if (cleanUid.isEmpty) return;
+      if (_isTestEnv) return;
       final prefs = await SharedPreferences.getInstance();
       final lastSync = force ? null : prefs.getString('last_synced_at_notifs_$cleanUid');
       var docs = await FirestoreService().fetchDeltaDocuments(
@@ -12572,6 +12593,37 @@ class DatabaseHelper {
   Future<void> deleteNotification(String id) async {
     final db = await database;
     await db.delete('notifications', where: 'id = ?', whereArgs: [id]);
+    try {
+      unawaited(FirestoreService().deleteDocument('notifications', id));
+    } catch (_) {}
+  }
+
+  /// Batch deletes multiple notifications by their IDs from local SQLite and Cloud Firestore.
+  Future<int> batchDeleteNotifications(List<String> ids) async {
+    if (ids.isEmpty) return 0;
+    final db = await database;
+    int count = 0;
+    const chunkSize = 500;
+    for (var i = 0; i < ids.length; i += chunkSize) {
+      final chunk = ids.sublist(
+        i,
+        (i + chunkSize > ids.length) ? ids.length : i + chunkSize,
+      );
+      final placeholders = List.filled(chunk.length, '?').join(',');
+      count += await db.delete(
+        'notifications',
+        where: 'id IN ($placeholders)',
+        whereArgs: chunk,
+      );
+    }
+
+    for (final id in ids) {
+      try {
+        unawaited(FirestoreService().deleteDocument('notifications', id));
+      } catch (_) {}
+    }
+
+    return count;
   }
 
   Future<void> clearNotificationsForUser(String userId) async {

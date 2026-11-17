@@ -176,6 +176,51 @@ class NotificationNotifier extends Notifier<NotificationState> {
     } catch (_) {}
   }
 
+  /// Batch deletes multiple notifications by their IDs and updates state atomically.
+  Future<int> deleteBatchNotifications(List<String> ids) async {
+    if (ids.isEmpty) return 0;
+    try {
+      final count = await _db.batchDeleteNotifications(ids);
+      final idSet = ids.toSet();
+      final updated = state.notifications.where((n) => !idSet.contains(n.id)).toList();
+      final unread = updated.where((n) => !n.isRead).length;
+
+      state = state.copyWith(
+        notifications: updated,
+        unreadCount: unread,
+      );
+      return count;
+    } catch (_) {
+      return 0;
+    }
+  }
+
+  /// Filters current in-memory notifications by search [query] and [category].
+  List<AppNotification> filterByQuery(String query, {String category = 'all'}) {
+    final q = query.trim().toLowerCase();
+    return state.notifications.where((n) {
+      if (category == 'unread' && n.isRead) return false;
+      if (category == 'assignments' &&
+          !['new_assignment', 'activity_submission', 'grade_released', 'resubmission_allowed'].contains(n.type)) {
+        return false;
+      }
+      if (category == 'assessments' &&
+          !['quiz', 'quiz_assigned', 'quiz_completed'].contains(n.type) &&
+          !n.type.contains('quiz')) {
+        return false;
+      }
+      if (category == 'announcements' && n.type != 'announcement') return false;
+      if (category == 'chat' && n.type != 'chat' && n.type != 'group_chat') return false;
+
+      if (q.isEmpty) return true;
+      final titleMatch = n.title.toLowerCase().contains(q);
+      final msgMatch = n.message.toLowerCase().contains(q);
+      final typeMatch = n.type.toLowerCase().contains(q);
+      final actorMatch = (n.actorName ?? '').toLowerCase().contains(q);
+      return titleMatch || msgMatch || typeMatch || actorMatch;
+    }).toList();
+  }
+
   Future<void> clearAll() async {
     final user = ref.read(authProvider);
     if (user == null) return;
@@ -196,4 +241,58 @@ final notificationsProvider = NotifierProvider<NotificationNotifier, Notificatio
 
 final unreadNotificationCountProvider = Provider<int>((ref) {
   return ref.watch(notificationsProvider).unreadCount;
+});
+
+class NotificationSearchQueryNotifier extends Notifier<String> {
+  @override
+  String build() => '';
+
+  void setQuery(String query) => state = query;
+  void clear() => state = '';
+}
+
+final notificationSearchQueryProvider =
+    NotifierProvider<NotificationSearchQueryNotifier, String>(() {
+  return NotificationSearchQueryNotifier();
+});
+
+class NotificationCategoryFilterNotifier extends Notifier<String> {
+  @override
+  String build() => 'all';
+
+  void setCategory(String category) => state = category;
+}
+
+final notificationCategoryFilterProvider =
+    NotifierProvider<NotificationCategoryFilterNotifier, String>(() {
+  return NotificationCategoryFilterNotifier();
+});
+
+/// Reactive provider delivering filtered notifications based on real-time search query and category filter.
+final filteredNotificationsProvider = Provider<List<AppNotification>>((ref) {
+  final notifState = ref.watch(notificationsProvider);
+  final query = ref.watch(notificationSearchQueryProvider).trim().toLowerCase();
+  final category = ref.watch(notificationCategoryFilterProvider);
+
+  return notifState.notifications.where((n) {
+    if (category == 'unread' && n.isRead) return false;
+    if (category == 'assignments' &&
+        !['new_assignment', 'activity_submission', 'grade_released', 'resubmission_allowed'].contains(n.type)) {
+      return false;
+    }
+    if (category == 'assessments' &&
+        !['quiz', 'quiz_assigned', 'quiz_completed'].contains(n.type) &&
+        !n.type.contains('quiz')) {
+      return false;
+    }
+    if (category == 'announcements' && n.type != 'announcement') return false;
+    if (category == 'chat' && n.type != 'chat' && n.type != 'group_chat') return false;
+
+    if (query.isEmpty) return true;
+    final titleMatch = n.title.toLowerCase().contains(query);
+    final msgMatch = n.message.toLowerCase().contains(query);
+    final typeMatch = n.type.toLowerCase().contains(query);
+    final actorMatch = (n.actorName ?? '').toLowerCase().contains(query);
+    return titleMatch || msgMatch || typeMatch || actorMatch;
+  }).toList();
 });
