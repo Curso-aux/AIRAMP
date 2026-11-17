@@ -1,8 +1,15 @@
 import 'package:flutter_test/flutter_test.dart';
+import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 import 'package:airamp_flutter/src/core/utils/institutional_id_helper.dart';
 import 'package:airamp_flutter/src/features/auth/application/auth_provider.dart';
+import 'package:airamp_flutter/src/core/database/database_helper.dart';
 
 void main() {
+  setUpAll(() {
+    sqfliteFfiInit();
+    databaseFactory = databaseFactoryFfi;
+  });
+
   group('Campus Identifier Auto-Generation Tests', () {
     test('Derives clean 3-letter acronym from standard campus names', () {
       expect(
@@ -123,6 +130,34 @@ void main() {
       // Unassigned admin is not matched to either
       final isUnassigned = !schools.any((s) => s['admin_id'] == admins[2]['id'] || (s['id'] == admins[2]['school_id']));
       expect(isUnassigned, isTrue);
+    });
+
+    test('New campus analytics summary strictly isolates data and returns 0 when empty', () async {
+      final db = await DatabaseHelper().database;
+      
+      // Seed an admin into new campus
+      await db.insert('users', {
+        'id': 'A-100-9999',
+        'email': 'admin@newcampus.edu',
+        'password': 'hashed_test_password',
+        'role': 'admin',
+        'full_name': 'New Campus Admin',
+        'school_id': 'sch_isolated_test',
+        'created_at': DateTime.now().toIso8601String(),
+      }, conflictAlgorithm: ConflictAlgorithm.replace);
+
+      // Query analytics summary for new campus
+      final summary = await DatabaseHelper().getAdminAnalyticsSummary(schoolId: 'sch_isolated_test');
+      
+      // Total registered users should be 0 (administrator is not a registered student or teacher)
+      expect(summary['totalUsers'], 0);
+      expect(summary['totalStudents'], 0);
+      expect(summary['totalTeachers'], 0);
+      expect(summary['totalAdmins'], 1);
+      expect(summary['totalEnrollments'], 0);
+      expect(summary['totalSubjects'], 0);
+      expect(summary['totalSections'], 0);
+      expect(summary['totalAttempts'], 0);
     });
   });
 }

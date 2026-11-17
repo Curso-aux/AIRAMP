@@ -3393,8 +3393,19 @@ class DatabaseHelper {
   Future<List<Map<String, dynamic>>> getAllQuizScores({
     String? section,
     String? query,
+    String? schoolId,
   }) async {
     final db = await database;
+    String schoolWhere = '';
+    List<dynamic> whereArgs = [];
+    if (schoolId != null && schoolId.isNotEmpty) {
+      if (schoolId == 'sch_main') {
+        schoolWhere = " AND (u.school_id = 'sch_main' OR u.school_id IS NULL OR u.school_id = '') ";
+      } else {
+        schoolWhere = " AND u.school_id = ? ";
+        whereArgs.add(schoolId);
+      }
+    }
     final results = await db.rawQuery('''
       SELECT qa.*, 
              u.full_name as student_name, 
@@ -3414,6 +3425,7 @@ class DatabaseHelper {
       LEFT JOIN quizzes qz ON qa.quiz_id = qz.id
       WHERE u.full_name IS NOT NULL
         AND u.full_name != ''
+        $schoolWhere
         AND u.id NOT LIKE '%1794%'
         AND qa.student_id NOT LIKE '%1794%'
         AND qa.student_id NOT LIKE 's_anticheat_%'
@@ -3426,7 +3438,7 @@ class DatabaseHelper {
         AND COALESCE(lo.title, '') NOT LIKE '%1794%'
         AND (qa.quiz_id IS NULL OR qa.quiz_id IN (SELECT id FROM quizzes WHERE title NOT LIKE '%1794%' AND title NOT LIKE '%Math Roster Quiz%' AND title != '1'))
       ORDER BY qa.attempted_at DESC
-    ''');
+    ''', whereArgs.isNotEmpty ? whereArgs : null);
 
     var list = results.where((r) {
       final sId = (r['student_id']?.toString() ?? '').toLowerCase();
@@ -3604,29 +3616,37 @@ class DatabaseHelper {
       return r == 'admin' || r == 'super_admin' || id.startsWith('A-') || id.startsWith('SA-');
     }).length;
     final totalSchoolUsers = totalStudents + totalTeachers;
-    final totalUsers = totalSchoolUsers > 0 ? totalSchoolUsers : users.length;
+    final totalUsers = totalSchoolUsers;
     final matchingStudentIds = users.where((u) {
       final r = (u['role'] as String? ?? '').toLowerCase().trim();
       final id = (u['id'] as String? ?? '').trim();
       return r == 'student' || id.startsWith('S-') || id.startsWith('001-') || id.startsWith('STD_');
     }).map((u) => u['id'] as String).toSet();
 
-    // 2. Filter Subjects
+    // 2. Filter Subjects strictly by schoolId
     final allSubjects = await db.query('subjects');
+    final schoolSubjects = allSubjects.where((s) {
+      if (schoolId != null && schoolId.isNotEmpty) {
+        final sSchool = (s['school_id'] as String? ?? '').trim();
+        if (schoolId == 'sch_main') {
+          if (sSchool.isNotEmpty && sSchool != 'sch_main') return false;
+        } else {
+          if (sSchool != schoolId) return false;
+        }
+      }
+      return true;
+    }).toList();
     final subjects = subjectId != null
-        ? allSubjects.where((s) => s['id'] == subjectId).toList()
-        : allSubjects;
+        ? schoolSubjects.where((s) => s['id'] == subjectId).toList()
+        : schoolSubjects;
     final totalSubjects = subjects.length;
+    final schoolSubjectIds = subjects.map((s) => s['id']).toSet();
 
-    // 3. Filter Enrollments (scoped to matching students & subject)
+    // 3. Filter Enrollments (strictly scoped to matching students and campus subjects)
     final allEnrollments = await db.query('enrollments');
     final enrollments = allEnrollments.where((e) {
-      if ((section != null && section != 'All Sections') ||
-          (studentCategory != null &&
-              studentCategory != 'all' &&
-              studentCategory.isNotEmpty)) {
-        if (!matchingStudentIds.contains(e['student_id'])) return false;
-      }
+      if (!matchingStudentIds.contains(e['student_id'])) return false;
+      if (!schoolSubjectIds.contains(e['subject_id'])) return false;
       if (subjectId != null && e['subject_id'] != subjectId) return false;
       return true;
     }).toList();
@@ -3634,15 +3654,11 @@ class DatabaseHelper {
 
     // Topics & LOs
     final allTopics = await db.query('topics');
-    final topics = subjectId != null
-        ? allTopics.where((t) => t['subject_id'] == subjectId).toList()
-        : allTopics;
+    final topics = allTopics.where((t) => schoolSubjectIds.contains(t['subject_id'])).toList();
     final topicIds = topics.map((t) => t['id'] as int).toSet();
 
     final allLos = await db.query('learning_outcomes');
-    final los = subjectId != null
-        ? allLos.where((l) => topicIds.contains(l['topic_id'])).toList()
-        : allLos;
+    final los = allLos.where((l) => topicIds.contains(l['topic_id'])).toList();
 
     // 4. Date calculation for timeframe
     DateTime? startDate;
@@ -3660,12 +3676,8 @@ class DatabaseHelper {
     // 5. Filter Quiz Attempts (AND logic: matching students, subject, and timeframe)
     final allAttempts = await db.query('quiz_attempts');
     final attempts = allAttempts.where((a) {
-      if ((section != null && section != 'All Sections') ||
-          (studentCategory != null &&
-              studentCategory != 'all' &&
-              studentCategory.isNotEmpty)) {
-        if (!matchingStudentIds.contains(a['student_id'])) return false;
-      }
+      if (!matchingStudentIds.contains(a['student_id'])) return false;
+      if (!schoolSubjectIds.contains(a['subject_id'])) return false;
       if (subjectId != null && a['subject_id'] != subjectId) return false;
       if (startDate != null) {
         final dateStr = a['attempted_at']?.toString();
@@ -3764,24 +3776,29 @@ class DatabaseHelper {
       (a, b) => (b['count'] as int).compareTo(a['count'] as int),
     );
 
-    final announcements = await db.query(
+    final allAnnouncements = await db.query(
       'announcements',
       orderBy: 'id DESC',
-      limit: 5,
     );
+    final announcements = allAnnouncements.where((a) {
+      if (schoolId != null && schoolId.isNotEmpty) {
+        final aSchool = (a['school_id'] as String? ?? '').trim();
+        if (schoolId == 'sch_main') {
+          if (aSchool.isNotEmpty && aSchool != 'sch_main') return false;
+        } else {
+          if (aSchool != schoolId) return false;
+        }
+      }
+      return true;
+    }).take(5).toList();
 
     // 8. Filtered recent attempts matching all criteria
-    final allRecentAttempts = await getAllQuizScores();
+    final allRecentAttempts = await getAllQuizScores(schoolId: schoolId);
     final recentAttempts = allRecentAttempts
         .where((a) {
-          if ((section != null && section != 'All Sections') ||
-              (studentCategory != null &&
-                  studentCategory != 'all' &&
-                  studentCategory.isNotEmpty)) {
-            final studentId = a['student_id'] as String?;
-            if (studentId == null || !matchingStudentIds.contains(studentId)) {
-              return false;
-            }
+          final studentId = a['student_id'] as String?;
+          if (studentId == null || !matchingStudentIds.contains(studentId)) {
+            return false;
           }
           if (subjectId != null && a['subject_id'] != subjectId) return false;
           if (startDate != null) {
@@ -3803,7 +3820,18 @@ class DatabaseHelper {
         : '0';
 
     final allSections = await db.query('sections');
-    final totalSections = allSections.length;
+    final schoolSections = allSections.where((sec) {
+      if (schoolId != null && schoolId.isNotEmpty) {
+        final secSchool = (sec['school_id'] as String? ?? '').trim();
+        if (schoolId == 'sch_main') {
+          if (secSchool.isNotEmpty && secSchool != 'sch_main') return false;
+        } else {
+          if (secSchool != schoolId) return false;
+        }
+      }
+      return true;
+    }).toList();
+    final totalSections = schoolSections.length;
 
     return {
       'totalUsers': totalUsers,

@@ -508,9 +508,11 @@ final teacherScoresProvider =
 class TeacherScoresNotifier extends Notifier<List<Map<String, dynamic>>> {
   String _selectedSection = 'All Sections';
   String _searchQuery = '';
+  String? _schoolId;
 
   @override
   List<Map<String, dynamic>> build() {
+    _schoolId = ref.watch(activeAdminCampusProvider) ?? ref.watch(authProvider)?.schoolId;
     loadScores();
     return [];
   }
@@ -518,10 +520,12 @@ class TeacherScoresNotifier extends Notifier<List<Map<String, dynamic>>> {
   Future<void> loadScores({
     String? section,
     String? query,
+    String? schoolId,
     bool forceRefresh = false,
   }) async {
     if (section != null) _selectedSection = section;
     if (query != null) _searchQuery = query;
+    final targetSchool = schoolId ?? _schoolId ?? ref.read(activeAdminCampusProvider) ?? ref.read(authProvider)?.schoolId;
 
     AppCacheManager.instance.invalidatePrefix('teacher_scores_');
     try {
@@ -534,12 +538,13 @@ class TeacherScoresNotifier extends Notifier<List<Map<String, dynamic>>> {
       );
     } catch (_) {}
 
-    final cacheKey = 'teacher_scores_${_selectedSection}_$_searchQuery';
+    final cacheKey = 'teacher_scores_${targetSchool}_${_selectedSection}_$_searchQuery';
     final results = await AppCacheManager.instance.getOrFetch(
       cacheKey,
       () => DatabaseHelper().getAllQuizScores(
         section: _selectedSection,
         query: _searchQuery,
+        schoolId: targetSchool,
       ),
       ttl: const Duration(minutes: 2),
       forceRefresh: true,
