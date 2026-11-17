@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:convert';
 import 'dart:math';
 import 'package:dio/dio.dart';
 import 'package:flutter/foundation.dart';
@@ -97,13 +98,13 @@ class AuthRepository {
     }
 
     // 3. If local verification failed (e.g. newly created on Web Admin, or password was updated),
-    // query Cloud Firestore via ultra-fast direct REST lookup to authenticate against latest cloud credentials
+    // query Cloud Firestore via ultra-fast direct lookup to authenticate against latest cloud credentials
     Map<String, dynamic>? cloudUser;
     if (verifiedUsers.isEmpty) {
       try {
         cloudUser = await FirestoreService()
             .findUserById(identifier)
-            .timeout(const Duration(seconds: 4), onTimeout: () => null);
+            .timeout(const Duration(seconds: 8), onTimeout: () => null);
       } catch (e) {
         debugPrint('[AuthRepository] Cloud lookup note: $e');
       }
@@ -148,6 +149,11 @@ class AuthRepository {
               cloudDbRow,
               conflictAlgorithm: ConflictAlgorithm.replace,
             );
+            if (kIsWeb) {
+              final prefs = await SharedPreferences.getInstance();
+              final allUsers = await db.query('users');
+              await prefs.setString('local_cached_users_v1', jsonEncode(allUsers));
+            }
           } catch (_) {}
 
           verifiedUsers.add(cloudDbRow);
@@ -273,6 +279,33 @@ class AuthRepository {
             where: 'id = ?',
             whereArgs: [schoolId],
           );
+        } catch (_) {}
+      }
+      if (schoolRows.isEmpty) {
+        try {
+          final directDoc = await FirestoreService().getDocument('schools', schoolId);
+          if (directDoc != null && directDoc.isNotEmpty) {
+            final rowData = {
+              'id': schoolId,
+              'name': directDoc['name']?.toString() ?? 'Campus $schoolId',
+              'code': directDoc['code']?.toString() ?? schoolId,
+              'address': directDoc['address']?.toString() ?? '',
+              'logo_url': directDoc['logo_url']?.toString(),
+              'admin_id': (directDoc['admin_id'] != null &&
+                      directDoc['admin_id'].toString().isNotEmpty &&
+                      directDoc['admin_id'].toString() != 'null')
+                  ? directDoc['admin_id'].toString()
+                  : null,
+              'status': directDoc['status']?.toString() ?? 'active',
+              'created_at': directDoc['created_at']?.toString() ?? DateTime.now().toIso8601String(),
+            };
+            await db.insert(
+              'schools',
+              rowData,
+              conflictAlgorithm: ConflictAlgorithm.replace,
+            );
+            schoolRows = [rowData];
+          }
         } catch (_) {}
       }
       if (schoolRows.isEmpty) {

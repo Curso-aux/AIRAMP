@@ -771,10 +771,38 @@ class FirestoreService {
     final idLower = rawTrimmed.toLowerCase();
     if (rawTrimmed.isEmpty || rawTrimmed.contains('@') || _isTestEnv) return null;
 
+    // 1. PRIMARY FAST PATH: SDK direct lookup (Instant on Web & Native via live connection)
+    if (isAvailable) {
+      try {
+        final docSnap = await usersCollection.doc(rawTrimmed).get().timeout(const Duration(milliseconds: 3000));
+        if (docSnap.exists && docSnap.data() != null) {
+          final d = Map<String, dynamic>.from(docSnap.data()!);
+          if (!d.containsKey('id')) d['id'] = docSnap.id;
+          return d;
+        }
+        if (idLower != rawTrimmed) {
+          final docSnapLower = await usersCollection.doc(idLower).get().timeout(const Duration(milliseconds: 2000));
+          if (docSnapLower.exists && docSnapLower.data() != null) {
+            final d = Map<String, dynamic>.from(docSnapLower.data()!);
+            if (!d.containsKey('id')) d['id'] = docSnapLower.id;
+            return d;
+          }
+        }
+        final querySnap = await usersCollection.where('id', isEqualTo: rawTrimmed).limit(1).get().timeout(const Duration(milliseconds: 2500));
+        if (querySnap.docs.isNotEmpty) {
+          final d = Map<String, dynamic>.from(querySnap.docs.first.data());
+          if (!d.containsKey('id')) d['id'] = querySnap.docs.first.id;
+          return d;
+        }
+      } catch (e) {
+        debugPrint('[FirestoreService] SDK findUserById note: $e');
+      }
+    }
+
+    // 2. FALLBACK: Direct REST query by Document ID
     try {
-      // 1. FAST PATH: Direct REST query by Document ID (~100-250ms)
       final directUser = await _fetchDocRest(rawTrimmed)
-          .timeout(const Duration(milliseconds: 2000), onTimeout: () => null);
+          .timeout(const Duration(milliseconds: 2500), onTimeout: () => null);
       if (directUser != null && directUser.isNotEmpty) {
         return directUser;
       }
@@ -782,7 +810,7 @@ class FirestoreService {
       // Direct doc fetch lowercase if different (e.g. sa-000-0001)
       if (idLower != rawTrimmed) {
         final directUserLower = await _fetchDocRest(idLower)
-            .timeout(const Duration(milliseconds: 1500), onTimeout: () => null);
+            .timeout(const Duration(milliseconds: 2000), onTimeout: () => null);
         if (directUserLower != null && directUserLower.isNotEmpty) {
           return directUserLower;
         }
@@ -796,30 +824,14 @@ class FirestoreService {
       for (final r in restResults) {
         if (r != null && r.isNotEmpty) return r;
       }
-
-      // 2. FALLBACK: Native/Web SDK query
-      if (isAvailable) {
-        final docSnap = await usersCollection.doc(rawTrimmed).get().timeout(const Duration(seconds: 2));
-        if (docSnap.exists && docSnap.data() != null) {
-          final d = docSnap.data()!;
-          if (!d.containsKey('id')) d['id'] = docSnap.id;
-          return d;
-        }
-        final querySnap = await usersCollection.where('id', isEqualTo: rawTrimmed).limit(1).get().timeout(const Duration(seconds: 2));
-        if (querySnap.docs.isNotEmpty) {
-          final d = querySnap.docs.first.data();
-          if (!d.containsKey('id')) d['id'] = querySnap.docs.first.id;
-          return d;
-        }
-      }
     } catch (e) {
-      debugPrint('[FirestoreService] findUserById note: $e');
+      debugPrint('[FirestoreService] REST findUserById note: $e');
     }
     return null;
   }
 
   /// Searches Cloud Firestore for an account by email, ID, or username.
-  /// Uses ultra-fast REST direct fetches first (<200ms) with SDK fallback.
+  /// Uses ultra-fast SDK direct fetches first (<150ms) with REST fallback.
   Future<Map<String, dynamic>?> findUserByIdentifier(String identifier) async {
     final rawTrimmed = identifier.trim();
     final idLower = rawTrimmed.toLowerCase();
@@ -827,7 +839,7 @@ class FirestoreService {
 
     try {
       return await _findUserInternal(idLower, rawTrimmed)
-          .timeout(const Duration(seconds: 4), onTimeout: () => null);
+          .timeout(const Duration(seconds: 6), onTimeout: () => null);
     } catch (e) {
       debugPrint('[FirestoreService] findUserByIdentifier note: $e');
       return null;
@@ -837,17 +849,57 @@ class FirestoreService {
   Future<Map<String, dynamic>?> _findUserInternal(String idLower, String rawTrimmed) async {
     final isEmail = rawTrimmed.contains('@');
 
-    // 1. FAST PATH: Direct REST query (~100-250ms, bypasses Web SDK cold-start & WebSocket latency)
+    // 1. PRIMARY FAST PATH: SDK query (Instant on Web & Native via live connection)
+    if (isAvailable) {
+      try {
+        if (isEmail) {
+          final results = await Future.wait([
+            usersCollection.where('email_lower', isEqualTo: idLower).limit(1).get().timeout(const Duration(milliseconds: 2500)),
+            usersCollection.where('email', isEqualTo: rawTrimmed).limit(1).get().timeout(const Duration(milliseconds: 2500)),
+          ]);
+          for (final snap in results) {
+            if (snap.docs.isNotEmpty) {
+              final d = Map<String, dynamic>.from(snap.docs.first.data());
+              if (!d.containsKey('id')) d['id'] = snap.docs.first.id;
+              return d;
+            }
+          }
+        } else {
+          final docSnap = await usersCollection.doc(rawTrimmed).get().timeout(const Duration(milliseconds: 2500));
+          if (docSnap.exists && docSnap.data() != null) {
+            final d = Map<String, dynamic>.from(docSnap.data()!);
+            if (!d.containsKey('id')) d['id'] = docSnap.id;
+            return d;
+          }
+          if (idLower != rawTrimmed) {
+            final docSnapLower = await usersCollection.doc(idLower).get().timeout(const Duration(milliseconds: 2000));
+            if (docSnapLower.exists && docSnapLower.data() != null) {
+              final d = Map<String, dynamic>.from(docSnapLower.data()!);
+              if (!d.containsKey('id')) d['id'] = docSnapLower.id;
+              return d;
+            }
+          }
+          final qSnap = await usersCollection.where('username_lower', isEqualTo: idLower).limit(1).get().timeout(const Duration(milliseconds: 2000));
+          if (qSnap.docs.isNotEmpty) {
+            final d = Map<String, dynamic>.from(qSnap.docs.first.data());
+            if (!d.containsKey('id')) d['id'] = qSnap.docs.first.id;
+            return d;
+          }
+        }
+      } catch (e) {
+        debugPrint('[FirestoreService] SDK _findUserInternal note: $e');
+      }
+    }
+
+    // 2. FALLBACK: Direct REST query (~100-250ms)
     try {
       if (!isEmail) {
-        // Direct document fetch by ID (e.g. SA-000-0001, A-100-0001, T-100-0001, S-100-0001)
         final directUser = await _fetchDocRest(rawTrimmed)
             .timeout(const Duration(milliseconds: 2000), onTimeout: () => null);
         if (directUser != null && directUser.isNotEmpty) {
           return directUser;
         }
 
-        // Direct doc fetch lowercase if different (e.g. sa-000-0001)
         if (idLower != rawTrimmed) {
           final directUserLower = await _fetchDocRest(idLower)
               .timeout(const Duration(milliseconds: 1500), onTimeout: () => null);
@@ -856,7 +908,6 @@ class FirestoreService {
           }
         }
 
-        // Fast parallel structured query by username or id
         final restResults = await Future.wait([
           _queryRest('id', rawTrimmed).timeout(const Duration(milliseconds: 2000), onTimeout: () => null),
           _queryRest('username_lower', idLower).timeout(const Duration(milliseconds: 2000), onTimeout: () => null),
@@ -866,7 +917,6 @@ class FirestoreService {
           if (r != null && r.isNotEmpty) return r;
         }
       } else {
-        // Fast email query via REST
         final restResults = await Future.wait([
           _queryRest('email_lower', idLower).timeout(const Duration(milliseconds: 2000), onTimeout: () => null),
           _queryRest('email', rawTrimmed).timeout(const Duration(milliseconds: 2000), onTimeout: () => null),
@@ -878,34 +928,6 @@ class FirestoreService {
       }
     } catch (e) {
       debugPrint('[FirestoreService] Fast REST search note: $e');
-    }
-
-    // 2. FALLBACK: Native/Web SDK query (if REST didn't resolve)
-    if (isAvailable) {
-      try {
-        if (isEmail) {
-          final results = await Future.wait([
-            usersCollection.where('email_lower', isEqualTo: idLower).limit(1).get().timeout(const Duration(seconds: 2)),
-            usersCollection.where('email', isEqualTo: rawTrimmed).limit(1).get().timeout(const Duration(seconds: 2)),
-          ]);
-          for (final snap in results) {
-            if (snap.docs.isNotEmpty) {
-              final d = snap.docs.first.data();
-              if (!d.containsKey('id')) d['id'] = snap.docs.first.id;
-              return d;
-            }
-          }
-        } else {
-          final docSnap = await usersCollection.doc(rawTrimmed).get().timeout(const Duration(seconds: 2));
-          if (docSnap.exists && docSnap.data() != null) {
-            final d = docSnap.data()!;
-            if (!d.containsKey('id')) d['id'] = docSnap.id;
-            return d;
-          }
-        }
-      } catch (e) {
-        debugPrint('[FirestoreService] SDK search note: $e');
-      }
     }
 
     return null;

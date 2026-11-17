@@ -12869,7 +12869,14 @@ class DatabaseHelper {
       await prefs.setStringList('permanently_deleted_accounts', deletedList);
     } catch (_) {}
 
-    await db.insert('users', adminData);
+    await db.insert('users', adminData, conflictAlgorithm: ConflictAlgorithm.replace);
+    if (kIsWeb) {
+      try {
+        final prefs = await SharedPreferences.getInstance();
+        final allUsers = await db.query('users');
+        await prefs.setString('local_cached_users_v1', jsonEncode(allUsers));
+      } catch (_) {}
+    }
 
     if (schoolScope != null && role == 'admin') {
       try {
@@ -12946,6 +12953,13 @@ class DatabaseHelper {
     };
 
     await db.update('users', updates, where: 'id = ?', whereArgs: [adminId]);
+    if (kIsWeb) {
+      try {
+        final prefs = await SharedPreferences.getInstance();
+        final allUsers = await db.query('users');
+        await prefs.setString('local_cached_users_v1', jsonEncode(allUsers));
+      } catch (_) {}
+    }
     try {
       await FirestoreService().saveUser({'id': adminId, ...updates});
     } catch (_) {}
@@ -13022,6 +13036,13 @@ class DatabaseHelper {
 
     if (updates.isNotEmpty) {
       await db.update('users', updates, where: 'id = ?', whereArgs: [adminId]);
+    if (kIsWeb) {
+      try {
+        final prefs = await SharedPreferences.getInstance();
+        final allUsers = await db.query('users');
+        await prefs.setString('local_cached_users_v1', jsonEncode(allUsers));
+      } catch (_) {}
+    }
       try {
         await FirestoreService().saveUser({'id': adminId, ...updates});
       } catch (_) {}
