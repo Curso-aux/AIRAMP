@@ -12,6 +12,7 @@ import '../../../core/utils/csv_helper.dart';
 
 import '../../../core/services/email_service.dart';
 import '../../../core/database/firestore_service.dart';
+import '../../auth/application/auth_provider.dart';
 
 // --- Announcements ---
 final announcementsProvider =
@@ -20,25 +21,47 @@ final announcementsProvider =
     });
 
 class AnnouncementsNotifier extends Notifier<List<Map<String, dynamic>>> {
+  String? _schoolId;
+
   @override
   List<Map<String, dynamic>> build() {
-    _loadAnnouncements();
+    final activeSchool = ref.watch(activeAdminCampusProvider);
+    _schoolId = activeSchool;
+    _loadAnnouncements(schoolId: activeSchool);
     return [];
   }
 
-  Future<void> _loadAnnouncements() async {
+  Future<void> _loadAnnouncements({String? schoolId}) async {
+    final targetSchool = schoolId ?? _schoolId;
     final db = await DatabaseHelper().database;
-    final List<Map<String, dynamic>> maps = await db.query(
-      'announcements',
-      orderBy: 'id DESC',
-    );
+    List<Map<String, dynamic>> maps;
+    if (targetSchool != null && targetSchool.isNotEmpty) {
+      if (targetSchool == 'sch_main') {
+        maps = await db.query(
+          'announcements',
+          where: "school_id = 'sch_main' OR school_id IS NULL OR school_id = ''",
+          orderBy: 'id DESC',
+        );
+      } else {
+        maps = await db.query(
+          'announcements',
+          where: 'school_id = ?',
+          whereArgs: [targetSchool],
+          orderBy: 'id DESC',
+        );
+      }
+    } else {
+      maps = await db.query('announcements', orderBy: 'id DESC');
+    }
     if (!ref.mounted) return;
     state = maps;
   }
 
   Future<void> addAnnouncement(Map<String, dynamic> announcement) async {
     final db = await DatabaseHelper().database;
-    await db.insert('announcements', announcement);
+    final mutable = Map<String, dynamic>.from(announcement);
+    mutable['school_id'] ??= _schoolId ?? ref.read(activeAdminCampusProvider) ?? 'sch_main';
+    await db.insert('announcements', mutable);
     await _loadAnnouncements();
   }
 
@@ -144,41 +167,16 @@ final subjectsProvider =
 class SubjectsNotifier extends Notifier<List<Map<String, dynamic>>> {
   SubjectsNotifier({Dio? dio});
   VoidCallback? _syncListener;
+  String? _schoolId;
 
   @override
   List<Map<String, dynamic>> build() {
+    final activeSchool = ref.watch(activeAdminCampusProvider);
+    _schoolId = activeSchool;
+
     _syncListener = () async {
       if (ref.mounted) {
-        final db = await DatabaseHelper().database;
-        await DatabaseHelper().deduplicateSubjects();
-        final fresh = await db.rawQuery('''
-          SELECT s.*,
-                 (SELECT COUNT(DISTINCT e.student_id) 
-                  FROM enrollments e 
-                  WHERE e.subject_id = s.id 
-                    AND (e.status IS NULL OR e.status = 'active')) as enrolled_count
-          FROM subjects s
-          ORDER BY s.id DESC
-        ''');
-        final Map<String, Map<String, dynamic>> deduped = {};
-        for (final s in fresh) {
-          final code =
-              (s['subject_code']?.toString() ?? s['name']?.toString() ?? '')
-                  .trim()
-                  .toUpperCase();
-          if (code.isEmpty) continue;
-          if (!deduped.containsKey(code)) {
-            deduped[code] = s;
-          } else {
-            final curCount =
-                (deduped[code]!['enrolled_count'] as num?)?.toInt() ?? 0;
-            final newCount = (s['enrolled_count'] as num?)?.toInt() ?? 0;
-            if (newCount > curCount) {
-              deduped[code] = s;
-            }
-          }
-        }
-        if (ref.mounted) state = deduped.values.toList();
+        await _loadSubjects(schoolId: _schoolId);
       }
     };
     FirestoreService.addSyncListener(_syncListener!);
@@ -188,11 +186,12 @@ class SubjectsNotifier extends Notifier<List<Map<String, dynamic>>> {
       }
     });
 
-    _loadSubjects();
+    _loadSubjects(schoolId: activeSchool);
     return [];
   }
 
-  Future<void> _loadSubjects() async {
+  Future<void> _loadSubjects({String? schoolId}) async {
+    final targetSchool = schoolId ?? _schoolId;
     final db = await DatabaseHelper().database;
     final existingLocal = await db.query('subjects');
 
@@ -224,6 +223,18 @@ class SubjectsNotifier extends Notifier<List<Map<String, dynamic>>> {
         whereArgs: [del.toUpperCase(), del.toUpperCase()],
       );
     }
+
+    String wherePart = '';
+    List<dynamic> whereArgs = [];
+    if (targetSchool != null && targetSchool.isNotEmpty) {
+      if (targetSchool == 'sch_main') {
+        wherePart = "WHERE (s.school_id = 'sch_main' OR s.school_id IS NULL OR s.school_id = '')";
+      } else {
+        wherePart = "WHERE s.school_id = ?";
+        whereArgs.add(targetSchool);
+      }
+    }
+
     final List<Map<String, dynamic>> maps = await db.rawQuery('''
       SELECT s.*,
              (SELECT COUNT(DISTINCT e.student_id) 
@@ -231,8 +242,10 @@ class SubjectsNotifier extends Notifier<List<Map<String, dynamic>>> {
               WHERE e.subject_id = s.id 
                 AND (e.status IS NULL OR e.status = 'active')) as enrolled_count
       FROM subjects s
+      $wherePart
       ORDER BY s.id DESC
-    ''');
+    ''', whereArgs.isNotEmpty ? whereArgs : null);
+
     final Map<String, Map<String, dynamic>> deduped = {};
     for (final s in maps) {
       final code =
@@ -268,6 +281,7 @@ class SubjectsNotifier extends Notifier<List<Map<String, dynamic>>> {
   Future<int> addSubject(Map<String, dynamic> subject) async {
     final db = await DatabaseHelper().database;
     final mutableSubject = Map<String, dynamic>.from(subject);
+    mutableSubject['school_id'] ??= _schoolId ?? ref.read(activeAdminCampusProvider) ?? 'sch_main';
     mutableSubject['created_at'] ??= DateTime.now().toIso8601String();
 
     final id = await db.insert('subjects', mutableSubject);
@@ -500,7 +514,7 @@ class SubjectsNotifier extends Notifier<List<Map<String, dynamic>>> {
 
   Future<void> reload() async {
     await FirestoreService().syncCloudSubjectsToLocal(force: true);
-    await _loadSubjects();
+    await _loadSubjects(schoolId: _schoolId);
   }
 
   Future<Map<String, dynamic>?> getSubjectById(int id) async {
@@ -546,13 +560,16 @@ final sectionsProvider =
 
 class SectionsNotifier extends Notifier<List<Map<String, dynamic>>> {
   VoidCallback? _syncListener;
+  String? _schoolId;
 
   @override
   List<Map<String, dynamic>> build() {
+    final activeSchool = ref.watch(activeAdminCampusProvider);
+    _schoolId = activeSchool;
+
     _syncListener = () async {
       if (ref.mounted) {
-        final db = await DatabaseHelper().database;
-        final fresh = await db.query('sections', orderBy: 'id DESC');
+        final fresh = await DatabaseHelper().getSectionsList(schoolId: _schoolId);
         if (ref.mounted) state = fresh;
       }
     };
@@ -563,11 +580,11 @@ class SectionsNotifier extends Notifier<List<Map<String, dynamic>>> {
       }
     });
 
-    _loadSections();
+    _loadSections(schoolId: activeSchool);
     return [];
   }
 
-  Future<void> _loadSections() async {
+  Future<void> _loadSections({String? schoolId}) async {
     final db = await DatabaseHelper().database;
     final existingLocal = await db.query('sections');
 
@@ -602,10 +619,8 @@ class SectionsNotifier extends Notifier<List<Map<String, dynamic>>> {
       await DatabaseHelper().ensureAllSectionChatsExist();
     } catch (_) {}
 
-    final List<Map<String, dynamic>> maps = await db.query(
-      'sections',
-      orderBy: 'id DESC',
-    );
+    final List<Map<String, dynamic>> maps =
+        await DatabaseHelper().getSectionsList(schoolId: schoolId ?? _schoolId);
     if (prefs != null) {
       try {
         await prefs.setString('local_cached_sections_v1', jsonEncode(maps));
@@ -618,12 +633,13 @@ class SectionsNotifier extends Notifier<List<Map<String, dynamic>>> {
 
   Future<void> reload() async {
     await FirestoreService().syncCloudSectionsToLocal(force: true);
-    await _loadSections();
+    await _loadSections(schoolId: _schoolId);
   }
 
   Future<void> addSection(Map<String, dynamic> section) async {
     final db = await DatabaseHelper().database;
     final mutableSection = Map<String, dynamic>.from(section);
+    mutableSection['school_id'] ??= _schoolId ?? ref.read(activeAdminCampusProvider) ?? 'sch_main';
 
     final rawKey =
         mutableSection['enrollment_key']?.toString().trim().toUpperCase() ?? '';
@@ -1639,9 +1655,13 @@ final adminAnalyticsProvider =
 class AdminAnalyticsNotifier extends Notifier<Map<String, dynamic>> {
   AnalyticsFilter _currentFilter = const AnalyticsFilter();
   VoidCallback? _syncListener;
+  String? _schoolId;
 
   @override
   Map<String, dynamic> build() {
+    final activeSchool = ref.watch(activeAdminCampusProvider);
+    _schoolId = activeSchool;
+
     ref.onDispose(() {
       if (_syncListener != null) {
         FirestoreService.removeSyncListener(_syncListener!);
@@ -1660,7 +1680,7 @@ class AdminAnalyticsNotifier extends Notifier<Map<String, dynamic>> {
     // Auto-pull users if local summary is empty or only has the self admin
     Future.microtask(() async {
       try {
-        final summary = await DatabaseHelper().getAdminAnalyticsSummary();
+        final summary = await DatabaseHelper().getAdminAnalyticsSummary(schoolId: activeSchool);
         final usersCount = summary['totalUsers'] as int? ?? 0;
         final studentsCount = summary['totalStudents'] as int? ?? 0;
         final teachersCount = summary['totalTeachers'] as int? ?? 0;
@@ -1715,6 +1735,7 @@ class AdminAnalyticsNotifier extends Notifier<Map<String, dynamic>> {
       } catch (_) {}
     }
     final summary = await DatabaseHelper().getAdminAnalyticsSummary(
+      schoolId: _schoolId,
       subjectId: _currentFilter.subjectId,
       section: _currentFilter.section,
       timeframe: _currentFilter.timeframe,
@@ -1737,10 +1758,14 @@ class AdminStudentsNotifier extends Notifier<List<Map<String, dynamic>>> {
   String _selectedSection = 'All';
   String _selectedGrade = 'All';
   String _searchQuery = '';
+  String? _schoolId;
   VoidCallback? _syncListener;
 
   @override
   List<Map<String, dynamic>> build() {
+    final activeSchool = ref.watch(activeAdminCampusProvider);
+    _schoolId = activeSchool;
+
     ref.onDispose(() {
       if (_syncListener != null) {
         FirestoreService.removeSyncListener(_syncListener!);
@@ -1750,6 +1775,7 @@ class AdminStudentsNotifier extends Notifier<List<Map<String, dynamic>>> {
     _syncListener = () async {
       if (ref.mounted) {
         final fresh = await DatabaseHelper().getAdminStudentsList(
+          schoolId: _schoolId,
           section: _selectedSection,
           grade: _selectedGrade,
           query: _searchQuery,
@@ -1774,6 +1800,7 @@ class AdminStudentsNotifier extends Notifier<List<Map<String, dynamic>>> {
     if (query != null) _searchQuery = query;
 
     final results = await DatabaseHelper().getAdminStudentsList(
+      schoolId: _schoolId,
       section: _selectedSection,
       grade: _selectedGrade,
       query: _searchQuery,
@@ -1789,6 +1816,7 @@ class AdminStudentsNotifier extends Notifier<List<Map<String, dynamic>>> {
           .then((_) async {
             if (!ref.mounted) return;
             final fresh = await DatabaseHelper().getAdminStudentsList(
+              schoolId: _schoolId,
               section: _selectedSection,
               grade: _selectedGrade,
               query: _searchQuery,
@@ -1810,7 +1838,9 @@ class AdminStudentsNotifier extends Notifier<List<Map<String, dynamic>>> {
     String studentType = 'regular',
     String? specialNotes,
     List<int>? enrollSubjectIds,
+    String? schoolId,
   }) async {
+    final targetSchool = schoolId ?? _schoolId ?? ref.read(activeAdminCampusProvider) ?? 'sch_main';
     final sid = await DatabaseHelper().createStudent(
       id: id,
       fullName: fullName,
@@ -1822,6 +1852,7 @@ class AdminStudentsNotifier extends Notifier<List<Map<String, dynamic>>> {
       studentType: studentType,
       specialNotes: specialNotes,
       enrollSubjectIds: enrollSubjectIds,
+      schoolId: targetSchool,
     );
     await loadStudents();
     ref.read(adminAnalyticsProvider.notifier).loadAnalytics();
@@ -2164,9 +2195,13 @@ final adminTeachersProvider =
 
 class AdminTeachersNotifier extends Notifier<List<Map<String, dynamic>>> {
   VoidCallback? _syncListener;
+  String? _schoolId;
 
   @override
   List<Map<String, dynamic>> build() {
+    final activeSchool = ref.watch(activeAdminCampusProvider);
+    _schoolId = activeSchool;
+
     ref.onDispose(() {
       if (_syncListener != null) {
         FirestoreService.removeSyncListener(_syncListener!);
@@ -2175,7 +2210,7 @@ class AdminTeachersNotifier extends Notifier<List<Map<String, dynamic>>> {
 
     _syncListener = () async {
       if (ref.mounted) {
-        final fresh = await DatabaseHelper().getTeachersList();
+        final fresh = await DatabaseHelper().getTeachersList(schoolId: _schoolId);
         if (ref.mounted) state = fresh;
         ref.invalidate(teachersListProvider);
       }
@@ -2187,7 +2222,7 @@ class AdminTeachersNotifier extends Notifier<List<Map<String, dynamic>>> {
   }
 
   Future<void> loadTeachers({bool syncCloud = true}) async {
-    final teachers = await DatabaseHelper().getTeachersList();
+    final teachers = await DatabaseHelper().getTeachersList(schoolId: _schoolId);
     if (!ref.mounted) return;
     state = teachers;
 
@@ -2198,7 +2233,7 @@ class AdminTeachersNotifier extends Notifier<List<Map<String, dynamic>>> {
           .syncCloudUsersToLocal(force: shouldForce)
           .then((_) async {
             if (!ref.mounted) return;
-            final fresh = await DatabaseHelper().getTeachersList();
+            final fresh = await DatabaseHelper().getTeachersList(schoolId: _schoolId);
             if (ref.mounted) state = fresh;
             ref.invalidate(teachersListProvider);
           })
@@ -2213,7 +2248,9 @@ class AdminTeachersNotifier extends Notifier<List<Map<String, dynamic>>> {
     required String password,
     String? username,
     List<int>? assignSubjectIds,
+    String? schoolId,
   }) async {
+    final targetSchool = schoolId ?? _schoolId ?? ref.read(activeAdminCampusProvider) ?? 'sch_main';
     final tid = await DatabaseHelper().createTeacher(
       id: id,
       fullName: fullName,
@@ -2221,6 +2258,7 @@ class AdminTeachersNotifier extends Notifier<List<Map<String, dynamic>>> {
       password: password,
       username: username,
       assignSubjectIds: assignSubjectIds,
+      schoolId: targetSchool,
     );
     await loadTeachers();
     ref.read(subjectsProvider.notifier).reload();
@@ -2392,7 +2430,7 @@ class SchoolAdminsNotifier extends Notifier<List<Map<String, dynamic>>> {
     required String password,
     String? username,
     String role = 'admin',
-    String? schoolId = 'sch_main',
+    String? schoolId,
   }) async {
     final aid = await DatabaseHelper().createAdmin(
       fullName: fullName,
@@ -2504,6 +2542,11 @@ class SchoolsNotifier extends Notifier<List<Map<String, dynamic>>> {
   @override
   List<Map<String, dynamic>> build() {
     loadSchools();
+    FirestoreService().syncCloudSchoolsToLocal().then((_) async {
+      if (!ref.mounted) return;
+      final fresh = await DatabaseHelper().getSchoolsList();
+      if (ref.mounted) state = fresh;
+    }).catchError((_) {});
     return [];
   }
 
@@ -2525,11 +2568,12 @@ class SchoolsNotifier extends Notifier<List<Map<String, dynamic>>> {
       code: code.trim().toUpperCase(),
       address: address?.trim(),
       adminId: adminId,
+      status: status,
     );
-    if (adminId != null && adminId.isNotEmpty) {
-      await DatabaseHelper().assignSchoolAdmin(id, adminId);
-    }
     await loadSchools();
+    try {
+      ref.read(schoolAdminsProvider.notifier).loadAdmins();
+    } catch (_) {}
     return id;
   }
 
@@ -2548,15 +2592,18 @@ class SchoolsNotifier extends Notifier<List<Map<String, dynamic>>> {
       'admin_id': adminId,
       'status': status,
     });
-    if (adminId != null && adminId.isNotEmpty) {
-      await DatabaseHelper().assignSchoolAdmin(id, adminId);
-    }
     await loadSchools();
+    try {
+      ref.read(schoolAdminsProvider.notifier).loadAdmins();
+    } catch (_) {}
   }
 
   Future<void> deleteSchool(String id) async {
     await DatabaseHelper().deleteSchool(id);
     await loadSchools();
+    try {
+      ref.read(schoolAdminsProvider.notifier).loadAdmins();
+    } catch (_) {}
   }
 }
 
@@ -2583,3 +2630,18 @@ final superAdminSelectedSchoolProvider =
     NotifierProvider<SuperAdminCampusFilterNotifier, String?>(() {
       return SuperAdminCampusFilterNotifier();
     });
+
+/// Active campus scope provider for Admin / Super Admin console
+/// - Super Admin: respects superAdminSelectedSchoolProvider (null = all campuses)
+/// - Campus Admin: strictly locked to user.schoolId
+final activeAdminCampusProvider = Provider<String?>((ref) {
+  final user = ref.watch(authProvider);
+  if (user == null) return null;
+  if (user.isSuperAdmin) {
+    return ref.watch(superAdminSelectedSchoolProvider);
+  }
+  if (user.isSchoolAdmin) {
+    return user.schoolId;
+  }
+  return user.schoolId ?? 'sch_main';
+});

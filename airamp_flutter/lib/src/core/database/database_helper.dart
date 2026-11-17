@@ -310,6 +310,18 @@ class DatabaseHelper {
           created_at TEXT NOT NULL
         )
       ''');
+      final existingMain = await db.query('schools', where: 'id = ?', whereArgs: ['sch_main']);
+      if (existingMain.isEmpty) {
+        await db.insert('schools', {
+          'id': 'sch_main',
+          'name': 'AIRAMP Demonstration High School',
+          'code': 'ADM-01',
+          'address': 'DepEd Campus, Manila, Philippines',
+          'admin_id': null,
+          'status': 'active',
+          'created_at': DateTime.now().toIso8601String(),
+        });
+      }
     } catch (_) {}
     try {
       await db.execute('''
@@ -329,6 +341,22 @@ class DatabaseHelper {
           created_at TEXT NOT NULL
         )
       ''');
+    } catch (_) {}
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final cachedStr = prefs.getString('local_cached_schools_v1');
+      if (cachedStr != null && cachedStr.isNotEmpty) {
+        final List<dynamic> decoded = jsonDecode(cachedStr);
+        for (final item in decoded) {
+          if (item is Map) {
+            await db.insert(
+              'schools',
+              Map<String, dynamic>.from(item),
+              conflictAlgorithm: ConflictAlgorithm.replace,
+            );
+          }
+        }
+      }
     } catch (_) {}
     try {
       final existingSchool = await db.query(
@@ -513,6 +541,20 @@ class DatabaseHelper {
             UPDATE users SET role = 'student', category = 'student'
             WHERE (id LIKE 'S-%' OR id LIKE '001-%' OR id LIKE 'STD_%') AND role != 'student'
           ''');
+        }
+
+        final cachedSchoolsStr = prefs.getString('local_cached_schools_v1');
+        if (cachedSchoolsStr != null && cachedSchoolsStr.isNotEmpty) {
+          final List<dynamic> decodedSchools = jsonDecode(cachedSchoolsStr);
+          for (final item in decodedSchools) {
+            if (item is Map) {
+              await db.insert(
+                'schools',
+                Map<String, dynamic>.from(item),
+                conflictAlgorithm: ConflictAlgorithm.replace,
+              );
+            }
+          }
         }
       } catch (_) {}
     }
@@ -1042,6 +1084,20 @@ class DatabaseHelper {
             UPDATE users SET role = 'student', category = 'student'
             WHERE (id LIKE 'S-%' OR id LIKE '001-%' OR id LIKE 'STD_%') AND role != 'student'
           ''');
+        }
+
+        final cachedSchoolsStr = prefs.getString('local_cached_schools_v1');
+        if (cachedSchoolsStr != null && cachedSchoolsStr.isNotEmpty) {
+          final List<dynamic> decodedSchools = jsonDecode(cachedSchoolsStr);
+          for (final item in decodedSchools) {
+            if (item is Map) {
+              await db.insert(
+                'schools',
+                Map<String, dynamic>.from(item),
+                conflictAlgorithm: ConflictAlgorithm.replace,
+              );
+            }
+          }
         }
       } catch (_) {}
     }
@@ -3430,6 +3486,7 @@ class DatabaseHelper {
     String? role,
     String? academicYear,
     String? departmentGradeLevel,
+    String? schoolId,
   }) async {
     final db = await database;
     try {
@@ -3440,6 +3497,15 @@ class DatabaseHelper {
 
     // 1. Filter Users by role, section, and student category
     final users = allUsers.where((u) {
+      if (schoolId != null && schoolId.isNotEmpty) {
+        final uSchool = (u['school_id'] as String? ?? '').trim();
+        if (schoolId == 'sch_main') {
+          if (uSchool.isNotEmpty && uSchool != 'sch_main') return false;
+        } else {
+          if (uSchool != schoolId) return false;
+        }
+      }
+
       final uRole = (u['role'] as String? ?? '').toLowerCase().trim();
       final uId = (u['id'] as String? ?? '').trim();
       final effectiveRole = InstitutionalIdHelper.detectRole(uId) ?? (uRole.isNotEmpty ? uRole : 'student');
@@ -3774,12 +3840,25 @@ class DatabaseHelper {
     String? section,
     String? grade,
     String? query,
+    String? schoolId,
   }) async {
     final db = await database;
 
+    String whereClause = "(role = 'student' OR (role IS NULL AND id NOT LIKE 'T-%' AND id NOT LIKE 'A-%' AND id NOT LIKE 'SA-%')) AND (is_archived IS NULL OR is_archived = 0) AND id NOT LIKE 'T-%' AND id NOT LIKE '002-%' AND id NOT LIKE 'TCH_%' AND id NOT LIKE 'A-%' AND id NOT LIKE 'ADM-%' AND id NOT LIKE 'ADMIN_%' AND id NOT LIKE 'SA-%' AND id NOT LIKE 'SA_%'";
+    List<dynamic> whereArgs = [];
+    if (schoolId != null && schoolId.isNotEmpty) {
+      if (schoolId == 'sch_main') {
+        whereClause += " AND (school_id = 'sch_main' OR school_id IS NULL OR school_id = '')";
+      } else {
+        whereClause += " AND school_id = ?";
+        whereArgs.add(schoolId);
+      }
+    }
+
     final users = await db.query(
       'users',
-      where: "(role = 'student' OR (role IS NULL AND id NOT LIKE 'T-%' AND id NOT LIKE 'A-%' AND id NOT LIKE 'SA-%')) AND (is_archived IS NULL OR is_archived = 0) AND id NOT LIKE 'T-%' AND id NOT LIKE '002-%' AND id NOT LIKE 'TCH_%' AND id NOT LIKE 'A-%' AND id NOT LIKE 'ADM-%' AND id NOT LIKE 'ADMIN_%' AND id NOT LIKE 'SA-%' AND id NOT LIKE 'SA_%'",
+      where: whereClause,
+      whereArgs: whereArgs.isNotEmpty ? whereArgs : null,
       orderBy: 'full_name ASC',
     );
     final enrollments = await db.query('enrollments');
@@ -5050,8 +5129,23 @@ class DatabaseHelper {
   }
 
   // ── Sections Management (Admin) ──────────────────────────
-  Future<List<Map<String, dynamic>>> getSectionsList() async {
+  Future<List<Map<String, dynamic>>> getSectionsList({String? schoolId}) async {
     final db = await database;
+    if (schoolId != null && schoolId.isNotEmpty) {
+      if (schoolId == 'sch_main') {
+        return await db.query(
+          'sections',
+          where: "school_id = 'sch_main' OR school_id IS NULL OR school_id = ''",
+          orderBy: 'id DESC',
+        );
+      }
+      return await db.query(
+        'sections',
+        where: 'school_id = ?',
+        whereArgs: [schoolId],
+        orderBy: 'id DESC',
+      );
+    }
     return await db.query('sections', orderBy: 'id DESC');
   }
 
@@ -5076,11 +5170,22 @@ class DatabaseHelper {
   }
 
   // ── Teachers & Faculty Management ────────────────────────
-  Future<List<Map<String, dynamic>>> getTeachersList() async {
+  Future<List<Map<String, dynamic>>> getTeachersList({String? schoolId}) async {
     final db = await database;
+    String whereClause = "(role = 'teacher' OR id LIKE 'T-%' OR id LIKE '002-%' OR id LIKE 'TCH_%') AND (is_archived IS NULL OR is_archived = 0)";
+    List<dynamic> whereArgs = [];
+    if (schoolId != null && schoolId.isNotEmpty) {
+      if (schoolId == 'sch_main') {
+        whereClause += " AND (school_id = 'sch_main' OR school_id IS NULL OR school_id = '')";
+      } else {
+        whereClause += " AND school_id = ?";
+        whereArgs.add(schoolId);
+      }
+    }
     final teachers = await db.query(
       'users',
-      where: "(role = 'teacher' OR id LIKE 'T-%' OR id LIKE '002-%' OR id LIKE 'TCH_%') AND (is_archived IS NULL OR is_archived = 0)",
+      where: whereClause,
+      whereArgs: whereArgs.isNotEmpty ? whereArgs : null,
       orderBy: 'full_name ASC',
     );
 
@@ -5559,6 +5664,7 @@ class DatabaseHelper {
     required String password,
     String? username,
     List<int>? assignSubjectIds,
+    String? schoolId,
   }) async {
     final db = await database;
     final salt = generateSalt();
@@ -5624,7 +5730,7 @@ class DatabaseHelper {
       'role': 'teacher',
       'category': 'teacher',
       'full_name': fullName.trim(),
-      'school_id': 'sch_main',
+      'school_id': schoolId ?? 'sch_main',
       'must_change_password': 1,
       'created_at': DateTime.now().toIso8601String(),
     };
@@ -5716,6 +5822,7 @@ class DatabaseHelper {
     String studentType = 'regular',
     String? specialNotes,
     List<int>? enrollSubjectIds,
+    String? schoolId,
   }) async {
     final db = await database;
     final salt = generateSalt();
@@ -5801,7 +5908,7 @@ class DatabaseHelper {
       'section': section,
       'student_type': studentType,
       'special_notes': specialNotes,
-      'school_id': 'sch_main',
+      'school_id': schoolId ?? 'sch_main',
       'must_change_password': 1,
       'enrolled_courses': 0,
       'enrolled_subjects': <String>[],
@@ -12706,7 +12813,7 @@ class DatabaseHelper {
     required String password,
     String? username,
     String role = 'admin',
-    String? schoolId = 'sch_main',
+    String? schoolId,
   }) async {
     final db = await database;
     final salt = generateSalt();
@@ -12720,16 +12827,24 @@ class DatabaseHelper {
               ? email.split('@').first
               : fullName.trim().toLowerCase().replaceAll(' ', '.'));
 
-    final schoolScope = schoolId ?? 'sch_main';
-    final schools = await getSchoolsList();
-    final campus = schools.firstWhere(
-      (s) => s['id'] == schoolScope,
-      orElse: () => {
-        'id': schoolScope,
-        'name': 'AIRAMP Demonstration High School',
-        'code': 'ADM-01',
-      },
-    );
+    final schoolScope = (role == 'super_admin')
+        ? 'sch_main'
+        : (schoolId != null && schoolId.trim().isNotEmpty && schoolId != 'unassigned'
+            ? schoolId.trim()
+            : null);
+
+    Map<String, dynamic>? campus;
+    if (schoolScope != null) {
+      final schools = await getSchoolsList();
+      campus = schools.firstWhere(
+        (s) => s['id'] == schoolScope,
+        orElse: () => {
+          'id': schoolScope,
+          'name': 'Institutional Campus',
+          'code': '',
+        },
+      );
+    }
 
     final adminData = {
       'id': adminId,
@@ -12756,6 +12871,14 @@ class DatabaseHelper {
 
     await db.insert('users', adminData);
 
+    if (schoolScope != null && role == 'admin') {
+      try {
+        await assignSchoolAdmin(schoolScope, adminId);
+      } catch (e) {
+        debugPrint('[DatabaseHelper] assignSchoolAdmin note: $e');
+      }
+    }
+
     try {
       await FirestoreService().saveUser(adminData);
     } catch (_) {}
@@ -12768,8 +12891,12 @@ class DatabaseHelper {
         username: resolvedUsername,
         plainPassword: password,
         role: role,
-        campusName: campus['name']?.toString() ?? 'AIRAMP Demonstration High School',
-        campusCode: campus['code']?.toString() ?? 'ADM-01',
+        campusName: campus != null
+            ? (campus['name']?.toString() ?? 'Institutional Campus')
+            : 'Pending Campus Assignment',
+        campusCode: campus != null
+            ? (campus['code']?.toString() ?? '')
+            : 'PENDING',
       );
     } catch (e) {
       debugPrint('[DatabaseHelper] Error dispatching admin credentials email: $e');
@@ -12864,7 +12991,19 @@ class DatabaseHelper {
     if (data.containsKey('username')) {
       updates['username'] = (data['username'] as String).trim();
     }
-    if (data.containsKey('school_id')) updates['school_id'] = data['school_id'];
+    if (data.containsKey('school_id')) {
+      final newSchoolId = data['school_id'] as String?;
+      updates['school_id'] = newSchoolId;
+      if (newSchoolId != null && newSchoolId.isNotEmpty) {
+        await updateSchool(newSchoolId, {'admin_id': adminId});
+      } else {
+        final linkedSchools = await db.query('schools', where: 'admin_id = ?', whereArgs: [adminId]);
+        for (final s in linkedSchools) {
+          final sId = s['id'] as String;
+          await updateSchool(sId, {'admin_id': null});
+        }
+      }
+    }
     if (data.containsKey('role')) updates['role'] = data['role'];
     if (data.containsKey('student_type')) {
       updates['student_type'] = data['student_type'];
@@ -12913,6 +13052,14 @@ class DatabaseHelper {
     );
     try {
       await db.delete('sessions', where: 'user_id = ?', whereArgs: [adminId]);
+    } catch (_) {}
+
+    try {
+      final linkedSchools = await db.query('schools', where: 'admin_id = ?', whereArgs: [adminId]);
+      for (final s in linkedSchools) {
+        final sId = s['id'] as String;
+        await updateSchool(sId, {'admin_id': null});
+      }
     } catch (_) {}
 
     try {
@@ -12989,6 +13136,14 @@ class DatabaseHelper {
       await db.delete('sessions', where: 'user_id = ?', whereArgs: [adminId]);
     } catch (_) {}
 
+    try {
+      final linkedSchools = await db.query('schools', where: 'admin_id = ?', whereArgs: [adminId]);
+      for (final s in linkedSchools) {
+        final sId = s['id'] as String;
+        await updateSchool(sId, {'admin_id': null});
+      }
+    } catch (_) {}
+
     // Record deletion in SharedPreferences so seed routines never resurrect it on browser refresh
     try {
       final prefs = await SharedPreferences.getInstance();
@@ -13017,20 +13172,63 @@ class DatabaseHelper {
   Future<List<Map<String, dynamic>>> getSchoolsList() async {
     final db = await database;
     try {
-      final results = await db.query('schools', orderBy: 'created_at ASC');
+      var results = await db.query('schools', orderBy: 'created_at ASC');
       if (results.isEmpty) {
-        return [
-          {
-            'id': 'sch_main',
-            'name': 'AIRAMP Demonstration High School',
-            'code': 'ADM-01',
-            'address': 'DepEd Campus, Manila, Philippines',
-            'status': 'active',
-            'created_at': DateTime.now().toIso8601String(),
-          },
-        ];
+        try {
+          final prefs = await SharedPreferences.getInstance();
+          final cachedStr = prefs.getString('local_cached_schools_v1');
+          if (cachedStr != null && cachedStr.isNotEmpty) {
+            final List<dynamic> decoded = jsonDecode(cachedStr);
+            for (final item in decoded) {
+              if (item is Map) {
+                await db.insert(
+                  'schools',
+                  Map<String, dynamic>.from(item),
+                  conflictAlgorithm: ConflictAlgorithm.replace,
+                );
+              }
+            }
+            results = await db.query('schools', orderBy: 'created_at ASC');
+          }
+        } catch (_) {}
       }
-      return results;
+
+      if (results.isEmpty) {
+        final defaultSchool = {
+          'id': 'sch_main',
+          'name': 'AIRAMP Demonstration High School',
+          'code': 'ADM-01',
+          'address': 'DepEd Campus, Manila, Philippines',
+          'admin_id': null,
+          'status': 'active',
+          'created_at': DateTime.now().toIso8601String(),
+        };
+        await db.insert('schools', defaultSchool, conflictAlgorithm: ConflictAlgorithm.ignore);
+        return [defaultSchool];
+      }
+
+      final enrichedResults = <Map<String, dynamic>>[];
+      for (final s in results) {
+        if (s['admin_id'] == null || s['admin_id'].toString().isEmpty) {
+          final sId = s['id'] as String;
+          final matchingAdmin = await db.query(
+            'users',
+            columns: ['id'],
+            where: "(role = 'admin') AND (is_archived IS NULL OR is_archived = 0) AND school_id = ?",
+            whereArgs: [sId],
+            limit: 1,
+          );
+          if (matchingAdmin.isNotEmpty) {
+            final assignedId = matchingAdmin.first['id'] as String;
+            final updatedMap = Map<String, dynamic>.from(s)..['admin_id'] = assignedId;
+            await db.update('schools', {'admin_id': assignedId}, where: 'id = ?', whereArgs: [sId]);
+            enrichedResults.add(updatedMap);
+            continue;
+          }
+        }
+        enrichedResults.add(s);
+      }
+      return enrichedResults;
     } catch (_) {
       return [
         {
@@ -13038,6 +13236,7 @@ class DatabaseHelper {
           'name': 'AIRAMP Demonstration High School',
           'code': 'ADM-01',
           'address': 'DepEd Campus, Manila, Philippines',
+          'admin_id': null,
           'status': 'active',
           'created_at': DateTime.now().toIso8601String(),
         },
@@ -13061,17 +13260,56 @@ class DatabaseHelper {
     String status = 'active',
   }) async {
     final db = await database;
+
+    // Validate that the assigned admin is not already assigned to another campus
+    if (adminId != null && adminId.trim().isNotEmpty) {
+      final conflicts = await db.query(
+        'schools',
+        where: 'admin_id = ?',
+        whereArgs: [adminId.trim()],
+      );
+      if (conflicts.isNotEmpty) {
+        final conflict = conflicts.first;
+        final cName = conflict['name']?.toString() ?? 'Another Campus';
+        final cCode = conflict['code']?.toString() ?? '';
+        throw Exception(
+          'This administrator is already assigned to $cName ($cCode). '
+          'An account can only be a campus admin for one campus at a time. '
+          'Please select an unassigned administrator or register a new administrator account.',
+        );
+      }
+    }
+
     final schoolId = 'sch_${DateTime.now().millisecondsSinceEpoch}';
-    await db.insert('schools', {
+    final schoolData = {
       'id': schoolId,
       'name': name.trim(),
       'code': code.trim().toUpperCase(),
       'address': address?.trim(),
       'logo_url': logoUrl?.trim(),
-      'admin_id': adminId,
+      'admin_id': (adminId != null && adminId.trim().isNotEmpty) ? adminId.trim() : null,
       'status': status,
       'created_at': DateTime.now().toIso8601String(),
-    }, conflictAlgorithm: ConflictAlgorithm.replace);
+    };
+
+    await db.insert('schools', schoolData, conflictAlgorithm: ConflictAlgorithm.replace);
+
+    if (adminId != null && adminId.trim().isNotEmpty) {
+      await db.update(
+        'users',
+        {'school_id': schoolId},
+        where: 'id = ?',
+        whereArgs: [adminId.trim()],
+      );
+      try {
+        await FirestoreService().saveUser({'id': adminId.trim(), 'school_id': schoolId});
+      } catch (_) {}
+    }
+
+    try {
+      await FirestoreService().saveSchool(schoolData);
+    } catch (_) {}
+
     return schoolId;
   }
 
@@ -13079,7 +13317,80 @@ class DatabaseHelper {
     final db = await database;
     final row = Map<String, dynamic>.from(data);
     row.remove('id');
-    await db.update('schools', row, where: 'id = ?', whereArgs: [id]);
+
+    if (row.containsKey('admin_id')) {
+      final newAdminId = row['admin_id'] as String?;
+      if (newAdminId != null && newAdminId.trim().isNotEmpty) {
+        final conflicts = await db.query(
+          'schools',
+          where: 'admin_id = ? AND id != ?',
+          whereArgs: [newAdminId.trim(), id],
+        );
+        if (conflicts.isNotEmpty) {
+          final conflict = conflicts.first;
+          final cName = conflict['name']?.toString() ?? 'Another Campus';
+          final cCode = conflict['code']?.toString() ?? '';
+          throw Exception(
+            'This administrator is already assigned to $cName ($cCode). '
+            'An account can only be a campus admin for one campus at a time. '
+            'Please select an unassigned administrator or register a new administrator account.',
+          );
+        }
+      }
+
+      // Unlink any admin account currently associated with this school if not the new admin
+      final existingSchoolUsers = await db.query(
+        'users',
+        columns: ['id'],
+        where: "school_id = ? AND (role = 'admin')",
+        whereArgs: [id],
+      );
+      for (final u in existingSchoolUsers) {
+        final uId = u['id'] as String;
+        if (uId != newAdminId) {
+          await db.update('users', {'school_id': null}, where: 'id = ?', whereArgs: [uId]);
+          try {
+            await FirestoreService().saveUser({'id': uId, 'school_id': null});
+          } catch (_) {}
+        }
+      }
+
+      if (newAdminId != null && newAdminId.trim().isNotEmpty) {
+        await db.update(
+          'users',
+          {'school_id': id},
+          where: 'id = ?',
+          whereArgs: [newAdminId.trim()],
+        );
+        try {
+          await FirestoreService().saveUser({'id': newAdminId.trim(), 'school_id': id});
+        } catch (_) {}
+      }
+    }
+
+    // Upsert to ensure sch_main or newly provisioned campus exists in the table
+    final existing = await db.query('schools', where: 'id = ?', whereArgs: [id]);
+    if (existing.isEmpty) {
+      final insertData = <String, dynamic>{
+        'id': id,
+        'name': row['name'] ?? (id == 'sch_main' ? 'AIRAMP Demonstration High School' : 'Campus $id'),
+        'code': row['code'] ?? (id == 'sch_main' ? 'ADM-01' : id),
+        'address': row['address'] ?? '',
+        'admin_id': row['admin_id'],
+        'status': row['status'] ?? 'active',
+        'created_at': DateTime.now().toIso8601String(),
+      };
+      await db.insert('schools', insertData, conflictAlgorithm: ConflictAlgorithm.replace);
+    } else {
+      await db.update('schools', row, where: 'id = ?', whereArgs: [id]);
+    }
+
+    final updatedSchool = await getSchoolById(id);
+    if (updatedSchool != null) {
+      try {
+        await FirestoreService().saveSchool(updatedSchool);
+      } catch (_) {}
+    }
   }
 
   Future<bool> deleteSchool(String id) async {
@@ -13102,6 +13413,9 @@ class DatabaseHelper {
       );
     }
     await db.delete('schools', where: 'id = ?', whereArgs: [id]);
+    try {
+      await FirestoreService().deleteSchoolFromCloud(id);
+    } catch (_) {}
     return true;
   }
 
@@ -13149,18 +13463,72 @@ class DatabaseHelper {
 
   Future<void> assignSchoolAdmin(String schoolId, String adminId) async {
     final db = await database;
-    await db.update(
+    
+    // Strict uniqueness check: Is this admin already assigned to ANOTHER school?
+    final conflicts = await db.query(
       'schools',
-      {'admin_id': adminId},
-      where: 'id = ?',
-      whereArgs: [schoolId],
+      where: 'admin_id = ? AND id != ?',
+      whereArgs: [adminId, schoolId],
     );
+    if (conflicts.isNotEmpty) {
+      final conflict = conflicts.first;
+      final cName = conflict['name']?.toString() ?? 'Another Campus';
+      final cCode = conflict['code']?.toString() ?? '';
+      throw Exception(
+        'This administrator is already assigned to $cName ($cCode). '
+        'An account can only be a campus admin for one campus at a time. '
+        'Please select an unassigned administrator or register a new administrator account.',
+      );
+    }
+
+    // Unlink previous admin of this school if different
+    final currentSchool = await getSchoolById(schoolId);
+    final prevAdminId = currentSchool?['admin_id'] as String?;
+    if (prevAdminId != null && prevAdminId.isNotEmpty && prevAdminId != adminId) {
+      await db.update(
+        'users',
+        {'school_id': null},
+        where: 'id = ?',
+        whereArgs: [prevAdminId],
+      );
+      try {
+        await FirestoreService().saveUser({'id': prevAdminId, 'school_id': null});
+      } catch (_) {}
+    }
+
+    final schoolExists = await db.query('schools', where: 'id = ?', whereArgs: [schoolId]);
+    if (schoolExists.isEmpty) {
+      await db.insert('schools', {
+        'id': schoolId,
+        'name': schoolId == 'sch_main' ? 'AIRAMP Demonstration High School' : 'Campus $schoolId',
+        'code': schoolId == 'sch_main' ? 'ADM-01' : schoolId,
+        'admin_id': adminId,
+        'status': 'active',
+        'created_at': DateTime.now().toIso8601String(),
+      }, conflictAlgorithm: ConflictAlgorithm.replace);
+    } else {
+      await db.update(
+        'schools',
+        {'admin_id': adminId},
+        where: 'id = ?',
+        whereArgs: [schoolId],
+      );
+    }
+
     await db.update(
       'users',
       {'school_id': schoolId},
       where: 'id = ?',
       whereArgs: [adminId],
     );
+
+    try {
+      await FirestoreService().saveUser({'id': adminId, 'school_id': schoolId});
+      final s = await getSchoolById(schoolId);
+      if (s != null) {
+        await FirestoreService().saveSchool(s);
+      }
+    } catch (_) {}
   }
 
   // ── Class Schedules Management ──────────────────────────────

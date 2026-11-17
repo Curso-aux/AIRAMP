@@ -50,7 +50,8 @@ class _SuperAdminAdminsTabState extends ConsumerState<SuperAdminAdminsTab> {
     final userCtrl = TextEditingController(text: admin['username'] as String? ?? '');
     final passCtrl = TextEditingController();
     String selectedRole = admin['role'] as String? ?? 'admin';
-    String selectedSchool = admin['school_id'] as String? ?? 'sch_main';
+    final rawSchool = admin['school_id'] as String?;
+    String selectedSchool = (rawSchool == null || rawSchool.isEmpty) ? 'unassigned' : rawSchool;
 
     showDialog(
       context: context,
@@ -180,7 +181,7 @@ class _SuperAdminAdminsTabState extends ConsumerState<SuperAdminAdminsTab> {
                         DropdownButtonFormField<String>(
                           initialValue: schools.any((s) => s['id'] == selectedSchool)
                               ? selectedSchool
-                              : (schools.first['id'] as String?),
+                              : 'unassigned',
                           isExpanded: true,
                           dropdownColor: gTheme.surfaceElevated,
                           style: TextStyle(color: gTheme.textPrimary, fontSize: 13),
@@ -190,12 +191,34 @@ class _SuperAdminAdminsTabState extends ConsumerState<SuperAdminAdminsTab> {
                             prefixIcon: Icon(Icons.account_balance_outlined, size: 18, color: gTheme.textSecondary),
                             border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
                           ),
-                          items: schools.map((s) {
-                            return DropdownMenuItem(
-                              value: s['id'] as String,
-                              child: Text('${s['name']} (${s['code']})', overflow: TextOverflow.ellipsis),
-                            );
-                          }).toList(),
+                          items: [
+                            const DropdownMenuItem(
+                              value: 'unassigned',
+                              child: Text(
+                                'None (Unassigned - Ready for assignment)',
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ),
+                            ...schools.map((s) {
+                              final currentAdminId = s['admin_id']?.toString();
+                              final isOccupiedByOther = currentAdminId != null &&
+                                  currentAdminId.isNotEmpty &&
+                                  currentAdminId != admin['id'];
+                              return DropdownMenuItem(
+                                value: s['id'] as String,
+                                enabled: !isOccupiedByOther,
+                                child: Text(
+                                  '${s['name']} (${s['code']})${isOccupiedByOther ? ' [Assigned]' : (currentAdminId == admin['id'] ? ' [Current]' : ' [Vacant]')}',
+                                  overflow: TextOverflow.ellipsis,
+                                  style: TextStyle(
+                                    color: isOccupiedByOther
+                                        ? gTheme.textSecondary.withValues(alpha: 0.5)
+                                        : gTheme.textPrimary,
+                                  ),
+                                ),
+                              );
+                            }),
+                          ],
                           onChanged: (val) {
                             if (val != null) setDialogState(() => selectedSchool = val);
                           },
@@ -234,7 +257,9 @@ class _SuperAdminAdminsTabState extends ConsumerState<SuperAdminAdminsTab> {
                         'email': email,
                         'username': userCtrl.text.trim().isNotEmpty ? userCtrl.text.trim() : null,
                         'role': selectedRole,
-                        'school_id': selectedRole == 'super_admin' ? 'sch_main' : selectedSchool,
+                        'school_id': selectedRole == 'super_admin'
+                            ? 'sch_main'
+                            : (selectedSchool == 'unassigned' ? null : selectedSchool),
                       };
                       if (pass.isNotEmpty) {
                         updateData['password'] = pass;
@@ -1263,15 +1288,20 @@ class _SuperAdminAdminsTabState extends ConsumerState<SuperAdminAdminsTab> {
                         itemBuilder: (context, index) {
                           final admin = filteredAdmins[index];
                           final isSuper = admin['role'] == 'super_admin';
-                          final schoolId = admin['school_id'] as String? ?? 'sch_main';
+                          final schoolId = admin['school_id'] as String?;
+                          final isUnassigned = !isSuper && (schoolId == null || schoolId.isEmpty || schoolId == 'unassigned');
 
-                          final matchedSchool = schools.firstWhere(
-                            (s) => s['id'] == schoolId,
-                            orElse: () => {'name': 'Default Campus', 'code': schoolId},
-                          );
+                          final matchedSchool = (!isSuper && !isUnassigned)
+                              ? schools.firstWhere(
+                                  (s) => s['id'] == schoolId,
+                                  orElse: () => {'name': 'Campus $schoolId', 'code': schoolId},
+                                )
+                              : null;
                           final schoolDisplay = isSuper
                               ? 'Global Master Jurisdiction (All Campuses)'
-                              : '${matchedSchool['name']} (${matchedSchool['code']})';
+                              : (isUnassigned
+                                  ? 'Unassigned (Pending Campus Assignment)'
+                                  : '${matchedSchool!['name']} (${matchedSchool['code']})');
 
                           final isRoot = admin['id'] == 'super_admin_christian' ||
                               admin['id'] == 'SA-000-0001' ||
@@ -1333,6 +1363,26 @@ class _SuperAdminAdminsTabState extends ConsumerState<SuperAdminAdminsTab> {
                               ),
                             ),
                           );
+
+                          final unassignedBadge = isUnassigned
+                              ? Container(
+                                  margin: const EdgeInsets.only(left: 6),
+                                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                  decoration: BoxDecoration(
+                                    color: const Color(0xFFD97706).withValues(alpha: 0.12),
+                                    borderRadius: BorderRadius.circular(4),
+                                    border: Border.all(color: const Color(0xFFD97706).withValues(alpha: 0.3)),
+                                  ),
+                                  child: const Text(
+                                    'UNASSIGNED',
+                                    style: TextStyle(
+                                      fontSize: 9,
+                                      fontWeight: FontWeight.w800,
+                                      color: Color(0xFFD97706),
+                                    ),
+                                  ),
+                                )
+                              : null;
 
                           final actionButtons = Row(
                             mainAxisSize: MainAxisSize.min,
@@ -1442,7 +1492,13 @@ class _SuperAdminAdminsTabState extends ConsumerState<SuperAdminAdminsTab> {
                                             ),
                                           ),
                                           const SizedBox(width: 8),
-                                          roleBadge,
+                                          Row(
+                                            mainAxisSize: MainAxisSize.min,
+                                            children: [
+                                              roleBadge,
+                                              if (unassignedBadge != null) unassignedBadge,
+                                            ],
+                                          ),
                                         ],
                                       ),
                                       const SizedBox(height: 10),
@@ -1527,14 +1583,24 @@ class _SuperAdminAdminsTabState extends ConsumerState<SuperAdminAdminsTab> {
                                       flex: 2,
                                       child: Align(
                                         alignment: Alignment.centerLeft,
-                                        child: roleBadge,
+                                        child: Row(
+                                          mainAxisSize: MainAxisSize.min,
+                                          children: [
+                                            roleBadge,
+                                            if (unassignedBadge != null) unassignedBadge,
+                                          ],
+                                        ),
                                       ),
                                     ),
                                     Expanded(
                                       flex: 3,
                                       child: Text(
                                         schoolDisplay,
-                                        style: TextStyle(fontSize: 12, color: gTheme.textSecondary),
+                                        style: TextStyle(
+                                          fontSize: 12,
+                                          color: isUnassigned ? const Color(0xFFD97706) : gTheme.textSecondary,
+                                          fontWeight: isUnassigned ? FontWeight.w600 : FontWeight.normal,
+                                        ),
                                         maxLines: 1,
                                         overflow: TextOverflow.ellipsis,
                                       ),

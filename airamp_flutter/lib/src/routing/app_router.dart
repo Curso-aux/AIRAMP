@@ -79,21 +79,29 @@ final routerProvider = Provider<GoRouter>((ref) {
   ref.onDispose(authNotifier.dispose);
 
   final initialAuth = ref.read(authProvider);
-  final initialLoc = (initialAuth != null && initialAuth.mustChangePassword)
-      ? (initialAuth.role == 'super_admin'
-          ? '/super-admin/profile'
-          : (initialAuth.role == 'admin'
-              ? '/admin/profile'
-              : (initialAuth.role == 'teacher' ? '/teacher/profile' : '/student/profile')))
-      : (initialAuth != null && initialAuth.role == 'super_admin')
-          ? '/super-admin'
-          : (initialAuth != null && initialAuth.role == 'admin')
-              ? '/admin/dashboard'
-              : (initialAuth != null && initialAuth.role == 'teacher'
-                  ? '/teacher/dashboard'
-                  : (initialAuth != null
-                      ? '/student/home'
-                      : (kIsWeb ? '/' : '/login')));
+  final isUnassignedAdmin = initialAuth != null &&
+      initialAuth.role == 'admin' &&
+      (initialAuth.schoolId == null ||
+          initialAuth.schoolId!.trim().isEmpty ||
+          initialAuth.schoolId == 'unassigned');
+
+  final initialLoc = isUnassignedAdmin
+      ? '/login'
+      : (initialAuth != null && initialAuth.mustChangePassword)
+          ? (initialAuth.role == 'super_admin'
+              ? '/super-admin/profile'
+              : (initialAuth.role == 'admin'
+                  ? '/admin/profile'
+                  : (initialAuth.role == 'teacher' ? '/teacher/profile' : '/student/profile')))
+          : (initialAuth != null && initialAuth.role == 'super_admin')
+              ? '/super-admin'
+              : (initialAuth != null && initialAuth.role == 'admin')
+                  ? '/admin/dashboard'
+                  : (initialAuth != null && initialAuth.role == 'teacher'
+                      ? '/teacher/dashboard'
+                      : (initialAuth != null
+                          ? '/student/home'
+                          : (kIsWeb ? '/' : '/login')));
 
   return GoRouter(
     navigatorKey: rootNavigatorKey,
@@ -601,6 +609,15 @@ final routerProvider = Provider<GoRouter>((ref) {
         }
       }
 
+      // Unassigned Campus Admin Multi-Tenancy Guard:
+      // If user is a Campus Admin but has no assigned campus, strictly block /admin routes!
+      if (isAuth && authState.role == 'admin') {
+        final sid = authState.schoolId?.trim();
+        if (sid == null || sid.isEmpty || sid == 'unassigned') {
+          return '/login?unassigned=1';
+        }
+      }
+
       // Mandatory First-Login Password Change Guard:
       // If user must change password, strictly lock navigation to only their profile page.
       if (isAuth && authState.mustChangePassword) {
@@ -627,6 +644,10 @@ final routerProvider = Provider<GoRouter>((ref) {
         if (authState.role == 'super_admin') {
           return '/super-admin';
         } else if (authState.role == 'admin') {
+          final sid = authState.schoolId?.trim();
+          if (sid == null || sid.isEmpty || sid == 'unassigned') {
+            return null;
+          }
           return '/admin/dashboard';
         } else if (authState.role == 'teacher') {
           return '/teacher/dashboard';
@@ -644,6 +665,10 @@ final routerProvider = Provider<GoRouter>((ref) {
           if (isSuperAdmin) {
             return '/super-admin';
           } else if (isAdmin) {
+            final sid = authState.schoolId?.trim();
+            if (sid == null || sid.isEmpty || sid == 'unassigned') {
+              return '/login?unassigned=1';
+            }
             return '/admin/dashboard';
           } else if (isTeacher) {
             return '/teacher/dashboard';
@@ -665,6 +690,10 @@ final routerProvider = Provider<GoRouter>((ref) {
           if (isSuperAdmin) {
             return '/super-admin';
           } else if (isAdmin) {
+            final sid = authState.schoolId?.trim();
+            if (sid == null || sid.isEmpty || sid == 'unassigned') {
+              return null;
+            }
             return '/admin/dashboard';
           } else if (isTeacher) {
             return '/teacher/dashboard';

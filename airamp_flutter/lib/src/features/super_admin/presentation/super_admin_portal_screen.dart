@@ -17,6 +17,7 @@ import 'tabs/super_admin_campuses_tab.dart';
 import 'tabs/super_admin_admins_tab.dart';
 import 'tabs/super_admin_security_tab.dart';
 import 'tabs/super_admin_profile_tab.dart';
+import '../../../core/utils/institutional_id_helper.dart';
 
 class SuperAdminPortalScreen extends ConsumerStatefulWidget {
   final int initialTabIndex;
@@ -53,6 +54,7 @@ class _SuperAdminPortalScreenState
     final addressCtrl = TextEditingController();
     String selectedStatus = 'active';
     String? selectedAdminId;
+    bool isCodeManuallyEdited = false;
 
     showDialog(
       context: context,
@@ -60,6 +62,21 @@ class _SuperAdminPortalScreenState
         return StatefulBuilder(
           builder: (context, setDialogState) {
             final admins = ref.watch(schoolAdminsProvider);
+            final schools = ref.watch(schoolsListProvider);
+
+            void autoGenerateCode() {
+              if (!isCodeManuallyEdited) {
+                final existingCodes = schools.map((s) => s['code']?.toString() ?? '').toList();
+                final generated = InstitutionalIdHelper.generateCampusCode(
+                  campusName: nameCtrl.text,
+                  existingCodes: existingCodes,
+                );
+                if (codeCtrl.text != generated) {
+                  codeCtrl.text = generated;
+                }
+              }
+            }
+
             return AlertDialog(
               backgroundColor: gTheme.surfaceElevated,
               shape: RoundedRectangleBorder(
@@ -122,6 +139,11 @@ class _SuperAdminPortalScreenState
                           color: gTheme.textPrimary,
                           fontSize: 13,
                         ),
+                        onChanged: (val) {
+                          setDialogState(() {
+                            autoGenerateCode();
+                          });
+                        },
                         decoration: InputDecoration(
                           labelText: 'School / Campus Name *',
                           labelStyle: TextStyle(color: gTheme.textSecondary),
@@ -151,14 +173,54 @@ class _SuperAdminPortalScreenState
                           color: gTheme.textPrimary,
                           fontSize: 13,
                         ),
+                        onChanged: (val) {
+                          setDialogState(() {
+                            isCodeManuallyEdited = true;
+                          });
+                        },
                         decoration: InputDecoration(
                           labelText: 'School Identifier Code *',
                           labelStyle: TextStyle(color: gTheme.textSecondary),
+                          helperText: isCodeManuallyEdited
+                              ? 'Custom code entered (Auto-sync paused)'
+                              : 'Auto-generated institutional code',
+                          helperStyle: TextStyle(
+                            fontSize: 11,
+                            color: isCodeManuallyEdited ? Colors.amber.shade700 : gTheme.primary,
+                          ),
                           prefixIcon: Icon(
                             Icons.tag_rounded,
                             size: 18,
                             color: gTheme.textSecondary,
                           ),
+                          suffixIcon: isCodeManuallyEdited
+                              ? IconButton(
+                                  icon: const Icon(Icons.refresh_rounded, size: 18),
+                                  tooltip: 'Reset to auto-generated code',
+                                  onPressed: () {
+                                    setDialogState(() {
+                                      isCodeManuallyEdited = false;
+                                      autoGenerateCode();
+                                    });
+                                  },
+                                )
+                              : Container(
+                                  margin: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+                                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                  decoration: BoxDecoration(
+                                    color: gTheme.primarySubtle,
+                                    borderRadius: BorderRadius.circular(4),
+                                    border: Border.all(color: gTheme.primaryBorder),
+                                  ),
+                                  child: Text(
+                                    'AUTO',
+                                    style: TextStyle(
+                                      fontSize: 10,
+                                      fontWeight: FontWeight.bold,
+                                      color: gTheme.primary,
+                                    ),
+                                  ),
+                                ),
                           border: OutlineInputBorder(
                             borderRadius: BorderRadius.circular(8),
                           ),
@@ -232,6 +294,10 @@ class _SuperAdminPortalScreenState
                             ),
                           );
 
+                          final availableAdmins = admins.where(
+                            (a) => !schools.any((s) => s['admin_id'] == a['id']),
+                          ).toList();
+
                           final adminField = DropdownButtonFormField<String?>(
                             initialValue: selectedAdminId,
                             isExpanded: true,
@@ -258,35 +324,109 @@ class _SuperAdminPortalScreenState
                                 value: null,
                                 child: Text('None (Assign Later)', overflow: TextOverflow.ellipsis),
                               ),
-                              ...admins.map(
-                                (a) => DropdownMenuItem(
-                                  value: a['id'] as String,
+                              ...admins.map((a) {
+                                final aId = a['id'] as String;
+                                final assignedSchool = schools.firstWhere(
+                                  (s) => s['admin_id'] == aId,
+                                  orElse: () => <String, dynamic>{},
+                                );
+                                final isAssigned = assignedSchool.isNotEmpty;
+                                final aName = a['full_name'] as String? ?? 'Admin';
+
+                                if (isAssigned) {
+                                  final sCode = assignedSchool['code'] ?? '';
+                                  return DropdownMenuItem<String?>(
+                                    value: aId,
+                                    enabled: false,
+                                    child: Text(
+                                      '$aName (Assigned to $sCode)',
+                                      style: TextStyle(color: gTheme.textMuted, fontSize: 12),
+                                      overflow: TextOverflow.ellipsis,
+                                    ),
+                                  );
+                                }
+
+                                return DropdownMenuItem<String?>(
+                                  value: aId,
                                   child: Text(
-                                    a['full_name'] as String? ?? 'Admin',
+                                    '$aName (Available)',
+                                    style: TextStyle(color: gTheme.textPrimary, fontWeight: FontWeight.w500),
                                     overflow: TextOverflow.ellipsis,
                                   ),
-                                ),
-                              ),
+                                );
+                              }),
                             ],
                             onChanged: (val) =>
                                 setDialogState(() => selectedAdminId = val),
                           );
 
+                          final adminHelpBanner = availableAdmins.isEmpty
+                              ? Container(
+                                  margin: const EdgeInsets.only(top: 8),
+                                  padding: const EdgeInsets.all(10),
+                                  decoration: BoxDecoration(
+                                    color: Colors.amber.withValues(alpha: 0.1),
+                                    borderRadius: BorderRadius.circular(8),
+                                    border: Border.all(color: Colors.amber.withValues(alpha: 0.3)),
+                                  ),
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      Row(
+                                        children: [
+                                          const Icon(Icons.info_outline, size: 16, color: Colors.amber),
+                                          const SizedBox(width: 6),
+                                          Expanded(
+                                            child: Text(
+                                              'All existing administrator accounts are already assigned to other campuses. Each campus requires a dedicated administrator.',
+                                              style: TextStyle(fontSize: 11, color: gTheme.textSecondary),
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                      const SizedBox(height: 6),
+                                      InkWell(
+                                        onTap: () {
+                                          Navigator.of(dialogCtx).pop();
+                                          _openAddAdminDialog(gTheme);
+                                        },
+                                        child: Text(
+                                          '+ Register New Administrator Account',
+                                          style: TextStyle(
+                                            fontSize: 12,
+                                            fontWeight: FontWeight.bold,
+                                            color: gTheme.primary,
+                                          ),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                )
+                              : const SizedBox.shrink();
+
                           if (isNarrowForm) {
                             return Column(
+                              crossAxisAlignment: CrossAxisAlignment.stretch,
                               children: [
                                 statusField,
                                 const SizedBox(height: 12),
                                 adminField,
+                                adminHelpBanner,
                               ],
                             );
                           }
 
-                          return Row(
+                          return Column(
+                            crossAxisAlignment: CrossAxisAlignment.stretch,
                             children: [
-                              Expanded(child: statusField),
-                              const SizedBox(width: 12),
-                              Expanded(child: adminField),
+                              Row(
+                                children: [
+                                  Expanded(child: statusField),
+                                  const SizedBox(width: 12),
+                                  Expanded(child: adminField),
+                                ],
+                              ),
+                              adminHelpBanner,
                             ],
                           );
                         },
@@ -322,6 +462,34 @@ class _SuperAdminPortalScreenState
                       );
                       return;
                     }
+
+                    // Check if code is already in use
+                    final existingSchools = ref.read(schoolsListProvider);
+                    if (existingSchools.any((s) => (s['code']?.toString().toUpperCase() ?? '') == code)) {
+                      AiraActionToast.showWarning(
+                        context,
+                        title: 'Identifier Code Exists',
+                        message: 'The campus identifier code "$code" is already taken. Please enter or generate a unique code.',
+                      );
+                      return;
+                    }
+
+                    // Strict validation: Check if selected admin is already assigned elsewhere
+                    if (selectedAdminId != null) {
+                      final conflict = existingSchools.firstWhere(
+                        (s) => s['admin_id'] == selectedAdminId,
+                        orElse: () => <String, dynamic>{},
+                      );
+                      if (conflict.isNotEmpty) {
+                        AiraActionToast.showWarning(
+                          context,
+                          title: 'Administrator Unavailable',
+                          message: 'This account is already a campus admin in ${conflict['name']} (${conflict['code']}). Each campus requires a dedicated administrator. Please register or select another account.',
+                        );
+                        return;
+                      }
+                    }
+
                     Navigator.of(dialogCtx).pop();
                     try {
                       await ref
@@ -616,7 +784,7 @@ class _SuperAdminPortalScreenState
                           initialValue:
                               schools.any((s) => s['id'] == selectedSchool)
                               ? selectedSchool
-                              : (schools.first['id'] as String?),
+                              : 'unassigned',
                           isExpanded: true,
                           dropdownColor: gTheme.surfaceElevated,
                           style: TextStyle(
@@ -635,15 +803,25 @@ class _SuperAdminPortalScreenState
                               borderRadius: BorderRadius.circular(8),
                             ),
                           ),
-                          items: schools.map((s) {
-                            return DropdownMenuItem(
-                              value: s['id'] as String,
+                          items: [
+                            const DropdownMenuItem(
+                              value: 'unassigned',
                               child: Text(
-                                '${s['name']} (${s['code']})',
+                                'None (Unassigned - Ready for new campus)',
                                 overflow: TextOverflow.ellipsis,
                               ),
-                            );
-                          }).toList(),
+                            ),
+                            ...schools.map((s) {
+                              final hasAdmin = s['admin_id'] != null && s['admin_id'].toString().isNotEmpty;
+                              return DropdownMenuItem(
+                                value: s['id'] as String,
+                                child: Text(
+                                  '${s['name']} (${s['code']})${hasAdmin ? " [Assigned]" : " [Vacant]"}',
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                              );
+                            }),
+                          ],
                           onChanged: (val) {
                             if (val != null) {
                               setDialogState(() => selectedSchool = val);
@@ -683,11 +861,17 @@ class _SuperAdminPortalScreenState
                           final schoolsList = ref.read(schoolsListProvider);
                           final chosenCampus = schoolsList.firstWhere(
                             (s) => s['id'] == (selectedRole == 'super_admin' ? 'sch_main' : selectedSchool),
-                            orElse: () => {'name': 'All Campuses (Master)', 'code': 'ALL'},
+                            orElse: () => {'name': 'Unassigned (Floating Admin)', 'code': 'NONE'},
                           );
                           final resolvedCampusName = selectedRole == 'super_admin'
                               ? 'Global Master Jurisdiction (All Campuses)'
-                              : '${chosenCampus['name']} (${chosenCampus['code']})';
+                              : (selectedSchool == 'unassigned'
+                                  ? 'Unassigned (Ready for assignment)'
+                                  : '${chosenCampus['name']} (${chosenCampus['code']})');
+
+                          final targetSchoolScope = selectedRole == 'super_admin'
+                              ? 'sch_main'
+                              : (selectedSchool == 'unassigned' ? null : selectedSchool);
 
                           try {
                             await ref
@@ -700,9 +884,7 @@ class _SuperAdminPortalScreenState
                                       ? userCtrl.text.trim()
                                       : null,
                                   role: selectedRole,
-                                  schoolId: selectedRole == 'super_admin'
-                                      ? 'sch_main'
-                                      : selectedSchool,
+                                  schoolId: targetSchoolScope,
                                 );
                             ref.invalidate(superAdminStatsProvider);
                             if (context.mounted) {

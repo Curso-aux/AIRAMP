@@ -32,7 +32,7 @@ class User {
     this.profileImage,
     this.section,
     this.grade,
-    this.schoolId = 'sch_main',
+    this.schoolId,
     this.availableRoles = const ['student', 'teacher'],
     this.mustChangePassword = false,
   });
@@ -80,16 +80,20 @@ class User {
         json['must_change_password'] == true ||
         json['must_change_password'] == '1';
 
+    final rawRole = json['role'] ?? 'student';
     return User(
       id: json['id'] ?? '',
       email: json['email'] ?? '',
-      role: json['role'] ?? 'student',
+      role: rawRole,
       fullName: json['fullName'] ?? json['full_name'] ?? '',
       username: json['username'] ?? json['fullName'] ?? json['full_name'] ?? '',
       profileImage: json['profileImage'] ?? json['profile_image'],
       section: json['section'],
       grade: json['grade'],
-      schoolId: json['schoolId'] ?? json['school_id'] ?? 'sch_main',
+      schoolId:
+          json['schoolId'] ??
+          json['school_id'] ??
+          (rawRole == 'admin' ? null : 'sch_main'),
       availableRoles:
           (json['availableRoles'] as List?)?.cast<String>() ??
           const ['student', 'teacher'],
@@ -442,14 +446,17 @@ class AuthNotifier extends Notifier<User?> {
         profileImage: profileImage,
         section: u['section'] as String?,
         grade: u['grade'] as String?,
-        schoolId: u['school_id'] as String? ?? 'sch_main',
+        schoolId:
+            (u['school_id'] as String?) ??
+            (actualRole == 'admin' ? null : 'sch_main'),
         mustChangePassword: mustChange,
       );
     } else {
+      final resolvedRole = cloudUser?['role'] as String? ?? session.role;
       state = User(
         id: session.userId,
         email: cloudUser?['email'] as String? ?? '',
-        role: cloudUser?['role'] as String? ?? session.role,
+        role: resolvedRole,
         fullName: cloudUser?['full_name'] as String? ?? session.userId,
         username: cloudUser?['username'] as String? ?? '',
         profileImage:
@@ -457,7 +464,9 @@ class AuthNotifier extends Notifier<User?> {
                 as String?,
         section: cloudUser?['section'] as String?,
         grade: cloudUser?['grade'] as String?,
-        schoolId: cloudUser?['school_id'] as String? ?? 'sch_main',
+        schoolId:
+            (cloudUser?['school_id'] as String?) ??
+            (resolvedRole == 'admin' ? null : 'sch_main'),
         mustChangePassword: mustChange,
       );
     }

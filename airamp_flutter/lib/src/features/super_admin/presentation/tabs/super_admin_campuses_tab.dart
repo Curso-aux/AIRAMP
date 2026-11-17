@@ -31,6 +31,10 @@ class _SuperAdminCampusesTabState extends ConsumerState<SuperAdminCampusesTab> {
         _searchQuery = _searchController.text.trim().toLowerCase();
       });
     });
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      ref.read(schoolsListProvider.notifier).loadSchools();
+      ref.read(schoolAdminsProvider.notifier).loadAdmins();
+    });
   }
 
   @override
@@ -40,11 +44,22 @@ class _SuperAdminCampusesTabState extends ConsumerState<SuperAdminCampusesTab> {
   }
 
   void _openEditSchoolDialog(BuildContext context, GovernanceTheme gTheme, Map<String, dynamic> school) {
+    final currentSchoolId = school['id'] as String;
     final nameCtrl = TextEditingController(text: school['name'] as String? ?? '');
     final codeCtrl = TextEditingController(text: school['code'] as String? ?? '');
     final addressCtrl = TextEditingController(text: school['address'] as String? ?? '');
     String selectedStatus = school['status'] as String? ?? 'active';
+    final currentAdmins = ref.read(schoolAdminsProvider);
     String? selectedAdminId = school['admin_id'] as String?;
+    if (selectedAdminId == null || selectedAdminId.isEmpty) {
+      final matching = currentAdmins.firstWhere(
+        (a) => a['school_id'] == currentSchoolId,
+        orElse: () => <String, dynamic>{},
+      );
+      if (matching.isNotEmpty) {
+        selectedAdminId = matching['id'] as String?;
+      }
+    }
 
     showDialog(
       context: context,
@@ -52,6 +67,8 @@ class _SuperAdminCampusesTabState extends ConsumerState<SuperAdminCampusesTab> {
         return StatefulBuilder(
           builder: (context, setDialogState) {
             final admins = ref.watch(schoolAdminsProvider);
+            final schools = ref.watch(schoolsListProvider);
+
             return AlertDialog(
               backgroundColor: gTheme.surfaceElevated,
               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
@@ -160,13 +177,38 @@ class _SuperAdminCampusesTabState extends ConsumerState<SuperAdminCampusesTab> {
                             ),
                             items: [
                               const DropdownMenuItem(value: null, child: Text('None (Assign Later)', overflow: TextOverflow.ellipsis)),
-                              ...admins.map((a) => DropdownMenuItem(
-                                value: a['id'] as String,
-                                child: Text(
-                                  a['full_name'] as String? ?? 'Admin',
-                                  overflow: TextOverflow.ellipsis,
-                                ),
-                              )),
+                              ...admins.map((a) {
+                                final aId = a['id'] as String;
+                                final assignedSchool = schools.firstWhere(
+                                  (s) => s['admin_id'] == aId,
+                                  orElse: () => <String, dynamic>{},
+                                );
+                                final isAssignedToOther = assignedSchool.isNotEmpty && assignedSchool['id'] != currentSchoolId;
+                                final isCurrentSchool = aId == selectedAdminId || (assignedSchool.isNotEmpty && assignedSchool['id'] == currentSchoolId);
+                                final aName = a['full_name'] as String? ?? 'Admin';
+
+                                if (isAssignedToOther) {
+                                  final sCode = assignedSchool['code'] ?? '';
+                                  return DropdownMenuItem<String?>(
+                                    value: aId,
+                                    enabled: false,
+                                    child: Text(
+                                      '$aName (Assigned to $sCode)',
+                                      style: TextStyle(color: gTheme.textMuted, fontSize: 12),
+                                      overflow: TextOverflow.ellipsis,
+                                    ),
+                                  );
+                                }
+
+                                return DropdownMenuItem<String?>(
+                                  value: aId,
+                                  child: Text(
+                                    '$aName${isCurrentSchool ? " (Currently Assigned)" : " (Available)"}',
+                                    style: TextStyle(color: gTheme.textPrimary, fontWeight: FontWeight.w500),
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
+                                );
+                              }),
                             ],
                             onChanged: (val) => setDialogState(() => selectedAdminId = val),
                           );
@@ -216,6 +258,34 @@ class _SuperAdminCampusesTabState extends ConsumerState<SuperAdminCampusesTab> {
                       );
                       return;
                     }
+
+                    // Check if code taken by another school
+                    final currentSchools = ref.read(schoolsListProvider);
+                    if (currentSchools.any((s) => s['id'] != currentSchoolId && (s['code']?.toString().toUpperCase() ?? '') == code)) {
+                      AiraActionToast.showWarning(
+                        context,
+                        title: 'Identifier Code Exists',
+                        message: 'The campus identifier code "$code" is already taken by another campus.',
+                      );
+                      return;
+                    }
+
+                    // Check if selected admin is assigned to another school
+                    if (selectedAdminId != null) {
+                      final conflict = currentSchools.firstWhere(
+                        (s) => s['id'] != currentSchoolId && s['admin_id'] == selectedAdminId,
+                        orElse: () => <String, dynamic>{},
+                      );
+                      if (conflict.isNotEmpty) {
+                        AiraActionToast.showWarning(
+                          context,
+                          title: 'Administrator Unavailable',
+                          message: 'This account is already assigned to ${conflict['name']} (${conflict['code']}). Each campus requires a dedicated administrator.',
+                        );
+                        return;
+                      }
+                    }
+
                     Navigator.of(dialogCtx).pop();
                     try {
                       await ref.read(schoolsListProvider.notifier).updateSchool(
@@ -697,7 +767,7 @@ class _SuperAdminCampusesTabState extends ConsumerState<SuperAdminCampusesTab> {
                         final isMain = schoolId == 'sch_main';
 
                         final assignedAdmin = admins.firstWhere(
-                          (a) => a['id'] == adminId,
+                          (a) => a['id'] == adminId || (a['school_id'] == schoolId && (adminId == null || adminId.isEmpty)),
                           orElse: () => <String, dynamic>{},
                         );
                         final adminName = assignedAdmin['full_name'] as String? ?? (adminId != null ? 'Admin $adminId' : 'Unassigned');

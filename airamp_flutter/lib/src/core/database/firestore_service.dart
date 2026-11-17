@@ -225,7 +225,7 @@ class FirestoreService {
   }
 
   Map<String, dynamic> _convertValueToFirestoreField(dynamic val) {
-    if (val == null) {
+    if (val == null || val is FieldValue) {
       return {'nullValue': null};
     } else if (val is bool) {
       return {'booleanValue': val};
@@ -581,11 +581,16 @@ class FirestoreService {
         if (localUsers.isNotEmpty) {
           final local = localUsers.first;
           for (final entry in local.entries) {
-            if (entry.value != null &&
-                (!dataToSave.containsKey(entry.key) ||
-                    dataToSave[entry.key] == null ||
-                    dataToSave[entry.key].toString().trim().isEmpty)) {
-              dataToSave[entry.key] = entry.value;
+            if (entry.value != null) {
+              if (entry.key == 'school_id' && dataToSave.containsKey('school_id')) {
+                // Caller explicitly provided school_id (even if null or empty to unassign)
+                continue;
+              }
+              if (!dataToSave.containsKey(entry.key) ||
+                  dataToSave[entry.key] == null ||
+                  dataToSave[entry.key].toString().trim().isEmpty) {
+                dataToSave[entry.key] = entry.value;
+              }
             }
           }
         }
@@ -639,7 +644,9 @@ class FirestoreService {
       }
     }
 
-    dataToSave['school_id'] ??= 'sch_main';
+    if (dataToSave['role'] != 'admin' && dataToSave['role'] != 'super_admin') {
+      dataToSave['school_id'] ??= 'sch_main';
+    }
     dataToSave['must_change_password'] ??= 1;
     dataToSave['created_at'] ??= DateTime.now().toIso8601String();
     dataToSave['updated_at'] = DateTime.now().toIso8601String();
@@ -651,8 +658,22 @@ class FirestoreService {
       dataToSave['profile_image'] = dataToSave['profileImage'];
     }
 
+    final explicitSchoolIdCleared = (resolvedRole == 'admin' || resolvedRole == 'super_admin') &&
+        dataToSave.containsKey('school_id') &&
+        (dataToSave['school_id'] == null ||
+            dataToSave['school_id'].toString().trim().isEmpty ||
+            dataToSave['school_id'].toString() == 'null');
+    if (explicitSchoolIdCleared) {
+      if (isAvailable) {
+        dataToSave['school_id'] = FieldValue.delete();
+      } else {
+        dataToSave['school_id'] = null;
+      }
+    }
+
     // Never overwrite existing non-null cloud fields with nulls during routine sync/login
-    dataToSave.removeWhere((key, value) => value == null);
+    // (Except when school_id was explicitly unassigned)
+    dataToSave.removeWhere((key, value) => value == null && (!explicitSchoolIdCleared || key != 'school_id'));
 
     // Ensure this user ID, email, and username are removed from any local deletion tombstone list
     try {
@@ -1269,7 +1290,11 @@ class FirestoreService {
             'grade': gradeVal,
             'student_type': studentTypeVal,
             'special_notes': data['special_notes'] ?? old['special_notes'],
-            'school_id': data['school_id'] ?? old['school_id'] ?? 'sch_main',
+            'school_id': (resolvedRole == 'admin' || resolvedRole == 'super_admin')
+                ? (data['school_id'] != null && data['school_id'].toString().isNotEmpty && data['school_id'].toString() != 'null'
+                    ? data['school_id'].toString().trim()
+                    : null)
+                : (data['school_id'] ?? old['school_id'] ?? 'sch_main'),
             'must_change_password': mustChangeVal,
             'is_archived': isArchived ? 1 : 0,
             'archived_at': isArchived ? (archivedAt ?? DateTime.now().toIso8601String()) : null,
@@ -1757,6 +1782,144 @@ class FirestoreService {
       notifySyncListeners();
     } catch (e) {
       debugPrint('[FirestoreService] Error syncing cloud schedules to local SQLite: $e');
+    }
+  }
+
+  DateTime? _lastSchoolsSyncTime;
+
+  /// Syncs institutional campuses / schools from Cloud Firestore to local SQLite and localStorage cache.
+  Future<void> syncCloudSchoolsToLocal({bool force = false}) async {
+    try {
+      final db = await DatabaseHelper().database;
+      SharedPreferences? prefs;
+      try {
+        prefs = await SharedPreferences.getInstance();
+      } catch (_) {}
+
+      // 1. Fast cache restore if SQLite is empty
+      int localCount = 0;
+      try {
+        localCount = Sqflite.firstIntValue(
+          await db.rawQuery('SELECT COUNT(*) FROM schools'),
+        ) ?? 0;
+      } catch (_) {}
+
+      if (localCount <= 1 && prefs != null) {
+        final cachedStr = prefs.getString('local_cached_schools_v1');
+        if (cachedStr != null && cachedStr.isNotEmpty) {
+          try {
+            final List<dynamic> decoded = jsonDecode(cachedStr);
+            for (final item in decoded) {
+              if (item is Map) {
+                await db.insert(
+                  'schools',
+                  Map<String, dynamic>.from(item),
+                  conflictAlgorithm: ConflictAlgorithm.replace,
+                );
+              }
+            }
+          } catch (_) {}
+        }
+      }
+
+      final now = DateTime.now();
+      if (!force && localCount > 1 && !kIsWeb && _lastSchoolsSyncTime != null &&
+          now.difference(_lastSchoolsSyncTime!) < const Duration(minutes: 3)) {
+        return;
+      }
+      _lastSchoolsSyncTime = now;
+
+      final cloudDocs = await fetchAllDocuments('schools');
+      if (cloudDocs.isNotEmpty) {
+        for (final doc in cloudDocs) {
+          final schoolId = doc['_docId']?.toString() ?? doc['id']?.toString() ?? '';
+          if (schoolId.isEmpty) continue;
+
+          final rowData = {
+            'id': schoolId,
+            'name': doc['name']?.toString() ?? 'Campus $schoolId',
+            'code': doc['code']?.toString() ?? schoolId,
+            'address': doc['address']?.toString() ?? '',
+            'logo_url': doc['logo_url']?.toString(),
+            'admin_id': (doc['admin_id'] != null &&
+                    doc['admin_id'].toString().isNotEmpty &&
+                    doc['admin_id'].toString() != 'null')
+                ? doc['admin_id'].toString()
+                : null,
+            'status': doc['status']?.toString() ?? 'active',
+            'created_at': doc['created_at']?.toString() ?? DateTime.now().toIso8601String(),
+          };
+
+          await db.insert(
+            'schools',
+            rowData,
+            conflictAlgorithm: ConflictAlgorithm.replace,
+          );
+        }
+      }
+
+      // Always ensure sch_main is seeded if not present
+      final mainCheck = await db.query('schools', where: 'id = ?', whereArgs: ['sch_main']);
+      if (mainCheck.isEmpty) {
+        final mainAdmin = await db.query(
+          'users',
+          columns: ['id'],
+          where: "(role = 'admin') AND (is_archived IS NULL OR is_archived = 0) AND school_id = 'sch_main'",
+          limit: 1,
+        );
+        final initialAdminId = mainAdmin.isNotEmpty ? mainAdmin.first['id'] as String? : null;
+
+        await db.insert('schools', {
+          'id': 'sch_main',
+          'name': 'AIRAMP Demonstration High School',
+          'code': 'ADM-01',
+          'address': 'DepEd Campus, Manila, Philippines',
+          'admin_id': initialAdminId,
+          'status': 'active',
+          'created_at': DateTime.now().toIso8601String(),
+        });
+      }
+
+      // Persist full set to local storage cache
+      if (prefs != null) {
+        try {
+          final all = await db.query('schools', orderBy: 'created_at ASC');
+          await prefs.setString('local_cached_schools_v1', jsonEncode(all));
+        } catch (_) {}
+      }
+
+      debugPrint('[FirestoreService] Synced ${cloudDocs.length} cloud schools to local SQLite');
+      notifySyncListeners();
+    } catch (e) {
+      debugPrint('[FirestoreService] Error syncing cloud schools to local SQLite: $e');
+    }
+  }
+
+  Future<void> saveSchool(Map<String, dynamic> schoolData) async {
+    final id = schoolData['id']?.toString().trim();
+    if (id == null || id.isEmpty) return;
+    try {
+      await saveDocument('schools', id, schoolData);
+      final prefs = await SharedPreferences.getInstance();
+      final db = await DatabaseHelper().database;
+      final all = await db.query('schools', orderBy: 'created_at ASC');
+      await prefs.setString('local_cached_schools_v1', jsonEncode(all));
+    } catch (e) {
+      debugPrint('[FirestoreService] saveSchool error: $e');
+    }
+  }
+
+  Future<void> deleteSchoolFromCloud(String id) async {
+    final cleanId = id.trim();
+    if (cleanId.isEmpty) return;
+    try {
+      await deleteDocument('schools', cleanId);
+      final prefs = await SharedPreferences.getInstance();
+      final db = await DatabaseHelper().database;
+      final all = await db.query('schools', orderBy: 'created_at ASC');
+      await prefs.setString('local_cached_schools_v1', jsonEncode(all));
+    } catch (e) {
+      debugPrint('[FirestoreService] deleteSchoolFromCloud error: $e');
     }
   }
 
@@ -2261,6 +2424,13 @@ class FirestoreService {
     final nowIso = DateTime.now().toIso8601String();
     dataToSave['updated_at'] ??= nowIso;
     dataToSave['created_at'] ??= nowIso;
+
+    // Handle explicit nulling/unassigning of fields (e.g. admin_id on schools unassign)
+    final explicitAdminIdCleared = data.containsKey('admin_id') &&
+        (data['admin_id'] == null || data['admin_id'].toString().trim().isEmpty || data['admin_id'].toString() == 'null');
+    if (explicitAdminIdCleared && isAvailable) {
+      dataToSave['admin_id'] = FieldValue.delete();
+    }
 
     if (isAvailable) {
       try {

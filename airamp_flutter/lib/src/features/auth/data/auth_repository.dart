@@ -22,7 +22,7 @@ class AuthSession {
     required this.session,
     required this.userId,
     required this.role,
-    this.schoolId = 'sch_main',
+    this.schoolId,
     this.mustChangePassword = false,
   });
 }
@@ -133,7 +133,7 @@ class AuthRepository {
             'grade': cloudUser['grade'],
             'student_type': cloudUser['student_type'] ?? 'regular',
             'special_notes': cloudUser['special_notes'],
-            'school_id': cloudUser['school_id'] ?? 'sch_main',
+            'school_id': cloudUser['school_id'],
             'profile_image':
                 cloudUser['profile_image'] ?? cloudUser['profileImage'],
             'must_change_password': cloudMust ? 1 : 0,
@@ -209,6 +209,37 @@ class AuthRepository {
       throw Exception(
         'This account has been deactivated. Please contact your institution administrator to restore access.',
       );
+    }
+
+    // Campus Administrator Multi-Tenancy Guard:
+    // A campus administrator must be assigned to an active campus before access is permitted.
+    if (role == 'admin') {
+      final schoolId = user['school_id']?.toString().trim();
+      if (schoolId == null || schoolId.isEmpty || schoolId == 'unassigned') {
+        throw Exception(
+          'Access Denied: This administrator account has not been assigned to a campus yet. Please contact the Super Administrator to assign your institutional campus before logging in.',
+        );
+      }
+
+      // Check campus status
+      final schoolRows = await db.query(
+        'schools',
+        where: 'id = ?',
+        whereArgs: [schoolId],
+      );
+      if (schoolRows.isEmpty) {
+        throw Exception(
+          'Access Denied: The assigned campus ("$schoolId") could not be found. Please contact the Super Administrator.',
+        );
+      } else {
+        final school = schoolRows.first;
+        final status = (school['status'] as String? ?? 'active').toLowerCase();
+        if (status != 'active') {
+          throw Exception(
+            'Access Denied: The campus "${school['name'] ?? schoolId}" is currently $status. Portal access is restricted.',
+          );
+        }
+      }
     }
 
     // Check Cloud Firestore for this user to restore any cloud avatar or updated profile:
@@ -379,7 +410,7 @@ class AuthRepository {
         'username': user['username'] ?? user['full_name'] ?? '',
         'section': user['section'],
         'grade': user['grade'],
-        'schoolId': user['school_id'] ?? 'sch_main',
+        'schoolId': user['school_id'] ?? (role == 'admin' ? null : 'sch_main'),
         'profileImage': user['profile_image'] ?? user['profileImage'],
         'must_change_password':
             user['must_change_password'] == 1 ||

@@ -297,6 +297,12 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
     required Color primaryAccent,
     required bool isLoading,
   }) {
+    final unassignedParam = GoRouterState.of(context).uri.queryParameters['unassigned'];
+    final displayError = _error.isNotEmpty
+        ? _error
+        : (unassignedParam == '1'
+            ? 'Access Denied: This administrator account is not assigned to an active campus. Please contact the Super Administrator.'
+            : '');
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.symmetric(horizontal: 28.0, vertical: 30.0),
@@ -350,7 +356,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
           const SizedBox(height: 22),
 
           // Error banner
-          if (_error.isNotEmpty) ...[
+          if (displayError.isNotEmpty) ...[
             Container(
               margin: const EdgeInsets.only(bottom: 18),
               padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
@@ -376,7 +382,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
                   const SizedBox(width: 10),
                   Expanded(
                     child: Text(
-                      _error,
+                      displayError,
                       style: TextStyle(
                         color: isDark
                             ? AppTheme.darkError
