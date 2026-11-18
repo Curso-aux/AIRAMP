@@ -100,12 +100,16 @@ class DatabaseHelper {
     try {
       final prefs = await SharedPreferences.getInstance();
       final delQ = prefs.getStringList('permanently_deleted_quizzes') ?? [];
-      final cleanedQ = delQ.where((item) => !RegExp(r'^\d+$').hasMatch(item)).toList();
+      final cleanedQ = delQ
+          .where((item) => !RegExp(r'^\d+$').hasMatch(item))
+          .toList();
       if (cleanedQ.length != delQ.length) {
         await prefs.setStringList('permanently_deleted_quizzes', cleanedQ);
       }
       final delA = prefs.getStringList('permanently_deleted_assignments') ?? [];
-      final cleanedA = delA.where((item) => !RegExp(r'^\d+$').hasMatch(item)).toList();
+      final cleanedA = delA
+          .where((item) => !RegExp(r'^\d+$').hasMatch(item))
+          .toList();
       if (cleanedA.length != delA.length) {
         await prefs.setStringList('permanently_deleted_assignments', cleanedA);
       }
@@ -131,7 +135,9 @@ class DatabaseHelper {
       await db.execute('ALTER TABLE users ADD COLUMN profile_image TEXT');
     } catch (_) {}
     try {
-      await db.execute('ALTER TABLE users ADD COLUMN is_archived INTEGER DEFAULT 0');
+      await db.execute(
+        'ALTER TABLE users ADD COLUMN is_archived INTEGER DEFAULT 0',
+      );
     } catch (_) {}
     try {
       await db.execute('ALTER TABLE users ADD COLUMN archived_at TEXT');
@@ -152,7 +158,10 @@ class DatabaseHelper {
       ''');
     } catch (_) {}
     try {
-      await db.delete('users', where: "id = 'admin_1' OR id = 'super_admin_1' OR email = 'aira@admin'");
+      await db.delete(
+        'users',
+        where: "id = 'admin_1' OR id = 'super_admin_1' OR email = 'aira@admin'",
+      );
     } catch (_) {}
     try {
       await db.execute(
@@ -221,14 +230,10 @@ class DatabaseHelper {
       );
     } catch (_) {}
     try {
-      await db.execute(
-        'ALTER TABLE submissions ADD COLUMN storage_url TEXT',
-      );
+      await db.execute('ALTER TABLE submissions ADD COLUMN storage_url TEXT');
     } catch (_) {}
     try {
-      await db.execute(
-        'ALTER TABLE assignments ADD COLUMN storage_url TEXT',
-      );
+      await db.execute('ALTER TABLE assignments ADD COLUMN storage_url TEXT');
     } catch (_) {}
     try {
       await db.execute(
@@ -286,16 +291,24 @@ class DatabaseHelper {
       await db.execute('ALTER TABLE conversations ADD COLUMN section_key TEXT');
     } catch (_) {}
     try {
-      await db.execute('ALTER TABLE conversations ADD COLUMN section_id INTEGER');
+      await db.execute(
+        'ALTER TABLE conversations ADD COLUMN section_id INTEGER',
+      );
     } catch (_) {}
     try {
-      await db.execute('ALTER TABLE conversations ADD COLUMN room_admin_id TEXT');
+      await db.execute(
+        'ALTER TABLE conversations ADD COLUMN room_admin_id TEXT',
+      );
     } catch (_) {}
     try {
-      await db.execute('ALTER TABLE conversations ADD COLUMN room_admin_name TEXT');
+      await db.execute(
+        'ALTER TABLE conversations ADD COLUMN room_admin_name TEXT',
+      );
     } catch (_) {}
     try {
-      await db.execute('ALTER TABLE conversations ADD COLUMN participant_ids TEXT');
+      await db.execute(
+        'ALTER TABLE conversations ADD COLUMN participant_ids TEXT',
+      );
     } catch (_) {}
     try {
       await db.execute('''
@@ -310,7 +323,11 @@ class DatabaseHelper {
           created_at TEXT NOT NULL
         )
       ''');
-      final existingMain = await db.query('schools', where: 'id = ?', whereArgs: ['sch_main']);
+      final existingMain = await db.query(
+        'schools',
+        where: 'id = ?',
+        whereArgs: ['sch_main'],
+      );
       if (existingMain.isEmpty) {
         await db.insert('schools', {
           'id': 'sch_main',
@@ -323,19 +340,27 @@ class DatabaseHelper {
         });
       }
       try {
-        await db.execute("ALTER TABLE schools ADD COLUMN academic_year TEXT DEFAULT 'AY 2025-2026'");
+        await db.execute(
+          "ALTER TABLE schools ADD COLUMN academic_year TEXT DEFAULT 'AY 2025-2026'",
+        );
       } catch (_) {}
       try {
-        await db.execute("ALTER TABLE schools ADD COLUMN current_semester TEXT DEFAULT '1st Semester'");
+        await db.execute(
+          "ALTER TABLE schools ADD COLUMN current_semester TEXT DEFAULT '1st Semester'",
+        );
       } catch (_) {}
       try {
-        await db.execute("ALTER TABLE schools ADD COLUMN last_archived_at TEXT");
+        await db.execute(
+          "ALTER TABLE schools ADD COLUMN last_archived_at TEXT",
+        );
       } catch (_) {}
       try {
         await db.execute("ALTER TABLE schools ADD COLUMN last_reset_at TEXT");
       } catch (_) {}
       try {
-        await db.execute("ALTER TABLE schools ADD COLUMN archive_checksum TEXT");
+        await db.execute(
+          "ALTER TABLE schools ADD COLUMN archive_checksum TEXT",
+        );
       } catch (_) {}
     } catch (_) {}
     try {
@@ -519,16 +544,24 @@ class DatabaseHelper {
     } catch (_) {}
 
     try {
-      await db.execute("ALTER TABLE users ADD COLUMN school_id TEXT DEFAULT 'sch_main'");
+      await db.execute(
+        "ALTER TABLE users ADD COLUMN school_id TEXT DEFAULT 'sch_main'",
+      );
     } catch (_) {}
     try {
-      await db.execute("ALTER TABLE subjects ADD COLUMN school_id TEXT DEFAULT 'sch_main'");
+      await db.execute(
+        "ALTER TABLE subjects ADD COLUMN school_id TEXT DEFAULT 'sch_main'",
+      );
     } catch (_) {}
     try {
-      await db.execute("ALTER TABLE sections ADD COLUMN school_id TEXT DEFAULT 'sch_main'");
+      await db.execute(
+        "ALTER TABLE sections ADD COLUMN school_id TEXT DEFAULT 'sch_main'",
+      );
     } catch (_) {}
     try {
-      await db.execute("ALTER TABLE announcements ADD COLUMN school_id TEXT DEFAULT 'sch_main'");
+      await db.execute(
+        "ALTER TABLE announcements ADD COLUMN school_id TEXT DEFAULT 'sch_main'",
+      );
     } catch (_) {}
 
     // On Web (in-memory SQLite), fast-restore cached users from localStorage in 0ms on startup
@@ -1062,16 +1095,24 @@ class DatabaseHelper {
     } catch (_) {}
 
     try {
-      await db.execute("ALTER TABLE users ADD COLUMN school_id TEXT DEFAULT 'sch_main'");
+      await db.execute(
+        "ALTER TABLE users ADD COLUMN school_id TEXT DEFAULT 'sch_main'",
+      );
     } catch (_) {}
     try {
-      await db.execute("ALTER TABLE subjects ADD COLUMN school_id TEXT DEFAULT 'sch_main'");
+      await db.execute(
+        "ALTER TABLE subjects ADD COLUMN school_id TEXT DEFAULT 'sch_main'",
+      );
     } catch (_) {}
     try {
-      await db.execute("ALTER TABLE sections ADD COLUMN school_id TEXT DEFAULT 'sch_main'");
+      await db.execute(
+        "ALTER TABLE sections ADD COLUMN school_id TEXT DEFAULT 'sch_main'",
+      );
     } catch (_) {}
     try {
-      await db.execute("ALTER TABLE announcements ADD COLUMN school_id TEXT DEFAULT 'sch_main'");
+      await db.execute(
+        "ALTER TABLE announcements ADD COLUMN school_id TEXT DEFAULT 'sch_main'",
+      );
     } catch (_) {}
 
     // On Web (in-memory SQLite), fast-restore cached users from localStorage in 0ms on startup
@@ -1147,7 +1188,10 @@ class DatabaseHelper {
 
     if (oldVersion < 3) {
       // Purge legacy seeded admin account
-      await db.delete('users', where: "id = 'super_admin_1' OR id = 'admin_1' OR email = 'aira@admin'");
+      await db.delete(
+        'users',
+        where: "id = 'super_admin_1' OR id = 'admin_1' OR email = 'aira@admin'",
+      );
     }
 
     if (oldVersion < 4) {
@@ -1284,7 +1328,6 @@ class DatabaseHelper {
       try {
         await db.execute('ALTER TABLE users ADD COLUMN grade TEXT');
       } catch (_) {}
-
     }
 
     if (oldVersion < 13) {
@@ -1547,19 +1590,29 @@ class DatabaseHelper {
 
     if (oldVersion < 22) {
       try {
-        await db.execute('ALTER TABLE conversations ADD COLUMN section_key TEXT');
+        await db.execute(
+          'ALTER TABLE conversations ADD COLUMN section_key TEXT',
+        );
       } catch (_) {}
       try {
-        await db.execute('ALTER TABLE conversations ADD COLUMN section_id INTEGER');
+        await db.execute(
+          'ALTER TABLE conversations ADD COLUMN section_id INTEGER',
+        );
       } catch (_) {}
       try {
-        await db.execute('ALTER TABLE conversations ADD COLUMN room_admin_id TEXT');
+        await db.execute(
+          'ALTER TABLE conversations ADD COLUMN room_admin_id TEXT',
+        );
       } catch (_) {}
       try {
-        await db.execute('ALTER TABLE conversations ADD COLUMN room_admin_name TEXT');
+        await db.execute(
+          'ALTER TABLE conversations ADD COLUMN room_admin_name TEXT',
+        );
       } catch (_) {}
       try {
-        await db.execute('ALTER TABLE conversations ADD COLUMN participant_ids TEXT');
+        await db.execute(
+          'ALTER TABLE conversations ADD COLUMN participant_ids TEXT',
+        );
       } catch (_) {}
     }
   }
@@ -1604,7 +1657,9 @@ class DatabaseHelper {
     return res.isNotEmpty ? res.first : null;
   }
 
-  Future<Map<String, dynamic>?> getConversationBySectionKey(String sectionKey) async {
+  Future<Map<String, dynamic>?> getConversationBySectionKey(
+    String sectionKey,
+  ) async {
     final cleanKey = sectionKey.trim().toUpperCase();
     if (cleanKey.isEmpty) return null;
     final db = await database;
@@ -1671,18 +1726,14 @@ class DatabaseHelper {
         final welcomeText =
             'Welcome to the official group chat for $sectionName! Moderated by $teacherName (Room Admin). All section announcements, discussions, and updates will be posted here. Only students enrolled with key $cleanKey can access this channel.';
 
-        await db.insert(
-          'messages',
-          {
-            'id': welcomeMsgId,
-            'conversation_id': convId,
-            'sender_id': teacherId.trim(),
-            'text': welcomeText,
-            'created_at': now,
-            'is_read': 1,
-          },
-          conflictAlgorithm: ConflictAlgorithm.ignore,
-        );
+        await db.insert('messages', {
+          'id': welcomeMsgId,
+          'conversation_id': convId,
+          'sender_id': teacherId.trim(),
+          'text': welcomeText,
+          'created_at': now,
+          'is_read': 1,
+        }, conflictAlgorithm: ConflictAlgorithm.ignore);
 
         try {
           await FirestoreService().saveChatMessage(
@@ -1758,7 +1809,10 @@ class DatabaseHelper {
         whereArgs: [cleanKeyOrName.toUpperCase(), cleanKeyOrName.toUpperCase()],
       );
       if (secRows.isNotEmpty) {
-        final secKey = secRows.first['enrollment_key']?.toString().trim().toUpperCase();
+        final secKey = secRows.first['enrollment_key']
+            ?.toString()
+            .trim()
+            .toUpperCase();
         if (secKey != null && secKey.isNotEmpty) {
           convos = await db.query(
             'conversations',
@@ -1770,7 +1824,9 @@ class DatabaseHelper {
     }
 
     if (convos.isEmpty) {
-      debugPrint('[DatabaseHelper] No section chat found for key/name: $cleanKeyOrName');
+      debugPrint(
+        '[DatabaseHelper] No section chat found for key/name: $cleanKeyOrName',
+      );
       return false;
     }
 
@@ -1784,10 +1840,17 @@ class DatabaseHelper {
       try {
         final decoded = jsonDecode(rawParticipants);
         if (decoded is List) {
-          participants = decoded.map((e) => e.toString().trim()).where((e) => e.isNotEmpty).toList();
+          participants = decoded
+              .map((e) => e.toString().trim())
+              .where((e) => e.isNotEmpty)
+              .toList();
         }
       } catch (_) {
-        participants = rawParticipants.split(',').map((e) => e.trim()).where((e) => e.isNotEmpty).toList();
+        participants = rawParticipants
+            .split(',')
+            .map((e) => e.trim())
+            .where((e) => e.isNotEmpty)
+            .toList();
       }
     }
 
@@ -1816,26 +1879,27 @@ class DatabaseHelper {
 
       // Automated announcement when a student joins the section group chat
       try {
-        final studentRow = (await db.query('users', where: 'id = ?', whereArgs: [cleanStudentId])).firstOrNull;
-        final studentName = studentRow?['full_name']?.toString() ??
+        final studentRow = (await db.query(
+          'users',
+          where: 'id = ?',
+          whereArgs: [cleanStudentId],
+        )).firstOrNull;
+        final studentName =
+            studentRow?['full_name']?.toString() ??
             studentRow?['name']?.toString() ??
             'A new student';
         final joinMsgId = 'msg_join_${cleanStudentId}_$convId';
         final now = DateTime.now().toIso8601String();
         final joinText = '$studentName has joined the group chat!';
 
-        await db.insert(
-          'messages',
-          {
-            'id': joinMsgId,
-            'conversation_id': convId,
-            'sender_id': 'system',
-            'text': joinText,
-            'created_at': now,
-            'is_read': 1,
-          },
-          conflictAlgorithm: ConflictAlgorithm.ignore,
-        );
+        await db.insert('messages', {
+          'id': joinMsgId,
+          'conversation_id': convId,
+          'sender_id': 'system',
+          'text': joinText,
+          'created_at': now,
+          'is_read': 1,
+        }, conflictAlgorithm: ConflictAlgorithm.ignore);
 
         await FirestoreService().saveChatMessage(
           conversationId: convId,
@@ -1852,7 +1916,9 @@ class DatabaseHelper {
         );
       } catch (_) {}
 
-      debugPrint('[DatabaseHelper] Student $cleanStudentId successfully joined $convId');
+      debugPrint(
+        '[DatabaseHelper] Student $cleanStudentId successfully joined $convId',
+      );
     }
 
     return true;
@@ -1862,13 +1928,19 @@ class DatabaseHelper {
   Future<void> ensureAllSectionChatsExist() async {
     final db = await database;
     final sections = await db.query('sections');
-    final teachers = await db.query('users', where: "role = 'teacher' OR role = 'admin'");
+    final teachers = await db.query(
+      'users',
+      where: "role = 'teacher' OR role = 'admin'",
+    );
     final defaultTeacher = teachers.isNotEmpty ? teachers.first : null;
 
     for (final sec in sections) {
-      final secId = sec['id'] is int ? sec['id'] as int : int.tryParse(sec['id'].toString()) ?? 1;
+      final secId = sec['id'] is int
+          ? sec['id'] as int
+          : int.tryParse(sec['id'].toString()) ?? 1;
       final secName = sec['name'] as String? ?? 'Section';
-      final secKey = (sec['enrollment_key'] as String?)?.trim().toUpperCase() ?? '';
+      final secKey =
+          (sec['enrollment_key'] as String?)?.trim().toUpperCase() ?? '';
       if (secKey.isEmpty) continue;
 
       final existing = await db.query(
@@ -1905,7 +1977,10 @@ class DatabaseHelper {
 
         if (teacherId.isEmpty && defaultTeacher != null) {
           teacherId = defaultTeacher['id'] as String;
-          teacherName = defaultTeacher['full_name'] as String? ?? defaultTeacher['name'] as String? ?? 'Teacher';
+          teacherName =
+              defaultTeacher['full_name'] as String? ??
+              defaultTeacher['name'] as String? ??
+              'Teacher';
         }
 
         if (teacherId.isNotEmpty) {
@@ -1917,7 +1992,8 @@ class DatabaseHelper {
             teacherName: teacherName,
             grade: sec['grade']?.toString(),
             room: sec['room']?.toString(),
-            isInitialCreation: false, // Never send welcome messages on startup/sync
+            isInitialCreation:
+                false, // Never send welcome messages on startup/sync
           );
         }
       }
@@ -2025,7 +2101,10 @@ class DatabaseHelper {
         final msgId = msg['id']?.toString() ?? '';
         list.removeWhere((item) => item is Map && item['id'] == msgId);
         list.add(Map<String, dynamic>.from(msg));
-        await prefs.setString('local_cached_chat_messages_v1', jsonEncode(list));
+        await prefs.setString(
+          'local_cached_chat_messages_v1',
+          jsonEncode(list),
+        );
       } catch (_) {}
     }
   }
@@ -2151,7 +2230,10 @@ class DatabaseHelper {
     final seenCodes = <String>{};
     final uniqueSubjects = <Map<String, dynamic>>[];
     for (final s in subjects) {
-      final code = (s['subject_code']?.toString() ?? s['name']?.toString() ?? '').trim().toUpperCase();
+      final code =
+          (s['subject_code']?.toString() ?? s['name']?.toString() ?? '')
+              .trim()
+              .toUpperCase();
       if (code.isNotEmpty && !seenCodes.contains(code)) {
         seenCodes.add(code);
         uniqueSubjects.add(s);
@@ -2327,11 +2409,17 @@ class DatabaseHelper {
     // Authoritative Cloud Firestore fallback: Check if key exists in Firestore
     if (section == null) {
       try {
-        final cloudSec = await FirestoreService().getDocument('sections', keyUpper);
+        final cloudSec = await FirestoreService().getDocument(
+          'sections',
+          keyUpper,
+        );
         if (cloudSec != null && cloudSec.isNotEmpty) {
           section = cloudSec;
         } else {
-          final cloudKey = await FirestoreService().getDocument('enrollment_keys', keyUpper);
+          final cloudKey = await FirestoreService().getDocument(
+            'enrollment_keys',
+            keyUpper,
+          );
           if (cloudKey != null && cloudKey.isNotEmpty) {
             final secName = cloudKey['section']?.toString() ?? '';
             section = {
@@ -2352,7 +2440,9 @@ class DatabaseHelper {
     final sectionName = section['name']?.toString() ?? '';
 
     // 3. Find subjects explicitly associated with this section
-    List<Map<String, dynamic>> matchingSubjects = await getSubjectsForSection(sectionName.isNotEmpty ? sectionName : keyUpper);
+    List<Map<String, dynamic>> matchingSubjects = await getSubjectsForSection(
+      sectionName.isNotEmpty ? sectionName : keyUpper,
+    );
     if (matchingSubjects.isEmpty && grade.isNotEmpty) {
       matchingSubjects = await db.query(
         'subjects',
@@ -2439,7 +2529,11 @@ class DatabaseHelper {
           .map((s) => s['subject_code']?.toString().trim().toUpperCase() ?? '')
           .where((c) => c.isNotEmpty)
           .toList();
-      final userRow = (await db.query('users', where: 'id = ?', whereArgs: [studentId])).firstOrNull;
+      final userRow = (await db.query(
+        'users',
+        where: 'id = ?',
+        whereArgs: [studentId],
+      )).firstOrNull;
       final syncPayload = <String, dynamic>{
         'id': studentId,
         'section': sectionName,
@@ -2760,7 +2854,8 @@ class DatabaseHelper {
     }
 
     try {
-      final attemptDocId = 'qa_${studentId}_${quizId ?? loId}_${DateTime.now().millisecondsSinceEpoch}';
+      final attemptDocId =
+          'qa_${studentId}_${quizId ?? loId}_${DateTime.now().millisecondsSinceEpoch}';
       unawaited(
         FirestoreService().saveDocument('quiz_attempts', attemptDocId, {
           'student_id': studentId,
@@ -2777,7 +2872,9 @@ class DatabaseHelper {
         }),
       );
     } catch (e, st) {
-      debugPrint('[DatabaseHelper] recordQuizAttempt Firestore sync error: $e\n$st');
+      debugPrint(
+        '[DatabaseHelper] recordQuizAttempt Firestore sync error: $e\n$st',
+      );
     }
 
     if (isPassed && loId > 0) {
@@ -3080,12 +3177,15 @@ class DatabaseHelper {
   /// Check if any LO in the subject has flashcards
   Future<int> getFlashcardCountForSubject(int subjectId) async {
     final db = await database;
-    final res = await db.rawQuery('''
+    final res = await db.rawQuery(
+      '''
       SELECT COUNT(*) as cnt FROM module_flashcards mf
       INNER JOIN learning_outcomes lo ON mf.lo_id = lo.id
       INNER JOIN topics t ON lo.topic_id = t.id
       WHERE t.subject_id = ?
-    ''', [subjectId]);
+    ''',
+      [subjectId],
+    );
     return Sqflite.firstIntValue(res) ?? 0;
   }
 
@@ -3356,10 +3456,7 @@ class DatabaseHelper {
       final subName = sub.isNotEmpty
           ? sub.first['name'] as String? ?? 'Subject'
           : 'Subject';
-      final cleanSubCode = subCode.replaceAll(
-        RegExp(r'[^a-zA-Z0-9]'),
-        '_',
-      );
+      final cleanSubCode = subCode.replaceAll(RegExp(r'[^a-zA-Z0-9]'), '_');
       final cleanTitle = title.toLowerCase().replaceAll(
         RegExp(r'[^a-z0-9]'),
         '_',
@@ -3415,7 +3512,8 @@ class DatabaseHelper {
     List<dynamic> whereArgs = [];
     if (schoolId != null && schoolId.isNotEmpty) {
       if (schoolId == 'sch_main') {
-        schoolWhere = " AND (u.school_id = 'sch_main' OR u.school_id IS NULL OR u.school_id = '') ";
+        schoolWhere =
+            " AND (u.school_id = 'sch_main' OR u.school_id IS NULL OR u.school_id = '') ";
       } else {
         schoolWhere = " AND u.school_id = ? ";
         whereArgs.add(schoolId);
@@ -3535,8 +3633,13 @@ class DatabaseHelper {
 
       final uRole = (u['role'] as String? ?? '').toLowerCase().trim();
       final uId = (u['id'] as String? ?? '').trim();
-      final effectiveRole = InstitutionalIdHelper.detectRole(uId) ?? (uRole.isNotEmpty ? uRole : 'student');
-      if (role != null && role != 'all' && role.isNotEmpty && effectiveRole != role) {
+      final effectiveRole =
+          InstitutionalIdHelper.detectRole(uId) ??
+          (uRole.isNotEmpty ? uRole : 'student');
+      if (role != null &&
+          role != 'all' &&
+          role.isNotEmpty &&
+          effectiveRole != role) {
         return false;
       }
 
@@ -3618,25 +3721,40 @@ class DatabaseHelper {
     final totalStudents = users.where((u) {
       final r = (u['role'] as String? ?? '').toLowerCase().trim();
       final id = (u['id'] as String? ?? '').trim();
-      return r == 'student' || id.startsWith('S-') || id.startsWith('001-') || id.startsWith('STD_');
+      return r == 'student' ||
+          id.startsWith('S-') ||
+          id.startsWith('001-') ||
+          id.startsWith('STD_');
     }).length;
     final totalTeachers = users.where((u) {
       final r = (u['role'] as String? ?? '').toLowerCase().trim();
       final id = (u['id'] as String? ?? '').trim();
-      return r == 'teacher' || id.startsWith('T-') || id.startsWith('002-') || id.startsWith('TCH_');
+      return r == 'teacher' ||
+          id.startsWith('T-') ||
+          id.startsWith('002-') ||
+          id.startsWith('TCH_');
     }).length;
     final totalAdmins = users.where((u) {
       final r = (u['role'] as String? ?? '').toLowerCase().trim();
       final id = (u['id'] as String? ?? '').trim();
-      return r == 'admin' || r == 'super_admin' || id.startsWith('A-') || id.startsWith('SA-');
+      return r == 'admin' ||
+          r == 'super_admin' ||
+          id.startsWith('A-') ||
+          id.startsWith('SA-');
     }).length;
     final totalSchoolUsers = totalStudents + totalTeachers;
     final totalUsers = totalSchoolUsers;
-    final matchingStudentIds = users.where((u) {
-      final r = (u['role'] as String? ?? '').toLowerCase().trim();
-      final id = (u['id'] as String? ?? '').trim();
-      return r == 'student' || id.startsWith('S-') || id.startsWith('001-') || id.startsWith('STD_');
-    }).map((u) => u['id'] as String).toSet();
+    final matchingStudentIds = users
+        .where((u) {
+          final r = (u['role'] as String? ?? '').toLowerCase().trim();
+          final id = (u['id'] as String? ?? '').trim();
+          return r == 'student' ||
+              id.startsWith('S-') ||
+              id.startsWith('001-') ||
+              id.startsWith('STD_');
+        })
+        .map((u) => u['id'] as String)
+        .toSet();
 
     // 2. Filter Subjects strictly by schoolId
     final allSubjects = await db.query('subjects');
@@ -3669,7 +3787,9 @@ class DatabaseHelper {
 
     // Topics & LOs
     final allTopics = await db.query('topics');
-    final topics = allTopics.where((t) => schoolSubjectIds.contains(t['subject_id'])).toList();
+    final topics = allTopics
+        .where((t) => schoolSubjectIds.contains(t['subject_id']))
+        .toList();
     final topicIds = topics.map((t) => t['id'] as int).toSet();
 
     final allLos = await db.query('learning_outcomes');
@@ -3762,7 +3882,11 @@ class DatabaseHelper {
     for (final u in users) {
       final r = (u['role'] as String? ?? '').toLowerCase().trim();
       final id = (u['id'] as String? ?? '').trim();
-      final isStudent = r == 'student' || id.startsWith('S-') || id.startsWith('001-') || id.startsWith('STD_');
+      final isStudent =
+          r == 'student' ||
+          id.startsWith('S-') ||
+          id.startsWith('001-') ||
+          id.startsWith('STD_');
       if (isStudent) {
         final sec = (u['section'] as String?)?.trim();
         final label = (sec != null && sec.isNotEmpty) ? sec : 'Unassigned';
@@ -3795,17 +3919,20 @@ class DatabaseHelper {
       'announcements',
       orderBy: 'id DESC',
     );
-    final announcements = allAnnouncements.where((a) {
-      if (schoolId != null && schoolId.isNotEmpty) {
-        final aSchool = (a['school_id'] as String? ?? '').trim();
-        if (schoolId == 'sch_main') {
-          if (aSchool.isNotEmpty && aSchool != 'sch_main') return false;
-        } else {
-          if (aSchool != schoolId) return false;
-        }
-      }
-      return true;
-    }).take(5).toList();
+    final announcements = allAnnouncements
+        .where((a) {
+          if (schoolId != null && schoolId.isNotEmpty) {
+            final aSchool = (a['school_id'] as String? ?? '').trim();
+            if (schoolId == 'sch_main') {
+              if (aSchool.isNotEmpty && aSchool != 'sch_main') return false;
+            } else {
+              if (aSchool != schoolId) return false;
+            }
+          }
+          return true;
+        })
+        .take(5)
+        .toList();
 
     // 8. Filtered recent attempts matching all criteria
     final allRecentAttempts = await getAllQuizScores(schoolId: schoolId);
@@ -3887,11 +4014,13 @@ class DatabaseHelper {
   }) async {
     final db = await database;
 
-    String whereClause = "(role = 'student' OR (role IS NULL AND id NOT LIKE 'T-%' AND id NOT LIKE 'A-%' AND id NOT LIKE 'SA-%')) AND (is_archived IS NULL OR is_archived = 0) AND id NOT LIKE 'T-%' AND id NOT LIKE '002-%' AND id NOT LIKE 'TCH_%' AND id NOT LIKE 'A-%' AND id NOT LIKE 'ADM-%' AND id NOT LIKE 'ADMIN_%' AND id NOT LIKE 'SA-%' AND id NOT LIKE 'SA_%'";
+    String whereClause =
+        "(role = 'student' OR (role IS NULL AND id NOT LIKE 'T-%' AND id NOT LIKE 'A-%' AND id NOT LIKE 'SA-%')) AND (is_archived IS NULL OR is_archived = 0) AND id NOT LIKE 'T-%' AND id NOT LIKE '002-%' AND id NOT LIKE 'TCH_%' AND id NOT LIKE 'A-%' AND id NOT LIKE 'ADM-%' AND id NOT LIKE 'ADMIN_%' AND id NOT LIKE 'SA-%' AND id NOT LIKE 'SA_%'";
     List<dynamic> whereArgs = [];
     if (schoolId != null && schoolId.isNotEmpty) {
       if (schoolId == 'sch_main') {
-        whereClause += " AND (school_id = 'sch_main' OR school_id IS NULL OR school_id = '')";
+        whereClause +=
+            " AND (school_id = 'sch_main' OR school_id IS NULL OR school_id = '')";
       } else {
         whereClause += " AND school_id = ?";
         whereArgs.add(schoolId);
@@ -3976,7 +4105,8 @@ class DatabaseHelper {
 
     final users = await db.query(
       'users',
-      where: "role = 'student' AND is_archived = 1 AND id NOT LIKE 'T-%' AND id NOT LIKE '002-%' AND id NOT LIKE 'TCH_%' AND id NOT LIKE 'A-%' AND id NOT LIKE 'ADM-%' AND id NOT LIKE 'ADMIN_%' AND id NOT LIKE 'SA-%' AND id NOT LIKE 'SA_%'",
+      where:
+          "role = 'student' AND is_archived = 1 AND id NOT LIKE 'T-%' AND id NOT LIKE '002-%' AND id NOT LIKE 'TCH_%' AND id NOT LIKE 'A-%' AND id NOT LIKE 'ADM-%' AND id NOT LIKE 'ADMIN_%' AND id NOT LIKE 'SA-%' AND id NOT LIKE 'SA_%'",
       orderBy: 'archived_at DESC, full_name ASC',
     );
     final enrollments = await db.query('enrollments');
@@ -4039,10 +4169,7 @@ class DatabaseHelper {
     final now = DateTime.now().toIso8601String();
     await db.update(
       'users',
-      {
-        'is_archived': 1,
-        'archived_at': now,
-      },
+      {'is_archived': 1, 'archived_at': now},
       where: 'id = ?',
       whereArgs: [studentId],
     );
@@ -4061,7 +4188,10 @@ class DatabaseHelper {
   }) async {
     if (studentIds.isEmpty) return;
     final total = studentIds.length;
-    onProgress?.call(0.1, 'Updating local database records ($total students)...');
+    onProgress?.call(
+      0.1,
+      'Updating local database records ($total students)...',
+    );
 
     final db = await database;
     final now = DateTime.now().toIso8601String();
@@ -4069,22 +4199,24 @@ class DatabaseHelper {
     for (final id in studentIds) {
       batch.update(
         'users',
-        {
-          'is_archived': 1,
-          'archived_at': now,
-        },
+        {'is_archived': 1, 'archived_at': now},
         where: 'id = ?',
         whereArgs: [id],
       );
     }
     await batch.commit(noResult: true);
-    onProgress?.call(0.25, 'Connecting to Cloud Firestore ($total accounts)...');
+    onProgress?.call(
+      0.25,
+      'Connecting to Cloud Firestore ($total accounts)...',
+    );
 
     // Concurrently synchronize Cloud Firestore with granular per-item progress
     int completed = 0;
     const concurrency = 4;
     for (var i = 0; i < studentIds.length; i += concurrency) {
-      final end = (i + concurrency < studentIds.length) ? i + concurrency : studentIds.length;
+      final end = (i + concurrency < studentIds.length)
+          ? i + concurrency
+          : studentIds.length;
       final chunk = studentIds.sublist(i, end);
       await Future.wait(
         chunk.map((id) async {
@@ -4106,7 +4238,10 @@ class DatabaseHelper {
     }
     onProgress?.call(0.95, 'Refreshing student directory...');
     await Future.delayed(const Duration(milliseconds: 100));
-    onProgress?.call(1.0, 'Deactivation complete! ($total students deactivated)');
+    onProgress?.call(
+      1.0,
+      'Deactivation complete! ($total students deactivated)',
+    );
   }
 
   /// Restores an archived student back to the active directory.
@@ -4114,10 +4249,7 @@ class DatabaseHelper {
     final db = await database;
     await db.update(
       'users',
-      {
-        'is_archived': 0,
-        'archived_at': null,
-      },
+      {'is_archived': 0, 'archived_at': null},
       where: 'id = ?',
       whereArgs: [studentId],
     );
@@ -4137,10 +4269,7 @@ class DatabaseHelper {
     for (final id in studentIds) {
       batch.update(
         'users',
-        {
-          'is_archived': 0,
-          'archived_at': null,
-        },
+        {'is_archived': 0, 'archived_at': null},
         where: 'id = ?',
         whereArgs: [id],
       );
@@ -4163,7 +4292,10 @@ class DatabaseHelper {
   }) async {
     if (studentIds.isEmpty) return;
     final total = studentIds.length;
-    onProgress?.call(0.10, 'Purging local student enrollments and records ($total students)...');
+    onProgress?.call(
+      0.10,
+      'Purging local student enrollments and records ($total students)...',
+    );
 
     final db = await database;
     final idToEmail = <String, String>{};
@@ -4184,33 +4316,50 @@ class DatabaseHelper {
     final batch = db.batch();
     for (final id in studentIds) {
       batch.delete('enrollments', where: 'student_id = ?', whereArgs: [id]);
-      batch.delete('student_progress', where: 'student_id = ?', whereArgs: [id]);
+      batch.delete(
+        'student_progress',
+        where: 'student_id = ?',
+        whereArgs: [id],
+      );
       batch.delete('quiz_attempts', where: 'student_id = ?', whereArgs: [id]);
-      batch.delete('quiz_assignments', where: 'student_id = ?', whereArgs: [id]);
+      batch.delete(
+        'quiz_assignments',
+        where: 'student_id = ?',
+        whereArgs: [id],
+      );
       batch.delete('submissions', where: 'student_id = ?', whereArgs: [id]);
       batch.delete('notifications', where: 'user_id = ?', whereArgs: [id]);
       batch.delete('users', where: 'id = ?', whereArgs: [id]);
     }
     await batch.commit(noResult: true);
 
-    onProgress?.call(0.20, 'Revoking system credentials & blacklisting accounts...');
+    onProgress?.call(
+      0.20,
+      'Revoking system credentials & blacklisting accounts...',
+    );
 
     try {
       final prefs = await SharedPreferences.getInstance();
-      final deletedList = prefs.getStringList('permanently_deleted_accounts') ?? [];
+      final deletedList =
+          prefs.getStringList('permanently_deleted_accounts') ?? [];
       for (final id in studentIds) {
         if (!deletedList.contains(id)) deletedList.add(id);
       }
       await prefs.setStringList('permanently_deleted_accounts', deletedList);
     } catch (_) {}
 
-    onProgress?.call(0.25, 'Connecting to Cloud Firestore ($total accounts)...');
+    onProgress?.call(
+      0.25,
+      'Connecting to Cloud Firestore ($total accounts)...',
+    );
 
     // Concurrently purge Cloud Firestore with granular per-item progress tracking
     int completed = 0;
     const concurrency = 4;
     for (var i = 0; i < studentIds.length; i += concurrency) {
-      final end = (i + concurrency < studentIds.length) ? i + concurrency : studentIds.length;
+      final end = (i + concurrency < studentIds.length)
+          ? i + concurrency
+          : studentIds.length;
       final chunk = studentIds.sublist(i, end);
       await Future.wait(
         chunk.map((id) async {
@@ -4221,7 +4370,9 @@ class DatabaseHelper {
           final ratio = completed / total;
           final progressVal = 0.25 + (0.65 * ratio); // Scales 25% -> 90%
           final email = idToEmail[id];
-          final displayTarget = (email != null && email.isNotEmpty) ? email : id;
+          final displayTarget = (email != null && email.isNotEmpty)
+              ? email
+              : id;
           onProgress?.call(
             progressVal,
             'Purged Cloud Firestore ($completed of $total: $displayTarget)',
@@ -4230,7 +4381,10 @@ class DatabaseHelper {
       );
     }
 
-    onProgress?.call(0.95, 'Synchronizing school registry & invalidating cache...');
+    onProgress?.call(
+      0.95,
+      'Synchronizing school registry & invalidating cache...',
+    );
     await Future.delayed(const Duration(milliseconds: 150));
     onProgress?.call(1.0, 'Purge complete! ($total student records removed)');
   }
@@ -4354,10 +4508,14 @@ class DatabaseHelper {
     // 6. Delete user record
     await db.delete('users', where: 'id = ?', whereArgs: [studentId]);
 
-    onProgress?.call(0.35, 'Revoking student credentials & blacklisting account...');
+    onProgress?.call(
+      0.35,
+      'Revoking student credentials & blacklisting account...',
+    );
     try {
       final prefs = await SharedPreferences.getInstance();
-      final deletedList = prefs.getStringList('permanently_deleted_accounts') ?? [];
+      final deletedList =
+          prefs.getStringList('permanently_deleted_accounts') ?? [];
       if (!deletedList.contains(studentId)) {
         deletedList.add(studentId);
         await prefs.setStringList('permanently_deleted_accounts', deletedList);
@@ -4365,7 +4523,10 @@ class DatabaseHelper {
     } catch (_) {}
 
     final targetDesc = (email != null && email.isNotEmpty) ? email : studentId;
-    onProgress?.call(0.60, 'Purging Cloud Firestore records for $targetDesc...');
+    onProgress?.call(
+      0.60,
+      'Purging Cloud Firestore records for $targetDesc...',
+    );
 
     // 7. Delete from Cloud Firestore
     try {
@@ -4385,7 +4546,10 @@ class DatabaseHelper {
       );
     }
 
-    onProgress?.call(0.95, 'Synchronizing student registry & invalidating cache...');
+    onProgress?.call(
+      0.95,
+      'Synchronizing student registry & invalidating cache...',
+    );
     await Future.delayed(const Duration(milliseconds: 150));
     onProgress?.call(1.0, 'Student record purged successfully!');
   }
@@ -4425,12 +4589,13 @@ class DatabaseHelper {
       final rawId = (row['id'] as String? ?? '').trim();
       final detectedRole = InstitutionalIdHelper.detectRole(rawId);
       final rawRole = (row['role'] as String? ?? '').trim().toLowerCase();
-      final role = detectedRole ??
+      final role =
+          detectedRole ??
           ((rawRole == 'teacher' ||
-              rawRole == 'admin' ||
-              rawRole == 'super_admin')
-          ? rawRole
-          : 'student');
+                  rawRole == 'admin' ||
+                  rawRole == 'super_admin')
+              ? rawRole
+              : 'student');
       final rawSection = (row['section'] as String? ?? '').trim();
       final rawGrade = (row['grade'] as String? ?? '').trim();
       final studentType = (row['student_type'] as String? ?? 'regular')
@@ -4755,12 +4920,15 @@ class DatabaseHelper {
     final db = await database;
     try {
       final rowsRaw = await db.query('reg_links', orderBy: 'created_at DESC');
-      final List<Map<String, dynamic>> rows = rowsRaw.map((r) => Map<String, dynamic>.from(r)).toList();
+      final List<Map<String, dynamic>> rows = rowsRaw
+          .map((r) => Map<String, dynamic>.from(r))
+          .toList();
       final sections = await db.query('sections');
       final students = await db.query(
         'users',
         columns: ['id', 'section', 'grade'],
-        where: "(role = 'student' OR id LIKE 'S-%' OR id LIKE '003-%' OR id LIKE 'STU_%') AND (is_archived IS NULL OR is_archived = 0)",
+        where:
+            "(role = 'student' OR id LIKE 'S-%' OR id LIKE '003-%' OR id LIKE 'STU_%') AND (is_archived IS NULL OR is_archived = 0)",
       );
 
       final Map<String, String> sectionGradeMap = {};
@@ -4778,8 +4946,14 @@ class DatabaseHelper {
         }
       }
 
-      final existingSectionNames = rows.map((r) => (r['section'] as String?)?.trim().toLowerCase()).whereType<String>().toSet();
-      final existingCodes = rows.map((r) => (r['code'] as String?)?.trim().toUpperCase()).whereType<String>().toSet();
+      final existingSectionNames = rows
+          .map((r) => (r['section'] as String?)?.trim().toLowerCase())
+          .whereType<String>()
+          .toSet();
+      final existingCodes = rows
+          .map((r) => (r['code'] as String?)?.trim().toUpperCase())
+          .whereType<String>()
+          .toSet();
 
       // Ensure EVERY active section in the school has an enrollment key visible, even if 0 students are enrolled
       for (final s in sections) {
@@ -4789,10 +4963,15 @@ class DatabaseHelper {
         final rawKey = s['enrollment_key']?.toString().trim().toUpperCase();
         final code = (rawKey != null && rawKey.isNotEmpty)
             ? rawKey
-            : SectionKeyHelper.generateKey(sectionName: secName, gradeLevel: s['grade']?.toString());
+            : SectionKeyHelper.generateKey(
+                sectionName: secName,
+                gradeLevel: s['grade']?.toString(),
+              );
 
-        if (!existingSectionNames.contains(secLower) && !existingCodes.contains(code)) {
-          final maxUses = int.tryParse(s['max_students']?.toString() ?? '50') ?? 50;
+        if (!existingSectionNames.contains(secLower) &&
+            !existingCodes.contains(code)) {
+          final maxUses =
+              int.tryParse(s['max_students']?.toString() ?? '50') ?? 50;
           final fallbackRow = {
             'code': code,
             'section': secName,
@@ -4806,7 +4985,13 @@ class DatabaseHelper {
           existingCodes.add(code);
 
           // Persist synthesized key into SQLite reg_links so it is immediately cached
-          db.insert('reg_links', fallbackRow, conflictAlgorithm: ConflictAlgorithm.replace).catchError((_) => 0);
+          db
+              .insert(
+                'reg_links',
+                fallbackRow,
+                conflictAlgorithm: ConflictAlgorithm.replace,
+              )
+              .catchError((_) => 0);
         }
       }
 
@@ -4830,7 +5015,8 @@ class DatabaseHelper {
         // Calculate real live enrolled students from users table
         int liveStudentCount = 0;
         for (final stu in students) {
-          final stuSec = (stu['section'] as String?)?.trim().toLowerCase() ?? '';
+          final stuSec =
+              (stu['section'] as String?)?.trim().toLowerCase() ?? '';
           if (stuSec.isEmpty) continue;
 
           final cleanStuSec = stuSec
@@ -4852,19 +5038,24 @@ class DatabaseHelper {
         final sectionTableCount = sectionStudentCountMap[secLower] ?? 0;
 
         // Effective count is the maximum of live students, section cached count, and stored counter
-        final effectiveUsed = [liveStudentCount, sectionTableCount, storedUsed]
-            .reduce((a, b) => a > b ? a : b);
+        final effectiveUsed = [
+          liveStudentCount,
+          sectionTableCount,
+          storedUsed,
+        ].reduce((a, b) => a > b ? a : b);
 
         // Keep local SQLite reg_links updated if out of sync
         if (effectiveUsed != storedUsed) {
           final code = r['code']?.toString();
           if (code != null && code.isNotEmpty) {
-            db.update(
-              'reg_links',
-              {'used_count': effectiveUsed},
-              where: 'code = ?',
-              whereArgs: [code],
-            ).catchError((_) => 0);
+            db
+                .update(
+                  'reg_links',
+                  {'used_count': effectiveUsed},
+                  where: 'code = ?',
+                  whereArgs: [code],
+                )
+                .catchError((_) => 0);
           }
         }
 
@@ -4907,24 +5098,34 @@ class DatabaseHelper {
 
     // Ensure fake admin accounts are completely purged from database
     try {
-      await db.delete('users', where: "id = 'admin_1' OR id = 'super_admin_1' OR email = 'aira@admin'");
+      await db.delete(
+        'users',
+        where: "id = 'admin_1' OR id = 'super_admin_1' OR email = 'aira@admin'",
+      );
     } catch (_) {}
 
     // Ensure permanently_deleted_accounts only holds legitimate deleted IDs and NEVER holds email addresses
     try {
       final prefs = await SharedPreferences.getInstance();
-      final deletedList = prefs.getStringList('permanently_deleted_accounts') ?? [];
-      final cleanedList = deletedList.where((item) => !item.contains('@')).toList();
+      final deletedList =
+          prefs.getStringList('permanently_deleted_accounts') ?? [];
+      final cleanedList = deletedList
+          .where((item) => !item.contains('@'))
+          .toList();
       if (cleanedList.length != deletedList.length) {
         await prefs.setStringList('permanently_deleted_accounts', cleanedList);
       }
       final delQ = prefs.getStringList('permanently_deleted_quizzes') ?? [];
-      final cleanedQ = delQ.where((item) => !RegExp(r'^\d+$').hasMatch(item)).toList();
+      final cleanedQ = delQ
+          .where((item) => !RegExp(r'^\d+$').hasMatch(item))
+          .toList();
       if (cleanedQ.length != delQ.length) {
         await prefs.setStringList('permanently_deleted_quizzes', cleanedQ);
       }
       final delA = prefs.getStringList('permanently_deleted_assignments') ?? [];
-      final cleanedA = delA.where((item) => !RegExp(r'^\d+$').hasMatch(item)).toList();
+      final cleanedA = delA
+          .where((item) => !RegExp(r'^\d+$').hasMatch(item))
+          .toList();
       if (cleanedA.length != delA.length) {
         await prefs.setStringList('permanently_deleted_assignments', cleanedA);
       }
@@ -4932,14 +5133,19 @@ class DatabaseHelper {
 
     // Ensure demo accounts (admin_2, teacher_1, student_1) are permanently purged from local database
     try {
-      await db.delete('users', where: "id IN ('admin_2', 'teacher_1', 'student_1') OR email IN ('admin@aira.edu', 'john.reyes@deped.gov.ph', 'maria@test.com')");
+      await db.delete(
+        'users',
+        where:
+            "id IN ('admin_2', 'teacher_1', 'student_1') OR email IN ('admin@aira.edu', 'john.reyes@deped.gov.ph', 'maria@test.com')",
+      );
     } catch (_) {}
 
     // Ensure evangelistachristian88@gmail.com exists as Primary Root Super Administrator
     try {
       final existingChristian = await db.query(
         'users',
-        where: "LOWER(email) = ? OR id = 'SA-000-0001' OR id = 'super_admin_christian'",
+        where:
+            "LOWER(email) = ? OR id = 'SA-000-0001' OR id = 'super_admin_christian'",
         whereArgs: ['evangelistachristian88@gmail.com'],
       );
       final saltChristian = generateSalt();
@@ -4960,7 +5166,10 @@ class DatabaseHelper {
       } else {
         final currentSalt = existingChristian.first['password_salt'] as String?;
         final currentPass = existingChristian.first['password'] as String?;
-        if (currentSalt == null || currentSalt.isEmpty || currentPass == null || currentPass.isEmpty) {
+        if (currentSalt == null ||
+            currentSalt.isEmpty ||
+            currentPass == null ||
+            currentPass.isEmpty) {
           await db.update(
             'users',
             {
@@ -4972,7 +5181,8 @@ class DatabaseHelper {
               'password_salt': saltChristian,
               'profile_image': 'assets/images/aira_mascot_logo.png',
             },
-            where: "LOWER(email) = ? OR id = 'super_admin_christian' OR id = 'SA-000-0001'",
+            where:
+                "LOWER(email) = ? OR id = 'super_admin_christian' OR id = 'SA-000-0001'",
             whereArgs: ['evangelistachristian88@gmail.com'],
           );
         } else {
@@ -4985,7 +5195,8 @@ class DatabaseHelper {
               'full_name': 'Christian Evangelista',
               'profile_image': 'assets/images/aira_mascot_logo.png',
             },
-            where: "LOWER(email) = ? OR id = 'super_admin_christian' OR id = 'SA-000-0001'",
+            where:
+                "LOWER(email) = ? OR id = 'super_admin_christian' OR id = 'SA-000-0001'",
             whereArgs: ['evangelistachristian88@gmail.com'],
           );
         }
@@ -5001,7 +5212,8 @@ class DatabaseHelper {
     try {
       await db.delete(
         'users',
-        where: "id IN ('teacher_1', 'teacher_test_1', 'student_1', 'student_2', 'student_3', 'student_4') OR email IN ('john.reyes@deped.gov.ph', 'teacher1@aira.edu', 'maria@test.com')",
+        where:
+            "id IN ('teacher_1', 'teacher_test_1', 'student_1', 'student_2', 'student_3', 'student_4') OR email IN ('john.reyes@deped.gov.ph', 'teacher1@aira.edu', 'maria@test.com')",
       );
     } catch (_) {}
 
@@ -5033,27 +5245,57 @@ class DatabaseHelper {
 
     // Purge mock sections
     try {
-      await db.delete('sections', where: "enrollment_key IN ('SEC-EMR10', 'SEC-STEM11', 'SEC-GOLD12') OR name IN ('Grade 10 - Emerald', 'Grade 11 - STEM B', 'Grade 12 - Gold')");
-      await db.delete('reg_links', where: "code IN ('SEC-EMR10', 'SEC-STEM11', 'SEC-GOLD12')");
+      await db.delete(
+        'sections',
+        where:
+            "enrollment_key IN ('SEC-EMR10', 'SEC-STEM11', 'SEC-GOLD12') OR name IN ('Grade 10 - Emerald', 'Grade 11 - STEM B', 'Grade 12 - Gold')",
+      );
+      await db.delete(
+        'reg_links',
+        where: "code IN ('SEC-EMR10', 'SEC-STEM11', 'SEC-GOLD12')",
+      );
     } catch (_) {}
 
     // Purge mock quizzes, assignments
     try {
-      await db.delete('quizzes', where: "title LIKE '%Midterm Quiz Assessment%'");
-      await db.delete('assignments', where: "title LIKE '%Final Project: Flutter Migration%'");
+      await db.delete(
+        'quizzes',
+        where: "title LIKE '%Midterm Quiz Assessment%'",
+      );
+      await db.delete(
+        'assignments',
+        where: "title LIKE '%Final Project: Flutter Migration%'",
+      );
     } catch (_) {}
 
     // Ensure mock student seeds are permanently purged
     try {
       await db.delete(
         'users',
-        where: "id IN ('student_1', 'student_2', 'student_3', 'student_4') OR email IN ('maria@test.com', 'juan.delacruz@school.edu', 'angela.santos@school.edu', 'mark.bautista@school.edu')",
+        where:
+            "id IN ('student_1', 'student_2', 'student_3', 'student_4') OR email IN ('maria@test.com', 'juan.delacruz@school.edu', 'angela.santos@school.edu', 'mark.bautista@school.edu')",
       );
       for (final sid in ['student_1', 'student_2', 'student_3', 'student_4']) {
-        await db.delete('enrollments', where: 'student_id = ?', whereArgs: [sid]);
-        await db.delete('student_progress', where: 'student_id = ?', whereArgs: [sid]);
-        await db.delete('quiz_attempts', where: 'student_id = ?', whereArgs: [sid]);
-        await db.delete('submissions', where: 'student_id = ?', whereArgs: [sid]);
+        await db.delete(
+          'enrollments',
+          where: 'student_id = ?',
+          whereArgs: [sid],
+        );
+        await db.delete(
+          'student_progress',
+          where: 'student_id = ?',
+          whereArgs: [sid],
+        );
+        await db.delete(
+          'quiz_attempts',
+          where: 'student_id = ?',
+          whereArgs: [sid],
+        );
+        await db.delete(
+          'submissions',
+          where: 'student_id = ?',
+          whereArgs: [sid],
+        );
       }
     } catch (_) {}
 
@@ -5063,7 +5305,8 @@ class DatabaseHelper {
       final allStudents = await db.query(
         'users',
         columns: ['section'],
-        where: "(role = 'student' OR id LIKE 'S-%' OR id LIKE '003-%' OR id LIKE 'STU_%') AND (is_archived IS NULL OR is_archived = 0)",
+        where:
+            "(role = 'student' OR id LIKE 'S-%' OR id LIKE '003-%' OR id LIKE 'STU_%') AND (is_archived IS NULL OR is_archived = 0)",
       );
 
       for (final s in allSecs) {
@@ -5077,7 +5320,8 @@ class DatabaseHelper {
 
           int count = 0;
           for (final stu in allStudents) {
-            final stuSec = (stu['section'] as String?)?.trim().toLowerCase() ?? '';
+            final stuSec =
+                (stu['section'] as String?)?.trim().toLowerCase() ?? '';
             if (stuSec.isEmpty) continue;
             final cleanStuSec = stuSec
                 .replaceAll(RegExp(r'^grade\s*\d+\s*[-–—]\s*'), '')
@@ -5093,7 +5337,12 @@ class DatabaseHelper {
               count++;
             }
           }
-          await db.update('sections', {'student_count': count}, where: 'id = ?', whereArgs: [s['id']]);
+          await db.update(
+            'sections',
+            {'student_count': count},
+            where: 'id = ?',
+            whereArgs: [s['id']],
+          );
         }
       }
     } catch (_) {}
@@ -5133,10 +5382,16 @@ class DatabaseHelper {
       final allSubs = await db.query('subjects', orderBy: 'id ASC');
       final seenCodes = <String, Map<String, dynamic>>{};
       for (final s in allSubs) {
-        final code = (s['subject_code']?.toString() ?? s['name']?.toString() ?? '').trim().toUpperCase();
+        final code =
+            (s['subject_code']?.toString() ?? s['name']?.toString() ?? '')
+                .trim()
+                .toUpperCase();
         if (code.isEmpty) continue;
         final subId = s['id'] as int;
-        final countRes = await db.rawQuery('SELECT COUNT(*) as cnt FROM enrollments WHERE subject_id = ?', [subId]);
+        final countRes = await db.rawQuery(
+          'SELECT COUNT(*) as cnt FROM enrollments WHERE subject_id = ?',
+          [subId],
+        );
         final cnt = (countRes.first['cnt'] as num?)?.toInt() ?? 0;
         final current = {...s, '_cnt': cnt};
 
@@ -5148,11 +5403,33 @@ class DatabaseHelper {
           final keepId = existingCnt >= cnt ? existingId : subId;
           final deleteId = existingCnt >= cnt ? subId : existingId;
 
-          await db.rawUpdate('UPDATE OR IGNORE enrollments SET subject_id = ? WHERE subject_id = ?', [keepId, deleteId]);
-          await db.delete('enrollments', where: 'subject_id = ?', whereArgs: [deleteId]);
-          await db.update('assignments', {'subject_id': keepId}, where: 'subject_id = ?', whereArgs: [deleteId]);
-          await db.update('quizzes', {'subject_id': keepId}, where: 'subject_id = ?', whereArgs: [deleteId]);
-          await db.update('topics', {'subject_id': keepId}, where: 'subject_id = ?', whereArgs: [deleteId]);
+          await db.rawUpdate(
+            'UPDATE OR IGNORE enrollments SET subject_id = ? WHERE subject_id = ?',
+            [keepId, deleteId],
+          );
+          await db.delete(
+            'enrollments',
+            where: 'subject_id = ?',
+            whereArgs: [deleteId],
+          );
+          await db.update(
+            'assignments',
+            {'subject_id': keepId},
+            where: 'subject_id = ?',
+            whereArgs: [deleteId],
+          );
+          await db.update(
+            'quizzes',
+            {'subject_id': keepId},
+            where: 'subject_id = ?',
+            whereArgs: [deleteId],
+          );
+          await db.update(
+            'topics',
+            {'subject_id': keepId},
+            where: 'subject_id = ?',
+            whereArgs: [deleteId],
+          );
           await db.delete('subjects', where: 'id = ?', whereArgs: [deleteId]);
 
           if (keepId == subId) {
@@ -5178,7 +5455,8 @@ class DatabaseHelper {
       if (schoolId == 'sch_main') {
         return await db.query(
           'sections',
-          where: "school_id = 'sch_main' OR school_id IS NULL OR school_id = ''",
+          where:
+              "school_id = 'sch_main' OR school_id IS NULL OR school_id = ''",
           orderBy: 'id DESC',
         );
       }
@@ -5215,11 +5493,13 @@ class DatabaseHelper {
   // ── Teachers & Faculty Management ────────────────────────
   Future<List<Map<String, dynamic>>> getTeachersList({String? schoolId}) async {
     final db = await database;
-    String whereClause = "(role = 'teacher' OR id LIKE 'T-%' OR id LIKE '002-%' OR id LIKE 'TCH_%') AND (is_archived IS NULL OR is_archived = 0)";
+    String whereClause =
+        "(role = 'teacher' OR id LIKE 'T-%' OR id LIKE '002-%' OR id LIKE 'TCH_%') AND (is_archived IS NULL OR is_archived = 0)";
     List<dynamic> whereArgs = [];
     if (schoolId != null && schoolId.isNotEmpty) {
       if (schoolId == 'sch_main') {
-        whereClause += " AND (school_id = 'sch_main' OR school_id IS NULL OR school_id = '')";
+        whereClause +=
+            " AND (school_id = 'sch_main' OR school_id IS NULL OR school_id = '')";
       } else {
         whereClause += " AND school_id = ?";
         whereArgs.add(schoolId);
@@ -5272,7 +5552,8 @@ class DatabaseHelper {
     final db = await database;
     final teachers = await db.query(
       'users',
-      where: "(role = 'teacher' OR id LIKE 'T-%' OR id LIKE '002-%' OR id LIKE 'TCH_%') AND is_archived = 1",
+      where:
+          "(role = 'teacher' OR id LIKE 'T-%' OR id LIKE '002-%' OR id LIKE 'TCH_%') AND is_archived = 1",
       orderBy: 'archived_at DESC, full_name ASC',
     );
 
@@ -5316,10 +5597,7 @@ class DatabaseHelper {
     final now = DateTime.now().toIso8601String();
     await db.update(
       'users',
-      {
-        'is_archived': 1,
-        'archived_at': now,
-      },
+      {'is_archived': 1, 'archived_at': now},
       where: 'id = ?',
       whereArgs: [teacherId],
     );
@@ -5346,22 +5624,24 @@ class DatabaseHelper {
     for (final id in teacherIds) {
       batch.update(
         'users',
-        {
-          'is_archived': 1,
-          'archived_at': now,
-        },
+        {'is_archived': 1, 'archived_at': now},
         where: 'id = ?',
         whereArgs: [id],
       );
     }
     await batch.commit(noResult: true);
-    onProgress?.call(0.25, 'Connecting to Cloud Firestore ($total accounts)...');
+    onProgress?.call(
+      0.25,
+      'Connecting to Cloud Firestore ($total accounts)...',
+    );
 
     // Concurrently synchronize Cloud Firestore with granular per-item progress
     int completed = 0;
     const concurrency = 4;
     for (var i = 0; i < teacherIds.length; i += concurrency) {
-      final end = (i + concurrency < teacherIds.length) ? i + concurrency : teacherIds.length;
+      final end = (i + concurrency < teacherIds.length)
+          ? i + concurrency
+          : teacherIds.length;
       final chunk = teacherIds.sublist(i, end);
       await Future.wait(
         chunk.map((id) async {
@@ -5383,7 +5663,10 @@ class DatabaseHelper {
     }
     onProgress?.call(0.95, 'Refreshing faculty directory...');
     await Future.delayed(const Duration(milliseconds: 100));
-    onProgress?.call(1.0, 'Deactivation complete! ($total members deactivated)');
+    onProgress?.call(
+      1.0,
+      'Deactivation complete! ($total members deactivated)',
+    );
   }
 
   /// Restores an archived teacher back to the active faculty directory.
@@ -5391,10 +5674,7 @@ class DatabaseHelper {
     final db = await database;
     await db.update(
       'users',
-      {
-        'is_archived': 0,
-        'archived_at': null,
-      },
+      {'is_archived': 0, 'archived_at': null},
       where: 'id = ?',
       whereArgs: [teacherId],
     );
@@ -5414,10 +5694,7 @@ class DatabaseHelper {
     for (final id in teacherIds) {
       batch.update(
         'users',
-        {
-          'is_archived': 0,
-          'archived_at': null,
-        },
+        {'is_archived': 0, 'archived_at': null},
         where: 'id = ?',
         whereArgs: [id],
       );
@@ -5440,7 +5717,10 @@ class DatabaseHelper {
   }) async {
     if (teacherIds.isEmpty) return;
     final total = teacherIds.length;
-    onProgress?.call(0.10, 'Unassigning subjects and preparing purge ($total members)...');
+    onProgress?.call(
+      0.10,
+      'Unassigning subjects and preparing purge ($total members)...',
+    );
 
     final db = await database;
     final idToEmail = <String, String>{};
@@ -5470,24 +5750,33 @@ class DatabaseHelper {
     }
     await batch.commit(noResult: true);
 
-    onProgress?.call(0.20, 'Revoking system credentials & blacklisting accounts...');
+    onProgress?.call(
+      0.20,
+      'Revoking system credentials & blacklisting accounts...',
+    );
 
     try {
       final prefs = await SharedPreferences.getInstance();
-      final deletedList = prefs.getStringList('permanently_deleted_accounts') ?? [];
+      final deletedList =
+          prefs.getStringList('permanently_deleted_accounts') ?? [];
       for (final id in teacherIds) {
         if (!deletedList.contains(id)) deletedList.add(id);
       }
       await prefs.setStringList('permanently_deleted_accounts', deletedList);
     } catch (_) {}
 
-    onProgress?.call(0.25, 'Connecting to Cloud Firestore ($total accounts)...');
+    onProgress?.call(
+      0.25,
+      'Connecting to Cloud Firestore ($total accounts)...',
+    );
 
     // Concurrently purge Cloud Firestore with granular per-item progress tracking
     int completed = 0;
     const concurrency = 4;
     for (var i = 0; i < teacherIds.length; i += concurrency) {
-      final end = (i + concurrency < teacherIds.length) ? i + concurrency : teacherIds.length;
+      final end = (i + concurrency < teacherIds.length)
+          ? i + concurrency
+          : teacherIds.length;
       final chunk = teacherIds.sublist(i, end);
       await Future.wait(
         chunk.map((id) async {
@@ -5498,7 +5787,9 @@ class DatabaseHelper {
           final ratio = completed / total;
           final progressVal = 0.25 + (0.65 * ratio); // Scales 25% -> 90%
           final email = idToEmail[id];
-          final displayTarget = (email != null && email.isNotEmpty) ? email : id;
+          final displayTarget = (email != null && email.isNotEmpty)
+              ? email
+              : id;
           onProgress?.call(
             progressVal,
             'Purged Cloud Firestore ($completed of $total: $displayTarget)',
@@ -5507,7 +5798,10 @@ class DatabaseHelper {
       );
     }
 
-    onProgress?.call(0.95, 'Synchronizing school registry & invalidating cache...');
+    onProgress?.call(
+      0.95,
+      'Synchronizing school registry & invalidating cache...',
+    );
     await Future.delayed(const Duration(milliseconds: 150));
     onProgress?.call(1.0, 'Purge complete! ($total faculty members removed)');
   }
@@ -5531,7 +5825,12 @@ class DatabaseHelper {
       final cachedStr = prefs.getString('local_cached_users_v1');
       if (cachedStr != null && cachedStr.isNotEmpty) {
         final List<dynamic> decoded = jsonDecode(cachedStr);
-        final found = decoded.any((e) => e is Map && (e['id']?.toString() ?? '').toUpperCase() == cleanId.toUpperCase());
+        final found = decoded.any(
+          (e) =>
+              e is Map &&
+              (e['id']?.toString() ?? '').toUpperCase() ==
+                  cleanId.toUpperCase(),
+        );
         if (found) return true;
       }
     } catch (_) {}
@@ -5735,9 +6034,14 @@ class DatabaseHelper {
       } catch (_) {}
     }
 
-    final detectedExistingRole = existingId != null ? InstitutionalIdHelper.detectRole(existingId) : null;
-    final detectedProposedRole = id != null ? InstitutionalIdHelper.detectRole(id) : null;
-    if (detectedProposedRole == 'student' || (detectedProposedRole == null && detectedExistingRole == 'student')) {
+    final detectedExistingRole = existingId != null
+        ? InstitutionalIdHelper.detectRole(existingId)
+        : null;
+    final detectedProposedRole = id != null
+        ? InstitutionalIdHelper.detectRole(id)
+        : null;
+    if (detectedProposedRole == 'student' ||
+        (detectedProposedRole == null && detectedExistingRole == 'student')) {
       throw Exception(
         'Cannot register account "$cleanEmail" as teacher: ID "${id ?? existingId}" is a student identifier.',
       );
@@ -5781,10 +6085,12 @@ class DatabaseHelper {
     // Clear any previous tombstone in SharedPreferences so newly created accounts are never blocked
     try {
       final prefs = await SharedPreferences.getInstance();
-      final deletedList = prefs.getStringList('permanently_deleted_accounts') ?? [];
+      final deletedList =
+          prefs.getStringList('permanently_deleted_accounts') ?? [];
       deletedList.remove(finalTeacherId);
       deletedList.remove(cleanEmail);
-      if (resolvedUsername.isNotEmpty) deletedList.remove(resolvedUsername.toLowerCase());
+      if (resolvedUsername.isNotEmpty)
+        deletedList.remove(resolvedUsername.toLowerCase());
       await prefs.setStringList('permanently_deleted_accounts', deletedList);
     } catch (_) {}
 
@@ -5837,18 +6143,25 @@ class DatabaseHelper {
     }
 
     unawaited(
-      EmailService().sendAccountCredentials(
-        toEmail: email.trim(),
-        fullName: fullName.trim(),
-        userId: finalTeacherId,
-        username: resolvedUsername,
-        plainPassword: password,
-        role: 'teacher',
-      ).then((res) {
-        debugPrint('[DatabaseHelper] Teacher credentials email dispatched: ${res.success}');
-      }).catchError((e) {
-        debugPrint('[DatabaseHelper] Error dispatching teacher credentials email: $e');
-      }),
+      EmailService()
+          .sendAccountCredentials(
+            toEmail: email.trim(),
+            fullName: fullName.trim(),
+            userId: finalTeacherId,
+            username: resolvedUsername,
+            plainPassword: password,
+            role: 'teacher',
+          )
+          .then((res) {
+            debugPrint(
+              '[DatabaseHelper] Teacher credentials email dispatched: ${res.success}',
+            );
+          })
+          .catchError((e) {
+            debugPrint(
+              '[DatabaseHelper] Error dispatching teacher credentials email: $e',
+            );
+          }),
     );
 
     return finalTeacherId;
@@ -5893,8 +6206,12 @@ class DatabaseHelper {
       } catch (_) {}
     }
 
-    final detectedExistingRole = existingId != null ? InstitutionalIdHelper.detectRole(existingId) : null;
-    final detectedProposedRole = id != null ? InstitutionalIdHelper.detectRole(id) : null;
+    final detectedExistingRole = existingId != null
+        ? InstitutionalIdHelper.detectRole(existingId)
+        : null;
+    final detectedProposedRole = id != null
+        ? InstitutionalIdHelper.detectRole(id)
+        : null;
     if (detectedProposedRole == 'teacher' ||
         detectedProposedRole == 'admin' ||
         detectedProposedRole == 'super_admin' ||
@@ -5931,7 +6248,9 @@ class DatabaseHelper {
               : fullName.trim().toLowerCase().replaceAll(' ', '.'));
 
     final cleanFullName = fullName.trim();
-    final firstName = cleanFullName.split(' ').where((s) => s.isNotEmpty).firstOrNull ?? cleanFullName;
+    final firstName =
+        cleanFullName.split(' ').where((s) => s.isNotEmpty).firstOrNull ??
+        cleanFullName;
 
     final studentData = {
       'id': finalStudentId,
@@ -5971,10 +6290,12 @@ class DatabaseHelper {
     // Clear any previous tombstone in SharedPreferences so newly created accounts are never blocked
     try {
       final prefs = await SharedPreferences.getInstance();
-      final deletedList = prefs.getStringList('permanently_deleted_accounts') ?? [];
+      final deletedList =
+          prefs.getStringList('permanently_deleted_accounts') ?? [];
       deletedList.remove(finalStudentId);
       deletedList.remove(cleanEmail);
-      if (resolvedUsername.isNotEmpty) deletedList.remove(resolvedUsername.toLowerCase());
+      if (resolvedUsername.isNotEmpty)
+        deletedList.remove(resolvedUsername.toLowerCase());
       await prefs.setStringList('permanently_deleted_accounts', deletedList);
     } catch (_) {}
 
@@ -6033,21 +6354,28 @@ class DatabaseHelper {
     }
 
     unawaited(
-      EmailService().sendAccountCredentials(
-        toEmail: email.trim(),
-        fullName: fullName.trim(),
-        userId: finalStudentId,
-        username: resolvedUsername,
-        plainPassword: password,
-        role: 'student',
-        grade: grade,
-        section: section,
-        specialNotes: specialNotes,
-      ).then((res) {
-        debugPrint('[DatabaseHelper] Student credentials email dispatched: ${res.success}');
-      }).catchError((e) {
-        debugPrint('[DatabaseHelper] Error dispatching student credentials email: $e');
-      }),
+      EmailService()
+          .sendAccountCredentials(
+            toEmail: email.trim(),
+            fullName: fullName.trim(),
+            userId: finalStudentId,
+            username: resolvedUsername,
+            plainPassword: password,
+            role: 'student',
+            grade: grade,
+            section: section,
+            specialNotes: specialNotes,
+          )
+          .then((res) {
+            debugPrint(
+              '[DatabaseHelper] Student credentials email dispatched: ${res.success}',
+            );
+          })
+          .catchError((e) {
+            debugPrint(
+              '[DatabaseHelper] Error dispatching student credentials email: $e',
+            );
+          }),
     );
 
     return finalStudentId;
@@ -6201,7 +6529,8 @@ class DatabaseHelper {
           whereArgs: [teacherId],
         );
         for (final sub in oldSubs) {
-          final subCode = sub['subject_code']?.toString().trim().toUpperCase() ?? '';
+          final subCode =
+              sub['subject_code']?.toString().trim().toUpperCase() ?? '';
           final docId = subCode.isNotEmpty ? subCode : 'SUBJ_${sub['id']}';
           await FirestoreService().saveDocument('subjects', docId, {
             'teacher_id': null,
@@ -6228,7 +6557,11 @@ class DatabaseHelper {
       final assignedCodes = <String>[];
       for (final subId in assignSubjectIds) {
         await assignTeacherToSubject(subId, teacherId, teacherName);
-        final sub = (await db.query('subjects', where: 'id = ?', whereArgs: [subId])).firstOrNull;
+        final sub = (await db.query(
+          'subjects',
+          where: 'id = ?',
+          whereArgs: [subId],
+        )).firstOrNull;
         if (sub != null) {
           final c = sub['subject_code']?.toString().trim().toUpperCase() ?? '';
           if (c.isNotEmpty) assignedCodes.add(c);
@@ -6276,10 +6609,14 @@ class DatabaseHelper {
     // Delete the teacher account
     await db.delete('users', where: 'id = ?', whereArgs: [teacherId]);
 
-    onProgress?.call(0.35, 'Revoking faculty credentials & blacklisting account...');
+    onProgress?.call(
+      0.35,
+      'Revoking faculty credentials & blacklisting account...',
+    );
     try {
       final prefs = await SharedPreferences.getInstance();
-      final deletedList = prefs.getStringList('permanently_deleted_accounts') ?? [];
+      final deletedList =
+          prefs.getStringList('permanently_deleted_accounts') ?? [];
       if (!deletedList.contains(teacherId)) {
         deletedList.add(teacherId);
         await prefs.setStringList('permanently_deleted_accounts', deletedList);
@@ -6287,7 +6624,10 @@ class DatabaseHelper {
     } catch (_) {}
 
     final targetDesc = (email != null && email.isNotEmpty) ? email : teacherId;
-    onProgress?.call(0.60, 'Purging Cloud Firestore records for $targetDesc...');
+    onProgress?.call(
+      0.60,
+      'Purging Cloud Firestore records for $targetDesc...',
+    );
 
     // Delete from Cloud Firestore
     try {
@@ -6307,7 +6647,10 @@ class DatabaseHelper {
       );
     }
 
-    onProgress?.call(0.95, 'Synchronizing school registry & invalidating cache...');
+    onProgress?.call(
+      0.95,
+      'Synchronizing school registry & invalidating cache...',
+    );
     await Future.delayed(const Duration(milliseconds: 150));
     onProgress?.call(1.0, 'Faculty record purged permanently!');
   }
@@ -6316,7 +6659,8 @@ class DatabaseHelper {
     String teacherId,
   ) async {
     final db = await database;
-    return await db.rawQuery('''
+    return await db.rawQuery(
+      '''
       SELECT s.*,
              (SELECT COUNT(DISTINCT e.student_id) 
               FROM enrollments e 
@@ -6325,7 +6669,9 @@ class DatabaseHelper {
       FROM subjects s
       WHERE s.teacher_id = ?
       ORDER BY s.id DESC
-    ''', [teacherId]);
+    ''',
+      [teacherId],
+    );
   }
 
   Future<int> assignTeacherToSubject(
@@ -6342,9 +6688,14 @@ class DatabaseHelper {
     );
 
     try {
-      final sub = (await db.query('subjects', where: 'id = ?', whereArgs: [subjectId])).firstOrNull;
+      final sub = (await db.query(
+        'subjects',
+        where: 'id = ?',
+        whereArgs: [subjectId],
+      )).firstOrNull;
       if (sub != null) {
-        final subCode = sub['subject_code']?.toString().trim().toUpperCase() ?? '';
+        final subCode =
+            sub['subject_code']?.toString().trim().toUpperCase() ?? '';
         final docId = subCode.isNotEmpty ? subCode : 'SUBJ_$subjectId';
         await FirestoreService().saveDocument('subjects', docId, {
           'teacher_id': teacherId,
@@ -7105,7 +7456,9 @@ class DatabaseHelper {
       final cleanSec = section.toLowerCase().trim();
       final filteredSecs = sectionsList.where((s) {
         final lower = s.toLowerCase().trim();
-        return lower == cleanSec || lower.contains(cleanSec) || cleanSec.contains(lower);
+        return lower == cleanSec ||
+            lower.contains(cleanSec) ||
+            cleanSec.contains(lower);
       }).toList();
       sectionsList = filteredSecs.isNotEmpty ? filteredSecs : [section];
     }
@@ -7120,7 +7473,8 @@ class DatabaseHelper {
     final List<Map<String, dynamic>> students = [];
     for (final u in allStudentsRaw) {
       final uSec = (u['section'] as String?)?.toLowerCase().trim() ?? '';
-      final isMatch = sectionsSet.isEmpty ||
+      final isMatch =
+          sectionsSet.isEmpty ||
           sectionsSet.contains(uSec) ||
           sectionsSet.any((s) => s.contains(uSec) || uSec.contains(s));
       if (isMatch) {
@@ -7259,16 +7613,22 @@ class DatabaseHelper {
     for (final att in rawAttempts) {
       final loId = att['lo_id'] as int?;
       final qId = att['quiz_id'] as int?;
-      final key = loId != null ? 'lo_$loId' : (qId != null ? 'quiz_$qId' : null);
+      final key = loId != null
+          ? 'lo_$loId'
+          : (qId != null ? 'quiz_$qId' : null);
       if (key != null && !compKeys.contains(key)) {
         competencies.add({
           'key': key,
           'code': loId != null ? 'LO-$loId' : 'Q-$qId',
           'id': loId ?? qId!,
           'type': loId != null ? 'lo' : 'quiz',
-          'title': (att['assessment_title'] as String? ?? 'Curriculum Assessment').trim(),
+          'title':
+              (att['assessment_title'] as String? ?? 'Curriculum Assessment')
+                  .trim(),
           'topicTitle': 'Curriculum Assessment',
-          'subjectId': att['subject_id'] as int? ?? (subjectIds.isNotEmpty ? subjectIds.first : 0),
+          'subjectId':
+              att['subject_id'] as int? ??
+              (subjectIds.isNotEmpty ? subjectIds.first : 0),
           'subjectName': '',
           'subjectCode': '',
           'passingScore': 75,
@@ -7301,15 +7661,23 @@ class DatabaseHelper {
       for (final sec in sectionsList) {
         final secLower = sec.toLowerCase().trim();
         final secAtts = compAttempts.where((a) {
-          final sSec = (a['student_section'] as String?)?.toLowerCase().trim() ?? '';
-          return sSec == secLower || sSec.contains(secLower) || secLower.contains(sSec);
+          final sSec =
+              (a['student_section'] as String?)?.toLowerCase().trim() ?? '';
+          return sSec == secLower ||
+              sSec.contains(secLower) ||
+              secLower.contains(sSec);
         }).toList();
 
         final attCount = secAtts.length;
         final double? avg = attCount > 0
-            ? (secAtts.map((a) => (a['percentage'] as num).toDouble()).reduce((a, b) => a + b) / attCount)
+            ? (secAtts
+                      .map((a) => (a['percentage'] as num).toDouble())
+                      .reduce((a, b) => a + b) /
+                  attCount)
             : null;
-        final passCount = secAtts.where((a) => (a['is_passed'] as int?) == 1).length;
+        final passCount = secAtts
+            .where((a) => (a['is_passed'] as int?) == 1)
+            .length;
         final passRate = attCount > 0 ? (passCount / attCount) * 100 : null;
 
         String tier;
@@ -7329,7 +7697,9 @@ class DatabaseHelper {
           'attemptsCount': attCount,
           'avgScore': avg != null ? double.parse(avg.toStringAsFixed(1)) : null,
           'passedCount': passCount,
-          'passRate': passRate != null ? double.parse(passRate.toStringAsFixed(1)) : null,
+          'passRate': passRate != null
+              ? double.parse(passRate.toStringAsFixed(1))
+              : null,
           'tier': tier,
           'attempts': secAtts,
         };
@@ -7339,12 +7709,19 @@ class DatabaseHelper {
       final studentStats = <String, Map<String, dynamic>>{};
       for (final stud in targetStudents) {
         final sId = stud['id'] as String;
-        final sAtts = compAttempts.where((a) => a['student_id'] == sId).toList();
+        final sAtts = compAttempts
+            .where((a) => a['student_id'] == sId)
+            .toList();
         final attCount = sAtts.length;
         final double? avg = attCount > 0
-            ? (sAtts.map((a) => (a['percentage'] as num).toDouble()).reduce((a, b) => a + b) / attCount)
+            ? (sAtts
+                      .map((a) => (a['percentage'] as num).toDouble())
+                      .reduce((a, b) => a + b) /
+                  attCount)
             : null;
-        final passCount = sAtts.where((a) => (a['is_passed'] as int?) == 1).length;
+        final passCount = sAtts
+            .where((a) => (a['is_passed'] as int?) == 1)
+            .length;
         final latest = sAtts.isNotEmpty ? sAtts.last : null;
 
         String tier;
@@ -7364,8 +7741,12 @@ class DatabaseHelper {
           'attemptsCount': attCount,
           'avgScore': avg != null ? double.parse(avg.toStringAsFixed(1)) : null,
           'passedCount': passCount,
-          'latestScore': latest != null ? (latest['percentage'] as num).toDouble() : null,
-          'isPassed': latest != null ? ((latest['is_passed'] as int?) == 1) : null,
+          'latestScore': latest != null
+              ? (latest['percentage'] as num).toDouble()
+              : null,
+          'isPassed': latest != null
+              ? ((latest['is_passed'] as int?) == 1)
+              : null,
           'lastAttemptDate': latest?['attempted_at'],
           'tier': tier,
           'attempts': sAtts,
@@ -7375,10 +7756,17 @@ class DatabaseHelper {
       // Overall cohort stats for this competency
       final totalAtts = compAttempts.length;
       final double? overallAvg = totalAtts > 0
-          ? (compAttempts.map((a) => (a['percentage'] as num).toDouble()).reduce((a, b) => a + b) / totalAtts)
+          ? (compAttempts
+                    .map((a) => (a['percentage'] as num).toDouble())
+                    .reduce((a, b) => a + b) /
+                totalAtts)
           : null;
-      final overallPassed = compAttempts.where((a) => (a['is_passed'] as int?) == 1).length;
-      final overallPassRate = totalAtts > 0 ? (overallPassed / totalAtts) * 100 : null;
+      final overallPassed = compAttempts
+          .where((a) => (a['is_passed'] as int?) == 1)
+          .length;
+      final overallPassRate = totalAtts > 0
+          ? (overallPassed / totalAtts) * 100
+          : null;
 
       String overallTier;
       if (overallAvg == null) {
@@ -7399,9 +7787,13 @@ class DatabaseHelper {
         'students': studentStats,
         'overall': {
           'attemptsCount': totalAtts,
-          'avgScore': overallAvg != null ? double.parse(overallAvg.toStringAsFixed(1)) : null,
+          'avgScore': overallAvg != null
+              ? double.parse(overallAvg.toStringAsFixed(1))
+              : null,
           'passedCount': overallPassed,
-          'passRate': overallPassRate != null ? double.parse(overallPassRate.toStringAsFixed(1)) : null,
+          'passRate': overallPassRate != null
+              ? double.parse(overallPassRate.toStringAsFixed(1))
+              : null,
           'tier': overallTier,
         },
       });
@@ -7580,7 +7972,11 @@ class DatabaseHelper {
         whereArgs: [studentId],
       );
       try {
-        final userRow = (await db.query('users', where: 'id = ?', whereArgs: [studentId])).firstOrNull;
+        final userRow = (await db.query(
+          'users',
+          where: 'id = ?',
+          whereArgs: [studentId],
+        )).firstOrNull;
         final syncPayload = <String, dynamic>{
           'id': studentId,
           'enrolled_courses': 0,
@@ -7631,7 +8027,11 @@ class DatabaseHelper {
         );
       }
 
-      final sub = (await db.query('subjects', where: 'id = ?', whereArgs: [subId])).firstOrNull;
+      final sub = (await db.query(
+        'subjects',
+        where: 'id = ?',
+        whereArgs: [subId],
+      )).firstOrNull;
       if (sub != null) {
         final c = sub['subject_code']?.toString().trim().toUpperCase() ?? '';
         if (c.isNotEmpty) enrolledCodes.add(c);
@@ -7639,7 +8039,11 @@ class DatabaseHelper {
     }
 
     try {
-      final userRow = (await db.query('users', where: 'id = ?', whereArgs: [studentId])).firstOrNull;
+      final userRow = (await db.query(
+        'users',
+        where: 'id = ?',
+        whereArgs: [studentId],
+      )).firstOrNull;
       final syncPayload = <String, dynamic>{
         'id': studentId,
         'enrolled_courses': subjectIds.length,
@@ -7657,7 +8061,9 @@ class DatabaseHelper {
   }
 
   /// Retrieves list of subjects assigned explicitly to a section
-  Future<List<Map<String, dynamic>>> getSubjectsForSection(String sectionNameOrKey) async {
+  Future<List<Map<String, dynamic>>> getSubjectsForSection(
+    String sectionNameOrKey,
+  ) async {
     final db = await database;
     final clean = sectionNameOrKey.trim().toLowerCase();
     if (clean.isEmpty) return [];
@@ -7704,7 +8110,10 @@ class DatabaseHelper {
         final seen = <String>{};
         final uniqueMatched = <Map<String, dynamic>>[];
         for (final m in matched) {
-          final code = (m['subject_code']?.toString() ?? m['name']?.toString() ?? '').trim().toUpperCase();
+          final code =
+              (m['subject_code']?.toString() ?? m['name']?.toString() ?? '')
+                  .trim()
+                  .toUpperCase();
           if (code.isNotEmpty && !seen.contains(code)) {
             seen.add(code);
             uniqueMatched.add(m);
@@ -7724,7 +8133,10 @@ class DatabaseHelper {
         final seen = <String>{};
         final uniqueMatched = <Map<String, dynamic>>[];
         for (final m in matched) {
-          final code = (m['subject_code']?.toString() ?? m['name']?.toString() ?? '').trim().toUpperCase();
+          final code =
+              (m['subject_code']?.toString() ?? m['name']?.toString() ?? '')
+                  .trim()
+                  .toUpperCase();
           if (code.isNotEmpty && !seen.contains(code)) {
             seen.add(code);
             uniqueMatched.add(m);
@@ -7750,7 +8162,10 @@ class DatabaseHelper {
     final secRes = await db.query(
       'sections',
       where: 'LOWER(name) = ? OR LOWER(enrollment_key) = ?',
-      whereArgs: [sectionName.toLowerCase().trim(), sectionName.toLowerCase().trim()],
+      whereArgs: [
+        sectionName.toLowerCase().trim(),
+        sectionName.toLowerCase().trim(),
+      ],
     );
     String? secGrade;
     bool gradeUpdated = false;
@@ -7777,7 +8192,9 @@ class DatabaseHelper {
       where: 'student_id = ? AND status = ?',
       whereArgs: [studentId, 'active'],
     );
-    final currentSubIdsBefore = currentEnrsBefore.map((e) => e['subject_id'] as int).toSet();
+    final currentSubIdsBefore = currentEnrsBefore
+        .map((e) => e['subject_id'] as int)
+        .toSet();
 
     for (final s in subjects) {
       final subId = s['id'] as int;
@@ -7815,7 +8232,8 @@ class DatabaseHelper {
       }
     }
 
-    final bool enrollmentsChanged = gradeUpdated ||
+    final bool enrollmentsChanged =
+        gradeUpdated ||
         staleRemoved ||
         currentSubIdsBefore.length != validSubjectIds.length ||
         !currentSubIdsBefore.containsAll(validSubjectIds);
@@ -7823,7 +8241,11 @@ class DatabaseHelper {
     // Only invoke Firestore write if enrollments or section/grade actually changed to conserve quota
     if (syncToCloud && enrollmentsChanged) {
       try {
-        final userRow = (await db.query('users', where: 'id = ?', whereArgs: [studentId])).firstOrNull;
+        final userRow = (await db.query(
+          'users',
+          where: 'id = ?',
+          whereArgs: [studentId],
+        )).firstOrNull;
         final syncPayload = <String, dynamic>{
           'id': studentId,
           'section': sectionName,
@@ -8000,7 +8422,8 @@ class DatabaseHelper {
       RegExp(r'[^a-z0-9]'),
       '_',
     );
-    final canonicalCloudId = 'quiz_${DateTime.now().millisecondsSinceEpoch}_$cleanTitle';
+    final canonicalCloudId =
+        'quiz_${DateTime.now().millisecondsSinceEpoch}_$cleanTitle';
 
     final quizId = await db.insert('quizzes', {
       'cloud_id': canonicalCloudId,
@@ -8024,13 +8447,16 @@ class DatabaseHelper {
       final prefs = await SharedPreferences.getInstance();
       final delQ = prefs.getStringList('permanently_deleted_quizzes') ?? [];
       final rawTitle = title.toLowerCase().trim();
-      final cleanedQ = delQ.where((item) =>
-        item != quizId.toString() &&
-        item != canonicalCloudId &&
-        item != cleanTitle &&
-        item != rawTitle &&
-        !RegExp(r'^\d+$').hasMatch(item)
-      ).toList();
+      final cleanedQ = delQ
+          .where(
+            (item) =>
+                item != quizId.toString() &&
+                item != canonicalCloudId &&
+                item != cleanTitle &&
+                item != rawTitle &&
+                !RegExp(r'^\d+$').hasMatch(item),
+          )
+          .toList();
       if (cleanedQ.length != delQ.length) {
         await prefs.setStringList('permanently_deleted_quizzes', cleanedQ);
       }
@@ -8065,10 +8491,7 @@ class DatabaseHelper {
       final subName = sub.isNotEmpty
           ? sub.first['name'] as String? ?? 'Subject'
           : 'Subject';
-      final cleanSubCode = subCode.replaceAll(
-        RegExp(r'[^a-zA-Z0-9]'),
-        '_',
-      );
+      final cleanSubCode = subCode.replaceAll(RegExp(r'[^a-zA-Z0-9]'), '_');
       final cloudDocId = 'quiz_${cleanSubCode}_${cleanTitle}_$quizId';
 
       // 1. Save to Supabase (primary database with zero quota limits)
@@ -8162,6 +8585,14 @@ class DatabaseHelper {
         final subCode = sub.isNotEmpty
             ? sub.first['subject_code'] as String? ?? 'SUBJ'
             : 'SUBJ';
+        final qTitle = q['title'] as String? ?? 'Quiz';
+        final tName = q['teacher_name'] as String? ?? 'Your teacher';
+        final tId = q['teacher_id'] as String?;
+        final effectiveDue = dueDate ?? q['due_date'] as String?;
+        final formattedDue = (effectiveDue != null && effectiveDue.length >= 10)
+            ? ' Due: ${effectiveDue.substring(0, 10)}'
+            : '';
+
         for (final sid in studentIds) {
           final docId = 'qa_${quizId}_$sid';
           await FirestoreService().saveDocument('quiz_assignments', docId, {
@@ -8177,10 +8608,27 @@ class DatabaseHelper {
             'total_questions': totalQuestions,
             'percentage': 0.0,
           });
+
+          // Dispatch notification to assigned student
+          unawaited(
+            createNotification(
+              userId: sid,
+              type: 'quiz_assigned',
+              title: 'New Quiz: $qTitle',
+              message: '$tName assigned quiz "$qTitle".$formattedDue',
+              relatedId: quizId.toString(),
+              targetRoute: '/student/courses',
+              subjectId: q['subject_id'] as int?,
+              actorId: tId,
+              actorName: tName,
+            ),
+          );
         }
       }
     } catch (e, st) {
-      debugPrint('[DatabaseHelper] assignQuizToStudents Firestore sync notice: $e\n$st');
+      debugPrint(
+        '[DatabaseHelper] assignQuizToStudents Firestore sync notice: $e\n$st',
+      );
     }
     return assigned;
   }
@@ -8193,19 +8641,31 @@ class DatabaseHelper {
     String? localSubCode;
     String? localSubName;
     try {
-      final curSub = await db.query('subjects', where: 'id = ?', whereArgs: [subjectId]);
+      final curSub = await db.query(
+        'subjects',
+        where: 'id = ?',
+        whereArgs: [subjectId],
+      );
       if (curSub.isNotEmpty) {
         localSubCode = curSub.first['subject_code']?.toString().toUpperCase();
         localSubName = curSub.first['name']?.toString().trim().toUpperCase();
         if (localSubCode != null && localSubCode.isNotEmpty) {
-          final sameCode = await db.query('subjects', where: 'UPPER(subject_code) = ?', whereArgs: [localSubCode]);
+          final sameCode = await db.query(
+            'subjects',
+            where: 'UPPER(subject_code) = ?',
+            whereArgs: [localSubCode],
+          );
           for (final s in sameCode) {
             final id = s['id'] as int;
             if (!matchingSubIds.contains(id)) matchingSubIds.add(id);
           }
         }
         if (localSubName != null && localSubName.isNotEmpty) {
-          final sameName = await db.query('subjects', where: 'UPPER(TRIM(name)) = ?', whereArgs: [localSubName]);
+          final sameName = await db.query(
+            'subjects',
+            where: 'UPPER(TRIM(name)) = ?',
+            whereArgs: [localSubName],
+          );
           for (final s in sameName) {
             final id = s['id'] as int;
             if (!matchingSubIds.contains(id)) matchingSubIds.add(id);
@@ -8226,16 +8686,25 @@ class DatabaseHelper {
     try {
       prefs = await SharedPreferences.getInstance();
     } catch (_) {}
-    final deletedQuizzes = prefs?.getStringList('permanently_deleted_quizzes') ?? [];
+    final deletedQuizzes =
+        prefs?.getStringList('permanently_deleted_quizzes') ?? [];
 
     final List<Map<String, dynamic>> enriched = [];
     for (final q in quizzes) {
-      final qId = (q['id'] is num) ? (q['id'] as num).toInt() : int.tryParse(q['id']?.toString() ?? '') ?? 0;
+      final qId = (q['id'] is num)
+          ? (q['id'] as num).toInt()
+          : int.tryParse(q['id']?.toString() ?? '') ?? 0;
       final cloudId = q['cloud_id']?.toString() ?? '';
       final title = (q['title'] as String? ?? '').trim();
-      final cleanTitle = title.toLowerCase().replaceAll(RegExp(r'[^a-z0-9]'), '_');
-      final isDeleted = (cloudId.isNotEmpty && !RegExp(r'^\d+$').hasMatch(cloudId) && deletedQuizzes.contains(cloudId)) ||
-                        (cleanTitle.isNotEmpty && deletedQuizzes.contains(cleanTitle));
+      final cleanTitle = title.toLowerCase().replaceAll(
+        RegExp(r'[^a-z0-9]'),
+        '_',
+      );
+      final isDeleted =
+          (cloudId.isNotEmpty &&
+              !RegExp(r'^\d+$').hasMatch(cloudId) &&
+              deletedQuizzes.contains(cloudId)) ||
+          (cleanTitle.isNotEmpty && deletedQuizzes.contains(cleanTitle));
       if (isDeleted) {
         continue;
       }
@@ -8276,14 +8745,20 @@ class DatabaseHelper {
         );
         for (final sq in supaQuizzes) {
           final title = (sq['title'] as String? ?? '').trim();
-          final cleanTitle = title.toLowerCase().replaceAll(RegExp(r'[^a-z0-9]'), '_');
+          final cleanTitle = title.toLowerCase().replaceAll(
+            RegExp(r'[^a-z0-9]'),
+            '_',
+          );
           final qIdStr = sq['id']?.toString() ?? '';
-          if ((!RegExp(r'^\d+$').hasMatch(qIdStr) && deletedQuizzes.contains(qIdStr)) ||
+          if ((!RegExp(r'^\d+$').hasMatch(qIdStr) &&
+                  deletedQuizzes.contains(qIdStr)) ||
               (cleanTitle.isNotEmpty && deletedQuizzes.contains(cleanTitle))) {
             continue;
           }
           final qId = int.tryParse(qIdStr) ?? 1;
-          final questions = (sq['questions_json'] is List) ? (sq['questions_json'] as List) : [];
+          final questions = (sq['questions_json'] is List)
+              ? (sq['questions_json'] as List)
+              : [];
           enriched.add({
             'id': qId,
             'cloud_id': qIdStr,
@@ -8296,11 +8771,15 @@ class DatabaseHelper {
             'question_count': questions.length,
             'assigned_count': 1,
             'completed_count': 0,
-            'created_at': sq['created_at']?.toString() ?? DateTime.now().toIso8601String(),
+            'created_at':
+                sq['created_at']?.toString() ??
+                DateTime.now().toIso8601String(),
           });
         }
       } catch (e) {
-        debugPrint('[DatabaseHelper] getQuizzesForSubject Supabase fallback notice: $e');
+        debugPrint(
+          '[DatabaseHelper] getQuizzesForSubject Supabase fallback notice: $e',
+        );
       }
     }
 
@@ -8371,13 +8850,18 @@ class DatabaseHelper {
     try {
       prefs = await SharedPreferences.getInstance();
     } catch (_) {}
-    final deletedQuizzes = prefs?.getStringList('permanently_deleted_quizzes') ?? [];
+    final deletedQuizzes =
+        prefs?.getStringList('permanently_deleted_quizzes') ?? [];
     if (deletedQuizzes.isEmpty) return rows;
     return rows.where((r) {
       final qId = r['quiz_id']?.toString() ?? '';
-      final t = (r['title']?.toString() ?? '').trim().toLowerCase().replaceAll(RegExp(r'[^a-z0-9]'), '_');
-      final isDeleted = (!RegExp(r'^\d+$').hasMatch(qId) && deletedQuizzes.contains(qId)) ||
-                        (t.isNotEmpty && deletedQuizzes.contains(t));
+      final t = (r['title']?.toString() ?? '').trim().toLowerCase().replaceAll(
+        RegExp(r'[^a-z0-9]'),
+        '_',
+      );
+      final isDeleted =
+          (!RegExp(r'^\d+$').hasMatch(qId) && deletedQuizzes.contains(qId)) ||
+          (t.isNotEmpty && deletedQuizzes.contains(t));
       return !isDeleted;
     }).toList();
   }
@@ -8469,7 +8953,9 @@ class DatabaseHelper {
         }),
       );
     } catch (e, st) {
-      debugPrint('[DatabaseHelper] completeQuizAssignment Firestore sync error: $e\n$st');
+      debugPrint(
+        '[DatabaseHelper] completeQuizAssignment Firestore sync error: $e\n$st',
+      );
     }
 
     // Also ensure quiz_attempts has an entry if not already logged
@@ -8606,21 +9092,26 @@ class DatabaseHelper {
 
   Future<void> deleteQuiz(int quizId) async {
     final db = await database;
-    final quizRows = await db.query('quizzes', where: 'id = ?', whereArgs: [quizId]);
-    final quizRow = quizRows.isNotEmpty ? quizRows.first : null;
-    final cleanTitle = (quizRow?['title'] as String? ?? '').toLowerCase().replaceAll(
-      RegExp(r'[^a-z0-9]'),
-      '_',
+    final quizRows = await db.query(
+      'quizzes',
+      where: 'id = ?',
+      whereArgs: [quizId],
     );
+    final quizRow = quizRows.isNotEmpty ? quizRows.first : null;
+    final cleanTitle = (quizRow?['title'] as String? ?? '')
+        .toLowerCase()
+        .replaceAll(RegExp(r'[^a-z0-9]'), '_');
     final subId = quizRow?['subject_id'];
     String cleanSubCode = 'SUBJ';
     if (subId != null) {
-      final subRows = await db.query('subjects', where: 'id = ?', whereArgs: [subId]);
+      final subRows = await db.query(
+        'subjects',
+        where: 'id = ?',
+        whereArgs: [subId],
+      );
       if (subRows.isNotEmpty) {
-        cleanSubCode = (subRows.first['subject_code'] as String? ?? 'SUBJ').replaceAll(
-          RegExp(r'[^a-zA-Z0-9]'),
-          '_',
-        );
+        cleanSubCode = (subRows.first['subject_code'] as String? ?? 'SUBJ')
+            .replaceAll(RegExp(r'[^a-zA-Z0-9]'), '_');
       }
     }
 
@@ -8629,7 +9120,11 @@ class DatabaseHelper {
     // 1. Delete associated attempts, scores, assignments, questions, and the quiz itself
     await db.delete('quiz_attempts', where: 'quiz_id = ?', whereArgs: [quizId]);
     try {
-      await db.delete('student_scores', where: 'quiz_id = ?', whereArgs: [quizId]);
+      await db.delete(
+        'student_scores',
+        where: 'quiz_id = ?',
+        whereArgs: [quizId],
+      );
     } catch (_) {}
     await db.delete(
       'quiz_assignments',
@@ -8642,13 +9137,18 @@ class DatabaseHelper {
     // Track tombstone so cloud delta/full sync never resurrects this quiz
     try {
       final prefs = await SharedPreferences.getInstance();
-      final deletedQuizzes = prefs.getStringList('permanently_deleted_quizzes') ?? [];
-      if (cloudId != null && cloudId.isNotEmpty && !RegExp(r'^\d+$').hasMatch(cloudId) && !deletedQuizzes.contains(cloudId)) {
+      final deletedQuizzes =
+          prefs.getStringList('permanently_deleted_quizzes') ?? [];
+      if (cloudId != null &&
+          cloudId.isNotEmpty &&
+          !RegExp(r'^\d+$').hasMatch(cloudId) &&
+          !deletedQuizzes.contains(cloudId)) {
         deletedQuizzes.add(cloudId);
       }
       final cloudDocId = 'quiz_${cleanSubCode}_${cleanTitle}_$quizId';
       if (!deletedQuizzes.contains(cloudDocId)) deletedQuizzes.add(cloudDocId);
-      if (cleanTitle.isNotEmpty && !deletedQuizzes.contains(cleanTitle)) deletedQuizzes.add(cleanTitle);
+      if (cleanTitle.isNotEmpty && !deletedQuizzes.contains(cleanTitle))
+        deletedQuizzes.add(cleanTitle);
       await prefs.setStringList('permanently_deleted_quizzes', deletedQuizzes);
     } catch (_) {}
 
@@ -8666,33 +9166,60 @@ class DatabaseHelper {
     try {
       await FirestoreService().deleteDocument('quizzes', quizId.toString());
       if (cleanTitle.isNotEmpty) {
-        await FirestoreService().deleteDocument('quizzes', 'quiz_${cleanSubCode}_${cleanTitle}_$quizId');
-        await FirestoreService().deleteDocument('quizzes', 'quiz_${subId}_${cleanTitle}_$quizId');
+        await FirestoreService().deleteDocument(
+          'quizzes',
+          'quiz_${cleanSubCode}_${cleanTitle}_$quizId',
+        );
+        await FirestoreService().deleteDocument(
+          'quizzes',
+          'quiz_${subId}_${cleanTitle}_$quizId',
+        );
       }
-      final cloudQuizzes = await FirestoreService().fetchAllDocuments('quizzes');
+      final cloudQuizzes = await FirestoreService().fetchAllDocuments(
+        'quizzes',
+      );
       for (final doc in cloudQuizzes) {
         final rawQId = doc['id'];
-        final docId = doc['_docId']?.toString() ?? doc['id']?.toString() ?? doc['document_id']?.toString() ?? '';
-        if (rawQId == quizId || rawQId?.toString() == quizId.toString() || docId.endsWith('_$quizId') || docId == quizId.toString()) {
+        final docId =
+            doc['_docId']?.toString() ??
+            doc['id']?.toString() ??
+            doc['document_id']?.toString() ??
+            '';
+        if (rawQId == quizId ||
+            rawQId?.toString() == quizId.toString() ||
+            docId.endsWith('_$quizId') ||
+            docId == quizId.toString()) {
           if (docId.isNotEmpty) {
             await FirestoreService().deleteDocument('quizzes', docId);
           }
         }
       }
-      final cloudAttempts = await FirestoreService().fetchAllDocuments('quiz_attempts');
+      final cloudAttempts = await FirestoreService().fetchAllDocuments(
+        'quiz_attempts',
+      );
       for (final doc in cloudAttempts) {
         final rawQId = doc['quiz_id'];
-        final docId = doc['_docId']?.toString() ?? doc['id']?.toString() ?? doc['document_id']?.toString() ?? '';
+        final docId =
+            doc['_docId']?.toString() ??
+            doc['id']?.toString() ??
+            doc['document_id']?.toString() ??
+            '';
         if (rawQId == quizId || rawQId?.toString() == quizId.toString()) {
           if (docId.isNotEmpty) {
             await FirestoreService().deleteDocument('quiz_attempts', docId);
           }
         }
       }
-      final cloudAssignments = await FirestoreService().fetchAllDocuments('quiz_assignments');
+      final cloudAssignments = await FirestoreService().fetchAllDocuments(
+        'quiz_assignments',
+      );
       for (final doc in cloudAssignments) {
         final rawQId = doc['quiz_id'];
-        final docId = doc['_docId']?.toString() ?? doc['id']?.toString() ?? doc['document_id']?.toString() ?? '';
+        final docId =
+            doc['_docId']?.toString() ??
+            doc['id']?.toString() ??
+            doc['document_id']?.toString() ??
+            '';
         if (rawQId == quizId || rawQId?.toString() == quizId.toString()) {
           if (docId.isNotEmpty) {
             await FirestoreService().deleteDocument('quiz_assignments', docId);
@@ -8834,7 +9361,9 @@ class DatabaseHelper {
 
     // 3. Purge Cloud Firestore collections so artifacts never resurrect
     try {
-      final cloudQuizzes = await FirestoreService().fetchAllDocuments('quizzes');
+      final cloudQuizzes = await FirestoreService().fetchAllDocuments(
+        'quizzes',
+      );
       final List<Future<void>> quizDeleteFutures = [];
       for (final q in cloudQuizzes) {
         final title = q['title']?.toString() ?? '';
@@ -8843,7 +9372,8 @@ class DatabaseHelper {
         final docId = rawId?.toString().trim() ?? '';
         final intId = (rawId is int) ? rawId : int.tryParse(docId);
 
-        final isTestQuiz = candidateIds.contains(intId) ||
+        final isTestQuiz =
+            candidateIds.contains(intId) ||
             title.contains('1794') ||
             title == '1' ||
             title == '' ||
@@ -8861,7 +9391,9 @@ class DatabaseHelper {
             lowerTitle.contains('temp');
 
         if (isTestQuiz && docId.isNotEmpty) {
-          quizDeleteFutures.add(FirestoreService().deleteDocument('quizzes', docId));
+          quizDeleteFutures.add(
+            FirestoreService().deleteDocument('quizzes', docId),
+          );
           deletedCount++;
         }
       }
@@ -8869,17 +9401,24 @@ class DatabaseHelper {
         await Future.wait(quizDeleteFutures);
       }
 
-      final cloudAttempts = await FirestoreService().fetchAllDocuments('quiz_attempts');
+      final cloudAttempts = await FirestoreService().fetchAllDocuments(
+        'quiz_attempts',
+      );
       final List<Future<void>> attemptDeleteFutures = [];
       for (final doc in cloudAttempts) {
         final sid = doc['student_id']?.toString() ?? '';
         final qTitle = doc['quiz_title']?.toString() ?? '';
         final lowerQTitle = qTitle.toLowerCase().trim();
         final rawQId = doc['quiz_id'];
-        final intQId = (rawQId is int) ? rawQId : int.tryParse(rawQId?.toString() ?? '');
-        final docId = (doc['_docId'] ?? doc['id'] ?? doc['document_id'] ?? '').toString().trim();
+        final intQId = (rawQId is int)
+            ? rawQId
+            : int.tryParse(rawQId?.toString() ?? '');
+        final docId = (doc['_docId'] ?? doc['id'] ?? doc['document_id'] ?? '')
+            .toString()
+            .trim();
 
-        final isTestAttempt = candidateIds.contains(intQId) ||
+        final isTestAttempt =
+            candidateIds.contains(intQId) ||
             sid.contains('1794') ||
             sid.startsWith('student_loop_') ||
             sid.startsWith('bulk_student_') ||
@@ -8901,7 +9440,9 @@ class DatabaseHelper {
             lowerQTitle.startsWith('test');
 
         if (isTestAttempt && docId.isNotEmpty) {
-          attemptDeleteFutures.add(FirestoreService().deleteDocument('quiz_attempts', docId));
+          attemptDeleteFutures.add(
+            FirestoreService().deleteDocument('quiz_attempts', docId),
+          );
           deletedCount++;
         }
       }
@@ -9031,12 +9572,15 @@ class DatabaseHelper {
 
     // 5. Cloud Firestore synchronization purge (removes artifacts from cloud collections)
     try {
-      final cloudAttempts = await FirestoreService().fetchAllDocuments('quiz_attempts');
+      final cloudAttempts = await FirestoreService().fetchAllDocuments(
+        'quiz_attempts',
+      );
       for (final doc in cloudAttempts) {
         final sid = doc['student_id']?.toString() ?? '';
         final qTitle = doc['quiz_title']?.toString() ?? '';
         final lowerQTitle = qTitle.toLowerCase().trim();
-        final docId = doc['id']?.toString() ?? doc['document_id']?.toString() ?? '';
+        final docId =
+            doc['id']?.toString() ?? doc['document_id']?.toString() ?? '';
         if (sid.contains('1794') ||
             sid.startsWith('s_anticheat_') ||
             sid.startsWith('student_reset_') ||
@@ -9058,19 +9602,23 @@ class DatabaseHelper {
             lowerQTitle.startsWith('db quiz') ||
             lowerQTitle.startsWith('test')) {
           if (docId.isNotEmpty) {
-            unawaited(FirestoreService().deleteDocument('quiz_attempts', docId));
+            unawaited(
+              FirestoreService().deleteDocument('quiz_attempts', docId),
+            );
             deleted++;
           }
         }
       }
 
-      final cloudQuizzes = await FirestoreService().fetchAllDocuments('quizzes');
+      final cloudQuizzes = await FirestoreService().fetchAllDocuments(
+        'quizzes',
+      );
       for (final q in cloudQuizzes) {
         final title = q['title']?.toString() ?? '';
         final lowerTitle = title.toLowerCase().trim();
         final docId = q['id']?.toString() ?? q['document_id']?.toString() ?? '';
-        if (title.contains('1794') || 
-            title == '1' || 
+        if (title.contains('1794') ||
+            title == '1' ||
             lowerTitle.contains('math roster quiz') ||
             lowerTitle.startsWith('diagnostic quiz') ||
             lowerTitle.startsWith('quantum mechanics') ||
@@ -9162,13 +9710,18 @@ class DatabaseHelper {
     try {
       prefs = await SharedPreferences.getInstance();
     } catch (_) {}
-    final deletedQuizzes = prefs?.getStringList('permanently_deleted_quizzes') ?? [];
+    final deletedQuizzes =
+        prefs?.getStringList('permanently_deleted_quizzes') ?? [];
     if (deletedQuizzes.isEmpty) return rows;
     return rows.where((r) {
       final qId = r['quiz_id']?.toString() ?? '';
-      final t = (r['title']?.toString() ?? '').trim().toLowerCase().replaceAll(RegExp(r'[^a-z0-9]'), '_');
-      final isDeleted = (!RegExp(r'^\d+$').hasMatch(qId) && deletedQuizzes.contains(qId)) ||
-                        (t.isNotEmpty && deletedQuizzes.contains(t));
+      final t = (r['title']?.toString() ?? '').trim().toLowerCase().replaceAll(
+        RegExp(r'[^a-z0-9]'),
+        '_',
+      );
+      final isDeleted =
+          (!RegExp(r'^\d+$').hasMatch(qId) && deletedQuizzes.contains(qId)) ||
+          (t.isNotEmpty && deletedQuizzes.contains(t));
       return !isDeleted;
     }).toList();
   }
@@ -9397,9 +9950,12 @@ class DatabaseHelper {
 
       // Difficulty Index (p) = Total Correct / Total Examinees
       final int correctCount = totalSelections[correctOpt] ?? 0;
-      final double rawP =
-          totalAttempts > 0 ? (correctCount / totalAttempts) : 0.0;
-      final double p = (rawP.isNaN || rawP.isInfinite) ? 0.0 : rawP.clamp(0.0, 1.0);
+      final double rawP = totalAttempts > 0
+          ? (correctCount / totalAttempts)
+          : 0.0;
+      final double p = (rawP.isNaN || rawP.isInfinite)
+          ? 0.0
+          : rawP.clamp(0.0, 1.0);
       sumP += p;
       sumPtimesOneMinusP += (p * (1.0 - p));
 
@@ -9419,9 +9975,12 @@ class DatabaseHelper {
       // Discrimination Index (D) = (Upper Correct - Lower Correct) / GroupSize
       final int uCorrect = upperSelections[correctOpt] ?? 0;
       final int lCorrect = lowerSelections[correctOpt] ?? 0;
-      final double rawD =
-          groupSize > 0 ? ((uCorrect - lCorrect) / groupSize.toDouble()) : 0.0;
-      final double d = (rawD.isNaN || rawD.isInfinite) ? 0.0 : rawD.clamp(-1.0, 1.0);
+      final double rawD = groupSize > 0
+          ? ((uCorrect - lCorrect) / groupSize.toDouble())
+          : 0.0;
+      final double d = (rawD.isNaN || rawD.isInfinite)
+          ? 0.0
+          : rawD.clamp(-1.0, 1.0);
       sumD += d;
 
       final String discriminationLabel;
@@ -9643,13 +10202,16 @@ class DatabaseHelper {
       final prefs = await SharedPreferences.getInstance();
       final delA = prefs.getStringList('permanently_deleted_assignments') ?? [];
       final rawTitle = title.toLowerCase().trim();
-      final cleanedA = delA.where((item) =>
-        item != id.toString() &&
-        item != canonicalCloudId &&
-        item != cleanTitle &&
-        item != rawTitle &&
-        !RegExp(r'^\d+$').hasMatch(item)
-      ).toList();
+      final cleanedA = delA
+          .where(
+            (item) =>
+                item != id.toString() &&
+                item != canonicalCloudId &&
+                item != cleanTitle &&
+                item != rawTitle &&
+                !RegExp(r'^\d+$').hasMatch(item),
+          )
+          .toList();
       if (cleanedA.length != delA.length) {
         await prefs.setStringList('permanently_deleted_assignments', cleanedA);
       }
@@ -9703,7 +10265,8 @@ class DatabaseHelper {
         'attachment_name': attachmentName,
         'attachment_path': attachmentPath,
         'attachment_size': attachmentSize,
-        'attachment_bytes': null, // Do not bloat Cloud Firestore with large Base64 files
+        'attachment_bytes':
+            null, // Do not bloat Cloud Firestore with large Base64 files
         'storage_url': storageUrl ?? gdriveFolderUrl,
         'gdrive_folder_url': gdriveFolderUrl,
         'status': 'active',
@@ -9716,7 +10279,9 @@ class DatabaseHelper {
         assignmentMap,
       );
     } catch (e, st) {
-      debugPrint('[DatabaseHelper] createAssignment Firestore sync notice: $e\n$st');
+      debugPrint(
+        '[DatabaseHelper] createAssignment Firestore sync notice: $e\n$st',
+      );
     }
 
     // 2. Generate notifications for all enrolled students in this subject
@@ -9768,25 +10333,33 @@ class DatabaseHelper {
       try {
         prefs = await SharedPreferences.getInstance();
       } catch (_) {}
-      final localCountRes = await db.rawQuery('SELECT COUNT(*) as cnt FROM assignments');
+      final localCountRes = await db.rawQuery(
+        'SELECT COUNT(*) as cnt FROM assignments',
+      );
       final localCount = (localCountRes.first['cnt'] as num?)?.toInt() ?? 0;
-      final lastSync = (force || kIsWeb || localCount == 0) ? null : prefs?.getString('last_synced_at_assignments');
+      final lastSync = (force || kIsWeb || localCount == 0)
+          ? null
+          : prefs?.getString('last_synced_at_assignments');
 
       // 1. Fetch from Supabase first (unlimited reads, zero quota constraints)
       bool supabaseConnected = false;
       var cloudDocs = <Map<String, dynamic>>[];
       try {
         if (SupabaseService.instance.isInitialized) {
-          final supaAssignments = await SupabaseService.instance.fetchAllAssignments();
+          final supaAssignments = await SupabaseService.instance
+              .fetchAllAssignments();
           supabaseConnected = true;
           for (final sa in supaAssignments) {
-            final subMap = sa['subjects'] is Map ? Map<String, dynamic>.from(sa['subjects']) : null;
+            final subMap = sa['subjects'] is Map
+                ? Map<String, dynamic>.from(sa['subjects'])
+                : null;
             cloudDocs.add({
               'id': sa['id'],
               'cloud_id': sa['id'],
               'title': sa['title'],
               'description': sa['description'],
-              'subject_id': int.tryParse(sa['subject_id']?.toString() ?? '') ?? 1,
+              'subject_id':
+                  int.tryParse(sa['subject_id']?.toString() ?? '') ?? 1,
               'subject_code': subMap?['code']?.toString(),
               'subject_name': subMap?['name']?.toString(),
               'due_date': sa['due_date'],
@@ -9796,29 +10369,41 @@ class DatabaseHelper {
           }
         }
       } catch (e) {
-        debugPrint('[DatabaseHelper] syncCloudAssignmentsToLocal Supabase note: $e');
+        debugPrint(
+          '[DatabaseHelper] syncCloudAssignmentsToLocal Supabase note: $e',
+        );
       }
 
       // 2. Fall back to Firestore ONLY if Supabase was completely unreachable
       if (!supabaseConnected && !kIsWeb) {
         try {
-          cloudDocs = await FirestoreService().fetchDeltaDocuments(
-            'assignments',
-            since: lastSync,
-          ).timeout(const Duration(seconds: 2), onTimeout: () => []);
+          cloudDocs = await FirestoreService()
+              .fetchDeltaDocuments('assignments', since: lastSync)
+              .timeout(const Duration(seconds: 2), onTimeout: () => []);
           if (cloudDocs.isEmpty && (localCount == 0 || force)) {
-            cloudDocs = await FirestoreService().fetchAllDocuments('assignments')
+            cloudDocs = await FirestoreService()
+                .fetchAllDocuments('assignments')
                 .timeout(const Duration(seconds: 2), onTimeout: () => []);
           }
         } catch (_) {}
       }
 
       // Always purge tombstones so deleted items never resurrect (only for non-numeric cloud IDs)
-      final deletedAssignments = prefs?.getStringList('permanently_deleted_assignments') ?? [];
+      final deletedAssignments =
+          prefs?.getStringList('permanently_deleted_assignments') ?? [];
       for (final delId in deletedAssignments) {
         if (!RegExp(r'^\d+$').hasMatch(delId)) {
-          await db.delete('submissions', where: 'assignment_cloud_id = ? OR assignment_id IN (SELECT id FROM assignments WHERE cloud_id = ?)', whereArgs: [delId, delId]);
-          await db.delete('assignments', where: 'cloud_id = ?', whereArgs: [delId]);
+          await db.delete(
+            'submissions',
+            where:
+                'assignment_cloud_id = ? OR assignment_id IN (SELECT id FROM assignments WHERE cloud_id = ?)',
+            whereArgs: [delId, delId],
+          );
+          await db.delete(
+            'assignments',
+            where: 'cloud_id = ?',
+            whereArgs: [delId],
+          );
         }
       }
 
@@ -9827,11 +10412,19 @@ class DatabaseHelper {
         final activeCloudIds = <String>{};
         final activeCloudTitles = <String>{};
         for (final doc in cloudDocs) {
-          final idStr = doc['id']?.toString() ?? doc['cloud_id']?.toString() ?? doc['_docId']?.toString() ?? '';
+          final idStr =
+              doc['id']?.toString() ??
+              doc['cloud_id']?.toString() ??
+              doc['_docId']?.toString() ??
+              '';
           if (idStr.isNotEmpty) activeCloudIds.add(idStr);
           final rawLocalId = doc['local_id']?.toString();
-          if (rawLocalId != null && rawLocalId.isNotEmpty) activeCloudIds.add(rawLocalId);
-          final t = (doc['title']?.toString() ?? '').trim().toLowerCase().replaceAll(RegExp(r'[^a-z0-9]'), '_');
+          if (rawLocalId != null && rawLocalId.isNotEmpty)
+            activeCloudIds.add(rawLocalId);
+          final t = (doc['title']?.toString() ?? '')
+              .trim()
+              .toLowerCase()
+              .replaceAll(RegExp(r'[^a-z0-9]'), '_');
           if (t.isNotEmpty) activeCloudTitles.add(t);
         }
 
@@ -9839,29 +10432,54 @@ class DatabaseHelper {
         for (final local in allLocal) {
           final localId = local['id']?.toString() ?? '';
           final localCloudId = local['cloud_id']?.toString() ?? '';
-          final localTitle = (local['title'] as String? ?? '').trim().toLowerCase().replaceAll(RegExp(r'[^a-z0-9]'), '_');
-          final isPresent = activeCloudIds.contains(localId) ||
-                            (localCloudId.isNotEmpty && activeCloudIds.contains(localCloudId)) ||
-                            (localTitle.isNotEmpty && activeCloudTitles.contains(localTitle));
+          final localTitle = (local['title'] as String? ?? '')
+              .trim()
+              .toLowerCase()
+              .replaceAll(RegExp(r'[^a-z0-9]'), '_');
+          final isPresent =
+              activeCloudIds.contains(localId) ||
+              (localCloudId.isNotEmpty &&
+                  activeCloudIds.contains(localCloudId)) ||
+              (localTitle.isNotEmpty && activeCloudTitles.contains(localTitle));
           if (!isPresent) {
-            await db.delete('submissions', where: 'assignment_id = ?', whereArgs: [local['id']]);
-            await db.delete('assignments', where: 'id = ?', whereArgs: [local['id']]);
+            await db.delete(
+              'submissions',
+              where: 'assignment_id = ?',
+              whereArgs: [local['id']],
+            );
+            await db.delete(
+              'assignments',
+              where: 'id = ?',
+              whereArgs: [local['id']],
+            );
           }
         }
       }
 
       if (cloudDocs.isEmpty) {
         try {
-          await prefs?.setString('last_synced_at_assignments', DateTime.now().toIso8601String());
+          await prefs?.setString(
+            'last_synced_at_assignments',
+            DateTime.now().toIso8601String(),
+          );
         } catch (_) {}
         return;
       }
       for (final doc in cloudDocs) {
         final title = doc['title']?.toString() ?? 'Assignment';
-        final cleanTitle = title.toLowerCase().replaceAll(RegExp(r'[^a-z0-9]'), '_');
-        final rawId = doc['id']?.toString() ?? doc['cloud_id']?.toString() ?? doc['_docId']?.toString() ?? '';
-        final isDeleted = (!RegExp(r'^\d+$').hasMatch(rawId) && deletedAssignments.contains(rawId)) ||
-                          (cleanTitle.isNotEmpty && deletedAssignments.contains(cleanTitle));
+        final cleanTitle = title.toLowerCase().replaceAll(
+          RegExp(r'[^a-z0-9]'),
+          '_',
+        );
+        final rawId =
+            doc['id']?.toString() ??
+            doc['cloud_id']?.toString() ??
+            doc['_docId']?.toString() ??
+            '';
+        final isDeleted =
+            (!RegExp(r'^\d+$').hasMatch(rawId) &&
+                deletedAssignments.contains(rawId)) ||
+            (cleanTitle.isNotEmpty && deletedAssignments.contains(cleanTitle));
         if (isDeleted) {
           // Permanently deleted by user, do not resurrect into SQLite!
           continue;
@@ -9919,7 +10537,9 @@ class DatabaseHelper {
               'description': subName ?? 'Subject $targetSubjectId',
               'teacher_id': doc['teacher_id']?.toString() ?? 'teacher_1',
               'teacher_name': doc['teacher_name']?.toString(),
-              'created_at': doc['created_at']?.toString() ?? DateTime.now().toIso8601String(),
+              'created_at':
+                  doc['created_at']?.toString() ??
+                  DateTime.now().toIso8601String(),
             });
           } catch (_) {}
         }
@@ -10006,7 +10626,8 @@ class DatabaseHelper {
           final locId = loc['id'] as int;
           final title = (loc['title']?.toString() ?? '').toLowerCase().trim();
           final cId = loc['cloud_id']?.toString();
-          final isMock = title.contains('photosynthesis') ||
+          final isMock =
+              title.contains('photosynthesis') ||
               title.contains('flutter state management') ||
               title.contains('midterm research essay') ||
               title.contains('responsive design lab') ||
@@ -10015,8 +10636,15 @@ class DatabaseHelper {
               title.contains('newtonian dynamics') ||
               title.contains('penetration testing') ||
               title.contains('temporary assignment');
-          if (isMock || (validCloudIds.isNotEmpty && cId != null && !validCloudIds.contains(cId))) {
-            await db.delete('submissions', where: 'assignment_id = ?', whereArgs: [locId]);
+          if (isMock ||
+              (validCloudIds.isNotEmpty &&
+                  cId != null &&
+                  !validCloudIds.contains(cId))) {
+            await db.delete(
+              'submissions',
+              where: 'assignment_id = ?',
+              whereArgs: [locId],
+            );
             await db.delete('assignments', where: 'id = ?', whereArgs: [locId]);
           }
         }
@@ -10035,7 +10663,10 @@ class DatabaseHelper {
         '[DatabaseHelper] Synced ${cloudDocs.length} Cloud assignments to local SQLite',
       );
       try {
-        await prefs?.setString('last_synced_at_assignments', DateTime.now().toIso8601String());
+        await prefs?.setString(
+          'last_synced_at_assignments',
+          DateTime.now().toIso8601String(),
+        );
       } catch (_) {}
     } catch (e) {
       debugPrint('[DatabaseHelper] syncCloudAssignmentsToLocal note: $e');
@@ -10067,7 +10698,8 @@ class DatabaseHelper {
           '_',
         );
         final existingCloudId = a['cloud_id']?.toString();
-        final cloudDocId = (existingCloudId != null && existingCloudId.isNotEmpty)
+        final cloudDocId =
+            (existingCloudId != null && existingCloudId.isNotEmpty)
             ? existingCloudId
             : 'assign_${subCode}_${cleanTitle}_$aId';
 
@@ -10087,7 +10719,8 @@ class DatabaseHelper {
           'attachment_name': a['attachment_name'],
           'attachment_path': a['attachment_path'],
           'attachment_size': a['attachment_size'],
-          'attachment_bytes': null, // Kept local in SQLite, null in Cloud Firestore to preserve limits
+          'attachment_bytes':
+              null, // Kept local in SQLite, null in Cloud Firestore to preserve limits
           'status': a['status'] ?? 'active',
           'created_at': a['created_at'] ?? DateTime.now().toIso8601String(),
         };
@@ -10197,9 +10830,14 @@ class DatabaseHelper {
       try {
         prefs = await SharedPreferences.getInstance();
       } catch (_) {}
-      final localQuizCountRes = await db.rawQuery('SELECT COUNT(*) as cnt FROM quizzes');
-      final localQuizCount = (localQuizCountRes.first['cnt'] as num?)?.toInt() ?? 0;
-      final lastSync = (force || kIsWeb || localQuizCount == 0) ? null : prefs?.getString('last_synced_at_quizzes');
+      final localQuizCountRes = await db.rawQuery(
+        'SELECT COUNT(*) as cnt FROM quizzes',
+      );
+      final localQuizCount =
+          (localQuizCountRes.first['cnt'] as num?)?.toInt() ?? 0;
+      final lastSync = (force || kIsWeb || localQuizCount == 0)
+          ? null
+          : prefs?.getString('last_synced_at_quizzes');
 
       // 1. Fetch from Supabase first (unlimited reads, zero quota constraints)
       bool supabaseConnected = false;
@@ -10209,45 +10847,65 @@ class DatabaseHelper {
           final supaQuizzes = await SupabaseService.instance.fetchAllQuizzes();
           supabaseConnected = true;
           for (final sq in supaQuizzes) {
-            final subMap = sq['subjects'] is Map ? Map<String, dynamic>.from(sq['subjects']) : null;
+            final subMap = sq['subjects'] is Map
+                ? Map<String, dynamic>.from(sq['subjects'])
+                : null;
             cloudQuizzes.add({
               'id': int.tryParse(sq['id']?.toString() ?? '') ?? sq['id'],
               'cloud_id': sq['id']?.toString(),
               'title': sq['title'],
-              'subject_id': int.tryParse(sq['subject_id']?.toString() ?? '') ?? 1,
+              'subject_id':
+                  int.tryParse(sq['subject_id']?.toString() ?? '') ?? 1,
               'subject_code': subMap?['code']?.toString(),
               'subject_name': subMap?['name']?.toString(),
               'time_limit_minutes': sq['time_limit_minutes'] ?? 0,
-              'questions': sq['questions_json'] is List ? sq['questions_json'] : [],
+              'questions': sq['questions_json'] is List
+                  ? sq['questions_json']
+                  : [],
               'created_at': sq['created_at'],
             });
           }
         }
       } catch (e) {
-        debugPrint('[DatabaseHelper] syncCloudQuizzesToLocal Supabase note: $e');
+        debugPrint(
+          '[DatabaseHelper] syncCloudQuizzesToLocal Supabase note: $e',
+        );
       }
 
       // 2. Fall back to Firestore ONLY if Supabase was completely unreachable
       if (!supabaseConnected && !kIsWeb) {
         try {
-          cloudQuizzes = await FirestoreService().fetchDeltaDocuments(
-            'quizzes',
-            since: lastSync,
-          ).timeout(const Duration(seconds: 2), onTimeout: () => []);
+          cloudQuizzes = await FirestoreService()
+              .fetchDeltaDocuments('quizzes', since: lastSync)
+              .timeout(const Duration(seconds: 2), onTimeout: () => []);
           if (cloudQuizzes.isEmpty && (localQuizCount == 0 || force)) {
-            cloudQuizzes = await FirestoreService().fetchAllDocuments('quizzes')
+            cloudQuizzes = await FirestoreService()
+                .fetchAllDocuments('quizzes')
                 .timeout(const Duration(seconds: 2), onTimeout: () => []);
           }
         } catch (_) {}
       }
 
       // Always purge tombstones so deleted items never resurrect (only for non-numeric cloud IDs)
-      final deletedQuizzes = prefs?.getStringList('permanently_deleted_quizzes') ?? [];
+      final deletedQuizzes =
+          prefs?.getStringList('permanently_deleted_quizzes') ?? [];
       for (final delId in deletedQuizzes) {
         if (!RegExp(r'^\d+$').hasMatch(delId)) {
-          await db.delete('quiz_attempts', where: 'quiz_id IN (SELECT id FROM quizzes WHERE cloud_id = ?)', whereArgs: [delId]);
-          await db.delete('quiz_assignments', where: 'quiz_id IN (SELECT id FROM quizzes WHERE cloud_id = ?)', whereArgs: [delId]);
-          await db.delete('questions', where: 'quiz_id IN (SELECT id FROM quizzes WHERE cloud_id = ?)', whereArgs: [delId]);
+          await db.delete(
+            'quiz_attempts',
+            where: 'quiz_id IN (SELECT id FROM quizzes WHERE cloud_id = ?)',
+            whereArgs: [delId],
+          );
+          await db.delete(
+            'quiz_assignments',
+            where: 'quiz_id IN (SELECT id FROM quizzes WHERE cloud_id = ?)',
+            whereArgs: [delId],
+          );
+          await db.delete(
+            'questions',
+            where: 'quiz_id IN (SELECT id FROM quizzes WHERE cloud_id = ?)',
+            whereArgs: [delId],
+          );
           await db.delete('quizzes', where: 'cloud_id = ?', whereArgs: [delId]);
         }
       }
@@ -10257,11 +10915,16 @@ class DatabaseHelper {
         final activeCloudQuizIds = <String>{};
         final activeCloudQuizTitles = <String>{};
         for (final doc in cloudQuizzes) {
-          final idStr = doc['id']?.toString() ?? doc['_docId']?.toString() ?? '';
+          final idStr =
+              doc['id']?.toString() ?? doc['_docId']?.toString() ?? '';
           if (idStr.isNotEmpty) activeCloudQuizIds.add(idStr);
           final rawLocalId = doc['local_id']?.toString();
-          if (rawLocalId != null && rawLocalId.isNotEmpty) activeCloudQuizIds.add(rawLocalId);
-          final t = (doc['title']?.toString() ?? '').trim().toLowerCase().replaceAll(RegExp(r'[^a-z0-9]'), '_');
+          if (rawLocalId != null && rawLocalId.isNotEmpty)
+            activeCloudQuizIds.add(rawLocalId);
+          final t = (doc['title']?.toString() ?? '')
+              .trim()
+              .toLowerCase()
+              .replaceAll(RegExp(r'[^a-z0-9]'), '_');
           if (t.isNotEmpty) activeCloudQuizTitles.add(t);
         }
 
@@ -10269,18 +10932,45 @@ class DatabaseHelper {
         for (final local in allLocalQuizzes) {
           final localId = local['id']?.toString() ?? '';
           final localCloudId = local['cloud_id']?.toString() ?? '';
-          final localTitle = (local['title'] as String? ?? '').trim().toLowerCase().replaceAll(RegExp(r'[^a-z0-9]'), '_');
-          final isPresent = (localCloudId.isNotEmpty && activeCloudQuizIds.contains(localCloudId)) ||
-                            (!RegExp(r'^\d+$').hasMatch(localId) && activeCloudQuizIds.contains(localId)) ||
-                            (localTitle.isNotEmpty && activeCloudQuizTitles.contains(localTitle));
+          final localTitle = (local['title'] as String? ?? '')
+              .trim()
+              .toLowerCase()
+              .replaceAll(RegExp(r'[^a-z0-9]'), '_');
+          final isPresent =
+              (localCloudId.isNotEmpty &&
+                  activeCloudQuizIds.contains(localCloudId)) ||
+              (!RegExp(r'^\d+$').hasMatch(localId) &&
+                  activeCloudQuizIds.contains(localId)) ||
+              (localTitle.isNotEmpty &&
+                  activeCloudQuizTitles.contains(localTitle));
           if (!isPresent) {
-            await db.delete('quiz_attempts', where: 'quiz_id = ?', whereArgs: [local['id']]);
-            await db.delete('quiz_assignments', where: 'quiz_id = ?', whereArgs: [local['id']]);
-            await db.delete('questions', where: 'quiz_id = ?', whereArgs: [local['id']]);
+            await db.delete(
+              'quiz_attempts',
+              where: 'quiz_id = ?',
+              whereArgs: [local['id']],
+            );
+            await db.delete(
+              'quiz_assignments',
+              where: 'quiz_id = ?',
+              whereArgs: [local['id']],
+            );
+            await db.delete(
+              'questions',
+              where: 'quiz_id = ?',
+              whereArgs: [local['id']],
+            );
             try {
-              await db.delete('student_scores', where: 'quiz_id = ?', whereArgs: [local['id']]);
+              await db.delete(
+                'student_scores',
+                where: 'quiz_id = ?',
+                whereArgs: [local['id']],
+              );
             } catch (_) {}
-            await db.delete('quizzes', where: 'id = ?', whereArgs: [local['id']]);
+            await db.delete(
+              'quizzes',
+              where: 'id = ?',
+              whereArgs: [local['id']],
+            );
           }
         }
       }
@@ -10291,10 +10981,15 @@ class DatabaseHelper {
         if (title.trim().isEmpty || title == '1') {
           continue;
         }
-        final cleanTitle = title.toLowerCase().replaceAll(RegExp(r'[^a-z0-9]'), '_');
+        final cleanTitle = title.toLowerCase().replaceAll(
+          RegExp(r'[^a-z0-9]'),
+          '_',
+        );
         final rawQId = doc['id']?.toString() ?? doc['_docId']?.toString() ?? '';
-        final isDeleted = (!RegExp(r'^\d+$').hasMatch(rawQId) && deletedQuizzes.contains(rawQId)) ||
-                          (cleanTitle.isNotEmpty && deletedQuizzes.contains(cleanTitle));
+        final isDeleted =
+            (!RegExp(r'^\d+$').hasMatch(rawQId) &&
+                deletedQuizzes.contains(rawQId)) ||
+            (cleanTitle.isNotEmpty && deletedQuizzes.contains(cleanTitle));
         if (isDeleted) {
           // Permanently deleted by user, do not resurrect into SQLite!
           continue;
@@ -10349,7 +11044,9 @@ class DatabaseHelper {
               'description': subName ?? 'Subject $targetSubjectId',
               'teacher_id': doc['teacher_id']?.toString() ?? 'teacher_1',
               'teacher_name': doc['teacher_name']?.toString(),
-              'created_at': doc['created_at']?.toString() ?? DateTime.now().toIso8601String(),
+              'created_at':
+                  doc['created_at']?.toString() ??
+                  DateTime.now().toIso8601String(),
             });
           } catch (_) {}
         }
@@ -10412,8 +11109,12 @@ class DatabaseHelper {
           );
         }
 
-        final questions = (doc['questions'] as List?)
-                ?.map((item) => (item is Map) ? Map<String, dynamic>.from(item) : null)
+        final questions =
+            (doc['questions'] as List?)
+                ?.map(
+                  (item) =>
+                      (item is Map) ? Map<String, dynamic>.from(item) : null,
+                )
                 .whereType<Map<String, dynamic>>()
                 .toList() ??
             [];
@@ -10480,18 +11181,20 @@ class DatabaseHelper {
       var cloudAttempts = <Map<String, dynamic>>[];
       if (!kIsWeb) {
         try {
-          cloudAssignments = await FirestoreService().fetchDeltaDocuments(
-            'quiz_assignments',
-            since: lastSync,
-          ).timeout(const Duration(seconds: 2), onTimeout: () => []);
-          cloudAttempts = await FirestoreService().fetchDeltaDocuments(
-            'quiz_attempts',
-            since: lastSync,
-          ).timeout(const Duration(seconds: 2), onTimeout: () => []);
-          final localAttemptCountRes = await db.rawQuery('SELECT COUNT(*) as cnt FROM quiz_attempts');
-          final localAttemptCount = (localAttemptCountRes.first['cnt'] as num?)?.toInt() ?? 0;
+          cloudAssignments = await FirestoreService()
+              .fetchDeltaDocuments('quiz_assignments', since: lastSync)
+              .timeout(const Duration(seconds: 2), onTimeout: () => []);
+          cloudAttempts = await FirestoreService()
+              .fetchDeltaDocuments('quiz_attempts', since: lastSync)
+              .timeout(const Duration(seconds: 2), onTimeout: () => []);
+          final localAttemptCountRes = await db.rawQuery(
+            'SELECT COUNT(*) as cnt FROM quiz_attempts',
+          );
+          final localAttemptCount =
+              (localAttemptCountRes.first['cnt'] as num?)?.toInt() ?? 0;
           if (cloudAttempts.isEmpty && (localAttemptCount == 0 || force)) {
-            cloudAttempts = await FirestoreService().fetchAllDocuments('quiz_attempts')
+            cloudAttempts = await FirestoreService()
+                .fetchAllDocuments('quiz_attempts')
                 .timeout(const Duration(seconds: 2), onTimeout: () => []);
           }
         } catch (_) {}
@@ -10554,10 +11257,12 @@ class DatabaseHelper {
       for (final att in cloudAttempts) {
         final sid = att['student_id']?.toString() ?? '';
         if (sid.isEmpty) continue;
-        final docId = att['id']?.toString() ?? att['document_id']?.toString() ?? '';
+        final docId =
+            att['id']?.toString() ?? att['document_id']?.toString() ?? '';
         final qTitle = att['quiz_title']?.toString() ?? '';
         final lowerQTitle = qTitle.toLowerCase().trim();
-        final isGarbage = sid.contains('1794') ||
+        final isGarbage =
+            sid.contains('1794') ||
             sid.startsWith('s_anticheat_') ||
             sid.startsWith('student_reset_') ||
             sid.startsWith('student_lo_reset_') ||
@@ -10579,17 +11284,22 @@ class DatabaseHelper {
             lowerQTitle.startsWith('test');
         if (isGarbage) {
           if (docId.isNotEmpty) {
-            unawaited(FirestoreService().deleteDocument('quiz_attempts', docId));
+            unawaited(
+              FirestoreService().deleteDocument('quiz_attempts', docId),
+            );
           }
           continue;
         }
         final rawQId = (att['quiz_id'] as num?)?.toInt();
         final rawSubId = (att['subject_id'] as num?)?.toInt() ?? 1;
-        final attemptedAt = att['attempted_at']?.toString() ?? DateTime.now().toIso8601String();
+        final attemptedAt =
+            att['attempted_at']?.toString() ?? DateTime.now().toIso8601String();
         final score = (att['score'] as num?)?.toInt() ?? 0;
         final totalQuestions = (att['total_questions'] as num?)?.toInt() ?? 0;
         final percentage = (att['percentage'] as num?)?.toDouble() ?? 0.0;
-        final isPassed = (att['is_passed'] == 1 || att['is_passed'] == true) ? 1 : 0;
+        final isPassed = (att['is_passed'] == 1 || att['is_passed'] == true)
+            ? 1
+            : 0;
         final durationSeconds = (att['duration_seconds'] as num?)?.toInt() ?? 0;
         final loId = (att['lo_id'] as num?)?.toInt() ?? 0;
         final answers = att['answers']?.toString();
@@ -10648,7 +11358,10 @@ class DatabaseHelper {
         '[DatabaseHelper] Synced ${cloudQuizzes.length} Cloud quizzes to local SQLite',
       );
       try {
-        await prefs?.setString('last_synced_at_quizzes', DateTime.now().toIso8601String());
+        await prefs?.setString(
+          'last_synced_at_quizzes',
+          DateTime.now().toIso8601String(),
+        );
       } catch (_) {}
     } catch (e) {
       debugPrint('[DatabaseHelper] syncCloudQuizzesToLocal note: $e');
@@ -10700,7 +11413,8 @@ class DatabaseHelper {
           final seenLoTitles = <String>{};
 
           for (final lo in los) {
-            final loTitle = (lo['title']?.toString() ?? 'Learning Outcome').trim();
+            final loTitle = (lo['title']?.toString() ?? 'Learning Outcome')
+                .trim();
             final normLoTitle = loTitle.toLowerCase();
             if (seenLoTitles.contains(normLoTitle)) continue;
             seenLoTitles.add(normLoTitle);
@@ -10723,14 +11437,18 @@ class DatabaseHelper {
               var cData = c['content_data']?.toString() ?? '';
               try {
                 final decoded = jsonDecode(cData);
-                if (decoded is Map<String, dynamic> && decoded['is_file'] == true) {
+                if (decoded is Map<String, dynamic> &&
+                    decoded['is_file'] == true) {
                   final filePath = decoded['file_path']?.toString();
                   final fileBytesStr = decoded['file_bytes']?.toString();
-                  final fileName = decoded['file_name']?.toString() ?? 'material.pdf';
+                  final fileName =
+                      decoded['file_name']?.toString() ?? 'material.pdf';
 
-                  if ((filePath == null || !filePath.startsWith('http')) && CloudStorageService().isAvailable) {
+                  if ((filePath == null || !filePath.startsWith('http')) &&
+                      CloudStorageService().isAvailable) {
                     Uint8List? rawBytes;
-                    if (fileBytesStr != null && fileBytesStr.trim().isNotEmpty) {
+                    if (fileBytesStr != null &&
+                        fileBytesStr.trim().isNotEmpty) {
                       rawBytes = base64Decode(fileBytesStr.trim());
                     } else if (filePath != null && !kIsWeb) {
                       final f = File(filePath);
@@ -10738,20 +11456,27 @@ class DatabaseHelper {
                     }
 
                     if (rawBytes != null && rawBytes.isNotEmpty) {
-                      final upRes = await CloudStorageService().uploadCurriculumMaterial(
-                        loId: loId,
-                        fileName: fileName,
-                        bytes: rawBytes,
-                      );
+                      final upRes = await CloudStorageService()
+                          .uploadCurriculumMaterial(
+                            loId: loId,
+                            fileName: fileName,
+                            bytes: rawBytes,
+                          );
                       if (upRes.success && upRes.downloadUrl != null) {
                         decoded['file_path'] = upRes.downloadUrl;
                         cData = jsonEncode(decoded);
-                        await db.update('contents', {'content_data': cData}, where: 'id = ?', whereArgs: [c['id']]);
+                        await db.update(
+                          'contents',
+                          {'content_data': cData},
+                          where: 'id = ?',
+                          whereArgs: [c['id']],
+                        );
                       }
                     }
                   }
                   final cloudDecoded = Map<String, dynamic>.from(decoded);
-                  if (cloudDecoded['file_path'] != null && cloudDecoded['file_path'].toString().startsWith('http')) {
+                  if (cloudDecoded['file_path'] != null &&
+                      cloudDecoded['file_path'].toString().startsWith('http')) {
                     cloudDecoded.remove('file_bytes');
                   }
                   cData = jsonEncode(cloudDecoded);
@@ -10832,13 +11557,18 @@ class DatabaseHelper {
     _isSyncingCurriculum = true;
     try {
       final prefs = await SharedPreferences.getInstance();
-      final lastSync = force ? null : prefs.getString('last_synced_at_curriculum');
+      final lastSync = force
+          ? null
+          : prefs.getString('last_synced_at_curriculum');
       final cloudSubjects = await FirestoreService().fetchDeltaDocuments(
         'curriculum_subjects',
         since: lastSync,
       );
       if (cloudSubjects.isEmpty) {
-        await prefs.setString('last_synced_at_curriculum', DateTime.now().toIso8601String());
+        await prefs.setString(
+          'last_synced_at_curriculum',
+          DateTime.now().toIso8601String(),
+        );
         return;
       }
       final db = await database;
@@ -10947,7 +11677,8 @@ class DatabaseHelper {
           final seenIncomingLoTitles = <String>{};
 
           for (final lo in los) {
-            final loTitle = (lo['title']?.toString() ?? 'Learning Outcome').trim();
+            final loTitle = (lo['title']?.toString() ?? 'Learning Outcome')
+                .trim();
             final normLoTitle = loTitle.toLowerCase();
             if (seenIncomingLoTitles.contains(normLoTitle)) continue;
             seenIncomingLoTitles.add(normLoTitle);
@@ -10990,7 +11721,11 @@ class DatabaseHelper {
               if (matchLo.length > 1) {
                 for (int i = 1; i < matchLo.length; i++) {
                   final dupLoId = matchLo[i]['id'] as int;
-                  await db.delete('learning_outcomes', where: 'id = ?', whereArgs: [dupLoId]);
+                  await db.delete(
+                    'learning_outcomes',
+                    where: 'id = ?',
+                    whereArgs: [dupLoId],
+                  );
                 }
               }
             }
@@ -11036,9 +11771,15 @@ class DatabaseHelper {
               whereArgs: [localLoId],
             );
             for (final row in localContents) {
-              final locTitle = (row['title']?.toString() ?? '').trim().toLowerCase();
+              final locTitle = (row['title']?.toString() ?? '')
+                  .trim()
+                  .toLowerCase();
               if (!incomingContentTitles.contains(locTitle)) {
-                await db.delete('contents', where: 'id = ?', whereArgs: [row['id']]);
+                await db.delete(
+                  'contents',
+                  where: 'id = ?',
+                  whereArgs: [row['id']],
+                );
               }
             }
 
@@ -11090,9 +11831,15 @@ class DatabaseHelper {
               whereArgs: [localLoId],
             );
             for (final row in localQuestions) {
-              final locQText = (row['question_text']?.toString() ?? '').trim().toLowerCase();
+              final locQText = (row['question_text']?.toString() ?? '')
+                  .trim()
+                  .toLowerCase();
               if (!incomingQuestionTexts.contains(locQText)) {
-                await db.delete('questions', where: 'id = ?', whereArgs: [row['id']]);
+                await db.delete(
+                  'questions',
+                  where: 'id = ?',
+                  whereArgs: [row['id']],
+                );
               }
             }
           }
@@ -11105,12 +11852,26 @@ class DatabaseHelper {
             whereArgs: [localTopicId],
           );
           for (final row in localLos) {
-            final locLoTitle = (row['title']?.toString() ?? '').trim().toLowerCase();
+            final locLoTitle = (row['title']?.toString() ?? '')
+                .trim()
+                .toLowerCase();
             if (!seenIncomingLoTitles.contains(locLoTitle)) {
               final delLoId = row['id'] as int;
-              await db.delete('contents', where: 'lo_id = ?', whereArgs: [delLoId]);
-              await db.delete('questions', where: 'lo_id = ?', whereArgs: [delLoId]);
-              await db.delete('learning_outcomes', where: 'id = ?', whereArgs: [delLoId]);
+              await db.delete(
+                'contents',
+                where: 'lo_id = ?',
+                whereArgs: [delLoId],
+              );
+              await db.delete(
+                'questions',
+                where: 'lo_id = ?',
+                whereArgs: [delLoId],
+              );
+              await db.delete(
+                'learning_outcomes',
+                where: 'id = ?',
+                whereArgs: [delLoId],
+              );
             }
           }
         }
@@ -11123,21 +11884,43 @@ class DatabaseHelper {
           whereArgs: [localSubId],
         );
         for (final row in localTopics) {
-          final locTTitle = (row['title']?.toString() ?? '').trim().toLowerCase();
+          final locTTitle = (row['title']?.toString() ?? '')
+              .trim()
+              .toLowerCase();
           if (!seenIncomingTopicTitles.contains(locTTitle)) {
             final delTopicId = row['id'] as int;
-            final childLos = await db.query('learning_outcomes', columns: ['id'], where: 'topic_id = ?', whereArgs: [delTopicId]);
+            final childLos = await db.query(
+              'learning_outcomes',
+              columns: ['id'],
+              where: 'topic_id = ?',
+              whereArgs: [delTopicId],
+            );
             for (final loRow in childLos) {
               final delLoId = loRow['id'] as int;
-              await db.delete('contents', where: 'lo_id = ?', whereArgs: [delLoId]);
-              await db.delete('questions', where: 'lo_id = ?', whereArgs: [delLoId]);
+              await db.delete(
+                'contents',
+                where: 'lo_id = ?',
+                whereArgs: [delLoId],
+              );
+              await db.delete(
+                'questions',
+                where: 'lo_id = ?',
+                whereArgs: [delLoId],
+              );
             }
-            await db.delete('learning_outcomes', where: 'topic_id = ?', whereArgs: [delTopicId]);
+            await db.delete(
+              'learning_outcomes',
+              where: 'topic_id = ?',
+              whereArgs: [delTopicId],
+            );
             await db.delete('topics', where: 'id = ?', whereArgs: [delTopicId]);
           }
         }
       }
-      await prefs.setString('last_synced_at_curriculum', DateTime.now().toIso8601String());
+      await prefs.setString(
+        'last_synced_at_curriculum',
+        DateTime.now().toIso8601String(),
+      );
     } catch (e) {
       debugPrint('[DatabaseHelper] syncCloudCurriculumToLocal note: $e');
     } finally {
@@ -11179,7 +11962,11 @@ class DatabaseHelper {
             }
 
             // Ensure student user exists in Supabase to satisfy foreign key constraint
-            final userRow = await db.query('users', where: 'id = ?', whereArgs: [sId]);
+            final userRow = await db.query(
+              'users',
+              where: 'id = ?',
+              whereArgs: [sId],
+            );
             final u = userRow.isNotEmpty ? userRow.first : null;
             await SupabaseService.instance.upsertUser({
               'id': sId,
@@ -11204,14 +11991,19 @@ class DatabaseHelper {
               assignmentId: canonicalCloudId,
               studentId: sId,
               textResponse: s['text_response']?.toString(),
-              attachmentUrl: (s['storage_url'] ?? s['content_link'])?.toString(),
-              score: (s['grade'] is num) ? (s['grade'] as num).toDouble() : null,
+              attachmentUrl: (s['storage_url'] ?? s['content_link'])
+                  ?.toString(),
+              score: (s['grade'] is num)
+                  ? (s['grade'] as num).toDouble()
+                  : null,
               feedback: s['feedback']?.toString(),
               submittedAt: s['submitted_at']?.toString(),
               metadata: meta,
             );
           } catch (supaErr) {
-            debugPrint('[DatabaseHelper] pushLocalSubmissionsToCloud Supabase error: $supaErr');
+            debugPrint(
+              '[DatabaseHelper] pushLocalSubmissionsToCloud Supabase error: $supaErr',
+            );
           }
         }
 
@@ -11219,15 +12011,25 @@ class DatabaseHelper {
         final mutable = Map<String, dynamic>.from(s);
         var imgBytes = mutable['image_bytes']?.toString();
         final imgPath = mutable['image_path']?.toString();
-        if ((imgBytes == null || imgBytes.isEmpty) && imgPath != null && !kIsWeb) {
+        if ((imgBytes == null || imgBytes.isEmpty) &&
+            imgPath != null &&
+            !kIsWeb) {
           try {
             final f = File(imgPath);
             if (f.existsSync()) {
               final raw = await f.readAsBytes();
-              final comp = await ImageCompressHelper.compressImage(raw, maxDimension: 1200);
+              final comp = await ImageCompressHelper.compressImage(
+                raw,
+                maxDimension: 1200,
+              );
               imgBytes = base64Encode(comp);
               mutable['image_bytes'] = imgBytes;
-              await db.update('submissions', {'image_bytes': imgBytes}, where: 'id = ?', whereArgs: [s['id']]);
+              await db.update(
+                'submissions',
+                {'image_bytes': imgBytes},
+                where: 'id = ?',
+                whereArgs: [s['id']],
+              );
             }
           } catch (_) {}
         }
@@ -11235,7 +12037,10 @@ class DatabaseHelper {
           try {
             final raw = ImageCompressHelper.safeDecodeBase64(imgBytes);
             if (raw != null) {
-              final comp = await ImageCompressHelper.compressImage(raw, maxDimension: 800);
+              final comp = await ImageCompressHelper.compressImage(
+                raw,
+                maxDimension: 800,
+              );
               imgBytes = base64Encode(comp);
               mutable['image_bytes'] = imgBytes;
             }
@@ -11246,11 +12051,7 @@ class DatabaseHelper {
         }
 
         mutable['file_bytes'] = null; // Preserve 1MB Firestore limit
-        await FirestoreService().saveDocument(
-          'submissions',
-          docId,
-          mutable,
-        );
+        await FirestoreService().saveDocument('submissions', docId, mutable);
       }
     } catch (e) {
       debugPrint('[DatabaseHelper] pushLocalSubmissionsToCloud note: $e');
@@ -11263,8 +12064,12 @@ class DatabaseHelper {
   /// Throttled to 20 seconds unless [force] is true to prevent redundant bursts.
   Future<void> syncAllCloudData({bool force = false}) async {
     final now = DateTime.now();
-    if (!force && _lastFullSyncTime != null && now.difference(_lastFullSyncTime!) < const Duration(seconds: 20)) {
-      debugPrint('[DatabaseHelper] syncAllCloudData throttled (last full sync ${now.difference(_lastFullSyncTime!).inSeconds}s ago)');
+    if (!force &&
+        _lastFullSyncTime != null &&
+        now.difference(_lastFullSyncTime!) < const Duration(seconds: 20)) {
+      debugPrint(
+        '[DatabaseHelper] syncAllCloudData throttled (last full sync ${now.difference(_lastFullSyncTime!).inSeconds}s ago)',
+      );
       return;
     }
     _lastFullSyncTime = now;
@@ -11314,7 +12119,10 @@ class DatabaseHelper {
   /// Sync student submissions from Cloud Firestore down to local SQLite cache.
   /// Uses role-scoping: students ONLY pull their own submissions, not the entire school!
   /// Uses delta querying via 'last_synced_at_submissions' so 0 reads are consumed if nothing changed!
-  Future<void> syncCloudSubmissionsToLocal({int? assignmentId, bool force = false}) async {
+  Future<void> syncCloudSubmissionsToLocal({
+    int? assignmentId,
+    bool force = false,
+  }) async {
     try {
       SharedPreferences? prefs;
       try {
@@ -11322,7 +12130,9 @@ class DatabaseHelper {
       } catch (_) {}
       final currentRole = prefs?.getString('auth_session_role');
       final currentUserId = prefs?.getString('auth_session_user_id');
-      final lastSync = force ? null : prefs?.getString('last_synced_at_submissions');
+      final lastSync = force
+          ? null
+          : prefs?.getString('last_synced_at_submissions');
 
       final db = await database;
 
@@ -11389,28 +12199,44 @@ class DatabaseHelper {
               final decoded = jsonDecode(rawText);
               if (decoded is Map<String, dynamic>) {
                 meta = decoded;
-                rawText = meta['raw_text_response']?.toString() ?? meta['text']?.toString();
+                rawText =
+                    meta['raw_text_response']?.toString() ??
+                    meta['text']?.toString();
               }
             } catch (_) {}
           }
 
-          final userObj = row['users'] is Map ? row['users'] as Map<String, dynamic> : null;
-          final studentName = meta['student_name']?.toString() ?? userObj?['full_name']?.toString();
-          final studentSec = meta['student_section']?.toString() ?? userObj?['section']?.toString();
+          final userObj = row['users'] is Map
+              ? row['users'] as Map<String, dynamic>
+              : null;
+          final studentName =
+              meta['student_name']?.toString() ??
+              userObj?['full_name']?.toString();
+          final studentSec =
+              meta['student_section']?.toString() ??
+              userObj?['section']?.toString();
           final submissionType = meta['submission_type']?.toString() ?? 'both';
           final contentLink = meta['content_link']?.toString();
           final fileName = meta['file_name']?.toString();
           final fileSize = (meta['file_size'] as num?)?.toInt();
-          final storageUrl = (meta['storage_url'] ?? row['attachment_url'])?.toString();
+          final storageUrl = (meta['storage_url'] ?? row['attachment_url'])
+              ?.toString();
           final notes = meta['notes']?.toString();
-          final submittedAt = row['submitted_at']?.toString() ?? DateTime.now().toIso8601String();
-          final isResubAllowed = meta['resubmission_allowed'] == true ||
+          final submittedAt =
+              row['submitted_at']?.toString() ??
+              DateTime.now().toIso8601String();
+          final isResubAllowed =
+              meta['resubmission_allowed'] == true ||
               meta['status'] == 'resubmission_allowed' ||
               row['status'] == 'resubmission_allowed';
           final status = isResubAllowed
               ? 'resubmission_allowed'
-              : (meta['status']?.toString() ?? row['status']?.toString() ?? (row['score'] != null ? 'graded' : 'submitted'));
-          final grade = (row['score'] is num) ? (row['score'] as num).toDouble() : null;
+              : (meta['status']?.toString() ??
+                    row['status']?.toString() ??
+                    (row['score'] != null ? 'graded' : 'submitted'));
+          final grade = (row['score'] is num)
+              ? (row['score'] as num).toDouble()
+              : null;
           final feedback = row['feedback']?.toString();
 
           final subMap = {
@@ -11436,7 +12262,8 @@ class DatabaseHelper {
             final existingSub = await db.query(
               'submissions',
               columns: ['id'],
-              where: '(assignment_cloud_id = ? OR assignment_id = ?) AND student_id = ?',
+              where:
+                  '(assignment_cloud_id = ? OR assignment_id = ?) AND student_id = ?',
               whereArgs: [cAssignId, targetAssignmentId, sId],
             );
             if (existingSub.isNotEmpty) {
@@ -11452,47 +12279,64 @@ class DatabaseHelper {
           }
         }
       } catch (supaErr) {
-        debugPrint('[DatabaseHelper] syncCloudSubmissionsToLocal Supabase note: $supaErr');
+        debugPrint(
+          '[DatabaseHelper] syncCloudSubmissionsToLocal Supabase note: $supaErr',
+        );
       }
 
       // 2. Secondary fallback: Firestore (wrapped in try/catch to protect against 429 quota exhaustion)
       List<Map<String, dynamic>> cloudDocs = [];
       try {
-        if (currentRole == 'student' && currentUserId != null && currentUserId.isNotEmpty) {
-          cloudDocs = await FirestoreService().fetchDeltaDocuments(
-            'submissions',
-            whereField: 'student_id',
-            whereValue: currentUserId,
-            since: lastSync,
-          ).timeout(const Duration(seconds: 3), onTimeout: () => []);
+        if (currentRole == 'student' &&
+            currentUserId != null &&
+            currentUserId.isNotEmpty) {
+          cloudDocs = await FirestoreService()
+              .fetchDeltaDocuments(
+                'submissions',
+                whereField: 'student_id',
+                whereValue: currentUserId,
+                since: lastSync,
+              )
+              .timeout(const Duration(seconds: 3), onTimeout: () => []);
         } else {
-          cloudDocs = await FirestoreService().fetchDeltaDocuments(
-            'submissions',
-            since: lastSync,
-          ).timeout(const Duration(seconds: 3), onTimeout: () => []);
+          cloudDocs = await FirestoreService()
+              .fetchDeltaDocuments('submissions', since: lastSync)
+              .timeout(const Duration(seconds: 3), onTimeout: () => []);
         }
 
-        final localCountRes = await db.rawQuery('SELECT COUNT(*) as cnt FROM submissions');
+        final localCountRes = await db.rawQuery(
+          'SELECT COUNT(*) as cnt FROM submissions',
+        );
         final localCount = (localCountRes.first['cnt'] as num?)?.toInt() ?? 0;
         if (cloudDocs.isEmpty && (localCount == 0 || force)) {
-          if (currentRole == 'student' && currentUserId != null && currentUserId.isNotEmpty) {
-            cloudDocs = await FirestoreService().fetchDeltaDocuments(
-              'submissions',
-              whereField: 'student_id',
-              whereValue: currentUserId,
-            ).timeout(const Duration(seconds: 3), onTimeout: () => []);
+          if (currentRole == 'student' &&
+              currentUserId != null &&
+              currentUserId.isNotEmpty) {
+            cloudDocs = await FirestoreService()
+                .fetchDeltaDocuments(
+                  'submissions',
+                  whereField: 'student_id',
+                  whereValue: currentUserId,
+                )
+                .timeout(const Duration(seconds: 3), onTimeout: () => []);
           } else {
-            cloudDocs = await FirestoreService().fetchAllDocuments('submissions')
+            cloudDocs = await FirestoreService()
+                .fetchAllDocuments('submissions')
                 .timeout(const Duration(seconds: 3), onTimeout: () => []);
           }
         }
       } catch (firestoreErr) {
-        debugPrint('[DatabaseHelper] syncCloudSubmissionsToLocal Firestore skipped (quota/offline): $firestoreErr');
+        debugPrint(
+          '[DatabaseHelper] syncCloudSubmissionsToLocal Firestore skipped (quota/offline): $firestoreErr',
+        );
       }
 
       if (cloudDocs.isEmpty) {
         try {
-          await prefs?.setString('last_synced_at_submissions', DateTime.now().toIso8601String());
+          await prefs?.setString(
+            'last_synced_at_submissions',
+            DateTime.now().toIso8601String(),
+          );
         } catch (_) {}
         return;
       }
@@ -11576,7 +12420,8 @@ class DatabaseHelper {
         if (existingSub.isNotEmpty) {
           final existingStatus = existingSub.first['status']?.toString();
           // Never overwrite an unlocked resubmission state with stale Firestore data
-          if (existingStatus == 'resubmission_allowed' && status != 'resubmission_allowed') {
+          if (existingStatus == 'resubmission_allowed' &&
+              status != 'resubmission_allowed') {
             continue;
           }
           final existingSubId = existingSub.first['id'] as int;
@@ -11602,7 +12447,10 @@ class DatabaseHelper {
       } catch (_) {}
 
       try {
-        await prefs?.setString('last_synced_at_submissions', DateTime.now().toIso8601String());
+        await prefs?.setString(
+          'last_synced_at_submissions',
+          DateTime.now().toIso8601String(),
+        );
       } catch (_) {}
     } catch (e) {
       debugPrint('[DatabaseHelper] syncCloudSubmissionsToLocal note: $e');
@@ -11633,19 +12481,31 @@ class DatabaseHelper {
     String? localSubCode;
     String? localSubName;
     try {
-      final curSub = await db.query('subjects', where: 'id = ?', whereArgs: [subjectId]);
+      final curSub = await db.query(
+        'subjects',
+        where: 'id = ?',
+        whereArgs: [subjectId],
+      );
       if (curSub.isNotEmpty) {
         localSubCode = curSub.first['subject_code']?.toString().toUpperCase();
         localSubName = curSub.first['name']?.toString().trim().toUpperCase();
         if (localSubCode != null && localSubCode.isNotEmpty) {
-          final sameCode = await db.query('subjects', where: 'UPPER(subject_code) = ?', whereArgs: [localSubCode]);
+          final sameCode = await db.query(
+            'subjects',
+            where: 'UPPER(subject_code) = ?',
+            whereArgs: [localSubCode],
+          );
           for (final s in sameCode) {
             final id = s['id'] as int;
             if (!matchingSubIds.contains(id)) matchingSubIds.add(id);
           }
         }
         if (localSubName != null && localSubName.isNotEmpty) {
-          final sameName = await db.query('subjects', where: 'UPPER(TRIM(name)) = ?', whereArgs: [localSubName]);
+          final sameName = await db.query(
+            'subjects',
+            where: 'UPPER(TRIM(name)) = ?',
+            whereArgs: [localSubName],
+          );
           for (final s in sameName) {
             final id = s['id'] as int;
             if (!matchingSubIds.contains(id)) matchingSubIds.add(id);
@@ -11655,31 +12515,35 @@ class DatabaseHelper {
     } catch (_) {}
 
     final inClause = matchingSubIds.map((_) => '?').join(',');
-    final assignments = await db.rawQuery(
-      '''
+    final assignments = await db.rawQuery('''
       SELECT a.*,
              (SELECT COUNT(*) FROM submissions WHERE assignment_id = a.id) as submission_count,
              (SELECT COUNT(*) FROM submissions WHERE assignment_id = a.id AND status = 'graded') as graded_count
       FROM assignments a
       WHERE a.subject_id IN ($inClause)
       ORDER BY a.created_at DESC
-    ''',
-      matchingSubIds,
-    );
+    ''', matchingSubIds);
 
     SharedPreferences? prefs;
     try {
       prefs = await SharedPreferences.getInstance();
     } catch (_) {}
-    final deletedAssignments = prefs?.getStringList('permanently_deleted_assignments') ?? [];
+    final deletedAssignments =
+        prefs?.getStringList('permanently_deleted_assignments') ?? [];
 
     final List<Map<String, dynamic>> filtered = [];
     for (final a in assignments) {
       final cloudId = a['cloud_id']?.toString() ?? '';
       final title = (a['title'] as String? ?? '').trim();
-      final cleanTitle = title.toLowerCase().replaceAll(RegExp(r'[^a-z0-9]'), '_');
-      final isDeleted = (cloudId.isNotEmpty && !RegExp(r'^\d+$').hasMatch(cloudId) && deletedAssignments.contains(cloudId)) ||
-                        (cleanTitle.isNotEmpty && deletedAssignments.contains(cleanTitle));
+      final cleanTitle = title.toLowerCase().replaceAll(
+        RegExp(r'[^a-z0-9]'),
+        '_',
+      );
+      final isDeleted =
+          (cloudId.isNotEmpty &&
+              !RegExp(r'^\d+$').hasMatch(cloudId) &&
+              deletedAssignments.contains(cloudId)) ||
+          (cleanTitle.isNotEmpty && deletedAssignments.contains(cleanTitle));
       if (isDeleted) {
         continue;
       }
@@ -11696,10 +12560,15 @@ class DatabaseHelper {
         );
         for (final sa in supaAssignments) {
           final title = (sa['title'] as String? ?? '').trim();
-          final cleanTitle = title.toLowerCase().replaceAll(RegExp(r'[^a-z0-9]'), '_');
+          final cleanTitle = title.toLowerCase().replaceAll(
+            RegExp(r'[^a-z0-9]'),
+            '_',
+          );
           final aIdStr = sa['id']?.toString() ?? '';
-          if ((!RegExp(r'^\d+$').hasMatch(aIdStr) && deletedAssignments.contains(aIdStr)) ||
-              (cleanTitle.isNotEmpty && deletedAssignments.contains(cleanTitle))) {
+          if ((!RegExp(r'^\d+$').hasMatch(aIdStr) &&
+                  deletedAssignments.contains(aIdStr)) ||
+              (cleanTitle.isNotEmpty &&
+                  deletedAssignments.contains(cleanTitle))) {
             continue;
           }
           final aId = int.tryParse(aIdStr) ?? 1;
@@ -11717,11 +12586,15 @@ class DatabaseHelper {
             'status': sa['status']?.toString() ?? 'active',
             'submission_count': 0,
             'graded_count': 0,
-            'created_at': sa['created_at']?.toString() ?? DateTime.now().toIso8601String(),
+            'created_at':
+                sa['created_at']?.toString() ??
+                DateTime.now().toIso8601String(),
           });
         }
       } catch (e) {
-        debugPrint('[DatabaseHelper] getAssignmentsForSubject Supabase fallback notice: $e');
+        debugPrint(
+          '[DatabaseHelper] getAssignmentsForSubject Supabase fallback notice: $e',
+        );
       }
     }
 
@@ -11795,10 +12668,14 @@ class DatabaseHelper {
       if (rawTarget.startsWith('[') && rawTarget.endsWith(']')) {
         try {
           final List<dynamic> decoded = jsonDecode(rawTarget);
-          targetSet.addAll(decoded.map((e) => e.toString().trim().toLowerCase()));
+          targetSet.addAll(
+            decoded.map((e) => e.toString().trim().toLowerCase()),
+          );
         } catch (_) {}
       } else {
-        targetSet.addAll(rawTarget.split(',').map((s) => s.trim().toLowerCase()));
+        targetSet.addAll(
+          rawTarget.split(',').map((s) => s.trim().toLowerCase()),
+        );
       }
 
       if (targetSet.contains('*') ||
@@ -11814,7 +12691,8 @@ class DatabaseHelper {
     try {
       prefs = await SharedPreferences.getInstance();
     } catch (_) {}
-    final deletedAssignments = prefs?.getStringList('permanently_deleted_assignments') ?? [];
+    final deletedAssignments =
+        prefs?.getStringList('permanently_deleted_assignments') ?? [];
 
     // Deduplicate assignments so that if multiple rows exist for the same assignment, only one is returned (preferring the one with an active submission)
     final Map<String, Map<String, dynamic>> deduped = {};
@@ -11822,17 +12700,22 @@ class DatabaseHelper {
       final aId = a['id']?.toString() ?? '';
       final cloudId = a['cloud_id']?.toString() ?? '';
       final title = (a['title'] as String? ?? '').trim();
-      final cleanTitle = title.toLowerCase().replaceAll(RegExp(r'[^a-z0-9]'), '_');
+      final cleanTitle = title.toLowerCase().replaceAll(
+        RegExp(r'[^a-z0-9]'),
+        '_',
+      );
       if (deletedAssignments.contains(aId) ||
           (cloudId.isNotEmpty && deletedAssignments.contains(cloudId)) ||
           (cleanTitle.isNotEmpty && deletedAssignments.contains(cleanTitle))) {
         continue;
       }
-      final key = '${a['title']?.toString().toLowerCase().trim()}_${a['subject_id']}';
+      final key =
+          '${a['title']?.toString().toLowerCase().trim()}_${a['subject_id']}';
       if (!deduped.containsKey(key)) {
         deduped[key] = a;
       } else {
-        if (a['submission_id'] != null && deduped[key]!['submission_id'] == null) {
+        if (a['submission_id'] != null &&
+            deduped[key]!['submission_id'] == null) {
           deduped[key] = a;
         }
       }
@@ -11851,7 +12734,8 @@ class DatabaseHelper {
     // 1. Direct match by local ID or cloud ID for this student (most recent first)
     final res = await db.query(
       'submissions',
-      where: '(assignment_id = ? OR (assignment_cloud_id IS NOT NULL AND assignment_cloud_id = ?)) AND student_id = ?',
+      where:
+          '(assignment_id = ? OR (assignment_cloud_id IS NOT NULL AND assignment_cloud_id = ?)) AND student_id = ?',
       whereArgs: [assignmentId, cloudId ?? '', studentId],
       orderBy: 'id DESC',
     );
@@ -11861,10 +12745,13 @@ class DatabaseHelper {
     try {
       final prefs = await SharedPreferences.getInstance();
       final savedUserId = prefs.getString('auth_session_user_id');
-      if (savedUserId != null && savedUserId.isNotEmpty && savedUserId != studentId) {
+      if (savedUserId != null &&
+          savedUserId.isNotEmpty &&
+          savedUserId != studentId) {
         final savedRes = await db.query(
           'submissions',
-          where: '(assignment_id = ? OR (assignment_cloud_id IS NOT NULL AND assignment_cloud_id = ?)) AND student_id = ?',
+          where:
+              '(assignment_id = ? OR (assignment_cloud_id IS NOT NULL AND assignment_cloud_id = ?)) AND student_id = ?',
           whereArgs: [assignmentId, cloudId ?? '', savedUserId],
         );
         if (savedRes.isNotEmpty) return savedRes.first;
@@ -11875,7 +12762,8 @@ class DatabaseHelper {
     if (studentId == 'student_1' || studentId == 'guest') {
       final anyRes = await db.query(
         'submissions',
-        where: 'assignment_id = ? OR (assignment_cloud_id IS NOT NULL AND assignment_cloud_id = ?)',
+        where:
+            'assignment_id = ? OR (assignment_cloud_id IS NOT NULL AND assignment_cloud_id = ?)',
         whereArgs: [assignmentId, cloudId ?? ''],
         orderBy: 'submitted_at DESC',
         limit: 1,
@@ -11940,7 +12828,10 @@ class DatabaseHelper {
 
     final subjectId = (assignment['subject_id'] as int?) ?? 0;
     final cloudId = assignment['cloud_id']?.toString() ?? '';
-    final cleanTitle = (assignment['title'] as String? ?? '').trim().toLowerCase().replaceAll(RegExp(r'[^a-z0-9]'), '_');
+    final cleanTitle = (assignment['title'] as String? ?? '')
+        .trim()
+        .toLowerCase()
+        .replaceAll(RegExp(r'[^a-z0-9]'), '_');
     final dueDateStr = assignment['due_date'] as String?;
     DateTime? dueDate;
     if (dueDateStr != null && dueDateStr.isNotEmpty) {
@@ -12095,7 +12986,9 @@ class DatabaseHelper {
     String? notes,
   }) async {
     if (fileSize != null && fileSize > 10 * 1024 * 1024) {
-      throw Exception('Submitted file size ($fileSize bytes) exceeds the 10 MB limit.');
+      throw Exception(
+        'Submitted file size ($fileSize bytes) exceeds the 10 MB limit.',
+      );
     }
     final db = await database;
     final now = DateTime.now().toIso8601String();
@@ -12106,7 +12999,8 @@ class DatabaseHelper {
       where: 'assignment_id = ? AND student_id = ?',
       whereArgs: [assignmentId, studentId],
     );
-    final isResubmissionAllowed = existingSub.isNotEmpty &&
+    final isResubmissionAllowed =
+        existingSub.isNotEmpty &&
         existingSub.first['status'] == 'resubmission_allowed';
 
     // Check if submission is late and enforce 3-day grace period
@@ -12127,8 +13021,10 @@ class DatabaseHelper {
           if (submissionTime.isAfter(graceEnd)) {
             // Past 3-day grace period: only allowed if teacher explicitly unlocked it
             if (!isResubmissionAllowed) {
-              final formattedGraceEnd =
-                  graceEnd.toIso8601String().substring(0, 16).replaceAll('T', ' ');
+              final formattedGraceEnd = graceEnd
+                  .toIso8601String()
+                  .substring(0, 16)
+                  .replaceAll('T', ' ');
               throw Exception(
                 'Submission closed: The deadline passed and the 3-day grace period expired on $formattedGraceEnd. Contact your teacher if you need an extension.',
               );
@@ -12137,7 +13033,8 @@ class DatabaseHelper {
           status = 'late';
         }
       } catch (e) {
-        if (e is Exception && e.toString().contains('Submission closed')) rethrow;
+        if (e is Exception && e.toString().contains('Submission closed'))
+          rethrow;
       }
     }
 
@@ -12184,7 +13081,11 @@ class DatabaseHelper {
     // 1. Sync submission to Supabase PostgreSQL (Primary live backend)
     if (SupabaseService.instance.isInitialized) {
       try {
-        final userRow = await db.query('users', where: 'id = ?', whereArgs: [studentId]);
+        final userRow = await db.query(
+          'users',
+          where: 'id = ?',
+          whereArgs: [studentId],
+        );
         final u = userRow.isNotEmpty ? userRow.first : null;
         await SupabaseService.instance.upsertUser({
           'id': studentId,
@@ -12214,7 +13115,9 @@ class DatabaseHelper {
           metadata: meta,
         );
       } catch (supaErr) {
-        debugPrint('[DatabaseHelper] submitAssignment Supabase sync error: $supaErr');
+        debugPrint(
+          '[DatabaseHelper] submitAssignment Supabase sync error: $supaErr',
+        );
       }
     }
 
@@ -12227,9 +13130,17 @@ class DatabaseHelper {
           final f = File(imagePath);
           if (f.existsSync()) {
             final raw = await f.readAsBytes();
-            final comp = await ImageCompressHelper.compressImage(raw, maxDimension: 1200);
+            final comp = await ImageCompressHelper.compressImage(
+              raw,
+              maxDimension: 1200,
+            );
             safeImageBytes = base64Encode(comp);
-            await db.update('submissions', {'image_bytes': safeImageBytes}, where: 'id = ?', whereArgs: [id]);
+            await db.update(
+              'submissions',
+              {'image_bytes': safeImageBytes},
+              where: 'id = ?',
+              whereArgs: [id],
+            );
           }
         } catch (_) {}
       }
@@ -12237,7 +13148,10 @@ class DatabaseHelper {
         try {
           final raw = ImageCompressHelper.safeDecodeBase64(safeImageBytes);
           if (raw != null) {
-            final comp = await ImageCompressHelper.compressImage(raw, maxDimension: 800);
+            final comp = await ImageCompressHelper.compressImage(
+              raw,
+              maxDimension: 800,
+            );
             safeImageBytes = base64Encode(comp);
           }
         } catch (_) {}
@@ -12249,13 +13163,16 @@ class DatabaseHelper {
       unawaited(
         FirestoreService().saveDocument('submissions', docId, {
           ...subData,
-          'file_bytes': null, // Kept in local SQLite, omitted from Cloud Firestore to preserve 1MB limits & bandwidth
+          'file_bytes':
+              null, // Kept in local SQLite, omitted from Cloud Firestore to preserve 1MB limits & bandwidth
           'image_bytes': safeImageBytes,
           'id': id,
         }),
       );
     } catch (e, st) {
-      debugPrint('[DatabaseHelper] submitAssignment Firestore sync error: $e\n$st');
+      debugPrint(
+        '[DatabaseHelper] submitAssignment Firestore sync error: $e\n$st',
+      );
     }
 
     // 2. Automatically notify the assignment's teacher!
@@ -12323,15 +13240,14 @@ class DatabaseHelper {
               unawaited(
                 SupabaseService.instance.client
                     ?.from('submissions')
-                    .update({
-                      'score': grade,
-                      'feedback': feedback,
-                    })
+                    .update({'score': grade, 'feedback': feedback})
                     .eq('assignment_id', cloudAssignId)
                     .eq('student_id', studentId),
               );
             } catch (supaErr) {
-              debugPrint('[DatabaseHelper] gradeSubmission Supabase note: $supaErr');
+              debugPrint(
+                '[DatabaseHelper] gradeSubmission Supabase note: $supaErr',
+              );
             }
           }
           final docId = (cloudAssignId != null && cloudAssignId.isNotEmpty)
@@ -12377,7 +13293,9 @@ class DatabaseHelper {
         }
       }
     } catch (e, st) {
-      debugPrint('[DatabaseHelper] gradeSubmission Firestore sync error: $e\n$st');
+      debugPrint(
+        '[DatabaseHelper] gradeSubmission Firestore sync error: $e\n$st',
+      );
     }
 
     return updated;
@@ -12414,7 +13332,8 @@ class DatabaseHelper {
             cloudAssignId = assign?['cloud_id'] as String?;
           }
 
-          final targetCloudAssignId = (cloudAssignId != null && cloudAssignId.isNotEmpty)
+          final targetCloudAssignId =
+              (cloudAssignId != null && cloudAssignId.isNotEmpty)
               ? cloudAssignId
               : assignmentId.toString();
 
@@ -12426,7 +13345,9 @@ class DatabaseHelper {
                   ?.from('submissions')
                   .select('*')
                   .eq('student_id', studentId)
-                  .or('assignment_id.eq.$targetCloudAssignId,assignment_id.eq.$assignmentId');
+                  .or(
+                    'assignment_id.eq.$targetCloudAssignId,assignment_id.eq.$assignmentId',
+                  );
 
               Map<String, dynamic> mergedMeta = {
                 'status': status,
@@ -12450,30 +13371,26 @@ class DatabaseHelper {
                 if (rowId != null && rowId.isNotEmpty) {
                   await SupabaseService.instance.client
                       ?.from('submissions')
-                      .update({
-                        'text_response': jsonEncode(mergedMeta),
-                      })
+                      .update({'text_response': jsonEncode(mergedMeta)})
                       .eq('id', rowId);
                 } else {
                   await SupabaseService.instance.client
                       ?.from('submissions')
-                      .update({
-                        'text_response': jsonEncode(mergedMeta),
-                      })
+                      .update({'text_response': jsonEncode(mergedMeta)})
                       .eq('assignment_id', targetCloudAssignId)
                       .eq('student_id', studentId);
                 }
               } else {
                 await SupabaseService.instance.client
                     ?.from('submissions')
-                    .update({
-                      'text_response': jsonEncode(mergedMeta),
-                    })
+                    .update({'text_response': jsonEncode(mergedMeta)})
                     .eq('assignment_id', targetCloudAssignId)
                     .eq('student_id', studentId);
               }
             } catch (supaErr) {
-              debugPrint('[DatabaseHelper] setSubmissionResubmissionAllowed Supabase note: $supaErr');
+              debugPrint(
+                '[DatabaseHelper] setSubmissionResubmissionAllowed Supabase note: $supaErr',
+              );
             }
           }
 
@@ -12488,11 +13405,12 @@ class DatabaseHelper {
           );
           if (docId != '${assignmentId}_$studentId') {
             unawaited(
-              FirestoreService().saveDocument('submissions', '${assignmentId}_$studentId', {
-                'status': status,
-                'resubmission_allowed': allowed,
-                'updated_at': DateTime.now().toIso8601String(),
-              }),
+              FirestoreService()
+                  .saveDocument('submissions', '${assignmentId}_$studentId', {
+                    'status': status,
+                    'resubmission_allowed': allowed,
+                    'updated_at': DateTime.now().toIso8601String(),
+                  }),
             );
           }
 
@@ -12515,7 +13433,9 @@ class DatabaseHelper {
         }
       }
     } catch (e) {
-      debugPrint('[DatabaseHelper] setSubmissionResubmissionAllowed sync note: $e');
+      debugPrint(
+        '[DatabaseHelper] setSubmissionResubmissionAllowed sync note: $e',
+      );
     }
   }
 
@@ -12523,10 +13443,9 @@ class DatabaseHelper {
     final db = await database;
     final assign = await getAssignmentById(id);
     final cloudId = assign?['cloud_id'] as String?;
-    final cleanTitle = (assign?['title'] as String? ?? '').toLowerCase().replaceAll(
-      RegExp(r'[^a-z0-9]'),
-      '_',
-    );
+    final cleanTitle = (assign?['title'] as String? ?? '')
+        .toLowerCase()
+        .replaceAll(RegExp(r'[^a-z0-9]'), '_');
     await db.delete('submissions', where: 'assignment_id = ?', whereArgs: [id]);
     final deleted = await db.delete(
       'assignments',
@@ -12537,14 +13456,21 @@ class DatabaseHelper {
     // Track tombstone so cloud delta/full sync never resurrects this assignment
     try {
       final prefs = await SharedPreferences.getInstance();
-      final deletedAssignments = prefs.getStringList('permanently_deleted_assignments') ?? [];
-      if (cloudId != null && cloudId.isNotEmpty && !RegExp(r'^\d+$').hasMatch(cloudId) && !deletedAssignments.contains(cloudId)) {
+      final deletedAssignments =
+          prefs.getStringList('permanently_deleted_assignments') ?? [];
+      if (cloudId != null &&
+          cloudId.isNotEmpty &&
+          !RegExp(r'^\d+$').hasMatch(cloudId) &&
+          !deletedAssignments.contains(cloudId)) {
         deletedAssignments.add(cloudId);
       }
       if (cleanTitle.isNotEmpty && !deletedAssignments.contains(cleanTitle)) {
         deletedAssignments.add(cleanTitle);
       }
-      await prefs.setStringList('permanently_deleted_assignments', deletedAssignments);
+      await prefs.setStringList(
+        'permanently_deleted_assignments',
+        deletedAssignments,
+      );
     } catch (_) {}
 
     // Delete from Supabase
@@ -12553,7 +13479,10 @@ class DatabaseHelper {
         if (cloudId != null && cloudId.isNotEmpty) {
           await SupabaseService.instance.deleteAssignment(cloudId);
         }
-        await SupabaseService.instance.client?.from('assignments').delete().eq('id', id.toString());
+        await SupabaseService.instance.client
+            ?.from('assignments')
+            .delete()
+            .eq('id', id.toString());
       }
     } catch (_) {}
     try {
@@ -12561,22 +13490,40 @@ class DatabaseHelper {
         await FirestoreService().deleteDocument('assignments', cloudId);
       }
       await FirestoreService().deleteDocument('assignments', id.toString());
-      final cloudAssignments = await FirestoreService().fetchAllDocuments('assignments');
+      final cloudAssignments = await FirestoreService().fetchAllDocuments(
+        'assignments',
+      );
       for (final doc in cloudAssignments) {
         final rawId = doc['local_id'] ?? doc['id'];
-        final docId = doc['_docId']?.toString() ?? doc['id']?.toString() ?? doc['document_id']?.toString() ?? '';
-        if (rawId == id || rawId?.toString() == id.toString() || docId == cloudId || docId.endsWith('_$id') || (cleanTitle.isNotEmpty && docId.contains(cleanTitle))) {
+        final docId =
+            doc['_docId']?.toString() ??
+            doc['id']?.toString() ??
+            doc['document_id']?.toString() ??
+            '';
+        if (rawId == id ||
+            rawId?.toString() == id.toString() ||
+            docId == cloudId ||
+            docId.endsWith('_$id') ||
+            (cleanTitle.isNotEmpty && docId.contains(cleanTitle))) {
           if (docId.isNotEmpty) {
             await FirestoreService().deleteDocument('assignments', docId);
           }
         }
       }
-      final cloudSubs = await FirestoreService().fetchAllDocuments('submissions');
+      final cloudSubs = await FirestoreService().fetchAllDocuments(
+        'submissions',
+      );
       for (final doc in cloudSubs) {
         final rawAId = doc['assignment_id'];
         final rawCId = doc['assignment_cloud_id']?.toString();
-        final docId = doc['_docId']?.toString() ?? doc['id']?.toString() ?? doc['document_id']?.toString() ?? '';
-        if (rawAId == id || rawAId?.toString() == id.toString() || (cloudId != null && rawCId == cloudId)) {
+        final docId =
+            doc['_docId']?.toString() ??
+            doc['id']?.toString() ??
+            doc['document_id']?.toString() ??
+            '';
+        if (rawAId == id ||
+            rawAId?.toString() == id.toString() ||
+            (cloudId != null && rawCId == cloudId)) {
           if (docId.isNotEmpty) {
             await FirestoreService().deleteDocument('submissions', docId);
           }
@@ -12619,7 +13566,11 @@ class DatabaseHelper {
       'actor_id': actorId,
       'actor_name': actorName,
     };
-    await db.insert('notifications', notifData, conflictAlgorithm: ConflictAlgorithm.replace);
+    await db.insert(
+      'notifications',
+      notifData,
+      conflictAlgorithm: ConflictAlgorithm.replace,
+    );
 
     // Sync notification to Cloud Firestore
     try {
@@ -12632,13 +13583,18 @@ class DatabaseHelper {
   }
 
   /// Sync user notifications from Cloud Firestore down to local SQLite
-  Future<void> syncCloudNotificationsToLocal(String userId, {bool force = false}) async {
+  Future<void> syncCloudNotificationsToLocal(
+    String userId, {
+    bool force = false,
+  }) async {
     try {
       final cleanUid = userId.trim();
       if (cleanUid.isEmpty) return;
       if (_isTestEnv) return;
       final prefs = await SharedPreferences.getInstance();
-      final lastSync = force ? null : prefs.getString('last_synced_at_notifs_$cleanUid');
+      final lastSync = force
+          ? null
+          : prefs.getString('last_synced_at_notifs_$cleanUid');
       var docs = await FirestoreService().fetchDeltaDocuments(
         'notifications',
         whereField: 'user_id',
@@ -12653,7 +13609,10 @@ class DatabaseHelper {
         );
       }
       if (docs.isEmpty) {
-        await prefs.setString('last_synced_at_notifs_$cleanUid', DateTime.now().toIso8601String());
+        await prefs.setString(
+          'last_synced_at_notifs_$cleanUid',
+          DateTime.now().toIso8601String(),
+        );
         return;
       }
       final db = await database;
@@ -12669,9 +13628,14 @@ class DatabaseHelper {
         final actorName = doc['actor_name']?.toString();
         final targetRoute = doc['target_route']?.toString();
         final isRead = (doc['is_read'] == true || doc['is_read'] == 1) ? 1 : 0;
-        final createdAt = doc['created_at']?.toString() ?? DateTime.now().toIso8601String();
+        final createdAt =
+            doc['created_at']?.toString() ?? DateTime.now().toIso8601String();
 
-        final existing = await db.query('notifications', where: 'id = ?', whereArgs: [id]);
+        final existing = await db.query(
+          'notifications',
+          where: 'id = ?',
+          whereArgs: [id],
+        );
         if (existing.isEmpty) {
           await db.insert('notifications', {
             'id': id,
@@ -12689,7 +13653,10 @@ class DatabaseHelper {
           });
         }
       }
-      await prefs.setString('last_synced_at_notifs_$cleanUid', DateTime.now().toIso8601String());
+      await prefs.setString(
+        'last_synced_at_notifs_$cleanUid',
+        DateTime.now().toIso8601String(),
+      );
     } catch (e) {
       debugPrint('[DatabaseHelper] syncCloudNotificationsToLocal error: $e');
     }
@@ -12824,7 +13791,8 @@ class DatabaseHelper {
     String? schoolId,
   }) async {
     final db = await database;
-    String whereClause = "(role = 'admin' OR role = 'super_admin') AND is_archived = 1";
+    String whereClause =
+        "(role = 'admin' OR role = 'super_admin') AND is_archived = 1";
     final List<dynamic> whereArgs = [];
 
     if (schoolId != null && schoolId.isNotEmpty && schoolId != 'all') {
@@ -12872,9 +13840,11 @@ class DatabaseHelper {
 
     final schoolScope = (role == 'super_admin')
         ? 'sch_main'
-        : (schoolId != null && schoolId.trim().isNotEmpty && schoolId != 'unassigned'
-            ? schoolId.trim()
-            : null);
+        : (schoolId != null &&
+                  schoolId.trim().isNotEmpty &&
+                  schoolId != 'unassigned'
+              ? schoolId.trim()
+              : null);
 
     Map<String, dynamic>? campus;
     if (schoolScope != null) {
@@ -12905,14 +13875,19 @@ class DatabaseHelper {
     // Clear any previous tombstone in SharedPreferences so newly provisioned accounts are never blocked
     try {
       final prefs = await SharedPreferences.getInstance();
-      final deletedList = prefs.getStringList('permanently_deleted_accounts') ?? [];
+      final deletedList =
+          prefs.getStringList('permanently_deleted_accounts') ?? [];
       final cleanEmail = email.trim().toLowerCase();
       deletedList.remove(adminId);
       deletedList.remove(cleanEmail);
       await prefs.setStringList('permanently_deleted_accounts', deletedList);
     } catch (_) {}
 
-    await db.insert('users', adminData, conflictAlgorithm: ConflictAlgorithm.replace);
+    await db.insert(
+      'users',
+      adminData,
+      conflictAlgorithm: ConflictAlgorithm.replace,
+    );
     if (kIsWeb) {
       try {
         final prefs = await SharedPreferences.getInstance();
@@ -12949,7 +13924,9 @@ class DatabaseHelper {
             : 'PENDING',
       );
     } catch (e) {
-      debugPrint('[DatabaseHelper] Error dispatching admin credentials email: $e');
+      debugPrint(
+        '[DatabaseHelper] Error dispatching admin credentials email: $e',
+      );
     }
 
     return adminId;
@@ -12983,7 +13960,8 @@ class DatabaseHelper {
       );
     }
 
-    final effectivePassword = (newPassword != null && newPassword.trim().isNotEmpty)
+    final effectivePassword =
+        (newPassword != null && newPassword.trim().isNotEmpty)
         ? newPassword.trim()
         : 'Admin@${DateTime.now().millisecondsSinceEpoch % 10000}!';
 
@@ -13031,7 +14009,8 @@ class DatabaseHelper {
       username: username,
       plainPassword: effectivePassword,
       role: role,
-      campusName: campus['name']?.toString() ?? 'AIRAMP Demonstration High School',
+      campusName:
+          campus['name']?.toString() ?? 'AIRAMP Demonstration High School',
       campusCode: campus['code']?.toString() ?? 'ADM-01',
     );
   }
@@ -13054,7 +14033,11 @@ class DatabaseHelper {
       if (newSchoolId != null && newSchoolId.isNotEmpty) {
         await updateSchool(newSchoolId, {'admin_id': adminId});
       } else {
-        final linkedSchools = await db.query('schools', where: 'admin_id = ?', whereArgs: [adminId]);
+        final linkedSchools = await db.query(
+          'schools',
+          where: 'admin_id = ?',
+          whereArgs: [adminId],
+        );
         for (final s in linkedSchools) {
           final sId = s['id'] as String;
           await updateSchool(sId, {'admin_id': null});
@@ -13079,13 +14062,13 @@ class DatabaseHelper {
 
     if (updates.isNotEmpty) {
       await db.update('users', updates, where: 'id = ?', whereArgs: [adminId]);
-    if (kIsWeb) {
-      try {
-        final prefs = await SharedPreferences.getInstance();
-        final allUsers = await db.query('users');
-        await prefs.setString('local_cached_users_v1', jsonEncode(allUsers));
-      } catch (_) {}
-    }
+      if (kIsWeb) {
+        try {
+          final prefs = await SharedPreferences.getInstance();
+          final allUsers = await db.query('users');
+          await prefs.setString('local_cached_users_v1', jsonEncode(allUsers));
+        } catch (_) {}
+      }
       try {
         await FirestoreService().saveUser({'id': adminId, ...updates});
       } catch (_) {}
@@ -13101,16 +14084,15 @@ class DatabaseHelper {
       if (id == 'super_admin_christian' ||
           id == 'SA-000-0001' ||
           email == 'evangelistachristian88@gmail.com') {
-        throw StateError('Cannot deactivate primary system super administrator');
+        throw StateError(
+          'Cannot deactivate primary system super administrator',
+        );
       }
     }
     final now = DateTime.now().toIso8601String();
     await db.update(
       'users',
-      {
-        'is_archived': 1,
-        'archived_at': now,
-      },
+      {'is_archived': 1, 'archived_at': now},
       where: 'id = ?',
       whereArgs: [adminId],
     );
@@ -13119,7 +14101,11 @@ class DatabaseHelper {
     } catch (_) {}
 
     try {
-      final linkedSchools = await db.query('schools', where: 'admin_id = ?', whereArgs: [adminId]);
+      final linkedSchools = await db.query(
+        'schools',
+        where: 'admin_id = ?',
+        whereArgs: [adminId],
+      );
       for (final s in linkedSchools) {
         final sId = s['id'] as String;
         await updateSchool(sId, {'admin_id': null});
@@ -13135,14 +14121,17 @@ class DatabaseHelper {
       if (row.isNotEmpty) {
         final email = row.first['email'] as String?;
         if (email != null && email.isNotEmpty) {
-          await FirestoreService().saveDocument('users', email.toLowerCase().trim(), {
-            'is_archived': 1,
-            'archived_at': now,
-          });
+          await FirestoreService().saveDocument(
+            'users',
+            email.toLowerCase().trim(),
+            {'is_archived': 1, 'archived_at': now},
+          );
         }
       }
     } catch (e) {
-      debugPrint('[DatabaseHelper] Error syncing archived admin $adminId to Firestore: $e');
+      debugPrint(
+        '[DatabaseHelper] Error syncing archived admin $adminId to Firestore: $e',
+      );
     }
   }
 
@@ -13150,10 +14139,7 @@ class DatabaseHelper {
     final db = await database;
     await db.update(
       'users',
-      {
-        'is_archived': 0,
-        'archived_at': null,
-      },
+      {'is_archived': 0, 'archived_at': null},
       where: 'id = ?',
       whereArgs: [adminId],
     );
@@ -13168,14 +14154,17 @@ class DatabaseHelper {
       if (row.isNotEmpty) {
         final email = row.first['email'] as String?;
         if (email != null && email.isNotEmpty) {
-          await FirestoreService().saveDocument('users', email.toLowerCase().trim(), {
-            'is_archived': 0,
-            'archived_at': null,
-          });
+          await FirestoreService().saveDocument(
+            'users',
+            email.toLowerCase().trim(),
+            {'is_archived': 0, 'archived_at': null},
+          );
         }
       }
     } catch (e) {
-      debugPrint('[DatabaseHelper] Error syncing restored admin $adminId to Firestore: $e');
+      debugPrint(
+        '[DatabaseHelper] Error syncing restored admin $adminId to Firestore: $e',
+      );
     }
   }
 
@@ -13201,7 +14190,11 @@ class DatabaseHelper {
     } catch (_) {}
 
     try {
-      final linkedSchools = await db.query('schools', where: 'admin_id = ?', whereArgs: [adminId]);
+      final linkedSchools = await db.query(
+        'schools',
+        where: 'admin_id = ?',
+        whereArgs: [adminId],
+      );
       for (final s in linkedSchools) {
         final sId = s['id'] as String;
         await updateSchool(sId, {'admin_id': null});
@@ -13211,7 +14204,8 @@ class DatabaseHelper {
     // Record deletion in SharedPreferences so seed routines never resurrect it on browser refresh
     try {
       final prefs = await SharedPreferences.getInstance();
-      final deletedList = prefs.getStringList('permanently_deleted_accounts') ?? [];
+      final deletedList =
+          prefs.getStringList('permanently_deleted_accounts') ?? [];
       if (!deletedList.contains(adminId)) deletedList.add(adminId);
       // NOTE: We only tombstone the unique admin ID, never the email, so new accounts with the same email are never blocked
       await prefs.setStringList('permanently_deleted_accounts', deletedList);
@@ -13224,11 +14218,15 @@ class DatabaseHelper {
           .timeout(
             const Duration(seconds: 8),
             onTimeout: () {
-              debugPrint('[DatabaseHelper] Firestore deleteUser timed out for admin $adminId');
+              debugPrint(
+                '[DatabaseHelper] Firestore deleteUser timed out for admin $adminId',
+              );
             },
           );
     } catch (e) {
-      debugPrint('[DatabaseHelper] Error deleting admin $adminId from Firestore: $e');
+      debugPrint(
+        '[DatabaseHelper] Error deleting admin $adminId from Firestore: $e',
+      );
     }
   }
 
@@ -13267,7 +14265,11 @@ class DatabaseHelper {
           'status': 'active',
           'created_at': DateTime.now().toIso8601String(),
         };
-        await db.insert('schools', defaultSchool, conflictAlgorithm: ConflictAlgorithm.ignore);
+        await db.insert(
+          'schools',
+          defaultSchool,
+          conflictAlgorithm: ConflictAlgorithm.ignore,
+        );
         return [defaultSchool];
       }
 
@@ -13278,14 +14280,21 @@ class DatabaseHelper {
           final matchingAdmin = await db.query(
             'users',
             columns: ['id'],
-            where: "(role = 'admin') AND (is_archived IS NULL OR is_archived = 0) AND school_id = ?",
+            where:
+                "(role = 'admin') AND (is_archived IS NULL OR is_archived = 0) AND school_id = ?",
             whereArgs: [sId],
             limit: 1,
           );
           if (matchingAdmin.isNotEmpty) {
             final assignedId = matchingAdmin.first['id'] as String;
-            final updatedMap = Map<String, dynamic>.from(s)..['admin_id'] = assignedId;
-            await db.update('schools', {'admin_id': assignedId}, where: 'id = ?', whereArgs: [sId]);
+            final updatedMap = Map<String, dynamic>.from(s)
+              ..['admin_id'] = assignedId;
+            await db.update(
+              'schools',
+              {'admin_id': assignedId},
+              where: 'id = ?',
+              whereArgs: [sId],
+            );
             enrichedResults.add(updatedMap);
             continue;
           }
@@ -13318,12 +14327,17 @@ class DatabaseHelper {
   Future<Map<String, String>> getSchoolAcademicTerm(String schoolId) async {
     try {
       final db = await database;
-      final rows = await db.query('schools', where: 'id = ?', whereArgs: [schoolId]);
+      final rows = await db.query(
+        'schools',
+        where: 'id = ?',
+        whereArgs: [schoolId],
+      );
       if (rows.isNotEmpty) {
         final row = rows.first;
         return {
           'academic_year': row['academic_year']?.toString() ?? 'AY 2025-2026',
-          'current_semester': row['current_semester']?.toString() ?? '1st Semester',
+          'current_semester':
+              row['current_semester']?.toString() ?? '1st Semester',
           'last_archived_at': row['last_archived_at']?.toString() ?? '',
           'last_reset_at': row['last_reset_at']?.toString() ?? '',
           'archive_checksum': row['archive_checksum']?.toString() ?? '',
@@ -13362,20 +14376,23 @@ class DatabaseHelper {
       updates['last_reset_at'] = DateTime.now().toIso8601String();
     }
     try {
-      await db.update('schools', updates, where: 'id = ?', whereArgs: [schoolId]);
+      await db.update(
+        'schools',
+        updates,
+        where: 'id = ?',
+        whereArgs: [schoolId],
+      );
     } catch (_) {}
 
     // Also sync to Firestore if available
     try {
       if (FirestoreService().isAvailable) {
         final fs = FirestoreService().firestore;
-        if (fs != null) {
-          final docRef = fs.collection('schools').doc(schoolId);
-          try {
-            await docRef.update(updates);
-          } catch (_) {
-            await docRef.set(updates);
-          }
+        final docRef = fs.collection('schools').doc(schoolId);
+        try {
+          await docRef.update(updates);
+        } catch (_) {
+          await docRef.set(updates);
         }
       }
     } catch (_) {}
@@ -13417,12 +14434,18 @@ class DatabaseHelper {
       'code': code.trim().toUpperCase(),
       'address': address?.trim(),
       'logo_url': logoUrl?.trim(),
-      'admin_id': (adminId != null && adminId.trim().isNotEmpty) ? adminId.trim() : null,
+      'admin_id': (adminId != null && adminId.trim().isNotEmpty)
+          ? adminId.trim()
+          : null,
       'status': status,
       'created_at': DateTime.now().toIso8601String(),
     };
 
-    await db.insert('schools', schoolData, conflictAlgorithm: ConflictAlgorithm.replace);
+    await db.insert(
+      'schools',
+      schoolData,
+      conflictAlgorithm: ConflictAlgorithm.replace,
+    );
 
     if (adminId != null && adminId.trim().isNotEmpty) {
       await db.update(
@@ -13432,7 +14455,10 @@ class DatabaseHelper {
         whereArgs: [adminId.trim()],
       );
       try {
-        await FirestoreService().saveUser({'id': adminId.trim(), 'school_id': schoolId});
+        await FirestoreService().saveUser({
+          'id': adminId.trim(),
+          'school_id': schoolId,
+        });
       } catch (_) {}
     }
 
@@ -13478,7 +14504,12 @@ class DatabaseHelper {
       for (final u in existingSchoolUsers) {
         final uId = u['id'] as String;
         if (uId != newAdminId) {
-          await db.update('users', {'school_id': null}, where: 'id = ?', whereArgs: [uId]);
+          await db.update(
+            'users',
+            {'school_id': null},
+            where: 'id = ?',
+            whereArgs: [uId],
+          );
           try {
             await FirestoreService().saveUser({'id': uId, 'school_id': null});
           } catch (_) {}
@@ -13493,24 +14524,39 @@ class DatabaseHelper {
           whereArgs: [newAdminId.trim()],
         );
         try {
-          await FirestoreService().saveUser({'id': newAdminId.trim(), 'school_id': id});
+          await FirestoreService().saveUser({
+            'id': newAdminId.trim(),
+            'school_id': id,
+          });
         } catch (_) {}
       }
     }
 
     // Upsert to ensure sch_main or newly provisioned campus exists in the table
-    final existing = await db.query('schools', where: 'id = ?', whereArgs: [id]);
+    final existing = await db.query(
+      'schools',
+      where: 'id = ?',
+      whereArgs: [id],
+    );
     if (existing.isEmpty) {
       final insertData = <String, dynamic>{
         'id': id,
-        'name': row['name'] ?? (id == 'sch_main' ? 'AIRAMP Demonstration High School' : 'Campus $id'),
+        'name':
+            row['name'] ??
+            (id == 'sch_main'
+                ? 'AIRAMP Demonstration High School'
+                : 'Campus $id'),
         'code': row['code'] ?? (id == 'sch_main' ? 'ADM-01' : id),
         'address': row['address'] ?? '',
         'admin_id': row['admin_id'],
         'status': row['status'] ?? 'active',
         'created_at': DateTime.now().toIso8601String(),
       };
-      await db.insert('schools', insertData, conflictAlgorithm: ConflictAlgorithm.replace);
+      await db.insert(
+        'schools',
+        insertData,
+        conflictAlgorithm: ConflictAlgorithm.replace,
+      );
     } else {
       await db.update('schools', row, where: 'id = ?', whereArgs: [id]);
     }
@@ -13593,7 +14639,7 @@ class DatabaseHelper {
 
   Future<void> assignSchoolAdmin(String schoolId, String adminId) async {
     final db = await database;
-    
+
     // Strict uniqueness check: Is this admin already assigned to ANOTHER school?
     final conflicts = await db.query(
       'schools',
@@ -13614,7 +14660,9 @@ class DatabaseHelper {
     // Unlink previous admin of this school if different
     final currentSchool = await getSchoolById(schoolId);
     final prevAdminId = currentSchool?['admin_id'] as String?;
-    if (prevAdminId != null && prevAdminId.isNotEmpty && prevAdminId != adminId) {
+    if (prevAdminId != null &&
+        prevAdminId.isNotEmpty &&
+        prevAdminId != adminId) {
       await db.update(
         'users',
         {'school_id': null},
@@ -13622,15 +14670,24 @@ class DatabaseHelper {
         whereArgs: [prevAdminId],
       );
       try {
-        await FirestoreService().saveUser({'id': prevAdminId, 'school_id': null});
+        await FirestoreService().saveUser({
+          'id': prevAdminId,
+          'school_id': null,
+        });
       } catch (_) {}
     }
 
-    final schoolExists = await db.query('schools', where: 'id = ?', whereArgs: [schoolId]);
+    final schoolExists = await db.query(
+      'schools',
+      where: 'id = ?',
+      whereArgs: [schoolId],
+    );
     if (schoolExists.isEmpty) {
       await db.insert('schools', {
         'id': schoolId,
-        'name': schoolId == 'sch_main' ? 'AIRAMP Demonstration High School' : 'Campus $schoolId',
+        'name': schoolId == 'sch_main'
+            ? 'AIRAMP Demonstration High School'
+            : 'Campus $schoolId',
         'code': schoolId == 'sch_main' ? 'ADM-01' : schoolId,
         'admin_id': adminId,
         'status': 'active',
@@ -13696,7 +14753,9 @@ class DatabaseHelper {
       }
       return restored;
     } catch (e) {
-      debugPrint('[DatabaseHelper] Error restoring schedules from local cache: $e');
+      debugPrint(
+        '[DatabaseHelper] Error restoring schedules from local cache: $e',
+      );
       return 0;
     }
   }
@@ -13712,13 +14771,17 @@ class DatabaseHelper {
     final db = await database;
 
     // Dual-tier cache check: if table is empty in SQLite, restore from local_cached_schedules_v1
-    final totalCount = Sqflite.firstIntValue(
-      await db.rawQuery('SELECT COUNT(*) FROM class_schedules'),
-    ) ?? 0;
+    final totalCount =
+        Sqflite.firstIntValue(
+          await db.rawQuery('SELECT COUNT(*) FROM class_schedules'),
+        ) ??
+        0;
     if (totalCount == 0) {
       final restored = await _restoreSchedulesFromLocalCache(db);
       if (restored > 0) {
-        debugPrint('[DatabaseHelper] Restored $restored class schedules from local storage cache');
+        debugPrint(
+          '[DatabaseHelper] Restored $restored class schedules from local storage cache',
+        );
       }
       try {
         await FirestoreService().syncCloudSchedulesToLocal(force: true);
@@ -13831,9 +14894,15 @@ class DatabaseHelper {
     await db.update('class_schedules', row, where: 'id = ?', whereArgs: [id]);
     await _saveSchedulesToLocalCache(db);
     try {
-      final updated = await db.query('class_schedules', where: 'id = ?', whereArgs: [id]);
+      final updated = await db.query(
+        'class_schedules',
+        where: 'id = ?',
+        whereArgs: [id],
+      );
       if (updated.isNotEmpty) {
-        unawaited(FirestoreService().saveDocument('class_schedules', id, updated.first));
+        unawaited(
+          FirestoreService().saveDocument('class_schedules', id, updated.first),
+        );
       }
     } catch (_) {}
   }
@@ -14157,13 +15226,16 @@ class DatabaseHelper {
     } catch (_) {}
   }
 
-  Future<void> clearAuditLogs({String? actorName = 'Super Administrator'}) async {
+  Future<void> clearAuditLogs({
+    String? actorName = 'Super Administrator',
+  }) async {
     final db = await database;
     try {
       await db.delete('system_audit_logs');
       await logAuditEvent(
         action: 'AUDIT_LOG_ARCHIVED',
-        details: 'Audit logs cleared and archived by administrator. New verification hash chain initialized.',
+        details:
+            'Audit logs cleared and archived by administrator. New verification hash chain initialized.',
         actorName: actorName,
       );
     } catch (_) {}

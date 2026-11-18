@@ -27,9 +27,8 @@ class _NotificationCenterScreenState
     {'id': 'all', 'label': 'All'},
     {'id': 'unread', 'label': 'Unread'},
     {'id': 'assignments', 'label': 'Assignments'},
-    {'id': 'assessments', 'label': 'Assessments'},
+    {'id': 'quizzes', 'label': 'Quizzes'},
     {'id': 'announcements', 'label': 'Announcements'},
-    {'id': 'chat', 'label': 'Chat'},
   ];
 
   @override
@@ -242,12 +241,17 @@ class _NotificationCenterScreenState
                 tooltip: 'Mark all as read',
                 onPressed: () {
                   ref.read(notificationsProvider.notifier).markAllAsRead();
-                  AppToast.showSuccess(context, 'All notifications marked as read.');
+                  AppToast.showSuccess(
+                    context,
+                    'All notifications marked as read.',
+                  );
                 },
               ),
             IconButton(
               icon: Icon(
-                _isSelectionMode ? Icons.close_rounded : Icons.checklist_rounded,
+                _isSelectionMode
+                    ? Icons.close_rounded
+                    : Icons.checklist_rounded,
                 color: AppTheme.text,
               ),
               tooltip: 'Select multiple',
@@ -335,7 +339,7 @@ class _NotificationCenterScreenState
               scrollDirection: Axis.horizontal,
               padding: const EdgeInsets.symmetric(horizontal: 16),
               itemCount: _categories.length,
-              separatorBuilder: (_, __) => const SizedBox(width: 8),
+              separatorBuilder: (_, _) => const SizedBox(width: 8),
               itemBuilder: (context, index) {
                 final cat = _categories[index];
                 final isSelected = activeCategory == cat['id'];
@@ -377,8 +381,9 @@ class _NotificationCenterScreenState
                   labelStyle: TextStyle(
                     color: isSelected ? Colors.white : AppTheme.textSecondary,
                     fontSize: 12,
-                    fontWeight:
-                        isSelected ? FontWeight.bold : FontWeight.normal,
+                    fontWeight: isSelected
+                        ? FontWeight.bold
+                        : FontWeight.normal,
                   ),
                   side: BorderSide(
                     color: isSelected
@@ -426,14 +431,18 @@ class _NotificationCenterScreenState
                     ),
                     icon: Icon(
                       filteredList.isNotEmpty &&
-                              filteredList.every((n) => _selectedIds.contains(n.id))
+                              filteredList.every(
+                                (n) => _selectedIds.contains(n.id),
+                              )
                           ? Icons.deselect_rounded
                           : Icons.select_all_rounded,
                       size: 18,
                     ),
                     label: Text(
                       filteredList.isNotEmpty &&
-                              filteredList.every((n) => _selectedIds.contains(n.id))
+                              filteredList.every(
+                                (n) => _selectedIds.contains(n.id),
+                              )
                           ? 'Deselect All'
                           : 'Select All',
                       style: const TextStyle(fontSize: 13),
@@ -445,8 +454,9 @@ class _NotificationCenterScreenState
                     style: ElevatedButton.styleFrom(
                       backgroundColor: AppTheme.error,
                       foregroundColor: Colors.white,
-                      disabledBackgroundColor:
-                          AppTheme.error.withValues(alpha: 0.3),
+                      disabledBackgroundColor: AppTheme.error.withValues(
+                        alpha: 0.3,
+                      ),
                       shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(10),
                       ),
@@ -463,7 +473,9 @@ class _NotificationCenterScreenState
                         fontWeight: FontWeight.bold,
                       ),
                     ),
-                    onPressed: _selectedIds.isEmpty ? null : _confirmBatchDelete,
+                    onPressed: _selectedIds.isEmpty
+                        ? null
+                        : _confirmBatchDelete,
                   ),
                 ],
               ),
@@ -473,28 +485,30 @@ class _NotificationCenterScreenState
           Expanded(
             child: filteredList.isEmpty
                 ? (currentQuery.isNotEmpty
-                    ? Center(
-                        child: AppEmptyState.search(
-                          query: currentQuery,
-                          onClearSearch: () {
-                            _searchController.clear();
-                            ref
-                                .read(notificationSearchQueryProvider.notifier)
-                                .clear();
-                          },
-                        ),
-                      )
-                    : Center(
-                        child: AppEmptyState(
-                          icon: Icons.notifications_none_rounded,
-                          title: activeCategory == 'unread'
-                              ? 'No Unread Notifications'
-                              : 'All Caught Up!',
-                          message: activeCategory == 'unread'
-                              ? 'You have read all your notifications.'
-                              : 'No activity notifications available at this time.',
-                        ),
-                      ))
+                      ? Center(
+                          child: AppEmptyState.search(
+                            query: currentQuery,
+                            onClearSearch: () {
+                              _searchController.clear();
+                              ref
+                                  .read(
+                                    notificationSearchQueryProvider.notifier,
+                                  )
+                                  .clear();
+                            },
+                          ),
+                        )
+                      : Center(
+                          child: AppEmptyState(
+                            icon: Icons.notifications_none_rounded,
+                            title: activeCategory == 'unread'
+                                ? 'No Unread Notifications'
+                                : 'All Caught Up!',
+                            message: activeCategory == 'unread'
+                                ? 'You have read all your notifications.'
+                                : 'No activity notifications available at this time.',
+                          ),
+                        ))
                 : RefreshIndicator(
                     onRefresh: () async {
                       await ref
@@ -547,16 +561,18 @@ class _NotificationCenterScreenState
                               color: isSelected
                                   ? AppTheme.primary.withValues(alpha: 0.12)
                                   : (notif.isRead
-                                      ? AppTheme.surface
-                                      : color.withValues(alpha: 0.08)),
+                                        ? AppTheme.surface
+                                        : color.withValues(alpha: 0.08)),
                               borderRadius: BorderRadius.circular(14),
                               border: Border.all(
                                 color: isSelected
                                     ? AppTheme.primary
                                     : (notif.isRead
-                                        ? AppTheme.border
-                                        : color.withValues(alpha: 0.35)),
-                                width: isSelected ? 1.5 : (notif.isRead ? 1 : 1.2),
+                                          ? AppTheme.border
+                                          : color.withValues(alpha: 0.35)),
+                                width: isSelected
+                                    ? 1.5
+                                    : (notif.isRead ? 1 : 1.2),
                               ),
                             ),
                             child: InkWell(
@@ -588,8 +604,9 @@ class _NotificationCenterScreenState
                                         value: isSelected,
                                         activeColor: AppTheme.primary,
                                         shape: RoundedRectangleBorder(
-                                          borderRadius:
-                                              BorderRadius.circular(4),
+                                          borderRadius: BorderRadius.circular(
+                                            4,
+                                          ),
                                         ),
                                         onChanged: (_) =>
                                             _toggleItemSelection(notif.id),

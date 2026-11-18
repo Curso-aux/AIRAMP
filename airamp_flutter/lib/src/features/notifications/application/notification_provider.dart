@@ -5,6 +5,7 @@ import '../../../routing/app_router.dart';
 import '../../auth/application/auth_provider.dart';
 import '../domain/notification_model.dart';
 import '../presentation/components/in_app_notification_banner.dart';
+import 'device_notification_service.dart';
 
 class NotificationState {
   final List<AppNotification> notifications;
@@ -53,7 +54,7 @@ class NotificationNotifier extends Notifier<NotificationState> {
     try {
       final rawList = await _db.getNotificationsForUser(user.id);
       final list = rawList.map((m) => AppNotification.fromMap(m)).toList();
-      final unread = list.where((n) => !n.isRead).length;
+      final unread = list.where((n) => !n.isRead && n.type != 'chat' && n.type != 'group_chat').length;
 
       state = NotificationState(
         notifications: list,
@@ -113,9 +114,10 @@ class NotificationNotifier extends Notifier<NotificationState> {
       // Only add to in-memory state if this notification belongs to currently logged-in user
       final currentUser = ref.read(authProvider);
       if (currentUser != null && currentUser.id == targetUserId) {
+        final isChatNoise = notif.type == 'chat' || notif.type == 'group_chat';
         state = state.copyWith(
           notifications: [notif, ...state.notifications],
-          unreadCount: state.unreadCount + 1,
+          unreadCount: isChatNoise ? state.unreadCount : state.unreadCount + 1,
         );
 
         if (showBanner) {
@@ -123,6 +125,8 @@ class NotificationNotifier extends Notifier<NotificationState> {
           if (context != null && context.mounted) {
             InAppNotificationBanner.show(context, notif);
           }
+          // Trigger system-level device notification popup outside the app
+          DeviceNotificationService.instance.showFromAppNotification(notif);
         }
       }
 
@@ -142,7 +146,7 @@ class NotificationNotifier extends Notifier<NotificationState> {
         return n;
       }).toList();
 
-      final unread = updated.where((n) => !n.isRead).length;
+      final unread = updated.where((n) => !n.isRead && n.type != 'chat' && n.type != 'group_chat').length;
       state = state.copyWith(
         notifications: updated,
         unreadCount: unread,
@@ -168,7 +172,7 @@ class NotificationNotifier extends Notifier<NotificationState> {
     try {
       await _db.deleteNotification(id);
       final updated = state.notifications.where((n) => n.id != id).toList();
-      final unread = updated.where((n) => !n.isRead).length;
+      final unread = updated.where((n) => !n.isRead && n.type != 'chat' && n.type != 'group_chat').length;
       state = state.copyWith(
         notifications: updated,
         unreadCount: unread,
@@ -183,7 +187,7 @@ class NotificationNotifier extends Notifier<NotificationState> {
       final count = await _db.batchDeleteNotifications(ids);
       final idSet = ids.toSet();
       final updated = state.notifications.where((n) => !idSet.contains(n.id)).toList();
-      final unread = updated.where((n) => !n.isRead).length;
+      final unread = updated.where((n) => !n.isRead && n.type != 'chat' && n.type != 'group_chat').length;
 
       state = state.copyWith(
         notifications: updated,
@@ -199,18 +203,20 @@ class NotificationNotifier extends Notifier<NotificationState> {
   List<AppNotification> filterByQuery(String query, {String category = 'all'}) {
     final q = query.trim().toLowerCase();
     return state.notifications.where((n) {
+      // Exclude chat join/message noise from the academic Notification Center
+      if (n.type == 'chat' || n.type == 'group_chat') return false;
+
       if (category == 'unread' && n.isRead) return false;
       if (category == 'assignments' &&
           !['new_assignment', 'activity_submission', 'grade_released', 'resubmission_allowed'].contains(n.type)) {
         return false;
       }
-      if (category == 'assessments' &&
+      if ((category == 'quizzes' || category == 'assessments') &&
           !['quiz', 'quiz_assigned', 'quiz_completed'].contains(n.type) &&
           !n.type.contains('quiz')) {
         return false;
       }
       if (category == 'announcements' && n.type != 'announcement') return false;
-      if (category == 'chat' && n.type != 'chat' && n.type != 'group_chat') return false;
 
       if (q.isEmpty) return true;
       final titleMatch = n.title.toLowerCase().contains(q);
@@ -275,18 +281,20 @@ final filteredNotificationsProvider = Provider<List<AppNotification>>((ref) {
   final category = ref.watch(notificationCategoryFilterProvider);
 
   return notifState.notifications.where((n) {
+    // Exclude chat join/message noise from the academic Notification Center
+    if (n.type == 'chat' || n.type == 'group_chat') return false;
+
     if (category == 'unread' && n.isRead) return false;
     if (category == 'assignments' &&
         !['new_assignment', 'activity_submission', 'grade_released', 'resubmission_allowed'].contains(n.type)) {
       return false;
     }
-    if (category == 'assessments' &&
+    if ((category == 'quizzes' || category == 'assessments') &&
         !['quiz', 'quiz_assigned', 'quiz_completed'].contains(n.type) &&
         !n.type.contains('quiz')) {
       return false;
     }
     if (category == 'announcements' && n.type != 'announcement') return false;
-    if (category == 'chat' && n.type != 'chat' && n.type != 'group_chat') return false;
 
     if (query.isEmpty) return true;
     final titleMatch = n.title.toLowerCase().contains(query);

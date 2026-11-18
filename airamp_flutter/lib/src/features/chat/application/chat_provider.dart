@@ -608,6 +608,11 @@ class ChatNotifier extends Notifier<ChatState> {
       orElse: () => null,
     );
 
+    // Suppress system join/leave membership noise from spawning notification records
+    if (msg.senderId == 'system' || msg.text.contains('joined the group chat')) {
+      return;
+    }
+
     final isGroup = convo?.type == 'group' || !msg.conversationId.startsWith('dm_');
     final String title;
     if (isGroup && convo?.name != null && convo!.name!.isNotEmpty) {

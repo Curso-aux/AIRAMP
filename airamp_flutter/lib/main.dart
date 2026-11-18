@@ -15,6 +15,7 @@ import 'src/core/services/session_draft_service.dart';
 import 'src/core/services/aira_voice_service.dart';
 import 'src/features/auth/application/auth_provider.dart';
 import 'src/features/esp32_hub/data/saved_materials_service.dart';
+import 'src/features/notifications/application/device_notification_service.dart';
 import 'src/core/components/aira/global_aira_floating_overlay.dart';
 import 'src/core/components/aira/aira_splash_loading_view.dart';
 import 'src/core/utils/web_plugin_helper.dart';
@@ -99,6 +100,7 @@ class _AirampAppState extends ConsumerState<AirampApp> {
           Future.delayed(const Duration(milliseconds: 2000)),
       ]);
       AiraVoiceService.instance.init();
+      DeviceNotificationService.instance.init();
     } catch (e) {
       debugPrint('Error during app bootstrap: $e');
     }

@@ -197,7 +197,7 @@ class NotificationActivityDispatcher {
     }
   }
 
-  /// Alerts assigned students when a teacher publishes a quiz or assessment.
+  /// Alerts assigned students when a teacher publishes a quiz.
   Future<List<String>> notifyQuizAssigned({
     required String quizId,
     required int? subjectId,
@@ -217,7 +217,7 @@ class NotificationActivityDispatcher {
         final eval = _filterService.evaluate(
           userId: sId,
           type: 'quiz_assigned',
-          title: 'New Assessment: $title',
+          title: 'New Quiz: $title',
           eventTime: DateTime.now(),
           relatedId: quizId,
           actorId: teacherId,
@@ -227,8 +227,8 @@ class NotificationActivityDispatcher {
           final id = await _db.createNotification(
             userId: sId,
             type: 'quiz_assigned',
-            title: 'New Assessment: $title',
-            message: '${teacherName ?? "Teacher"} assigned assessment "$title".$formattedDue',
+            title: 'New Quiz: $title',
+            message: '${teacherName ?? "Teacher"} assigned quiz "$title".$formattedDue',
             relatedId: quizId,
             targetRoute: '/student/courses',
             subjectId: subjectId,
@@ -244,7 +244,7 @@ class NotificationActivityDispatcher {
     return createdIds;
   }
 
-  /// Alerts student and teacher upon completion of a quiz assessment.
+  /// Alerts student and teacher upon completion of a quiz.
   Future<void> notifyQuizAttemptCompleted({
     required String quizId,
     required int? subjectId,
@@ -260,7 +260,7 @@ class NotificationActivityDispatcher {
       final studentEval = _filterService.evaluate(
         userId: studentId,
         type: 'quiz',
-        title: 'Assessment Completed: $title',
+        title: 'Quiz Completed: $title',
         eventTime: DateTime.now(),
         relatedId: quizId,
       );
@@ -271,7 +271,7 @@ class NotificationActivityDispatcher {
         await _db.createNotification(
           userId: studentId,
           type: 'quiz',
-          title: 'Assessment Submitted$passEmoji',
+          title: 'Quiz Submitted$passEmoji',
           message: 'You scored $score/$totalQuestions ($pct%) on "$title".',
           relatedId: quizId,
           targetRoute: '/student/history',

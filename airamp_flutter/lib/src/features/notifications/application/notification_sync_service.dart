@@ -7,6 +7,7 @@ import '../../../routing/app_router.dart';
 import '../domain/notification_filter_service.dart';
 import '../domain/notification_model.dart';
 import '../presentation/components/in_app_notification_banner.dart';
+import 'device_notification_service.dart';
 
 abstract class INotificationSyncService {
   void startSync(String userId);
@@ -155,6 +156,8 @@ class NotificationSyncService implements INotificationSyncService {
         if (context != null && context.mounted) {
           InAppNotificationBanner.show(context, notif);
         }
+        // Trigger OS-level system notification popup outside the app
+        DeviceNotificationService.instance.showFromAppNotification(notif);
       }
 
       if (!_streamController.isClosed) {
