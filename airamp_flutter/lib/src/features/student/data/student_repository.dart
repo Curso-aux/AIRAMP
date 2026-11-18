@@ -408,15 +408,15 @@ class StudentQuizAttemptsNotifier extends Notifier<List<Map<String, dynamic>>> {
       selectedAnswers: selectedAnswers,
     );
 
-    // Notify student of completed assessment
+    // Notify student of completed quiz
     ref
         .read(notificationsProvider.notifier)
         .addNotification(
           userId: studentId,
           type: 'quiz',
-          title: isPassed ? 'Assessment Passed! 🎉' : 'Assessment Submitted',
+          title: isPassed ? 'Quiz Passed! 🎉' : 'Quiz Submitted',
           message:
-              'You scored $score / $totalQuestions (${percentage.toStringAsFixed(0)}%) on your assessment.',
+              'You scored $score / $totalQuestions (${percentage.toStringAsFixed(0)}%) on your quiz.',
           targetRoute: '/student/history',
           relatedId: quizId?.toString(),
           showBanner: true,
@@ -467,15 +467,15 @@ class StudentQuizAttemptsNotifier extends Notifier<List<Map<String, dynamic>>> {
       selectedAnswers: selectedAnswers,
     );
 
-    // Notify student of completed assessment
+    // Notify student of completed quiz
     ref
         .read(notificationsProvider.notifier)
         .addNotification(
           userId: studentId,
           type: 'quiz',
-          title: isPassed ? 'Assessment Passed! 🎉' : 'Assessment Submitted',
+          title: isPassed ? 'Quiz Passed! 🎉' : 'Quiz Submitted',
           message:
-              'You scored $score / $totalQuestions (${percentage.toStringAsFixed(0)}%) on your assessment.',
+              'You scored $score / $totalQuestions (${percentage.toStringAsFixed(0)}%) on your quiz.',
           targetRoute: '/student/history',
           relatedId: quizId?.toString(),
           showBanner: true,
@@ -512,7 +512,9 @@ class TeacherScoresNotifier extends Notifier<List<Map<String, dynamic>>> {
 
   @override
   List<Map<String, dynamic>> build() {
-    _schoolId = ref.watch(activeAdminCampusProvider) ?? ref.watch(authProvider)?.schoolId;
+    _schoolId =
+        ref.watch(activeAdminCampusProvider) ??
+        ref.watch(authProvider)?.schoolId;
     loadScores();
     return [];
   }
@@ -525,7 +527,11 @@ class TeacherScoresNotifier extends Notifier<List<Map<String, dynamic>>> {
   }) async {
     if (section != null) _selectedSection = section;
     if (query != null) _searchQuery = query;
-    final targetSchool = schoolId ?? _schoolId ?? ref.read(activeAdminCampusProvider) ?? ref.read(authProvider)?.schoolId;
+    final targetSchool =
+        schoolId ??
+        _schoolId ??
+        ref.read(activeAdminCampusProvider) ??
+        ref.read(authProvider)?.schoolId;
 
     AppCacheManager.instance.invalidatePrefix('teacher_scores_');
     try {
@@ -538,7 +544,8 @@ class TeacherScoresNotifier extends Notifier<List<Map<String, dynamic>>> {
       );
     } catch (_) {}
 
-    final cacheKey = 'teacher_scores_${targetSchool}_${_selectedSection}_$_searchQuery';
+    final cacheKey =
+        'teacher_scores_${targetSchool}_${_selectedSection}_$_searchQuery';
     final results = await AppCacheManager.instance.getOrFetch(
       cacheKey,
       () => DatabaseHelper().getAllQuizScores(

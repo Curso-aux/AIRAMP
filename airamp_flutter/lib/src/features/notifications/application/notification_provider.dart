@@ -6,6 +6,7 @@ import '../../auth/application/auth_provider.dart';
 import '../domain/notification_model.dart';
 import '../presentation/components/in_app_notification_banner.dart';
 import 'device_notification_service.dart';
+import 'notification_sync_service.dart';
 
 class NotificationState {
   final List<AppNotification> notifications;
@@ -33,15 +34,37 @@ class NotificationState {
 
 class NotificationNotifier extends Notifier<NotificationState> {
   final DatabaseHelper _db = DatabaseHelper();
+  StreamSubscription? _syncSub;
 
   @override
   NotificationState build() {
     final currentUser = ref.watch(authProvider);
     if (currentUser != null) {
       Future.microtask(() => loadNotifications());
+      _listenToSync();
       return const NotificationState(isLoading: true);
     }
+    _syncSub?.cancel();
+    _syncSub = null;
     return const NotificationState();
+  }
+
+  void _listenToSync() {
+    _syncSub?.cancel();
+    _syncSub = NotificationSyncService().notificationStream.listen((incoming) {
+      if (incoming.isEmpty) return;
+      final existingIds = state.notifications.map((n) => n.id).toSet();
+      final newItems = incoming.where((n) => !existingIds.contains(n.id)).toList();
+      if (newItems.isNotEmpty) {
+        final unreadCountDelta = newItems
+            .where((n) => !n.isRead && n.type != 'chat' && n.type != 'group_chat')
+            .length;
+        state = state.copyWith(
+          notifications: [...newItems, ...state.notifications],
+          unreadCount: state.unreadCount + unreadCountDelta,
+        );
+      }
+    });
   }
 
   Future<void> loadNotifications() async {
@@ -52,6 +75,8 @@ class NotificationNotifier extends Notifier<NotificationState> {
     }
 
     try {
+      // Sync latest cloud events from Supabase first
+      await NotificationSyncService().syncFromSupabaseNow(userId: user.id);
       final rawList = await _db.getNotificationsForUser(user.id);
       final list = rawList.map((m) => AppNotification.fromMap(m)).toList();
       final unread = list.where((n) => !n.isRead && n.type != 'chat' && n.type != 'group_chat').length;

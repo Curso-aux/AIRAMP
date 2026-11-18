@@ -18,6 +18,7 @@ import 'supabase_service.dart';
 import '../services/email_service.dart';
 import '../services/cloud_storage_service.dart';
 import '../../features/teacher/domain/item_analysis_model.dart';
+import '../../features/notifications/application/device_notification_service.dart';
 
 class DatabaseHelper {
   static final DatabaseHelper _instance = DatabaseHelper._internal();
@@ -10607,8 +10608,9 @@ class DatabaseHelper {
               : [title.toLowerCase().trim(), targetSubjectId],
         );
 
+        int effectiveAssignmentId = 0;
         if (existing.isEmpty) {
-          await db.insert('assignments', {
+          effectiveAssignmentId = await db.insert('assignments', {
             'cloud_id': cloudId,
             'target_sections': targetSections,
             'title': title,
@@ -10627,7 +10629,7 @@ class DatabaseHelper {
             'attachment_bytes': attachmentBytes,
           });
         } else {
-          final existingId = existing.first['id'] as int;
+          effectiveAssignmentId = existing.first['id'] as int;
           await db.update(
             'assignments',
             {
@@ -10647,8 +10649,55 @@ class DatabaseHelper {
               'attachment_bytes': attachmentBytes,
             },
             where: 'id = ?',
-            whereArgs: [existingId],
+            whereArgs: [effectiveAssignmentId],
           );
+        }
+
+        // Notify enrolled students of the new assignment
+        final enrollments = await db.query(
+          'enrollments',
+          where: 'subject_id = ?',
+          whereArgs: [targetSubjectId],
+        );
+        final targetStudents = <String>{};
+        for (final en in enrollments) {
+          final sid = en['student_id']?.toString();
+          if (sid != null && sid.isNotEmpty) targetStudents.add(sid);
+        }
+        if (targetStudents.isEmpty) {
+          final studentUsers = await db.query('users', where: 'role = ?', whereArgs: ['student']);
+          for (final u in studentUsers) {
+            final uid = u['id']?.toString();
+            if (uid != null && uid.isNotEmpty) targetStudents.add(uid);
+          }
+        }
+        for (final sid in targetStudents) {
+          final existingNotif = await db.query(
+            'notifications',
+            where: 'user_id = ? AND (related_id = ? OR related_id = ? OR (title = ? AND type = ?))',
+            whereArgs: [sid, cloudId ?? '', effectiveAssignmentId.toString(), 'New Assignment: $title', 'new_assignment'],
+          );
+          if (existingNotif.isEmpty) {
+            await createNotification(
+              userId: sid,
+              type: 'new_assignment',
+              title: 'New Assignment: $title',
+              message: '${teacherName ?? "Your teacher"} posted "$title".${dueDate != null ? " Due: ${dueDate.substring(0, 10)}" : ""}',
+              relatedId: effectiveAssignmentId.toString(),
+              targetRoute: '/student/courses',
+              subjectId: targetSubjectId,
+              actorId: teacherId,
+              actorName: teacherName ?? 'Teacher',
+            );
+            if (!kIsWeb) {
+              DeviceNotificationService.instance.showNotification(
+                title: 'New Assignment: $title',
+                body: '${teacherName ?? "Your teacher"} posted "$title".',
+                payload: '/student/courses',
+                type: 'new_assignment',
+              );
+            }
+          }
         }
       }
       // Clean up any mock test assignments and duplicate assignment rows in local SQLite
@@ -11189,25 +11238,64 @@ class DatabaseHelper {
           where: 'subject_id = ?',
           whereArgs: [targetSubjectId],
         );
+        final targetStudents = <String>{};
         for (final en in enrollments) {
           final sid = en['student_id']?.toString();
-          if (sid != null && sid.isNotEmpty) {
-            final existingQa = await db.query(
-              'quiz_assignments',
-              where: 'quiz_id = ? AND student_id = ?',
-              whereArgs: [localQuizId, sid],
+          if (sid != null && sid.isNotEmpty) targetStudents.add(sid);
+        }
+        if (targetStudents.isEmpty) {
+          final studentUsers = await db.query('users', where: 'role = ?', whereArgs: ['student']);
+          for (final u in studentUsers) {
+            final uid = u['id']?.toString();
+            if (uid != null && uid.isNotEmpty) targetStudents.add(uid);
+          }
+        }
+
+        for (final sid in targetStudents) {
+          final existingQa = await db.query(
+            'quiz_assignments',
+            where: 'quiz_id = ? AND student_id = ?',
+            whereArgs: [localQuizId, sid],
+          );
+          if (existingQa.isEmpty) {
+            await db.insert('quiz_assignments', {
+              'quiz_id': localQuizId,
+              'student_id': sid,
+              'assigned_at': createdAt,
+              'due_date': dueDate,
+              'status': 'pending',
+              'score': 0,
+              'total_questions': questions.isNotEmpty ? questions.length : 3,
+              'percentage': 0.0,
+            });
+          }
+
+          // Ensure student receives an academic notification for this new quiz
+          final existingNotif = await db.query(
+            'notifications',
+            where: 'user_id = ? AND (related_id = ? OR related_id = ? OR (title = ? AND type = ?))',
+            whereArgs: [sid, rawQId, localQuizId.toString(), 'New Quiz: $title', 'quiz_assigned'],
+          );
+          if (existingNotif.isEmpty) {
+            await createNotification(
+              userId: sid,
+              type: 'quiz_assigned',
+              title: 'New Quiz: $title',
+              message: '${teacherName ?? "Your teacher"} assigned quiz "$title".${dueDate != null ? " Due: ${dueDate.substring(0, 10)}" : ""}',
+              relatedId: localQuizId.toString(),
+              targetRoute: '/student/courses',
+              subjectId: targetSubjectId,
+              actorId: teacherId,
+              actorName: teacherName ?? 'Teacher',
             );
-            if (existingQa.isEmpty) {
-              await db.insert('quiz_assignments', {
-                'quiz_id': localQuizId,
-                'student_id': sid,
-                'assigned_at': createdAt,
-                'due_date': dueDate,
-                'status': 'pending',
-                'score': 0,
-                'total_questions': questions.isNotEmpty ? questions.length : 3,
-                'percentage': 0.0,
-              });
+            // Trigger OS-level notification popup outside the app
+            if (!kIsWeb) {
+              DeviceNotificationService.instance.showNotification(
+                title: 'New Quiz: $title',
+                body: '${teacherName ?? "Your teacher"} assigned quiz "$title".',
+                payload: '/student/courses',
+                type: 'quiz_assigned',
+              );
             }
           }
         }
@@ -13608,7 +13696,12 @@ class DatabaseHelper {
       conflictAlgorithm: ConflictAlgorithm.replace,
     );
 
-    // Sync notification to Cloud Firestore
+    // Sync notification to Supabase & Cloud Firestore
+    try {
+      unawaited(
+        SupabaseService.instance.saveNotification(notifData),
+      );
+    } catch (_) {}
     try {
       unawaited(
         FirestoreService().saveDocument('notifications', id, notifData),
@@ -13693,6 +13786,46 @@ class DatabaseHelper {
         'last_synced_at_notifs_$cleanUid',
         DateTime.now().toIso8601String(),
       );
+
+      // Also sync user notifications from Supabase
+      try {
+        final supaNotifs = await SupabaseService.instance.fetchNotifications(cleanUid);
+        if (supaNotifs.isNotEmpty) {
+          final db = await database;
+          for (final doc in supaNotifs) {
+            final id = doc['id']?.toString();
+            if (id == null || id.isEmpty) continue;
+            final type = doc['type']?.toString() ?? 'general';
+            final title = doc['title']?.toString() ?? 'Notification';
+            final message = doc['message']?.toString() ?? '';
+            final relatedId = doc['related_id']?.toString();
+            final subjectId = (doc['subject_id'] as num?)?.toInt();
+            final actorId = doc['actor_id']?.toString();
+            final actorName = doc['actor_name']?.toString();
+            final targetRoute = doc['target_route']?.toString();
+            final isRead = (doc['is_read'] == true || doc['is_read'] == 1) ? 1 : 0;
+            final createdAt = doc['created_at']?.toString() ?? DateTime.now().toIso8601String();
+
+            final existing = await db.query('notifications', where: 'id = ?', whereArgs: [id]);
+            if (existing.isEmpty) {
+              await db.insert('notifications', {
+                'id': id,
+                'user_id': cleanUid,
+                'type': type,
+                'title': title,
+                'message': message,
+                'related_id': relatedId,
+                'subject_id': subjectId,
+                'actor_id': actorId,
+                'actor_name': actorName,
+                'target_route': targetRoute,
+                'is_read': isRead,
+                'created_at': createdAt,
+              });
+            }
+          }
+        }
+      } catch (_) {}
     } catch (e) {
       debugPrint('[DatabaseHelper] syncCloudNotificationsToLocal error: $e');
     }
@@ -13705,6 +13838,15 @@ class DatabaseHelper {
       await syncCloudNotificationsToLocal(userId);
     } catch (_) {}
     final db = await database;
+    try {
+      // Auto-sanitize legacy "Assessment" wording into "Quiz"
+      await db.rawUpdate('''
+        UPDATE notifications 
+        SET title = REPLACE(title, 'Assessment', 'Quiz'),
+            message = REPLACE(message, 'assessment', 'quiz')
+        WHERE title LIKE '%Assessment%' OR message LIKE '%assessment%'
+      ''');
+    } catch (_) {}
     return await db.query(
       'notifications',
       where: 'user_id = ?',

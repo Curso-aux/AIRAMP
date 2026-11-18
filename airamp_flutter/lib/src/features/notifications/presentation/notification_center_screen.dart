@@ -674,7 +674,11 @@ class _NotificationCenterScreenState
                                             overflow: TextOverflow.ellipsis,
                                           ),
                                           if (notif.actorName != null &&
-                                              notif.actorName!.isNotEmpty) ...[
+                                              notif.actorName!.isNotEmpty &&
+                                              notif.type != 'chat' &&
+                                              notif.type != 'group_chat' &&
+                                              notif.actorName !=
+                                                  'Classmate') ...[
                                             const SizedBox(height: 6),
                                             Row(
                                               children: [

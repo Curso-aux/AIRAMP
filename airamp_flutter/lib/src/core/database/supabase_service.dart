@@ -647,4 +647,84 @@ class SupabaseService {
   Future<List<Map<String, dynamic>>> fetchAllSubmissions() async {
     return fetchSubmissions();
   }
+
+  // ════════════════════════════════════════════════════════════════
+  // ── 7. NOTIFICATIONS & REALTIME STREAMS ─────────────────────────
+  // ════════════════════════════════════════════════════════════════
+
+  /// Stream published quizzes in real-time
+  Stream<List<Map<String, dynamic>>> streamQuizzes() {
+    if (!isInitialized || client == null) return const Stream.empty();
+    try {
+      return client!
+          .from('quizzes')
+          .stream(primaryKey: ['id'])
+          .order('created_at', ascending: false);
+    } catch (e) {
+      debugPrint('[SupabaseService] streamQuizzes error: $e');
+      return const Stream.empty();
+    }
+  }
+
+  /// Stream assignments in real-time
+  Stream<List<Map<String, dynamic>>> streamAssignments() {
+    if (!isInitialized || client == null) return const Stream.empty();
+    try {
+      return client!
+          .from('assignments')
+          .stream(primaryKey: ['id'])
+          .order('created_at', ascending: false);
+    } catch (e) {
+      debugPrint('[SupabaseService] streamAssignments error: $e');
+      return const Stream.empty();
+    }
+  }
+
+  /// Save or dispatch a notification in Supabase
+  Future<void> saveNotification(Map<String, dynamic> data) async {
+    if (!isInitialized || client == null) return;
+    try {
+      final payload = Map<String, dynamic>.from(data);
+      // Ensure boolean format for is_read in Supabase
+      if (payload['is_read'] is int) {
+        payload['is_read'] = payload['is_read'] == 1;
+      }
+      await client!.from('notifications').upsert(payload, onConflict: 'id');
+      debugPrint('[SupabaseService] saveNotification succeeded for ${data['id']}');
+    } catch (e) {
+      debugPrint('[SupabaseService] saveNotification notice: $e');
+    }
+  }
+
+  /// Fetch notifications for a user from Supabase
+  Future<List<Map<String, dynamic>>> fetchNotifications(String userId) async {
+    if (!isInitialized || client == null) return [];
+    try {
+      final data = await client!
+          .from('notifications')
+          .select()
+          .eq('user_id', userId)
+          .order('created_at', ascending: false)
+          .limit(60);
+      return List<Map<String, dynamic>>.from(data);
+    } catch (e) {
+      debugPrint('[SupabaseService] fetchNotifications notice: $e');
+      return [];
+    }
+  }
+
+  /// Stream user notifications in real-time from Supabase
+  Stream<List<Map<String, dynamic>>> streamNotifications(String userId) {
+    if (!isInitialized || client == null) return const Stream.empty();
+    try {
+      return client!
+          .from('notifications')
+          .stream(primaryKey: ['id'])
+          .eq('user_id', userId)
+          .order('created_at', ascending: false);
+    } catch (e) {
+      debugPrint('[SupabaseService] streamNotifications error: $e');
+      return const Stream.empty();
+    }
+  }
 }

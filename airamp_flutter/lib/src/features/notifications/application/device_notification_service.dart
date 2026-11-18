@@ -91,6 +91,9 @@ class DeviceNotificationService {
         icon: '@mipmap/ic_launcher',
         enableVibration: true,
         playSound: true,
+        visibility: NotificationVisibility.public,
+        category: AndroidNotificationCategory.reminder,
+        channelAction: AndroidNotificationChannelAction.createIfNotExists,
         styleInformation: BigTextStyleInformation(body),
       );
       const darwinDetails = DarwinNotificationDetails(
