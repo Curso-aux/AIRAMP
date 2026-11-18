@@ -229,7 +229,19 @@ final teacherHandledSectionsProvider = FutureProvider<List<String>>((ref) async 
   final user = ref.watch(authProvider);
   final teacherId = user?.id;
   if (teacherId == null) return [];
-  return await DatabaseHelper().getSectionsForTeacher(teacherId);
+  final sections = await DatabaseHelper().getSectionsForTeacher(teacherId);
+  if (sections.isNotEmpty) return sections;
+
+  // Resilient fallback: use section names from handled sections details
+  final details = await DatabaseHelper().getHandledSectionsWithDetails(teacherId);
+  final detailNames = details
+      .map((d) => d['name']?.toString().trim() ?? '')
+      .where((n) => n.isNotEmpty)
+      .toSet()
+      .toList();
+  if (detailNames.isNotEmpty) return detailNames;
+
+  return await DatabaseHelper().getAvailableSectionsList();
 });
 
 // Teacher Handled Sections For Specific Subject Provider

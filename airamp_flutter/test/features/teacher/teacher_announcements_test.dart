@@ -33,6 +33,14 @@ void main() {
 
     test('2. Teacher can retrieve handled sections list', () async {
       final helper = DatabaseHelper();
+      final db = await helper.database;
+      await db.insert('sections', {
+        'name': 'Grade 10 - Emerald',
+        'grade': 'Grade 10',
+        'description': 'Science Section',
+        'student_count': 30,
+        'created_at': DateTime.now().toIso8601String(),
+      });
       final sections = await helper.getSectionsForTeacher('teacher_1');
 
       expect(sections, isA<List<String>>());

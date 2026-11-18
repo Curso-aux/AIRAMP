@@ -168,10 +168,17 @@ class _PostAnnouncementDialogState extends ConsumerState<PostAnnouncementDialog>
     final handledSectionsAsync = ref.watch(teacherHandledSectionsProvider);
     final handledSections = handledSectionsAsync.value ?? [];
 
+    final handledDetailsAsync = ref.watch(teacherHandledSectionsDetailsProvider);
+    final detailNames = (handledDetailsAsync.value ?? [])
+        .map((d) => d['name']?.toString().trim() ?? '')
+        .where((n) => n.isNotEmpty)
+        .toList();
+
     // Ensure our section list always has 'All Handled Sections' + all distinct sections
     final sectionOptions = <String>{
       'All Handled Sections',
       ...handledSections.where((s) => s.isNotEmpty && s != 'All Handled Sections'),
+      ...detailNames.where((s) => s.isNotEmpty && s != 'All Handled Sections'),
     }.toList();
 
     // If current selected section isn't in options, default to 'All Handled Sections'

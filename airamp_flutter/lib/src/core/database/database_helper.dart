@@ -7337,13 +7337,31 @@ class DatabaseHelper {
             );
             if (matched.isNotEmpty) {
               sections.add(matched);
+            } else {
+              sections.add(sec);
             }
           }
         }
       }
     }
 
-    // Resilient fallback: If no sections were found via enrollments, but the teacher has assigned subjects
+    // 2. Also check class_schedules assigned to this teacher
+    try {
+      final scheds = await db.query(
+        'class_schedules',
+        columns: ['section_name'],
+        where: 'teacher_id = ?',
+        whereArgs: [teacherId],
+      );
+      for (final row in scheds) {
+        final sec = row['section_name']?.toString().trim();
+        if (sec != null && sec.isNotEmpty) {
+          sections.add(sec);
+        }
+      }
+    } catch (_) {}
+
+    // 3. Resilient fallback: If no sections were found via enrollments, match teacher assigned subjects
     if (sections.isEmpty && subjects.isNotEmpty) {
       final subjectGrades = subjects
           .map((s) => (s['grade_level'] as String?)?.trim().toLowerCase())
@@ -7355,20 +7373,25 @@ class DatabaseHelper {
         for (final r in secRows) {
           final rGrade = (r['grade'] as String?)?.trim().toLowerCase();
           final rName = (r['name'] as String?)?.trim();
-          if (rGrade != null &&
-              subjectGrades.contains(rGrade) &&
-              rName != null &&
-              rName.isNotEmpty) {
-            sections.add(rName);
+          if (rName != null && rName.isNotEmpty) {
+            if (rGrade != null &&
+                (subjectGrades.contains(rGrade) ||
+                 subjectGrades.any((sg) => sg != null && (sg.contains(rGrade) || rGrade.contains(sg))))) {
+              sections.add(rName);
+            }
           }
         }
       }
 
-      // If still empty and teacher is teacher_1 (default faculty instructor), link to available school sections
-      if (sections.isEmpty &&
-          (teacherId == 'teacher_1' || teacherId.contains('reyes'))) {
+      // If still empty, link to available school sections for the campus
+      if (sections.isEmpty && availableSections.isNotEmpty) {
         sections.addAll(availableSections);
       }
+    }
+
+    // 4. Final safety fallback: If teacher has campus sections available, populate them
+    if (sections.isEmpty && availableSections.isNotEmpty) {
+      sections.addAll(availableSections);
     }
 
     final sorted = sections.toList()..sort();
@@ -7820,12 +7843,25 @@ class DatabaseHelper {
       final aSec = (a['section'] as String?)?.trim();
       final isAuthor = a['author_id'] == teacherId;
 
-      // When filtered by a specific section (e.g. "Emerald")
+      // When filtered by a specific section (e.g. "Grade 12 - Sapphire")
       if (section != null &&
           section.isNotEmpty &&
           section != 'All Handled Sections' &&
           section != 'All Sections') {
-        return aSec == section;
+        final secLower = section.toLowerCase().trim();
+        final aSecLower = (aSec ?? '').toLowerCase().trim();
+
+        // 1. Direct or fuzzy section match
+        final isDirectMatch = aSecLower == secLower ||
+            (aSecLower.isNotEmpty &&
+                (secLower.contains(aSecLower) || aSecLower.contains(secLower)));
+
+        // 2. Announcements broadcast to all handled sections also apply to this specific section!
+        final isBroadcast = aSecLower == 'all handled sections' ||
+            aSecLower == 'all sections' ||
+            aSecLower.isEmpty;
+
+        return isDirectMatch || isBroadcast;
       }
 
       // When set to 'All Handled Sections' or no filter:

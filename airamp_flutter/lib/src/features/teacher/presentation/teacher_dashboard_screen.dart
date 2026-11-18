@@ -3599,9 +3599,15 @@ class _TeacherDashboardScreenState extends ConsumerState<TeacherDashboardScreen>
     List<Map<String, dynamic>> announcements,
     List<String> handledSections,
   ) {
+    final detailNames = (ref.watch(teacherHandledSectionsDetailsProvider).value ?? [])
+        .map((d) => d['name']?.toString().trim() ?? '')
+        .where((n) => n.isNotEmpty)
+        .toList();
+
     final sectionOptions = <String>{
       'All Handled Sections',
       ...handledSections.where((s) => s.isNotEmpty && s != 'All Handled Sections'),
+      ...detailNames.where((s) => s.isNotEmpty && s != 'All Handled Sections'),
     }.toList();
 
     return Column(
