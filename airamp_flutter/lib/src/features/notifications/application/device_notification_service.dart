@@ -36,7 +36,7 @@ class DeviceNotificationService {
       );
 
       await _localNotifications.initialize(
-        settings: initSettings,
+        initSettings,
         onDidReceiveNotificationResponse: (NotificationResponse response) {
           debugPrint('[DeviceNotificationService] Notification tapped: ${response.payload}');
         },
@@ -104,10 +104,10 @@ class DeviceNotificationService {
       );
 
       await _localNotifications.show(
-        id: notifId,
-        title: title,
-        body: body,
-        notificationDetails: details,
+        notifId,
+        title,
+        body,
+        details,
         payload: payload,
       );
     } catch (e) {
