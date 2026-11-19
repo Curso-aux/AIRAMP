@@ -58,7 +58,25 @@ class _SuperAdminAdminsTabState extends ConsumerState<SuperAdminAdminsTab> {
     );
     final passCtrl = TextEditingController();
     String selectedRole = admin['role'] as String? ?? 'admin';
-    final rawSchool = admin['school_id'] as String?;
+    String? rawSchool = admin['school_id'] as String?;
+    if (rawSchool == null || rawSchool.isEmpty || rawSchool == 'unassigned') {
+      final aId = (admin['id'] as String? ?? '').trim();
+      final aEmail = (admin['email'] as String? ?? '').toLowerCase().trim();
+      final aUser = (admin['username'] as String? ?? '').toLowerCase().trim();
+      final linked = ref.read(schoolsListProvider).firstWhere(
+        (s) {
+          final sAdminId = (s['admin_id'] as String? ?? '').trim();
+          if (sAdminId.isEmpty) return false;
+          return (aId.isNotEmpty && sAdminId == aId) ||
+                 (aEmail.isNotEmpty && sAdminId.toLowerCase() == aEmail) ||
+                 (aUser.isNotEmpty && sAdminId.toLowerCase() == aUser);
+        },
+        orElse: () => <String, dynamic>{},
+      );
+      if (linked.isNotEmpty) {
+        rawSchool = linked['id'] as String?;
+      }
+    }
     String selectedSchool = (rawSchool == null || rawSchool.isEmpty)
         ? 'unassigned'
         : rawSchool;
@@ -1633,7 +1651,25 @@ class _SuperAdminAdminsTabState extends ConsumerState<SuperAdminAdminsTab> {
                         itemBuilder: (context, index) {
                           final admin = filteredAdmins[index];
                           final isSuper = admin['role'] == 'super_admin';
-                          final schoolId = admin['school_id'] as String?;
+                          String? schoolId = admin['school_id'] as String?;
+                          if (!isSuper && (schoolId == null || schoolId.isEmpty || schoolId == 'unassigned')) {
+                            final aId = (admin['id'] as String? ?? '').trim();
+                            final aEmail = (admin['email'] as String? ?? '').toLowerCase().trim();
+                            final aUser = (admin['username'] as String? ?? '').toLowerCase().trim();
+                            final linked = schools.firstWhere(
+                              (s) {
+                                final sAdminId = (s['admin_id'] as String? ?? '').trim();
+                                if (sAdminId.isEmpty) return false;
+                                return (aId.isNotEmpty && sAdminId == aId) ||
+                                       (aEmail.isNotEmpty && sAdminId.toLowerCase() == aEmail) ||
+                                       (aUser.isNotEmpty && sAdminId.toLowerCase() == aUser);
+                              },
+                              orElse: () => <String, dynamic>{},
+                            );
+                            if (linked.isNotEmpty) {
+                              schoolId = linked['id'] as String?;
+                            }
+                          }
                           final isUnassigned =
                               !isSuper &&
                               (schoolId == null ||

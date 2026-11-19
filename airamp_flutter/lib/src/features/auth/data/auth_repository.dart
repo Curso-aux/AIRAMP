@@ -191,7 +191,21 @@ class AuthRepository {
       }
 
       if (candidateAdmin != null) {
-        final sId = candidateAdmin['school_id']?.toString().trim();
+        var sId = candidateAdmin['school_id']?.toString().trim();
+        if (sId == null || sId.isEmpty || sId == 'unassigned') {
+          final cId = (candidateAdmin['id'] as String? ?? '').trim();
+          final cEmail = (candidateAdmin['email'] as String? ?? '').toLowerCase().trim();
+          final cUser = (candidateAdmin['username'] as String? ?? '').toLowerCase().trim();
+          final linked = await db.query(
+            'schools',
+            where: 'admin_id = ? OR LOWER(admin_id) = ? OR LOWER(admin_id) = ?',
+            whereArgs: [cId, cEmail, cUser],
+          );
+          if (linked.isNotEmpty) {
+            sId = linked.first['id'] as String?;
+            candidateAdmin['school_id'] = sId;
+          }
+        }
         if (sId == null || sId.isEmpty || sId == 'unassigned') {
           throw Exception(
             'Access Denied: Administrator is still not assigned to a campus. Please contact the Super Administrator to assign your campus.',
@@ -257,7 +271,30 @@ class AuthRepository {
     // Campus Administrator Multi-Tenancy Guard:
     // A campus administrator must be assigned to an active campus before access is permitted.
     if (role == 'admin') {
-      final schoolId = user['school_id']?.toString().trim();
+      var schoolId = user['school_id']?.toString().trim();
+      if (schoolId == null || schoolId.isEmpty || schoolId == 'unassigned') {
+        // Auto-heal bidirectional link from schools table if assigned as a campus administrator
+        final uId = (user['id'] as String? ?? '').trim();
+        final uEmail = (user['email'] as String? ?? '').toLowerCase().trim();
+        final uUser = (user['username'] as String? ?? '').toLowerCase().trim();
+
+        final linked = await db.query(
+          'schools',
+          where: 'admin_id = ? OR LOWER(admin_id) = ? OR LOWER(admin_id) = ?',
+          whereArgs: [uId, uEmail, uUser],
+        );
+        if (linked.isNotEmpty) {
+          schoolId = linked.first['id'] as String?;
+          if (schoolId != null && schoolId.isNotEmpty) {
+            user['school_id'] = schoolId;
+            unawaited(db.update('users', {'school_id': schoolId}, where: 'id = ?', whereArgs: [user['id']]));
+            try {
+              unawaited(FirestoreService().saveUser({'id': user['id'], 'school_id': schoolId}));
+            } catch (_) {}
+          }
+        }
+      }
+
       if (schoolId == null || schoolId.isEmpty || schoolId == 'unassigned') {
         throw Exception(
           'Access Denied: Administrator is still not assigned to a campus. Please contact the Super Administrator to assign your campus.',

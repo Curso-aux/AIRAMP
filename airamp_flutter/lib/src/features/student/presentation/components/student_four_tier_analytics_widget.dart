@@ -658,17 +658,17 @@ class _StudentFourTierAnalyticsWidgetState
                       {
                         'title': '📖 Review Polynomial Factoring Flashcards',
                         'description':
-                            'Study the Topic 3 summary cards downloaded from your classroom hub node.',
+                            'Study the Topic 3 summary cards and review key formulas.',
                         'badge': '📖 Flashcards',
                         'priority': 'warning',
                         'actionLabel': 'Open Flashcards',
                         'actionType': 'open_modules',
                       },
                       {
-                        'title': '💾 Synchronize Offline Study Pack',
+                        'title': '💾 Download Offline Study Pack',
                         'description':
-                            'Connect to your classroom ESP32 hub box to get updated practice worksheets.',
-                        'badge': '💾 Offline Hub',
+                            'Save lesson flashcards and practice worksheets to your device so you can study offline anywhere.',
+                        'badge': '💾 Offline Study',
                         'priority': 'routine',
                         'actionLabel': 'Download Files',
                         'actionType': 'open_hub',
@@ -694,10 +694,10 @@ class _StudentFourTierAnalyticsWidgetState
                         'actionType': 'open_modules',
                       },
                       {
-                        'title': '💾 Download Offline Study Packs',
+                        'title': '💾 Download Offline Study Pack',
                         'description':
-                            'Save lesson flashcards and study packs from your classroom hub box so you can study offline at home.',
-                        'badge': '💾 Offline',
+                            'Save lesson flashcards and study packs to your device so you can study offline at home.',
+                        'badge': '💾 Offline Study',
                         'priority': 'routine',
                         'actionLabel': 'Download Files',
                         'actionType': 'open_hub',

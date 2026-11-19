@@ -4425,16 +4425,16 @@ class _TeacherDashboardScreenState
         ? recommendedActions
         : [
             {
-              'title': 'Formative Assessment Review',
+              'title': 'Schedule Quick Topic Review',
               'description':
-                  'Schedule quick remedial review questions for topics with low learning objective mastery.',
+                  'Prepare short practice questions for topics where students scored below 75%.',
               'priority': 'high',
               'action': 'review_quizzes',
             },
             {
-              'title': 'ESP32 Hub Study Pack Sync',
+              'title': 'Share Offline Study Pack',
               'description':
-                  'Sync latest module materials and flashcards to offline classroom hubs for zero-data review.',
+                  'Provide latest lesson notes and practice flashcards to students for offline homework review.',
               'priority': 'medium',
               'action': 'sync_hub',
             },
@@ -4484,7 +4484,7 @@ class _TeacherDashboardScreenState
                   borderRadius: BorderRadius.circular(8),
                 ),
                 child: Text(
-                  'Tier 4: Prescriptive',
+                  'Action Steps',
                   style: TextStyle(
                     fontSize: 10.5,
                     fontWeight: FontWeight.w700,

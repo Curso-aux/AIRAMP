@@ -987,11 +987,11 @@ class _AdminDashboardScreenState extends ConsumerState<AdminDashboardScreen> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        // ── TIER 1: DESCRIPTIVE ──
+        // ── TIER 1: ENROLLMENT & ACTIVITY ──
         _buildCampusTierContainer(
-          tierBadge: 'Tier 1: Descriptive',
+          tierBadge: 'Enrollment & Activity',
           tierColor: AppTheme.primary,
-          title: 'Campus Enrollment Attainment',
+          title: 'Student Enrollment by Track',
           icon: Icons.history_edu_rounded,
           isDark: isDark,
           content: Column(
@@ -1037,11 +1037,11 @@ class _AdminDashboardScreenState extends ConsumerState<AdminDashboardScreen> {
         ),
         const SizedBox(height: 14),
 
-        // ── TIER 2: DIAGNOSTIC ──
+        // ── TIER 2: SECTION BREAKDOWN ──
         _buildCampusTierContainer(
-          tierBadge: 'Tier 2: Diagnostic',
+          tierBadge: 'Section Breakdown',
           tierColor: AppTheme.accent,
-          title: 'Cohort & Section Disparity Audit',
+          title: 'Class Section Quiz Scores',
           icon: Icons.troubleshoot_rounded,
           isDark: isDark,
           content: Column(
@@ -1051,7 +1051,7 @@ class _AdminDashboardScreenState extends ConsumerState<AdminDashboardScreen> {
                 spacing: 8,
                 runSpacing: 6,
                 children: [
-                  _buildTierChip('Ratio', '$studentTeacherRatio:1', isDark),
+                  _buildTierChip('Avg Class Size', '${studentTeacherRatio.split(':').first.trim()} / Teacher', isDark),
                   _buildTierChip('Sections', '${sectionDistribution.isNotEmpty ? sectionDistribution.length : sectionsCount}', isDark),
                   _buildTierChip('Baseline', '75% Pass', isDark),
                 ],
@@ -1085,11 +1085,11 @@ class _AdminDashboardScreenState extends ConsumerState<AdminDashboardScreen> {
         ),
         const SizedBox(height: 14),
 
-        // ── TIER 3: PREDICTIVE ──
+        // ── TIER 3: ACADEMIC FORECAST ──
         _buildCampusTierContainer(
-          tierBadge: 'Tier 3: Predictive',
+          tierBadge: 'Academic Forecast',
           tierColor: AppTheme.warning,
-          title: 'Cohort Retention & NAT Readiness',
+          title: 'Estimated Passing Rates & NAT Readiness',
           icon: Icons.trending_up_rounded,
           isDark: isDark,
           content: Column(
@@ -1152,31 +1152,31 @@ class _AdminDashboardScreenState extends ConsumerState<AdminDashboardScreen> {
         ),
         const SizedBox(height: 14),
 
-        // ── TIER 4: PRESCRIPTIVE ──
+        // ── TIER 4: SCHOOL ACTION PLAN ──
         _buildCampusTierContainer(
-          tierBadge: 'Tier 4: Prescriptive',
+          tierBadge: 'School Action Plan',
           tierColor: AppTheme.success,
-          title: 'Actionable Administrative Directives',
+          title: 'Recommended Steps for School Leaders',
           icon: Icons.lightbulb_outline_rounded,
           isDark: isDark,
           content: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               PrescriptiveActionCard(
-                title: benchmarkMet ? 'Scale High-Performing Syllabus' : 'Targeted Section Remediation',
+                title: benchmarkMet ? 'Share High-Performing Study Guides' : 'Classroom Review & Remediation',
                 description: benchmarkMet
-                    ? 'Replicate best-performing instructional models and dispatch enrichment materials to ESP32 classroom hubs.'
-                    : 'Initiate targeted remediation for sections falling below the 75% pass mark and allocate faculty consultation hours.',
+                    ? 'Share lesson plans from top-performing sections with all teachers and distribute enrichment worksheets.'
+                    : 'Set up extra review sessions for sections scoring below 75% and schedule faculty consultation hours.',
                 badgeText: benchmarkMet ? 'Excellence' : 'Intervention',
-                actionLabel: 'Execute Directive',
+                actionLabel: 'Send to Teachers',
                 priority: benchmarkMet ? PrescriptionPriority.recommended : PrescriptionPriority.warning,
                 isDark: isDark,
                 onAction: () {
                   ScaffoldMessenger.of(context).showSnackBar(
                     SnackBar(
                       content: Text(benchmarkMet
-                          ? 'Enrichment guide successfully broadcasted to institutional nodes.'
-                          : 'Remedial intervention package dispatched to handled sections.'),
+                          ? 'Enrichment guides distributed to class sections.'
+                          : 'Remedial review worksheets sent to class sections.'),
                       backgroundColor: benchmarkMet ? AppTheme.success : AppTheme.warning,
                     ),
                   );

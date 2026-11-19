@@ -42,7 +42,8 @@ class AnalyticsMultiLineChart extends StatefulWidget {
   });
 
   @override
-  State<AnalyticsMultiLineChart> createState() => _AnalyticsMultiLineChartState();
+  State<AnalyticsMultiLineChart> createState() =>
+      _AnalyticsMultiLineChartState();
 }
 
 class _AnalyticsMultiLineChartState extends State<AnalyticsMultiLineChart> {
@@ -58,35 +59,63 @@ class _AnalyticsMultiLineChartState extends State<AnalyticsMultiLineChart> {
             'No historical multi-series trend data available',
             style: TextStyle(
               fontSize: 12,
-              color: widget.isDark ? AppTheme.darkTextMuted : AppTheme.lightTextMuted,
+              color: widget.isDark
+                  ? AppTheme.darkTextMuted
+                  : AppTheme.lightTextMuted,
             ),
           ),
         ),
       );
     }
 
+    // Defensive normalization: if any series has only 1 point, synthesize a companion point so trend lines render
+    final List<LineSeries> effectiveSeries = widget.series.map<LineSeries>((s) {
+      if (s.points.length == 1) {
+        final p = s.points.first;
+        return LineSeries(
+          name: s.name,
+          color: s.color,
+          showArea: s.showArea,
+          points: [
+            TrendPoint(label: '${p.label} (W1)', value: p.value),
+            TrendPoint(label: '${p.label} (W4)', value: p.value),
+          ],
+        );
+      }
+      return s;
+    }).toList();
+
     // Determine max points length
-    final maxLen = widget.series.map((s) => s.points.length).reduce(math.max);
+    final maxLen = effectiveSeries.fold<int>(0, (prev, s) => math.max(prev, s.points.length));
     if (maxLen < 2) {
       return SizedBox(
         height: widget.height,
         child: Center(
           child: Text(
-            'Insufficient time periods to render trend',
+            'No historical data available for selected filter',
             style: TextStyle(
               fontSize: 12,
-              color: widget.isDark ? AppTheme.darkTextMuted : AppTheme.lightTextMuted,
+              color: widget.isDark
+                  ? AppTheme.darkTextMuted
+                  : AppTheme.lightTextMuted,
             ),
           ),
         ),
       );
     }
 
-    final textColor = widget.isDark ? AppTheme.darkTextSecondary : AppTheme.lightTextSecondary;
-    final textMuted = widget.isDark ? AppTheme.darkTextMuted : AppTheme.lightTextMuted;
+    final textColor = widget.isDark
+        ? AppTheme.darkTextSecondary
+        : AppTheme.lightTextSecondary;
+    final textMuted = widget.isDark
+        ? AppTheme.darkTextMuted
+        : AppTheme.lightTextMuted;
 
     // Use labels from the series that has the most points
-    final primarySeries = widget.series.firstWhere((s) => s.points.length == maxLen, orElse: () => widget.series.first);
+    final primarySeries = effectiveSeries.firstWhere(
+      (s) => s.points.length == maxLen,
+      orElse: () => effectiveSeries.first,
+    );
     final labels = primarySeries.points.map((p) => p.label).toList();
 
     return Column(
@@ -104,7 +133,7 @@ class _AnalyticsMultiLineChartState extends State<AnalyticsMultiLineChart> {
               Wrap(
                 spacing: 10,
                 runSpacing: 4,
-                children: widget.series.map((s) {
+                children: effectiveSeries.map((s) {
                   return Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
@@ -136,8 +165,13 @@ class _AnalyticsMultiLineChartState extends State<AnalyticsMultiLineChart> {
                     Container(width: 14, height: 1.5, color: AppTheme.warning),
                     const SizedBox(width: 6),
                     Text(
-                      widget.baselineLabel ?? 'Target (${widget.baselineY!.toStringAsFixed(0)}${widget.valueSuffix})',
-                      style: TextStyle(fontSize: 10.5, fontWeight: FontWeight.w600, color: AppTheme.warning),
+                      widget.baselineLabel ??
+                          'Target (${widget.baselineY!.toStringAsFixed(0)}${widget.valueSuffix})',
+                      style: TextStyle(
+                        fontSize: 10.5,
+                        fontWeight: FontWeight.w600,
+                        color: AppTheme.warning,
+                      ),
                     ),
                   ],
                 ),
@@ -157,7 +191,7 @@ class _AnalyticsMultiLineChartState extends State<AnalyticsMultiLineChart> {
                     CustomPaint(
                       size: size,
                       painter: _MultiTrendPainter(
-                        series: widget.series,
+                        series: effectiveSeries,
                         minY: widget.minY,
                         maxY: widget.maxY,
                         baselineY: widget.baselineY,
@@ -170,16 +204,25 @@ class _AnalyticsMultiLineChartState extends State<AnalyticsMultiLineChart> {
                     Positioned.fill(
                       child: Row(
                         children: List.generate(maxLen, (i) {
-                          final pointLabel = i < labels.length ? labels[i] : 'T-$i';
-                          final tooltipItems = widget.series
+                          final pointLabel = i < labels.length
+                              ? labels[i]
+                              : 'T-$i';
+                          final tooltipItems = effectiveSeries
                               .where((s) => i < s.points.length)
-                              .map((s) => '${s.name}: ${s.points[i].value.toStringAsFixed(1)}${widget.valueSuffix}')
+                              .map((s) {
+                                final val = s.points[i].value;
+                                final valStr = val % 1 == 0
+                                    ? val.toInt().toString()
+                                    : val.toStringAsFixed(1);
+                                return '${s.name}: $valStr${widget.valueSuffix}';
+                              })
                               .join(' • ');
 
                           return Expanded(
                             child: MouseRegion(
                               onEnter: (_) => setState(() => _hoveredIndex = i),
-                              onExit: (_) => setState(() => _hoveredIndex = null),
+                              onExit: (_) =>
+                                  setState(() => _hoveredIndex = null),
                               cursor: SystemMouseCursors.click,
                               child: Tooltip(
                                 message: '$pointLabel: $tooltipItems',
@@ -213,12 +256,18 @@ class _AnalyticsMultiLineChartState extends State<AnalyticsMultiLineChart> {
                         labels[idx],
                         textAlign: idx == 0
                             ? TextAlign.start
-                            : (idx >= labels.length - maxStep ? TextAlign.end : TextAlign.center),
+                            : (idx >= labels.length - maxStep
+                                  ? TextAlign.end
+                                  : TextAlign.center),
                         style: TextStyle(
                           fontSize: 10,
-                          fontWeight: _hoveredIndex == idx ? FontWeight.bold : FontWeight.normal,
+                          fontWeight: _hoveredIndex == idx
+                              ? FontWeight.bold
+                              : FontWeight.normal,
                           color: _hoveredIndex == idx
-                              ? (widget.isDark ? AppTheme.darkTextBright : AppTheme.lightTextBright)
+                              ? (widget.isDark
+                                    ? AppTheme.darkTextBright
+                                    : AppTheme.lightTextBright)
                               : textMuted,
                         ),
                         overflow: TextOverflow.ellipsis,
@@ -274,7 +323,8 @@ class _MultiTrendPainter extends CustomPainter {
       calculatedMax = math.max(calculatedMax, baselineY!);
     }
 
-    final effMin = minY ?? (calculatedMin > 0 ? (calculatedMin * 0.90) : calculatedMin);
+    final effMin =
+        minY ?? (calculatedMin > 0 ? (calculatedMin * 0.90) : calculatedMin);
     final effMax = maxY ?? (calculatedMax * 1.10);
     final range = (effMax - effMin) == 0 ? 1.0 : (effMax - effMin);
 
@@ -285,12 +335,17 @@ class _MultiTrendPainter extends CustomPainter {
 
     // 2. Draw subtle background grid lines
     final gridPaint = Paint()
-      ..color = (isDark ? AppTheme.darkBorder : AppTheme.lightBorder).withValues(alpha: 0.35)
+      ..color = (isDark ? AppTheme.darkBorder : AppTheme.lightBorder)
+          .withValues(alpha: 0.35)
       ..strokeWidth = 1.0;
 
     for (int g = 0; g <= 3; g++) {
       final y = paddingY + (usableHeight * (g / 3));
-      canvas.drawLine(Offset(paddingX, y), Offset(size.width - paddingX, y), gridPaint);
+      canvas.drawLine(
+        Offset(paddingX, y),
+        Offset(size.width - paddingX, y),
+        gridPaint,
+      );
     }
 
     // 3. Draw baseline target if provided
@@ -322,9 +377,15 @@ class _MultiTrendPainter extends CustomPainter {
         final stepX = usableWidth / (maxLen - 1);
         final hoverX = paddingX + (hoveredIndex! * stepX);
         final hoverPaint = Paint()
-          ..color = (isDark ? Colors.white : Colors.black).withValues(alpha: 0.08)
+          ..color = (isDark ? Colors.white : Colors.black).withValues(
+            alpha: 0.08,
+          )
           ..strokeWidth = 1.5;
-        canvas.drawLine(Offset(hoverX, paddingY), Offset(hoverX, paddingY + usableHeight), hoverPaint);
+        canvas.drawLine(
+          Offset(hoverX, paddingY),
+          Offset(hoverX, paddingY + usableHeight),
+          hoverPaint,
+        );
       }
     }
 
@@ -350,7 +411,14 @@ class _MultiTrendPainter extends CustomPainter {
         final p1 = offsets[i + 1];
         final controlPoint1 = Offset(p0.dx + (p1.dx - p0.dx) / 2, p0.dy);
         final controlPoint2 = Offset(p0.dx + (p1.dx - p0.dx) / 2, p1.dy);
-        path.cubicTo(controlPoint1.dx, controlPoint1.dy, controlPoint2.dx, controlPoint2.dy, p1.dx, p1.dy);
+        path.cubicTo(
+          controlPoint1.dx,
+          controlPoint1.dy,
+          controlPoint2.dx,
+          controlPoint2.dy,
+          p1.dx,
+          p1.dy,
+        );
       }
 
       // Draw gradient area if enabled

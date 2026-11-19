@@ -3,7 +3,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../../core/theme/theme_provider.dart';
-import '../../../../core/database/database_helper.dart';
 import '../../../../core/components/analytics_donut_chart.dart';
 import '../../../../core/components/analytics/analytics_components.dart';
 import '../../data/admin_repository.dart';
@@ -93,44 +92,8 @@ class AdminWebAnalyticsView extends ConsumerWidget {
                     ],
                   );
 
-                  final purgeBtn = OutlinedButton.icon(
-                    onPressed: () async {
-                      final deleted = await DatabaseHelper().purgeGarbageTestArtifacts();
-                      await ref.read(adminAnalyticsProvider.notifier).loadAnalytics(syncCloud: true);
-                      if (context.mounted) {
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(
-                            content: Text(deleted > 0
-                                ? 'Cleaned $deleted test records from the system.'
-                                : 'System is clean. No test records found.'),
-                            backgroundColor: AppTheme.success,
-                            behavior: SnackBarBehavior.floating,
-                            duration: const Duration(seconds: 3),
-                          ),
-                        );
-                      }
-                    },
-                    icon: Icon(Icons.cleaning_services_outlined, size: 16, color: AppTheme.textSecondary),
-                    label: Text(
-                      'Clear Test Data',
-                      style: TextStyle(
-                        fontSize: 13,
-                        fontWeight: FontWeight.w600,
-                        color: isDark ? AppTheme.darkTextSecondary : AppTheme.lightTextSecondary,
-                      ),
-                    ),
-                    style: OutlinedButton.styleFrom(
-                      backgroundColor: isDark ? AppTheme.darkSurface : Colors.white,
-                      side: BorderSide(color: isDark ? AppTheme.darkBorder : AppTheme.lightBorder),
-                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                      minimumSize: const Size(0, 40),
-                    ),
-                  );
-
                   final refreshBtn = OutlinedButton.icon(
                     onPressed: () async {
-                      await DatabaseHelper().purgeGarbageTestArtifacts();
                       await ref.read(adminAnalyticsProvider.notifier).loadAnalytics(syncCloud: true);
                     },
                     icon: Icon(Icons.refresh, size: 16, color: isDark ? AppTheme.darkPrimary : AppTheme.lightPrimary),
@@ -151,14 +114,7 @@ class AdminWebAnalyticsView extends ConsumerWidget {
                     ),
                   );
 
-                  final actionButtons = Wrap(
-                    spacing: 8,
-                    runSpacing: 8,
-                    children: [
-                      purgeBtn,
-                      refreshBtn,
-                    ],
-                  );
+                  final actionButtons = refreshBtn;
 
                   if (isNarrow) {
                     return Column(
@@ -546,7 +502,7 @@ class AdminWebAnalyticsView extends ConsumerWidget {
               final isWide = constraints.maxWidth >= 850;
 
               final tier1Card = _buildCampusTierTile(
-                tierBadge: 'Step 1: Enrollment & Quizzes',
+                tierBadge: 'Enrollment & Quizzes',
                 tierBadgeColor: AppTheme.primary,
                 friendlyTitle: 'Students, Teachers & Total Quizzes Taken',
                 icon: Icons.history_edu_rounded,
@@ -609,7 +565,7 @@ class AdminWebAnalyticsView extends ConsumerWidget {
               );
 
               final tier2Card = _buildCampusTierTile(
-                tierBadge: 'Step 2: Section Breakdown',
+                tierBadge: 'Section Breakdown',
                 tierBadgeColor: AppTheme.accent,
                 friendlyTitle: 'Class Section Scores & Student Counts',
                 icon: Icons.troubleshoot_rounded,
@@ -621,7 +577,7 @@ class AdminWebAnalyticsView extends ConsumerWidget {
                       spacing: 12,
                       runSpacing: 8,
                       children: [
-                        _buildTierMetricChip('Student-Faculty Ratio', '$studentTeacherRatio : 1', isDark),
+                        _buildTierMetricChip('Average Class Size', '${studentTeacherRatio.split(':').first.trim()} Students / Teacher', isDark),
                         _buildTierMetricChip('Sections Tracked', '${demoAnalytics.sectionComparisonBars.length}', isDark),
                         _buildTierMetricChip('Passing Target', '75% Pass', isDark),
                       ],
@@ -660,7 +616,7 @@ class AdminWebAnalyticsView extends ConsumerWidget {
               );
 
               final tier3Card = _buildCampusTierTile(
-                tierBadge: 'Step 3: Exam Forecast',
+                tierBadge: 'Academic Forecast',
                 tierBadgeColor: AppTheme.warning,
                 friendlyTitle: 'Estimated Passing Rates & Exam Readiness',
                 icon: Icons.trending_up_rounded,
@@ -709,7 +665,7 @@ class AdminWebAnalyticsView extends ConsumerWidget {
               );
 
               final tier4Card = _buildCampusTierTile(
-                tierBadge: 'Step 4: School Action Plan',
+                tierBadge: 'School Action Plan',
                 tierBadgeColor: AppTheme.success,
                 friendlyTitle: 'Recommended Next Steps for Principal',
                 icon: Icons.lightbulb_outline_rounded,
@@ -728,7 +684,7 @@ class AdminWebAnalyticsView extends ConsumerWidget {
                     PrescriptiveActionCard(
                       title: benchmarkMet ? 'Share Top-Performing Study Guides' : 'Help Sections Needing Extra Practice',
                       description: benchmarkMet
-                          ? 'Send enrichment worksheets and review guides to classroom hub boxes.'
+                          ? 'Send enrichment worksheets and review guides to class sections.'
                           : 'Schedule remedial review for sections below 75% pass mark and give teachers extra consultation time.',
                       badgeText: benchmarkMet ? 'Excellence' : 'Intervention',
                       actionLabel: 'Send Action to Teachers',
@@ -738,7 +694,7 @@ class AdminWebAnalyticsView extends ConsumerWidget {
                         ScaffoldMessenger.of(context).showSnackBar(
                           SnackBar(
                             content: Text(benchmarkMet
-                                ? 'Enrichment guides sent to classroom boxes.'
+                                ? 'Enrichment guides sent to class sections.'
                                 : 'Review worksheets sent to class sections.'),
                             backgroundColor: benchmarkMet ? AppTheme.success : AppTheme.warning,
                           ),
@@ -748,8 +704,8 @@ class AdminWebAnalyticsView extends ConsumerWidget {
                     const SizedBox(height: 10),
                     Text(
                       benchmarkMet
-                          ? '1. Share lesson plans from top-performing sections with all teachers.\n2. Send advanced practice sheets to classroom hub boxes.\n3. Review quiz questions quarterly to keep tests fair and clear.'
-                          : '1. Set up extra review sessions for sections scoring below 75%.\n2. Send practice worksheets to classroom storage units.\n3. Give teachers extra consultation hours to tutor students who need help.',
+                          ? '1. Share lesson plans from top-performing sections with all teachers.\n2. Distribute advanced practice worksheets for high-scoring students.\n3. Review quiz questions quarterly to keep tests fair and clear.'
+                          : '1. Set up extra review sessions for sections scoring below 75%.\n2. Distribute remedial review worksheets to help students prepare for upcoming quizzes.\n3. Give teachers extra consultation hours to tutor students who need help.',
                       style: TextStyle(
                         fontSize: 11.5,
                         height: 1.45,

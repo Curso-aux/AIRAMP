@@ -6,10 +6,10 @@ import 'analytics_multi_line_chart.dart';
 
 /// Available Demo Scenarios that the client can manipulate to validate visualization behavior.
 enum DemoScenario {
-  standard('Standard Academic Benchmark', 'Normal operational metrics across all institutional scopes.'),
-  highPerforming('High Performing (Honor Cohort)', '92%+ pass rates, high subject mastery, and low intervention rates.'),
-  atRisk('At-Risk / Capacity Alert', 'Significant drop in pass rates, strained faculty ratios, and urgent interventions.'),
-  midtermPeak('Midterm Examination Peak', 'Heavy attempt spikes, high server/node load, and score distribution shifts.');
+  standard('Standard Academic Benchmark', 'Normal passing rates and steady student performance across all campuses.'),
+  highPerforming('High Performing (Honor Cohort)', '92%+ pass rates, high subject mastery, and top student performance.'),
+  atRisk('At-Risk / Needs Extra Support', 'Noticeable drop in quiz scores, higher student-teacher ratios, and remedial review needed.'),
+  midtermPeak('Midterm Examination Peak', 'High exam attempt volume, grade distribution shifts, and active quiz completions.');
 
   final String label;
   final String description;
@@ -187,53 +187,98 @@ final superAdminDemoAnalyticsProvider = Provider<SuperAdminDemoAnalytics>((ref) 
   // Multi-line monthly user growth over time
   final months = ['Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec', 'Jan', 'Feb', 'Mar', 'Apr', 'May'];
   final studentPoints = <TrendPoint>[];
-  final teacherPoints = <TrendPoint>[];
   final attemptPoints = <TrendPoint>[];
 
-  double baseSt = 1600 * yearMult;
-  double baseTc = 95;
-  double baseAtt = 2400;
+  // Base enrollment progression matching totalStudents
+  final targetMayStudents = totStudents.toDouble();
+  final enrollmentCurve = [0.68, 0.74, 0.88, 0.94, 0.96, 0.97, 0.97, 0.99, 1.0, 1.0, 1.0, 1.0];
+
+  // Monthly quiz attempt volumes (peaking in Oct midterms & Mar finals)
+  // Base volume scales proportionally with total enrolled students
+  final quizVolumeMultiplier = (totStudents / 2760.0).clamp(0.1, 3.0);
+  final monthlyQuizBase = [
+    850.0,   // Jun: Orientation / Diagnostic quizzes
+    1450.0,  // Jul: First unit practice
+    2300.0,  // Aug: First graded formative quizzes
+    2950.0,  // Sep: Prelim period
+    4200.0,  // Oct: Midterm Examination Surge
+    3250.0,  // Nov: 2nd Quarter assessments
+    1400.0,  // Dec: Holiday break / review
+    2950.0,  // Jan: 2nd Semester restart
+    3400.0,  // Feb: Pre-finals prep
+    4450.0,  // Mar: Final Examination Peak
+    2800.0,  // Apr: Remedial & performance tasks
+    1650.0,  // May: Year-end completion
+  ];
 
   for (int i = 0; i < months.length; i++) {
     final m = months[i];
-    if (m == 'Aug') baseSt += 400 * scenarioMult;
-    if (m == 'Sep') baseSt += 150 * scenarioMult;
-    if (m == 'Jan') baseSt += 80 * scenarioMult;
+    final stVal = (targetMayStudents * enrollmentCurve[i]).roundToDouble();
 
-    if (m == 'Aug') baseTc += 15;
-    if (m == 'Jan') baseTc += 5;
-
-    double attFactor = 1.0;
+    double examSurge = 1.0;
     if (filter.scenario == DemoScenario.midtermPeak && (m == 'Oct' || m == 'Mar')) {
-      attFactor = 2.4; // Midterm exam surge!
-    } else if (m == 'Oct' || m == 'Mar') {
-      attFactor = 1.8;
-    } else if (m == 'Dec') {
-      attFactor = 0.6; // Holiday break
+      examSurge = 1.35; // Dramatic midterm/final exam surge
+    } else if (filter.scenario == DemoScenario.highPerforming) {
+      examSurge = 1.20; // High cohort completes 20% more practice quizzes
+    } else if (filter.scenario == DemoScenario.atRisk) {
+      examSurge = 0.82; // At-risk cohort takes fewer optional review quizzes
     }
 
-    studentPoints.add(TrendPoint(label: m, value: (baseSt * (1 + (i * 0.015))).roundToDouble()));
-    teacherPoints.add(TrendPoint(label: m, value: baseTc));
-    attemptPoints.add(TrendPoint(label: m, value: (baseAtt * attFactor * scenarioMult).roundToDouble()));
+    final attVal = (monthlyQuizBase[i] * quizVolumeMultiplier * examSurge).roundToDouble();
+
+    studentPoints.add(TrendPoint(label: m, value: stVal));
+    attemptPoints.add(TrendPoint(label: m, value: attVal));
   }
 
-  // Filter by single month if requested
+  // Filter by single month if requested: generate weekly breakdown so the line chart always has 4 points
   List<LineSeries> networkGrowthSeries;
   if (filter.month != 'All Months') {
-    final targetMonth = filter.month.substring(0, 3);
-    final sP = studentPoints.where((p) => p.label == targetMonth).toList();
-    final tP = teacherPoints.where((p) => p.label == targetMonth).toList();
-    final aP = attemptPoints.where((p) => p.label == targetMonth).toList();
+    final targetMonth = filter.month.length >= 3 ? filter.month.substring(0, 3) : filter.month;
+    final mIndex = months.indexOf(targetMonth);
+    final safeIdx = mIndex >= 0 ? mIndex : 5; // Default to November (index 5)
+    final mSt = studentPoints[safeIdx].value;
+    final mAtt = attemptPoints[safeIdx].value;
+
+    final weeklyStudents = [
+      TrendPoint(label: '$targetMonth W1', value: (mSt * 0.985).roundToDouble()),
+      TrendPoint(label: '$targetMonth W2', value: (mSt * 0.992).roundToDouble()),
+      TrendPoint(label: '$targetMonth W3', value: (mSt * 0.998).roundToDouble()),
+      TrendPoint(label: '$targetMonth W4', value: (mSt * 1.002).roundToDouble()),
+    ];
+
+    final weeklyAttempts = [
+      TrendPoint(label: '$targetMonth W1', value: (mAtt * 0.22).roundToDouble()),
+      TrendPoint(label: '$targetMonth W2', value: (mAtt * 0.28).roundToDouble()),
+      TrendPoint(label: '$targetMonth W3', value: (mAtt * 0.31).roundToDouble()),
+      TrendPoint(label: '$targetMonth W4', value: (mAtt * 0.19).roundToDouble()),
+    ];
+
     networkGrowthSeries = [
-      LineSeries(name: 'Enrolled Students', color: const Color(0xFF0D9488), points: sP.isNotEmpty ? sP : studentPoints, showArea: true),
-      LineSeries(name: 'Active Faculty', color: const Color(0xFF0284C7), points: tP.isNotEmpty ? tP : teacherPoints),
-      LineSeries(name: 'Monthly Attempts (÷10)', color: const Color(0xFFF59E0B), points: (aP.isNotEmpty ? aP : attemptPoints).map((p) => TrendPoint(label: p.label, value: p.value / 10)).toList()),
+      LineSeries(
+        name: 'Enrolled Students',
+        color: const Color(0xFF0D9488),
+        points: weeklyStudents,
+        showArea: true,
+      ),
+      LineSeries(
+        name: 'Quizzes Taken',
+        color: const Color(0xFFF59E0B),
+        points: weeklyAttempts,
+      ),
     ];
   } else {
     networkGrowthSeries = [
-      LineSeries(name: 'Enrolled Students', color: const Color(0xFF0D9488), points: studentPoints, showArea: true),
-      LineSeries(name: 'Active Faculty', color: const Color(0xFF0284C7), points: teacherPoints),
-      LineSeries(name: 'Monthly Attempts (÷10)', color: const Color(0xFFF59E0B), points: attemptPoints.map((p) => TrendPoint(label: p.label, value: p.value / 10)).toList()),
+      LineSeries(
+        name: 'Enrolled Students',
+        color: const Color(0xFF0D9488),
+        points: studentPoints,
+        showArea: true,
+      ),
+      LineSeries(
+        name: 'Quizzes Taken',
+        color: const Color(0xFFF59E0B),
+        points: attemptPoints,
+      ),
     ];
   }
 
@@ -340,14 +385,48 @@ final campusAdminDemoAnalyticsProvider = Provider<CampusAdminDemoAnalytics>((ref
   final attemptPoints = <TrendPoint>[];
   final activeStudentPoints = <TrendPoint>[];
 
+  final campusStudentCount = (860 * scenarioMult).round();
+  final campusQuizBase = (1240 * scenarioMult).round();
+
   for (int i = 0; i < months.length; i++) {
     final m = months[i];
     double peak = 1.0;
     if (m == 'Oct' || m == 'Mar') peak = 1.7 * scenarioMult;
     if (m == 'Dec') peak = 0.55;
 
-    attemptPoints.add(TrendPoint(label: m, value: (680 * peak).roundToDouble()));
-    activeStudentPoints.add(TrendPoint(label: m, value: (195 + (i * 2.5)).roundToDouble()));
+    attemptPoints.add(TrendPoint(label: m, value: (campusQuizBase * 0.55 * peak).roundToDouble()));
+    activeStudentPoints.add(TrendPoint(label: m, value: (campusStudentCount * (0.80 + (i * 0.018))).clamp(50.0, campusStudentCount.toDouble()).roundToDouble()));
+  }
+
+  List<LineSeries> monthlyAttemptSeries;
+  if (filter.month != 'All Months') {
+    final targetMonth = filter.month.length >= 3 ? filter.month.substring(0, 3) : filter.month;
+    final mIndex = months.indexOf(targetMonth);
+    final safeIdx = mIndex >= 0 ? mIndex : 5;
+    final mAtt = attemptPoints[safeIdx].value;
+    final mSt = activeStudentPoints[safeIdx].value;
+
+    final weeklyAttempts = [
+      TrendPoint(label: '$targetMonth W1', value: (mAtt * 0.22).roundToDouble()),
+      TrendPoint(label: '$targetMonth W2', value: (mAtt * 0.28).roundToDouble()),
+      TrendPoint(label: '$targetMonth W3', value: (mAtt * 0.31).roundToDouble()),
+      TrendPoint(label: '$targetMonth W4', value: (mAtt * 0.19).roundToDouble()),
+    ];
+    final weeklyStudents = [
+      TrendPoint(label: '$targetMonth W1', value: (mSt * 0.98).roundToDouble()),
+      TrendPoint(label: '$targetMonth W2', value: (mSt * 0.99).roundToDouble()),
+      TrendPoint(label: '$targetMonth W3', value: (mSt * 1.00).roundToDouble()),
+      TrendPoint(label: '$targetMonth W4', value: (mSt * 1.01).roundToDouble()),
+    ];
+    monthlyAttemptSeries = [
+      LineSeries(name: 'Quiz Attempts', color: const Color(0xFF0D9488), points: weeklyAttempts, showArea: true),
+      LineSeries(name: 'Active Learners', color: const Color(0xFF0284C7), points: weeklyStudents),
+    ];
+  } else {
+    monthlyAttemptSeries = [
+      LineSeries(name: 'Quiz Attempts', color: const Color(0xFF0D9488), points: attemptPoints, showArea: true),
+      LineSeries(name: 'Active Learners', color: const Color(0xFF0284C7), points: activeStudentPoints),
+    ];
   }
 
   // Grade Distribution Histogram
@@ -365,10 +444,7 @@ final campusAdminDemoAnalyticsProvider = Provider<CampusAdminDemoAnalytics>((ref
     overallPassRate: basePassRate,
     averageScore: baseAvgScore,
     sectionComparisonBars: sectionBars,
-    monthlyAttemptSeries: [
-      LineSeries(name: 'Quiz Attempts', color: const Color(0xFF0D9488), points: attemptPoints, showArea: true),
-      LineSeries(name: 'Active Learners', color: const Color(0xFF0284C7), points: activeStudentPoints),
-    ],
+    monthlyAttemptSeries: monthlyAttemptSeries,
     gradeDistributionBars: gradeBars,
     demographics: {
       'regular': (710 * scenarioMult).round(),

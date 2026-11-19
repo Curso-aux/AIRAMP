@@ -1877,7 +1877,24 @@ class FirestoreService {
             rowData,
             conflictAlgorithm: ConflictAlgorithm.replace,
           );
+
+          if (rowData['admin_id'] != null) {
+            final aId = (rowData['admin_id'] as String).trim();
+            await db.update(
+              'users',
+              {'school_id': schoolId},
+              where: '(id = ? OR LOWER(id) = ? OR LOWER(email) = ? OR LOWER(username) = ?) AND (school_id IS NULL OR school_id = "" OR school_id = "unassigned")',
+              whereArgs: [aId, aId.toLowerCase(), aId.toLowerCase(), aId.toLowerCase()],
+            );
+          }
         }
+      }
+
+      if (kIsWeb && prefs != null) {
+        try {
+          final allUsers = await db.query('users');
+          await prefs.setString('local_cached_users_v1', jsonEncode(allUsers));
+        } catch (_) {}
       }
 
       // Always ensure sch_main is seeded if not present
