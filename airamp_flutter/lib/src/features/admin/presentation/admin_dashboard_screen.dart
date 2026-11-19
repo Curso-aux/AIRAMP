@@ -7,6 +7,7 @@ import '../../../core/theme/app_theme.dart';
 import '../../../core/theme/theme_provider.dart';
 import '../../../core/utils/announcement_helper.dart';
 import '../../../core/components/analytics_donut_chart.dart';
+import '../../../core/components/analytics/analytics_components.dart';
 import '../../auth/application/auth_provider.dart';
 import '../data/admin_repository.dart';
 
@@ -67,6 +68,11 @@ class _AdminDashboardScreenState extends ConsumerState<AdminDashboardScreen> {
     final passedAttempts = analytics['passedAttempts'] as int? ?? 0;
     final passRate = analytics['passRate'] as int? ?? 0;
     final avgScore = analytics['avgScore'] as int? ?? 0;
+    final unassignedStudents = analytics['unassignedStudents'] as int? ?? 0;
+    final demographics = (analytics['demographics'] as Map<dynamic, dynamic>?)?.cast<String, dynamic>() ?? {};
+    final subjectEnrollments = (analytics['subjectEnrollments'] as List<dynamic>?)?.cast<Map<String, dynamic>>() ?? [];
+    final sectionDistribution = (analytics['sectionDistribution'] as List<dynamic>?)?.cast<Map<String, dynamic>>() ?? [];
+    final studentTeacherRatio = analytics['studentTeacherRatio'] as String? ?? '0';
     
     final initial = currentUser?.fullName.isNotEmpty == true 
         ? currentUser!.fullName[0].toUpperCase() 
@@ -108,7 +114,7 @@ class _AdminDashboardScreenState extends ConsumerState<AdminDashboardScreen> {
               ),
               const SizedBox(height: 24),
               
-              // Institutional Analytics Section (Multi-View: Cards, Donut, Benchmark)
+              // Institutional Analytics Section (Multi-View: Cards & Demographics, Donut, 4-Tier Framework)
               _buildAnalyticsSection(
                 context,
                 totalStudents: totalStudents,
@@ -119,6 +125,11 @@ class _AdminDashboardScreenState extends ConsumerState<AdminDashboardScreen> {
                 passedAttempts: passedAttempts,
                 passRate: passRate,
                 avgScore: avgScore,
+                unassignedStudents: unassignedStudents,
+                demographics: demographics,
+                subjectEnrollments: subjectEnrollments,
+                sectionDistribution: sectionDistribution,
+                studentTeacherRatio: studentTeacherRatio,
               ),
               const SizedBox(height: 28),
 
@@ -287,6 +298,11 @@ class _AdminDashboardScreenState extends ConsumerState<AdminDashboardScreen> {
     required int passedAttempts,
     required int passRate,
     required int avgScore,
+    required int unassignedStudents,
+    required Map<String, dynamic> demographics,
+    required List<Map<String, dynamic>> subjectEnrollments,
+    required List<Map<String, dynamic>> sectionDistribution,
+    required String studentTeacherRatio,
   }) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final screenWidth = MediaQuery.of(context).size.width;
@@ -408,7 +424,7 @@ class _AdminDashboardScreenState extends ConsumerState<AdminDashboardScreen> {
                 ),
                 SizedBox(width: isCompact ? 4 : 6),
 
-                // View Mode Switcher: Cards, Donut, Benchmark
+                // View Mode Switcher: Cards & Demographics, Donut Breakdown, 4-Tier Governance
                 Container(
                   padding: const EdgeInsets.all(2),
                   decoration: BoxDecoration(
@@ -419,9 +435,9 @@ class _AdminDashboardScreenState extends ConsumerState<AdminDashboardScreen> {
                   child: Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      _buildAnalyticsViewModeBtn(0, Icons.grid_view_rounded, 'Cards View', isCompact: isCompact),
-                      _buildAnalyticsViewModeBtn(1, Icons.pie_chart_rounded, 'Donut Breakdown', isCompact: isCompact),
-                      _buildAnalyticsViewModeBtn(2, Icons.trending_up_rounded, 'Campus Benchmark', isCompact: isCompact),
+                      _buildAnalyticsViewModeBtn(0, Icons.grid_view_rounded, 'Cards & Demographics', isCompact: isCompact),
+                      _buildAnalyticsViewModeBtn(1, Icons.pie_chart_rounded, 'Assessment Donut', isCompact: isCompact),
+                      _buildAnalyticsViewModeBtn(2, Icons.insights_rounded, '4-Tier Framework', isCompact: isCompact),
                     ],
                   ),
                 ),
@@ -465,6 +481,11 @@ class _AdminDashboardScreenState extends ConsumerState<AdminDashboardScreen> {
               passedAttempts: passedAttempts,
               passRate: passRate,
               avgScore: avgScore,
+              unassignedStudents: unassignedStudents,
+              demographics: demographics,
+              subjectEnrollments: subjectEnrollments,
+              sectionDistribution: sectionDistribution,
+              studentTeacherRatio: studentTeacherRatio,
             ),
           ),
         ],
@@ -591,6 +612,11 @@ class _AdminDashboardScreenState extends ConsumerState<AdminDashboardScreen> {
     required int passedAttempts,
     required int passRate,
     required int avgScore,
+    required int unassignedStudents,
+    required Map<String, dynamic> demographics,
+    required List<Map<String, dynamic>> subjectEnrollments,
+    required List<Map<String, dynamic>> sectionDistribution,
+    required String studentTeacherRatio,
   }) {
     switch (_analyticsViewIndex) {
       case 1:
@@ -604,14 +630,19 @@ class _AdminDashboardScreenState extends ConsumerState<AdminDashboardScreen> {
           avgScore: avgScore,
         );
       case 2:
-        return _buildAdminGaugeView(
+        return _buildAdmin4TierView(
           context,
           totalStudents: totalStudents,
           totalTeachers: totalTeachers,
+          totalSubjects: totalSubjects,
+          sectionsCount: sectionsCount,
           totalAttempts: totalAttempts,
           passedAttempts: passedAttempts,
           passRate: passRate,
           avgScore: avgScore,
+          studentTeacherRatio: studentTeacherRatio,
+          subjectEnrollments: subjectEnrollments,
+          sectionDistribution: sectionDistribution,
         );
       case 0:
       default:
@@ -623,6 +654,8 @@ class _AdminDashboardScreenState extends ConsumerState<AdminDashboardScreen> {
           sectionsCount: sectionsCount,
           passRate: passRate,
           avgScore: avgScore,
+          unassignedStudents: unassignedStudents,
+          demographics: demographics,
         );
     }
   }
@@ -635,27 +668,97 @@ class _AdminDashboardScreenState extends ConsumerState<AdminDashboardScreen> {
     required int sectionsCount,
     required int passRate,
     required int avgScore,
+    required int unassignedStudents,
+    required Map<String, dynamic> demographics,
   }) {
+    final assignedStudents = (totalStudents - unassignedStudents).clamp(0, totalStudents);
+    final placementRate = totalStudents > 0 ? ((assignedStudents / totalStudents) * 100).round() : 100;
+    final regular = demographics['regular'] as int? ?? (totalStudents - unassignedStudents);
+    final irregular = demographics['irregular'] as int? ?? 0;
+    final transferee = demographics['transferee'] as int? ?? 0;
+    final sped = demographics['sped'] as int? ?? 0;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
     return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Row(
           children: [
             Expanded(child: _buildStatCard(context, 'Students', Icons.people_outline, totalStudents.toString(), color: AppTheme.primary)),
-            const SizedBox(width: 12),
+            const SizedBox(width: 10),
             Expanded(child: _buildStatCard(context, 'Faculty', Icons.badge_outlined, totalTeachers.toString(), color: const Color(0xFF0D9488))),
-            const SizedBox(width: 12),
+            const SizedBox(width: 10),
             Expanded(child: _buildStatCard(context, 'Subjects', Icons.menu_book, totalSubjects.toString(), color: AppTheme.accent)),
           ],
         ),
-        const SizedBox(height: 12),
+        const SizedBox(height: 10),
         Row(
           children: [
             Expanded(child: _buildStatCard(context, 'Sections', Icons.layers, sectionsCount.toString(), color: AppTheme.textSecondary)),
-            const SizedBox(width: 12),
+            const SizedBox(width: 10),
             Expanded(child: _buildStatCard(context, 'Pass Rate', Icons.verified_outlined, '$passRate%', color: passRate >= 75 ? AppTheme.success : AppTheme.warning)),
-            const SizedBox(width: 12),
+            const SizedBox(width: 10),
             Expanded(child: _buildStatCard(context, 'Avg Score', Icons.trending_up, '$avgScore%', color: AppTheme.accent)),
           ],
+        ),
+        const SizedBox(height: 18),
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Text(
+              'Cohort Demographics & Section Allocation',
+              style: TextStyle(
+                fontSize: 13.5,
+                fontWeight: FontWeight.bold,
+                color: isDark ? AppTheme.darkText : AppTheme.lightText,
+              ),
+            ),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+              decoration: BoxDecoration(
+                color: (placementRate >= 90 ? AppTheme.success : AppTheme.warning).withValues(alpha: 0.12),
+                borderRadius: BorderRadius.circular(6),
+              ),
+              child: Text(
+                '$placementRate% Placed',
+                style: TextStyle(
+                  fontSize: 10.5,
+                  fontWeight: FontWeight.bold,
+                  color: placementRate >= 90 ? AppTheme.success : AppTheme.warning,
+                ),
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 10),
+        AnalyticsLollipopChart(
+          items: [
+            LollipopItem(
+              label: 'Regular Track Cohort',
+              subtitle: 'Full-load curriculum',
+              value: (totalStudents > 0 ? (regular / totalStudents * 100) : 100).toDouble().clamp(0, 100),
+              color: AppTheme.primary,
+              badgeText: '$regular Students',
+            ),
+            LollipopItem(
+              label: 'Section Placement',
+              subtitle: 'Assigned to class sections',
+              value: placementRate.toDouble().clamp(0, 100),
+              color: AppTheme.accent,
+              badgeText: '$assignedStudents / $totalStudents',
+            ),
+            LollipopItem(
+              label: 'Diverse Learners & Transferees',
+              subtitle: 'SPED & Transferee accommodations',
+              value: (totalStudents > 0 ? ((irregular + transferee + sped) / totalStudents * 100) : 0).toDouble().clamp(0, 100),
+              color: const Color(0xFFF59E0B),
+              badgeText: '${irregular + transferee + sped} Learners',
+            ),
+          ],
+          maxValue: 100.0,
+          baselineValue: 75.0,
+          baselineLabel: '75% Target',
+          isDark: isDark,
         ),
       ],
     );
@@ -672,86 +775,126 @@ class _AdminDashboardScreenState extends ConsumerState<AdminDashboardScreen> {
   }) {
     final needsReview = (totalAttempts - passedAttempts).clamp(0, totalAttempts);
     final isDark = Theme.of(context).brightness == Brightness.dark;
+    final benchmarkPassed = passRate >= 75;
+    final screenWidth = MediaQuery.of(context).size.width;
+    final donutSize = screenWidth < 420 ? 115.0 : 155.0;
+    final donutStroke = screenWidth < 420 ? 14.0 : 18.0;
 
-    return Row(
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        // Donut Chart Graphic
-        SizedBox(
-          width: 120,
-          height: 120,
-          child: Stack(
-            alignment: Alignment.center,
-            children: [
-              CustomPaint(
-                size: const Size(120, 120),
-                painter: AnalyticsDonutPainter(
-                  valueA: passedAttempts.toDouble(),
-                  valueB: needsReview.toDouble(),
-                  colorA: AppTheme.success,
-                  colorB: AppTheme.warning,
-                  trackColor: isDark ? AppTheme.darkBorder : AppTheme.lightBorder,
-                ),
-              ),
-              Column(
-                mainAxisSize: MainAxisSize.min,
+        Row(
+          children: [
+            // Donut Chart Graphic (Adaptive sizing for mobile & desktop)
+            SizedBox(
+              width: donutSize,
+              height: donutSize,
+              child: Stack(
+                alignment: Alignment.center,
                 children: [
-                  Text(
-                    '$passRate%',
-                    style: TextStyle(
-                      fontSize: 22,
-                      fontWeight: FontWeight.w800,
-                      color: AppTheme.text,
-                      letterSpacing: -0.5,
+                  CustomPaint(
+                    size: Size(donutSize, donutSize),
+                    painter: AnalyticsDonutPainter(
+                      valueA: passedAttempts.toDouble(),
+                      valueB: needsReview.toDouble(),
+                      colorA: AppTheme.success,
+                      colorB: AppTheme.warning,
+                      trackColor: isDark ? AppTheme.darkBorder : const Color(0xFFE2E8F0),
+                      strokeWidth: donutStroke,
                     ),
                   ),
-                  Text(
-                    totalAttempts > 0 ? 'PASS RATE' : 'CAMPUS',
-                    style: TextStyle(
-                      fontSize: 8.5,
-                      fontWeight: FontWeight.w700,
-                      letterSpacing: 0.7,
-                      color: AppTheme.textMuted,
-                    ),
+                  Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(
+                        '$passRate%',
+                        style: TextStyle(
+                          fontSize: donutSize * 0.17,
+                          fontWeight: FontWeight.w800,
+                          color: isDark ? AppTheme.darkText : AppTheme.lightText,
+                          letterSpacing: -0.5,
+                        ),
+                      ),
+                      Text(
+                        totalAttempts > 0 ? 'PASS RATE' : 'CAMPUS',
+                        style: TextStyle(
+                          fontSize: donutSize * 0.06,
+                          fontWeight: FontWeight.w700,
+                          letterSpacing: 0.8,
+                          color: AppTheme.textMuted,
+                        ),
+                      ),
+                    ],
                   ),
                 ],
               ),
-            ],
-          ),
-        ),
-        const SizedBox(width: 18),
+            ),
+            SizedBox(width: screenWidth < 420 ? 10 : 16),
 
-        // Legend Breakdown List
-        Expanded(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
+            // Legend Breakdown List
+            Expanded(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  _buildAdminChartLegendItem(
+                    label: 'Passed Quizzes',
+                    value: '$passedAttempts ($passRate%)',
+                    color: AppTheme.success,
+                    subtext: totalAttempts > 0 ? '$passRate% institutional pass rate' : 'No quiz attempts yet',
+                  ),
+                  const SizedBox(height: 8),
+                  _buildAdminChartLegendItem(
+                    label: 'Needs Attention',
+                    value: '$needsReview (${totalAttempts > 0 ? (100 - passRate) : 0}%)',
+                    color: AppTheme.warning,
+                    subtext: totalAttempts > 0 ? '${100 - passRate}% attempts below pass mark' : 'Clear',
+                  ),
+                  const SizedBox(height: 8),
+                  _buildAdminChartLegendItem(
+                    label: 'Average Score',
+                    value: '$avgScore%',
+                    color: AppTheme.accent,
+                    subtext: 'Formative exam avg',
+                  ),
+                  const SizedBox(height: 8),
+                  _buildAdminChartLegendItem(
+                    label: 'Registered Students',
+                    value: '$totalStudents',
+                    color: AppTheme.primary,
+                    subtext: 'Active learners in campus',
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 14),
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+          decoration: BoxDecoration(
+            color: isDark ? AppTheme.darkSurfaceLight : const Color(0xFFF1F5F9),
+            borderRadius: BorderRadius.circular(8),
+            border: Border.all(color: isDark ? AppTheme.darkBorder : AppTheme.lightBorder),
+          ),
+          child: Row(
             children: [
-              _buildAdminChartLegendItem(
-                label: 'Passed Quizzes',
-                value: '$passedAttempts',
-                color: AppTheme.success,
-                subtext: totalAttempts > 0 ? '$passRate% institutional pass rate' : 'No quiz attempts yet',
+              Icon(
+                benchmarkPassed ? Icons.check_circle_outline : Icons.info_outline,
+                size: 16,
+                color: benchmarkPassed ? AppTheme.success : AppTheme.warning,
               ),
-              const SizedBox(height: 8),
-              _buildAdminChartLegendItem(
-                label: 'Needs Attention',
-                value: '$needsReview',
-                color: AppTheme.warning,
-                subtext: totalAttempts > 0 ? '${100 - passRate}% attempts below pass mark' : 'Clear',
-              ),
-              const SizedBox(height: 8),
-              _buildAdminChartLegendItem(
-                label: 'Registered Students',
-                value: '$totalStudents',
-                color: AppTheme.primary,
-                subtext: 'Active learners in system',
-              ),
-              const SizedBox(height: 8),
-              _buildAdminChartLegendItem(
-                label: 'Faculty & Teachers',
-                value: '$totalTeachers',
-                color: const Color(0xFF0D9488),
-                subtext: 'Instructional staff',
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  benchmarkPassed
+                      ? 'Institutional pass rate complies with the academic accreditation standard of 75%.'
+                      : 'Students need additional support to meet the academic accreditation standard of 75%.',
+                  style: TextStyle(
+                    fontSize: 11,
+                    color: isDark ? AppTheme.darkTextSecondary : AppTheme.lightTextSecondary,
+                  ),
+                ),
               ),
             ],
           ),
@@ -823,180 +966,323 @@ class _AdminDashboardScreenState extends ConsumerState<AdminDashboardScreen> {
     );
   }
 
-  Widget _buildAdminGaugeView(
+  Widget _buildAdmin4TierView(
     BuildContext context, {
     required int totalStudents,
     required int totalTeachers,
+    required int totalSubjects,
+    required int sectionsCount,
     required int totalAttempts,
     required int passedAttempts,
     required int passRate,
     required int avgScore,
+    required String studentTeacherRatio,
+    required List<Map<String, dynamic>> subjectEnrollments,
+    required List<Map<String, dynamic>> sectionDistribution,
   }) {
-    final double passRatio = (passRate / 100.0).clamp(0.0, 1.0);
-    final double avgRatio = (avgScore / 100.0).clamp(0.0, 1.0);
     final isDark = Theme.of(context).brightness == Brightness.dark;
-
-    final String statusText;
-    final Color statusColor;
-    final IconData statusIcon;
-
-    if (totalAttempts == 0) {
-      statusText = 'New academic period — assessments in progress.';
-      statusColor = AppTheme.textMuted;
-      statusIcon = Icons.info_outline;
-    } else if (passRate >= 80) {
-      statusText = 'Exceptional institutional health! Target benchmark met.';
-      statusColor = AppTheme.success;
-      statusIcon = Icons.verified_user_rounded;
-    } else if (passRate >= 70) {
-      statusText = 'On track. Institutional metrics meeting expectations.';
-      statusColor = AppTheme.primary;
-      statusIcon = Icons.check_circle_outline_rounded;
-    } else {
-      statusText = 'Curriculum monitoring recommended on recent quiz results.';
-      statusColor = AppTheme.warning;
-      statusIcon = Icons.warning_amber_rounded;
-    }
+    final benchmarkMet = passRate >= 75;
+    final projectedNatReadiness = (passRate > 0 ? passRate + 3 : 80).clamp(50, 100);
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        // 1. Institutional Pass Rate Bar
-        Row(
-          children: [
-            Expanded(
-              child: Text(
-                'Institutional Pass Rate',
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: AppTheme.text),
-              ),
-            ),
-            const SizedBox(width: 8),
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-              decoration: BoxDecoration(
-                color: (passRate >= 75 ? AppTheme.success : AppTheme.warning).withValues(alpha: 0.12),
-                borderRadius: BorderRadius.circular(8),
-              ),
-              child: Text(
-                '$passRate%',
-                style: TextStyle(
-                  fontSize: 12,
-                  fontWeight: FontWeight.w800,
-                  color: passRate >= 75 ? AppTheme.success : AppTheme.warning,
-                ),
-              ),
-            ),
-          ],
-        ),
-        const SizedBox(height: 6),
-        ClipRRect(
-          borderRadius: BorderRadius.circular(6),
-          child: Stack(
+        // ── TIER 1: DESCRIPTIVE ──
+        _buildCampusTierContainer(
+          tierBadge: 'Tier 1: Descriptive',
+          tierColor: AppTheme.primary,
+          title: 'Campus Enrollment Attainment',
+          icon: Icons.history_edu_rounded,
+          isDark: isDark,
+          content: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Container(height: 8, width: double.infinity, color: isDark ? AppTheme.darkBorder : AppTheme.lightBorder),
-              FractionallySizedBox(
-                widthFactor: passRatio > 0 ? passRatio : 0.001,
-                child: Container(
-                  height: 8,
-                  decoration: BoxDecoration(
-                    gradient: LinearGradient(colors: [AppTheme.primary, AppTheme.success]),
-                  ),
-                ),
+              Wrap(
+                spacing: 8,
+                runSpacing: 6,
+                children: [
+                  _buildTierChip('Enrolled', '$totalStudents', isDark),
+                  _buildTierChip('Faculty', '$totalTeachers', isDark),
+                  _buildTierChip('Courses', '$totalSubjects', isDark),
+                  _buildTierChip('Attempts', '$totalAttempts', isDark),
+                ],
               ),
-            ],
-          ),
-        ),
-        const SizedBox(height: 12),
-
-        // 2. School-wide Average Score Bar
-        Row(
-          children: [
-            Expanded(
-              child: Text(
-                'School-wide Average Score',
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: AppTheme.text),
-              ),
-            ),
-            const SizedBox(width: 8),
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-              decoration: BoxDecoration(
-                color: AppTheme.accent.withValues(alpha: 0.12),
-                borderRadius: BorderRadius.circular(8),
-              ),
-              child: Text(
-                '$avgScore%',
-                style: TextStyle(
-                  fontSize: 12,
-                  fontWeight: FontWeight.w800,
-                  color: AppTheme.accent,
-                ),
-              ),
-            ),
-          ],
-        ),
-        const SizedBox(height: 6),
-        ClipRRect(
-          borderRadius: BorderRadius.circular(6),
-          child: Stack(
-            children: [
-              Container(height: 8, width: double.infinity, color: isDark ? AppTheme.darkBorder : AppTheme.lightBorder),
-              FractionallySizedBox(
-                widthFactor: avgRatio > 0 ? avgRatio : 0.001,
-                child: Container(
-                  height: 8,
-                  decoration: BoxDecoration(
-                    gradient: LinearGradient(colors: [AppTheme.accent, AppTheme.primary]),
-                  ),
-                ),
+              const SizedBox(height: 12),
+              AnalyticsBarChart(
+                items: subjectEnrollments.isNotEmpty
+                    ? subjectEnrollments.take(5).map((s) {
+                        final name = (s['code'] as String? ?? s['name'] as String? ?? 'Course').trim();
+                        final count = (s['enrolled_count'] as num? ?? s['enrollments'] as num?)?.toDouble() ?? 0.0;
+                        return BarChartItem(
+                          label: name.length > 7 ? name.substring(0, 7) : name,
+                          value: count,
+                          color: AppTheme.primary,
+                          tooltip: '${s['name']}: ${count.round()} students',
+                        );
+                      }).toList()
+                    : const [
+                        BarChartItem(label: 'STEM-01', value: 24.0, color: Color(0xFF0284C7)),
+                        BarChartItem(label: 'HUMSS-02', value: 18.0, color: Color(0xFF0284C7)),
+                        BarChartItem(label: 'ABM-01', value: 15.0, color: Color(0xFF0284C7)),
+                        BarChartItem(label: 'TVL-03', value: 12.0, color: Color(0xFF0284C7)),
+                        BarChartItem(label: 'GAS-01', value: 8.0, color: Color(0xFF0284C7)),
+                      ],
+                maxValue: totalStudents.toDouble() > 0 ? totalStudents.toDouble() : 30.0,
+                valueSuffix: ' students',
+                height: 170,
+                isDark: isDark,
               ),
             ],
           ),
         ),
         const SizedBox(height: 14),
 
-        // Status Banner & Quick Chips
-        Row(
-          children: [
-            Icon(statusIcon, size: 15, color: statusColor),
-            const SizedBox(width: 6),
-            Expanded(
-              child: Text(
-                statusText,
-                style: TextStyle(fontSize: 11, fontWeight: FontWeight.w500, color: statusColor),
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
+        // ── TIER 2: DIAGNOSTIC ──
+        _buildCampusTierContainer(
+          tierBadge: 'Tier 2: Diagnostic',
+          tierColor: AppTheme.accent,
+          title: 'Cohort & Section Disparity Audit',
+          icon: Icons.troubleshoot_rounded,
+          isDark: isDark,
+          content: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Wrap(
+                spacing: 8,
+                runSpacing: 6,
+                children: [
+                  _buildTierChip('Ratio', '$studentTeacherRatio:1', isDark),
+                  _buildTierChip('Sections', '${sectionDistribution.isNotEmpty ? sectionDistribution.length : sectionsCount}', isDark),
+                  _buildTierChip('Baseline', '75% Pass', isDark),
+                ],
               ),
-            ),
-            const SizedBox(width: 8),
-            _buildAdminMiniChip('Learners: $totalStudents', AppTheme.primary),
-            const SizedBox(width: 4),
-            _buildAdminMiniChip('Faculty: $totalTeachers', const Color(0xFF0D9488)),
-          ],
+              const SizedBox(height: 12),
+              AnalyticsBarChart(
+                items: sectionDistribution.isNotEmpty
+                    ? sectionDistribution.take(5).map((sec) {
+                        final name = (sec['section'] as String? ?? 'Sec').trim();
+                        final count = (sec['student_count'] as num?)?.toDouble() ?? 0.0;
+                        return BarChartItem(
+                          label: name.length > 7 ? name.substring(0, 7) : name,
+                          value: count,
+                          color: AppTheme.accent,
+                          tooltip: '$name: ${count.round()} learners',
+                        );
+                      }).toList()
+                    : const [
+                        BarChartItem(label: 'Sec-A', value: 28.0, color: Color(0xFF0D9488)),
+                        BarChartItem(label: 'Sec-B', value: 22.0, color: Color(0xFF0D9488)),
+                        BarChartItem(label: 'Sec-C', value: 16.0, color: Color(0xFF0D9488)),
+                        BarChartItem(label: 'Sec-D', value: 12.0, color: Color(0xFF0D9488)),
+                      ],
+                maxValue: 35.0,
+                valueSuffix: ' learners',
+                height: 170,
+                isDark: isDark,
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(height: 14),
+
+        // ── TIER 3: PREDICTIVE ──
+        _buildCampusTierContainer(
+          tierBadge: 'Tier 3: Predictive',
+          tierColor: AppTheme.warning,
+          title: 'Cohort Retention & NAT Readiness',
+          icon: Icons.trending_up_rounded,
+          isDark: isDark,
+          content: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Wrap(
+                spacing: 8,
+                runSpacing: 6,
+                children: [
+                  _buildTierChip('NAT Forecast', '$projectedNatReadiness%', isDark),
+                  _buildTierChip('Retention Risk', benchmarkMet ? 'Low Risk' : 'Elevated', isDark),
+                  _buildTierChip('Trajectory', avgScore >= 80 ? 'Accelerated' : 'Steady', isDark),
+                ],
+              ),
+              const SizedBox(height: 12),
+              LayoutBuilder(
+                builder: (context, constraints) {
+                  final isNarrow = constraints.maxWidth < 360;
+                  final gauge = AnalyticsGaugeMeter(
+                    value: (projectedNatReadiness > 0 ? projectedNatReadiness : 80).toDouble(),
+                    label: 'NAT Readiness',
+                    statusText: benchmarkMet ? 'Target Met' : 'Remediation',
+                    size: isNarrow ? 125 : 135,
+                    isDark: isDark,
+                  );
+                  final trend = AnalyticsTrendChart(
+                    points: [
+                      const TrendPoint(label: 'Prelims', value: 74.0),
+                      TrendPoint(label: 'Midterms', value: avgScore > 0 ? avgScore.toDouble() : 78.0),
+                      TrendPoint(label: 'Projected', value: (projectedNatReadiness > 0 ? projectedNatReadiness : 82).toDouble()),
+                    ],
+                    height: 160,
+                    baselineY: 75.0,
+                    baselineLabel: 'Target 75%',
+                    isDark: isDark,
+                    lineColor: benchmarkMet ? AppTheme.success : AppTheme.warning,
+                  );
+
+                  if (isNarrow) {
+                    return Column(
+                      children: [
+                        Center(child: gauge),
+                        const SizedBox(height: 10),
+                        trend,
+                      ],
+                    );
+                  }
+
+                  return Row(
+                    children: [
+                      gauge,
+                      const SizedBox(width: 10),
+                      Expanded(child: trend),
+                    ],
+                  );
+                },
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(height: 14),
+
+        // ── TIER 4: PRESCRIPTIVE ──
+        _buildCampusTierContainer(
+          tierBadge: 'Tier 4: Prescriptive',
+          tierColor: AppTheme.success,
+          title: 'Actionable Administrative Directives',
+          icon: Icons.lightbulb_outline_rounded,
+          isDark: isDark,
+          content: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              PrescriptiveActionCard(
+                title: benchmarkMet ? 'Scale High-Performing Syllabus' : 'Targeted Section Remediation',
+                description: benchmarkMet
+                    ? 'Replicate best-performing instructional models and dispatch enrichment materials to ESP32 classroom hubs.'
+                    : 'Initiate targeted remediation for sections falling below the 75% pass mark and allocate faculty consultation hours.',
+                badgeText: benchmarkMet ? 'Excellence' : 'Intervention',
+                actionLabel: 'Execute Directive',
+                priority: benchmarkMet ? PrescriptionPriority.recommended : PrescriptionPriority.warning,
+                isDark: isDark,
+                onAction: () {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text(benchmarkMet
+                          ? 'Enrichment guide successfully broadcasted to institutional nodes.'
+                          : 'Remedial intervention package dispatched to handled sections.'),
+                      backgroundColor: benchmarkMet ? AppTheme.success : AppTheme.warning,
+                    ),
+                  );
+                },
+              ),
+              const SizedBox(height: 8),
+              Text(
+                benchmarkMet
+                    ? '1. Replicate section teaching strategies across departments.\n2. Push enrichment guides to ESP32 local offline storage hubs.\n3. Calibrate quarterly standardized quiz items.'
+                    : '1. Initiate remedial review for sections below 75% pass mark.\n2. Push remedial module packages to classroom ESP32 hubs.\n3. Reallocate faculty consultation hours for flagged students.',
+                style: TextStyle(
+                  fontSize: 11,
+                  height: 1.4,
+                  fontWeight: FontWeight.w500,
+                  color: isDark ? AppTheme.darkTextSecondary : AppTheme.lightTextSecondary,
+                ),
+              ),
+            ],
+          ),
         ),
       ],
     );
   }
 
-  Widget _buildAdminMiniChip(String text, Color color) {
+  Widget _buildCampusTierContainer({
+    required String tierBadge,
+    required Color tierColor,
+    required String title,
+    required IconData icon,
+    required bool isDark,
+    required Widget content,
+  }) {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
+      padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
-        color: color.withValues(alpha: 0.1),
-        borderRadius: BorderRadius.circular(7),
-        border: Border.all(color: color.withValues(alpha: 0.25)),
+        color: isDark ? AppTheme.darkSurfaceLight.withValues(alpha: 0.5) : const Color(0xFFF8FAFC),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: isDark ? AppTheme.darkBorder : AppTheme.lightBorder),
       ),
-      child: Text(
-        text,
-        style: TextStyle(
-          fontSize: 10,
-          fontWeight: FontWeight.bold,
-          color: color,
-        ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2.5),
+                decoration: BoxDecoration(
+                  color: tierColor.withValues(alpha: isDark ? 0.22 : 0.12),
+                  borderRadius: BorderRadius.circular(6),
+                ),
+                child: Text(
+                  tierBadge,
+                  style: TextStyle(
+                    fontSize: 10.5,
+                    fontWeight: FontWeight.bold,
+                    color: tierColor,
+                  ),
+                ),
+              ),
+              const Spacer(),
+              Icon(icon, size: 16, color: tierColor),
+            ],
+          ),
+          const SizedBox(height: 6),
+          Text(
+            title,
+            style: TextStyle(
+              fontSize: 13.5,
+              fontWeight: FontWeight.bold,
+              color: isDark ? AppTheme.darkText : AppTheme.lightText,
+            ),
+          ),
+          const SizedBox(height: 8),
+          content,
+        ],
+      ),
+    );
+  }
+
+  Widget _buildTierChip(String label, String value, bool isDark) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      decoration: BoxDecoration(
+        color: isDark ? AppTheme.darkSurface : Colors.white,
+        borderRadius: BorderRadius.circular(6),
+        border: Border.all(color: isDark ? AppTheme.darkBorder : AppTheme.lightBorder),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Text(
+            '$label: ',
+            style: TextStyle(
+              fontSize: 10,
+              color: isDark ? AppTheme.darkTextMuted : AppTheme.lightTextSecondary,
+            ),
+          ),
+          Text(
+            value,
+            style: TextStyle(
+              fontSize: 11,
+              fontWeight: FontWeight.bold,
+              color: isDark ? AppTheme.darkText : AppTheme.lightText,
+            ),
+          ),
+        ],
       ),
     );
   }

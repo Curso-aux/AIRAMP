@@ -15,23 +15,22 @@ class StudentScaffold extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final currentUser = ref.watch(authProvider);
     final chatState = ref.watch(chatProvider);
-    final unreadChatCount = chatState.conversations.fold<int>(0, (sum, c) => sum + c.unreadCount);
+    final unreadChatCount = chatState.conversations.fold<int>(
+      0,
+      (sum, c) => sum + c.unreadCount,
+    );
     if (currentUser?.mustChangePassword == true) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         context.go('/student/profile');
       });
-      return const Scaffold(
-        body: Center(child: CircularProgressIndicator()),
-      );
+      return const Scaffold(body: Center(child: CircularProgressIndicator()));
     }
 
     final screenWidth = MediaQuery.of(context).size.width;
 
     // Responsive Desktop Web layout with Collapsible Sidebar (Screens >= 900px)
     if (screenWidth >= 900) {
-      return StudentWebScaffold(
-        navigationShell: navigationShell,
-      );
+      return StudentWebScaffold(navigationShell: navigationShell);
     }
 
     // Mobile / Tablet layout with Swipeable and Auto-hiding Bottom Navigation Bar
@@ -50,7 +49,7 @@ class StudentScaffold extends ConsumerWidget {
         const BottomNavigationBarItem(
           icon: Icon(Icons.menu_book_outlined),
           activeIcon: Icon(Icons.menu_book),
-          label: 'Courses',
+          label: 'Subjects',
         ),
         const BottomNavigationBarItem(
           icon: Icon(Icons.calendar_month_outlined),

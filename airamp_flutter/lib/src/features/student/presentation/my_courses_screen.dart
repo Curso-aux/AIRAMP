@@ -981,7 +981,7 @@ class _MyCoursesScreenState extends ConsumerState<MyCoursesScreen> {
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Text(
-                            _activeTab == 0 ? 'My Courses' : 'Academic Progress',
+                            _activeTab == 0 ? 'My Subjects' : 'Learning Progress',
                             style: TextStyle(
                               fontSize: 26,
                               fontWeight: FontWeight.bold,
@@ -992,7 +992,7 @@ class _MyCoursesScreenState extends ConsumerState<MyCoursesScreen> {
                           const SizedBox(height: 3),
                           Text(
                             _activeTab == 0
-                                ? 'Class curriculum and room schedule'
+                                ? 'Class subjects, lessons and room schedule'
                                 : 'Track your learning journey and quiz milestones',
                             style: TextStyle(
                               fontSize: 13.5,
@@ -1159,7 +1159,7 @@ class _MyCoursesScreenState extends ConsumerState<MyCoursesScreen> {
                                 ),
                                 const SizedBox(width: 6),
                                 Text(
-                                  'Enrolled Courses (${courses.length})',
+                                  'Enrolled Subjects (${courses.length})',
                                   style: TextStyle(
                                     fontSize: 12,
                                     fontWeight: _activeTab == 0 ? FontWeight.bold : FontWeight.w500,

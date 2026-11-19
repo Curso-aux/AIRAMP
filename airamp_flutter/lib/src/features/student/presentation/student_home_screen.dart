@@ -13,6 +13,7 @@ import '../data/student_repository.dart';
 import 'components/student_schedule_widget.dart';
 import 'components/student_announcements_sheet.dart';
 import 'components/student_sticky_top_header.dart';
+import 'components/student_four_tier_analytics_widget.dart';
 import '../../esp32_hub/presentation/student_esp32_sync_modal.dart';
 import '../../esp32_hub/domain/esp32_hub_models.dart';
 import '../../esp32_hub/data/saved_materials_service.dart';
@@ -39,6 +40,7 @@ class _StudentHomeScreenState extends ConsumerState<StudentHomeScreen> {
       if (mounted) {
         ref.read(studentCoursesProvider.notifier).reload();
         ref.read(studentProgressProvider.notifier).loadProgress();
+        ref.read(studentFourTierAnalyticsProvider.notifier).loadAnalytics();
         ref.read(studentQuizAssignmentsProvider.notifier).reload();
         ref.invalidate(announcementsProvider);
         final user = ref.read(authProvider);
@@ -145,6 +147,7 @@ class _StudentHomeScreenState extends ConsumerState<StudentHomeScreen> {
                   await Future.wait([
                     ref.read(studentCoursesProvider.notifier).reload(),
                     ref.read(studentProgressProvider.notifier).loadProgress(),
+                    ref.read(studentFourTierAnalyticsProvider.notifier).loadAnalytics(),
                     ref.read(studentQuizAssignmentsProvider.notifier).reload(),
                   ]);
                   ref.invalidate(announcementsProvider);
@@ -157,102 +160,96 @@ class _StudentHomeScreenState extends ConsumerState<StudentHomeScreen> {
                 },
                 color: AppTheme.primary,
                 child: SingleChildScrollView(
-                  padding: EdgeInsets.symmetric(
-                    horizontal: isDesktop ? 32 : (isCompact ? 14 : 20),
-                    vertical: isDesktop ? 16 : 8,
-                  ),
+                  padding: EdgeInsets.all(isDesktop ? 24 : 16),
                   physics: const AlwaysScrollableScrollPhysics(),
-                  child: Center(
-                    child: ConstrainedBox(
-                      constraints: const BoxConstraints(maxWidth: 1360),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          // Responsive Body: 2 Columns on Desktop, 1 Column on Mobile
-                          if (isDesktop)
-                            Row(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                // Left Column (flex: 7): Offline Hub, Continue Learning, Class Schedule
-                                Expanded(
-                                  flex: 7,
-                                  child: Column(
-                                    crossAxisAlignment:
-                                        CrossAxisAlignment.start,
-                                    children: [
-                                      _buildEsp32OfflineHubCard(
-                                        context,
-                                        currentUser,
-                                      ),
-                                      const SizedBox(height: 24),
-                                      _buildContinueLearningSection(
-                                        context,
-                                        activeCourse,
-                                      ),
-                                      const SizedBox(height: 24),
-                                      StudentScheduleWidget(
-                                        sectionName: currentUser.section,
-                                      ),
-                                    ],
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      // 4-Tier Learning Analytics: Displayed on Desktop; on phone accessed via the top-right Progress button
+                      if (isDesktop) ...[
+                        const StudentFourTierAnalyticsWidget(),
+                        const SizedBox(height: 20),
+                      ],
+
+                      // Responsive Body: Balanced 50/50 Columns on Desktop, 1 Column on Mobile
+                      if (isDesktop)
+                        Row(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            // Left Column (Balanced 50%): Offline Hub, Continue Learning, Class Schedule
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  _buildEsp32OfflineHubCard(
+                                    context,
+                                    currentUser,
                                   ),
-                                ),
-                                const SizedBox(width: 24),
-                                // Right Column (flex: 5): Quizzes, Assignments, Announcements
-                                Expanded(
-                                  flex: 5,
-                                  child: Column(
-                                    crossAxisAlignment:
-                                        CrossAxisAlignment.start,
-                                    children: [
-                                      _buildQuizzesSection(
-                                        context,
-                                        pendingQuizzes,
-                                      ),
-                                      const SizedBox(height: 24),
-                                      _buildAssignmentsSection(
-                                        context,
-                                        currentUser.id,
-                                      ),
-                                      const SizedBox(height: 24),
-                                      _buildAnnouncementsSection(
-                                        studentAnnouncements,
-                                      ),
-                                    ],
+                                  const SizedBox(height: 20),
+                                  _buildContinueLearningSection(
+                                    context,
+                                    activeCourse,
                                   ),
-                                ),
-                              ],
-                            )
-                          else
-                            Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                _buildEsp32OfflineHubCard(context, currentUser),
-                                const SizedBox(height: 20),
-                                StudentScheduleWidget(
-                                  sectionName: currentUser.section,
-                                ),
-                                const SizedBox(height: 16),
-                                _buildQuizzesSection(context, pendingQuizzes),
-                                const SizedBox(height: 24),
-                                _buildAssignmentsSection(
-                                  context,
-                                  currentUser.id,
-                                ),
-                                const SizedBox(height: 32),
-                                _buildAnnouncementsSection(
-                                  studentAnnouncements,
-                                ),
-                                const SizedBox(height: 32),
-                                _buildContinueLearningSection(
-                                  context,
-                                  activeCourse,
-                                ),
-                              ],
+                                  const SizedBox(height: 20),
+                                  StudentScheduleWidget(
+                                    sectionName: currentUser.section,
+                                  ),
+                                ],
+                              ),
                             ),
-                          const SizedBox(height: 100),
-                        ],
-                      ),
-                    ),
+                            const SizedBox(width: 20),
+                            // Right Column (Balanced 50%): Quizzes, Assignments, Announcements
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  _buildQuizzesSection(
+                                    context,
+                                    pendingQuizzes,
+                                  ),
+                                  const SizedBox(height: 20),
+                                  _buildAssignmentsSection(
+                                    context,
+                                    currentUser.id,
+                                  ),
+                                  const SizedBox(height: 20),
+                                  _buildAnnouncementsSection(
+                                    studentAnnouncements,
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ],
+                        )
+                      else
+                        Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            _buildEsp32OfflineHubCard(context, currentUser),
+                            const SizedBox(height: 20),
+                            StudentScheduleWidget(
+                              sectionName: currentUser.section,
+                            ),
+                            const SizedBox(height: 16),
+                            _buildQuizzesSection(context, pendingQuizzes),
+                            const SizedBox(height: 20),
+                            _buildAssignmentsSection(
+                              context,
+                              currentUser.id,
+                            ),
+                            const SizedBox(height: 20),
+                            _buildAnnouncementsSection(
+                              studentAnnouncements,
+                            ),
+                            const SizedBox(height: 20),
+                            _buildContinueLearningSection(
+                              context,
+                              activeCourse,
+                            ),
+                          ],
+                        ),
+                      const SizedBox(height: 60),
+                    ],
                   ),
                 ),
               ),
@@ -338,7 +335,7 @@ class _StudentHomeScreenState extends ConsumerState<StudentHomeScreen> {
                             ),
                           ),
                           child: Text(
-                            'Zero Mobile Data',
+                            'No Internet Needed',
                             style: TextStyle(
                               color: AppTheme.primary,
                               fontSize: 10,
@@ -351,7 +348,7 @@ class _StudentHomeScreenState extends ConsumerState<StudentHomeScreen> {
                     ),
                     const SizedBox(height: 5),
                     Text(
-                      'Scan the QR code displayed on the physical Classroom Hub screen with your camera to connect, then open here to access materials.',
+                      'Scan the QR code on the classroom hub box with your camera to connect, then tap here to download lesson files without using mobile data.',
                       style: TextStyle(
                         fontSize: 12,
                         color: AppTheme.textSecondary,
@@ -389,8 +386,8 @@ class _StudentHomeScreenState extends ConsumerState<StudentHomeScreen> {
                         fit: BoxFit.scaleDown,
                         child: Text(
                           count > 0
-                              ? 'Saved Materials ($count)'
-                              : 'Saved Materials',
+                              ? 'My Saved Files ($count)'
+                              : 'My Saved Files',
                           style: TextStyle(
                             fontWeight: FontWeight.w600,
                             fontSize: 12.5,
@@ -424,11 +421,11 @@ class _StudentHomeScreenState extends ConsumerState<StudentHomeScreen> {
                           },
                         );
                       },
-                      icon: const Icon(Icons.dns_outlined, size: 16),
+                      icon: const Icon(Icons.download_rounded, size: 16),
                       label: const FittedBox(
                         fit: BoxFit.scaleDown,
                         child: Text(
-                          'Access Materials',
+                          'Download Materials',
                           style: TextStyle(
                             fontWeight: FontWeight.bold,
                             fontSize: 13,
@@ -901,7 +898,7 @@ class _StudentHomeScreenState extends ConsumerState<StudentHomeScreen> {
                   border: Border.all(color: AppTheme.border),
                 ),
                 child: Text(
-                  '${pendingQuizzes.length} To Take',
+                  '${pendingQuizzes.length} To Answer',
                   style: TextStyle(
                     fontSize: 11,
                     fontWeight: FontWeight.w600,

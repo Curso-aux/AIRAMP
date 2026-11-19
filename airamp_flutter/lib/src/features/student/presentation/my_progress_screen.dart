@@ -9,6 +9,7 @@ import '../../../core/database/database_helper.dart';
 import '../../admin/data/admin_repository.dart';
 import '../../auth/application/auth_provider.dart';
 import '../data/student_repository.dart';
+import 'components/student_four_tier_analytics_widget.dart';
 
 class MyProgressScreen extends ConsumerStatefulWidget {
   final bool isEmbedded;
@@ -110,6 +111,10 @@ class _MyProgressScreenState extends ConsumerState<MyProgressScreen> {
           const SizedBox(height: 24),
         ],
 
+        // 4-Tier Student Progress & Intelligence Engine
+        const StudentFourTierAnalyticsWidget(),
+        const SizedBox(height: 24),
+
         if (courses.isEmpty)
           Container(
             width: double.infinity,
@@ -129,12 +134,12 @@ class _MyProgressScreenState extends ConsumerState<MyProgressScreen> {
                   ),
                   const SizedBox(height: 12),
                   Text(
-                    'No enrolled courses yet.',
+                    'No enrolled subjects yet.',
                     style: TextStyle(color: AppTheme.textMuted, fontSize: 16),
                   ),
                   const SizedBox(height: 8),
                   Text(
-                    'Enroll in a course from My Courses to view your progress here.',
+                    'Enroll in a subject from My Subjects to view your progress here.',
                     textAlign: TextAlign.center,
                     style: TextStyle(
                       color: AppTheme.textSecondary,
@@ -152,7 +157,7 @@ class _MyProgressScreenState extends ConsumerState<MyProgressScreen> {
                       ),
                     ),
                     child: const Text(
-                      'Go to My Courses',
+                      'Go to My Subjects',
                       style: TextStyle(
                         fontWeight: FontWeight.bold,
                         color: Colors.white,
@@ -408,7 +413,7 @@ class _MyProgressScreenState extends ConsumerState<MyProgressScreen> {
           ),
           const SizedBox(height: 12),
           Text(
-            '$completed of $total learning outcomes completed (${progress.toInt()}%)',
+            '$completed of $total lessons completed (${progress.toInt()}%)',
             style: TextStyle(fontWeight: FontWeight.w600, color: AppTheme.text),
           ),
           const SizedBox(height: 16),
@@ -431,8 +436,8 @@ class _MyProgressScreenState extends ConsumerState<MyProgressScreen> {
                 Expanded(
                   child: Text(
                     unlockType == 'sequential'
-                        ? 'Sequential: Each LO unlocks after passing the preceding assessment'
-                        : 'Flexible: All lessons and assessments are accessible anytime',
+                        ? 'Sequential: Each lesson unlocks after passing the preceding quiz'
+                        : 'Flexible: All lessons and quizzes are accessible anytime',
                     style: TextStyle(
                       fontSize: 12,
                       color: AppTheme.textSecondary,
@@ -504,7 +509,7 @@ class _MyProgressScreenState extends ConsumerState<MyProgressScreen> {
             Padding(
               padding: const EdgeInsets.all(16),
               child: Text(
-                'No learning outcomes in this topic.',
+                'No lessons in this topic.',
                 style: TextStyle(color: AppTheme.textMuted, fontSize: 12),
               ),
             )

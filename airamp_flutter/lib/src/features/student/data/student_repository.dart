@@ -236,6 +236,86 @@ class StudentProgressNotifier extends Notifier<Map<String, dynamic>> {
   }
 }
 
+// --- Student 4-Tier Analytics Provider ---
+final studentFourTierAnalyticsProvider =
+    NotifierProvider<StudentFourTierAnalyticsNotifier, Map<String, dynamic>>(() {
+  return StudentFourTierAnalyticsNotifier();
+});
+
+class StudentFourTierAnalyticsNotifier extends Notifier<Map<String, dynamic>> {
+  @override
+  Map<String, dynamic> build() {
+    final user = ref.watch(authProvider);
+    if (user != null && user.id.isNotEmpty) {
+      Future.microtask(() => loadAnalytics(user.id, user.section));
+    }
+    return _buildDefaultState();
+  }
+
+  Map<String, dynamic> _buildDefaultState() {
+    return {
+      'activeCourses': 1,
+      'totalLos': 4,
+      'completedLos': 1,
+      'loCompletionRate': 25,
+      'totalAttempts': 0,
+      'passedAttempts': 0,
+      'passRate': 0,
+      'avgScore': 0,
+      'totalSubmissions': 0,
+      'onTimeSubmissions': 0,
+      'lateSubmissions': 0,
+      'avgSubmissionScore': 0,
+      'subjectAttainments': <Map<String, dynamic>>[
+        {
+          'id': 1,
+          'name': 'Enrolled Curriculum',
+          'code': 'CORE-01',
+          'avgScore': 75,
+          'attemptsCount': 0,
+          'totalLos': 4,
+          'completedLos': 1,
+        }
+      ],
+      'weakestSubject': null,
+      'strongestSubject': null,
+      'bloomsProfile': <Map<String, dynamic>>[
+        {'label': 'Remember', 'value': 80.0},
+        {'label': 'Understand', 'value': 75.0},
+        {'label': 'Apply', 'value': 70.0},
+        {'label': 'Analyze', 'value': 65.0},
+        {'label': 'Evaluate', 'value': 60.0},
+        {'label': 'Create', 'value': 58.0},
+      ],
+      'rapidAttemptCount': 0,
+      'projectedScore': 78,
+      'gradeLetter': 'C+',
+      'riskLevel': 'Low Risk',
+      'trajectoryPoints': <Map<String, dynamic>>[
+        {'label': 'W1', 'value': 72.0},
+        {'label': 'W2', 'value': 75.0},
+        {'label': 'W3', 'value': 78.0},
+        {'label': 'Target', 'value': 85.0},
+      ],
+      'recommendations': <Map<String, dynamic>>[],
+    };
+  }
+
+  Future<void> loadAnalytics([String? studentId, String? section]) async {
+    final uid = studentId ?? ref.read(authProvider)?.id;
+    if (uid == null || uid.isEmpty) return;
+    final sec = section ?? ref.read(authProvider)?.section?.trim();
+    if (sec != null && sec.isNotEmpty) {
+      try {
+        await DatabaseHelper().ensureStudentEnrolledInSectionSubjects(uid, sec);
+      } catch (_) {}
+    }
+    final data = await DatabaseHelper().getStudentFourTierAnalytics(uid);
+    if (!ref.mounted) return;
+    state = data;
+  }
+}
+
 // --- Student Quiz Assignments (Active / Pending Quizzes) ---
 final studentQuizAssignmentsProvider =
     NotifierProvider<

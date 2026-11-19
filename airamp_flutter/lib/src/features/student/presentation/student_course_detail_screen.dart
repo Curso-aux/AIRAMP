@@ -497,7 +497,7 @@ class _StudentCourseDetailScreenState
                             mainAxisAlignment: MainAxisAlignment.spaceBetween,
                             children: [
                               Text(
-                                '$completedCount of $totalLos Learning Outcomes Completed',
+                                '$completedCount of $totalLos Lessons Completed ⭐',
                                 style: TextStyle(
                                   fontSize: 12,
                                   fontWeight: FontWeight.w600,
@@ -546,7 +546,7 @@ class _StudentCourseDetailScreenState
                         const SizedBox(width: 8),
                         Expanded(
                           child: Text(
-                            'Course Curriculum',
+                            'Subject Lessons & Topics',
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
                             style: TextStyle(
@@ -1045,7 +1045,7 @@ class _StudentCourseDetailScreenState
                   Padding(
                     padding: const EdgeInsets.all(18),
                     child: Text(
-                      'No learning outcomes in this topic yet.',
+                      'No lessons in this topic yet.',
                       style: TextStyle(color: AppTheme.textMuted, fontSize: 12),
                     ),
                   )
@@ -1111,7 +1111,7 @@ class _StudentCourseDetailScreenState
                   ScaffoldMessenger.of(context).showSnackBar(
                     const SnackBar(
                       content: Text(
-                        'Complete previous learning outcomes and assessments to unlock this lesson.',
+                        'Complete previous lessons and quizzes to unlock this topic 🔒',
                       ),
                       duration: Duration(seconds: 2),
                     ),
@@ -1379,7 +1379,7 @@ class _StudentCourseDetailScreenState
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Text(
-                            lo['title']?.toString() ?? 'Learning Outcome',
+                            lo['title']?.toString() ?? 'Lesson Topic',
                             style: TextStyle(
                               fontSize: 20,
                               fontWeight: FontWeight.bold,
